@@ -2,6 +2,7 @@ import { type Queryable, transaction } from "@kuutti/db";
 import {
   type DealBreaker,
   type DealBreakerField,
+  type DistanceBand,
   type ProfileCard,
   type Relaxation,
   type RelaxationOffer,
@@ -219,7 +220,9 @@ const choiceOf = (decision: RoundDecision | null, fish: boolean): RoundChoice | 
  * candidate is still active with no block between the two: the builder reads
  * the pool before it writes, and a pause, a sanction, an erasure or a block
  * in between must not leave a row that outlives it. A candidate dropped so
- * leaves its place empty, as the read does.
+ * leaves its place empty, as the read does. Each entry is written with the
+ * band its builder measured: frozen there, so that moving home and reading the
+ * card again says nothing new (ADR-061 §5).
  */
 export async function saveRound(
   deps: RoundDeps,
@@ -228,7 +231,7 @@ export async function saveRound(
     day: string;
     /** How the places no rule forces were ordered, for `round_built` (#95). */
     ordering: RoundOrdering;
-    entries: { candidateId: string; reason: RoundReason }[];
+    entries: { candidateId: string; reason: RoundReason; distance: DistanceBand }[];
   },
 ): Promise<{ roundId: string } | null> {
   if (input.entries.some((entry) => entry.candidateId === input.accountId)) {
@@ -247,9 +250,10 @@ export async function saveRound(
     if (!id) return null;
     if (input.entries.length > 0) {
       const written = await tx.query<{ reason: RoundReason }>(
-        `INSERT INTO round_entries (round_id, position, candidate_id, reason)
-         SELECT $1, e.ordinality, e.candidate, e.reason::round_reason
-           FROM unnest($2::uuid[], $3::text[]) WITH ORDINALITY AS e(candidate, reason, ordinality)
+        `INSERT INTO round_entries (round_id, position, candidate_id, reason, distance)
+         SELECT $1, e.ordinality, e.candidate, e.reason::round_reason, e.distance::distance_band
+           FROM unnest($2::uuid[], $3::text[], $5::text[])
+                WITH ORDINALITY AS e(candidate, reason, distance, ordinality)
            JOIN account c ON c.id = e.candidate
           WHERE c.state = 'active' AND NOT blocked_between($4, e.candidate)
           FOR SHARE OF c
@@ -259,6 +263,7 @@ export async function saveRound(
           input.entries.map((e) => e.candidateId),
           input.entries.map((e) => e.reason),
           input.accountId,
+          input.entries.map((e) => e.distance),
         ],
       );
       return { id, reasons: written.rows.map((row) => row.reason) };
@@ -288,6 +293,7 @@ type EntryRow = {
   decision: RoundDecision | null;
   fish: boolean | null;
   relaxed_field: DealBreakerField | null;
+  distance: DistanceBand | null;
 };
 
 /**
@@ -295,9 +301,11 @@ type EntryRow = {
  * the shown record and counts the day's cards (ADR-008); a card it refuses (a
  * block either way, a sanction, a profile no longer complete) is left out.
  * Each says which of the person's own deal-breakers, not paused, its card
- * says nothing on (ADR-042 §8): every deal-breaker field is a card field, and
- * the card leaves out an unanswered one and a hidden one alike, so the label
- * never tells them apart (#515).
+ * says nothing on (ADR-042 §8): the card leaves out an unanswered field and a
+ * hidden one alike, so the label never tells them apart (#515). Distance is no
+ * card field and everybody has a home, so no card is ever without it
+ * (ADR-061 §7). The band is the one written with the entry, never computed
+ * here (§5).
  */
 async function entriesOf(
   accountId: string,
@@ -315,10 +323,11 @@ async function entriesOf(
       reason: row.reason,
       decision: choiceOf(row.decision, row.fish === true),
       card,
+      distance: row.distance,
       ...(row.relaxed_field ? { relaxedField: row.relaxed_field } : {}),
-      notAnswered: dealBreakers
-        .filter((dealBreaker) => card.fields[dealBreaker.field] === undefined)
-        .map((dealBreaker) => dealBreaker.field),
+      notAnswered: dealBreakers.flatMap(({ field }) =>
+        field === "distance" || card.fields[field] !== undefined ? [] : [field],
+      ),
     });
   }
   return entries;
@@ -338,7 +347,8 @@ export async function readTodaysRound(
   const at = deps.now();
   const day = finnishDay(at);
   const { rows } = await deps.db.query<EntryRow & { id: string }>(
-    `SELECT r.id, e.position, e.candidate_id, e.reason, e.decision, e.fish, e.relaxed_field
+    `SELECT r.id, e.position, e.candidate_id, e.reason, e.decision, e.fish, e.relaxed_field,
+            e.distance
        FROM rounds r LEFT JOIN round_entries e ON e.round_id = r.id
       WHERE r.account_id = $1 AND r.day = $2
       ORDER BY e.position`,
@@ -657,8 +667,12 @@ export async function unopenedRoundsOf(
  * with no round today; `candidates` whom a relaxation lets in today, in the
  * order they would come, null for one the offers would not list.
  */
-/** Somebody a relaxation lets in, with the day's other relaxations their filters still need (ADR-042 §5). */
-export type RelaxedCandidate = { candidateId: string; needs: DealBreakerField[] };
+/** Somebody a relaxation lets in, with the day's other relaxations their filters still need (ADR-042 §5) and how far they live, written with the card (ADR-061 §5). */
+export type RelaxedCandidate = {
+  candidateId: string;
+  needs: DealBreakerField[];
+  distance: DistanceBand;
+};
 
 export type ShortPool = {
   offers: (accountId: string) => Promise<{ short: boolean; offers: RelaxationOffer[] } | null>;
@@ -687,18 +701,26 @@ const GIVEN = `(${PLACES} - (SELECT count(*) FROM round_entries e
 
 /**
  * Today's relaxations of the person's round (ADR-042 §3), the highest place it
- * gave, and how many ordered places it gave; null with no round for the day.
+ * gave, how many ordered places it gave, and whether the person moved home
+ * since it was built (ADR-061 §5); null with no round for the day.
  */
 export async function relaxationsOf(
   db: Queryable,
   accountId: string,
   day: string,
-): Promise<{ last: number; given: number; relaxed: Relaxation[] } | null> {
-  const { rows } = await db.query<{ last: number; given: number; relaxed: Relaxation[] }>(
+): Promise<{ last: number; given: number; relaxed: Relaxation[]; moved: boolean } | null> {
+  const { rows } = await db.query<{
+    last: number;
+    given: number;
+    relaxed: Relaxation[];
+    moved: boolean;
+  }>(
     `SELECT ${PLACES} AS last, ${GIVEN} AS given,
             coalesce((SELECT json_agg(json_build_object('field', x.field, 'kind', x.kind)
                                       ORDER BY x.field)
-                        FROM round_relaxation x WHERE x.round_id = r.id), '[]') AS relaxed
+                        FROM round_relaxation x WHERE x.round_id = r.id), '[]') AS relaxed,
+            EXISTS (SELECT 1 FROM account a
+                     WHERE a.id = r.account_id AND a.home_moved_at > r.built_at) AS moved
        FROM rounds r WHERE r.account_id = $1 AND r.day = $2`,
     [accountId, day, FREE_LIKES],
   );
@@ -784,11 +806,13 @@ export async function appendRelaxed(
     );
     const positions = taken.rows.map((_, index) => last + index + 1);
     if (positions.length === 0) return [];
-    const needs = new Map(input.candidates.map((c) => [c.candidateId, c.needs]));
+    const candidates = new Map(input.candidates.map((c) => [c.candidateId, c]));
     await tx.query(
-      `INSERT INTO round_entries (round_id, position, candidate_id, reason, relaxed_field, relaxed_with)
-       SELECT $1, e.position, e.candidate, 'relaxed', $4, string_to_array(e.relaxed_with, ',')
-         FROM unnest($2::smallint[], $3::uuid[], $5::text[]) AS e(position, candidate, relaxed_with)`,
+      `INSERT INTO round_entries (round_id, position, candidate_id, reason, relaxed_field, relaxed_with, distance)
+       SELECT $1, e.position, e.candidate, 'relaxed', $4, string_to_array(e.relaxed_with, ','),
+              e.distance::distance_band
+         FROM unnest($2::smallint[], $3::uuid[], $5::text[], $6::text[])
+              AS e(position, candidate, relaxed_with, distance)`,
       [
         roundId,
         positions,
@@ -796,8 +820,9 @@ export async function appendRelaxed(
         input.relaxation.field,
         // Field keys hold no comma: each card's relaxations as one text, the tapped one first.
         taken.rows.map((row) =>
-          [input.relaxation.field, ...(needs.get(row.candidate) ?? [])].join(","),
+          [input.relaxation.field, ...(candidates.get(row.candidate)?.needs ?? [])].join(","),
         ),
+        taken.rows.map((row) => candidates.get(row.candidate)?.distance),
       ],
     );
     await tx.query(
@@ -903,7 +928,7 @@ export async function readAdded(
 ): Promise<RoundEntry[]> {
   if (positions.length === 0) return [];
   const { rows } = await deps.db.query<EntryRow>(
-    `SELECT e.position, e.candidate_id, e.reason, e.decision, e.fish, e.relaxed_field
+    `SELECT e.position, e.candidate_id, e.reason, e.decision, e.fish, e.relaxed_field, e.distance
        FROM round_entries e JOIN rounds r ON r.id = e.round_id
       WHERE r.account_id = $1 AND r.day = $2 AND e.position = ANY($3::smallint[])
       ORDER BY e.position`,
@@ -942,6 +967,7 @@ export type OwnRound = {
     seenAt: Date | null;
     decision: RoundChoice | null;
     decidedAt: Date | null;
+    distance: DistanceBand | null;
   }[];
 };
 
@@ -972,8 +998,10 @@ export async function exportRounds(
     decision: RoundDecision | null;
     fish: boolean;
     decided_at: Date | null;
+    distance: DistanceBand | null;
   }>(
-    `SELECT e.round_id, e.position, e.reason, e.relaxed_field, e.seen_at, e.decision, e.fish, e.decided_at
+    `SELECT e.round_id, e.position, e.reason, e.relaxed_field, e.seen_at, e.decision, e.fish, e.decided_at,
+            e.distance
        FROM round_entries e JOIN rounds r ON r.id = e.round_id
       WHERE r.account_id = $1 AND r.id = ANY($2::uuid[])
       ORDER BY e.position`,
@@ -1012,6 +1040,7 @@ export async function exportRounds(
         seenAt: entry.seen_at,
         decision: choiceOf(entry.decision, entry.fish),
         decidedAt: entry.decided_at,
+        distance: entry.distance,
       })),
   }));
 }

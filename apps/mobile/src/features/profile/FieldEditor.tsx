@@ -90,11 +90,14 @@ export function optionTextKey(
 /** One choice: a button that says whether it is chosen, never a colour alone. */
 export function Chip({
   label,
+  heard,
   selected,
   onPress,
   glyph,
 }: {
   label: string;
+  /** What a screen reader says where the label alone would not tell two chips apart. */
+  heard?: string;
   selected: boolean;
   onPress: () => void;
   /** A decorative glyph before the label (#213); the label still names the button. */
@@ -103,7 +106,12 @@ export function Chip({
   const variant = selected ? "default" : "outline";
   if (glyph === undefined || glyph === null || glyph === false) {
     return (
-      <Button variant={variant} accessibilityState={{ selected }} onPress={onPress}>
+      <Button
+        variant={variant}
+        accessibilityLabel={heard}
+        accessibilityState={{ selected }}
+        onPress={onPress}
+      >
         {label}
       </Button>
     );

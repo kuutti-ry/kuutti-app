@@ -9,17 +9,17 @@ import {
   type ConsentsResponse,
   type ConsentVersions,
   type Gender,
+  type HomeSummary,
   ONBOARDING_STEPS,
   type OnboardingStatus,
   type OnboardingStep,
   PHOTOS_FOR_COMPLETENESS,
-  type PondSummary,
   type PreferencesResponse,
   type WithdrawableConsentKind,
 } from "@kuutti/schema";
 import { AppError } from "../lib/errors.ts";
 import type { Logger } from "../lib/logger.ts";
-import { matchingConfigNumber, readMatchingConfig } from "../lib/matching-config.ts";
+import { matchingConfigNumber } from "../lib/matching-config.ts";
 import {
   CHANGE_CADENCE_KEY,
   deleteSeeksOfAccount,
@@ -27,7 +27,7 @@ import {
   readPreferences,
 } from "../matching/index.ts";
 import { listPhotos } from "../media/index.ts";
-import { findPondBySlug, findPondOfAccount, listPonds, setPondOfAccount } from "../pond/index.ts";
+import { findPondOfAccount } from "../pond/index.ts";
 import { ageInYears, readProfile, withdrawSpecialCategoryAnswers } from "../profile/index.ts";
 import { enrolResearchSubject, removeResearchSubject, track } from "../research/index.ts";
 import * as repo from "./repo.ts";
@@ -42,9 +42,6 @@ import { visibleState } from "./standing.ts";
 // every status read, never a flag a route sets.
 
 export type OnboardingDeps = { db: Queryable; logger: Logger; now: () => Date };
-
-/** The matching_config key naming the pond every account is put in while there is one (ADR-010 §10). */
-const DEFAULT_POND_KEY = "default_pond";
 
 function currentVersions(): ConsentVersions {
   const out: Partial<Record<ConsentKind, string>> = {};
@@ -63,7 +60,8 @@ export const CURRENT_CONSENT_VERSIONS: ConsentVersions = currentVersions();
 export type OnboardingAnswers = {
   gender: Gender | null;
   preferences: PreferencesResponse;
-  pond: PondSummary | null;
+  /** A home the list knows: one that left it reads as none, which opens the step again (ADR-061 §2). */
+  home: HomeSummary | null;
   terms: string | null;
   privacy: string | null;
   /** The special-category consent's version when it is the current one: the seek answer counts only with it (ADR-019 §4). */
@@ -82,9 +80,9 @@ export function missingSteps(input: OnboardingAnswers): OnboardingStep[] {
     seeks: input.preferences.seeks !== null && input.specialCategory !== null,
     intent: input.profile.intent,
     age_window: input.preferences.ageWindow !== null,
+    home: input.home !== null,
     photos: input.profile.photos,
     prompts_or_bio: input.profile.promptsOrBio,
-    pond: input.pond !== null,
   };
   return ONBOARDING_STEPS.filter((step) => !done[step]);
 }
@@ -126,30 +124,6 @@ export async function currentConsent(
   return row ? { version: row.version, givenAt: row.givenAt } : null;
 }
 
-/**
- * One pond for now (#146, ADR-010 §10 and §11): an account with none is
- * put in the pond matching_config names, on its first status read, so no
- * pond step exists. Where the key names no live pond (several ponds later,
- * or a test database without the seed) the step stays and PUT /account/pond
- * is the way, as before.
- */
-async function assignDefaultPond(
-  deps: OnboardingDeps,
-  accountId: string,
-): Promise<PondSummary | null> {
-  const slug = await readMatchingConfig(deps.db, DEFAULT_POND_KEY);
-  if (typeof slug !== "string" || slug.length === 0) return null;
-  // With more than one pond to choose from the choice is the person's (#174,
-  // ADR-010 §12): the step stays open and the app asks; a child pond is no choice yet.
-  const topLevel = (await listPonds(deps.db)).filter((pond) => pond.parentId === null);
-  if (topLevel.length > 1) return null;
-  const pond = await findPondBySlug(deps.db, slug);
-  if (!pond) return null;
-  if ((await setPondOfAccount(deps.db, accountId, pond.id)) !== "set") return null;
-  deps.logger.info({ accountId, pondId: pond.id }, "pond assigned");
-  return pond;
-}
-
 export async function onboardingStatus(
   deps: OnboardingDeps,
   accountId: string,
@@ -163,17 +137,18 @@ export async function onboardingStatus(
   ) {
     throw new AppError(404, "not_found", "No live account");
   }
-  const [preferences, consents, profile, photos, cadence] = await Promise.all([
+  const [preferences, consents, profile, photos, cadence, pond] = await Promise.all([
     readPreferences(deps.db, accountId),
     // The newest active row per kind, however long the history (#65 review).
     repo.activeConsents(deps.db, accountId),
     readProfile({ ...deps, readPreferences }, accountId),
     listPhotos(deps.db, accountId),
     matchingConfigNumber(deps.db, CHANGE_CADENCE_KEY),
+    // Read, never set: the home's write sets the one pond (ADR-061 §8).
+    findPondOfAccount(deps.db, accountId),
   ]);
   const now = deps.now();
-  const pond =
-    (await findPondOfAccount(deps.db, accountId)) ?? (await assignDefaultPond(deps, accountId));
+  const { home } = profile;
   const terms = acceptedCurrent(consents, "terms")?.version ?? null;
   const privacy = acceptedCurrent(consents, "privacy")?.version ?? null;
   const specialCategory = acceptedCurrent(consents, "special_category")?.version ?? null;
@@ -181,7 +156,7 @@ export async function onboardingStatus(
   const missing = missingSteps({
     gender: account.gender,
     preferences,
-    pond,
+    home,
     terms,
     privacy,
     specialCategory,
@@ -210,6 +185,7 @@ export async function onboardingStatus(
     age: ageInYears(account.birthYear, account.birthMonth, now),
     gender: account.gender,
     pond,
+    home,
     preferences,
     consents: {
       terms,

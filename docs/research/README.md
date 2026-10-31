@@ -16,7 +16,7 @@ One row is one event of a person who had given the research consent at the time:
 | `name` | string | the event, a name of the registry |
 | `research_id` | string | the pseudonym: the same person while they stay in the study, a new one if they withdraw and join again; it names nobody, and the association removes its link to the person on withdrawal or erasure |
 | `consent_version` | string | the wording of the research consent the person had accepted |
-| `pond` | string or null | where the person looks for others; null: not chosen yet; `*`: withheld |
+| `pond` | string or null | the person's pond, the same for everybody since #514 (ADR-061 §8), though an older row may name another; it says nothing of where a person lives, and no event does; null: none yet; `*`: withheld |
 | `age_band` | string | `18-24`, `25-29`, `30-34`, `35-39`, `40-49`, `50+`; or `18-29`, `30-39`, `40+` when coarsened |
 | `gender` | string or null | self-declared: `woman`, `man`, `non_binary`; null: not declared |
 | `field_intent` | string or null | what the person is here for; null: not answered; `*`: withheld. A further profile field joins as a column `field_<key>` from the day it is flagged |

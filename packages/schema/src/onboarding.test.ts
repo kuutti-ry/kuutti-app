@@ -11,11 +11,14 @@ import {
   ConsentsResponse,
   GENDERS,
   GenderUpdate,
+  HomeSummary,
+  HomeUpdate,
   ONBOARDING_STEPS,
   OnboardingStatus,
-  PondChoice,
-  PondList,
+  PLACE_NAME_MAX,
+  PlaceName,
   PondSummary,
+  PostalCode,
   PreferencesResponse,
   PreferencesUpdate,
   WithdrawableConsentKind,
@@ -138,7 +141,7 @@ describe("the gender", () => {
   });
 });
 
-describe("the ponds", () => {
+describe("the pond", () => {
   const pond = {
     id: uuid(1),
     slug: "helsinki",
@@ -147,7 +150,7 @@ describe("the ponds", () => {
     parentId: null,
   };
 
-  it("carry both case forms and the parent", () => {
+  it("carries both case forms and the parent", () => {
     expect(PondSummary.parse(pond)).toEqual(pond);
     expect(PondSummary.parse({ ...pond, parentId: uuid(2) }).parentId).toBe(uuid(2));
   });
@@ -158,19 +161,123 @@ describe("the ponds", () => {
     ["a name of 81 characters", { name: "n".repeat(81) }, "too_big"],
     ["no inessive", { nameInessive: "" }, "too_small"],
     ["a parent that is not a uuid", { parentId: "uusimaa" }, "invalid_format"],
-  ])("refuse %s", (_, change, code) => {
+  ])("refuses %s", (_, change, code) => {
     expect(codes(PondSummary, { ...pond, ...change })).toEqual([code]);
   });
+});
 
-  it("list at most two hundred", () => {
-    expect(PondList.safeParse({ ponds: Array(200).fill(pond) }).success).toBe(true);
-    expect(codes(PondList, { ponds: Array(201).fill(pond) })).toEqual(["too_big"]);
+describe("the home postal code", () => {
+  it.each(["00100", "00530", "83960", "99990", "12345"])("takes %s as five digits", (code) => {
+    expect(PostalCode.parse(code)).toBe(code);
   });
 
-  it("are chosen by id alone", () => {
-    expect(PondChoice.parse({ pondId: uuid(1) })).toEqual({ pondId: uuid(1) });
-    expect(codes(PondChoice, { pondId: "helsinki" })).toEqual(["invalid_format"]);
-    expect(codes(PondChoice, { pondId: uuid(1), slug: "helsinki" })).toEqual(["unrecognized_keys"]);
+  it.each([
+    ["nothing", ""],
+    ["four digits", "0010"],
+    ["six digits", "001000"],
+    ["a letter", "0010a"],
+    ["a name", "Kallio"],
+    ["a space before", " 00100"],
+    ["a space after", "00100 "],
+    ["a line after", "00100\n"],
+    ["digits of another script", "٠٠١٠٠"],
+  ])("refuses %s", (_, code) => {
+    expect(codes(PostalCode, code)).toEqual(["invalid_format"]);
+  });
+
+  it.each([
+    ["a number", 100],
+    ["null", null],
+    ["nothing at all", undefined],
+  ])("refuses %s, which is no text", (_, code) => {
+    expect(codes(PostalCode, code)).toEqual(["invalid_type"]);
+  });
+
+  it("is refused by the pattern and never quotes what was typed (ADR-061 §9)", () => {
+    const answer = JSON.stringify(PostalCode.safeParse("1234x").error?.issues);
+    expect(answer).not.toContain("1234x");
+  });
+});
+
+describe("a place's name", () => {
+  const place = { fi: "Helsinki", sv: "Helsingfors" };
+
+  it("is Finnish and Swedish", () => {
+    expect(PlaceName.parse(place)).toEqual(place);
+  });
+
+  it(`takes ${PLACE_NAME_MAX} characters and no more`, () => {
+    const longest = "n".repeat(PLACE_NAME_MAX);
+    expect(PlaceName.safeParse({ fi: longest, sv: longest }).success).toBe(true);
+    expect(codes(PlaceName, { ...place, fi: `${longest}n` })).toEqual(["too_big"]);
+    expect(codes(PlaceName, { ...place, sv: `${longest}n` })).toEqual(["too_big"]);
+  });
+
+  it.each([
+    ["an empty Finnish name", { fi: "" }, "too_small"],
+    ["an empty Swedish name", { sv: "" }, "too_small"],
+    ["no Swedish name", { sv: undefined }, "invalid_type"],
+  ])("refuses %s", (_, change, code) => {
+    expect(codes(PlaceName, { ...place, ...change })).toEqual([code]);
+  });
+});
+
+describe("a home as its owner reads it", () => {
+  const town = { fi: "Helsinki", sv: "Helsingfors" };
+  const area = { fi: "Kallio", sv: "Berghäll" };
+
+  it("names the town and the area, and says which the card shows", () => {
+    const home = { town, area, showArea: true };
+    expect(HomeSummary.parse(home)).toEqual(home);
+  });
+
+  it("has no area where a municipality is kept", () => {
+    const home = { town, area: null, showArea: false };
+    expect(HomeSummary.parse(home)).toEqual(home);
+  });
+
+  it("drops anything but names, a key or digits above all", () => {
+    expect(HomeSummary.parse({ town, area, showArea: false, key: "00530" })).toEqual({
+      town,
+      area,
+      showArea: false,
+    });
+  });
+
+  it.each([
+    ["no town", { town: null }, "invalid_type"],
+    ["no word on the choice", { showArea: undefined }, "invalid_type"],
+    ["a choice as text", { showArea: "yes" }, "invalid_type"],
+    ["an area with no name", { area: { fi: "", sv: "x" } }, "too_small"],
+  ])("refuses %s", (_, change, code) => {
+    expect(codes(HomeSummary, { town, area, showArea: false, ...change })).toEqual([code]);
+  });
+});
+
+describe("the home update", () => {
+  it.each([
+    ["a code alone", { postalCode: "00530" }],
+    ["the choice alone, which needs no code", { showArea: true }],
+    ["the choice taken back", { showArea: false }],
+    ["both", { postalCode: "00530", showArea: true }],
+  ])("takes %s", (_, update) => {
+    expect(HomeUpdate.parse(update)).toEqual(update);
+  });
+
+  it("refuses neither, with the message that says what it needs", () => {
+    expect(issues(HomeUpdate, {})).toEqual([
+      { code: "custom", path: "", message: "a postal code, what the card shows or both" },
+    ]);
+  });
+
+  it.each([
+    ["a code that is no code", { postalCode: "530" }, "invalid_format"],
+    ["a code as a number", { postalCode: 530 }, "invalid_type"],
+    ["a choice as text", { showArea: "true" }, "invalid_type"],
+    ["a null code", { postalCode: null }, "invalid_type"],
+    ["an extra key", { postalCode: "00530", town: "Helsinki" }, "unrecognized_keys"],
+  ])("refuses %s", (_, update, code) => {
+    expect(codes(HomeUpdate, update)).toContain(code);
   });
 });
 
@@ -222,10 +329,26 @@ describe("the consents", () => {
 describe("the onboarding steps", () => {
   it("activate on the four answers and the two consents, never research", () => {
     expect([...ACTIVATION_STEPS].sort()).toEqual(
-      ["age_window", "gender", "pond", "privacy", "seeks", "terms"].sort(),
+      ["age_window", "gender", "home", "privacy", "seeks", "terms"].sort(),
     );
     for (const step of ACTIVATION_STEPS) expect(ONBOARDING_STEPS).toContain(step);
     expect(ONBOARDING_STEPS).not.toContain("research");
+  });
+
+  it("ask the home after the age window, where the pond was (ADR-061 §1)", () => {
+    expect(ONBOARDING_STEPS).toEqual([
+      "terms",
+      "privacy",
+      "name",
+      "gender",
+      "seeks",
+      "intent",
+      "age_window",
+      "home",
+      "photos",
+      "prompts_or_bio",
+    ]);
+    expect(ONBOARDING_STEPS).not.toContain("pond");
   });
 
   const status = {
@@ -233,6 +356,7 @@ describe("the onboarding steps", () => {
     age: 18,
     gender: null,
     pond: null,
+    home: null,
     preferences: { seeks: null, ageWindow: null },
     consents: { terms: null, privacy: null, specialCategory: null, research: null },
     currentVersions: { terms: "1", privacy: "1", research: "1", special_category: "1" },
@@ -243,6 +367,13 @@ describe("the onboarding steps", () => {
 
   it("say what is missing in the order the app asks", () => {
     expect(OnboardingStatus.parse(status).missing).toEqual([...ONBOARDING_STEPS]);
+  });
+
+  it("carry the home in names, or null, and must say which", () => {
+    const home = { town: { fi: "Turku", sv: "Åbo" }, area: null, showArea: false };
+    expect(OnboardingStatus.parse({ ...status, home }).home).toEqual(home);
+    expect(OnboardingStatus.parse(status).home).toBeNull();
+    expect(codes(OnboardingStatus, { ...status, home: undefined })).toEqual(["invalid_type"]);
   });
 
   it.each([

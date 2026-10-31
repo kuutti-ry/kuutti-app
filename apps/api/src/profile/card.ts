@@ -17,7 +17,7 @@ import {
   recordCardServed,
   secondsUntil,
 } from "../media/index.ts";
-import { findPondOfAccount } from "../pond/index.ts";
+import { homeRules, homeSummary, shownPlace } from "../pond/index.ts";
 import { completeness } from "./completeness.ts";
 import * as repo from "./repo.ts";
 
@@ -137,9 +137,9 @@ export async function buildCard(
   if (!own && (subject.state !== "active" || subject.blocked)) {
     throw new AppError(404, "not_found", "No such card");
   }
-  const [photos, pond, viewer] = await Promise.all([
+  const [photos, rules, viewer] = await Promise.all([
     listApprovedPhotos(deps.db, subject.accountId),
-    findPondOfAccount(deps.db, subject.accountId),
+    homeRules(deps.db),
     // The viewer's own answers, for what both answered; the owner previews without.
     own ? null : repo.findProfile(deps.db, input.viewerAccountId),
   ]);
@@ -190,6 +190,8 @@ export async function buildCard(
     );
   }
   const onCard = fieldsOnCard(subject.profile);
+  // A name and never digits (ADR-061 §3). No band here: a band is the round's entry's (§5).
+  const home = homeSummary(subject.homePlace, subject.homeShowsArea, rules);
   const cardPhotos: CardPhoto[] = photos.map((p) => ({
     id: p.id,
     blurhash: p.blurhash,
@@ -204,7 +206,7 @@ export async function buildCard(
       displayName: subject.profile.displayName,
       age: { years: ageInYears(subject.birthYear, subject.birthMonth, at), verifiedByBank: true },
       gender: subject.gender,
-      pond,
+      place: home && shownPlace(home),
       photos: cardPhotos,
       // What is there to be seen and what both sides matched on; a soft value or a setting stays on the profile (ADR-019 §2).
       fields: onCard,

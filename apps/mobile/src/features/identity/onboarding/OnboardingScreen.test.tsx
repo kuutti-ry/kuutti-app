@@ -1,10 +1,14 @@
 import { CONSENT_VERSIONS } from "@kuutti/i18n";
+import type { HomeSummary } from "@kuutti/schema";
 import { act, fireEvent, screen, waitFor } from "@testing-library/react-native";
 import { useLocales } from "expo-localization";
 import type * as React from "react";
+import { AccessibilityInfo, PixelRatio, Platform } from "react-native";
 import { saveSession } from "@/lib/session";
 import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
+import { hasCutText } from "@/test/layout";
 import { renderWithTheme } from "@/test/render";
+import { MAX_FONT_SCALE } from "@/theme/a11y";
 import { defaultAgeWindow, OnboardingScreen } from "./OnboardingScreen";
 
 const { __router: router, __focus: focus } = jest.requireMock("expo-router") as {
@@ -51,14 +55,17 @@ const POND = {
   nameInessive: "Suomessa",
   parentId: null,
 };
-const CAPITAL = {
-  id: "5f1c1c4e-9a8e-4a0b-9c3a-0c8d1e2f3a01",
-  slug: "paakaupunkiseutu",
-  name: "Pääkaupunkiseutu",
-  nameInessive: "Pääkaupunkiseudulla",
-  parentId: null,
+/** The answers of the fake home route, by code: an area kept, and one too small to keep. */
+const HOMES: Readonly<Record<string, HomeSummary>> = {
+  "00530": {
+    town: { fi: "Helsinki", sv: "Helsingfors" },
+    area: { fi: "Kallio", sv: "Berghäll" },
+    showArea: false,
+  },
+  "83960": { town: { fi: "Joensuu", sv: "Joensuu" }, area: null, showArea: false },
 };
-const ACTIVATION = ["gender", "seeks", "age_window", "pond", "terms", "privacy"];
+const IN_KALLIO = HOMES["00530"] as HomeSummary;
+const ACTIVATION = ["gender", "seeks", "age_window", "home", "terms", "privacy"];
 
 type Profile = {
   displayName: string;
@@ -91,7 +98,8 @@ function fakeApi(
     genderFrom: string | null;
     /** The API refuses whom one seeks: the consent went while the step was open (ADR-010 §16). */
     seeksRefused: boolean;
-    /** The pond; null when there is more than one and the person has not chosen (#174). */
+    /** The home as the API reads it back; its write sets the one pond (ADR-061 §8). */
+    home: HomeSummary | null;
     pond: typeof POND | null;
   } = {
     gender: null,
@@ -102,7 +110,8 @@ function fakeApi(
     photos: 0,
     genderFrom: null,
     seeksRefused: false,
-    pond: POND,
+    home: null,
+    pond: null,
   };
   const calls: { method: string; path: string; body: unknown }[] = [];
   const has = (kind: string, version: string) =>
@@ -118,7 +127,7 @@ function fakeApi(
       ...(server.seeks && has("special_category", SPECIAL) ? [] : ["seeks"]),
       ...(server.profile?.fields.intent ? [] : ["intent"]),
       ...(server.ageWindow ? [] : ["age_window"]),
-      ...(server.pond ? [] : ["pond"]),
+      ...(server.home ? [] : ["home"]),
       ...(server.photos >= 3 ? [] : ["photos"]),
       // A ready line counts like a bio (#239), as the API's completeness has it.
       ...(bio.length >= 50 || server.profile?.bioPreset || prompts >= 2 ? [] : ["prompts_or_bio"]),
@@ -129,6 +138,7 @@ function fakeApi(
       age: options.age ?? 36,
       gender: server.gender,
       pond: server.pond,
+      home: server.home,
       preferences: { seeks: server.seeks, ageWindow: server.ageWindow },
       consents: {
         terms: has("terms", TERMS) ? TERMS : null,
@@ -152,6 +162,7 @@ function fakeApi(
       ? { ...server.profile, specialCategoryConsent: null, updatedAt: "2026-09-26T10:00:00.000Z" }
       : null,
     completeness: { complete: false, missing: [] },
+    home: server.home,
   });
   globalThis.fetch = jest.fn(async (input: Request | string, init?: RequestInit) => {
     const request = input instanceof Request ? input : new Request(input, init);
@@ -192,11 +203,19 @@ function fakeApi(
       server.gender = (body as { gender: string }).gender;
       return new Response(null, { status: 204 });
     }
-    if (path === "/ponds") return json({ ponds: [CAPITAL, POND] });
-    if (path === "/account/pond") {
-      const { pondId } = body as { pondId: string };
-      server.pond = [CAPITAL, POND].find((pond) => pond.id === pondId) ?? null;
-      return new Response(null, { status: 204 });
+    if (path === "/account/home") {
+      const { postalCode, showArea } = body as { postalCode?: string; showArea?: boolean };
+      if (postalCode !== undefined) {
+        const found = HOMES[postalCode];
+        if (!found) {
+          const error = { code: "postal_code_unknown", message: "No such code", requestId: "r" };
+          return json({ error }, 400);
+        }
+        server.home = found;
+        server.pond = POND;
+      }
+      if (showArea !== undefined && server.home) server.home = { ...server.home, showArea };
+      return json(server.home);
     }
     if (path === "/preferences" && server.seeksRefused) {
       const error = { code: "consent_required", message: "Consent first", requestId: "r" };
@@ -244,6 +263,8 @@ const { __store: store } = jest.requireMock("expo-secure-store") as {
   __store: Map<string, string>;
 };
 const AGREED = "kuutti.preference.agreedVersions";
+
+afterEach(() => jest.restoreAllMocks());
 
 beforeEach(async () => {
   router.replace.mockReset();
@@ -314,11 +335,25 @@ describe("OnboardingScreen", () => {
     await press(screen.getByRole("button", { name: "Oldest, one year older" }));
     await press(screen.getByRole("button", { name: "Continue" }));
     await flush();
-    await waitFor(() => expect(screen.getByText("Two photos of you")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("Where do you live?")).toBeTruthy());
     expect(server.seeks).toEqual(["man", "non_binary"]);
     expect(server.ageWindow).toEqual({ min: 30, max: 42 });
+    expect(screen.getByText("Step 6 of 8")).toBeTruthy();
     checkA11y();
-    // The pond is a step only where there is a choice (#174): its number stays, unshown here.
+    await type(screen.getByLabelText("Postal code"), "00530");
+    checkA11y();
+    await press(screen.getByRole("button", { name: "0 0 5 3 0, Kallio" }));
+    await flush();
+    await waitFor(() => expect(screen.getByText("What should your card show?")).toBeTruthy());
+    expect(screen.getByText("Step 6 of 8")).toBeTruthy();
+    expect(server.pond).toEqual(POND);
+    checkA11y();
+    await press(screen.getByRole("button", { name: "Kallio" }));
+    await flush();
+    await press(screen.getByRole("button", { name: "Continue" }));
+    await waitFor(() => expect(screen.getByText("Two photos of you")).toBeTruthy());
+    expect(server.home?.showArea).toBe(true);
+    checkA11y();
     expect(screen.getByText("Step 7 of 8")).toBeTruthy();
     await press(screen.getByRole("button", { name: "Add photos" }));
     // The photos screen says the same step as every other one (#146).
@@ -351,6 +386,8 @@ describe("OnboardingScreen", () => {
       "/preferences",
       "/profile",
       "/preferences",
+      "/account/home",
+      "/account/home",
       "/profile",
     ]);
     expect(calls.filter((c) => c.path === "/preferences" && c.method === "PUT")).toEqual([
@@ -497,34 +534,6 @@ describe("OnboardingScreen", () => {
     expect(server.profile?.fields).toEqual({ intent: "dance_partner" });
   });
 
-  it("asks the pond with one button per area, in the person's language, when there is more than one to choose from", async () => {
-    const { server, calls } = fakeApi();
-    server.consents.push(consented("terms"), consented("privacy"), consented("special_category"));
-    server.gender = "woman";
-    server.seeks = ["man"];
-    server.ageWindow = { min: 30, max: 40 };
-    server.profile = {
-      displayName: "Aino",
-      bio: "x".repeat(50),
-      bioPreset: null,
-      fields: { intent: "casual" },
-      prompts: [],
-    };
-    server.photos = 3;
-    server.pond = null;
-    await show(<OnboardingScreen />);
-    await waitFor(() => expect(screen.getByText("Where do you live?")).toBeTruthy());
-    // The seeded slugs read in the app's language, never the Finnish name the API sends (#174).
-    await waitFor(() => expect(screen.getByRole("button", { name: "Capital Area" })).toBeTruthy());
-    expect(screen.getByRole("button", { name: "Finland" })).toBeTruthy();
-    expect(screen.queryByText("Suomi")).toBeNull();
-    checkA11y();
-    await press(screen.getByRole("button", { name: "Finland" }));
-    expect(calls.some((c) => c.method === "PUT" && c.path === "/account/pond")).toBe(true);
-    await waitFor(() => expect(screen.queryByText("Where do you live?")).toBeNull());
-    expect(server.pond).toMatchObject({ slug: "suomi" });
-  });
-
   it("offers the identity label after a non-binary gender only, and saves the one chosen", async () => {
     const { server } = fakeApi();
     server.consents.push(consented("terms"), consented("privacy"));
@@ -620,6 +629,7 @@ describe("OnboardingScreen", () => {
     };
     server.gender = "woman";
     server.ageWindow = { min: 35, max: 50 };
+    server.home = IN_KALLIO;
     await show(<OnboardingScreen />);
     await waitFor(() => expect(screen.getByText("Whom are you looking for?")).toBeTruthy());
     await press(screen.getByRole("button", { name: "Anyone" }));
@@ -758,6 +768,7 @@ describe("OnboardingScreen", () => {
       fields: { intent: "casual" },
       prompts: [],
     };
+    server.home = IN_KALLIO;
     server.photos = 3;
   }
 
@@ -878,21 +889,6 @@ describe("OnboardingScreen", () => {
     await waitFor(() => expect(screen.getByText("How we do things here")).toBeTruthy());
   });
 
-  it("says the areas could not be read, and reads them again on request", async () => {
-    const { server } = fakeApi();
-    allAnswered(server);
-    server.pond = null;
-    const api = failingUntilOk("/ponds");
-    await show(<OnboardingScreen />);
-    await waitFor(() => expect(screen.getByText("Where do you live?")).toBeTruthy());
-    await waitFor(() =>
-      expect(screen.getByText("Something did not load. Try again.")).toBeTruthy(),
-    );
-    api.ok();
-    await press(screen.getByRole("button", { name: "Try again" }));
-    await waitFor(() => expect(screen.getByRole("button", { name: "Finland" })).toBeTruthy());
-  });
-
   it("says a step did not go through when the API refuses it for another reason than its cadence", async () => {
     const { server } = fakeApi();
     server.consents.push(consented("terms"), consented("privacy"));
@@ -908,6 +904,288 @@ describe("OnboardingScreen", () => {
     );
     expect(screen.queryByText(/You changed this recently/)).toBeNull();
     expect(screen.getByText("How do you describe yourself?")).toBeTruthy();
+  });
+
+  describe("the home (#514, ADR-061)", () => {
+    const EXPLAIN =
+      "Your postal code tells Kuutti how far people are. Others see a town or your area by name, never the digits.";
+    const NOT_FOUND = "We can't find that code. Choose the nearest area from the list.";
+    const homeCalls = (calls: ReturnType<typeof fakeApi>["calls"]) =>
+      calls.filter((c) => c.path === "/account/home");
+    /** Everything but the home answered: the step is next, and in reach of what follows it. */
+    const atHome = async () => {
+      const api = fakeApi();
+      allAnswered(api.server);
+      api.server.home = null;
+      api.server.photos = 0;
+      await show(<OnboardingScreen />);
+      await waitFor(() => expect(screen.getByText("Where do you live?")).toBeTruthy());
+      return api;
+    };
+    const pick = async (digits: string, name: string) => {
+      await type(screen.getByLabelText("Postal code"), digits);
+      await press(screen.getByRole("button", { name }));
+      await flush();
+    };
+
+    it("is asked after the ages, in the pond's place, with the field its own and nothing focused", async () => {
+      const { calls } = await atHome();
+      expect(screen.getByText("Step 6 of 8")).toBeTruthy();
+      expect(screen.getByText(EXPLAIN)).toBeTruthy();
+      expect(screen.getByLabelText("Postal code").props.autoFocus).toBeUndefined();
+      expect(screen.queryAllByRole("button")).toEqual([]);
+      // No list of ponds to read: the areas are on the phone.
+      expect(calls.filter((c) => c.path.includes("pond"))).toEqual([]);
+      checkA11y();
+    });
+
+    it("A half-typed postal code stays on the phone", async () => {
+      const { calls } = await atHome();
+      const sentBefore = calls.length;
+      await type(screen.getByLabelText("Postal code"), "005");
+      expect(screen.getAllByRole("button").length).toBeGreaterThan(1);
+      await type(screen.getByLabelText("Postal code"), "00530");
+      // Nothing at all, on any path, while the digits are being typed.
+      expect(calls).toHaveLength(sentBefore);
+      await press(screen.getByRole("button", { name: "0 0 5 3 0, Kallio" }));
+      await flush();
+      expect(homeCalls(calls)).toEqual([
+        { method: "PUT", path: "/account/home", body: { postalCode: "00530" } },
+      ]);
+    });
+
+    it("says a code that cannot become one at once, and leaves the nearest areas to choose from", async () => {
+      await atHome();
+      await type(screen.getByLabelText("Postal code"), "99999");
+      expect(screen.getByText(NOT_FOUND)).toBeTruthy();
+      expect(screen.getByRole("button", { name: "9 9 9 9 0, Nuorgam" })).toBeTruthy();
+      checkA11y();
+    });
+
+    it("then shows what the card will say and the choice, under the same number", async () => {
+      await atHome();
+      await pick("00530", "0 0 5 3 0, Kallio");
+      await waitFor(() => expect(screen.getByText("What should your card show?")).toBeTruthy());
+      expect(screen.queryByText(/^Step 0/)).toBeNull();
+      expect(screen.getByText("Step 6 of 8")).toBeTruthy();
+      expect(
+        screen.getByRole("button", { name: "Helsinki" }).props.accessibilityState?.selected,
+      ).toBe(true);
+      expect(screen.getByText("On your card: Helsinki")).toBeTruthy();
+      expect(screen.queryByLabelText("Postal code")).toBeNull();
+      checkA11y();
+    });
+
+    it("saves the choice alone, reads it back, and Continue goes on with it kept", async () => {
+      const { server, calls } = await atHome();
+      await pick("00530", "0 0 5 3 0, Kallio");
+      await waitFor(() => expect(screen.getByText("What should your card show?")).toBeTruthy());
+      await press(screen.getByRole("button", { name: "Kallio" }));
+      await flush();
+      expect(
+        screen.getByRole("button", { name: "Kallio" }).props.accessibilityState?.selected,
+      ).toBe(true);
+      expect(screen.getByText("On your card: Kallio")).toBeTruthy();
+      expect(homeCalls(calls).at(-1)?.body).toEqual({ showArea: true });
+      await press(screen.getByRole("button", { name: "Continue" }));
+      await waitFor(() => expect(screen.getByText("Two photos of you")).toBeTruthy());
+      expect(server.home?.showArea).toBe(true);
+    });
+
+    it("leaves the town standing when Continue is pressed without a choice", async () => {
+      const { server, calls } = await atHome();
+      await pick("00530", "0 0 5 3 0, Kallio");
+      await waitFor(() => expect(screen.getByText("What should your card show?")).toBeTruthy());
+      await press(screen.getByRole("button", { name: "Continue" }));
+      await waitFor(() => expect(screen.getByText("Two photos of you")).toBeTruthy());
+      expect(server.home?.showArea).toBe(false);
+      expect(homeCalls(calls)).toHaveLength(1);
+    });
+
+    it("says the town alone where no area is kept, with nothing to choose", async () => {
+      await atHome();
+      await pick("83960", "8 3 9 6 0, Koli");
+      await waitFor(() =>
+        expect(screen.getByText("Your card shows the nearest town.")).toBeTruthy(),
+      );
+      expect(screen.getByText("What should your card show?")).toBeTruthy();
+      expect(screen.getByText("On your card: Joensuu")).toBeTruthy();
+      expect(screen.getAllByRole("button").map((b) => b.props.children)).toHaveLength(1);
+      checkA11y();
+      await press(screen.getByRole("button", { name: "Continue" }));
+      await waitFor(() => expect(screen.getByText("Two photos of you")).toBeTruthy());
+    });
+
+    it("asks the choice once: neither a read on focus nor a walk resumed brings it back", async () => {
+      const { calls } = await atHome();
+      await pick("00530", "0 0 5 3 0, Kallio");
+      await waitFor(() => expect(screen.getByText("What should your card show?")).toBeTruthy());
+      // The status read again on focus changes nothing: the step is the screen's own.
+      await act(async () => {
+        focus();
+        await settle(120);
+      });
+      expect(screen.getByText("What should your card show?")).toBeTruthy();
+      await press(screen.getByRole("button", { name: "Continue" }));
+      await waitFor(() => expect(screen.getByText("Two photos of you")).toBeTruthy());
+      await act(async () => {
+        focus();
+        await settle(120);
+      });
+      expect(screen.getByText("Two photos of you")).toBeTruthy();
+      expect(homeCalls(calls)).toHaveLength(1);
+    });
+
+    it("goes straight to the photos on a walk resumed with a home, the town standing", async () => {
+      const { server } = fakeApi();
+      allAnswered(server);
+      server.photos = 0;
+      await show(<OnboardingScreen />);
+      await waitFor(() => expect(screen.getByText("Two photos of you")).toBeTruthy());
+      expect(screen.queryByText("What should your card show?")).toBeNull();
+      expect(screen.queryByText("Where do you live?")).toBeNull();
+    });
+
+    it("opens again for somebody active whose kept place left the list, asking nothing else", async () => {
+      // Read as no home (ADR-061 §2): the status lists the step, the rest is answered.
+      const { server } = fakeApi();
+      allAnswered(server);
+      server.home = null;
+      await show(<OnboardingScreen />);
+      await waitFor(() => expect(screen.getByText("Where do you live?")).toBeTruthy());
+      await pick("00530", "0 0 5 3 0, Kallio");
+      await waitFor(() => expect(screen.getByText("What should your card show?")).toBeTruthy());
+      await press(screen.getByRole("button", { name: "Continue" }));
+      await flush();
+      await waitFor(() => expect(router.replace).toHaveBeenCalledWith("/"));
+    });
+
+    it("says a code the API lacks in the same words, stays at the step, and takes another", async () => {
+      const { server, calls } = await atHome();
+      // On the phone's list and not on the fake API's: a build older than the API's list.
+      await pick("00100", "0 0 1 0 0, Helsinki keskusta - Etu-Töölö");
+      await waitFor(() => expect(screen.getByText(NOT_FOUND)).toBeTruthy());
+      expect(screen.queryByText("Something did not load. Try again.")).toBeNull();
+      expect(screen.getByText("Where do you live?")).toBeTruthy();
+      expect(screen.getByLabelText("Postal code").props.value).toBe("00100");
+      expect(server.home).toBeNull();
+      await pick("00530", "0 0 5 3 0, Kallio");
+      await waitFor(() => expect(screen.getByText("What should your card show?")).toBeTruthy());
+      expect(screen.queryByText(NOT_FOUND)).toBeNull();
+      expect(homeCalls(calls)).toHaveLength(2);
+    });
+
+    it("speaks a refused save on iOS, which has no live regions, and offers the nearest areas", async () => {
+      jest.replaceProperty(Platform, "OS", "ios");
+      const announce = jest.spyOn(AccessibilityInfo, "announceForAccessibility").mockClear();
+      await atHome();
+      await pick("00100", "0 0 1 0 0, Helsinki keskusta - Etu-Töölö");
+      await waitFor(() => expect(announce).toHaveBeenCalledWith(NOT_FOUND));
+      expect(screen.getAllByText(NOT_FOUND)).toHaveLength(1);
+      expect(
+        screen.queryByRole("button", { name: "0 0 1 0 0, Helsinki keskusta - Etu-Töölö" }),
+      ).toBeNull();
+      expect(screen.getAllByRole("button").length).toBeGreaterThan(0);
+    });
+
+    it("says a save that failed for another reason as a step that did not go through", async () => {
+      const { server } = await atHome();
+      const api = failingUntilOk("/account/home");
+      await pick("00530", "0 0 5 3 0, Kallio");
+      await waitFor(() =>
+        expect(screen.getByText("Something did not load. Try again.")).toBeTruthy(),
+      );
+      expect(screen.getByText("Where do you live?")).toBeTruthy();
+      expect(server.home).toBeNull();
+      // Pressed again once the API takes it, from the digits still there.
+      api.ok();
+      await press(screen.getByRole("button", { name: "0 0 5 3 0, Kallio" }));
+      await flush();
+      await waitFor(() => expect(screen.getByText("What should your card show?")).toBeTruthy());
+    });
+
+    it("says a choice that failed, and keeps what the card says and the way on", async () => {
+      const { server } = await atHome();
+      await pick("00530", "0 0 5 3 0, Kallio");
+      await waitFor(() => expect(screen.getByText("What should your card show?")).toBeTruthy());
+      failingUntilOk("/account/home");
+      await press(screen.getByRole("button", { name: "Kallio" }));
+      await flush();
+      await waitFor(() =>
+        expect(screen.getByText("Something did not load. Try again.")).toBeTruthy(),
+      );
+      expect(screen.getByText("On your card: Helsinki")).toBeTruthy();
+      expect(server.home?.showArea).toBe(false);
+      await press(screen.getByRole("button", { name: "Continue" }));
+      await waitFor(() => expect(screen.getByText("Two photos of you")).toBeTruthy());
+      // The town stands, and what failed is not said on a step that did not fail.
+      expect(screen.queryByText("Something did not load. Try again.")).toBeNull();
+    });
+
+    it("holds the rows and the way on while a save is on its way", async () => {
+      const { calls } = await atHome();
+      const answers = globalThis.fetch;
+      let release: (() => void) | undefined;
+      globalThis.fetch = jest.fn(async (input: Request | string, init?: RequestInit) => {
+        const request = input instanceof Request ? input : new Request(input, init);
+        if (new URL(request.url).pathname === "/account/home") {
+          await new Promise<void>((resolve) => {
+            release = resolve;
+          });
+        }
+        return answers(input, init);
+      }) as unknown as typeof fetch;
+      await type(screen.getByLabelText("Postal code"), "00530");
+      const row = screen.getByRole("button", { name: "0 0 5 3 0, Kallio" });
+      await press(row);
+      await press(row);
+      expect(row.props.accessibilityState?.disabled).toBe(true);
+      await act(async () => {
+        release?.();
+        await settle(120);
+      });
+      await waitFor(() => expect(screen.getByText("What should your card show?")).toBeTruthy());
+      expect(homeCalls(calls)).toHaveLength(1);
+    });
+
+    it("keeps the rows above the keyboard: a tap on one counts with it up", async () => {
+      await atHome();
+      const scroll = screen.container.queryAll((node) => node.type === "RCTScrollView")[0];
+      expect(scroll?.props.automaticallyAdjustKeyboardInsets).toBe(true);
+      expect(scroll?.props.keyboardShouldPersistTaps).toBe("handled");
+    });
+
+    it("holds both steps at the largest text", async () => {
+      jest.spyOn(PixelRatio, "getFontScale").mockReturnValue(MAX_FONT_SCALE);
+      await atHome();
+      await type(screen.getByLabelText("Postal code"), "0");
+      expect(hasCutText(screen.toJSON() as HostNode)).toBe(false);
+      checkA11y();
+      await pick("00530", "0 0 5 3 0, Kallio");
+      await waitFor(() => expect(screen.getByText("What should your card show?")).toBeTruthy());
+      expect(hasCutText(screen.toJSON() as HostNode)).toBe(false);
+      checkA11y();
+    });
+
+    it.each([
+      ["fi-FI", "Missä asut?", "Postinumero", "0 0 5 3 0, Kallio", "Mitä korttisi näyttää?"],
+      ["sv-FI", "Var bor du?", "Postnummer", "0 0 5 3 0, Berghäll", "Vad ska ditt kort visa?"],
+    ])("speaks %s", async (tag, title, label, row, choice) => {
+      (useLocales as jest.Mock).mockReturnValue([{ languageTag: tag }]);
+      try {
+        const { server } = fakeApi();
+        allAnswered(server);
+        server.home = null;
+        await show(<OnboardingScreen />);
+        await waitFor(() => expect(screen.getByText(title)).toBeTruthy());
+        await type(screen.getByLabelText(label), "00530");
+        await press(screen.getByRole("button", { name: row }));
+        await flush();
+        await waitFor(() => expect(screen.getByText(choice)).toBeTruthy());
+      } finally {
+        (useLocales as jest.Mock).mockReturnValue([{ languageTag: "en-US" }]);
+      }
+    });
   });
 
   it("takes back a label, and a gender sought, pressed a second time", async () => {
@@ -1014,6 +1292,7 @@ describe("OnboardingScreen", () => {
     server.gender = "man";
     server.seeks = ["woman"];
     server.ageWindow = { min: 30, max: 42 };
+    server.home = IN_KALLIO;
     server.photos = 3;
   }
 

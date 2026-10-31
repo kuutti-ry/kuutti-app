@@ -1,6 +1,7 @@
 import { formatHeight } from "@kuutti/i18n";
 import {
   CARD_FIELD_KEYS,
+  type DistanceBand,
   PROFILE_FIELDS,
   type ProfileCard,
   type ProfileFieldKey,
@@ -16,7 +17,6 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Text } from "@/components/ui/text";
 import { captionKey, type OnRefused, PhotoDescriptionText, PhotoImage } from "@/features/media";
-import { pondName } from "@/features/pond";
 import { SafetyActions } from "@/features/safety";
 import { useT } from "@/lib/locale";
 import { usePhotoDescriptionText } from "@/lib/photo-descriptions";
@@ -25,7 +25,7 @@ import { DECORATIVE, TOUCH_TARGET } from "@/theme/a11y";
 import { useHapticTap } from "@/theme/haptics";
 import { FieldLabel } from "./fieldIcons";
 import { hasGlyphs, OptionGlyph } from "./glyphs";
-import { genderKey, optionKey, presetKey, promptKey } from "./keys";
+import { genderKey, optionKey, placeName, presetKey, promptKey } from "./keys";
 
 /** The card's own accessibility action, by name; its label is the heard one. */
 const SAFETY_ACTION = "blockOrReport";
@@ -42,8 +42,10 @@ type Gallery = { card: string; index: number; seen: readonly string[] };
 /**
  * A card as others see it (#47, #150): the photos in the card variant, one
  * at a time, the name and the age, the gender with the identity label
- * after it, then one answer in the person's own words (the sheet's Hinge
- * takeaway), the bio or its placeholder, the
+ * after it, the name of the home and, in a round, how far it is in words
+ * (ADR-061 §3, §5): a name and a band, each on a line of its own, with no
+ * digits, no kilometres, and no meaning in a colour. Then one answer in the
+ * person's own words (the sheet's Hinge takeaway), the bio or its placeholder, the
  * info fields the API left on the card with what both answered marked in
  * words, and the rest of the prompts. The rounds of M4 render the same
  * component; the reason label of rules/mobile.md joins there.
@@ -67,10 +69,13 @@ type Gallery = { card: string; index: number; seen: readonly string[] };
  */
 export function ProfileCardView({
   card,
+  distance,
   onRefused,
   onGone,
 }: {
   card: ProfileCard;
+  /** How far the person lives, as their round entry froze it (ADR-061 §5); a card outside a round has none. */
+  distance?: DistanceBand | null;
   /** A photo URL the API refused (#52 budget or another code): the screen says so instead of a silent placeholder. */
   onRefused?: OnRefused;
   /** Someone else's card: the person blocked or reported them, and the screen takes the card away. */
@@ -248,7 +253,8 @@ export function ProfileCardView({
         {identityLabel && (
           <Text variant="muted">{t(optionKey("identityLabel", identityLabel))}</Text>
         )}
-        {card.pond && <Text variant="muted">{pondName(t, card.pond)}</Text>}
+        {card.place && <Text variant="muted">{placeName(card.place, locale)}</Text>}
+        {distance && <Text variant="muted">{t(optionKey("distance", distance))}</Text>}
       </CardHeader>
       <CardContent className="gap-4">
         {firstPrompt && prompt(firstPrompt)}

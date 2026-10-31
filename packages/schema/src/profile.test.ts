@@ -171,8 +171,24 @@ describe("the profile as its owner reads it back", () => {
     const response = {
       profile: null,
       completeness: { complete: false, missing: ["display_name", "photos"] },
+      home: null,
     };
     expect(ProfileResponse.parse(response)).toEqual(response);
+  });
+
+  it("carries the home in names beside the document, never in what is saved (ADR-061 §3)", () => {
+    const home = {
+      town: { fi: "Helsinki", sv: "Helsingfors" },
+      area: { fi: "Kallio", sv: "Berghäll" },
+      showArea: true,
+    };
+    const response = { profile: null, completeness: { complete: true, missing: [] }, home };
+    expect(ProfileResponse.parse(response).home).toEqual(home);
+    expect(codes(ProfileResponse, { ...response, home: undefined })).toEqual(["invalid_type"]);
+    expect(ProfileDocument.shape).not.toHaveProperty("home");
+    expect(ProfileUpdate.safeParse({ ...profile, home }).error?.issues[0]?.code).toBe(
+      "unrecognized_keys",
+    );
   });
 
   it("refuses an unknown missing item", () => {
@@ -191,7 +207,7 @@ describe("the card another person sees", () => {
     displayName: "Aino",
     age: { years: 34, verifiedByBank: true },
     gender: "woman",
-    pond: null,
+    place: null,
     photos: [
       {
         id: uuid(2),
@@ -208,6 +224,20 @@ describe("the card another person sees", () => {
     prompts: [],
     shared: { hobbies: ["sauna"], languages: [] },
   };
+
+  it("names the person's place in both languages, or says nothing, and no longer a pond (ADR-061 §3)", () => {
+    const place = { fi: "Helsinki", sv: "Helsingfors" };
+    expect(ProfileCard.parse({ ...card, place }).place).toEqual(place);
+    expect(ProfileCard.parse(card).place).toBeNull();
+    expect(codes(ProfileCard, { ...card, place: "00530" })).toEqual(["invalid_type"]);
+    expect(codes(ProfileCard, { ...card, place: undefined })).toEqual(["invalid_type"]);
+    expect(ProfileCard.shape).not.toHaveProperty("pond");
+    expect(ProfileCard.parse({ ...card, pond: { slug: "suomi" } })).not.toHaveProperty("pond");
+  });
+
+  it("carries no band: a band is the round's, frozen on its entry (ADR-061 §5)", () => {
+    expect(ProfileCard.shape).not.toHaveProperty("distance");
+  });
 
   it("carries the owner's caption of a photo (#296), null when the API did not say", () => {
     const withLine = { ...card, photos: [{ ...card.photos[0], caption: "summer_day" }] };

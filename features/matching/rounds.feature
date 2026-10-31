@@ -5,20 +5,21 @@ Feature: The day's round, built: whom it holds and in which order
   round a Finnish day: at night, or at the day's first read when the night
   built none. Its cards are people of the same pond who are complete and seen
   by others, in each other's pool both ways (filters.feature), up to
-  round_size, the most soft matches first, equal counts in an order of the
-  day's and the person's own. Nobody is shown again while they cool down,
-  nobody with whom one has a conversation, and nothing fills a short round.
-  Before those cards come the people whose like waits on the person (#97,
-  ADR-037), oldest first, up to liked_you_cap. The order of coming back and
-  relaxing a deal-breaker for the day are short-pool.feature's (#99, ADR-042).
+  round_size: the nearest band first (#514, ADR-061 §6), then the most soft
+  matches, equal counts in an order of the day's and the person's own. Nobody
+  is shown again while they cool down, nobody with whom one has a conversation,
+  and nothing fills a short round. Before those cards come the people whose
+  like waits on the person (#97, ADR-037), oldest first, up to liked_you_cap.
+  The order of coming back and relaxing a deal-breaker for the day are
+  short-pool.feature's (#99, ADR-042).
 
   Scenario: Everybody complete in an open pond gets a round for the day, and nobody else
     Given "A" complete in an open pond, "B" whose profile lacks its photos there, and "C" complete in a closed pond
     When the night builds the rounds
     Then "A" has today's round, and "B" and "C" have none
 
-  Scenario: A round holds at most round_size cards, the most soft matches first
-    Given round_size is 2 and "A" has three people in their pool, similar to "A" on two, one and no soft fields
+  Scenario: A round holds at most round_size cards, and within a band the most soft matches come first
+    Given round_size is 2 and "A" has three people in their pool in one band, similar to "A" on two, one and no soft fields
     When the night builds the rounds
     Then "A"'s round is the one with two, then the one with one
 
@@ -127,3 +128,75 @@ Feature: The day's round, built: whom it holds and in which order
     Given "B" liked "A" yesterday, and the night built both rounds
     When "A" passes "B"
     Then what "B" reads of their own round and of their rounds' history is as it was
+
+  # Distance (#514, ADR-061 §5 and §6): the straight line between two kept
+  # places' centres (home.feature), said in bands and never in kilometres. With
+  # one pond nothing else keeps people local, so the band orders a round before
+  # the soft count; what waits on a person it does not move. A band is written
+  # with its entry and read from there, and a move closes the day's short pool,
+  # so a home can move freely: moving and reading the same card again says
+  # nothing new, and a move is one new reading a night.
+
+  Scenario Outline: Two homes are in the band of the straight line between their kept places
+    Given the bands end at 5, 15 and 50 km, and two kept places are <km> km apart, centre to centre
+    Then the two are <band>, asked from either side
+
+    Examples:
+      | km    | band   |
+      | 0     | nearby |
+      | 4.99  | nearby |
+      | 5     | close  |
+      | 14.99 | close  |
+      | 15    | around |
+      | 49.99 | around |
+      | 50    | far    |
+      | 900   | far    |
+
+  Scenario: The nearest band comes first, then the most soft matches, then the day's order
+    Given "A"'s pool holds "B" far away with three soft matches, "C" close with one, "D" close with two and "E" nearby with none
+    When the night builds the rounds
+    Then "A"'s round is "E", "D", "C", "B"
+    And two people level on both stand in an order of the day's and "A"'s own
+
+  Scenario: The liked-you places keep their order, whatever the band
+    Given "B" liked "A" three days ago from far away, and "C" one day ago from nearby
+    When the night builds the rounds
+    Then "A"'s round opens with "B", then "C", each labelled liked you
+
+  Scenario: Coming back keeps its order, whatever the band
+    Given nobody new, and "A" was shown "C" 45 days ago, far away, and "D" 40 days ago, nearby, both left undecided
+    When the night builds the rounds
+    Then "A"'s round is "C", then "D", each labelled seen before
+
+  Scenario: Every entry is written with its band, whichever way it came into the round
+    Given "A"'s round holds somebody new, somebody whose like waited, somebody seen before and somebody a relaxation let in
+    When "A" reads today's round
+    Then each entry says the band between the two homes as they stood when it was written
+    And so does a round built at the day's first read
+
+  Scenario: An entry keeps its band, so moving home and reading again says nothing new
+    Given "A"'s round holds "B" as close
+    When "A" moves next door to "B", then "B" moves far away, and "A" reads the round after each move
+    Then "B"'s entry says close every time
+
+  Scenario: A move closes the day's short pool, so a home typed answers nothing until the next round
+    Given "A" has a short round, with a relaxation on offer that has nothing to do with distance
+    When "A" moves home
+    Then no relaxation is offered that day and one tapped is refused, and what was relaxed before stays
+    And the next night's round offers again, from the new home
+
+  Scenario: A home typed again is no move, and the first home is none
+    Given "A" has a short round with a relaxation on offer, and the place the round was built from
+    When "A" gives a postal code that keeps the same place
+    Then the relaxation is still on offer
+
+  Scenario: A new home and a changed edge count from the next round, never on an entry written
+    Given the night built today's rounds
+    When "A" moves home and an admin changes distance_nearby_km
+    Then today's entries and their order are as they were
+    And the next night measures from the new home with the new edge
+
+  Scenario: Only a round's entry says a band, and as a word
+    Given "A"'s round holds "B"
+    When "A" reads the round and previews their own card
+    Then "B"'s entry says a band, neither card says one, and no answer holds a distance in kilometres

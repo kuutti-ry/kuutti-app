@@ -1,6 +1,12 @@
 import type { Queryable } from "@kuutti/db";
-import { type DealBreaker, type GateResponse, PROFILE_FIELDS } from "@kuutti/schema";
+import {
+  type DealBreaker,
+  type DistanceEdges,
+  type GateResponse,
+  PROFILE_FIELDS,
+} from "@kuutti/schema";
 import { CURRENT_CONSENT_VERSIONS } from "../identity/index.ts";
+import { distanceEdges } from "../lib/matching-config.ts";
 import {
   type DealBreakerRow,
   dealBreakersFrom,
@@ -8,6 +14,7 @@ import {
   preferencesFrom,
   type RoundCandidate,
 } from "../matching/index.ts";
+import { homeRules, keptPlace, pointOf } from "../pond/index.ts";
 import { ageInYears, answeredFieldsOf, answeredPromptsOf, completeness } from "../profile/index.ts";
 
 /**
@@ -27,6 +34,7 @@ type FactsRow = {
   id: string;
   identity_id: string;
   gender: string | null;
+  home_place: string | null;
   state: string;
   birth_year: number | null;
   birth_month: number | null;
@@ -53,7 +61,7 @@ export type Subject = RoundCandidate & {
 // Who can be complete: live accounts in good standing. `registered` is not
 // (no consents yet), paused, suspended and banned accounts are hidden or gone.
 const FACTS = `
-  SELECT a.id, a.identity_id, a.gender, a.state, a.birth_year, a.birth_month,
+  SELECT a.id, a.identity_id, a.gender, a.home_place, a.state, a.birth_year, a.birth_month,
          p.display_name, p.bio, p.bio_preset, p.prompts, p.fields, p.fields->>'intent' AS intent,
          (SELECT count(*) FROM photo ph
            WHERE ph.account_id = a.id AND ph.purpose = 'profile' AND ph.state = 'approved') AS approved_photos,
@@ -79,18 +87,28 @@ const NO_BLOCKS: ReadonlySet<string> = new Set();
 /** Somebody with no deal-breaker. */
 const NO_DEAL_BREAKERS: readonly DealBreaker[] = [];
 
+/** What a read of people measures homes by (ADR-061 §2, §5): read once, the same for everybody of it. */
+type Homes = { minInhabitants: number; edges: DistanceEdges };
+
+async function homesOf(db: Queryable): Promise<Homes> {
+  const { minInhabitants } = await homeRules(db);
+  return { minInhabitants, edges: await distanceEdges(db) };
+}
+
 /**
  * The row as a subject, or null while something is missing: the profile's
  * completeness (#47) and onboarding's (ADR-010 §6: a consent for an older
  * wording reads as none) are both asked, by the rules the person's own
  * screens are told by. `blocks` are the identities the person blocked (#84),
- * `dealBreakers` the person's deal-breakers as stored (#87).
+ * `dealBreakers` the person's deal-breakers as stored (#87), `homes` what a
+ * home is measured by.
  */
 function subjectFrom(
   row: FactsRow,
   at: Date,
   blocks: ReadonlySet<string>,
   dealBreakers: readonly DealBreaker[],
+  homes: Homes,
 ): Subject | null {
   const preferences = preferencesFrom({ seeks: row.seeks, ageWindow: row.age_window });
   const gender = row.gender as PoolPerson["gender"] | null;
@@ -99,6 +117,10 @@ function subjectFrom(
   // Intent is a hard filter both ways (#147): an onboarding step, so a person without one is not done.
   const intent = PROFILE_FIELDS.intent.schema.safeParse(row.intent).data;
   if (!intent) return null;
+  // So is the home (ADR-061 §1, §2): read through the floor, and without a place the list knows there is nobody to measure from.
+  const place = row.home_place === null ? null : keptPlace(row.home_place, homes.minInhabitants);
+  const point = place === null ? null : pointOf(place);
+  if (!point) return null;
   // The seek answer counts only with the special-category consent (ADR-019 §4), as the status reads it.
   if (!row.terms || !row.privacy || !row.special_category) return null;
   const complete = completeness({
@@ -119,6 +141,7 @@ function subjectFrom(
       ageWindow: preferences.ageWindow,
       age: ageInYears(row.birth_year, row.birth_month, at),
       intent,
+      home: { ...point, edges: homes.edges },
       identityId: row.identity_id,
       blocks,
       fields: answeredFieldsOf(row.fields),
@@ -150,6 +173,7 @@ async function subjectsOf(
     db,
     rows.map((row) => row.id),
   );
+  const homes = await homesOf(db);
   return rows.flatMap(
     (row) =>
       subjectFrom(
@@ -157,6 +181,7 @@ async function subjectsOf(
         at,
         blocks.get(row.identity_id) ?? NO_BLOCKS,
         dealBreakers.get(row.id) ?? NO_DEAL_BREAKERS,
+        homes,
       ) ?? [],
   );
 }

@@ -2,6 +2,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { collectNotices, type Notices, shippedFilesOf, textKey } from "@kuutti/notices";
+import { POSTAL_AREAS_CREDIT } from "@kuutti/schema/postal-areas";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   bundledFiles,
@@ -235,7 +236,7 @@ describe("the notices file", () => {
       "is also copied to\nhttps://github.com/kuutti-ry/kuutti-app/releases/tag/sources-sharp-libvips-1.3.4,\nin case",
     );
     expect(
-      file.slice(file.indexOf(`${rule}\nlibvips 8.18.7`), file.indexOf(`${rule}\nText 1\n`)),
+      file.slice(file.indexOf(`${rule}\nlibvips 8.18.7`), file.indexOf(`${rule}\nTHE POSTAL LIST`)),
     ).toBe(
       [
         rule,
@@ -255,6 +256,30 @@ describe("the notices file", () => {
         "",
       ].join("\n"),
     );
+    // What CC BY 4.0 asks: whose it is, the licence, the date, and what Kuutti changed (ADR-061 §4).
+    expect(
+      file.slice(file.indexOf(`${rule}\nTHE POSTAL LIST`), file.indexOf(`${rule}\nText 1\n`)),
+    ).toBe(
+      [
+        rule,
+        "THE POSTAL LIST",
+        "",
+        "dist/ carries a list of Finland's postal areas and municipalities, used to",
+        "read a person's home. It is not under the licence of this image's code, and",
+        "Statistics Finland has not endorsed Kuutti or this use of it.",
+        "",
+        POSTAL_AREAS_CREDIT.en.source,
+        "",
+        POSTAL_AREAS_CREDIT.en.changes,
+        "",
+        `Source: ${POSTAL_AREAS_CREDIT.sourceUrl}`,
+        "",
+        "",
+      ].join("\n"),
+    );
+    expect(POSTAL_AREAS_CREDIT.en.source).toContain("Statistics Finland");
+    expect(POSTAL_AREAS_CREDIT.en.source).toContain("CC BY 4.0");
+    expect(POSTAL_AREAS_CREDIT.en.changes).toContain("Changed by Kuutti");
     expect(file.slice(file.indexOf(`${rule}\nText 1\n`))).toBe(
       [
         `${rule}\nText 1\n\n${MIT}`,
@@ -268,11 +293,10 @@ describe("the notices file", () => {
     );
   });
 
-  it("is the header, libvips' part and its texts for no packages", () => {
+  it("is the header, libvips' part, the postal list and its texts for no packages", () => {
     const file = render({ texts: {}, packages: [] }, { ...PART, libraries: [] });
-    expect(file).toMatch(
-      /then the texts, each once, as their\nfiles have them\.\n\n={80}\nLIBVIPS/,
-    );
+    expect(file).toMatch(/then the texts, each once, as their files have them\.\n\n={80}\nLIBVIPS/);
+    expect(file).toMatch(/in case its own address moves or goes\.\n\n={80}\nTHE POSTAL LIST/);
     expect(file).toMatch(/Text 3\n\nMOZILLA\n$/);
   });
 });

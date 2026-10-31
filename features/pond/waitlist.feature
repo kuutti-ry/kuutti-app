@@ -27,7 +27,7 @@ Feature: The waitlist counter
       | 12    | 0   | 0          | 0          | hidden    |
 
   Scenario: Only live accounts with a pond are counted, a shadow-banned one like any other
-    Given a pond with nine counted people and a shadow-banned one, and beside them a paused, a suspended and a deleted account, one whose identity is banned, and one that chose no pond
+    Given a pond with nine counted people and a shadow-banned one, and beside them a paused, a suspended and a deleted account, one whose identity is banned, and one that has no pond yet
     When the figures are taken
     Then the pond's total is ten
 
@@ -128,12 +128,12 @@ Feature: The waitlist counter
     Then the bar has moved and the total stands
 
   Scenario: The bar says shares of the caller's own pond and nothing else
-    Given two ponds with different bars
-    When a person of each pond asks
-    Then each hears the shares of their own pond, never cached, with no count, no pond and no day
+    Given a pond whose bar is said
+    When a person of the pond asks
+    Then they hear its shares, never cached, with no count, no pond and no day
 
   Scenario: Nobody hears a bar without a pond or without a session
-    When somebody who chose no pond asks
+    When somebody with no pond asks
     Then the bar is not said
     When somebody asks without a session
     Then the answer is refused

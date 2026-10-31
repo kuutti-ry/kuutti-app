@@ -11,6 +11,10 @@ Feature: The filters, hard both ways, and the soft preferences that only order
   person hid from their card is still an answer (#515): only the card leaves it
   out. One on height (#508) accepts no list of answers: it is one relation of
   the other person's height to the holder's own, and everyone is having none.
+  One on distance (#514, ADR-061 §7) has no field: it accepts the bands of the
+  pair's distance (rounds.feature) up to nearby, close or around, since far
+  accepted is no filter. Everybody has a home, so it is never paused and nobody
+  is unknown to it. Without one the whole country is a person's pool.
   The soft preferences (education, drinking, the attitude to drugs) are a
   person's own answers. They only order a round, counted where the two are
   similar from both sides. They never take anybody out of a pool, and never
@@ -145,6 +149,71 @@ Feature: The filters, hard both ways, and the soft preferences that only order
       | man        | woman                | woman      | woman,man,non_binary | dance_partner  | yes   |
       | non_binary | woman,man,non_binary | man        | woman                | open_to_either | no    |
       | non_binary | woman,man,non_binary | man        | woman                | dance_partner  | no    |
+
+  # A deal-breaker on distance (#514, ADR-061 §7), the seventh, asked of the
+  # pair's band instead of an answer. Relaxing one for the day is otherwise
+  # short-pool.feature's.
+
+  Scenario Outline: A distance deal-breaker lets through only the bands its holder accepts, asked from either side
+    Given a person with a deal-breaker on distance accepting <accept>, the bands ending at 5, 15 and 50 km
+    And another person whose home is <km> km from theirs, the two otherwise in each other's pool
+    Then they are <in> each other's pool, asked from either side, whichever of them holds it
+
+    Examples:
+      | accept              | km    | in     |
+      | nearby              | 0     | in     |
+      | nearby              | 4.99  | in     |
+      | nearby              | 5     | not in |
+      | nearby,close        | 5     | in     |
+      | nearby,close        | 14.99 | in     |
+      | nearby,close        | 15    | not in |
+      | nearby,close,around | 15    | in     |
+      | nearby,close,around | 49.99 | in     |
+      | nearby,close,around | 50    | not in |
+      | nearby,close,around | 900   | not in |
+
+  Scenario: Without a deal-breaker on distance the whole country is one pool
+    Given two people 900 km apart, otherwise in each other's pool, neither with a deal-breaker on distance
+    Then they are in each other's pool, asked from either side
+
+  Scenario: Two distance deal-breakers are both asked, so the narrower decides
+    Given a person who accepts up to around, and another 10 km away who accepts nearby
+    Then they are out of each other's pool, asked from either side
+    And 3 km apart they are in it
+
+  Scenario: A distance deal-breaker is never paused, for everybody has a home
+    Given a person who answered nothing on their profile, with a deal-breaker on distance accepting nearby, and another 10 km away
+    Then they are out of each other's pool, asked from either side
+    And the deal-breaker does not read as paused
+
+  Scenario: A distance deal-breaker keeps the two out of each other's rounds
+    Given "A"'s deal-breaker on distance accepts nearby, "B" lives nearby and "C" close
+    When the night builds the rounds
+    Then "A" and "B" are in each other's rounds, "C" is not in "A"'s, and "A" is not in "C"'s
+
+  Scenario: The gate's count leaves a pair a distance deal-breaker excludes out of each other's pool
+    Given thirty-one people of one pond, each in every other's pool
+    And one of them has a deal-breaker on distance that another's home does not pass
+    When the night counts the gates
+    Then neither of the two counts toward the other's figure
+    And after the holder moves nearer, the next night counts both again
+
+  Scenario: A short round offers a distance deal-breaker set aside, never for those who did not answer
+    Given "A"'s deal-breaker on distance accepts nearby, and twelve people live further away
+    When "A" reads today's relaxations
+    Then the round is short, and distance is offered set aside alone, 10 more
+    And relaxing it for those who did not answer is not found, with nothing written
+
+  Scenario: A distance deal-breaker set aside lets in people beyond it, never against their own filters
+    Given "A"'s deal-breaker on distance accepts nearby, and "B" and "C" live further away
+    And "B"'s own deal-breaker on distance excludes "A"
+    When "A" sets distance aside for today
+    Then "C" is added to "A"'s round, labelled relaxed with distance, and "B" is not
+
+  Scenario: A card never says that its person did not answer a distance
+    Given "A"'s deal-breaker on distance lets "B" through
+    When "A" reads today's round
+    Then "B"'s card lists nothing as not answered
 
   Scenario Outline: Soft preferences count only what is similar from both sides
     Given one person who answered <mine> and another who answered <theirs>

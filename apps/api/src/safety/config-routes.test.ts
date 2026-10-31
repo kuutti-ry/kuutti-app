@@ -124,9 +124,10 @@ describe("GET /admin/config", () => {
     );
     expect(items.map((i) => i.key)).toEqual(rows.map((r) => r.key));
     expect(items.find((i) => i.key === "default_pond")).toMatchObject({
-      value: "paakaupunkiseutu",
-      version: 2,
+      value: "suomi",
+      version: 3,
       versions: [
+        { version: 3, value: "suomi", createdBy: "migration:0093", reason: null },
         { version: 2, value: "paakaupunkiseutu", createdBy: "migration:0025", reason: null },
         { version: 1, value: "suomi", createdBy: "migration:0020", reason: null },
       ],
@@ -222,7 +223,7 @@ describe("POST /admin/config/{key}", () => {
     await withMatchingConfig(ctx.client, { config_routes_flag: true });
     const staff = await admin(ctx);
     for (const [key, value, version] of [
-      ["default_pond", "suomi", 3],
+      ["default_pond", "paakaupunkiseutu", 4],
       ["config_routes_flag", false, 2],
       ["photo_fetches_per_day", { full: 30, card: 300, thumb: 600 }, 2],
     ] as const) {

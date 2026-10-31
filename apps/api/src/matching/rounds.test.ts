@@ -99,8 +99,12 @@ async function roundFor(
     ordering: "count",
     entries: cards.map((card) =>
       "person" in card
-        ? { candidateId: card.person.accountId, reason: card.reason }
-        : { candidateId: card.accountId, reason: "matches_filters" as const },
+        ? { candidateId: card.person.accountId, reason: card.reason, distance: "nearby" as const }
+        : {
+            candidateId: card.accountId,
+            reason: "matches_filters" as const,
+            distance: "nearby" as const,
+          },
     ),
   });
   if (!built) throw new Error("round not built");
@@ -499,7 +503,7 @@ describe("seen and decided", () => {
         accountId: a,
         day: TODAY,
         ordering: "count",
-        entries: [{ candidateId: b, reason: "matches_filters" }],
+        entries: [{ candidateId: b, reason: "matches_filters", distance: "nearby" }],
       });
       const firstPid = await pidOf(first);
       const secondPid = await pidOf(second);
@@ -666,8 +670,8 @@ describe("the day's likes (#98, ADR-036)", () => {
         day: TODAY,
         ordering: "count",
         entries: [
-          { candidateId: b, reason: "matches_filters" },
-          { candidateId: c, reason: "matches_filters" },
+          { candidateId: b, reason: "matches_filters", distance: "nearby" },
+          { candidateId: c, reason: "matches_filters", distance: "nearby" },
         ],
       });
       const firstPid = await pidOf(first);
@@ -858,6 +862,8 @@ describe("erasure, the export and the events", () => {
             decision: "like",
             decisionInWords: "Liked",
             decidedAt: expect.any(String),
+            distance: "nearby",
+            distanceInWords: "Nearby",
           },
         ],
       },
@@ -890,7 +896,7 @@ describe("erasure, the export and the events", () => {
         accountId: a.accountId,
         day: TODAY,
         ordering: "count",
-        entries: [{ candidateId: b.accountId, reason: "matches_filters" }],
+        entries: [{ candidateId: b.accountId, reason: "matches_filters", distance: "nearby" }],
       }),
     ).toBeNull();
     expect(await eventsOf(ctx.client, "round_built")).toHaveLength(1);
@@ -912,7 +918,7 @@ describe("erasure, the export and the events", () => {
         accountId: gone.accountId,
         day: TODAY,
         ordering: "count",
-        entries: [{ candidateId: b.accountId, reason: "matches_filters" }],
+        entries: [{ candidateId: b.accountId, reason: "matches_filters", distance: "nearby" }],
       }),
     ).toBeNull();
     await erase(c);
@@ -953,7 +959,7 @@ describe("erasure, the export and the events", () => {
           accountId: who.accountId,
           day: TODAY,
           ordering: "count",
-          entries: [{ candidateId: c.accountId, reason: "matches_filters" }],
+          entries: [{ candidateId: c.accountId, reason: "matches_filters", distance: "nearby" }],
         }),
       ).toBeNull();
     }

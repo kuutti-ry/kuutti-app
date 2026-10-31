@@ -3,6 +3,14 @@ import { CONSENT_VERSIONS } from "@kuutti/i18n";
 import type { ProfileFields } from "@kuutti/schema";
 
 /**
+ * Kept places of the list at known distances (ADR-061): `HOME`, Kallio, and from
+ * it, by the bands of 5, 15 and 50 km, Sörnäinen at 0.8 km, Vattuniemi at 5.1,
+ * Hiekkaharju at 15.0 and Rovaniemi at 714.
+ */
+export const HOME = "00530";
+export const HOMES = { nearby: "00500", close: "00210", around: "01350", far: "96100" } as const;
+
+/**
  * Many verified people at once, for figures that only mean something in
  * numbers (#54). Plain SQL like `signedInAccount`: a test of one slice may
  * not import another's internals. No sessions: nobody here signs in.
@@ -22,6 +30,8 @@ export type PeopleOptions = {
   intent?: NonNullable<ProfileFields["intent"]>;
   /** With `complete`: their other answers, beside the intent (default: none; #87). */
   fields?: ProfileFields;
+  /** Their kept place's key, as a home is stored (default: `HOME` with `complete`, else none; null for a complete person with none, #514). */
+  home?: string | null;
   /** Born in June of this year (default: 1990). */
   birthYear?: number;
   /** Terms, privacy and the special-category consent in their current wording, as onboarding leaves them (#46, #146): what completeness asks for (ADR-060 §3). */
@@ -112,8 +122,9 @@ export async function people(
        FROM generate_series(1, $3::int) g
        RETURNING id)
      , numbered AS (SELECT id, row_number() OVER () AS n FROM ids)
-     INSERT INTO account (identity_id, state, birth_year, birth_month, gender, pond_id, registered_at)
-     SELECT id, $4::account_state, $7, 6, $5::gender, $6,
+     INSERT INTO account (identity_id, state, birth_year, birth_month, gender, pond_id, home_place,
+                          registered_at)
+     SELECT id, $4::account_state, $7, 6, $5::gender, $6, $9,
             coalesce($8::timestamptz, now()) + n * interval '1 second'
      FROM numbered ORDER BY n
      RETURNING id, registered_at`,
@@ -126,6 +137,7 @@ export async function people(
       pondId,
       options.birthYear ?? 1990,
       options.registeredAt ?? null,
+      options.home === undefined ? (options.complete ? HOME : null) : options.home,
     ],
   );
   const ids = rows

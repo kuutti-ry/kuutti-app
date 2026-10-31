@@ -52,11 +52,6 @@ const target = { database: "kuutti", user: "kuutti_app", host: "10.0.1.5", port:
 
 async function world(ctx: TestContext) {
   const { logger, lines } = await captureLogger();
-  // The pond the histories name, and the default pond (#146): the test database has no seed.
-  await ctx.client.query(
-    `INSERT INTO ponds (slug, name_nominative, name_inessive) VALUES ('paakaupunkiseutu', 'Pääkaupunkiseutu', 'Pääkaupunkiseudulla')
-     ON CONFLICT (slug) DO NOTHING`,
-  );
   const hmacKey = hmacKeyFromHex(randomBytes(32).toString("hex"));
   const now = () => new Date();
   const writer = viaServices({ db: ctx.client, logger, now, hmacKey });
@@ -208,18 +203,36 @@ describe("the stories through the services", () => {
     const { rows: accounts } = await ctx.client.query<{
       state: string;
       slug: string | null;
+      home: string | null;
       hide: boolean | null;
       terms: string | null;
     }>(
-      `SELECT a.state, p.slug,
+      `SELECT a.state, p.slug, a.home_place AS home,
               (SELECT (pr.fields->>'hideFromField')::boolean FROM profile pr WHERE pr.account_id = a.id) AS hide,
               (SELECT c.version FROM consent c WHERE c.account_id = a.id AND c.kind = 'terms' LIMIT 1) AS terms
        FROM account a LEFT JOIN ponds p ON p.id = a.pond_id WHERE a.identity_id = $1`,
       [sanna.identity?.id],
     );
     expect(accounts).toEqual([
-      { state: "active", slug: "paakaupunkiseutu", hide: null, terms: expect.any(String) },
+      { state: "active", slug: "suomi", home: "02100", hide: null, terms: expect.any(String) },
     ]);
+    // What the route keeps of what each typed (ADR-061 §2): an area too small
+    // for it goes to its municipality, one too small to the nearest that is
+    // not, and Onni left before the step.
+    const kept: [string, string | null, string | null][] = [
+      ["kerttu", "149", "suomi"],
+      ["helmi", "505", "suomi"],
+      ["onni", null, null],
+    ];
+    for (const [key, home, slug] of kept) {
+      const { identity } = await loginWouldBe(ctx, hmacKey, key);
+      const { rows } = await ctx.client.query(
+        `SELECT a.home_place AS home, p.slug FROM account a LEFT JOIN ponds p ON p.id = a.pond_id
+         WHERE a.identity_id = $1`,
+        [identity?.id],
+      );
+      expect(rows, key).toEqual([{ home, slug }]);
+    }
     const noa = await loginWouldBe(ctx, hmacKey, "noa");
     const { rows: noaRows } = await ctx.client.query<{ hide: boolean }>(
       `SELECT (pr.fields->>'hideFromField')::boolean AS hide FROM profile pr
@@ -425,21 +438,23 @@ describe("the stories through the services", () => {
       standing: 1,
     });
 
-    const { rows } = await ctx.client.query<{ candidate_id: string; reason: string }>(
-      `SELECT e.candidate_id, e.reason FROM rounds r JOIN round_entries e ON e.round_id = r.id
+    const { rows } = await ctx.client.query<{
+      candidate_id: string;
+      reason: string;
+      distance: string;
+    }>(
+      `SELECT e.candidate_id, e.reason, e.distance FROM rounds r JOIN round_entries e ON e.round_id = r.id
         WHERE r.account_id = $1 AND r.day = $2 ORDER BY e.position`,
       [account("iida"), finnishDay(now())],
     );
-    // Henna's like waits first (ADR-037); the other three as anybody's cards, in the order of the soft matches.
-    expect(rows[0]).toEqual({ candidate_id: account("henna"), reason: "liked_you" });
-    expect(rows.slice(1).map((r) => r.reason)).toEqual([
-      "matches_filters",
-      "matches_filters",
-      "matches_filters",
+    // Henna's like waits first (ADR-037); the other three as anybody's cards,
+    // nearest first (ADR-061 §6), and every band is on its entry (§5).
+    expect(rows).toEqual([
+      { candidate_id: account("henna"), reason: "liked_you", distance: "nearby" },
+      { candidate_id: account("katja"), reason: "matches_filters", distance: "close" },
+      { candidate_id: account("minna"), reason: "matches_filters", distance: "around" },
+      { candidate_id: account("riikka"), reason: "matches_filters", distance: "far" },
     ]);
-    expect(new Set(rows.slice(1).map((r) => r.candidate_id))).toEqual(
-      new Set(["katja", "minna", "riikka"].map(account)),
-    );
 
     // Staging's job runs again without a reset: the round and the like stay as they were.
     expect(await giveRounds({ db: ctx.client, logger, now }, results)).toEqual({
@@ -469,6 +484,9 @@ describe("the stories through the services", () => {
       for (const seeks of history.onboarding?.seeks ?? []) {
         expect(text, history.key).not.toMatch(new RegExp(`"seeks":\\s*\\[?"?${seeks}`));
       }
+      // Bounded, so that the same five digits inside an id are no finding.
+      const home = history.onboarding?.home;
+      if (home) expect(text, history.key).not.toMatch(new RegExp(`\\b${home}\\b`));
     }
     expect(text).not.toMatch(/"gender":\s*"(woman|man|non_binary)"/);
   });

@@ -7,7 +7,7 @@ export type { Logger };
 
 /**
  * Fields that must never reach a log line: the personal identity code, message
- * text, email, credentials, a report's note, a message's body, a stored contact (CLAUDE.md security defaults, rule 5). Top level and
+ * text, email, credentials, a report's note, a message's body, a stored contact, a home (CLAUDE.md security defaults, rule 5). Top level and
  * one level nested; the PII-in-logs test (#11) is the backstop.
  */
 const REDACTED_PATHS = [
@@ -29,6 +29,11 @@ const REDACTED_PATHS = [
   "caption",
   // A stored contact (#103, ADR-031 §11): the request's body names it so.
   "value",
+  // A home (#514, ADR-061 §9): the request's body and the row name it so. A net:
+  // the digits are looked up in memory, and no line is written with a home in it.
+  "postalCode",
+  "homePlace",
+  "home_place",
   "*.hetu",
   "*.personal_identity_code",
   "*.email",
@@ -43,6 +48,9 @@ const REDACTED_PATHS = [
   "*.note",
   "*.body",
   "*.value",
+  "*.postalCode",
+  "*.homePlace",
+  "*.home_place",
 ];
 
 type LogDestination = { write(line: string): void };

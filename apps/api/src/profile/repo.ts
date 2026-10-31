@@ -156,6 +156,9 @@ export type CardSubject = {
   birthMonth: number | null;
   /** Self-declared, display only (ADR-019 §1). */
   gender: Gender | null;
+  /** The kept place's key and whether the card shows its area (ADR-061 §3): the card reads a name from these, and neither leaves the API. */
+  homePlace: string | null;
+  homeShowsArea: boolean;
   profile: ProfileRow | null;
   /** A block stands between the viewer and the subject, set by either (#84, ADR-030 §2). */
   blocked: boolean;
@@ -174,7 +177,7 @@ export async function findCardSubject(
   input: { viewerAccountId: string; subjectAccountId: string },
 ): Promise<CardSubject | null> {
   const { rows } = await db.query<Row>(
-    `SELECT a.id, a.state, a.birth_year, a.birth_month, a.gender,
+    `SELECT a.id, a.state, a.birth_year, a.birth_month, a.gender, a.home_place, a.home_shows_area,
             blocked_between($2, a.id) AS blocked,
             p.account_id, p.display_name, p.bio, p.bio_preset, p.fields, p.prompts,
             p.hidden_fields, p.updated_at
@@ -190,6 +193,8 @@ export async function findCardSubject(
     birthYear: (r.birth_year as number | null) ?? null,
     birthMonth: (r.birth_month as number | null) ?? null,
     gender: (r.gender as Gender | null) ?? null,
+    homePlace: (r.home_place as string | null) ?? null,
+    homeShowsArea: r.home_shows_area === true,
     profile: r.account_id ? profileFrom(r) : null,
     blocked: r.blocked === true,
   };

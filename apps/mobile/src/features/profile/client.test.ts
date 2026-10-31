@@ -5,6 +5,7 @@ import {
   fetchDealBreakers,
   fetchProfile,
   saveDealBreakers,
+  saveHome,
   saveProfile,
 } from "./client";
 
@@ -20,6 +21,7 @@ const refusal = (code: string, status: number) =>
 const EMPTY = {
   profile: null,
   completeness: { complete: false, missing: ["photos"] },
+  home: null,
 };
 const DEAL_BREAKERS = { dealBreakers: [], max: 3 };
 
@@ -68,6 +70,7 @@ describe("the profile client", () => {
         updatedAt: "2026-09-26T10:00:00.000Z",
       },
       completeness: EMPTY.completeness,
+      home: null,
     };
     const seen = answering(
       json(stored),
@@ -94,6 +97,80 @@ describe("the profile client", () => {
       message: "profile save answered 422",
     });
     expect(first).toHaveBeenCalledWith(null);
+  });
+
+  describe("saveHome (ADR-061)", () => {
+    const HOME = {
+      town: { fi: "Helsinki", sv: "Helsingfors" },
+      area: { fi: "Kallio", sv: "Berghäll" },
+      showArea: false,
+    };
+
+    it.each([
+      ["a new postal code", { postalCode: "00530" }],
+      ["what the card shows", { showArea: true }],
+      ["both", { postalCode: "00530", showArea: true }],
+    ])(
+      "sends %s in the body and nowhere else, and answers what the API kept",
+      async (_what, update) => {
+        const seen = answering(json(HOME));
+        expect(await saveHome(update)).toEqual(HOME);
+        expect(seen[0]?.method).toBe("PUT");
+        expect(pathOf(seen[0])).toBe("/account/home");
+        expect(new URL(seen[0]?.url ?? "").search).toBe("");
+        expect(JSON.parse(await (seen[0] as Request).text())).toEqual(update);
+      },
+    );
+
+    it("fails a refusal with its code, which the screens say in words", async () => {
+      answering(refusal("postal_code_unknown", 400));
+      await expect(saveHome({ postalCode: "99999" })).rejects.toMatchObject({
+        name: "ApiError",
+        status: 400,
+        code: "postal_code_unknown",
+        message: "home answered 400",
+      });
+    });
+
+    it("never repeats the digits in what it throws", async () => {
+      answering(refusal("postal_code_unknown", 400));
+      const failure = await saveHome({ postalCode: "99999" }).catch((error: Error) => error);
+      expect(String((failure as Error).message)).not.toContain("99999");
+    });
+
+    it("refuses an answer outside the contract", async () => {
+      answering(json({ town: "Helsinki" }));
+      await expect(saveHome({ showArea: true })).rejects.toThrow();
+    });
+
+    it("keeps its place in the line of saves: the list reads what was stored", async () => {
+      let answer: ((response: Response) => void) | undefined;
+      const paths: string[] = [];
+      globalThis.fetch = jest.fn(async (input: Request | string, init?: RequestInit) => {
+        const request = input instanceof Request ? input : new Request(input, init);
+        paths.push(`${request.method} ${pathOf(request)}`);
+        if (request.method === "PUT") {
+          return new Promise<Response>((resolve) => {
+            answer = resolve;
+          });
+        }
+        return json(EMPTY);
+      }) as unknown as typeof fetch;
+      const saved = saveHome({ showArea: true });
+      const read = fetchProfile();
+      await new Promise<void>((resolve) => setTimeout(resolve, 10));
+      expect(paths).toEqual(["PUT /account/home"]);
+      answer?.(json(HOME));
+      await saved;
+      await read;
+      expect(paths).toEqual(["PUT /account/home", "GET /profile"]);
+    });
+
+    it("leaves the line open after a refusal", async () => {
+      answering(refusal("internal_error", 500), json(EMPTY));
+      await expect(saveHome({ showArea: true })).rejects.toMatchObject({ status: 500 });
+      expect(await fetchProfile()).toEqual(EMPTY);
+    });
   });
 
   it("sends nothing when the stored document cannot be read first, and fails with that read's code", async () => {
@@ -124,7 +201,7 @@ describe("the profile client", () => {
       displayName: "Aino",
       age: { years: 36, verifiedByBank: true },
       gender: null,
-      pond: null,
+      place: null,
       photos: [
         {
           id: "0b1c1c4e-9a8e-4a0b-9c3a-0c8d1e2f3a01",

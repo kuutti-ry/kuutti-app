@@ -58,10 +58,6 @@ async function release(): Promise<{ dir: string; manifest: PhotoAsset[] }> {
 
 async function world(ctx: TestContext, assets: { dir: string; manifest: PhotoAsset[] }) {
   const { logger, lines } = await captureLogger();
-  await ctx.client.query(
-    `INSERT INTO ponds (slug, name_nominative, name_inessive) VALUES ('paakaupunkiseutu', 'Pääkaupunkiseutu', 'Pääkaupunkiseudulla')
-     ON CONFLICT (slug) DO NOTHING`,
-  );
   const media = testMediaDeps({ concurrency: 2 });
   const writer = viaServices({
     db: ctx.client,

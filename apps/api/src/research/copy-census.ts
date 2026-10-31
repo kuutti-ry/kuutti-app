@@ -34,7 +34,7 @@ export const COARSE_AGE_BAND: Record<AgeBand, string> = {
 };
 
 export type Cell = {
-  /** The pond's slug; null before the person chose one; WITHHELD when generalised. */
+  /** The pond's slug; null before the person has a home; WITHHELD when generalised. */
   pond: string | null;
   /** One of AGE_BANDS, or a COARSE_AGE_BAND value when generalised. */
   ageBand: string;

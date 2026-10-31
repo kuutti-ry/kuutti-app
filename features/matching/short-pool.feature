@@ -8,7 +8,9 @@ Feature: The short pool: coming back, relaxing a deal-breaker for the day, and w
   and one tap undoes it. Nothing else is ever relaxed, and nobody whose own
   filters exclude the person is ever let in. A like on a relaxed card reaches
   its person. Every card says which of the person's deal-breakers its person
-  did not answer.
+  did not answer. A deal-breaker on distance has nobody who did not answer, so
+  it is offered set aside alone and no card names it (filters.feature, ADR-061
+  §7).
 
   Scenario: Everybody new comes before anybody shown before
     Given round_size is 2, "A" has "B" new in their pool, "C" shown 45 days ago and "D" shown 40 days ago, both left undecided

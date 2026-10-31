@@ -1,9 +1,10 @@
 import { type Queryable, transaction } from "@kuutti/db";
 import {
-  DEAL_BREAKER_FIELDS,
   DEAL_BREAKERS_CAP,
   type DealBreaker,
+  DealBreakerField,
   type DealBreakersUpdate,
+  DISTANCE_FILTER_BANDS,
   dealBreakerOptions,
   PROFILE_FIELDS,
   type StoredDealBreaker,
@@ -25,7 +26,7 @@ const DEAL_BREAKERS_MAX_KEY = "deal_breakers_max";
 /** The caller's own answers, by field key; the route hands it in from the profile slice. */
 export type OwnFieldsReader = (accountId: string) => Promise<Record<string, unknown>>;
 
-const WHITELIST = DEAL_BREAKER_FIELDS as readonly string[];
+const WHITELIST: readonly string[] = DealBreakerField.options;
 const Accept = z.array(z.string());
 
 /** How many a person may have: the tunable, bounded by the contract's ceiling so a larger row never breaks a client. */
@@ -33,14 +34,24 @@ export async function dealBreakersMax(db: Queryable): Promise<number> {
   return Math.min(await matchingConfigNumber(db, DEAL_BREAKERS_MAX_KEY), DEAL_BREAKERS_CAP);
 }
 
-/** A filter waits while the person's own answer on its field is missing: read, never stored. The pool asks the same (#87). */
+/**
+ * A filter waits while the person's own answer on its field is missing: read,
+ * never stored. The pool asks the same (#87). Distance has no field: it reads
+ * the home everybody has, so it never waits (ADR-061 §7).
+ */
 export const pausedOf = (field: string, own: Record<string, unknown>): boolean =>
-  own[field] === undefined;
+  field !== "distance" && own[field] === undefined;
 
 /** The first accepted answer that is no option of the field, or null when every one is. */
 function invalidAccept(dealBreaker: DealBreaker): string | null {
   const options = dealBreakerOptions(dealBreaker.field);
   return dealBreaker.accept.find((option) => !options.includes(option)) ?? null;
+}
+
+/** A filter on distance is up to a band, the nearer ones with it (ADR-061 §7): nothing skipped, nothing twice. */
+function upToABand(accept: readonly string[]): boolean {
+  const bands: readonly string[] = DISTANCE_FILTER_BANDS.slice(0, accept.length);
+  return bands.length === accept.length && bands.every((band) => accept.includes(band));
 }
 
 /** A stored row of `preferences` on a deal-breaker's field. */
@@ -51,7 +62,9 @@ export type DealBreakerRow = { field: string; value: unknown; include_unknown: b
  * whitelist reads as none; so does an option that left the registry (ADR-009
  * §1), and a row with no option left: the next save removes it, since it is
  * not in the set sent. The caller's own read and the round builder's of many
- * people at once (#87) read them alike.
+ * people at once (#87) read them alike. Nobody is unknown to a filter on
+ * distance, so it lets them through whatever a row says: a short round then
+ * offers it set aside alone (ADR-061 §7).
  */
 export function dealBreakersFrom(rows: readonly DealBreakerRow[]): DealBreaker[] {
   return rows.flatMap((row) => {
@@ -59,7 +72,8 @@ export function dealBreakersFrom(rows: readonly DealBreakerRow[]): DealBreaker[]
     const field = row.field as DealBreaker["field"];
     const options = dealBreakerOptions(field);
     const accept = (Accept.safeParse(row.value).data ?? []).filter((o) => options.includes(o));
-    return accept.length === 0 ? [] : [{ field, accept, includeUnknown: row.include_unknown }];
+    const includeUnknown = field === "distance" || row.include_unknown;
+    return accept.length === 0 ? [] : [{ field, accept, includeUnknown }];
   });
 }
 
@@ -89,8 +103,8 @@ const sameFilter = (a: DealBreaker, b: DealBreaker): boolean =>
 
 /**
  * The whole set, replaced: at most `max`, each on a distinct whitelisted
- * field, accepting options the field has, or one relation of a number (#508).
- * A filter set or changed on what the person will not say about themselves is
+ * field, accepting options the field has, one relation of a number (#508), or
+ * the bands up to one (ADR-061 §7). A filter set or changed on what the person will not say about themselves is
  * refused as `filter_unanswered`, with the field, so the screen can ask for
  * the answer instead; a paused one sent back as it stands is kept, since the
  * screen sends the whole set and a pause deletes nothing (ADR-009 §1). Nothing
@@ -118,7 +132,16 @@ export async function saveDealBreakers(
         field: dealBreaker.field,
       });
     }
-    if (PROFILE_FIELDS[dealBreaker.field].kind === "number" && dealBreaker.accept.length > 1) {
+    if (dealBreaker.field === "distance") {
+      if (!upToABand(dealBreaker.accept)) {
+        throw new AppError(400, "validation_failed", "The bands up to one", {
+          field: dealBreaker.field,
+        });
+      }
+    } else if (
+      PROFILE_FIELDS[dealBreaker.field].kind === "number" &&
+      dealBreaker.accept.length > 1
+    ) {
       throw new AppError(400, "validation_failed", "One relation at most", {
         field: dealBreaker.field,
       });
@@ -162,7 +185,7 @@ export async function saveDealBreakers(
           accountId,
           dealBreaker.field,
           JSON.stringify(dealBreaker.accept),
-          dealBreaker.includeUnknown,
+          dealBreaker.field === "distance" || dealBreaker.includeUnknown,
           at,
         ],
       );

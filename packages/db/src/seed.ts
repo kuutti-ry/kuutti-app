@@ -5,18 +5,12 @@ import type { Pool } from "./pool.ts";
 import { account, identity, matchingConfig, ponds, preferences, profile } from "./schema/index.ts";
 
 /**
- * One pond for now, the capital region (#146, ADR-010 §10 and §11): everybody
- * is in Pääkaupunkiseutu, assigned by the API from matching_config.default_pond,
- * and the pond step does not exist. The postal-code ponds of the field sheet
- * come later; the tree (parent_id) is ready for them.
+ * One pond, the whole country (ADR-061 §8), set by the API with a person's home
+ * from matching_config.default_pond. Migration 0027 writes the same row, and a
+ * second pond here would come back on every boot of a preview after migration
+ * 0093 took it away.
  */
 export const SEED_PONDS = [
-  {
-    slug: "paakaupunkiseutu",
-    nameNominative: "Pääkaupunkiseutu",
-    nameInessive: "Pääkaupunkiseudulla",
-  },
-  // The rest of the country, a sibling of the capital region (#174, ADR-010 §12); migration 0027 writes the same row.
   {
     slug: "suomi",
     nameNominative: "Suomi",
@@ -170,8 +164,8 @@ export const MATCHING_CONFIG_V1 = {
   // only where at least this many people stand behind it.
   waitlist_k: 10,
   // #146 (ADR-010 §10): the pond every account is put in when it has none;
-  // the slug of a row in ponds. Version 2 names another (below); null once
-  // people choose among several.
+  // the slug of a row in ponds. Version 2 named another, version 3 this one
+  // again (below).
   default_pond: "suomi",
   // #147 (the field sheet, ADR-060 §9): a change of gender is possible once in
   // this many days.
@@ -179,6 +173,16 @@ export const MATCHING_CONFIG_V1 = {
   // #149 (TD-16, the disclose-to-filter rule): how many deal-breakers a person
   // may set; two at launch, so a small pond is not cut to nothing.
   deal_breakers_max: 2,
+  // #514 (ADR-061 §2, §3, migration 0095): a place kept has at least this many
+  // people, the one number no name, band or probe narrows anybody below; a
+  // town on a card has at least the second.
+  home_min_inhabitants: 3000,
+  home_town_min_inhabitants: 20000,
+  // #514 (ADR-061 §5, migration 0095): the outer edges of the distance bands
+  // in kilometres, nearby, close and around; far has none.
+  distance_nearby_km: 5,
+  distance_close_km: 15,
+  distance_around_km: 50,
 } as const;
 
 /**
@@ -203,6 +207,16 @@ export const MATCHING_CONFIG_V2 = {
 } as const;
 
 /**
+ * matching_config version 3: one pond, the whole country (ADR-061 §8, migration
+ * 0093), and a seventh deal-breaker, the distance, which is no field (ADR-061
+ * §7, migration 0095); the maintainer's of 31/10/2026.
+ */
+export const MATCHING_CONFIG_V3 = {
+  default_pond: "suomi",
+  deal_breakers_max: 7,
+} as const;
+
+/**
  * Identities that make the re-registration rule reachable through the mock
  * IdP (#34): one banned, one inside its deletion cooldown, one active with a
  * live account. Their hetu_hmac is a hash of the label, not of any code, so
@@ -218,6 +232,9 @@ export const SEED_IDENTITIES = [
     account: { birthYear: 1990, birthMonth: 1 },
   },
 ] as const;
+
+/** The seeded live account's home (ADR-061 §2): a key as the home's route keeps it, here Kallio's. */
+const SEED_HOME_PLACE = "00530";
 
 /** The seeded live account's profile (#47), so the card preview has something to show against the mock IdP. */
 const SEED_PROFILE = {
@@ -265,6 +282,7 @@ export async function seed(pool: Pool, createdBy = "seed"): Promise<SeedResult> 
   for (const [version, rows] of [
     [1, MATCHING_CONFIG_V1],
     [2, MATCHING_CONFIG_V2],
+    [3, MATCHING_CONFIG_V3],
   ] as const) {
     for (const [key, value] of Object.entries(rows)) {
       await db
@@ -310,15 +328,15 @@ export async function seed(pool: Pool, createdBy = "seed"): Promise<SeedResult> 
         .from(account)
         .where(and(eq(account.identityId, row.id), ne(account.state, "deleted")));
       if (current) {
-        // Onboarding (#46): gender, pond and the two hard rows; the consents
+        // Onboarding (#46): gender, home, pond and the two hard rows; the consents
         // are left for the flow to ask, so the screens can be tried locally.
         const [pond] = await db
           .select({ id: ponds.id })
           .from(ponds)
-          .where(eq(ponds.slug, MATCHING_CONFIG_V2.default_pond));
+          .where(eq(ponds.slug, MATCHING_CONFIG_V3.default_pond));
         await db
           .update(account)
-          .set({ gender: "woman", pondId: pond?.id ?? null })
+          .set({ gender: "woman", pondId: pond?.id ?? null, homePlace: SEED_HOME_PLACE })
           .where(eq(account.id, current.id));
         for (const [field, value] of [
           ["seeks", ["man", "non_binary"]],
@@ -356,7 +374,10 @@ export async function seed(pool: Pool, createdBy = "seed"): Promise<SeedResult> 
 
   return {
     ponds: SEED_PONDS.length,
-    matchingConfig: Object.keys(MATCHING_CONFIG_V1).length + Object.keys(MATCHING_CONFIG_V2).length,
+    matchingConfig: [MATCHING_CONFIG_V1, MATCHING_CONFIG_V2, MATCHING_CONFIG_V3].reduce(
+      (sum, version) => sum + Object.keys(version).length,
+      0,
+    ),
     identities: SEED_IDENTITIES.length,
   };
 }

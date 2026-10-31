@@ -4,74 +4,125 @@ import { signedInAccount } from "../test/account.ts";
 import { type TestContext, test } from "../test/harness.ts";
 import { pondNamed } from "../test/people.ts";
 import {
-  findPondBySlug,
+  findHomeOfAccount,
   findPondOfAccount,
+  listPonds,
   listPondsForAdmin,
+  lockHomeOfAccount,
   setMatchingOpen,
-  setPondOfAccount,
+  writeHomeOfAccount,
 } from "./repo.ts";
 
-// The pond slice's rows (#46, #500): the ponds by slug and by account, the
-// choice and what it answers, and the switch. Each statement about a person
+// The pond slice's rows (#46, #500, #514): the pond and the home of an account,
+// the write that sets them, and the switch. Each statement about a person
 // carries that person's account id (rule 6).
 
-async function childPond(ctx: TestContext, slug: string, parentId: string) {
-  const { rows } = await ctx.client.query<{ id: string }>(
-    `INSERT INTO ponds (slug, name_nominative, name_inessive, parent_id)
-     VALUES ($1, 'Otaniemi', 'Otaniemessä', $2) RETURNING id`,
-    [slug, parentId],
-  );
-  return rows[0]?.id ?? "";
-}
+const AT = new Date("2026-10-20T09:00:00.000Z");
 
-describe("ponds by slug and by account", () => {
-  test("a pond is found by its slug with its parent, and an unknown slug finds nothing", async ({
-    ctx,
-  }) => {
-    const parent = await pondNamed(ctx.client, "test-repo-espoo");
-    const child = await childPond(ctx, "test-repo-otaniemi", parent);
-    expect(await findPondBySlug(ctx.client, "test-repo-otaniemi")).toEqual({
-      id: child,
-      slug: "test-repo-otaniemi",
-      name: "Otaniemi",
-      nameInessive: "Otaniemessä",
-      parentId: parent,
-    });
-    expect(await findPondBySlug(ctx.client, "test-repo-espoo")).toMatchObject({
-      id: parent,
-      parentId: null,
-    });
-    expect(await findPondBySlug(ctx.client, "test-repo-nowhere")).toBeNull();
+describe("the pond and the home of an account", () => {
+  test("the ponds are listed parents first, whatever their names", async ({ ctx }) => {
+    const zeta = await pondNamed(ctx.client, "test-repo-zeta");
+    const { rows } = await ctx.client.query<{ id: string }>(
+      `INSERT INTO ponds (slug, name_nominative, name_inessive, parent_id)
+       VALUES ('test-repo-child', 'Aalto', 'Aallossa', $1) RETURNING id`,
+      [zeta],
+    );
+    const ponds = (await listPonds(ctx.client)).map((pond) => pond.id);
+    expect(ponds.indexOf(zeta)).toBeLessThan(ponds.indexOf(rows[0]?.id ?? ""));
   });
 
-  test("the pond of an account is its own choice, and nothing before it chose", async ({ ctx }) => {
+  test("an account's pond is its own, and nothing before the home set it", async ({ ctx }) => {
     const a = await signedInAccount(ctx.client, "a");
     const b = await signedInAccount(ctx.client, "b");
-    const pondId = await pondNamed(ctx.client, "test-repo-own");
     expect(await findPondOfAccount(ctx.client, a.accountId)).toBeNull();
-    expect(await setPondOfAccount(ctx.client, a.accountId, pondId)).toBe("set");
+    const home = { place: "00530", showsArea: false };
+    const pondId = await writeHomeOfAccount(ctx.client, a.accountId, home, "suomi", AT);
     expect(await findPondOfAccount(ctx.client, a.accountId)).toMatchObject({
       id: pondId,
-      slug: "test-repo-own",
+      slug: "suomi",
     });
     expect(await findPondOfAccount(ctx.client, b.accountId)).toBeNull();
+    expect(await findHomeOfAccount(ctx.client, b.accountId)).toEqual({
+      place: null,
+      showsArea: false,
+      movedAt: null,
+    });
   });
 
-  test("the choice says whether the pond or the account was missing", async ({ ctx }) => {
+  test("the write says what pond the account ends with, none where the slug names no pond", async ({
+    ctx,
+  }) => {
     const a = await signedInAccount(ctx.client);
-    const pondId = await pondNamed(ctx.client, "test-repo-choice");
-    expect(
-      await setPondOfAccount(ctx.client, a.accountId, "00000000-0000-4000-8000-000000000009"),
-    ).toBe("no_pond");
+    const home = { place: "00530", showsArea: true };
+    expect(await writeHomeOfAccount(ctx.client, a.accountId, home, "nowhere", AT)).toBeNull();
+    expect(await writeHomeOfAccount(ctx.client, a.accountId, home, null, AT)).toBeNull();
+    const pondId = await pondNamed(ctx.client, "test-repo-held");
+    await ctx.client.query("UPDATE account SET pond_id = $2 WHERE id = $1", [a.accountId, pondId]);
+    expect(await writeHomeOfAccount(ctx.client, a.accountId, home, "suomi", AT)).toBe(pondId);
+  });
+
+  test("a write with no place leaves the kept place, and sets what the card shows", async ({
+    ctx,
+  }) => {
+    const a = await signedInAccount(ctx.client);
+    await writeHomeOfAccount(
+      ctx.client,
+      a.accountId,
+      { place: "00530", showsArea: false },
+      "suomi",
+      AT,
+    );
+    await writeHomeOfAccount(
+      ctx.client,
+      a.accountId,
+      { place: null, showsArea: true },
+      "suomi",
+      AT,
+    );
+    expect(await findHomeOfAccount(ctx.client, a.accountId)).toEqual({
+      place: "00530",
+      showsArea: true,
+      movedAt: null,
+    });
+  });
+
+  test("another place than the one held is a move, at the time given, and overwrites the last", async ({
+    ctx,
+  }) => {
+    const a = await signedInAccount(ctx.client);
+    const write = (place: string | null, at: Date) =>
+      writeHomeOfAccount(ctx.client, a.accountId, { place, showsArea: false }, "suomi", at);
+    const movedAt = async () => (await findHomeOfAccount(ctx.client, a.accountId))?.movedAt;
+    const LATER = new Date(AT.getTime() + 60_000);
+
+    // The first home moves nobody, nor does the same place again, nor the choice alone.
+    await write("00530", AT);
+    expect(await movedAt()).toBeNull();
+    await write("00530", LATER);
+    expect(await movedAt()).toBeNull();
+    await write(null, LATER);
+    expect(await movedAt()).toBeNull();
+
+    await write("00100", AT);
+    expect(await movedAt()).toEqual(AT);
+    await write("00530", LATER);
+    expect(await movedAt()).toEqual(LATER);
+  });
+
+  test("the lock finds a live account's home, and nothing on a tombstone", async ({ ctx }) => {
+    const a = await signedInAccount(ctx.client);
+    await ctx.client.query("UPDATE account SET home_place = '091' WHERE id = $1", [a.accountId]);
+    expect(await lockHomeOfAccount(ctx.client, a.accountId)).toEqual({
+      place: "091",
+      showsArea: false,
+      movedAt: null,
+    });
     await ctx.client.query(
       "UPDATE account SET state = 'deleted', deleted_at = now() WHERE id = $1",
       [a.accountId],
     );
-    expect(await setPondOfAccount(ctx.client, a.accountId, pondId)).toBe("no_account");
-    const { rows } = await ctx.client.query("SELECT pond_id FROM account WHERE id = $1", [
-      a.accountId,
-    ]);
-    expect(rows[0]?.pond_id).toBeNull();
+    expect(await lockHomeOfAccount(ctx.client, a.accountId)).toBeNull();
+    expect(await findHomeOfAccount(ctx.client, "00000000-0000-4000-8000-000000000009")).toBeNull();
   });
 });
 

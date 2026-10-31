@@ -24,6 +24,7 @@ const STATUS = {
   age: 36,
   gender: "woman",
   pond: null,
+  home: null,
   preferences: { seeks: ["man"], ageWindow: { min: 30, max: 40 } },
   consents: { terms: "v1", privacy: "v1", specialCategory: "s1", research: null },
   currentVersions: { terms: "v1", privacy: "v1", research: "v1", special_category: "s1" },

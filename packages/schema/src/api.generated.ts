@@ -2044,7 +2044,7 @@ export interface paths {
         };
         /**
          * The caller's profile and what it still needs
-         * @description The profile as saved (null before the first save) and the completeness rule's verdict (what is missing before the profile can enter a round).
+         * @description The profile as saved (null before the first save), the completeness rule's verdict (what is missing before the profile can enter a round), and the home in names, which PUT /account/home writes and this document never does.
          */
         get: {
             parameters: {
@@ -2203,7 +2203,7 @@ export interface paths {
         };
         /**
          * What the caller has answered and which steps of onboarding are still open
-         * @description The steps of the field sheet in the order the app asks them, the answers so far, the consents given for the current wordings and the current versions. An account without a pond is put in the default pond here. When the four answers matching needs and the two consents are there and the account is still registered, it becomes active here; the profile steps keep `complete` false until they are done.
+         * @description The steps of the field sheet in the order the app asks them, the answers so far, the consents given for the current wordings and the current versions. When the four answers matching needs and the two consents are there and the account is still registered, it becomes active here; the profile steps keep `complete` false until they are done.
          */
         get: {
             parameters: {
@@ -6270,55 +6270,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/ponds": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * The ponds a person can choose
-         * @description Every pond with both Finnish case forms (TD-17), parents first. Where matching happens (TD-10); the choice is one per account.
-         */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description The ponds. */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["PondList"];
-                    };
-                };
-                /** @description unauthenticated, session_expired or session_revoked. */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ErrorResponse"];
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/account/pond": {
+    "/account/home": {
         parameters: {
             query?: never;
             header?: never;
@@ -6326,7 +6278,10 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** Choose the caller's pond */
+        /**
+         * Set the caller's home, or what their card shows of it
+         * @description A postal code of five digits, whether the card shows the area instead of the town, or both. What is kept is a place of at least matching_config home_min_inhabitants people: the postal area, else its municipality, else the nearest municipality that has them. A new postal code starts from the town again unless the same request says otherwise, and showArea stays false where no area is kept. The home changes whenever the person likes. The write sets the account's pond if it has none. The answer names places and never carries digits.
+         */
         put: {
             parameters: {
                 query?: never;
@@ -6336,18 +6291,20 @@ export interface paths {
             };
             requestBody: {
                 content: {
-                    "application/json": components["schemas"]["PondChoice"];
+                    "application/json": components["schemas"]["HomeUpdate"];
                 };
             };
             responses: {
-                /** @description Chosen. */
-                204: {
+                /** @description Saved; the home as its owner reads it. */
+                200: {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": components["schemas"]["HomeSummary"];
+                    };
                 };
-                /** @description Validation failed, or pond_unknown. */
+                /** @description validation_failed, or postal_code_unknown: five digits the list lacks. Both constant, repeating nothing that was sent. */
                 400: {
                     headers: {
                         [name: string]: unknown;
@@ -6392,7 +6349,7 @@ export interface paths {
         };
         /**
          * Today's round
-         * @description The Finnish day and its cards in order, each with why it is there and the caller's own decision. The first read of a day builds the caller's round once their matching has opened; entries null while they have none, an empty list for a round with nobody to show. A card that cannot be shown now is left out. fishToSend says whether the fish's budget lets the caller send one today, one of matching_config fish_budget in the calendar week (fish_window_days counted from a Monday) or an earned one, never how many. likesLeft says how many of the day's likes the caller has left, from matching_config like_budget_balanced down to zero, by the count that refuses a like. Serving a card writes the shown record and counts against matching_config exposure_cards_per_day (ADR-008).
+         * @description The Finnish day and its cards in order, each with why it is there, how far its person lives as it stood when the entry was written, and the caller's own decision. The first read of a day builds the caller's round once their matching has opened; entries null while they have none, an empty list for a round with nobody to show. A card that cannot be shown now is left out. fishToSend says whether the fish's budget lets the caller send one today, one of matching_config fish_budget in the calendar week (fish_window_days counted from a Monday) or an earned one, never how many. likesLeft says how many of the day's likes the caller has left, from matching_config like_budget_balanced down to zero, by the count that refuses a like. Serving a card writes the shown record and counts against matching_config exposure_cards_per_day (ADR-008).
          */
         get: {
             parameters: {
@@ -6845,7 +6802,7 @@ export interface paths {
         };
         /**
          * The caller's deal-breakers
-         * @description Each with whether it is paused: a deal-breaker waits while the person's own answer on its field is missing (#149, the disclose-to-filter rule). `max` is how many a person may have.
+         * @description Each with whether it is paused: a deal-breaker waits while the person's own answer on its field is missing (#149, the disclose-to-filter rule). One on distance has no field and is never paused. `max` is how many a person may have.
          */
         get: {
             parameters: {
@@ -6878,7 +6835,7 @@ export interface paths {
         };
         /**
          * Set the caller's deal-breakers
-         * @description The whole set, at most `max`, each on a distinct whitelisted field the person has answered themselves, accepting options the field has. Hard rows: #87 applies them in the pool, both ways.
+         * @description The whole set, at most `max`, each on a distinct whitelisted field the person has answered themselves, accepting options the field has. One on distance has no field: it accepts the bands up to nearby, close or around, and lets through those who did not answer whatever the request says, since nobody can leave it unanswered. Hard rows: #87 applies them in the pool, both ways.
          */
         put: {
             parameters: {
@@ -6902,7 +6859,7 @@ export interface paths {
                         "application/json": components["schemas"]["DealBreakersResponse"];
                     };
                 };
-                /** @description Validation failed: more than allowed, a field twice, or an answer the field has not. */
+                /** @description Validation failed: more than allowed, a field twice, an answer the field has not, or bands that do not run up to one. */
                 400: {
                     headers: {
                         [name: string]: unknown;
@@ -7079,6 +7036,12 @@ export interface components {
                 birthMonth: number | null;
                 gender: components["schemas"]["Gender"];
                 pond: components["schemas"]["PondSummary"];
+                home: {
+                    place: string;
+                    shownOnCard: string;
+                    /** Format: date-time */
+                    movedAt: string | null;
+                } | null;
                 /** Format: date-time */
                 genderChangedAt: string | null;
                 email: string | null;
@@ -7173,7 +7136,7 @@ export interface components {
             paused: boolean;
         };
         /** @enum {string} */
-        DealBreakerField: "monogamy" | "hasKids" | "wantsKids" | "smoking" | "languages" | "height";
+        DealBreakerField: "monogamy" | "hasKids" | "wantsKids" | "smoking" | "languages" | "height" | "distance";
         ConsentRecord: {
             kind: components["schemas"]["ConsentKind"];
             version: string;
@@ -7551,11 +7514,15 @@ export interface components {
             decisionInWords: string | null;
             /** Format: date-time */
             decidedAt: string | null;
+            distance: components["schemas"]["DistanceBand"];
+            distanceInWords: string | null;
         };
         /** @enum {string} */
         RoundReason: "matches_filters" | "liked_you" | "seen_before" | "relaxed" | "fish";
         /** @enum {string|null} */
         RoundChoice: "like" | "pass" | "fish" | null;
+        /** @enum {string|null} */
+        DistanceBand: "nearby" | "close" | "around" | "far" | null;
         ExportedInvitations: {
             made: {
                 /** Format: date-time */
@@ -7871,6 +7838,7 @@ export interface components {
         ProfileResponse: {
             profile: components["schemas"]["ProfileDocument"];
             completeness: components["schemas"]["Completeness"];
+            home: components["schemas"]["HomeSummary"];
         };
         Completeness: {
             complete: boolean;
@@ -7878,6 +7846,15 @@ export interface components {
         };
         /** @enum {string} */
         CompletenessItem: "display_name" | "photos" | "bio_or_prompts" | "seeks" | "age_window";
+        HomeSummary: {
+            town: components["schemas"]["PlaceName"];
+            area: components["schemas"]["PlaceName"] & unknown;
+            showArea: boolean;
+        } | null;
+        PlaceName: {
+            fi: string;
+            sv: string;
+        };
         ProfileUpdate: {
             displayName: string;
             bio: string | null;
@@ -7900,7 +7877,7 @@ export interface components {
                 verifiedByBank: true;
             };
             gender: components["schemas"]["Gender"];
-            pond: components["schemas"]["PondSummary"];
+            place: components["schemas"]["PlaceName"] & unknown;
             photos: components["schemas"]["CardPhoto"][];
             fields: components["schemas"]["ProfileFields"];
             bio: string | null;
@@ -7925,6 +7902,7 @@ export interface components {
             age: number;
             gender: components["schemas"]["Gender"];
             pond: components["schemas"]["PondSummary"];
+            home: components["schemas"]["HomeSummary"];
             preferences: components["schemas"]["PreferencesResponse"];
             consents: {
                 terms: string | null;
@@ -7952,7 +7930,7 @@ export interface components {
             special_category: string;
         };
         /** @enum {string} */
-        OnboardingStep: "terms" | "privacy" | "name" | "gender" | "seeks" | "intent" | "age_window" | "photos" | "prompts_or_bio" | "pond";
+        OnboardingStep: "terms" | "privacy" | "name" | "gender" | "seeks" | "intent" | "age_window" | "home" | "photos" | "prompts_or_bio";
         GenderUpdate: {
             gender: components["schemas"]["Gender"];
         };
@@ -8652,12 +8630,10 @@ export interface components {
             man: number;
             nonBinary: number;
         } | null;
-        PondList: {
-            ponds: components["schemas"]["PondSummary"][];
-        };
-        PondChoice: {
-            /** Format: uuid */
-            pondId: string;
+        HomeUpdate: {
+            /** @description Five digits, checked against the list of postal areas. */
+            postalCode?: string;
+            showArea?: boolean;
         };
         RoundResponse: {
             /** Format: date */
@@ -8671,6 +8647,7 @@ export interface components {
             reason: components["schemas"]["RoundReason"];
             decision: components["schemas"]["RoundChoice"];
             card: components["schemas"]["ProfileCard"];
+            distance: components["schemas"]["DistanceBand"];
             relaxedField?: components["schemas"]["DealBreakerField"];
             notAnswered?: components["schemas"]["DealBreakerField"][];
         };

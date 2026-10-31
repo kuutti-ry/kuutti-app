@@ -9,7 +9,7 @@ export {
   pausedOf,
   readDealBreakers,
 } from "./deal-breakers.ts";
-export { inEachOthersPool, type PoolPerson, relaxedBy } from "./pool.ts";
+export { bandBetween, inEachOthersPool, type PoolPerson, relaxedBy } from "./pool.ts";
 export {
   CHANGE_CADENCE_KEY,
   deletePreferencesOfAccount,

@@ -23,7 +23,7 @@ import {
   test,
   testConfig,
 } from "../test/harness.ts";
-import { openPond, type PeopleOptions, people, pondNamed } from "../test/people.ts";
+import { HOMES, openPond, type PeopleOptions, people, pondNamed } from "../test/people.ts";
 import { buildRounds } from "./round-builder.ts";
 
 // The short pool (#99, ADR-042, features/matching/short-pool.feature): the
@@ -40,6 +40,7 @@ const DAY = finnishDay(NIGHT);
 const NOON = new Date("2026-10-20T09:00:00.000Z");
 const NEXT_NIGHT = new Date("2026-10-21T01:00:00.000Z");
 const NEXT_DAY = finnishDay(NEXT_NIGHT);
+const NEXT_NOON = new Date("2026-10-21T09:00:00.000Z");
 
 /** A woman who seeks men and does not smoke; with a deal-breaker on smoking unless told otherwise. */
 const HER: PeopleOptions = {
@@ -136,7 +137,7 @@ async function shownBefore(
     accountId: owner,
     day: daysBefore(days),
     ordering: "count",
-    entries: [{ candidateId: candidate, reason: "matches_filters" }],
+    entries: [{ candidateId: candidate, reason: "matches_filters", distance: "nearby" }],
   });
   if (!built) throw new Error("earlier round not written");
   if (opened) {
@@ -174,6 +175,13 @@ async function offers(app: App, headers: Headers, day = DAY): Promise<Relaxation
 const relax = (app: App, headers: Headers, body: unknown, day = DAY) =>
   app.request(`/rounds/${day}/relaxations`, {
     method: "POST",
+    headers: jsonHeaders(headers),
+    body: JSON.stringify(body),
+  });
+
+const putHome = (app: App, headers: Headers, body: unknown) =>
+  app.request("/account/home", {
+    method: "PUT",
     headers: jsonHeaders(headers),
     body: JSON.stringify(body),
   });
@@ -775,6 +783,223 @@ describe("a deal-breaker on height through the night (#508)", () => {
   });
 });
 
+describe("a deal-breaker on distance through the night (#514, ADR-061 §7)", () => {
+  const SET_ASIDE = { field: "distance", kind: "aside" } as const;
+
+  /** "A" in Kallio who accepts nearby, and men at these homes; everybody's matching open. */
+  async function nearbyOnly(ctx: TestContext, slug: string, homes: readonly string[]) {
+    const pond = await pondNamed(ctx.client, slug);
+    const [a] = await people(ctx.client, pond, 1, HER);
+    if (!a) throw new Error("A not written");
+    await dealBreaker(ctx.client, a, "distance", ["nearby"], true);
+    const men: string[] = [];
+    for (const home of homes) {
+      const [man] = await people(ctx.client, pond, 1, { ...MEN, home });
+      if (!man) throw new Error("a man not written");
+      men.push(man);
+    }
+    await opened(ctx.client, pond, [a, ...men]);
+    return { a, men };
+  }
+
+  test("A short round offers a distance deal-breaker set aside, never for those who did not answer", async ({
+    ctx,
+  }) => {
+    const { a } = await nearbyOnly(
+      ctx,
+      "test-distance-offer",
+      Array.from({ length: 12 }, () => HOMES.close),
+    );
+    await buildRounds(await deps(ctx.client));
+    const app = await appAt(ctx.client);
+    const { headers } = await signInAs(ctx.client, a);
+
+    expect(await offers(app, headers)).toEqual({
+      short: true,
+      offers: [{ ...SET_ASIDE, more: 10 }],
+      relaxed: [],
+    });
+    const refused = await relax(app, headers, { field: "distance", kind: "unanswered" });
+    expect(refused.status).toBe(404);
+    expect(await codeOf(refused)).toBe("not_found");
+    expect(await roundOf(ctx.client, a)).toEqual([]);
+    const { rows } = await ctx.client.query("SELECT 1 FROM round_relaxation");
+    expect(rows).toEqual([]);
+  });
+
+  test("A distance deal-breaker set aside lets in people beyond it, never against their own filters", async ({
+    ctx,
+  }) => {
+    const { a, men } = await nearbyOnly(ctx, "test-distance-aside", [HOMES.close, HOMES.around]);
+    const [b, c] = men;
+    if (!b || !c) throw new Error("people not written");
+    await dealBreaker(ctx.client, b, "distance", ["nearby"], true);
+    await buildRounds(await deps(ctx.client));
+    const app = await appAt(ctx.client);
+    const { headers } = await signInAs(ctx.client, a);
+
+    const cards = await added(await relax(app, headers, SET_ASIDE));
+
+    expect(cards.map((card) => [card.card.accountId, card.distance, card.relaxedField])).toEqual([
+      [c, "around", "distance"],
+    ]);
+    expect(await roundOf(ctx.client, a)).toEqual([
+      { candidate_id: c, reason: "relaxed", relaxed_field: "distance" },
+    ]);
+  });
+
+  test("A move closes the day's short pool, so a home typed answers nothing until the next round", async ({
+    ctx,
+  }) => {
+    // The offer is on smoking: a move must say nothing through any deal-breaker's.
+    const { a } = await pondWith(ctx, "test-short-moved", [{ fields: {}, count: 1 }]);
+    await dealBreaker(ctx.client, a, "distance", ["nearby", "close", "around"], true);
+    await buildRounds(await deps(ctx.client));
+    const app = await appAt(ctx.client);
+    const { headers } = await signInAs(ctx.client, a);
+    await added(await relax(app, headers, UNANSWERED));
+    await undo(app, headers, "smoking");
+    const open = await offers(app, headers);
+    expect(open.offers.map((offer) => offer.field)).toContain("smoking");
+
+    expect((await putHome(app, headers, { postalCode: "96100" })).status).toBe(200);
+
+    // Both ways of asking are shut for the day, and neither says why.
+    expect(await offers(app, headers)).toEqual({ short: false, offers: [], relaxed: [] });
+    const tapped = await relax(app, headers, UNANSWERED);
+    expect(tapped.status).toBe(404);
+    expect(await codeOf(tapped)).toBe("not_found");
+    expect(await roundOf(ctx.client, a)).toEqual([]);
+
+    // The next night's round is built from the new home, and opens again.
+    await buildRounds(await deps(ctx.client, NEXT_NIGHT));
+    const nextDay = await appAt(ctx.client, NEXT_NOON);
+    const next = await offers(nextDay, headers, NEXT_DAY);
+    expect(next.short).toBe(true);
+  });
+
+  test("A home typed again is no move, and the first home is none", async ({ ctx }) => {
+    const { a } = await pondWith(ctx, "test-short-same", [{ fields: {}, count: 1 }]);
+    await buildRounds(await deps(ctx.client));
+    const app = await appAt(ctx.client);
+    const { headers } = await signInAs(ctx.client, a);
+    const before = await offers(app, headers);
+    expect(before.offers).not.toEqual([]);
+
+    // Two codes of one kept place, the second a code too small to keep; and the choice alone.
+    const { rows } = await ctx.client.query<{ home_place: string }>(
+      "SELECT home_place FROM account WHERE id = $1",
+      [a],
+    );
+    expect((await putHome(app, headers, { postalCode: rows[0]?.home_place })).status).toBe(200);
+    expect((await putHome(app, headers, { showArea: true })).status).toBe(200);
+
+    expect(await offers(app, headers)).toEqual(before);
+    const moved = await ctx.client.query("SELECT home_moved_at FROM account WHERE id = $1", [a]);
+    expect(moved.rows).toEqual([{ home_moved_at: null }]);
+  });
+
+  test("set aside, it is undone as any other, and tomorrow's round filters again", async ({
+    ctx,
+  }) => {
+    const { a, men } = await nearbyOnly(ctx, "test-distance-undo", [HOMES.close]);
+    const [b] = men;
+    await buildRounds(await deps(ctx.client));
+    const app = await appAt(ctx.client);
+    const { headers } = await signInAs(ctx.client, a);
+    await added(await relax(app, headers, SET_ASIDE));
+    expect((await roundOf(ctx.client, a)).map((e) => e.candidate_id)).toEqual([b]);
+
+    const undone = await undo(app, headers, "distance");
+    expect(RelaxationUndone.parse(await undone.json()).removed).toEqual([1]);
+    expect(await roundOf(ctx.client, a)).toEqual([]);
+
+    await buildRounds(await deps(ctx.client, NEXT_NIGHT));
+    expect(await roundOf(ctx.client, a, NEXT_DAY)).toEqual([]);
+  });
+
+  test("a like on a card a distance set aside let in reaches its person", async ({ ctx }) => {
+    const { a, men } = await nearbyOnly(ctx, "test-distance-like", [HOMES.close]);
+    const [b] = men;
+    if (!b) throw new Error("people not written");
+    await buildRounds(await deps(ctx.client));
+    const app = await appAt(ctx.client);
+    const { headers } = await signInAs(ctx.client, a);
+    const [card] = await added(await relax(app, headers, SET_ASIDE));
+    if (!card) throw new Error("nothing added");
+    const liked = await app.request(`/rounds/${DAY}/entries/${card.position}/decision`, {
+      method: "PUT",
+      headers: jsonHeaders(headers),
+      body: JSON.stringify({ decision: "like" }),
+    });
+    expect(liked.status).toBe(200);
+
+    await buildRounds(await deps(ctx.client, NEXT_NIGHT));
+
+    expect(await roundOf(ctx.client, b, NEXT_DAY)).toEqual([
+      { candidate_id: a, reason: "liked_you", relaxed_field: null },
+    ]);
+  });
+
+  test("A card never says that its person did not answer a distance", async ({ ctx }) => {
+    const { a, men } = await nearbyOnly(ctx, "test-distance-card", [HOMES.nearby]);
+    const [b] = men;
+    await buildRounds(await deps(ctx.client));
+    const app = await appAt(ctx.client);
+    const { headers } = await signInAs(ctx.client, a);
+
+    const { entries } = await readToday(app, headers);
+
+    expect(entries?.map((entry) => entry.card.accountId)).toEqual([b]);
+    expect(entries?.[0]?.notAnswered).toEqual([]);
+  });
+
+  test("Every entry is written with its band, whichever way it came into the round", async ({
+    ctx,
+  }) => {
+    const pond = await pondNamed(ctx.client, "test-distance-every-way");
+    const [a] = await people(ctx.client, pond, 1, HER);
+    if (!a) throw new Error("A not written");
+    await dealBreaker(ctx.client, a, "smoking", ["never"], true);
+    const man = async (home: string, fields: ProfileFields = {}) => {
+      const [id] = await people(ctx.client, pond, 1, { ...men(fields), home });
+      if (!id) throw new Error("a man not written");
+      return id;
+    };
+    const fresh = await man(HOMES.close);
+    const waited = await man(HOMES.far);
+    const seen = await man(HOMES.nearby);
+    const relaxedIn = await man(HOMES.around, { smoking: "regularly" });
+    await opened(ctx.client, pond, [a, fresh, waited, seen, relaxedIn]);
+    await shownBefore(ctx.client, waited, a, 1, "like");
+    await shownBefore(ctx.client, a, seen, 45, null);
+    await buildRounds(await deps(ctx.client));
+    const app = await appAt(ctx.client);
+    const { headers } = await signInAs(ctx.client, a);
+    await added(await relax(app, headers, ASIDE));
+
+    const { entries } = await readToday(app, headers);
+
+    expect(entries?.map((e) => [e.card.accountId, e.reason, e.distance])).toEqual([
+      [waited, "liked_you", "far"],
+      [fresh, "matches_filters", "close"],
+      [seen, "seen_before", "nearby"],
+      [relaxedIn, "relaxed", "around"],
+    ]);
+
+    // Measured when each was written: a relaxation's from the home of that moment.
+    const later = await signInAs(ctx.client, relaxedIn);
+    const moved = await app.request("/account/home", {
+      method: "PUT",
+      headers: jsonHeaders(later.headers),
+      body: JSON.stringify({ postalCode: "96100" }),
+    });
+    expect(moved.status).toBe(200);
+    const again = await readToday(app, headers);
+    expect(again.entries?.map((e) => e.distance)).toEqual(["far", "close", "nearby", "around"]);
+  });
+});
+
 describe("the routes' edges", () => {
   test("the relaxation routes need a session", async ({ ctx }) => {
     const app = await appAt(ctx.client);
@@ -1039,8 +1264,10 @@ describe("the routes' edges", () => {
         e.reason,
         e.relaxedField,
         e.relaxedFieldInWords,
+        e.distance,
+        e.distanceInWords,
       ]),
-    ).toEqual([["relaxed", "smoking", "Smoking"]]);
+    ).toEqual([["relaxed", "smoking", "Smoking", "nearby", "Nearby"]]);
     expect(document.rounds.items[0]?.relaxations).toEqual([
       {
         field: "smoking",

@@ -4,7 +4,7 @@ import { generateHetu } from "@kuutti-ry/tunnistus-oidc/hetu";
 import type { QueryResultRow } from "pg";
 import { afterAll, describe, expect, it } from "vitest";
 import { createApp } from "../app.ts";
-import type { IdentityBroker } from "../identity/index.ts";
+import { CURRENT_CONSENT_VERSIONS, type IdentityBroker } from "../identity/index.ts";
 import { type Mailer, type MailMessage, sesMailer } from "../lib/mail.ts";
 import { addressOf, TRUSTED_PROXIES, type TrustedProxy } from "../lib/rate-limit.ts";
 import { signedInAccount, staffSession, withMatchingConfig } from "./account.ts";
@@ -698,6 +698,96 @@ describe("PII in logs", () => {
     for (const secret of [hetu, code, tokens.accessToken, tokens.refreshToken]) {
       expect(out).not.toContain(secret);
     }
+  });
+
+  // The sweep's fake session never reaches the home's handler (#514, ADR-061
+  // §9): a code kept, one too small to keep, one the list lacks, something
+  // that is no code, what the card shows, and the write interrupted by a fault.
+  test("A home reaches no log line, no error and no event", async ({ ctx }) => {
+    const reports: unknown[] = [];
+    const { logger, lines } = await captureLogger();
+    let armed = false;
+    const db: Queryable = {
+      async query<R extends QueryResultRow = QueryResultRow>(text: string, values?: unknown[]) {
+        if (armed && /UPDATE account\s+SET home_moved_at/.test(text)) {
+          armed = false;
+          throw new Error("Connection terminated unexpectedly");
+        }
+        return ctx.client.query<R>(text, values);
+      },
+    };
+    const app = createApp({
+      config: testConfig(),
+      logger,
+      db,
+      report: (error, context) => reports.push({ error: String(error), context }),
+    });
+    const a = await signedInAccount(ctx.client);
+    const json = { ...a.headers, "content-type": "application/json" };
+    const consent = await app.request("/consents", {
+      method: "POST",
+      headers: json,
+      body: JSON.stringify({
+        kind: "research",
+        version: CURRENT_CONSENT_VERSIONS.research,
+        locale: "fi",
+      }),
+    });
+    expect(consent.status).toBe(200);
+    const put = (body: unknown) =>
+      app.request("/account/home", { method: "PUT", headers: json, body: JSON.stringify(body) });
+
+    expect((await put({ postalCode: "00530" })).status).toBe(200);
+    expect((await put({ showArea: true })).status).toBe(200);
+    expect((await put({ postalCode: "83960" })).status).toBe(200);
+    const refused = await put({ postalCode: "99999" });
+    expect(refused.status).toBe(400);
+    // What an answer says, without its request id: random, it may hold any digits.
+    const said = async (answer: Response) => {
+      const { requestId: _random, ...words } = (await answer.json()).error;
+      return JSON.stringify(words);
+    };
+    expect(await said(refused)).not.toContain("99999");
+    const malformed = await put({ postalCode: "0053A" });
+    expect(malformed.status).toBe(400);
+    expect(await said(malformed)).not.toContain("0053A");
+    armed = true;
+    expect((await put({ postalCode: "33100" })).status).toBe(500);
+
+    // The write's line names the account alone.
+    const written = lines().filter((l) => l.msg === "home set");
+    expect(written).toHaveLength(3);
+    for (const {
+      level: _level,
+      time: _time,
+      pid: _pid,
+      hostname: _host,
+      msg,
+      ...rest
+    } of written) {
+      expect(msg).toBe("home set");
+      expect(rest).toEqual({ accountId: a.accountId });
+    }
+    // Each path left its line, so the absence below is not for want of lines.
+    expect(lines().some((l) => l.code === "postal_code_unknown")).toBe(true);
+    expect(lines().some((l) => l.msg === "request validation failed")).toBe(true);
+    expect(lines().some((l) => l.msg === "unhandled error")).toBe(true);
+    expect(reports).toHaveLength(1);
+
+    const { rows: events } = await ctx.client.query(
+      `SELECT e.name, e.props, e.snapshot, e.pond FROM events e
+         JOIN research_subject s ON s.research_id = e.research_id
+        WHERE s.account_id = $1`,
+      [a.accountId],
+    );
+    expect(events.length).toBeGreaterThan(0);
+    const everything = JSON.stringify([lines(), reports, events]);
+    for (const digits of ["00530", "83960", "99999", "0053A", "33100", "422"]) {
+      // A quoted match, or one after a word: five digits can occur by chance in an id or a time.
+      expect(everything).not.toContain(`"${digits}"`);
+      expect(everything).not.toContain(` ${digits}`);
+    }
+    expect(everything).not.toMatch(/Kallio|Berghäll|Helsinki|Helsingfors|Lieksa|Joensuu|Tampere/);
   });
 
   // The sweep's fake session never reaches the e-mail's handlers (#385,

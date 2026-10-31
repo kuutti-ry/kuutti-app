@@ -159,6 +159,25 @@ describe("account erasure", () => {
     expect(identity.rows[0]?.hetu_hmac).toBeTruthy(); // the identity row stays
   });
 
+  test("Erasure leaves no home on the tombstone", async ({ ctx }) => {
+    const { app } = await appWith(ctx);
+    const a = await signedInAccount(ctx.client);
+    const res = await app.request("/account/home", {
+      method: "PUT",
+      headers: { ...a.headers, "content-type": "application/json" },
+      body: JSON.stringify({ postalCode: "00530", showArea: true }),
+    });
+    expect(res.status).toBe(200);
+    expect((await del(app, a.headers)).status).toBe(204);
+    const { rows } = await ctx.client.query(
+      "SELECT state, home_place, home_shows_area, pond_id FROM account WHERE id = $1",
+      [a.accountId],
+    );
+    expect(rows).toEqual([
+      { state: "deleted", home_place: null, home_shows_area: false, pond_id: null },
+    ]);
+  });
+
   test("A photo another account also uploaded keeps its objects", async ({ ctx }) => {
     const { app, store } = await appWith(ctx);
     const a = await signedInAccount(ctx.client, "a");
@@ -373,6 +392,105 @@ describe("account erasure", () => {
     expect(text).not.toContain(b.accountId);
     expect(text).not.toMatch(/hetu|hmac|research_id|researchId/i);
     expect(text).not.toContain(staff.identityId);
+  });
+
+  describe("the home in the export (ADR-061 §9)", () => {
+    const putHome = (app: ReturnType<typeof createApp>, headers: object, body: unknown) =>
+      app.request("/account/home", {
+        method: "PUT",
+        headers: { ...headers, "content-type": "application/json" },
+        body: JSON.stringify(body),
+      });
+
+    test("The export says the home in words, never a key", async ({ ctx }) => {
+      const { app } = await appWith(ctx);
+      const a = await signedInAccount(ctx.client);
+      expect((await putHome(app, a.headers, { postalCode: "00530" })).status).toBe(200);
+      const { document, raw } = await openExport(
+        await app.request("/account/export", { headers: a.headers }),
+      );
+      expect(document.account.home).toEqual({
+        place: "Kallio",
+        shownOnCard: "Helsinki",
+        movedAt: null,
+      });
+      expect(raw).not.toContain('"00530"');
+      expect(raw).not.toMatch(/homePlace|home_place/);
+    });
+
+    test("says what the card shows where the person chose their area, and the Swedish names in Swedish", async ({
+      ctx,
+    }) => {
+      const { app } = await appWith(ctx);
+      const a = await signedInAccount(ctx.client);
+      await putHome(app, a.headers, { postalCode: "00530", showArea: true });
+      expect((await exportOf(app, a.headers)).account.home).toEqual({
+        place: "Kallio",
+        shownOnCard: "Kallio",
+        movedAt: null,
+      });
+      const swedish = await openExport(
+        await app.request("/account/export", {
+          headers: { ...a.headers, "accept-language": "sv" },
+        }),
+      );
+      expect(swedish.document.account.home).toEqual({
+        place: "Berghäll",
+        shownOnCard: "Berghäll",
+        movedAt: null,
+      });
+    });
+
+    test("says the municipality kept, which is not the town the card names", async ({ ctx }) => {
+      const { app } = await appWith(ctx);
+      const a = await signedInAccount(ctx.client);
+      await putHome(app, a.headers, { postalCode: "83960" });
+      const { document, raw } = await openExport(
+        await app.request("/account/export", { headers: a.headers }),
+      );
+      expect(document.account.home).toEqual({
+        place: "Lieksa",
+        shownOnCard: "Joensuu",
+        movedAt: null,
+      });
+      expect(raw).not.toContain('"422"');
+    });
+
+    test("is null without a home, and for a place the list no longer knows", async ({ ctx }) => {
+      const { app } = await appWith(ctx);
+      const a = await signedInAccount(ctx.client);
+      expect((await exportOf(app, a.headers)).account.home).toBeNull();
+      await ctx.client.query("UPDATE account SET home_place = '12345' WHERE id = $1", [
+        a.accountId,
+      ]);
+      expect((await exportOf(app, a.headers)).account.home).toBeNull();
+    });
+
+    test("reads the place through the floor, as everything does", async ({ ctx }) => {
+      const { app } = await appWith(ctx);
+      const a = await signedInAccount(ctx.client);
+      await putHome(app, a.headers, { postalCode: "00530", showArea: true });
+      await withMatchingConfig(ctx.client, { home_min_inhabitants: 20000 });
+      expect((await exportOf(app, a.headers)).account.home).toEqual({
+        place: "Helsinki",
+        shownOnCard: "Helsinki",
+        movedAt: null,
+      });
+    });
+
+    test("says when the home last moved, and the erasure takes that with it", async ({ ctx }) => {
+      const { app } = await appWith(ctx);
+      const a = await signedInAccount(ctx.client);
+      await putHome(app, a.headers, { postalCode: "00530" });
+      await putHome(app, a.headers, { postalCode: "00100" });
+      const { movedAt } = (await exportOf(app, a.headers)).account.home ?? {};
+      expect(movedAt).toEqual(expect.any(String));
+      expect((await del(app, a.headers)).status).toBe(204);
+      const { rows } = await ctx.client.query("SELECT home_moved_at FROM account WHERE id = $1", [
+        a.accountId,
+      ]);
+      expect(rows).toEqual([{ home_moved_at: null }]);
+    });
   });
 
   test("The export works without object storage, with no photo files", async ({ ctx }) => {

@@ -49,7 +49,11 @@ async function roundOf(db: Queryable, owner: Person, cards: Person[], days = 0) 
       accountId: owner.accountId,
       day: finnishDay(at),
       ordering: "count",
-      entries: cards.map((card) => ({ candidateId: card.accountId, reason: "matches_filters" })),
+      entries: cards.map((card) => ({
+        candidateId: card.accountId,
+        reason: "matches_filters",
+        distance: "nearby",
+      })),
     },
   );
   if (!built) throw new Error("round not built");
@@ -369,7 +373,7 @@ describe("the same moment", () => {
           accountId: owner,
           day: TODAY,
           ordering: "count",
-          entries: [{ candidateId: card, reason: "matches_filters" }],
+          entries: [{ candidateId: card, reason: "matches_filters", distance: "nearby" }],
         });
       }
       const firstPid = await pidOf(first);
@@ -417,7 +421,7 @@ describe("the same moment", () => {
         accountId: owner,
         day: TODAY,
         ordering: "count",
-        entries: [{ candidateId: card, reason: "matches_filters" }],
+        entries: [{ candidateId: card, reason: "matches_filters", distance: "nearby" }],
       });
     }
     return { a, b, deps };

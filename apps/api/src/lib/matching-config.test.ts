@@ -4,6 +4,7 @@ import { describe, expect, test } from "../test/harness.ts";
 import { AppError } from "./errors.ts";
 import {
   asHour,
+  distanceEdges,
   matchingConfigNumber,
   matchingConfigNumbers,
   readMatchingConfig,
@@ -102,6 +103,22 @@ describe("matchingConfigNumbers", () => {
 
 // The push's quiet hours and the round's hour (#102, ADR-055 §6, §7): the
 // panel keeps a number whole and from 0, with no ceiling.
+describe("distanceEdges", () => {
+  test("are the three bands' keys, the latest version of each", async ({ ctx }) => {
+    expect(await distanceEdges(ctx.client)).toEqual({ nearby: 5, close: 15, around: 50 });
+    await row(ctx.client, "distance_close_km", 2, 20);
+    expect(await distanceEdges(ctx.client)).toEqual({ nearby: 5, close: 20, around: 50 });
+  });
+
+  test("an edge that is not a number fails the read and is named", async ({ ctx }) => {
+    await row(ctx.client, "distance_around_km", 2, "fifty");
+    await expect(distanceEdges(ctx.client)).rejects.toMatchObject({
+      status: 500,
+      detail: { key: "distance_around_km" },
+    });
+  });
+});
+
 describe("asHour", () => {
   it.each([0, 1, 9, 22, 23])("takes %i as an hour of the day", (hour) => {
     expect(asHour("lib_test.hour", hour)).toBe(hour);

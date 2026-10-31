@@ -466,6 +466,13 @@ profile.field.height:
   sv: "Längd"
   machine: { fi: true, sv: true }
 
+profile.field.distance:
+  en: "Distance"
+  description: "Label of the distance row of the deal-breakers (#514, ADR-061 §7), also in the round's line on a relaxed deal-breaker and in a person's export. It reads the home, so it is no field of the profile registry."
+  fi: "Etäisyys"
+  sv: "Avstånd"
+  machine: { fi: true, sv: true }
+
 profile.field.exercise:
   en: "Exercise"
   description: "Label of the exercise field of the profile registry (#145, ADR-019)."
@@ -671,9 +678,16 @@ profile.dealBreakers.accept:
 
 profile.dealBreakers.everyone:
   en: "Everyone"
-  description: "First button of the height row of the deal-breakers (#508): no filter on height. Short: the row holds four buttons."
+  description: "First button of the height row and of the distance row of the deal-breakers (#508, #514): no filter on it. Short: the row holds four buttons."
   fi: "Kaikki"
   sv: "Alla"
+  machine: { fi: true, sv: true }
+
+profile.dealBreakers.everyoneOf:
+  en: "Everyone, {field}"
+  description: "Screen-reader name of the same button, heard instead of profile.dealBreakers.everyone (#514): two rows have one, and {field} is the row's label, after a comma so nothing is inflected."
+  fi: "Kaikki, {field}"
+  sv: "Alla, {field}"
   machine: { fi: true, sv: true }
 
 profile.dealBreakers.includeUnknown:
@@ -723,6 +737,90 @@ profile.dealBreakers.open:
   description: "Row on the profile list and button on the e-mail screen that opens the deal-breakers (#149, #239)."
   fi: "Ehdottomat rajasi"
   sv: "Dina absoluta gränser"
+  machine: { fi: true, sv: true }
+
+profile.place.title:
+  en: "Home"
+  description: "Row on the profile list and title of the screen it opens, where the person changes their home and what their card shows of it (#514, ADR-061). The place they live, not the app's home screen."
+  fi: "Koti"
+  sv: "Hem"
+  machine: { fi: true, sv: true }
+
+profile.place.back:
+  en: "Back to your profile"
+  description: "Screen-reader label of the back arrow of the home screen (#514)."
+  fi: "Takaisin profiiliisi"
+  sv: "Tillbaka till din profil"
+  machine: { fi: true, sv: true }
+
+profile.place.explain:
+  en: "Your postal code tells Kuutti how far people are. Others see a town or your area by name, never the digits."
+  description: "Explanation over the postal code field, in onboarding's home step and on the home screen (#514, ADR-061 §2, §3). True and short: it must not say Kuutti keeps no postal code, since a large area's code is kept."
+  fi: "Postinumerosi kertoo Kuutille, kuinka kaukana ihmiset ovat. Muut näkevät kaupungin tai alueesi nimen, eivät koskaan numeroita."
+  sv: "Ditt postnummer berättar för Kuutti hur långt bort folk är. Andra ser en stad eller ditt område med namn, aldrig siffrorna."
+  machine: { fi: true, sv: true }
+
+profile.place.code:
+  en: "Postal code"
+  description: "Label of the postal code field, seen and heard (#514)."
+  fi: "Postinumero"
+  sv: "Postnummer"
+  machine: { fi: true, sv: true }
+
+profile.place.row:
+  en: "{digits}, {name}"
+  description: "Screen-reader name of a suggested postal area under the field (#514): {digits} is its code with a space between the digits, so that it is said a digit at a time, {name} its name in the list's Finnish or Swedish."
+  fi: "{digits}, {name}"
+  sv: "{digits}, {name}"
+  machine: { fi: true, sv: true }
+
+profile.place.matches:
+  en: "{areas, plural, one {# area matches.} other {# areas match.}}"
+  description: "Said under the postal code field as it is typed (#514): how many areas are listed under it, at most eight, all there are."
+  fi: "{areas, plural, one {# alue sopii.} other {# aluetta sopii.}}"
+  sv: "{areas, plural, one {# område passar.} other {# områden passar.}}"
+  machine: { fi: true, sv: true }
+
+profile.place.more:
+  en: "The first {areas, number} areas. More digits narrow them."
+  description: "Said under the postal code field when more areas match than the list shows (#514): {areas} is how many it shows."
+  fi: "Ensimmäiset {areas, number} aluetta. Lisää numeroita tarkentaa listaa."
+  sv: "De första {areas, number} områdena. Fler siffror begränsar listan."
+  machine: { fi: true, sv: true }
+
+profile.place.choice:
+  en: "What should your card show?"
+  description: "Heading of the step after the postal code, and of the same part of the home screen (#514, ADR-061 §3): the nearest town or the area's name."
+  fi: "Mitä korttisi näyttää?"
+  sv: "Vad ska ditt kort visa?"
+  machine: { fi: true, sv: true }
+
+profile.place.nearestTown:
+  en: "Your card shows the nearest town."
+  description: "Said in place of the choice where there is no area to show instead, or the area bears the town's name (#514, ADR-061 §3)."
+  fi: "Korttisi näyttää lähimmän kaupungin."
+  sv: "Ditt kort visar närmaste stad."
+  machine: { fi: true, sv: true }
+
+profile.place.onCard:
+  en: "On your card: {place}"
+  description: "What the person's card says of their home, always in sight under the choice (#514, ADR-061 §3). {place} is a place's name, after a colon so nothing is inflected."
+  fi: "Kortillasi: {place}"
+  sv: "På ditt kort: {place}"
+  machine: { fi: true, sv: true }
+
+profile.place.saved:
+  en: "Saved."
+  description: "Said after a new home, or what the card shows, was saved (#514)."
+  fi: "Tallennettu."
+  sv: "Sparat."
+  machine: { fi: true, sv: true }
+
+profile.place.failed:
+  en: "It could not be saved. Try again."
+  description: "Said when saving the home failed for a reason other than an unknown postal code (#514)."
+  fi: "Tallentaminen ei onnistunut. Yritä uudelleen."
+  sv: "Det gick inte att spara. Försök igen."
   machine: { fi: true, sv: true }
 
 profile.later.title:
@@ -1605,6 +1703,34 @@ profile.option.height.shorter:
   description: "Button of the height row of the deal-breakers (#508): show only people shorter than the person. The comparison is with the person's own height."
   fi: "Minua lyhyempi"
   sv: "Kortare än jag"
+  machine: { fi: true, sv: true }
+
+profile.option.distance.nearby:
+  en: "Nearby"
+  description: "The nearest of the four distance bands (#514, ADR-061 §5): a line of its own on somebody's card in a round, and a button of the distance row of the deal-breakers, where it takes in nobody further. Says how far in words, never in kilometres: the distance behind the word is a setting. Short: the row holds four buttons."
+  fi: "Lähellä"
+  sv: "I närheten"
+  machine: { fi: true, sv: true }
+
+profile.option.distance.close:
+  en: "Close"
+  description: "The second of the four distance bands (#514, ADR-061 §5): further than nearby. A line of its own on somebody's card in a round, and a button of the distance row of the deal-breakers, where it takes in nearby people too. Never in kilometres. Short: the row holds four buttons."
+  fi: "Melko lähellä"
+  sv: "Ganska nära"
+  machine: { fi: true, sv: true }
+
+profile.option.distance.around:
+  en: "Around"
+  description: "The third of the four distance bands (#514, ADR-061 §5): the same part of the country, further than close. A line of its own on somebody's card in a round, and a button of the distance row of the deal-breakers, where it takes in nearby and close people too. Never in kilometres. Short: the row holds four buttons."
+  fi: "Samoilla seuduilla"
+  sv: "I trakten"
+  machine: { fi: true, sv: true }
+
+profile.option.distance.far:
+  en: "Far"
+  description: "The last of the four distance bands (#514, ADR-061 §5): beyond around. A line of its own on somebody's card in a round; the filter has no such button, since taking everybody is no filter. Never in kilometres, and it must not read as a judgement of the person."
+  fi: "Kauempana"
+  sv: "Längre bort"
   machine: { fi: true, sv: true }
 
 profile.option.exercise.never:
@@ -3312,11 +3438,11 @@ errors.filter_unanswered:
   sv: "För att filtrera på det här, dela ditt eget svar först."
   machine: { fi: true, sv: true }
 
-errors.pond_unknown:
-  en: "That area is not on the list."
-  description: "Pond choice (400), the pond id names no pond (#46)."
-  fi: "Tuota aluetta ei ole listalla."
-  sv: "Det området finns inte på listan."
+errors.postal_code_unknown:
+  en: "We can't find that code. Choose the nearest area from the list."
+  description: "PUT /account/home (400) and the home field on the phone (#514, ADR-061 §4): five digits the list of postal areas lacks. The same words for every code, and they never repeat it. The nearest areas stand under this text, on the phone."
+  fi: "Emme löydä tätä postinumeroa. Valitse lähin alue listalta."
+  sv: "Vi hittar inte det postnumret. Välj närmaste område i listan."
   machine: { fi: true, sv: true }
 
 errors.admin_not_allowed:
@@ -3967,13 +4093,6 @@ onboarding.failed:
   sv: "Något kunde inte läsas in. Försök igen."
   machine: { fi: true, sv: true }
 
-onboarding.retry:
-  en: "Try again"
-  description: "Retry button."
-  fi: "Yritä uudelleen"
-  sv: "Försök igen"
-  machine: { fi: true, sv: true }
-
 onboarding.continue:
   en: "Continue"
   description: "The button that saves a step and moves on."
@@ -4240,30 +4359,16 @@ onboarding.seeks.allow:
   sv: "Jag samtycker till att Kuutti lagrar vem jag söker"
   machine: { fi: true, sv: true }
 
-onboarding.pond.title:
+onboarding.home.title:
   en: "Where do you live?"
-  description: "Heading of the pond step (#174, ADR-010 §12), shown when there is more than one area to choose from."
+  description: "Heading of the home step of onboarding (#514, ADR-061 §1), where the person gives their postal code."
   fi: "Missä asut?"
   sv: "Var bor du?"
   machine: { fi: true, sv: true }
 
-onboarding.pond.explain:
-  en: "Kuutti matches people inside one area. Choose yours."
-  description: "Explanation under the pond step's heading (#174)."
-  fi: "Kuutti yhdistää ihmisiä yhden alueen sisällä. Valitse omasi."
-  sv: "Kuutti matchar människor inom ett område. Välj ditt."
-  machine: { fi: true, sv: true }
-
-pond.name.paakaupunkiseutu:
-  en: "Capital Area"
-  description: "The name of the pond with slug paakaupunkiseutu, by language (#174): the Helsinki capital region. Nominative only; no sentence is built around it."
-  fi: "Pääkaupunkiseutu"
-  sv: "Huvudstadsregionen"
-  machine: { fi: true, sv: true }
-
 pond.name.suomi:
   en: "Finland"
-  description: "The name of the pond with slug suomi, by language (#174): the rest of the country, a sibling of the capital region."
+  description: "The name of the pond with slug suomi, by language (#174): the one pond there is, the whole country (ADR-061 §8). Nominative only; no sentence is built around it."
   fi: "Suomi"
   sv: "Finland"
   machine: { fi: true, sv: true }
@@ -9223,6 +9328,20 @@ tech.licenses.version:
   description: "Licences screen (#416, #512): under the name of a package that names no provider, read after the name as one sentence. {version} is the package's version number, {license} the SPDX identifier of its licence (MIT, Apache-2.0, MIT AND Apache-2.0), which stays as it is."
   fi: "Versio {version}, {license}"
   sv: "Version {version}, {license}"
+  machine: { fi: true, sv: true }
+
+tech.licenses.data:
+  en: "Data"
+  description: "Licences screen (#514): the heading over the data the app carries that is not a package, each with its source and terms."
+  fi: "Aineistot"
+  sv: "Data"
+  machine: { fi: true, sv: true }
+
+tech.licenses.postalAreas:
+  en: "Postal areas"
+  description: "Licences screen (#514, ADR-061 §4): the name of the list of postal areas behind the home step. Its source, licence and what Kuutti changed follow it in the list's own words."
+  fi: "Postinumeroalueet"
+  sv: "Postnummerområden"
   machine: { fi: true, sv: true }
 
 tech.licenses.texts:

@@ -66,6 +66,7 @@ function fakeApi(profile: Profile | null = null) {
         }
       : null,
     completeness: { complete: false, missing: ["photos"] },
+    home: null,
   });
   globalThis.fetch = jest.fn(async (input: Request | string, init?: RequestInit) => {
     const request = input instanceof Request ? input : new Request(input, init);
@@ -380,7 +381,7 @@ describe("LaterFieldScreen", () => {
     globalThis.fetch = jest.fn(async () =>
       failing
         ? json({ error: { code: "internal_error", message: "x", requestId: "r" } }, 500)
-        : json({ profile: null, completeness: { complete: false, missing: [] } }),
+        : json({ profile: null, completeness: { complete: false, missing: [] }, home: null }),
     ) as unknown as typeof fetch;
     await show(<LaterFieldScreen field="smoking" />);
     expect(screen.getByText("Your profile could not be loaded.")).toBeTruthy();
@@ -446,6 +447,7 @@ describe("LaterFieldScreen", () => {
             updatedAt: "2026-10-08T10:00:00.000Z",
           },
           completeness: { complete: false, missing: ["photos"] },
+          home: null,
         }),
       );
       await settle();

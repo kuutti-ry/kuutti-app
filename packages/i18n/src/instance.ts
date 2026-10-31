@@ -24,7 +24,7 @@ export type PlainMessageKey = {
   [K in MessageKey]: keyof MessageParams[K] extends never ? K : never;
 }[MessageKey];
 
-/** `t("onboarding.retry")`, `t("errors.rate_limited", { seconds: 3 })`; an unknown key is a type error. */
+/** `t("load.retry")`, `t("errors.rate_limited", { seconds: 3 })`; an unknown key is a type error. */
 export type TFunction = <K extends MessageKey>(key: K, ...params: ParamsOf<K>) => string;
 
 export type CreateI18nOptions = {

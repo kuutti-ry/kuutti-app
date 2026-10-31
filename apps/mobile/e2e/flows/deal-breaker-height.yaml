@@ -1,6 +1,7 @@
 # Height as a deal-breaker (#508, features/matching/preferences.feature): four
 # buttons where a list has its switch, one relation to the person's own height
-# or Everyone, which is having none. Sanna answered her height and has no
+# or Everyone, which is having none and is heard with the row's name, the
+# distance's row having one too. Sanna answered her height and has no
 # deal-breaker; the flow ends as it began.
 appId: fi.kuutti.app
 name: Height takes one relation of its four buttons, kept when saved, and Everyone takes it off
@@ -16,7 +17,7 @@ name: Height takes one relation of its four buttons, kept when saved, and Everyo
     centerElement: true
     timeout: 60000
 - assertVisible:
-    text: "Everyone|Kaikki|Alla"
+    text: "(Everyone|Kaikki|Alla), (Height|Pituus|Längd)"
     selected: true
 - assertNotVisible: "(Deal-breaker: Height|Ehdoton raja: Pituus|Absolut gräns: Längd)(, .*)?"
 - assertNotVisible: "Also people who did not answer|Myös ne, jotka eivät vastanneet|Även de som inte svarade"
@@ -64,9 +65,9 @@ name: Height takes one relation of its four buttons, kept when saved, and Everyo
     selected: true
 
 # Everyone takes it off, and saved, she is back as she began.
-- tapOn: "Everyone|Kaikki|Alla"
+- tapOn: "(Everyone|Kaikki|Alla), (Height|Pituus|Längd)"
 - assertVisible:
-    text: "Everyone|Kaikki|Alla"
+    text: "(Everyone|Kaikki|Alla), (Height|Pituus|Längd)"
     selected: true
 - assertNotVisible: "Also people who did not answer|Myös ne, jotka eivät vastanneet|Även de som inte svarade"
 - scrollUntilVisible:

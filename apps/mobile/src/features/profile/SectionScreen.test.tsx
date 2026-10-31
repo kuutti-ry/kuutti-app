@@ -56,6 +56,7 @@ function fakeApi(
       return json({
         profile: options.profile ?? null,
         completeness: { complete: false, missing },
+        home: null,
       });
     }
     if (path === "/profile" && request.method === "PUT") {
@@ -76,6 +77,7 @@ function fakeApi(
           updatedAt: "2026-09-26T10:00:00.000Z",
         },
         completeness: { complete: false, missing: ["photos", "seeks", "age_window"] },
+        home: null,
       });
     }
     return json({ error: { code: "not_found", message: "no", requestId: "r" } }, 404);
@@ -311,7 +313,7 @@ describe("SectionScreen", () => {
         }
         document = { ...document, ...body };
       }
-      return json({ profile: document, completeness: { complete: false, missing } });
+      return json({ profile: document, completeness: { complete: false, missing }, home: null });
     }) as unknown as typeof fetch;
 
     const basics = await show(<SectionScreen section="basics" />);
@@ -398,7 +400,7 @@ describe("SectionScreen", () => {
     globalThis.fetch = jest.fn(async () =>
       failing
         ? json({ error: { code: "internal_error", message: "x", requestId: "r" } }, 500)
-        : json({ profile: null, completeness: { complete: false, missing } }),
+        : json({ profile: null, completeness: { complete: false, missing }, home: null }),
     ) as unknown as typeof fetch;
     await show(<SectionScreen section="lifestyle" />);
     expect(screen.getByText("Your profile could not be loaded.")).toBeTruthy();

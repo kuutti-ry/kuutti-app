@@ -97,6 +97,21 @@ export const account = pgTable(
     // in; null until answered, nulled again at erasure with the age.
     gender: gender("gender"),
     pondId: uuid("pond_id").references(() => ponds.id),
+    // The person's one home (ADR-061 §2, §9): the place kept, of at least
+    // matching_config.home_min_inhabitants people. A five-digit postal code
+    // where the area is that large, else a three-digit municipality number:
+    // official codes, which outlive a yearly list. It is read through
+    // `keptPlace`, so a raised floor coarsens every read at once. A change overwrites
+    // it and leaves no history; null until answered, nulled again at erasure.
+    homePlace: text("home_place"),
+    // Whether the card shows the kept area's name instead of the nearest town
+    // (ADR-061 §3); a new home starts from the town. Cleared at erasure.
+    homeShowsArea: boolean("home_shows_area").notNull().default(false),
+    // When the kept place last changed to another (ADR-061 §5): a round built
+    // before it offers no relaxation, so a move is one new reading a night and
+    // the home needs no limit. The latest alone, overwritten, and of no earlier
+    // place; null without a move, nulled again at erasure.
+    homeMovedAt: timestamp("home_moved_at", { withTimezone: true }),
     // When the gender last changed from an earlier answer (#147, ADR-060 §9):
     // a change is possible once in matching_config.change_cadence_days. Null
     // until the first change.

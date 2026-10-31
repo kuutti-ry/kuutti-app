@@ -24,6 +24,8 @@ import ProfileRoute from "../app/profile/index";
 // biome-ignore lint/style/noRestrictedImports: a route file, not a slice internal
 import LaterFieldRoute from "../app/profile/later/[field]";
 // biome-ignore lint/style/noRestrictedImports: a route file, not a slice internal
+import PlaceRoute from "../app/profile/place";
+// biome-ignore lint/style/noRestrictedImports: a route file, not a slice internal
 import ProfileSectionRoute from "../app/profile/section/[id]";
 import RoundRoute from "../app/round";
 import FoundThemRoute from "../app/settings/found-them";
@@ -115,6 +117,7 @@ jest.mock("@/features/profile", () => {
     DealBreakersScreen: probe("DealBreakersScreen"),
     holdLinkWhileUnsaved: jest.fn((path: string) => path),
     LaterFieldScreen: probe("LaterFieldScreen"),
+    PlaceScreen: probe("PlaceScreen"),
     ProfileScreen: probe("ProfileScreen"),
     SectionScreen: probe("SectionScreen"),
   };
@@ -173,6 +176,7 @@ describe("the screens without params", () => {
     ["/profile", ProfileRoute, "ProfileScreen"],
     ["/profile/card", CardPreviewRoute, "CardPreviewScreen"],
     ["/profile/deal-breakers", DealBreakersRoute, "DealBreakersScreen"],
+    ["/profile/place", PlaceRoute, "PlaceScreen"],
     ["/round", RoundRoute, "RoundScreen"],
     ["/settings", SettingsRoute, "SettingsScreen"],
     ["/settings/found-them", FoundThemRoute, "FoundThemScreen"],

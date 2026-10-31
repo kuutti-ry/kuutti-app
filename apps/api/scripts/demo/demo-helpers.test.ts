@@ -17,7 +17,6 @@ import { signedInAccount } from "../../src/test/account.ts";
 import { conversationBetween, photoMessage } from "../../src/test/chat.ts";
 import { captureLogger, describe, expect, type TestContext, test } from "../../src/test/harness.ts";
 import { fixtureJpeg, testMediaDeps } from "../../src/test/media.ts";
-import { pondNamed } from "../../src/test/people.ts";
 import { call, DemoError, type Fetch, loginAs, upload } from "./bank.ts";
 import { giveHistory, type HistoryWriter, viaRoutes } from "./histories.ts";
 import { loadAssets, uploadFaces } from "./photos.ts";
@@ -332,15 +331,15 @@ describe("one call of the API as the persona", () => {
       "DELETE /photos/1": () => new Response(null, { status: 204 }),
       "GET /profile": () =>
         json({ error: { code: "not_found", message: "x", requestId: "r" } }, 404),
-      "GET /ponds": () => new Response("<html>bad gateway</html>", { status: 502 }),
+      "GET /gate": () => new Response("<html>bad gateway</html>", { status: 502 }),
       "POST /consents": () => new Response(null, { status: 500 }),
     });
     expect(await call(api.context, TOKEN, "DELETE", "/photos/1")).toBeNull();
     await expect(call(api.context, TOKEN, "GET", "/profile")).rejects.toThrow(
       "GET /profile: 404 not_found",
     );
-    await expect(call(api.context, TOKEN, "GET", "/ponds")).rejects.toThrow(
-      "GET /ponds: 502 unreadable",
+    await expect(call(api.context, TOKEN, "GET", "/gate")).rejects.toThrow(
+      "GET /gate: 502 unreadable",
     );
     await expect(call(api.context, TOKEN, "POST", "/consents", { kind: "terms" })).rejects.toThrow(
       "POST /consents: 500 unreadable",
@@ -422,12 +421,13 @@ describe("the local hands, before and after a login", () => {
     await expect(writer.status(ACCOUNT)).rejects.toThrow(DemoError);
   });
 
-  test("after the login: a pond the API does not list is refused, and pictures go up one by one", async ({
+  test("after the login: a code the API does not know is refused by name, and pictures go up one by one", async ({
     ctx,
   }) => {
     let uploads = 0;
     const api = scripted({
-      "GET /ponds": () => json({ ponds: [] }),
+      "PUT /account/home": () =>
+        json({ error: { code: "postal_code_unknown", message: "x", requestId: "r" } }, 400),
       "POST /photos": () => {
         uploads += 1;
         return json(
@@ -450,9 +450,12 @@ describe("the local hands, before and after a login", () => {
     const writer = viaRoutes({ ...api.context, db: ctx.client, assets });
     expect(writer.assets).toBe(assets);
     expect(await writer.login(persona, "fi")).toEqual({ accountId: ACCOUNT, outcome: "created" });
-    await expect(writer.pond(ACCOUNT, "paakaupunkiseutu")).rejects.toThrow(
-      "no pond paakaupunkiseutu: run the seed first",
-    );
+    const refused = await writer.home(ACCOUNT, "99999").catch((error: unknown) => error);
+    expect(refused).toBeInstanceOf(DemoError);
+    // The refusal says what was refused, and the digits only go up in the body (ADR-061 §9).
+    expect((refused as DemoError).message).toBe("PUT /account/home: 400 postal_code_unknown");
+    const sent = api.calls.find((c) => c.route === "PUT /account/home")?.init?.body;
+    expect(JSON.parse(String(sent))).toEqual({ postalCode: "99999" });
     expect(await writer.photos(ACCOUNT, [new Uint8Array([1]), new Uint8Array([2])])).toEqual([
       "5e0c1d2f-3a4b-4c5d-8e6f-7a8b9c0d1e21",
       "5e0c1d2f-3a4b-4c5d-8e6f-7a8b9c0d1e22",
@@ -491,7 +494,7 @@ function fakeWriter(overrides: Partial<HistoryWriter>): HistoryWriter {
     consent: nothing,
     gender: nothing,
     preferences: nothing,
-    pond: nothing,
+    home: nothing,
     profile: nothing,
     photos: async () => [],
     approve: nothing,
@@ -525,6 +528,27 @@ describe("a history given", () => {
     await expect(giveHistory(historyOf("sanna"), writer)).rejects.toThrow(
       "sanna did not become active: photos, bio",
     );
+  });
+
+  it("types the story's home once the answers before it are in, and only Onni has none to type", async () => {
+    const said: string[] = [];
+    const writer = fakeWriter({
+      preferences: async () => {
+        said.push("preferences");
+      },
+      home: async (_, postalCode) => {
+        said.push(`home ${postalCode}`);
+      },
+      status: async () => {
+        said.push("status");
+        return { state: "active", missing: [] } as unknown as OnboardingStatus;
+      },
+    });
+    await giveHistory(historyOf("sanna"), writer);
+    expect(said).toEqual(["preferences", "home 02100", "status"]);
+    said.length = 0;
+    await giveHistory(historyOf("onni"), writer);
+    expect(said).toEqual([]);
   });
 
   it("without the release nobody gets a photo, and a story with none asks for none", async () => {
@@ -652,7 +676,7 @@ describe("the ban Tapio's story ends in", () => {
 describe("the staging hands where they refuse", () => {
   const hmacKey = hmacKeyFromHex("1f".repeat(32));
 
-  test("preferences, a pond and pictures each refuse an account or a world that is not there", async ({
+  test("preferences, a home and pictures each refuse an account or a world that is not there", async ({
     ctx,
   }) => {
     const { logger } = await captureLogger();
@@ -660,13 +684,10 @@ describe("the staging hands where they refuse", () => {
     await expect(
       writer.preferences(NOWHERE_ACCOUNT, { seeks: ["woman"], ageWindow: { min: 25, max: 40 } }),
     ).rejects.toThrow(`${NOWHERE_ACCOUNT}: no live account for the preferences`);
-    await expect(writer.pond(NOWHERE_ACCOUNT, "lib-demo-nowhere")).rejects.toThrow(
-      "no pond lib-demo-nowhere: run the seed first",
+    await expect(writer.home(NOWHERE_ACCOUNT, "99999")).rejects.toThrow(
+      "That postal code is not on the list",
     );
-    await pondNamed(ctx.client, "lib-demo-pond");
-    await expect(writer.pond(NOWHERE_ACCOUNT, "lib-demo-pond")).rejects.toThrow(
-      `${NOWHERE_ACCOUNT}: the pond could not be set`,
-    );
+    await expect(writer.home(NOWHERE_ACCOUNT, "00530")).rejects.toThrow("No live account");
     await expect(writer.photos(NOWHERE_ACCOUNT, [new Uint8Array([1])])).rejects.toThrow(
       "no object store is configured, and the stories have pictures",
     );

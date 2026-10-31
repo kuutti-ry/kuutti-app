@@ -7,6 +7,7 @@ export * from "./chat-frames.ts";
 export * from "./config.ts";
 export * from "./contact.ts";
 export * from "./deal-breakers.ts";
+export * from "./distance.ts";
 export { ErrorResponse } from "./errors.ts";
 export * from "./feedback.ts";
 export * from "./found-them.ts";
