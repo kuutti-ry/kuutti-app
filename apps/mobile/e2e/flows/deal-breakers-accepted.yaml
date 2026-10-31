@@ -62,8 +62,9 @@ name: Each deal-breaker waits for an accepted answer, and leaving unsaved asks f
     visible: "Leave without saving\\?|Poistutaanko tallentamatta\\?|Lämna utan att spara\\?"
     timeout: 15000
 - tapOn: "Leave without saving|Poistu tallentamatta|Lämna utan att spara"
+# Home's top: with matching open (ADR-060) the card and the push offer put the profile's button below the fold.
 - extendedWaitUntil:
-    visible: "Your profile|Profiilisi|Din profil"
+    visible: "Your area|Alueesi|Ditt område"
     timeout: 15000
 - openLink: kuutti://profile/deal-breakers
 - extendedWaitUntil:
