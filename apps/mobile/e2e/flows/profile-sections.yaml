@@ -1,9 +1,10 @@
 # The profile as a list of sections, each its own screen with no Save button
 # (#227): an answer given in a section is saved by going back, shows on the
-# card, and taking it back the same way takes it off. Sanna has no exercise
-# answer; the flow leaves her without one.
+# card, hidden it stays an answer and leaves the card (#515), and taking it back
+# the same way takes it off. Sanna has no exercise answer; the flow leaves her
+# without one, and shows it again before that, so a second run starts the same.
 appId: fi.kuutti.app
-name: A section saves on going back, and the card shows what it saved
+name: A section saves on going back, the card shows what it saved, and a hidden answer leaves it
 ---
 - runFlow: ../common/sign-in.yaml
 - openLink: kuutti://profile
@@ -47,6 +48,75 @@ name: A section saves on going back, and the card shows what it saved
     centerElement: true
     timeout: 60000
 - assertVisible: "Weekly|Viikoittain|Varje vecka"
+
+# Hidden: the section keeps the answer and says what hiding did, saved by going
+# back like any answer, and the card has no Exercise any more.
+- openLink: kuutti://profile
+- extendedWaitUntil:
+    visible: "(The basics|Perustiedot|Grunderna)(, .*)?"
+    timeout: 15000
+- waitForAnimationToEnd
+- tapOn: "(Lifestyle|Elämäntavat|Livsstil)(, .*)?"
+- extendedWaitUntil:
+    visible: "Smoking|Tupakointi|Rökning"
+    timeout: 15000
+- waitForAnimationToEnd
+- scrollUntilVisible:
+    element: "Weekly|Viikoittain|Varje vecka"
+    direction: DOWN
+    centerElement: true
+    timeout: 60000
+- tapOn: "Hide from your card: Exercise|Piilota kortiltasi: Liikunta|Dölj från ditt kort: Motion"
+- assertVisible: "Hidden from your card\\.|Piilotettu kortiltasi\\.|Dolt från ditt kort\\."
+- assertVisible:
+    text: "Weekly|Viikoittain|Varje vecka"
+    selected: true
+- tapOn: "Back to your profile|Takaisin profiiliisi|Tillbaka till din profil"
+- extendedWaitUntil:
+    visible: "(The basics|Perustiedot|Grunderna)(, .*)?"
+    timeout: 15000
+- openLink: kuutti://profile/card
+- extendedWaitUntil:
+    visible: "Your card|Korttisi|Ditt kort"
+    timeout: 15000
+- scrollUntilVisible:
+    element: "Weekly|Viikoittain|Varje vecka"
+    direction: DOWN
+    centerElement: true
+    timeout: 8000
+    optional: true
+- assertNotVisible: "Weekly|Viikoittain|Varje vecka"
+
+# Shown again from the same place, and back on the card.
+- openLink: kuutti://profile
+- extendedWaitUntil:
+    visible: "(The basics|Perustiedot|Grunderna)(, .*)?"
+    timeout: 15000
+- waitForAnimationToEnd
+- tapOn: "(Lifestyle|Elämäntavat|Livsstil)(, .*)?"
+- extendedWaitUntil:
+    visible: "Smoking|Tupakointi|Rökning"
+    timeout: 15000
+- waitForAnimationToEnd
+- scrollUntilVisible:
+    element: "Weekly|Viikoittain|Varje vecka"
+    direction: DOWN
+    centerElement: true
+    timeout: 60000
+- tapOn: "Show on your card: Exercise|Näytä kortillasi: Liikunta|Visa på ditt kort: Motion"
+- tapOn: "Back to your profile|Takaisin profiiliisi|Tillbaka till din profil"
+- extendedWaitUntil:
+    visible: "(The basics|Perustiedot|Grunderna)(, .*)?"
+    timeout: 15000
+- openLink: kuutti://profile/card
+- extendedWaitUntil:
+    visible: "Your card|Korttisi|Ditt kort"
+    timeout: 15000
+- scrollUntilVisible:
+    element: "Weekly|Viikoittain|Varje vecka"
+    direction: DOWN
+    centerElement: true
+    timeout: 60000
 
 # Taken back the same way, from the list: tapped again, which clears it, and
 # going back.

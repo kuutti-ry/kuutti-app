@@ -677,6 +677,24 @@ describe("GET /admin/accounts/{id}", () => {
     expect(page.profile?.fields).toEqual({ intent: "long_term" });
   });
 
+  test("leaves out the answers the person hides from the card, as the card does (#515)", async ({
+    ctx,
+    api,
+  }) => {
+    const moderator = await staffSession(ctx.client, "moderator");
+    const person = await signedInAccount(ctx.client);
+    await profileOf(
+      ctx,
+      person.accountId,
+      ProfileFields.parse({ intent: "long_term", smoking: "never" }),
+    );
+    await ctx.client.query("UPDATE profile SET hidden_fields = '{smoking}' WHERE account_id = $1", [
+      person.accountId,
+    ]);
+    const page = await pageOf(await open(api, moderator.headers, person.accountId));
+    expect(page.profile?.fields).toEqual({ intent: "long_term" });
+  });
+
   test("shows a ready bio line as the card does, when the person chose one instead of their words", async ({
     ctx,
     api,

@@ -1,10 +1,17 @@
 import type { Queryable } from "@kuutti/db";
-import type { ProfileUpdate } from "@kuutti/schema";
+import {
+  CARD_FIELD_KEYS,
+  PROFILE_FIELD_KEYS,
+  PROFILE_FIELDS,
+  type ProfileFields,
+  type ProfileUpdate,
+} from "@kuutti/schema";
+import fc from "fast-check";
 import type { QueryResultRow } from "pg";
 import { describe, expect, it } from "vitest";
 import { signedInAccount, withMatchingConfig } from "../test/account.ts";
 import { captureLogger, type TestContext, test } from "../test/harness.ts";
-import { buildCard, type CardDeps, sharedAnswers } from "./card.ts";
+import { buildCard, type CardDeps, fieldsOnCard, sharedAnswers } from "./card.ts";
 import {
   contactDetailsInUpdate,
   exportProfile,
@@ -307,6 +314,49 @@ describe("what both answered", () => {
       languages: ["fi", "en"],
     });
     expect(sharedAnswers({ hobbies: ["yoga"] }, {})).toEqual({ hobbies: [], languages: [] });
+  });
+});
+
+describe("what the card leaves out (#515)", () => {
+  /** One answer on every field of the registry, whatever its kind. */
+  const answers = Object.fromEntries(
+    PROFILE_FIELD_KEYS.map((key) => {
+      const spec = PROFILE_FIELDS[key];
+      if (spec.kind === "single") return [key, spec.options[0]];
+      if (spec.kind === "multi") return [key, [spec.options[0]]];
+      if (spec.kind === "number") return [key, spec.min];
+      return [key, spec.kind === "text" ? "Architect" : false];
+    }),
+  ) as ProfileFields;
+
+  it("keeps every other answer as it is and adds nothing, whatever is hidden", () => {
+    fc.assert(
+      fc.property(fc.subarray([...CARD_FIELD_KEYS]), (hiddenFields) => {
+        const onCard = fieldsOnCard({ fields: answers, hiddenFields });
+        expect(Object.keys(onCard).sort()).toEqual(
+          CARD_FIELD_KEYS.filter((key) => !hiddenFields.includes(key)).sort(),
+        );
+        for (const [key, value] of Object.entries(onCard)) {
+          expect(value).toEqual(answers[key as keyof ProfileFields]);
+        }
+      }),
+      { seed: 515, numRuns: 200 },
+    );
+  });
+
+  it("leaves the field of study out under the setting, whatever the set says", () => {
+    const fields: ProfileFields = { field: ["tech"], hideFromField: true, intent: "casual" };
+    expect(fieldsOnCard({ fields, hiddenFields: [] })).toEqual({ intent: "casual" });
+    expect(fieldsOnCard({ fields, hiddenFields: ["field"] })).toEqual({ intent: "casual" });
+    expect(fieldsOnCard({ fields: { ...fields, hideFromField: false }, hiddenFields: [] })).toEqual(
+      { field: ["tech"], intent: "casual" },
+    );
+  });
+
+  it("takes a hidden key with no answer behind it as nothing", () => {
+    expect(fieldsOnCard({ fields: { intent: "casual" }, hiddenFields: ["smoking"] })).toEqual({
+      intent: "casual",
+    });
   });
 });
 

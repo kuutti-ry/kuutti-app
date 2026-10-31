@@ -1,6 +1,7 @@
-import type { ProfileFieldKey, ProfileFields } from "@kuutti/schema";
+import type { HiddenField, ProfileFieldKey, ProfileFields } from "@kuutti/schema";
 import { fireEvent, screen } from "@testing-library/react-native";
 import { useState } from "react";
+import { AccessibilityInfo } from "react-native";
 import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
 import { renderWithTheme } from "@/test/render";
 import { FieldEditor, optionTextKey, toggled, visibleOptions } from "./FieldEditor";
@@ -11,9 +12,22 @@ import { FieldEditor, optionTextKey, toggled, visibleOptions } from "./FieldEdit
 
 /** The draft the editor works on, as the screens hold it; `fields` is what it holds now. */
 let fields: ProfileFields = {};
-function Harness({ field, initial }: { field: ProfileFieldKey; initial: ProfileFields }) {
-  const [draft, setDraft] = useState({ fields: initial });
+let hiddenFields: readonly HiddenField[] | undefined;
+function Harness({
+  field,
+  initial,
+  hidden,
+}: {
+  field: ProfileFieldKey;
+  initial: ProfileFields;
+  hidden?: HiddenField[];
+}) {
+  const [draft, setDraft] = useState<{ fields: ProfileFields; hiddenFields?: HiddenField[] }>({
+    fields: initial,
+    hiddenFields: hidden,
+  });
   fields = draft.fields;
+  hiddenFields = draft.hiddenFields;
   return (
     <FieldEditor
       field={field}
@@ -22,13 +36,14 @@ function Harness({ field, initial }: { field: ProfileFieldKey; initial: ProfileF
     />
   );
 }
-const show = (field: ProfileFieldKey, initial: ProfileFields = {}) =>
-  renderWithTheme(<Harness field={field} initial={initial} />);
+const show = (field: ProfileFieldKey, initial: ProfileFields = {}, hidden?: HiddenField[]) =>
+  renderWithTheme(<Harness field={field} initial={initial} hidden={hidden} />);
 const chosen = (name: string) =>
   screen.getByRole("button", { name }).props.accessibilityState?.selected;
 
 beforeEach(() => {
   fields = {};
+  hiddenFields = undefined;
 });
 
 describe("FieldEditor: a setting", () => {
@@ -40,6 +55,132 @@ describe("FieldEditor: a setting", () => {
     expect(fields).toEqual({ hideFromField: true });
     await fireEvent.press(screen.getByRole("switch", { name: "Hide me from people in my field" }));
     expect(fields).toEqual({});
+  });
+});
+
+describe("FieldEditor: what the card shows (#515)", () => {
+  const HIDE_SMOKING = "Hide from your card: Smoking";
+  const SHOW_SMOKING = "Show on your card: Smoking";
+  const USED = "Hidden from your card. Still used for matching.";
+  const NOT_USED = "Hidden from your card.";
+
+  afterEach(() => jest.restoreAllMocks());
+
+  it("offers nothing on an unanswered field", async () => {
+    await show("smoking");
+    expect(screen.queryByRole("button", { name: HIDE_SMOKING })).toBeNull();
+    expect(screen.queryByText(USED)).toBeNull();
+  });
+
+  it("offers Hide once there is an answer, with no line under the title", async () => {
+    await show("smoking");
+    await fireEvent.press(screen.getByRole("button", { name: "Never" }));
+    expect(screen.getByRole("button", { name: HIDE_SMOKING })).toBeTruthy();
+    expect(screen.getByText("Hide")).toBeTruthy();
+    expect(screen.queryByText(USED)).toBeNull();
+  });
+
+  it("hides the answer and keeps it, says what that means, and turns into Show", async () => {
+    const said = jest.spyOn(AccessibilityInfo, "announceForAccessibility");
+    await show("smoking", { smoking: "never" });
+    await fireEvent.press(screen.getByRole("button", { name: HIDE_SMOKING }));
+    expect(hiddenFields).toEqual(["smoking"]);
+    expect(fields).toEqual({ smoking: "never" });
+    expect(screen.getByText(USED)).toBeTruthy();
+    expect(screen.getByText("Show")).toBeTruthy();
+    expect(chosen("Never")).toBe(true);
+    expect(said).toHaveBeenCalledWith(USED);
+  });
+
+  it("shows a hidden answer again, the rest of the set as it was", async () => {
+    const said = jest.spyOn(AccessibilityInfo, "announceForAccessibility");
+    await show("smoking", { smoking: "never" }, ["height", "smoking"]);
+    await fireEvent.press(screen.getByRole("button", { name: SHOW_SMOKING }));
+    expect(hiddenFields).toEqual(["height"]);
+    expect(screen.getByRole("button", { name: HIDE_SMOKING })).toBeTruthy();
+    expect(screen.queryByText(USED)).toBeNull();
+    expect(said).toHaveBeenCalledWith("Back on your card.");
+  });
+
+  it.each([
+    ["intent", { intent: "casual" }, USED],
+    ["languages", { languages: ["fi"] }, USED],
+    ["monogamy", { monogamy: "monogamous" }, USED],
+    ["hobbies", { hobbies: ["sauna"] }, NOT_USED],
+    ["height", { height: 171 }, NOT_USED],
+    ["politics", { politics: ["vas"] }, NOT_USED],
+    ["religion", { religion: "atheist" }, NOT_USED],
+    ["occupationTitle", { occupationTitle: "Nurse" }, NOT_USED],
+  ] satisfies [ProfileFieldKey, ProfileFields, string][])(
+    "says matching still reads a hidden %s only where it does",
+    async (field, initial, line) => {
+      await show(field, initial, [field]);
+      expect(screen.getByText(line)).toBeTruthy();
+      expect(screen.queryByText(line === USED ? NOT_USED : USED)).toBeNull();
+    },
+  );
+
+  it.each([
+    ["education", { education: "amk" }],
+    ["drinking", {}],
+    ["drugsAttitude", { drugsAttitude: "not_my_thing" }],
+  ] as const)(
+    "says %s is never on a card, answered or not, with nothing to hide",
+    async (field, initial) => {
+      await show(field, initial);
+      expect(screen.getByText("Never on your card. Only used for matching.")).toBeTruthy();
+      expect(screen.queryByText("Hide")).toBeNull();
+    },
+  );
+
+  it("leaves a setting as it was: no Hide and no line", async () => {
+    await show("hideFromField", { hideFromField: true });
+    expect(screen.queryByText("Hide")).toBeNull();
+    expect(screen.queryByText("Never on your card. Only used for matching.")).toBeNull();
+  });
+
+  it("says a field of study is hidden under the setting, with nothing to press", async () => {
+    await show("field", { field: ["tech"], hideFromField: true });
+    expect(screen.getByText(NOT_USED)).toBeTruthy();
+    expect(screen.queryByText("Hide")).toBeNull();
+    expect(screen.queryByText("Show")).toBeNull();
+  });
+
+  it("offers Hide on a field of study again without the setting", async () => {
+    await show("field", { field: ["tech"] });
+    expect(screen.getByText("Hide")).toBeTruthy();
+    expect(screen.queryByText(NOT_USED)).toBeNull();
+  });
+
+  it("keeps a cleared answer's place in the set: answered again, it is hidden again, and says so", async () => {
+    await show("smoking", { smoking: "never" }, ["smoking"]);
+    await fireEvent.press(screen.getByRole("button", { name: "Never" }));
+    expect(fields).toEqual({});
+    expect(hiddenFields).toEqual(["smoking"]);
+    expect(screen.queryByText(USED)).toBeNull();
+    expect(screen.queryByText("Show")).toBeNull();
+    await fireEvent.press(screen.getByRole("button", { name: "Sometimes" }));
+    expect(screen.getByText(USED)).toBeTruthy();
+    expect(screen.getByRole("button", { name: SHOW_SMOKING })).toBeTruthy();
+  });
+
+  it("starts the hidden set from nothing on a draft that has none", async () => {
+    await show("height", { height: 171 });
+    expect(hiddenFields).toBeUndefined();
+    await fireEvent.press(screen.getByRole("button", { name: "Hide from your card: Height" }));
+    expect(hiddenFields).toEqual(["height"]);
+  });
+
+  it("offers it on a short text too", async () => {
+    await show("occupationTitle", { occupationTitle: "Nurse" });
+    expect(screen.getByRole("button", { name: "Hide from your card: Job title" })).toBeTruthy();
+  });
+
+  it("is a labelled button with a 44 pt target, in both states", async () => {
+    await show("smoking", { smoking: "never" });
+    expect(pressables(screen.toJSON() as HostNode).flatMap((n) => a11yProblems(n))).toEqual([]);
+    await fireEvent.press(screen.getByRole("button", { name: HIDE_SMOKING }));
+    expect(pressables(screen.toJSON() as HostNode).flatMap((n) => a11yProblems(n))).toEqual([]);
   });
 });
 

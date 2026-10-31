@@ -1,4 +1,4 @@
-import type { ProfileUpdate } from "@kuutti/schema";
+import type { HiddenField, ProfileUpdate } from "@kuutti/schema";
 import { act, renderHook, waitFor } from "@testing-library/react-native";
 import { saveSession } from "@/lib/session";
 import { changesOf, EMPTY_PROFILE, useProfile, withChanges } from "./useProfile";
@@ -19,6 +19,7 @@ const DOCUMENT: ProfileUpdate = {
   bioPreset: null,
   fields: { intent: "long_term", height: 170 },
   prompts: [{ key: "sunday", answer: "A long breakfast." }],
+  hiddenFields: [],
 };
 const stored = (document: ProfileUpdate | null) => ({
   profile: document
@@ -324,6 +325,42 @@ describe("useProfile: a section that has gone (#238)", () => {
   });
 });
 
+describe("useProfile: hiding an answer (#515)", () => {
+  it("reads an answer that names none as none hidden", async () => {
+    const { hiddenFields: _, ...older } = DOCUMENT;
+    serve([() => json(stored(older))]);
+    const { result } = await ready();
+    expect(result.current.draft.hiddenFields).toEqual([]);
+    expect(result.current.dirty).toBe(false);
+  });
+
+  it("is dirty after a Hide, and clean again once it is taken back", async () => {
+    serve([() => json(stored({ ...DOCUMENT, hiddenFields: ["height"] }))]);
+    const { result } = await ready();
+    expect(result.current.draft.hiddenFields).toEqual(["height"]);
+    await act(async () => result.current.update({ hiddenFields: ["height", "intent"] }));
+    expect(result.current.dirty).toBe(true);
+    expect(result.current.changes).toEqual({ hidden: { intent: true } });
+    await act(async () => result.current.update({ hiddenFields: ["height"] }));
+    expect(result.current.dirty).toBe(false);
+  });
+
+  it("saves a Hide onto the set as stored, so two screens read together both keep theirs", async () => {
+    const saved = serve(
+      [() => json(stored(DOCUMENT)), () => json(stored({ ...DOCUMENT, hiddenFields: ["height"] }))],
+      [(body) => json(stored(body as ProfileUpdate))],
+    );
+    const { result } = await ready();
+    await act(async () => result.current.update({ hiddenFields: ["intent"] }));
+    await act(async () => {
+      await result.current.save();
+    });
+    expect(saved).toMatchObject([{ hiddenFields: ["height", "intent"] }]);
+    expect(result.current.draft.hiddenFields).toEqual(["height", "intent"]);
+    expect(result.current.dirty).toBe(false);
+  });
+});
+
 describe("changesOf and withChanges: what a draft changed, put on another document (#238)", () => {
   it("names nothing for the same document with its keys in another order", () => {
     const reordered = {
@@ -345,6 +382,31 @@ describe("changesOf and withChanges: what a draft changed, put on another docume
       prompts: [],
       fields: { intent: "casual", height: undefined, smoking: "never" },
     });
+  });
+
+  it("names each field hidden or shown again, and nothing for the same set in another order (#515)", () => {
+    const from = { ...EMPTY_PROFILE, hiddenFields: ["smoking", "height"] as HiddenField[] };
+    expect(changesOf(from, { ...from, hiddenFields: ["height", "smoking"] })).toEqual({});
+    expect(changesOf(from, { ...from, hiddenFields: ["height", "hobbies"] })).toEqual({
+      hidden: { smoking: false, hobbies: true },
+    });
+    expect(changesOf({ ...EMPTY_PROFILE, hiddenFields: undefined }, EMPTY_PROFILE)).toEqual({});
+    expect(changesOf(from, { ...from, hiddenFields: undefined })).toEqual({
+      hidden: { smoking: false, height: false },
+    });
+  });
+
+  it("puts each one on the stored set, so a Hide from another screen stays (#515)", () => {
+    const stored = { ...EMPTY_PROFILE, hiddenFields: ["religion", "height"] as HiddenField[] };
+    expect(withChanges(stored, { hidden: { height: false, smoking: true } }).hiddenFields).toEqual([
+      "religion",
+      "smoking",
+    ]);
+    expect(withChanges(stored, {}).hiddenFields).toEqual(["religion", "height"]);
+    expect(
+      withChanges({ ...EMPTY_PROFILE, hiddenFields: undefined }, { hidden: { smoking: true } })
+        .hiddenFields,
+    ).toEqual(["smoking"]);
   });
 
   it("names a bio and a ready line together when either changes: the API takes one, never both", () => {

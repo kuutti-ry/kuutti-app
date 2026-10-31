@@ -3,6 +3,7 @@ import {
   CARD_FIELD_KEYS,
   cardFields,
   DEAL_BREAKER_FIELDS,
+  HiddenField,
   HOBBIES,
   HOBBY_GROUP_KEYS,
   HOBBY_GROUPS,
@@ -59,6 +60,16 @@ describe("the profile field registry (ADR-019)", () => {
     expect(
       cardFields({ intent: "casual", education: "amk", hideFromField: true, height: 178 }),
     ).toEqual({ intent: "casual", height: 178 });
+  });
+
+  it("lets a person hide every field a card carries, and nothing else (#515)", () => {
+    for (const key of PROFILE_FIELD_KEYS) {
+      expect(HiddenField.safeParse(key).success, key).toBe(CARD_FIELD_KEYS.includes(key));
+    }
+    // What a card needs is no field of the registry, so there is no hiding it.
+    for (const key of ["displayName", "age", "photos", "gender", "bio", "prompts"]) {
+      expect(HiddenField.safeParse(key).success, key).toBe(false);
+    }
   });
 
   it("parses the sheet's answers and refuses what it does not list", () => {

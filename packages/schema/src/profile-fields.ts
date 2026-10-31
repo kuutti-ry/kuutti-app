@@ -482,6 +482,18 @@ export const CARD_FIELD_KEYS = PROFILE_FIELD_KEYS.filter((key) => {
 });
 
 /**
+ * A field a person may keep off their card (#515, ADR-019 §2): every field a
+ * card carries. Hidden, an answer is still an answer: the pool, both sides'
+ * deal-breakers and the soft order read it as before, and only the card
+ * leaves it out. The name, the age, the photos and the gender are no fields
+ * here, since a card needs them; the soft fields never reach a card at all.
+ */
+export const HiddenField = z
+  .enum(CARD_FIELD_KEYS as unknown as [ProfileFieldKey, ...ProfileFieldKey[]])
+  .meta({ id: "HiddenField" });
+export type HiddenField = z.infer<typeof HiddenField>;
+
+/**
  * The optional fields as the screens after the gate ask them, one per
  * screen with "Ask me later", in the field sheet's order (#148, TD-16).
  * Intent and the identity label are onboarding's; a companion field shares

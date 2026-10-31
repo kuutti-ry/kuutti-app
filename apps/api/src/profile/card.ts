@@ -4,6 +4,7 @@ import {
   type Completeness,
   cardFields,
   type ProfileCard,
+  type ProfileDocument,
   type ProfileFields,
 } from "@kuutti/schema";
 import { AppError } from "../lib/errors.ts";
@@ -46,9 +47,10 @@ export type CardDeps = {
 
 /**
  * What both the viewer and the subject answered (#150): the hobbies and
- * languages the card marks "you too". Computed at build time from the two
- * documents, never stored, never a count or a score (the matching
- * document's invariant 6); nothing for the owner's own preview.
+ * languages the card marks "you too". Computed at build time from the
+ * viewer's document and what the subject's card shows, so a hidden answer is
+ * never told this way (#515); never stored, never a count or a score (the
+ * matching document's invariant 6); nothing for the owner's own preview.
  */
 export function sharedAnswers(
   viewer: ProfileFields | null,
@@ -63,9 +65,18 @@ export function sharedAnswers(
   return { hobbies: both("hobbies"), languages: both("languages") };
 }
 
-/** The card's fields: the info and hard ones (ADR-019 §2), less the field of study when the person hides it (#150). */
-export function fieldsOnCard(fields: ProfileFields): ProfileFields {
+/**
+ * The card's fields: the info and hard ones (ADR-019 §2), less what the person
+ * hides: the answers they keep off it (#515) and the field of study under
+ * "hide me from my field" (#150). The one reader of the hidden set: nothing
+ * in matching asks it, so a hidden answer counts as a shown one does.
+ */
+export function fieldsOnCard({
+  fields,
+  hiddenFields,
+}: Pick<ProfileDocument, "fields" | "hiddenFields">): ProfileFields {
   const out: Record<string, unknown> = { ...cardFields(fields) };
+  for (const key of hiddenFields) delete out[key];
   if (fields.hideFromField === true) delete out.field;
   return out as ProfileFields;
 }
@@ -178,6 +189,7 @@ export async function buildCard(
       "card served",
     );
   }
+  const onCard = fieldsOnCard(subject.profile);
   const cardPhotos: CardPhoto[] = photos.map((p) => ({
     id: p.id,
     blurhash: p.blurhash,
@@ -195,11 +207,11 @@ export async function buildCard(
       pond,
       photos: cardPhotos,
       // What is there to be seen and what both sides matched on; a soft value or a setting stays on the profile (ADR-019 §2).
-      fields: fieldsOnCard(subject.profile.fields),
+      fields: onCard,
       bio: subject.profile.bio,
       bioPreset: subject.profile.bioPreset,
       prompts: subject.profile.prompts,
-      shared: sharedAnswers(viewer?.fields ?? null, subject.profile.fields),
+      shared: sharedAnswers(viewer?.fields ?? null, onCard),
     },
     completeness: done,
   };

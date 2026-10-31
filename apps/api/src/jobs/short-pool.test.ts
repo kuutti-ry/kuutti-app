@@ -1,5 +1,6 @@
 import type { Queryable } from "@kuutti/db";
 import {
+  DealBreakersResponse,
   ErrorResponse,
   type ProfileFields,
   RelaxationAnswer,
@@ -87,6 +88,14 @@ async function dealBreaker(
      VALUES ($1, $2, $3::jsonb, 'hard', $4)`,
     [accountId, field, JSON.stringify(accept), includeUnknown],
   );
+}
+
+/** The answer stays off these people's cards (#515), as a save of the profile leaves it. */
+async function hidden(db: Queryable, ids: readonly (string | undefined)[], field: string) {
+  await db.query("UPDATE profile SET hidden_fields = $2 WHERE account_id = ANY($1::uuid[])", [
+    ids,
+    [field],
+  ]);
 }
 
 /** "A", one woman with a deal-breaker on smoking, and the men of the pond; everybody's matching open. */
@@ -613,6 +622,80 @@ describe("relaxing a deal-breaker for the day", () => {
     expect(byPerson.get(b)?.notAnswered).toEqual(["smoking"]);
     expect(byPerson.get(c)?.notAnswered).toEqual([]);
     expect(byPerson.get(b)?.relaxedField).toBeUndefined();
+  });
+
+  test("A hidden answer reads on a card as one not given", async ({ ctx }) => {
+    const { a, of } = await pondWith(
+      ctx,
+      "test-short-hidden-label",
+      [
+        { fields: {}, count: 1 },
+        { fields: { smoking: "never" }, count: 1 },
+      ],
+      true,
+    );
+    const [b] = of[0] ?? [];
+    const [c] = of[1] ?? [];
+    if (!b || !c) throw new Error("people not written");
+    await hidden(ctx.client, [c], "smoking");
+    await buildRounds(await deps(ctx.client));
+    const app = await appAt(ctx.client);
+    const { headers } = await signInAs(ctx.client, a);
+
+    const { entries } = await readToday(app, headers);
+
+    const byPerson = new Map(
+      (await roundOf(ctx.client, a)).map((e, index) => [e.candidate_id, entries?.[index]]),
+    );
+    expect(byPerson.get(b)?.card.fields.smoking).toBeUndefined();
+    expect(byPerson.get(c)?.card.fields.smoking).toBeUndefined();
+    expect(byPerson.get(b)?.notAnswered).toEqual(["smoking"]);
+    expect(byPerson.get(c)?.notAnswered).toEqual(["smoking"]);
+  });
+});
+
+describe("A hidden answer counts under a deal-breaker as a shown one does", () => {
+  test.for([
+    ["with", true],
+    ["without", false],
+  ] as const)("%s people who did not answer", async ([, includeUnknown], { ctx }) => {
+    const { a, of } = await pondWith(
+      ctx,
+      `test-short-hidden-counts-${includeUnknown}`,
+      [
+        { fields: { smoking: "regularly" }, count: 1 },
+        { fields: { smoking: "never" }, count: 1 },
+      ],
+      includeUnknown,
+    );
+    const [b] = of[0] ?? [];
+    const [c] = of[1] ?? [];
+    await hidden(ctx.client, [b, c], "smoking");
+
+    await buildRounds(await deps(ctx.client));
+
+    expect((await roundOf(ctx.client, a)).map((e) => e.candidate_id)).toEqual([c]);
+  });
+});
+
+describe("a person's own hidden answer", () => {
+  test("Hiding one's own answer leaves a deal-breaker on it in force", async ({ ctx }) => {
+    const { a, of } = await pondWith(ctx, "test-short-hidden-own", [
+      { fields: { smoking: "regularly" }, count: 1 },
+      { fields: { smoking: "never" }, count: 1 },
+    ]);
+    const [c] = of[1] ?? [];
+    await hidden(ctx.client, [a], "smoking");
+
+    await buildRounds(await deps(ctx.client));
+
+    const app = await appAt(ctx.client);
+    const { headers } = await signInAs(ctx.client, a);
+    const stored = await app.request("/preferences/deal-breakers", { headers });
+    expect(DealBreakersResponse.parse(await stored.json()).dealBreakers).toMatchObject([
+      { field: "smoking", paused: false },
+    ]);
+    expect((await roundOf(ctx.client, a)).map((e) => e.candidate_id)).toEqual([c]);
   });
 });
 

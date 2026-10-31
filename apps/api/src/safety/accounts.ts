@@ -120,7 +120,7 @@ export async function accountPage(
           bio: profile.bio,
           bioPreset: profile.bioPreset,
           prompts: profile.prompts,
-          fields: fieldsOnCard(profile.fields),
+          fields: fieldsOnCard(profile),
         }
       : null,
     photos: photos.slice(0, 50).map((p) => ({

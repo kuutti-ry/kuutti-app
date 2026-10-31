@@ -61,7 +61,12 @@ describe("the profile client", () => {
   it("saves what the screen makes of the document stored when the save goes, and answers what the API stored (#238)", async () => {
     const update = { displayName: "Aino", bio: null, bioPreset: null, fields: {}, prompts: [] };
     const stored = {
-      profile: { ...update, specialCategoryConsent: null, updatedAt: "2026-09-26T10:00:00.000Z" },
+      profile: {
+        ...update,
+        hiddenFields: [],
+        specialCategoryConsent: null,
+        updatedAt: "2026-09-26T10:00:00.000Z",
+      },
       completeness: EMPTY.completeness,
     };
     const seen = answering(

@@ -7070,6 +7070,8 @@ export interface components {
             bioPreset: components["schemas"]["BioPreset"];
             fields: components["schemas"]["ProfileFields"];
             prompts: components["schemas"]["PromptAnswer"][];
+            /** @default [] */
+            hiddenFields: components["schemas"]["HiddenField"][];
             specialCategoryConsent: {
                 version: string;
                 /** Format: date-time */
@@ -7122,6 +7124,8 @@ export interface components {
         };
         /** @enum {string} */
         PromptKey: "sunday" | "proud_of" | "argue_about" | "unpopular_opinion" | "teach_me" | "first_date" | "never_again" | "overrated" | "hidden_talent" | "last_laugh" | "three_things" | "ask_me";
+        /** @enum {string} */
+        HiddenField: "intent" | "identityLabel" | "monogamy" | "hasKids" | "wantsKids" | "smoking" | "nicotine" | "languages" | "hobbies" | "height" | "exercise" | "pets" | "field" | "occupation" | "occupationTitle" | "politics" | "religion" | "zodiac";
         ExportedPhoto: {
             id: components["schemas"]["PhotoId"];
             /** @description Placeholder the app paints before the thumb arrives (computed from the thumb). */
@@ -7757,6 +7761,7 @@ export interface components {
             bioPreset: components["schemas"]["BioPreset"];
             fields: components["schemas"]["ProfileFields"];
             prompts: components["schemas"]["PromptAnswer"][];
+            hiddenFields?: components["schemas"]["HiddenField"][];
         };
         CardPreviewResponse: {
             card: components["schemas"]["ProfileCard"];

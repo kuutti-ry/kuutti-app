@@ -21,10 +21,10 @@ export const profile = pgTable("profile", {
   bioPreset: text("bio_preset"),
   fields: jsonb("fields").notNull().default(sql`'{}'::jsonb`),
   prompts: jsonb("prompts").notNull().default(sql`'[]'::jsonb`),
-  // Explicit consent for special-category fields (article 9): the version of
-  // the text the person accepted and when; null means none given (ADR-009).
-  specialCategoryConsentVersion: text("special_category_consent_version"),
-  specialCategoryConsentedAt: timestamp("special_category_consented_at", { withTimezone: true }),
+  // The fields the person keeps off their card (#515): keys of the registry,
+  // never an answer. Only the card reads it; matching reads the answers as
+  // they are, hidden or not.
+  hiddenFields: text("hidden_fields").array().notNull().default(sql`'{}'::text[]`),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });

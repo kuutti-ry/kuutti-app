@@ -315,6 +315,103 @@ describe("profile routes", () => {
     expect(card?.shared).toEqual({ hobbies: [], languages: [] });
   });
 
+  test("a hidden answer stays on the profile and leaves the card, and nothing else moves (#515)", async ({
+    ctx,
+  }) => {
+    const { app } = await appWith(ctx);
+    const a = await signedInAccount(ctx.client);
+    const fields = { ...update.fields, hobbies: ["yoga"], height: 171 };
+    await put(app, a.headers, { ...update, fields });
+    const before = await app.request("/profile/card", { headers: a.headers });
+
+    const saved = await put(app, a.headers, {
+      ...update,
+      fields,
+      hiddenFields: ["hobbies", "height"],
+    });
+
+    expect(saved.status).toBe(200);
+    const after = ProfileResponse.parse(await saved.json());
+    expect(after.profile?.fields).toEqual(fields);
+    expect(after.profile?.hiddenFields).toEqual(["hobbies", "height"]);
+    const read = await app.request("/profile", { headers: a.headers });
+    expect(ProfileResponse.parse(await read.json()).profile?.hiddenFields).toEqual([
+      "hobbies",
+      "height",
+    ]);
+    const preview = CardPreviewResponse.parse(
+      await (await app.request("/profile/card", { headers: a.headers })).json(),
+    );
+    expect(preview.card?.fields).toEqual(update.fields);
+    expect(preview.completeness).toEqual(
+      CardPreviewResponse.parse(await before.json()).completeness,
+    );
+    // The set is the owner's: it is not on the card, under any name.
+    expect(JSON.stringify(preview.card)).not.toContain("hiddenFields");
+  });
+
+  test("a save that names no hidden fields keeps them, and an empty list shows them again (#515)", async ({
+    ctx,
+  }) => {
+    const { app } = await appWith(ctx);
+    const a = await signedInAccount(ctx.client);
+    const hiddenOf = async (response: Response) =>
+      ProfileResponse.parse(await response.json()).profile?.hiddenFields;
+    // A first save without the key stores none.
+    expect(await hiddenOf(await put(app, a.headers, update))).toEqual([]);
+    await put(app, a.headers, { ...update, hiddenFields: ["languages"] });
+
+    // An app from before the key must not put a hidden answer back on a card.
+    expect(await hiddenOf(await put(app, a.headers, update))).toEqual(["languages"]);
+
+    expect(await hiddenOf(await put(app, a.headers, { ...update, hiddenFields: [] }))).toEqual([]);
+  });
+
+  test.for([
+    ["a soft field, which no card carries", ["education"]],
+    ["a setting", ["hideFromField"]],
+    ["what is no field, however a card needs it", ["displayName"]],
+    ["the gender", ["gender"]],
+    ["the wrong type", ["smoking", 7]],
+    ["no list", "smoking"],
+    ["null", null],
+    ["more than a card carries", Array(CARD_FIELD_KEYS.length + 1).fill("smoking")],
+  ] as const)("PUT /profile refuses to hide %s (#515)", async ([, hiddenFields], { ctx }) => {
+    const { app } = await appWith(ctx);
+    const a = await signedInAccount(ctx.client);
+    const response = await put(app, a.headers, { ...update, hiddenFields });
+    expect(response.status).toBe(400);
+    const { rows } = await ctx.client.query("SELECT 1 FROM profile WHERE account_id = $1", [
+      a.accountId,
+    ]);
+    expect(rows).toHaveLength(0);
+  });
+
+  test("PUT /profile takes every field a card carries as hidden, up to all of them (#515)", async ({
+    ctx,
+  }) => {
+    const { app } = await appWith(ctx);
+    const a = await signedInAccount(ctx.client);
+    const saved = await put(app, a.headers, { ...update, hiddenFields: [...CARD_FIELD_KEYS] });
+    expect(saved.status).toBe(200);
+    const preview = await app.request("/profile/card", { headers: a.headers });
+    expect(CardPreviewResponse.parse(await preview.json()).card?.fields).toEqual({});
+  });
+
+  test("a stored key the card no longer carries hides nothing and costs nothing else (#515)", async ({
+    ctx,
+  }) => {
+    const { app } = await appWith(ctx);
+    const a = await signedInAccount(ctx.client);
+    await put(app, a.headers, { ...update, hiddenFields: ["languages"] });
+    await ctx.client.query(
+      "UPDATE profile SET hidden_fields = '{education,languages}' WHERE account_id = $1",
+      [a.accountId],
+    );
+    const read = await app.request("/profile", { headers: a.headers });
+    expect(ProfileResponse.parse(await read.json()).profile?.hiddenFields).toEqual(["languages"]);
+  });
+
   test("the card carries every answered info and hard field, nothing soft or hidden, and no key beyond the contract", async ({
     ctx,
   }) => {
@@ -555,14 +652,45 @@ describe("profile routes", () => {
     ).rejects.toMatchObject({ status: 404 });
   });
 
+  test('another viewer\'s card leaves out a hidden answer, and "you too" does not tell it (#515)', async ({
+    ctx,
+  }) => {
+    const { app, logger } = await appWith(ctx);
+    const viewer = await signedInAccount(ctx.client);
+    const fields = { ...update.fields, hobbies: ["yoga"] } as const;
+    await put(app, viewer.headers, { ...update, fields });
+    const subject = await signedInAccount(ctx.client);
+    await approvedPhotos(ctx, app, subject.headers, 3);
+    await put(app, subject.headers, {
+      ...update,
+      fields,
+      bio: "x".repeat(60),
+      bioPreset: null,
+      hiddenFields: ["hobbies"],
+    });
+    const { card } = await buildCard(
+      {
+        db: ctx.client,
+        logger,
+        now: () => new Date(),
+        readPreferences: async () => ({ seeks: "everyone", ageWindow: [20, 40] }),
+      },
+      { viewerAccountId: viewer.accountId, subjectAccountId: subject.accountId },
+    );
+    expect(card?.fields).toEqual(update.fields);
+    // The languages are on the card, so what both answered is marked as ever.
+    expect(card?.shared).toEqual({ hobbies: [], languages: ["fi", "en"] });
+  });
+
   test("erasing the account deletes the profile, and the export carries it until then", async ({
     ctx,
   }) => {
     const { app } = await appWith(ctx);
     const a = await signedInAccount(ctx.client);
-    await put(app, a.headers, update);
+    await put(app, a.headers, { ...update, hiddenFields: ["languages"] });
     const exported = await exportOf(app, a.headers);
     expect(exported.profile?.displayName).toBe("Aino");
+    expect(exported.profile?.hiddenFields).toEqual(["languages"]);
     const deleted = await app.request("/account/delete", {
       method: "POST",
       headers: { ...a.headers, "content-type": "application/json" },

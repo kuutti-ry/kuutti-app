@@ -1,4 +1,10 @@
-import type { Completeness, ProfileDocument, ProfileFields, ProfileUpdate } from "@kuutti/schema";
+import type {
+  Completeness,
+  HiddenField,
+  ProfileDocument,
+  ProfileFields,
+  ProfileUpdate,
+} from "@kuutti/schema";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ApiError } from "@/lib/api";
 import { fetchProfile, saveProfile } from "./client";
@@ -7,10 +13,13 @@ export type ProfileNotice = { kind: "error"; code: string | undefined } | null;
 
 /**
  * What a draft changed from the document it was read from (#238): the parts
- * that differ, and the fields one by one, a field taken away as undefined.
+ * that differ, the fields one by one, a field taken away as undefined, and
+ * the fields hidden (true) or shown again (false), one by one for the same
+ * reason (#515).
  */
-export type ProfileChanges = Partial<Omit<ProfileUpdate, "fields">> & {
+export type ProfileChanges = Partial<Omit<ProfileUpdate, "fields" | "hiddenFields">> & {
   fields?: Record<string, unknown>;
+  hidden?: Record<string, boolean>;
 };
 
 /** Changes the API refused after their screen had gone, and why (#238): a screen opened with them resumes there. */
@@ -22,6 +31,7 @@ export const EMPTY_PROFILE: ProfileUpdate = {
   bioPreset: null,
   fields: {},
   prompts: [],
+  hiddenFields: [],
 };
 
 /** Key order aside: the draft is built by merging patches, the document comes from the API. */
@@ -53,18 +63,29 @@ export function changesOf(from: ProfileUpdate, to: ProfileUpdate): ProfileChange
     if (canonical(was[key]) !== canonical(is[key])) fields[key] = is[key];
   }
   if (Object.keys(fields).length > 0) changes.fields = fields;
+  const wasHidden: readonly string[] = from.hiddenFields ?? [];
+  const isHidden: readonly string[] = to.hiddenFields ?? [];
+  const hidden: Record<string, boolean> = {};
+  for (const key of new Set([...wasHidden, ...isHidden])) {
+    if (wasHidden.includes(key) !== isHidden.includes(key)) hidden[key] = isHidden.includes(key);
+  }
+  if (Object.keys(hidden).length > 0) changes.hidden = hidden;
   return changes;
 }
 
 /** The document with the changes put on it; what they do not name stays as the document has it. */
 export function withChanges(document: ProfileUpdate, changes: ProfileChanges): ProfileUpdate {
-  const { fields: changed = {}, ...parts } = changes;
+  const { fields: changed = {}, hidden = {}, ...parts } = changes;
   const fields: Record<string, unknown> = { ...document.fields };
   for (const [key, value] of Object.entries(changed)) {
     if (value === undefined) delete fields[key];
     else fields[key] = value;
   }
-  return { ...document, ...parts, fields: fields as ProfileFields };
+  const hiddenFields = [
+    ...(document.hiddenFields ?? []).filter((key) => hidden[key] === undefined),
+    ...(Object.keys(hidden).filter((key) => hidden[key]) as HiddenField[]),
+  ];
+  return { ...document, ...parts, fields: fields as ProfileFields, hiddenFields };
 }
 
 const toUpdate = (profile: ProfileDocument): ProfileUpdate => ({
@@ -73,6 +94,7 @@ const toUpdate = (profile: ProfileDocument): ProfileUpdate => ({
   bioPreset: profile.bioPreset,
   fields: profile.fields,
   prompts: profile.prompts,
+  hiddenFields: profile.hiddenFields,
 });
 
 /**

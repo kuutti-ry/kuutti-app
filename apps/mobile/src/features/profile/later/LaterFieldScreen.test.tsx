@@ -198,6 +198,23 @@ describe("LaterFieldScreen", () => {
     expect(puts).toEqual([]);
   });
 
+  it("saves a Hide with the answer on Save and continue, and drops it on Ask me later (#515)", async () => {
+    const { puts } = fakeApi(named({}));
+    await show(<LaterFieldScreen field="hasKids" />);
+    await waitFor(() => expect(screen.getByText("While you wait")).toBeTruthy());
+    await press(screen.getByRole("button", { name: "Yes, living with me" }));
+    await press(screen.getByRole("button", { name: "Hide from your card: Kids" }));
+    await press(screen.getByRole("button", { name: "Ask me later" }));
+    expect(puts).toEqual([]);
+    expect(screen.queryByRole("button", { name: "Show on your card: Kids" })).toBeNull();
+
+    await press(screen.getByRole("button", { name: "Yes, living with me" }));
+    await press(screen.getByRole("button", { name: "Hide from your card: Kids" }));
+    await press(screen.getByRole("button", { name: "Save and continue" }));
+    expect(puts).toMatchObject([{ fields: { hasKids: "yes_with_me" }, hiddenFields: ["hasKids"] }]);
+    checkA11y();
+  });
+
   it("lands on the first unanswered field when the first one is answered already", async () => {
     fakeApi(named({ hasKids: "no" }));
     await show(<LaterFieldScreen field="hasKids" />);

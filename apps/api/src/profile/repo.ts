@@ -1,7 +1,9 @@
 import type { Queryable } from "@kuutti/db";
 import {
   type BioPreset,
+  CARD_FIELD_KEYS,
   type Gender,
+  type HiddenField,
   PROFILE_FIELD_KEYS,
   PROFILE_FIELDS,
   type ProfileDocument,
@@ -61,6 +63,12 @@ function storedPrompts(raw: unknown): { prompts: ProfileDocument["prompts"]; dro
   return { prompts, dropped };
 }
 
+/** The keys a card still carries: a field that left the card hides nothing, and one stale key costs that key alone (ADR-009 §1). */
+const storedHidden = (raw: unknown): HiddenField[] =>
+  (raw as string[]).filter((key): key is HiddenField =>
+    (CARD_FIELD_KEYS as readonly string[]).includes(key),
+  );
+
 /** How many prompts of a stored document still count: the ones the registry still knows (#54 reads many rows at once). */
 export const answeredPromptsOf = (raw: unknown): number => storedPrompts(raw).prompts.length;
 
@@ -77,14 +85,14 @@ const profileFrom = (r: Row): ProfileRow => {
     bioPreset: (r.bio_preset as BioPreset | null) ?? null,
     fields: fields.fields,
     prompts: prompts.prompts,
+    hiddenFields: storedHidden(r.hidden_fields),
     dropped: [...fields.dropped, ...prompts.dropped],
     updatedAt: (r.updated_at as Date).toISOString(),
   };
 };
 
-// The two special_category_consent_* columns stay unused since #204 (the
-// consent rows are the source); the next migration of this table drops them.
-const COLUMNS = "account_id, display_name, bio, bio_preset, fields, prompts, updated_at";
+const COLUMNS =
+  "account_id, display_name, bio, bio_preset, fields, prompts, hidden_fields, updated_at";
 
 export async function findProfile(db: Queryable, accountId: string): Promise<ProfileRow | null> {
   const { rows } = await db.query<Row>(`SELECT ${COLUMNS} FROM profile WHERE account_id = $1`, [
@@ -98,7 +106,8 @@ export async function findProfile(db: Queryable, accountId: string): Promise<Pro
  * The account row is taken under lock first, the same lock erasure takes, so
  * a save racing an erasure either lands before the deletes or sees the
  * tombstone and writes nothing. The special-category consent is not written
- * here: it is a consent row (ADR-019 §4, #204).
+ * here: it is a consent row (ADR-019 §4, #204). A save that names no hidden
+ * fields leaves them as they are (#515).
  */
 export async function upsertProfile(
   db: Queryable,
@@ -108,8 +117,8 @@ export async function upsertProfile(
 ): Promise<ProfileRow | null> {
   const { rows } = await db.query<Row>(
     `WITH live AS (SELECT id FROM account WHERE id = $1 AND state <> 'deleted' FOR UPDATE)
-     INSERT INTO profile (account_id, display_name, bio, bio_preset, fields, prompts, created_at, updated_at)
-     SELECT $1, $2, $3, $4, $5::jsonb, $6::jsonb, $7, $7
+     INSERT INTO profile (account_id, display_name, bio, bio_preset, fields, prompts, hidden_fields, created_at, updated_at)
+     SELECT $1, $2, $3, $4, $5::jsonb, $6::jsonb, COALESCE($8::text[], '{}'), $7, $7
      FROM live
      ON CONFLICT (account_id) DO UPDATE SET
        display_name = EXCLUDED.display_name,
@@ -117,6 +126,7 @@ export async function upsertProfile(
        bio_preset = EXCLUDED.bio_preset,
        fields = EXCLUDED.fields,
        prompts = EXCLUDED.prompts,
+       hidden_fields = COALESCE($8::text[], profile.hidden_fields),
        updated_at = EXCLUDED.updated_at
      RETURNING ${COLUMNS}`,
     [
@@ -127,6 +137,7 @@ export async function upsertProfile(
       JSON.stringify(update.fields),
       JSON.stringify(update.prompts),
       at,
+      update.hiddenFields ?? null,
     ],
   );
   return rows[0] ? profileFrom(rows[0]) : null;
@@ -165,7 +176,8 @@ export async function findCardSubject(
   const { rows } = await db.query<Row>(
     `SELECT a.id, a.state, a.birth_year, a.birth_month, a.gender,
             blocked_between($2, a.id) AS blocked,
-            p.account_id, p.display_name, p.bio, p.bio_preset, p.fields, p.prompts, p.updated_at
+            p.account_id, p.display_name, p.bio, p.bio_preset, p.fields, p.prompts,
+            p.hidden_fields, p.updated_at
      FROM account a LEFT JOIN profile p ON p.account_id = a.id
      WHERE a.id = $1`,
     [input.subjectAccountId, input.viewerAccountId],
