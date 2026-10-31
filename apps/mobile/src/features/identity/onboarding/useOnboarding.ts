@@ -52,9 +52,11 @@ export function useOnboarding() {
         await call();
         await reload();
       } catch (error) {
-        if (mounted.current) {
-          setFailedCode(error instanceof ApiError ? (error.code ?? "unknown") : "unknown");
-        }
+        const code = error instanceof ApiError ? (error.code ?? "unknown") : "unknown";
+        if (mounted.current) setFailedCode(code);
+        // The consent is gone (taken back on another device, or a new wording):
+        // the status says so, and the step's switch can be given again (ADR-010 §16).
+        if (code === "consent_required") await reload();
       } finally {
         if (mounted.current) setBusy(false);
       }

@@ -1,6 +1,6 @@
 import { DealBreakersResponse, type ProfileUpdate } from "@kuutti/schema";
 import { describe, expect } from "vitest";
-import { signedInAccount, withMatchingConfig } from "../test/account.ts";
+import { consentedAccount, signedInAccount, withMatchingConfig } from "../test/account.ts";
 import { exportOf } from "../test/export.ts";
 import { type TestContext, test } from "../test/harness.ts";
 
@@ -107,7 +107,7 @@ describe("deal-breakers", () => {
     ctx,
   }) => {
     await withMatchingConfig(ctx.client, { deal_breakers_max: 2 });
-    const a = await signedInAccount(ctx.client);
+    const a = await consentedAccount(ctx.client);
     const onboarding = await ctx.app.request("/preferences", {
       method: "PUT",
       headers: jsonHeaders(a.headers),

@@ -6851,7 +6851,7 @@ export interface paths {
         };
         /**
          * Set whom the caller seeks, the age window, or both
-         * @description Either or both, each replacing its row: a non-empty set of genders, an age window within 18 and 99 with min at most max. Onboarding saves each on its own screen (ADR-010 §13). Hard rows: the round builder never crosses them, in either direction.
+         * @description Either or both, each replacing its row: a non-empty set of genders, an age window within 18 and 99 with min at most max. Onboarding saves each on its own screen (ADR-010 §13). Hard rows: the round builder never crosses them, in either direction. The set of genders needs the sensitive-answers consent of the current wording (ADR-010 §16).
          */
         put: {
             parameters: {
@@ -6886,6 +6886,15 @@ export interface paths {
                 };
                 /** @description unauthenticated, session_expired or session_revoked. */
                 401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description consent_required: whom one seeks without the sensitive-answers consent of the current wording; nothing was saved, a window in the same request included. */
+                403: {
                     headers: {
                         [name: string]: unknown;
                     };

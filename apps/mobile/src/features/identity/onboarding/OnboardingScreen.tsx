@@ -303,14 +303,17 @@ export function OnboardingScreen() {
         )}
         {(failed || profileFailed) && (
           <Text accessibilityLiveRegion="assertive">
-            {/* A change refused for its cadence is said as that (#147), a refused
-                profile save in the profile's own words (#223), the rest as a step
-                that did not go through. */}
+            {/* A change refused for its cadence is said as that (#147), an answer
+                refused for its consent too (ADR-010 §16), a refused profile save
+                in the profile's own words (#223), the rest as a step that did not
+                go through. */}
             {failedCode === "change_too_soon"
               ? t("errors.change_too_soon")
-              : failed
-                ? t("onboarding.failed")
-                : profileErrorText(profile.notice, t)}
+              : failedCode === "consent_required"
+                ? t("errors.special_category_locked")
+                : failed
+                  ? t("onboarding.failed")
+                  : profileErrorText(profile.notice, t)}
           </Text>
         )}
         {failed && failedCode === "change_too_soon" && changeFrom && (

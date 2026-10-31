@@ -2,6 +2,7 @@ import { createHash, randomBytes } from "node:crypto";
 import type { Queryable } from "@kuutti/db";
 import type { ModeratorRole } from "@kuutti/schema";
 import { hashToken } from "../lib/auth-middleware.ts";
+import { SPECIAL_CATEGORY_CONSENT_VERSION } from "../profile/index.ts";
 
 /**
  * A verified account with one live device session, written straight into the
@@ -66,6 +67,17 @@ export async function signedInAccount(
     refreshToken,
     headers: { authorization: `Bearer ${accessToken}` },
   };
+}
+
+/** A signed-in account with the sensitive-answers consent of the current wording, which a save of whom one seeks needs (ADR-010 §16). */
+export async function consentedAccount(db: Queryable, label?: string): Promise<SignedIn> {
+  const account = await signedInAccount(db, label);
+  await db.query(
+    `INSERT INTO consent (account_id, kind, version, locale_shown)
+     VALUES ($1, 'special_category', $2, 'fi')`,
+    [account.accountId, SPECIAL_CATEGORY_CONSENT_VERSION],
+  );
+  return account;
 }
 
 /**

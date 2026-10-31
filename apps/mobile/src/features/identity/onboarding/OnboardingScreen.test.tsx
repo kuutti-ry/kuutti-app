@@ -89,6 +89,8 @@ function fakeApi(
     photos: number;
     /** From when a gender change is possible again; set, the API refuses one with 429 (#147). */
     genderFrom: string | null;
+    /** The API refuses whom one seeks: the consent went while the step was open (ADR-010 §16). */
+    seeksRefused: boolean;
     /** The pond; null when there is more than one and the person has not chosen (#174). */
     pond: typeof POND | null;
   } = {
@@ -99,6 +101,7 @@ function fakeApi(
     profile: null,
     photos: 0,
     genderFrom: null,
+    seeksRefused: false,
     pond: POND,
   };
   const calls: { method: string; path: string; body: unknown }[] = [];
@@ -194,6 +197,10 @@ function fakeApi(
       const { pondId } = body as { pondId: string };
       server.pond = [CAPITAL, POND].find((pond) => pond.id === pondId) ?? null;
       return new Response(null, { status: 204 });
+    }
+    if (path === "/preferences" && server.seeksRefused) {
+      const error = { code: "consent_required", message: "Consent first", requestId: "r" };
+      return json({ error }, 403);
     }
     if (path === "/preferences") {
       // Either row or both, each replacing its own (ADR-010 §13).
@@ -789,6 +796,32 @@ describe("OnboardingScreen", () => {
     await flush();
     await waitFor(() => expect(router.replace).toHaveBeenCalledWith("/"));
     expect(screen.queryByText("Help us learn how matching works")).toBeNull();
+    expect(server.seeks).toEqual(["man"]);
+  });
+
+  it("says why whom one seeks was refused and offers the consent again when it went meanwhile", async () => {
+    const { server } = fakeApi();
+    allAnswered(server);
+    server.seeks = null;
+    await show(<OnboardingScreen />);
+    await waitFor(() => expect(screen.getByText("Whom are you looking for?")).toBeTruthy());
+    await press(screen.getByRole("button", { name: "Men" }));
+    // Taken back on another device while the step was open (ADR-010 §16).
+    server.consents = server.consents.map((c) =>
+      c.kind === "special_category" ? { ...c, withdrawnAt: "2026-10-01T10:00:00.000Z" } : c,
+    );
+    server.seeksRefused = true;
+    await press(screen.getByRole("button", { name: "Continue" }));
+    await waitFor(() =>
+      expect(screen.getByText("This field needs your explicit consent first.")).toBeTruthy(),
+    );
+    expect(server.seeks).toBeNull();
+    // The status was read again, so the switch can be given once more.
+    server.seeksRefused = false;
+    await press(screen.getByLabelText("I consent to Kuutti storing whom I seek"));
+    await press(screen.getByRole("button", { name: "Continue" }));
+    await flush();
+    await waitFor(() => expect(router.replace).toHaveBeenCalledWith("/"));
     expect(server.seeks).toEqual(["man"]);
   });
 

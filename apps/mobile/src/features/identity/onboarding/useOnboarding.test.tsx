@@ -99,6 +99,19 @@ describe("useOnboarding", () => {
     expect(result.current.state).toMatchObject({ onboarding: { complete: true } });
   });
 
+  it("reads the status again when an answer is refused for its consent, which may be gone", async () => {
+    const { result } = await ready();
+    missing = ["seeks"];
+    await act(async () =>
+      result.current.step(async () => {
+        throw new ApiError("preferences answered 403", 403, "consent_required");
+      }),
+    );
+    expect(result.current).toMatchObject({ failed: true, failedCode: "consent_required" });
+    expect(result.current.state).toMatchObject({ onboarding: { missing: ["seeks"] } });
+    expect(reads).toBe(2);
+  });
+
   it("names the API's refusal of a step and keeps the status as it was", async () => {
     const { result } = await ready();
     await act(async () =>
@@ -108,6 +121,7 @@ describe("useOnboarding", () => {
     );
     expect(result.current).toMatchObject({ failed: true, failedCode: "gender_change_too_soon" });
     expect(result.current.state).toMatchObject({ onboarding: { missing: ["photos"] } });
+    expect(reads).toBe(1);
     expect(reads).toBe(1);
   });
 
