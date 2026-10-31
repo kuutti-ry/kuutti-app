@@ -2,6 +2,7 @@ import {
   DEAL_BREAKER_FIELDS,
   type DealBreakerField,
   type DealBreakersUpdate,
+  dealBreakerOptions,
   LATER_FIELD_ORDER,
   PROFILE_FIELDS,
   type StoredDealBreaker,
@@ -55,11 +56,6 @@ const canonical = (draft: Draft) =>
     updateOf(draft).dealBreakers.map((row) => ({ ...row, accept: [...row.accept].sort() })),
   );
 
-const optionsOf = (field: DealBreakerField): readonly string[] => {
-  const spec = PROFILE_FIELDS[field];
-  return spec.kind === "single" || spec.kind === "multi" ? spec.options : [];
-};
-
 /** How many options lead the accept list before the search: the languages' first ten, as in their picker (#239). */
 const shownFirstOf = (field: DealBreakerField): number | undefined => {
   const spec = PROFILE_FIELDS[field];
@@ -72,7 +68,8 @@ const shownFirstOf = (field: DealBreakerField): number | undefined => {
  * doubles as profile completion ("to filter on this, share yours first",
  * with the way to that field's screen). A deal-breaker whose own answer was
  * taken back is paused, said in words; the rows stay. #87 applies them in
- * the pool, both ways.
+ * the pool, both ways. Height has buttons where a list has its switch: one
+ * relation to the person's own height, or Everyone, which is having none (#508).
  */
 export function DealBreakersScreen() {
   const { t } = useT();
@@ -154,6 +151,14 @@ export function DealBreakersScreen() {
     }
     set(field, { on });
   };
+  // A relation replaces the one before it, so only the first press counts against the limit.
+  const chooseRelation = (field: DealBreakerField, relation: string) => {
+    if (!draft[field]?.on && count >= max) {
+      setNotice("limit");
+      return;
+    }
+    set(field, { on: true, accept: [relation] });
+  };
   const save = async () => {
     setSaving(true);
     setNotice(null);
@@ -207,7 +212,8 @@ export function DealBreakersScreen() {
           const label = t(fieldLabelKey(field));
           const row = draft[field] ?? OFF;
           const answered = own[field] !== undefined;
-          const options = optionsOf(field);
+          const relational = PROFILE_FIELDS[field].kind === "number";
+          const options = dealBreakerOptions(field);
           const shown = visibleOptions(
             options,
             shownFirstOf(field),
@@ -219,7 +225,7 @@ export function DealBreakersScreen() {
             <View key={field} className="gap-2">
               <View className="flex-row items-center justify-between gap-3">
                 <FieldLabel field={field} className="flex-1" />
-                {(answered || row.on) && (
+                {!relational && (answered || row.on) && (
                   <Switch
                     accessibilityLabel={t("profile.dealBreakers.switch", { field: label })}
                     checked={row.on}
@@ -243,9 +249,9 @@ export function DealBreakersScreen() {
                   {answerIt(field)}
                 </>
               )}
-              {row.on && (
+              {(row.on || (relational && answered)) && (
                 <>
-                  <Text variant="muted">{t("profile.dealBreakers.accept")}</Text>
+                  {!relational && <Text variant="muted">{t("profile.dealBreakers.accept")}</Text>}
                   {options.length >= SEARCHABLE_FROM && (
                     <Input
                       accessibilityLabel={t("profile.later.search")}
@@ -255,6 +261,16 @@ export function DealBreakersScreen() {
                     />
                   )}
                   <View className="flex-row flex-wrap gap-2">
+                    {relational && (
+                      <Chip
+                        label={t("profile.dealBreakers.everyone")}
+                        selected={!row.on}
+                        onPress={() => {
+                          tap();
+                          set(field, { on: false, accept: [] });
+                        }}
+                      />
+                    )}
                     {shown.map((option) => {
                       const selected = row.accept.includes(option);
                       return (
@@ -264,6 +280,10 @@ export function DealBreakersScreen() {
                           selected={selected}
                           onPress={() => {
                             tap();
+                            if (relational) {
+                              chooseRelation(field, option);
+                              return;
+                            }
                             setSeen((s) => ({ ...s, [field]: [...(s[field] ?? []), option] }));
                             set(field, {
                               accept: selected
@@ -275,19 +295,21 @@ export function DealBreakersScreen() {
                       );
                     })}
                   </View>
-                  <View className="flex-row items-center justify-between gap-3">
-                    <Text variant="small" className="flex-1">
-                      {t("profile.dealBreakers.includeUnknown")}
-                    </Text>
-                    <Switch
-                      accessibilityLabel={t("profile.dealBreakers.includeUnknown")}
-                      checked={row.includeUnknown}
-                      onCheckedChange={(includeUnknown) => {
-                        tap();
-                        set(field, { includeUnknown });
-                      }}
-                    />
-                  </View>
+                  {row.on && (
+                    <View className="flex-row items-center justify-between gap-3">
+                      <Text variant="small" className="flex-1">
+                        {t("profile.dealBreakers.includeUnknown")}
+                      </Text>
+                      <Switch
+                        accessibilityLabel={t("profile.dealBreakers.includeUnknown")}
+                        checked={row.includeUnknown}
+                        onCheckedChange={(includeUnknown) => {
+                          tap();
+                          set(field, { includeUnknown });
+                        }}
+                      />
+                    </View>
+                  )}
                 </>
               )}
             </View>

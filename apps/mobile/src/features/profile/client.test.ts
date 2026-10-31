@@ -166,6 +166,12 @@ describe("the profile client", () => {
     });
   });
 
+  it("reads a deal-breaker on height as the contract has it (#508)", async () => {
+    const height = { field: "height", accept: ["taller"], includeUnknown: true, paused: false };
+    answering(json({ dealBreakers: [height], max: 6 }));
+    expect(await fetchDealBreakers()).toEqual({ dealBreakers: [height], max: 6 });
+  });
+
   it("saves the deal-breakers, and fails a refusal with its code", async () => {
     const seen = answering(json(DEAL_BREAKERS), refusal("deal_breakers_limit", 422));
     expect(await saveDealBreakers({ dealBreakers: [] })).toEqual(DEAL_BREAKERS);

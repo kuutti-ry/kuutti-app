@@ -6,12 +6,13 @@ import {
   DealBreakerField,
   DealBreakersResponse,
   DealBreakersUpdate,
+  dealBreakerOptions,
   StoredDealBreaker,
 } from "./deal-breakers.ts";
 import { DEAL_BREAKER_FIELDS, PROFILE_FIELD_KEYS, PROFILE_FIELDS } from "./profile-fields.ts";
 
 // Deal-breakers (#149): a whitelisted field, a bounded list of accepted
-// answers, at most the contract's cap.
+// answers, at most the contract's cap: one per field of the whitelist (#508).
 
 const codes = (schema: z.ZodType, input: unknown) =>
   schema.safeParse(input).error?.issues.map((issue) => issue.code) ?? [];
@@ -31,6 +32,25 @@ describe("a deal-breaker's field", () => {
       expect(PROFILE_FIELDS[field].preferenceAbout, field).not.toBe("deal_breaker");
       expect(codes(DealBreakerField, field), field).toEqual(["invalid_value"]);
     }
+  });
+});
+
+describe("what a deal-breaker may accept", () => {
+  it("is a list's options", () => {
+    expect(dealBreakerOptions("smoking")).toEqual(PROFILE_FIELDS.smoking.options);
+    expect(dealBreakerOptions("languages")).toEqual(PROFILE_FIELDS.languages.options);
+  });
+
+  it("is a number's relations to the holder's own answer (#508)", () => {
+    expect(dealBreakerOptions("height")).toEqual(["taller", "at_least_mine", "shorter"]);
+  });
+
+  it("is something on every field of the whitelist, and nothing on a free text or a setting", () => {
+    for (const field of DEAL_BREAKER_FIELDS) {
+      expect(dealBreakerOptions(field).length, field).toBeGreaterThan(0);
+    }
+    expect(dealBreakerOptions("occupationTitle")).toEqual([]);
+    expect(dealBreakerOptions("hideFromField")).toEqual([]);
   });
 });
 
@@ -61,17 +81,17 @@ describe("a deal-breaker", () => {
 });
 
 describe("the deal-breakers update", () => {
-  it("takes none, and up to the contract's cap of five", () => {
-    expect(DEAL_BREAKERS_CAP).toBe(5);
+  it("takes none, and up to one per field of the whitelist", () => {
+    expect(DEAL_BREAKERS_CAP).toBe(DEAL_BREAKER_FIELDS.length);
     expect(DealBreakersUpdate.parse({ dealBreakers: [] })).toEqual({ dealBreakers: [] });
-    const five = Array(DEAL_BREAKERS_CAP).fill(smoking);
-    expect(DealBreakersUpdate.parse({ dealBreakers: five }).dealBreakers).toHaveLength(5);
+    const all = Array(DEAL_BREAKERS_CAP).fill(smoking);
+    expect(DealBreakersUpdate.parse({ dealBreakers: all }).dealBreakers).toHaveLength(6);
   });
 
-  it("refuses a sixth, a missing list and an extra key", () => {
-    expect(codes(DealBreakersUpdate, { dealBreakers: Array(6).fill(smoking) })).toEqual([
-      "too_big",
-    ]);
+  it("refuses one more, a missing list and an extra key", () => {
+    expect(
+      codes(DealBreakersUpdate, { dealBreakers: Array(DEAL_BREAKERS_CAP + 1).fill(smoking) }),
+    ).toEqual(["too_big"]);
     expect(codes(DealBreakersUpdate, {})).toEqual(["invalid_type"]);
     expect(codes(DealBreakersUpdate, { dealBreakers: [], max: 2 })).toEqual(["unrecognized_keys"]);
   });
@@ -86,8 +106,8 @@ describe("the stored deal-breakers", () => {
   it.each([
     [0, true],
     [2, true],
-    [5, true],
-    [6, false],
+    [6, true],
+    [7, false],
     [-1, false],
     [1.5, false],
   ])("say how many a person may have: %d is %s", (max, ok) => {
@@ -97,7 +117,10 @@ describe("the stored deal-breakers", () => {
   it("hold at most the cap", () => {
     const stored = { ...smoking, paused: false };
     expect(
-      DealBreakersResponse.safeParse({ dealBreakers: Array(6).fill(stored), max: 5 }).success,
+      DealBreakersResponse.safeParse({
+        dealBreakers: Array(DEAL_BREAKERS_CAP + 1).fill(stored),
+        max: DEAL_BREAKERS_CAP,
+      }).success,
     ).toBe(false);
   });
 });

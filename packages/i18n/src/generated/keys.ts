@@ -1024,6 +1024,7 @@ export type MessageParams = {
   "profile.dealBreakers.accept": Record<never, never>;
   "profile.dealBreakers.answer": Record<never, never>;
   "profile.dealBreakers.back": Record<never, never>;
+  "profile.dealBreakers.everyone": Record<never, never>;
   "profile.dealBreakers.explain": { "max": number };
   "profile.dealBreakers.failed": Record<never, never>;
   "profile.dealBreakers.gated": Record<never, never>;
@@ -1134,6 +1135,9 @@ export type MessageParams = {
   "profile.option.hasKids.no": Record<never, never>;
   "profile.option.hasKids.yes_not_with_me": Record<never, never>;
   "profile.option.hasKids.yes_with_me": Record<never, never>;
+  "profile.option.height.at_least_mine": Record<never, never>;
+  "profile.option.height.shorter": Record<never, never>;
+  "profile.option.height.taller": Record<never, never>;
   "profile.option.hobbies.astronomy": Record<never, never>;
   "profile.option.hobbies.baking": Record<never, never>;
   "profile.option.hobbies.birdwatching": Record<never, never>;

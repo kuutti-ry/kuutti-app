@@ -1,17 +1,18 @@
 # Deal-breakers (#149, TD-16, features/matching/preferences.feature): at most
-# deal_breakers_max (2) of them, each on a field the person answered
-# themselves; one with no accepted answer cannot be saved, and a third is
-# refused in words and stays off. Sanna answered all five fields and has none
-# set; the flow saves nothing, so it leaves her as it found her.
+# deal_breakers_max (6) of them, one per field the person answered themselves,
+# so at six the limit refuses nobody; that refusal is the screen's test and the
+# API's, with a lower number. One with no accepted answer cannot be saved, and
+# leaving with the set unsaved asks first. Sanna answered all six fields and
+# has none set; the flow saves nothing, so it leaves her as it found her.
 appId: fi.kuutti.app
-name: At most two deal-breakers, each with an accepted answer; a third is refused in words
+name: Each deal-breaker waits for an accepted answer, and leaving unsaved asks first
 ---
 - runFlow: ../common/sign-in.yaml
 - openLink: kuutti://profile/deal-breakers
 - extendedWaitUntil:
     visible: "Deal-breakers|Ehdottomat rajat|Absoluta gränser"
     timeout: 15000
-- assertVisible: "Up to 2\\. Only on what you answered yourself.*|Enintään 2\\. Vain siitä, mihin vastasit itse.*|Högst 2\\. Bara om det du själv svarat på.*"
+- assertVisible: "Up to 6\\. Only on what you answered yourself.*|Enintään 6\\. Vain siitä, mihin vastasit itse.*|Högst 6\\. Bara om det du själv svarat på.*"
 - assertNotVisible: "To filter on this, share yours first\\.|Suodattaaksesi tällä kerro ensin omasi\\.|För att filtrera på det här, dela ditt eget först\\."
 
 # One on: it waits for an answer that is fine with her before it can be saved.
@@ -34,20 +35,20 @@ name: At most two deal-breakers, each with an accepted answer; a third is refuse
 - tapOn: "(Deal-breaker: Smoking|Ehdoton raja: Tupakointi|Absolut gräns: Rökning)(, .*)?"
 - tapOn: "Never|En koskaan|Aldrig"
 
-# A third: refused in words, and the switch stays off.
+# A third goes on as well: the limit is one on every field (#508).
 - scrollUntilVisible:
     element: "(Deal-breaker: Languages|Ehdoton raja: Kielet|Absolut gräns: Språk)(, .*)?"
     direction: DOWN
     centerElement: true
     timeout: 60000
 - tapOn: "(Deal-breaker: Languages|Ehdoton raja: Kielet|Absolut gräns: Språk)(, .*)?"
-- assertVisible: "That is 2 already\\.|Niitä on jo 2\\.|Det är redan 2\\."
+- assertNotVisible: "That is 6 already\\.|Niitä on jo 6\\.|Det är redan 6\\."
 - assertVisible:
-    text: "0|(Deal-breaker: Languages|Ehdoton raja: Kielet|Absolut gräns: Språk), off"
+    text: "1|(Deal-breaker: Languages|Ehdoton raja: Kielet|Absolut gräns: Språk), on"
     rightOf: "Languages|Kielet|Språk"
 
 # Left unsaved: opened again, nothing is on.
-# Leaving with the two unsaved asks first (14/10/2026): the arrow, kept on the
+# Leaving with them unsaved asks first (14/10/2026): the arrow, kept on the
 # word; then a link from outside the app, which waits for the word the same way
 # (app/+native-intent.ts) and is followed on it. Nothing of them is stored.
 - tapOn: "Back|Takaisin|Tillbaka"

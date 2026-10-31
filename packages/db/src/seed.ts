@@ -199,6 +199,9 @@ export const MATCHING_CONFIG_V2 = {
   // size, so a full round looked at whole stays under the photo rule; the
   // maintainer's of 29/10/2026, where version 1 took 120.
   auto_shadow_ban_photo_fetches: 200,
+  // #508 (ADR-009 History, migration 0092): six, one on every field a
+  // deal-breaker can be set on; the maintainer's of 31/10/2026, where version 1 took two.
+  deal_breakers_max: 6,
 } as const;
 
 /**

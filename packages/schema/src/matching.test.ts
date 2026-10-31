@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { z } from "zod";
+import { DEAL_BREAKERS_CAP } from "./deal-breakers.ts";
 import {
   ExportedRoundEntry,
   Relaxation,
@@ -181,8 +182,10 @@ describe("relaxing a deal-breaker for the day (#99, ADR-042)", () => {
     expect(RelaxationsResponse.parse({ short: true, offers: [offer], relaxed: [] }).offers).toEqual(
       [offer],
     );
+    const each = Array(DEAL_BREAKERS_CAP * 2).fill(offer);
+    expect(codes(RelaxationsResponse, { short: true, offers: each, relaxed: [] })).toEqual([]);
     expect(
-      codes(RelaxationsResponse, { short: true, offers: Array(11).fill(offer), relaxed: [] }),
+      codes(RelaxationsResponse, { short: true, offers: [...each, offer], relaxed: [] }),
     ).toEqual(["too_big"]);
     expect(codes(RelaxationsResponse, { short: true, offers: [], relaxed: [], count: 3 })).toEqual([
       "unrecognized_keys",

@@ -41,9 +41,10 @@ Each flow has a persona to itself where it changes something that another flow r
 | `sensitive-answers-withdrawal` | Noa | the consent withdrawn asks whom one seeks again, not the ages and not research; Anyone is all three |
 | `found-them` *once* | Aino | from Your account, Tell Kuutti off until a reason is ticked in words, the answer thanked; opened again it thanks at once and asks nothing (#83). Each account answers once; her account-deletion flow, after it, erases the answer with her |
 | `account-deletion` *once* | Aino | asked first, signed out, the next login refused for the cooldown |
-| `deal-breakers-limit` | Sanna | an accepted answer before saving; two at most, the third refused |
+| `deal-breakers-accepted` | Sanna | an accepted answer before saving; leaving unsaved asks first |
 | `deal-breakers-own-answer` | Noa | only on what she answered; Answer it opens the field |
 | `deal-breaker-paused` | Sanna | her own answer taken back pauses it in words; answering lifts it |
+| `deal-breaker-height` | Sanna | four buttons, no switch: one relation at a time, kept when saved, Everyone takes it off |
 | `card` | Sanna | photo, name with the age, the information fields, nothing soft |
 | `photos-gate-and-hidden-field` | Noa | one approved photo, the other in review: the gate and the profile wait; the hidden field leaves the card |
 | `photos-screen` | Sanna | states in words; full size and back; a caption on and off again (#296); removal asked (the drag and its actions are jest's, #179) |

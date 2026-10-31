@@ -87,6 +87,7 @@ const answeredAll = {
   wantsKids: "want",
   smoking: "never",
   languages: ["fi"],
+  height: 170,
 };
 
 const checkA11y = () => {
@@ -111,7 +112,7 @@ describe("DealBreakersScreen", () => {
     await show(<DealBreakersScreen />);
     await waitFor(() => expect(screen.getByText("Deal-breakers")).toBeTruthy());
     expect(screen.getByText(/Up to 2\./)).toBeTruthy();
-    // Four switches for the four answered fields; the fifth asks for the answer first.
+    // Four switches for the answered lists, height has buttons; kids ask for the answer first.
     expect(screen.getAllByRole("switch")).toHaveLength(4);
     expect(screen.queryByLabelText("Deal-breaker: Kids")).toBeNull();
     expect(screen.getAllByText("To filter on this, share yours first.")).toHaveLength(1);
@@ -245,6 +246,112 @@ describe("DealBreakersScreen", () => {
     );
     await press(screen.getByRole("button", { name: "Answer it" }));
     expect(router.push).toHaveBeenCalledWith("/profile/later/smoking");
+  });
+
+  describe("the height row (#508)", () => {
+    const button = (name: string) => screen.getByRole("button", { name });
+    const selected = (name: string) => button(name).props.accessibilityState?.selected;
+    const ready = async () => {
+      await show(<DealBreakersScreen />);
+      await waitFor(() => expect(screen.getByText("Deal-breakers")).toBeTruthy());
+    };
+
+    it("has four buttons where a list has its switch, with Everyone chosen", async () => {
+      fakeApi(answeredAll);
+      await ready();
+      expect(screen.queryByLabelText("Deal-breaker: Height")).toBeNull();
+      expect(selected("Everyone")).toBe(true);
+      for (const name of ["Taller than me", "My height or taller", "Shorter than me"]) {
+        expect(selected(name)).toBe(false);
+      }
+      // Nothing to say of those who did not answer until a relation is chosen, and no heading of
+      // answers that are fine: the buttons are the sentence.
+      expect(screen.queryByLabelText("Also people who did not answer")).toBeNull();
+      expect(screen.queryByText("Fine with me")).toBeNull();
+      checkA11y();
+    });
+
+    it("takes one relation at a time, saves it, and Everyone takes it off", async () => {
+      const { puts } = fakeApi(answeredAll);
+      await ready();
+      await press(button("Taller than me"));
+      expect(selected("Taller than me")).toBe(true);
+      expect(selected("Everyone")).toBe(false);
+      // On from the start (ADR-042 §8), as with every deal-breaker.
+      expect(
+        screen.getByLabelText("Also people who did not answer").props.accessibilityState?.checked,
+      ).toBe(true);
+      checkA11y();
+
+      await press(button("Shorter than me"));
+      expect(selected("Taller than me")).toBe(false);
+      expect(selected("Shorter than me")).toBe(true);
+      await press(button("Save the deal-breakers"));
+      await waitFor(() => expect(screen.getByText("Saved.")).toBeTruthy());
+
+      await press(button("Everyone"));
+      expect(selected("Everyone")).toBe(true);
+      expect(selected("Shorter than me")).toBe(false);
+      expect(screen.queryByLabelText("Also people who did not answer")).toBeNull();
+      await press(button("Save the deal-breakers"));
+      await waitFor(() => expect(puts).toHaveLength(2));
+      expect(puts).toEqual([[{ field: "height", accept: ["shorter"], includeUnknown: true }], []]);
+    });
+
+    it("shows a stored relation and sends its switch back", async () => {
+      const { puts } = fakeApi(answeredAll, [
+        { field: "height", accept: ["at_least_mine"], includeUnknown: false },
+      ]);
+      await ready();
+      expect(selected("My height or taller")).toBe(true);
+      expect(selected("Everyone")).toBe(false);
+      expect(
+        screen.getByLabelText("Also people who did not answer").props.accessibilityState?.checked,
+      ).toBe(false);
+      await press(button("Taller than me"));
+      await press(button("Save the deal-breakers"));
+      await waitFor(() => expect(puts).toHaveLength(1));
+      expect(puts[0]).toEqual([{ field: "height", accept: ["taller"], includeUnknown: false }]);
+    });
+
+    it("counts a first relation against the limit", async () => {
+      fakeApi(answeredAll, [{ field: "smoking", accept: ["never"], includeUnknown: false }], 1);
+      await ready();
+      await press(button("Taller than me"));
+      expect(screen.getByText("That is 1 already.")).toBeTruthy();
+      expect(selected("Everyone")).toBe(true);
+      expect(selected("Taller than me")).toBe(false);
+    });
+
+    it("never counts a change of relation against the limit", async () => {
+      fakeApi(answeredAll, [{ field: "height", accept: ["taller"], includeUnknown: true }], 1);
+      await ready();
+      await press(button("Shorter than me"));
+      expect(screen.queryByText("That is 1 already.")).toBeNull();
+      expect(selected("Shorter than me")).toBe(true);
+    });
+
+    it("asks for the person's own height first, and leads to its screen", async () => {
+      fakeApi({ ...answeredAll, height: undefined });
+      await ready();
+      expect(screen.getByText("To filter on this, share yours first.")).toBeTruthy();
+      expect(screen.queryByRole("button", { name: "Taller than me" })).toBeNull();
+      expect(screen.queryByRole("button", { name: "Everyone" })).toBeNull();
+      await press(button("Answer it"));
+      expect(router.push).toHaveBeenCalledWith("/profile/later/height");
+    });
+
+    it("says in words that it is paused while the own height is missing, and can be taken off", async () => {
+      const { puts } = fakeApi({ ...answeredAll, height: undefined }, [
+        { field: "height", accept: ["taller"], includeUnknown: true },
+      ]);
+      await ready();
+      expect(screen.getByText("Paused until you answer it yourself.")).toBeTruthy();
+      expect(selected("Taller than me")).toBe(true);
+      await press(button("Everyone"));
+      await press(button("Save the deal-breakers"));
+      await waitFor(() => expect(puts).toEqual([[]]));
+    });
   });
 
   it("says when the deal-breakers could not be read, and tries again", async () => {

@@ -7038,7 +7038,7 @@ export interface components {
             paused: boolean;
         };
         /** @enum {string} */
-        DealBreakerField: "monogamy" | "hasKids" | "wantsKids" | "smoking" | "languages";
+        DealBreakerField: "monogamy" | "hasKids" | "wantsKids" | "smoking" | "languages" | "height";
         ConsentRecord: {
             kind: components["schemas"]["ConsentKind"];
             version: string;

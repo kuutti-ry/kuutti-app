@@ -128,7 +128,7 @@ export function Chip({
  * carry shows until the person says otherwise, so the one thing to do here is
  * "Hide", and only once there is an answer: a long form stays a form, with no
  * row of switches to go through. A hidden answer says so, and says that
- * matching still reads it only where it does: nothing reads a height or a
+ * matching still reads it only where it does: nothing reads a hobby or a
  * religion. A soft field never reaches a card, by the service's decision
  * (ADR-019 §2), and says that instead, since it has no "Hide" to ask about.
  * The title's row keeps its height, so the first answer moves no chip from

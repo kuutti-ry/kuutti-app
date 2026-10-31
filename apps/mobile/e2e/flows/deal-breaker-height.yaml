@@ -1,0 +1,80 @@
+# Height as a deal-breaker (#508, features/matching/preferences.feature): four
+# buttons where a list has its switch, one relation to the person's own height
+# or Everyone, which is having none. Sanna answered her height and has no
+# deal-breaker; the flow ends as it began.
+appId: fi.kuutti.app
+name: Height takes one relation of its four buttons, kept when saved, and Everyone takes it off
+---
+- runFlow: ../common/sign-in.yaml
+- openLink: kuutti://profile/deal-breakers
+- extendedWaitUntil:
+    visible: "Deal-breakers|Ehdottomat rajat|Absoluta gränser"
+    timeout: 15000
+- scrollUntilVisible:
+    element: "Shorter than me|Minua lyhyempi|Kortare än jag"
+    direction: DOWN
+    centerElement: true
+    timeout: 60000
+- assertVisible:
+    text: "Everyone|Kaikki|Alla"
+    selected: true
+- assertNotVisible: "(Deal-breaker: Height|Ehdoton raja: Pituus|Absolut gräns: Längd)(, .*)?"
+- assertNotVisible: "Also people who did not answer|Myös ne, jotka eivät vastanneet|Även de som inte svarade"
+
+# One relation at a time: the second replaces the first, and those who did not
+# answer are let through until switched off.
+- tapOn: "Taller than me|Minua pidempi|Längre än jag"
+- assertVisible:
+    text: "Taller than me|Minua pidempi|Längre än jag"
+    selected: true
+- tapOn: "My height or taller|Yhtä pitkä tai pidempi|Lika lång eller längre"
+- assertVisible:
+    text: "My height or taller|Yhtä pitkä tai pidempi|Lika lång eller längre"
+    selected: true
+- assertVisible:
+    text: "Taller than me|Minua pidempi|Längre än jag"
+    selected: false
+- assertVisible: "Also people who did not answer|Myös ne, jotka eivät vastanneet|Även de som inte svarade"
+
+# Saved, it is there when the screen opens again.
+- scrollUntilVisible:
+    element: "Save the deal-breakers|Tallenna rajat|Spara gränserna"
+    direction: DOWN
+    centerElement: true
+    timeout: 60000
+- tapOn: "Save the deal-breakers|Tallenna rajat|Spara gränserna"
+- extendedWaitUntil:
+    visible: "Saved\\.|Tallennettu\\.|Sparat\\."
+    timeout: 15000
+- openLink: kuutti://profile
+- extendedWaitUntil:
+    visible: "Your profile|Profiilisi|Din profil"
+    timeout: 15000
+- openLink: kuutti://profile/deal-breakers
+- extendedWaitUntil:
+    visible: "Deal-breakers|Ehdottomat rajat|Absoluta gränser"
+    timeout: 15000
+- scrollUntilVisible:
+    element: "Shorter than me|Minua lyhyempi|Kortare än jag"
+    direction: DOWN
+    centerElement: true
+    timeout: 60000
+- assertVisible:
+    text: "My height or taller|Yhtä pitkä tai pidempi|Lika lång eller längre"
+    selected: true
+
+# Everyone takes it off, and saved, she is back as she began.
+- tapOn: "Everyone|Kaikki|Alla"
+- assertVisible:
+    text: "Everyone|Kaikki|Alla"
+    selected: true
+- assertNotVisible: "Also people who did not answer|Myös ne, jotka eivät vastanneet|Även de som inte svarade"
+- scrollUntilVisible:
+    element: "Save the deal-breakers|Tallenna rajat|Spara gränserna"
+    direction: DOWN
+    centerElement: true
+    timeout: 60000
+- tapOn: "Save the deal-breakers|Tallenna rajat|Spara gränserna"
+- extendedWaitUntil:
+    visible: "Saved\\.|Tallennettu\\.|Sparat\\."
+    timeout: 15000

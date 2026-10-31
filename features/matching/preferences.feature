@@ -49,22 +49,29 @@ Feature: The hard preferences of onboarding
     Then the first change is stored, the second is refused as change_too_soon, the same gender again passes, and the onboarding status says from when
 
   Scenario Outline: A deal-breaker the rule refuses is not stored
-    Given a signed-in account that answered how it smokes and whether it has kids
+    Given a signed-in account that answered how it smokes, whether it has kids and its height
     When it sets <what>
     Then the answer is <status> and no deal-breaker is stored
 
     Examples:
       | what                                              | status |
-      | a third deal-breaker                              | 400    |
+      | one more deal-breaker than the config allows      | 400    |
       | a deal-breaker on a field outside the whitelist   | 400    |
       | a deal-breaker on a field it has not answered     | 409    |
       | a deal-breaker accepting an answer the field has not | 400 |
       | the same field twice                              | 400    |
+      | a deal-breaker on height accepting no relation of height | 400 |
+      | a deal-breaker on height accepting two relations  | 400    |
 
   Scenario: Deal-breakers are stored as hard rows beside onboarding's and paused while the own answer is missing
     Given a signed-in account with seeks, an age window and answers on smoking and kids
     When it sets a deal-breaker on each, takes its smoking answer back, and answers again
     Then the rows are hard and read back, the smoking one is paused in between and nothing is deleted, onboarding's rows stand, the export carries them, and no accepted answer reaches a log line
+
+  Scenario: A deal-breaker on height is stored as one relation to the person's own height
+    Given a signed-in account that answered its height
+    When it asks for somebody taller, then somebody shorter, then everyone
+    Then each relation is a hard row that reads back as saved, a second one replaces the first, and everyone leaves no row
 
   Scenario: The deal-breakers of another account are never served
     Given two accounts, one with a deal-breaker set

@@ -48,13 +48,24 @@ export function intentsFit(a: Intent, b: Intent): boolean {
   return a === "open_to_either" || b === "open_to_either";
 }
 
+/** How the other person's number stands to the holder's own: what a deal-breaker on height accepts (#508). */
+const RELATIONS: Readonly<Record<string, (theirs: number, own: number) => boolean>> = {
+  taller: (theirs, own) => theirs > own,
+  at_least_mine: (theirs, own) => theirs >= own,
+  shorter: (theirs, own) => theirs < own,
+};
+
 /**
  * Whether a deal-breaker lets an answer through (#149, the field sheet's
  * mutual rule): an accepted option, for a list such as the languages any one
- * of them, or no answer at all when the holder lets those through.
+ * of them, a number that stands as accepted to the holder's `own` (#508), or
+ * no answer at all when the holder lets those through.
  */
-export function accepts(dealBreaker: DealBreaker, answer: unknown): boolean {
+export function accepts(dealBreaker: DealBreaker, answer: unknown, own: unknown): boolean {
   if (answer === undefined) return dealBreaker.includeUnknown;
+  if (typeof answer === "number" && typeof own === "number") {
+    return dealBreaker.accept.some((relation) => RELATIONS[relation]?.(answer, own));
+  }
   const given: readonly unknown[] = Array.isArray(answer) ? answer : [answer];
   return given.some((option) => (dealBreaker.accept as readonly unknown[]).includes(option));
 }
@@ -70,7 +81,7 @@ export function passesFiltersOf(viewer: PoolPerson, candidate: PoolPerson): bool
     viewer.dealBreakers.every(
       (dealBreaker) =>
         pausedOf(dealBreaker.field, viewer.fields) ||
-        accepts(dealBreaker, candidate.fields[dealBreaker.field]),
+        accepts(dealBreaker, candidate.fields[dealBreaker.field], viewer.fields[dealBreaker.field]),
     )
   );
 }
