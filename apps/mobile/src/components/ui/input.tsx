@@ -7,7 +7,8 @@ import { MAX_FONT_SCALE } from "@/theme/a11y";
 // fixed one (scaled text is never clipped), the 3:1 --input outline in both
 // themes, and a label the type insists on, since a placeholder is not one.
 // Read-only is drawn as a disabled Button is (#467): a dashed outline and the
-// text in --muted-foreground, never faded below the set's contrast.
+// text in --muted-foreground, never faded below the set's contrast. Solid is
+// said for the same reason as there (#548): on Android the dash outlives its class.
 type InputProps = Omit<React.ComponentProps<typeof TextInput>, "accessibilityLabel"> &
   React.RefAttributes<TextInput> & { accessibilityLabel: string };
 
@@ -15,7 +16,7 @@ function Input({ className, ...props }: InputProps) {
   return (
     <TextInput
       className={cn(
-        "min-h-touch w-full min-w-0 rounded-md border border-input bg-background px-3 py-2 font-sans text-base text-foreground placeholder:text-muted-foreground",
+        "min-h-touch w-full min-w-0 rounded-md border border-solid border-input bg-background px-3 py-2 font-sans text-base text-foreground placeholder:text-muted-foreground",
         props.editable === false && "border-dashed text-muted-foreground",
         Platform.select({
           web: "outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring",

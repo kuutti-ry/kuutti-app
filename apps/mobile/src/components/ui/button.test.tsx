@@ -2,7 +2,7 @@ import { fireEvent, screen } from "@testing-library/react-native";
 import X from "lucide-react-native/icons/x";
 import { useContext } from "react";
 import { Text as RNText, StyleSheet } from "react-native";
-import { renderWithTheme } from "@/test/render";
+import { renderWithTheme, underProviders } from "@/test/render";
 import { Button } from "./button";
 import { Icon } from "./icon";
 import { Text, TextClassContext } from "./text";
@@ -50,6 +50,7 @@ describe("Button", () => {
       expect(classes).not.toMatch(/opacity-/);
       expect(classes).toMatch(/(^| )border( |$)/);
       expect(classes).toMatch(/\bborder-dashed\b/);
+      expect(classes).not.toMatch(/\bborder-solid\b/);
       expect(classes).toMatch(/\bborder-input\b/);
       expect(classes).toMatch(/(^| )bg-transparent( |$)/);
       expect(classes).not.toMatch(/(^| )bg-(primary|destructive|secondary|background)( |$)/);
@@ -59,6 +60,23 @@ describe("Button", () => {
       const label = screen.getByText("Save").props.className as string;
       expect(label).toMatch(/\btext-muted-foreground\b/);
       expect(label).not.toMatch(/\btext-(primary|destructive|secondary)-foreground\b/);
+    },
+  );
+
+  // Android keeps a border's dash when its style goes away, so a button enabled
+  // again has to say solid, on the same element (#548).
+  it.each(["default", "destructive", "outline", "secondary", "ghost"] as const)(
+    "says solid when the %s variant is enabled again, so Android drops the dash",
+    async (variant) => {
+      const { rerender } = await renderWithTheme(
+        <Button variant={variant} disabled>
+          Save
+        </Button>,
+      );
+      await rerender(underProviders(<Button variant={variant}>Save</Button>));
+      const classes = screen.getByRole("button", { name: "Save" }).props.className as string;
+      expect(classes).toMatch(/\bborder-solid\b/);
+      expect(classes).not.toMatch(/\bborder-dashed\b/);
     },
   );
 

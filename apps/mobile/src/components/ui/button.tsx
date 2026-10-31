@@ -15,8 +15,11 @@ const buttonVariants = cva(
     // or the disabled look draws it: a choice toggles between default (chosen)
     // and outline, and a busy button between enabled and disabled, and a
     // button 2 px narrower re-wrapped a row of chips on every tap (#239). The
-    // background shows through it on every platform.
-    "group shrink-0 flex-row items-center justify-center gap-2 rounded-md border border-transparent",
+    // background shows through it on every platform. Solid is said, not left
+    // to the default: when a border's style goes away Android keeps the dash it
+    // had (BorderDrawable.updatePathEffect skips a null style, React Native
+    // 0.86), so a button enabled again stayed dashed until it remounted (#548).
+    "group shrink-0 flex-row items-center justify-center gap-2 rounded-md border border-solid border-transparent",
     Platform.select({
       web: "outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none",
     }),

@@ -13,7 +13,8 @@ const TRACK_HEIGHT = 32;
 // text of its own. Disabled is drawn as a disabled Button is (#467): no fill,
 // a dashed track and a --muted-foreground thumb, still on its side; faded, it
 // fell below the high-contrast sets' contrast, and a dashed edge on the on
-// track's fill would vanish there (black on navy, white on light blue).
+// track's fill would vanish there (black on navy, white on light blue). Solid is
+// said for the same reason as there (#548): on Android the dash outlives its class.
 type SwitchProps = Omit<
   React.ComponentProps<typeof SwitchPrimitives.Root>,
   "accessibilityLabel" | "aria-label"
@@ -29,7 +30,7 @@ function Switch({ className, accessibilityLabel, ...props }: SwitchProps) {
       hitSlop={hitSlopFor(TRACK_WIDTH, TRACK_HEIGHT)}
       style={{ width: TRACK_WIDTH, height: TRACK_HEIGHT }}
       className={cn(
-        "shrink-0 flex-row items-center rounded-full border-2 border-input px-0.5",
+        "shrink-0 flex-row items-center rounded-full border-2 border-solid border-input px-0.5",
         Platform.select({
           web: "outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed",
         }),

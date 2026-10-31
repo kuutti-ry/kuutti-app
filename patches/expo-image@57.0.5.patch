@@ -1,0 +1,30 @@
+diff --git a/android/src/main/java/expo/modules/image/blurhash/BlurhashDecoder.kt b/android/src/main/java/expo/modules/image/blurhash/BlurhashDecoder.kt
+index a75d8872ce0ce814070ed4d43e7d4a3e4b50484a..9060580d74b011fa10b2a6fb81b74597396a894d 100644
+--- a/android/src/main/java/expo/modules/image/blurhash/BlurhashDecoder.kt
++++ b/android/src/main/java/expo/modules/image/blurhash/BlurhashDecoder.kt
+@@ -14,6 +14,9 @@ object BlurhashDecoder {
+   // cache Math.cos() calculations to improve performance.
+   // The number of calculations can be huge for many bitmaps: width * height * numCompX * numCompY * 2 * nBitmaps
+   // the cache is enabled by default, it is recommended to disable it only when just a few images are displayed
++  // Glide decodes on several threads and composeBitmap fills an array while it reads it, so everything
++  // that touches these maps is synchronized: a second decode would read the rows not yet filled as
++  // zeros and paint them black.
+   private val cacheCosinesX = HashMap<Int, DoubleArray>()
+   private val cacheCosinesY = HashMap<Int, DoubleArray>()
+ 
+@@ -22,6 +25,7 @@ object BlurhashDecoder {
+    * The cache is not big, but will increase when many image sizes are used,
+    * if the app needs memory it is recommended to clear it.
+    */
++  @Synchronized
+   fun clearCache() {
+     cacheCosinesX.clear()
+     cacheCosinesY.clear()
+@@ -90,6 +94,7 @@ object BlurhashDecoder {
+ 
+   private fun signedPow2(value: Float) = value.pow(2f).withSign(value)
+ 
++  @Synchronized
+   private fun composeBitmap(
+     width: Int,
+     height: Int,
