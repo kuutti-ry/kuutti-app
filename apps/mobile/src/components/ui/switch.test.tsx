@@ -1,5 +1,5 @@
 import { fireEvent, screen } from "@testing-library/react-native";
-import { renderWithTheme } from "@/test/render";
+import { renderWithTheme, underProviders } from "@/test/render";
 import { Switch, TRACK_HEIGHT, TRACK_WIDTH } from "./switch";
 
 // The switch (#12): a labelled switch whose state is said, drawn smaller than
@@ -51,6 +51,7 @@ describe("Switch", () => {
     // still at the on side.
     expect(toggle.props.className).not.toMatch(/opacity-/);
     expect(toggle.props.className).toMatch(/\bborder-dashed\b/);
+    expect(toggle.props.className).not.toMatch(/\bborder-solid\b/);
     expect(toggle.props.className).toMatch(/\bbg-transparent\b/);
     expect(toggle.props.className).not.toMatch(/\bbg-primary\b/);
     expect(toggle.props.className).toMatch(/\bjustify-end\b/);
@@ -67,5 +68,20 @@ describe("Switch", () => {
     expect(toggle.props.className).toMatch(/\bjustify-start\b/);
     expect(toggle.props.className).not.toMatch(/\bbg-background\b/);
     expect(JSON.stringify(screen.toJSON())).toMatch(/size-6 rounded-full bg-muted-foreground/);
+  });
+
+  // Android keeps a border's dash when its style goes away (#548).
+  it("says solid when it is enabled again, so Android drops the dash", async () => {
+    const { rerender } = await renderWithTheme(
+      <Switch accessibilityLabel="Research" checked={false} disabled onCheckedChange={jest.fn()} />,
+    );
+    await rerender(
+      underProviders(
+        <Switch accessibilityLabel="Research" checked={false} onCheckedChange={jest.fn()} />,
+      ),
+    );
+    const toggle = screen.getByRole("switch", { name: "Research" });
+    expect(toggle.props.className).toMatch(/\bborder-solid\b/);
+    expect(toggle.props.className).not.toMatch(/\bborder-dashed\b/);
   });
 });

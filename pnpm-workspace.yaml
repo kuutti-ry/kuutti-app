@@ -143,8 +143,20 @@ auditConfig:
 # three decode its own output again (%25C2%zz gives %C2%zz, where 0.2.2 gave
 # �%zz), and in %41%FE%FF its BOM rule replaced inside the run first, leaving
 # %41 undecoded. JavaScript only: the fingerprint does not move.
+#
+# expo-image: on Android Glide decodes blurhashes on several threads, and
+# BlurhashDecoder shares cosine tables between them that it fills while it reads
+# them. A decode that starts meanwhile reads the rows not yet filled as zeros and
+# paints them black, and Glide keeps that bitmap on disk under the blurhash, so
+# the band comes back on later launches (#547). The patch makes the decoder take
+# one bitmap at a time. An Android build takes expo-image from its prebuilt
+# library unless told otherwise, so apps/mobile/package.json's buildFromSource
+# goes with this entry. No release carries a fix yet: remove both, and
+# apps/mobile/src/expo-image.test.ts with them, once one does. It moves Android's
+# fingerprint, not the iPhone's, and it does not mend what a phone has stored.
 patchedDependencies:
   decode-uri-component@0.2.2: patches/decode-uri-component@0.2.2.patch
+  expo-image@57.0.5: patches/expo-image@57.0.5.patch
   react-native-screens@4.26.2: patches/react-native-screens@4.26.2.patch
 
 # The kit's first release, approved at the prompt on 2026-10-23, the day it
