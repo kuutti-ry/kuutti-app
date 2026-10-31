@@ -2,7 +2,9 @@
 Feature: The hard preferences of onboarding
   Whom a person seeks and the age window are hard filters (rule 7, TD-11):
   rows of mode hard the round builder joins for both parties, never crossed
-  in either direction. Onboarding writes them (#46). The deal-breakers over
+  in either direction. Onboarding writes them (#46). Whom one seeks is an
+  article 9 answer: it is saved only with the sensitive-answers consent of
+  the current wording (ADR-019 §4, ADR-010 §16). The deal-breakers over
   profile fields (#149, TD-16) are hard rows of the same table on a whitelist
   of fields, at most deal_breakers_max of them, each only on a field the
   person answered themselves: a filter on what one will not say about
@@ -32,6 +34,27 @@ Feature: The hard preferences of onboarding
     Given a signed-in account
     When it sets whom it seeks alone, then the age window alone
     Then each is stored when it is sent and the other stays as it was, and an update naming neither is refused
+
+  Scenario Outline: Whom one seeks needs the consent of the current wording
+    Given a signed-in account whose sensitive-answers consent is <consent>
+    When it sets whom it seeks and an age window
+    Then the answer is 403 consent_required and neither is stored
+
+    Examples:
+      | consent                    |
+      | never given                |
+      | given for an older wording |
+      | withdrawn                  |
+
+  Scenario: The age window needs no consent
+    Given a signed-in account without the sensitive-answers consent
+    When it sets an age window alone
+    Then the window is stored
+
+  Scenario: A save of whom one seeks that waited behind a withdrawal stores nothing
+    Given an account with the consent, whose withdrawal holds the account row
+    When a save of whom it seeks waits for that lock and then runs
+    Then it is refused and no answer is left with no consent on record
 
   Scenario: The preferences of another account are never served
     Given two accounts, one with preferences set

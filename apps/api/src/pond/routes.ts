@@ -119,15 +119,11 @@ export function pondRoutes(
 
   app.openapi(gateRoute, async (c) => {
     const { accountId } = callerOf(c);
-    // Never cached by anybody in between: it is one person's.
-    c.header("Cache-Control", "no-store");
     return c.json(await readGate(accountId), 200);
   });
 
   app.openapi(seeksRoute, async (c) => {
     const { accountId } = callerOf(c);
-    // Never cached by anybody in between: the answer is the caller's pond's.
-    c.header("Cache-Control", "no-store");
     return c.json({ seeks: await readPondSeeks(deps.db, accountId) }, 200);
   });
 

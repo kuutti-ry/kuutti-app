@@ -3279,7 +3279,7 @@ errors.text_contact_details:
 
 errors.special_category_locked:
   en: This field needs your explicit consent first.
-  description: Profile save (403), a special-category field was set without the consent version (#47, ADR-009).
+  description: A save refused (403), a special-category field or whom one seeks without the consent of the current wording (#47, ADR-009, ADR-010 §16).
   fi: Tämä kenttä vaatii ensin nimenomaisen suostumuksesi.
   sv: Det här fältet kräver först ditt uttryckliga samtycke.
   machine: { fi: true, sv: true }

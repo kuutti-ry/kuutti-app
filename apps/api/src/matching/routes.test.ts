@@ -2,7 +2,7 @@ import type { Queryable } from "@kuutti/db";
 import { DealBreakersResponse, PreferencesResponse } from "@kuutti/schema";
 import { describe, expect } from "vitest";
 import { createApp } from "../app.ts";
-import { signedInAccount, withMatchingConfig } from "../test/account.ts";
+import { consentedAccount, signedInAccount, withMatchingConfig } from "../test/account.ts";
 import { captureLogger, type TestContext, test, testConfig } from "../test/harness.ts";
 import { pondNamed } from "../test/people.ts";
 import {
@@ -42,6 +42,30 @@ function erasedBefore(ctx: TestContext, accountId: string, when: RegExp): Querya
         erased = true;
         await ctx.client.query(
           "UPDATE account SET state = 'deleted', deleted_at = now() WHERE id = $1",
+          [accountId],
+        );
+      }
+      return ctx.client.query(text, values);
+    },
+  } as Queryable;
+}
+
+/**
+ * The same, for the withdrawal that took the account row's lock first: the
+ * consent is withdrawn and the answer gone the moment `when` is about to run.
+ */
+function withdrawnBefore(ctx: TestContext, accountId: string, when: RegExp): Queryable {
+  let withdrawn = false;
+  return {
+    async query(text: string, values?: unknown[]) {
+      if (!withdrawn && when.test(text)) {
+        withdrawn = true;
+        await ctx.client.query(
+          "UPDATE consent SET withdrawn_at = now() WHERE account_id = $1 AND kind = 'special_category'",
+          [accountId],
+        );
+        await ctx.client.query(
+          "DELETE FROM preferences WHERE account_id = $1 AND field = 'seeks'",
           [accountId],
         );
       }
@@ -236,12 +260,32 @@ describe("rows that no longer parse", () => {
   });
 });
 
+describe("a save that meets a withdrawal", () => {
+  test("A save of whom one seeks that waited behind a withdrawal stores nothing", async ({
+    ctx,
+  }) => {
+    const me = await consentedAccount(ctx.client);
+    const { app } = await appWith(
+      ctx,
+      withdrawnBefore(ctx, me.accountId, /^SELECT gender, seeks_changed_at FROM account/),
+    );
+    const res = await app.request("/preferences", {
+      method: "PUT",
+      headers: json(me.headers),
+      body: JSON.stringify({ seeks: ["woman"] }),
+    });
+    expect(res.status).toBe(403);
+    expect(await errorCode(res)).toBe("consent_required");
+    expect(await rowsOf(ctx, me.accountId)).toEqual([]);
+  });
+});
+
 describe("the cadence of a change, once it has passed", () => {
   test("a change of whom one seeks after the cadence is allowed and starts the cadence again", async ({
     ctx,
   }) => {
     const { app } = await appWith(ctx);
-    const me = await signedInAccount(ctx.client);
+    const me = await consentedAccount(ctx.client);
     const put = (seeks: string[]) =>
       app.request("/preferences", {
         method: "PUT",
@@ -300,7 +344,7 @@ describe("a change of seeks at the pond gate (ADR-015 §9)", () => {
     ctx,
   }) => {
     const { app } = await appWith(ctx);
-    const me = await signedInAccount(ctx.client);
+    const me = await consentedAccount(ctx.client);
     await ctx.client.query(
       `INSERT INTO preferences (account_id, field, value, mode, include_unknown)
        VALUES ($1, 'seeks', '["woman", "non_binary"]', 'hard', false)`,

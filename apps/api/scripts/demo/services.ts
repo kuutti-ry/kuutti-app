@@ -8,6 +8,7 @@ import {
 } from "@kuutti/db/demo";
 import {
   CURRENT_CONSENT_VERSIONS,
+  currentConsent,
   declareGender,
   deriveArtificialIdentity,
   eraseAccount,
@@ -79,7 +80,9 @@ export function viaServices(context: ServicesContext): HistoryWriter {
       await declareGender(onboarding, accountId, gender);
     },
     async preferences(accountId, update) {
-      if (!(await savePreferences(db, accountId, update, now()))) {
+      const seeksConsent = async (tx: Queryable, id: string) =>
+        (await currentConsent(tx, id, "special_category")) !== null;
+      if (!(await savePreferences(db, accountId, update, now(), seeksConsent))) {
         throw new DemoError(`${accountId}: no live account for the preferences`);
       }
     },

@@ -68,7 +68,7 @@ async function guarded(
     return { status: res.status, body };
   };
   const code = (body: unknown) => ErrorResponse.parse(body).error.code;
-  return { call, code, asked, touched, lines, events };
+  return { app, call, code, asked, touched, lines, events };
 }
 
 describe("requireAdmin", () => {
@@ -87,6 +87,13 @@ describe("requireAdmin", () => {
     });
     expect(asked).toEqual([hashToken(TOKEN)]);
     expect(touched).toEqual([{ sessionId: "adm-ses-1", at: NOW }]);
+  });
+
+  it("tells nobody in between to keep what a member of staff reads", async () => {
+    const { app } = await guarded(live, ["moderator", "admin"], { now: () => NOW });
+    const res = await app.request("/queue", { headers: { authorization: `Bearer ${TOKEN}` } });
+    expect(res.status).toBe(200);
+    expect(res.headers.get("cache-control")).toBe("no-store");
   });
 
   it("refuses a missing, malformed or differently spelled token without asking the store", async () => {

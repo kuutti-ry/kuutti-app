@@ -1047,7 +1047,8 @@ describe("a count and a change of declaration at once", () => {
         try {
           await writer.query("BEGIN");
           const back = { seeks: ["woman" as const], ageWindow: WINDOW };
-          expect(await savePreferences(writer, he as string, back, NIGHT_2)).toBe(true);
+          const consented = async () => true;
+          expect(await savePreferences(writer, he as string, back, NIGHT_2, consented)).toBe(true);
           count = countGates({ db: pool, logger, now: () => NIGHT_2 });
           const waited = await Promise.race([count.then(() => "ran"), sleep(300, "waited")]);
           expect(waited).toBe("waited");

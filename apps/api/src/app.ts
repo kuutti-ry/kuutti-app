@@ -18,6 +18,7 @@ import {
   accountRoutes,
   adminSessionStore,
   authRoutes,
+  currentConsent,
   type IdentityBroker,
   isSignInStart,
   onboardingRoutes,
@@ -369,7 +370,16 @@ export function createApp(deps: Deps) {
     ),
   );
   // The deal-breakers need the caller's own answers (#149): the profile slice reads them, handed in here.
-  app.route("/", preferencesRoutes(deps, guard, ownFieldsOf));
+  app.route(
+    "/",
+    preferencesRoutes(
+      deps,
+      guard,
+      ownFieldsOf,
+      // Whom one seeks waits for the identity slice's consent row (ADR-019 §4, ADR-010 §16).
+      async (tx, accountId) => (await currentConsent(tx, accountId, "special_category")) !== null,
+    ),
+  );
 
   // The bearer scheme the session routes declare (#35); the tokens themselves
   // are opaque, so the scheme is all the contract says about them.

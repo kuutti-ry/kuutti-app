@@ -542,10 +542,12 @@ describe("onboarding and consents", () => {
     const { app, logs } = await appWith(ctx);
     // The seed pond, which matching_config.default_pond names (migration 0025); the test database has no seed.
     // Migration 0027 writes the second pond into every database: this test wants the one-pond world (ADR-010 §12).
-    await ctx.client.query("DELETE FROM ponds WHERE slug = 'suomi'");
+    // The capital first and `suomi` after it, the order every other test takes them in:
+    // the other way round this deadlocks against a test running in another file.
     const { rows } = await ctx.client.query<{ id: string }>(
       "INSERT INTO ponds (slug, name_nominative, name_inessive) VALUES ('paakaupunkiseutu', 'Pääkaupunkiseutu', 'Pääkaupunkiseudulla') RETURNING id",
     );
+    await ctx.client.query("DELETE FROM ponds WHERE slug = 'suomi'");
     const a = await signedInAccount(ctx.client, undefined, { state: "registered" });
     const first = await status(app, a.headers);
     expect(first.pond).toMatchObject({
@@ -643,10 +645,12 @@ describe("onboarding and consents: the quiet branches", () => {
   }) => {
     const { app, logs } = await appWith(ctx);
     // The one-pond world in which the default would otherwise be assigned (ADR-010 §12).
-    await ctx.client.query("DELETE FROM ponds WHERE slug = 'suomi'");
+    // The capital first and `suomi` after it, the order every other test takes them in:
+    // the other way round this deadlocks against a test running in another file.
     await ctx.client.query(
       "INSERT INTO ponds (slug, name_nominative, name_inessive) VALUES ('paakaupunkiseutu', 'Pääkaupunkiseutu', 'Pääkaupunkiseudulla') ON CONFLICT (slug) DO NOTHING",
     );
+    await ctx.client.query("DELETE FROM ponds WHERE slug = 'suomi'");
     for (const value of ['""', "7"]) {
       await ctx.client.query(
         `INSERT INTO matching_config (version, key, value, created_by) VALUES (99, 'default_pond', $1::jsonb, 'test')

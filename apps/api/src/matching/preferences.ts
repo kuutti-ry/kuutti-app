@@ -32,6 +32,13 @@ export function nextChangeFrom(changedAt: Date | null, cadenceDays: number, at: 
   return from.getTime() > at.getTime() ? from : null;
 }
 
+/**
+ * Whether the person holds the sensitive-answers consent of the current
+ * wording. The consent is the identity slice's row, so the app hands this in;
+ * it reads on the caller's transaction, under the account row's lock.
+ */
+export type SeeksConsentReader = (tx: Queryable, accountId: string) => Promise<boolean>;
+
 const sameSet = (a: readonly string[], b: readonly string[]) =>
   a.length === b.length && a.every((value) => b.includes(value));
 
@@ -68,13 +75,16 @@ export async function readPreferences(
 
 /**
  * The rows the update names, each written or replaced; the other stays as it
- * was (ADR-010 §13). A tombstone takes none (#51).
+ * was (ADR-010 §13). A tombstone takes none (#51). Whom one seeks is an article
+ * 9 answer: without the consent of the current wording it is refused, and
+ * nothing of the update is written (ADR-019 §4, ADR-010 §16).
  */
 export async function savePreferences(
   db: Queryable,
   accountId: string,
   update: PreferencesUpdate,
   at: Date,
+  seeksConsent: SeeksConsentReader,
 ): Promise<boolean> {
   return transaction(db, async (tx) => {
     // The lock erasure takes first (ADR-009 §8): a save racing an erasure
@@ -85,8 +95,22 @@ export async function savePreferences(
     );
     const account = live.rows[0];
     if (!account) return false;
-    const before = await readPreferences(tx, accountId);
     const { seeks, ageWindow } = update;
+    // Read under the lock a withdrawal takes, as the profile's save does: a
+    // save either lands before the withdrawal, whose clear then removes the
+    // answer, or waits, finds no consent and is refused, so no answer is left
+    // behind with no consent on record.
+    if (seeks !== undefined && !(await seeksConsent(tx, accountId))) {
+      throw new AppError(
+        403,
+        "consent_required",
+        "Whom one seeks needs the explicit consent first",
+        {
+          fields: [SEEKS],
+        },
+      );
+    }
+    const before = await readPreferences(tx, accountId);
     // A change of whom one seeks, once in the cadence (#147, ADR-015 §10): a
     // lever on the figures otherwise. The first answer and the same answer
     // again are no change; the window of ages is free. The time lives on the

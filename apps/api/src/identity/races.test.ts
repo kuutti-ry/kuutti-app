@@ -372,10 +372,10 @@ describe("the status read racing another request", () => {
     ctx,
   }) => {
     // The one-pond world the default pond needs (ADR-010 §12), as onboarding.test.ts builds it.
-    await ctx.client.query("DELETE FROM ponds WHERE slug = 'suomi'");
     await ctx.client.query(
       "INSERT INTO ponds (slug, name_nominative, name_inessive) VALUES ('paakaupunkiseutu', 'Pääkaupunkiseutu', 'Pääkaupunkiseudulla') ON CONFLICT (slug) DO NOTHING",
     );
+    await ctx.client.query("DELETE FROM ponds WHERE slug = 'suomi'");
     const me = await signedInAccount(ctx.client, undefined, { state: "registered" });
     const db = interleaved(ctx.client, { before: /UPDATE account SET pond_id = \$2/ }, () =>
       eraseOnOtherDevice(ctx, me.accountId),

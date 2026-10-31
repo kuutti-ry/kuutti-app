@@ -336,7 +336,6 @@ export function accountRoutes(deps: Deps, requireSession: MiddlewareHandler<AppE
     }
     c.header("Content-Type", "application/zip");
     c.header("Content-Disposition", `attachment; filename="${archive.name}"`);
-    c.header("Cache-Control", "no-store");
     return c.body(archive.bytes, 200);
   });
 
