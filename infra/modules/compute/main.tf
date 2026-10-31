@@ -1,6 +1,7 @@
-# The one API box per environment (TD-4, project context §2): t4g.small, Ubuntu
-# 24.04 arm64, an Elastic IP, and an instance role that reaches exactly its own
-# SSM prefix, its own log group and its backup prefix (TD-19, TD-4 access rule).
+# The one API box per environment (TD-4, project context §2): a t4g.small on
+# staging and a t4g.medium in production (ADR-046), Ubuntu 24.04 arm64, an
+# Elastic IP, and an instance role that reaches exactly its own SSM prefix, its
+# own log group and its backup prefix (TD-19, TD-4 access rule).
 # The bucket (modules/media, #48) and Rekognition (#49) arrived with M3, SES
 # sending with #385 (ADR-043 §5), the box's swap and its free-memory metric
 # with #77 (ADR-046).

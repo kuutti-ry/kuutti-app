@@ -49,9 +49,9 @@ variable "billing_alert_email" {
 }
 
 variable "monthly_budget_usd" {
-  description = "Monthly cost budget in USD, since the AWS/Billing metric behind the alarm is USD-only; the budget uses the same number. TD-4 set 50 EUR (55) for staging alone; 110 while production runs beside it (ADR-049), counted before credits."
+  description = "Monthly cost budget in USD, since the AWS/Billing metric behind the alarm is USD-only; the budget uses the same number. TD-4 set 50 EUR (55) for staging alone; 150 while production runs beside it (ADR-049), counted before credits."
   type        = number
-  default     = 110
+  default     = 150
 }
 
 variable "github_domain_verification" {

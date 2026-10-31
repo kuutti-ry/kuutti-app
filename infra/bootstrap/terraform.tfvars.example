@@ -8,7 +8,7 @@ github_repository_id = "000000000"
 # subscription from that mailbox after apply.
 billing_alert_email = "billing@example.invalid"
 
-# monthly_budget_usd = 110  # ADR-049: staging and production; TD-4's 50 EUR (55) was staging alone
+# monthly_budget_usd = 150  # ADR-049: staging and production; TD-4's 50 EUR (55) was staging alone
 
 # GitHub organisation domain verification (#16 B.1). Settings of the
 # organisation, Verified and approved domains, Add a domain: copy the record

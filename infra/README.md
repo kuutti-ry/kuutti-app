@@ -55,7 +55,7 @@ tofu init
 tofu apply
 ```
 
-Fill in the two GitHub IDs and the billing alias in `terraform.tfvars` before the apply. This runs with local state, because the bucket it creates is where state will live. The apply also creates the monthly budget (TD-4: 50 EUR, expressed as `monthly_budget_usd` because the billing metric is USD-only; 110 USD, counted before credits, since production runs beside staging, ADR-049), the CloudWatch billing alarm in us-east-1, and the SNS topic both notify. AWS mails a subscription confirmation to the billing alias: confirm it, then send the test notification:
+Fill in the two GitHub IDs and the billing alias in `terraform.tfvars` before the apply. This runs with local state, because the bucket it creates is where state will live. The apply also creates the monthly budget (TD-4: 50 EUR, expressed as `monthly_budget_usd` because the billing metric is USD-only; 150 USD, counted before credits, since production runs beside staging, ADR-049), the CloudWatch billing alarm in us-east-1, and the SNS topic both notify. AWS mails a subscription confirmation to the billing alias: confirm it, then send the test notification:
 
 ```sh
 aws sns publish --region us-east-1 --topic-arn "$(tofu output -raw billing_topic_arn)" \
@@ -265,14 +265,14 @@ The staging apply and the staging deploy run only while the repository variable 
 
 Until an environment's `media_enabled` is set (Media, below), TLS terminates at Traefik on the box and the API answers on the Elastic IP directly (#7).
 
-Each environment composes the three modules (#7, TD-19), and staging the panel's host as well (#313, ADR-025; production with #25):
+Each environment composes the three modules (#7, TD-19) and the panel's host (#313, ADR-025):
 
 | module | creates | notes |
 |---|---|---|
 | `network` | VPC /16, one public subnet, two private subnets, DB subnet group, `api` and `db` security groups | no NAT; `db` admits 5432 from the `api` group only; port 22 only for `ssh_cidrs`, empty by default |
 | `data` | RDS PostgreSQL 17 single-AZ, gp3 20→100 GB, 35-day PITR, `rds.force_ssl=1`, Extended Support declined, master password held by AWS | staging `db.t4g.micro`, prod `db.t4g.small` with deletion protection and a final snapshot |
-| `compute` | t4g.small Ubuntu 24.04 arm64, Elastic IP, IMDSv2, instance role `kuutti-api-<env>` under the boundary, log group `/kuutti/<env>/api`, first-boot script installing Dokploy | staging also owns the account-wide Session Manager preferences, `/kuutti/ssm-sessions`, and the `kuutti-staging-preview-database` Run Command document (#9) |
-| `admin` | private bucket `kuutti-admin-<env>-<account>`, CloudFront distribution on `admin.staging.<domain>` with the panel's headers, the path fallback and the `pr-*` function, ACM certificate in us-east-1, alias records | staging only; Admin panel, below |
+| `compute` | t4g.small on staging, t4g.medium in production, Ubuntu 24.04 arm64, Elastic IP, IMDSv2, instance role `kuutti-api-<env>` under the boundary, log group `/kuutti/<env>/api`, first-boot script installing Dokploy | staging also owns the account-wide Session Manager preferences, `/kuutti/ssm-sessions`, and the `kuutti-staging-preview-database` Run Command document (#9) |
+| `admin` | private bucket `kuutti-admin-<env>-<account>`, CloudFront distribution on `admin.staging.<domain>`, or `admin.<domain>` in production, with the panel's headers, the path fallback and the `pr-*` function, ACM certificate in us-east-1, alias records | Admin panel, below |
 
 The composition then writes the non-secret parameters `app-env`, `log-level`, `db-host`, `db-port`, `db-name`, `db-user` under `/kuutti/<env>/`, and, once `telia_client_id` has a value, `oidc-issuer`, `oidc-client-id`, `oidc-redirect-uri` and `oidc-acr-values` (#32, `docs/vendors/telia.md`); the API turns them into `APP_ENV`, `DB_HOST` and so on at boot and composes `DATABASE_URL` with `sslmode=require`.
 
@@ -430,11 +430,11 @@ Apple's APNs key and Google's FCM key live in EAS, not here (`eas credentials`).
 
 ### Admin panel (#313, ADR-025)
 
-`infra/modules/admin`, composed by staging (production with #25, on `admin.kuutti.app`): the moderators' panel as static files at `https://admin.staging.kuutti.app`. The module creates a private bucket `kuutti-admin-<env>-<account>` (public access blocked, bucket owner enforced, SSE-S3, no versioning since every object is the build of a commit; incomplete uploads go after a day and `pr-` objects after 14 days) that only the distribution reads, through origin access control; the distribution with its ACM certificate in us-east-1 and the A and AAAA alias records; the managed `CachingOptimized` policy; and a response-headers policy on every behaviour: a CSP of `default-src 'none'` whose `connect-src` is the API's origin alone, `img-src` `'self'` and the API's origin (the signed photo URLs, ADR-005), `script-src`, `style-src` and `font-src` `'self'` (Saiga's faces under `fonts/`, which the maintainer uploads by hand and the deploy's sync leaves alone, ADR-052), and `worker-src`, `base-uri`, `form-action` and `frame-ancestors` `'none'`, with HSTS, `nosniff`, `no-referrer`, `X-Frame-Options: DENY`, `Permissions-Policy`, COOP and CORP, and `X-Robots-Tag: noindex, nofollow` (the whole list is ADR-025 §3). The bucket answers 403 for a key it does not have, because CloudFront may not list it, and the distribution turns 403 and 404 into `/index.html` with 200, so `/accounts/<id>` loads the panel and its router finds the page (#302). A pull request's preview is `pr-<n>/` of the same bucket (Previews, below): the viewer-request CloudFront Function `kuutti-staging-admin-previews` (`modules/admin/previews.js`), on the `pr-*` behaviour alone, answers a path inside a preview whose last segment has no dot with that preview's `index.html`. There is no access log: the API's log has every staff request with the account and the request id, and a log of the host would add staff members' IP addresses and nothing a moderator does (ADR-025 §9). Staging's `admin-app-url` is that address and its `cors-allowed-origins` that origin alone (ADR-025 §10).
+`infra/modules/admin`, composed by each environment: the moderators' panel as static files at `https://admin.staging.kuutti.app` and, in production, `https://admin.kuutti.app`. The module creates a private bucket `kuutti-admin-<env>-<account>` (public access blocked, bucket owner enforced, SSE-S3, no versioning since every object is the build of a commit; incomplete uploads go after a day and `pr-` objects after 14 days) that only the distribution reads, through origin access control; the distribution with its ACM certificate in us-east-1 and the A and AAAA alias records; the managed `CachingOptimized` policy; and a response-headers policy on every behaviour: a CSP of `default-src 'none'` whose `connect-src` is the API's origin alone, `img-src` `'self'` and the API's origin (the signed photo URLs, ADR-005), `script-src`, `style-src` and `font-src` `'self'` (Saiga's faces under `fonts/`, which the maintainer uploads by hand and the deploy's sync leaves alone, ADR-052), and `worker-src`, `base-uri`, `form-action` and `frame-ancestors` `'none'`, with HSTS, `nosniff`, `no-referrer`, `X-Frame-Options: DENY`, `Permissions-Policy`, COOP and CORP, and `X-Robots-Tag: noindex, nofollow` (the whole list is ADR-025 §3). The bucket answers 403 for a key it does not have, because CloudFront may not list it, and the distribution turns 403 and 404 into `/index.html` with 200, so `/accounts/<id>` loads the panel and its router finds the page (#302). A pull request's preview is `pr-<n>/` of the same bucket (Previews, below): the viewer-request CloudFront Function `kuutti-staging-admin-previews` (`modules/admin/previews.js`), on the `pr-*` behaviour alone, answers a path inside a preview whose last segment has no dot with that preview's `index.html`. There is no access log: the API's log has every staff request with the account and the request id, and a log of the host would add staff members' IP addresses and nothing a moderator does (ADR-025 §9). Each environment's `admin-app-url` is its address and its `cors-allowed-origins` that origin alone (ADR-025 §10).
 
-CI writes the bucket, but for Saiga's faces under `fonts/`, which the maintainer uploads by hand since no runner ever has them (ADR-052); the deploy's sync leaves `fonts/` alone. `build.yml` builds `main`'s panel against the staging API and syncs it to the root as `kuutti-ci-apply` from the `staging` environment, `index.html` with `Cache-Control: no-cache` and the hashed assets as immutable, then invalidates `/*`. `preview.yml` writes a pull request's build to `pr-<n>/` as the plan role, whose `admin-previews` policy allows putting and deleting objects under `pr-*` and nothing else, and `preview-cleanup.yml` removes the prefix with the rest of the preview.
+CI writes the bucket, but for Saiga's faces under `fonts/`, which the maintainer uploads by hand since no runner ever has them (ADR-052); the deploy's sync leaves `fonts/` alone. `admin-deploy.yml`, which `build.yml` calls after each deploy, builds the panel against the environment's API and syncs it to the root as `kuutti-ci-apply` from that environment, `index.html` with `Cache-Control: no-cache` and the hashed assets as immutable, then invalidates `/*`. `preview.yml` writes a pull request's build to `pr-<n>/` as the plan role, whose `admin-previews` policy allows putting and deleting objects under `pr-*` and nothing else, and `preview-cleanup.yml` removes the prefix with the rest of the preview.
 
-The first apply, once, by the maintainer, in this order (ADR-025, Consequences):
+The first apply on staging, once, by the maintainer, in this order (ADR-025, Consequences):
 
 1. **Bootstrap.** `tofu apply` in `infra/bootstrap` for the plan role's `admin-previews` policy (`s3:PutObject` and `s3:DeleteObject` on `kuutti-admin-staging-<account>/pr-*`).
 2. **The environment.** Merging applies `envs/staging` through `infra.yml`, as for every module: the bucket, the certificate (validated by a record in the zone, a few minutes), the function, the distribution (about ten minutes), the alias records, and the two parameters. From here until step 4, a staff login on staging lands on an empty host.
@@ -480,6 +480,29 @@ done
 ```
 
 The first origin is answered with itself, the other two are refused.
+
+**Production's panel** (#25). The next `v*` tag's apply creates the host on `admin.kuutti.app`. Then, once, by the maintainer:
+
+1. **GitHub variables**, from production's outputs (`pnpm aws:login` first):
+
+   ```sh
+   cd infra/envs/prod
+   tofu init
+   gh variable set ADMIN_URL --env prod --body "$(tofu output -raw admin_url)"
+   gh variable set ADMIN_BUCKET --env prod --body "$(tofu output -raw admin_bucket)"
+   gh variable set ADMIN_DISTRIBUTION_ID --env prod --body "$(tofu output -raw admin_distribution_id)"
+   gh variable list --env prod
+   ```
+
+2. **The first build.** At a release `build.yml` calls `admin-deploy.yml` after `deploy prod`. A rehearsal tag stops at the release gate before that (ADR-049 §2), so start it by hand from the tag and approve its two jobs. `prod` admits `v*` tags alone, so a run from `main` is refused.
+
+   ```sh
+   gh workflow run admin-deploy.yml --ref "<the tag>" -f environment=prod
+   ```
+
+3. **Saiga**, as in step 5 above, with production's bucket and address.
+
+Done when that run's checks are green: the headers, a deep path, `licenses.txt` and the API's CORS. Nobody can sign in to production's panel until production has bank identification (ADR-049).
 
 ### Research copy (#194, ADR-029)
 
@@ -621,7 +644,7 @@ Sentry (TD-19, the one vendor besides AWS, Expo, GitHub and Telia), maintainer o
 
 ### Cost
 
-TD-4 budgets 50 EUR a month. One environment is roughly 30 EUR (instance, database, address, storage); with production's larger database both together come to about 90 to 95 USD at list price, before VAT. Decision (2026-09-14): staging is applied now, prod when there is a first release; raising `monthly_budget_usd` in the bootstrap is the deliberate step that goes with it. Changed on 2026-10-24 (ADR-049): production is applied before the first release, as a rehearsal of #25 without bank identification, and stays up; the budget is 110 USD, counted before credits, so the association's AWS credit does not hide what the two environments use. The panel's host adds about nothing (ADR-025): CloudFront's free tier covers 1 TB out, 10 million requests and 2 million function invocations a month, the certificate and the alias queries are free, and the bucket holds a few megabytes.
+TD-4 budgets 50 EUR a month. One environment is roughly 30 EUR (instance, database, address, storage); with production's larger database both together come to about 90 to 95 USD at list price, before VAT. Decision (2026-09-14): staging is applied now, prod when there is a first release; raising `monthly_budget_usd` in the bootstrap is the deliberate step that goes with it. Changed on 2026-10-24 (ADR-049): production is applied before the first release, as a rehearsal of #25 without bank identification, and stays up; the budget is 150 USD (110 until 2026-10-31), counted before credits, so the association's AWS credit does not hide what the two environments use. Production's `t4g.medium` (ADR-046) adds about 14 USD, so both together come to about 105 to 110 USD, and the credit of 1,000 USD lasts some nine months at that rate. The panel's host adds about nothing (ADR-025): CloudFront's free tier covers 1 TB out, 10 million requests and 2 million function invocations a month, the certificate and the alias queries are free, and the bucket holds a few megabytes.
 
 ### After the first apply, once per environment
 
@@ -739,7 +762,7 @@ Done when (the issue's list): a pull request that changes a screen gets its comm
 
 ### The box's headroom (#77, ADR-046)
 
-Twice (2026-09-27, 2026-10-08) the box, 1.8 GB, ran out of memory with Dokploy, the API and previews on it, and the API went with it. One script, `modules/compute/templates/headroom.sh.tpl`, keeps that from happening again: a swap file with `vm.swappiness = 10` (`swap_mb`: 2 GB on staging, none in production until ADR-046's open point on rule 1 is answered), and the box's `MemAvailable` pushed to CloudWatch (`Kuutti/<env>/box`) every minute by a cron line, which the alarm `kuutti-<env>-memory-low` reads (`docs/runbooks/alerts.md`). No memory limit on Dokploy: Node inside it sizes its heap at half of one, and Dokploy crashed in a loop under 1 GiB (ADR-046 §2 and History).
+Twice (2026-09-27, 2026-10-08) the box, 1.8 GB, ran out of memory with Dokploy, the API and previews on it, and the API went with it. One script, `modules/compute/templates/headroom.sh.tpl`, keeps that from happening again: a swap file with `vm.swappiness = 10` (`swap_mb`: 2 GB on staging, none in production, a `t4g.medium` so that no page of its memory reaches the disk, rule 1), and the box's `MemAvailable` pushed to CloudWatch (`Kuutti/<env>/box`) every minute by a cron line, which the alarm `kuutti-<env>-memory-low` reads (`docs/runbooks/alerts.md`). No memory limit on Dokploy: Node inside it sizes its heap at half of one, and Dokploy crashed in a loop under 1 GiB (ADR-046 §2 and History).
 
 A new box runs the script at first boot. A running box never sees an edit of user data, so it gets the same script from the Run Command document `kuutti-<env>-headroom`, which the maintainer sends after the apply that creates it, and again after a change of `swap_mb`. Until then the alarm says ALARM, since a box that has never pushed counts as breaching. A second run changes nothing; a swap file made by hand keeps its size, and its mode becomes 0600. From `infra/envs/<env>`, where `tofu output` has the state, with your own session (`pnpm aws:login`):
 

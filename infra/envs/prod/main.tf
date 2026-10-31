@@ -44,8 +44,9 @@ module "compute" {
   domain                     = var.domain
   manage_session_preferences = false
 
-  # No swap until the maintainer has answered ADR-046's open point on swap
-  # and rule 1, before the first release (#25).
+  # No swap: a page can hold a hetu or the HMAC key, and the file outlives the
+  # process that let go of it (rule 1). The t4g.medium's 4 GB stands in for it
+  # (ADR-046).
   swap_mb = 0
 }
 
@@ -70,6 +71,23 @@ module "media" {
   signing_public_key_pem = fileexists("${path.module}/cloudfront-signing-key.pub.pem") ? file("${path.module}/cloudfront-signing-key.pub.pem") : ""
   # Rotation (ADR-005): cloudfront-signing-key.<anything>.pub.pem files are trusted too.
   additional_signing_public_keys_pem = [for f in fileset(path.module, "cloudfront-signing-key.*.pub.pem") : file("${path.module}/${f}")]
+}
+
+# The moderation panel's host (#313, ADR-025): a bucket and a distribution of
+# its own on the host admin-app-url and cors-allowed-origins name
+# (variables.tf). admin-deploy.yml writes the build to its root; production has
+# no previews, so nothing writes under pr-*.
+module "admin" {
+  source = "../../modules/admin"
+  providers = {
+    aws           = aws
+    aws.us_east_1 = aws.us_east_1
+  }
+
+  environment = local.environment
+  zone_id     = data.aws_route53_zone.main.zone_id
+  admin_fqdn  = "admin.${var.domain}"
+  api_origin  = "https://api.${var.domain}"
 }
 
 # Alarms, the alert topic and the saved log queries (#11).

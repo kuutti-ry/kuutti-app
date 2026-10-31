@@ -14,8 +14,8 @@ rc=0
 # On 2026-09-27 and 2026-10-08 the box (1.8 GB, no swap) ran out of memory:
 # the OOM killer took Dokploy every two minutes, and every kill had Swarm
 # restart every service, the API's included. Swap turns that into a slow
-# minute. swap_mb is the environment's: production has none until ADR-046's
-# open point on rule 1 is answered, and 0 leaves whatever is there alone.
+# minute. swap_mb is the environment's: production has none, since a page can
+# hold a hetu (rule 1, ADR-046), and 0 leaves whatever is there alone.
 if [ ${swap_mb} -gt 0 ]; then
   if [ ! -f /swapfile ]; then
     fallocate -l ${swap_mb}M /swapfile
