@@ -55,7 +55,7 @@ Feature: The hard preferences of onboarding
 
     Examples:
       | what                                              | status |
-      | a third deal-breaker                              | 400    |
+      | one more deal-breaker than the config allows      | 400    |
       | a deal-breaker on a field outside the whitelist   | 400    |
       | a deal-breaker on a field it has not answered     | 409    |
       | a deal-breaker accepting an answer the field has not | 400 |

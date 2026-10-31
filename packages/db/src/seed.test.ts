@@ -137,6 +137,7 @@ describe("seed", () => {
           round_size: 10,
           like_budget_balanced: 10,
           auto_shadow_ban_photo_fetches: 200,
+          deal_breakers_max: 6,
         });
         expect(later).toEqual(MATCHING_CONFIG_V2);
       } finally {

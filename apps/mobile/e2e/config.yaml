@@ -29,7 +29,7 @@ executionOrder:
     - Field and work take as many choices as apply, Ask me later keeps what was stored, and long lists can be searched
     - A party and a star sign saved on their screens show on the card, and clearing them takes them off
     - The parties screen lists the parties and none of them, which stands alone, with no note and no search
-    - At most two deal-breakers, each with an accepted answer; a third is refused in words
+    - Each deal-breaker waits for an accepted answer, and leaving unsaved asks first
     - Taking one's own answer back pauses the deal-breaker on it, and answering again lifts the pause
     - Height takes one relation of its four buttons, kept when saved, and Everyone takes it off
     - Home names the area with its numbers and the gate in words, and the wrench names the API

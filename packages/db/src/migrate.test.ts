@@ -519,11 +519,12 @@ describe("migrate", () => {
             "round_push_hour",
             "round_push_idle_days",
           ]);
-          // A key's second version a later migration writes (0069, #95; 0070, #98; 0088, #513) is not there yet either.
+          // A key's second version a later migration writes (0069, #95; 0070, #98; 0088, #513; 0092, #508) is not there yet either.
           const laterVersions = new Set([
             "round_size",
             "like_budget_balanced",
             "auto_shadow_ban_photo_fetches",
+            "deal_breakers_max",
           ]);
           expect(rows).toHaveLength(
             Object.keys(MATCHING_CONFIG_V1).filter((key) => !later.has(key)).length +

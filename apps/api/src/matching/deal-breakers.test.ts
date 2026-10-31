@@ -50,7 +50,7 @@ const taller = { field: "height", accept: ["taller"], includeUnknown: true };
 describe("A deal-breaker the rule refuses is not stored", () => {
   test.for([
     [
-      "a third deal-breaker",
+      "one more deal-breaker than the config allows",
       [smoking, kids, { field: "monogamy", accept: ["monogamous"], includeUnknown: false }],
       400,
     ],
@@ -233,6 +233,8 @@ describe("deal-breakers", () => {
     ctx,
   }) => {
     const a = await signedInAccount(ctx.client);
+    // As migration 0092 leaves it: one on every field.
+    expect((await readDealBreakers(ctx.app, a.headers)).max).toBe(6);
     expect(
       (
         await answer(ctx.app, a.headers, {
