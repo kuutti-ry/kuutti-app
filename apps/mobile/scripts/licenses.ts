@@ -15,11 +15,12 @@
  * libraries the pods and gradle bring (folly, OkHttp, Fresco) are not in
  * node_modules and are not listed: #177's second list.
  *
- * Each package carries its copyright lines, its licence text and any NOTICE,
- * read from the directory the maps name (@kuutti/notices): Hermes bytecode
- * keeps no header comment, and MIT, ISC and BSD-3-Clause ask for the notice in
- * every copy (#416). A package that ships no licence file takes its row of
- * UPSTREAM below; a package with neither fails the run.
+ * Each package carries who provides it (#512), its copyright lines, its
+ * licence text and any NOTICE, read from the directory the maps name
+ * (@kuutti/notices): Hermes bytecode keeps no header comment, and MIT, ISC and
+ * BSD-3-Clause ask for the notice in every copy (#416). A package that ships
+ * no licence file takes its row of UPSTREAM below; a package with neither
+ * fails the run.
  *
  *   pnpm --filter mobile run licenses
  *

@@ -4,6 +4,7 @@
       "name": "@expo-google-fonts/material-symbols",
       "version": "0.4.47",
       "license": "MIT AND Apache-2.0",
+      "provider": "expo-google-fonts",
       "licences": [
         {
           "file": "LICENSE",
@@ -24,6 +25,7 @@
       "name": "@expo/cli",
       "version": "57.0.28",
       "license": "MIT",
+      "provider": "expo",
       "licences": [
         {
           "file": "LICENSE",
@@ -39,6 +41,7 @@
       "name": "@expo/metro-runtime",
       "version": "57.0.16",
       "license": "MIT",
+      "provider": "expo",
       "licences": [
         {
           "file": "LICENSE",
@@ -54,6 +57,7 @@
       "name": "@expo/ui",
       "version": "57.0.22",
       "license": "MIT",
+      "provider": "expo",
       "licences": [
         {
           "file": null,
@@ -70,6 +74,7 @@
       "name": "@formatjs/bigdecimal",
       "version": "0.2.7",
       "license": "MIT",
+      "provider": "formatjs",
       "licences": [
         {
           "file": "LICENSE.md",
@@ -85,6 +90,7 @@
       "name": "@formatjs/fast-memoize",
       "version": "3.1.7",
       "license": "MIT",
+      "provider": "formatjs",
       "licences": [
         {
           "file": "LICENSE.md",
@@ -100,6 +106,7 @@
       "name": "@formatjs/icu-messageformat-parser",
       "version": "3.5.18",
       "license": "MIT",
+      "provider": "formatjs",
       "licences": [
         {
           "file": "LICENSE.md",
@@ -115,6 +122,7 @@
       "name": "@formatjs/icu-skeleton-parser",
       "version": "2.1.11",
       "license": "MIT",
+      "provider": "formatjs",
       "licences": [
         {
           "file": "LICENSE.md",
@@ -130,6 +138,7 @@
       "name": "@formatjs/intl-displaynames",
       "version": "7.3.15",
       "license": "MIT",
+      "provider": "formatjs",
       "licences": [
         {
           "file": "LICENSE.md",
@@ -145,6 +154,7 @@
       "name": "@formatjs/intl-getcanonicallocales",
       "version": "3.2.12",
       "license": "MIT",
+      "provider": "formatjs",
       "licences": [
         {
           "file": "LICENSE.md",
@@ -160,6 +170,7 @@
       "name": "@formatjs/intl-locale",
       "version": "5.3.12",
       "license": "MIT",
+      "provider": "formatjs",
       "licences": [
         {
           "file": "LICENSE.md",
@@ -175,6 +186,7 @@
       "name": "@formatjs/intl-localematcher",
       "version": "0.9.0",
       "license": "MIT",
+      "provider": "formatjs",
       "licences": [
         {
           "file": "LICENSE.md",
@@ -190,6 +202,7 @@
       "name": "@formatjs/intl-pluralrules",
       "version": "6.3.15",
       "license": "MIT",
+      "provider": "formatjs",
       "licences": [
         {
           "file": "LICENSE.md",
@@ -205,6 +218,7 @@
       "name": "@formatjs/intl-supportedvaluesof",
       "version": "2.3.11",
       "license": "MIT",
+      "provider": "formatjs",
       "licences": [
         {
           "file": "LICENSE.md",
@@ -220,6 +234,7 @@
       "name": "@noble/hashes",
       "version": "2.4.0",
       "license": "MIT",
+      "provider": "noble",
       "licences": [
         {
           "file": "LICENSE",
@@ -235,6 +250,7 @@
       "name": "@radix-ui/react-compose-refs",
       "version": "1.1.5",
       "license": "MIT",
+      "provider": "radix-ui",
       "licences": [
         {
           "file": "LICENSE",
@@ -250,6 +266,7 @@
       "name": "@radix-ui/react-slot",
       "version": "1.3.3",
       "license": "MIT",
+      "provider": "radix-ui",
       "licences": [
         {
           "file": "LICENSE",
@@ -265,6 +282,7 @@
       "name": "@react-native-masked-view/masked-view",
       "version": "0.3.2",
       "license": "MIT",
+      "provider": "react-native-masked-view",
       "licences": [
         {
           "file": "LICENSE",
@@ -280,6 +298,7 @@
       "name": "@react-native/assets-registry",
       "version": "0.86.3",
       "license": "MIT",
+      "provider": "react-native",
       "licences": [
         {
           "file": null,
@@ -296,6 +315,7 @@
       "name": "@react-native/js-polyfills",
       "version": "0.86.3",
       "license": "MIT",
+      "provider": "react-native",
       "licences": [
         {
           "file": null,
@@ -320,6 +340,7 @@
       "name": "@react-native/normalize-colors",
       "version": "0.86.3",
       "license": "MIT",
+      "provider": "react-native",
       "licences": [
         {
           "file": null,
@@ -336,6 +357,7 @@
       "name": "@react-native/virtualized-lists",
       "version": "0.86.3",
       "license": "MIT",
+      "provider": "react-native",
       "licences": [
         {
           "file": null,
@@ -352,6 +374,7 @@
       "name": "@rn-primitives/dialog",
       "version": "1.5.2",
       "license": "MIT",
+      "provider": "rn-primitives",
       "licences": [
         {
           "file": "LICENSE",
@@ -367,6 +390,7 @@
       "name": "@rn-primitives/hooks",
       "version": "1.5.2",
       "license": "MIT",
+      "provider": "rn-primitives",
       "licences": [
         {
           "file": "LICENSE",
@@ -382,6 +406,7 @@
       "name": "@rn-primitives/label",
       "version": "1.5.2",
       "license": "MIT",
+      "provider": "rn-primitives",
       "licences": [
         {
           "file": "LICENSE",
@@ -397,6 +422,7 @@
       "name": "@rn-primitives/portal",
       "version": "1.5.3",
       "license": "MIT",
+      "provider": "rn-primitives",
       "licences": [
         {
           "file": "LICENSE",
@@ -412,6 +438,7 @@
       "name": "@rn-primitives/slot",
       "version": "1.5.2",
       "license": "MIT",
+      "provider": "rn-primitives",
       "licences": [
         {
           "file": "LICENSE",
@@ -427,6 +454,7 @@
       "name": "@rn-primitives/switch",
       "version": "1.5.2",
       "license": "MIT",
+      "provider": "rn-primitives",
       "licences": [
         {
           "file": "LICENSE",
@@ -442,6 +470,7 @@
       "name": "@sentry/browser",
       "version": "10.75.2",
       "license": "MIT",
+      "provider": "sentry",
       "licences": [
         {
           "file": "LICENSE",
@@ -457,6 +486,7 @@
       "name": "@sentry/browser-utils",
       "version": "10.75.2",
       "license": "MIT",
+      "provider": "sentry",
       "licences": [
         {
           "file": "LICENSE",
@@ -472,6 +502,7 @@
       "name": "@sentry/conventions",
       "version": "0.16.0",
       "license": "MIT",
+      "provider": "sentry",
       "licences": [
         {
           "file": "LICENSE",
@@ -487,6 +518,7 @@
       "name": "@sentry/core",
       "version": "10.75.2",
       "license": "MIT",
+      "provider": "sentry",
       "licences": [
         {
           "file": "LICENSE",
@@ -502,6 +534,7 @@
       "name": "@sentry/feedback",
       "version": "10.75.2",
       "license": "MIT",
+      "provider": "sentry",
       "licences": [
         {
           "file": "LICENSE",
@@ -517,6 +550,7 @@
       "name": "@sentry/react",
       "version": "10.75.2",
       "license": "MIT",
+      "provider": "sentry",
       "licences": [
         {
           "file": "LICENSE",
@@ -532,6 +566,7 @@
       "name": "@sentry/react-native",
       "version": "8.29.0",
       "license": "MIT",
+      "provider": "sentry",
       "licences": [
         {
           "file": "LICENSE.md",
@@ -547,6 +582,7 @@
       "name": "@sentry/replay",
       "version": "10.75.2",
       "license": "MIT",
+      "provider": "sentry",
       "licences": [
         {
           "file": "LICENSE",
@@ -562,6 +598,7 @@
       "name": "@sentry/replay-canvas",
       "version": "10.75.2",
       "license": "MIT",
+      "provider": "sentry",
       "licences": [
         {
           "file": "LICENSE",
@@ -577,6 +614,7 @@
       "name": "@ungap/structured-clone",
       "version": "1.4.0",
       "license": "ISC",
+      "provider": "ungap",
       "licences": [
         {
           "file": "LICENSE",
@@ -592,6 +630,7 @@
       "name": "abort-controller",
       "version": "3.0.0",
       "license": "MIT",
+      "provider": "Toru Nagashima",
       "licences": [
         {
           "file": "LICENSE",
@@ -607,6 +646,7 @@
       "name": "base64-js",
       "version": "1.5.1",
       "license": "MIT",
+      "provider": "T. Jameson Little",
       "licences": [
         {
           "file": "LICENSE",
@@ -622,6 +662,7 @@
       "name": "class-variance-authority",
       "version": "0.7.1",
       "license": "Apache-2.0",
+      "provider": "Joe Bell",
       "licences": [
         {
           "file": "LICENSE",
@@ -635,6 +676,7 @@
       "name": "clsx",
       "version": "2.1.1",
       "license": "MIT",
+      "provider": "Luke Edwards",
       "licences": [
         {
           "file": "license",
@@ -650,6 +692,7 @@
       "name": "color",
       "version": "4.2.3",
       "license": "MIT",
+      "provider": null,
       "licences": [
         {
           "file": "LICENSE",
@@ -665,6 +708,7 @@
       "name": "color-convert",
       "version": "2.0.1",
       "license": "MIT",
+      "provider": "Heather Arthur",
       "licences": [
         {
           "file": "LICENSE",
@@ -680,6 +724,7 @@
       "name": "color-name",
       "version": "1.1.4",
       "license": "MIT",
+      "provider": "DY",
       "licences": [
         {
           "file": "LICENSE",
@@ -695,6 +740,7 @@
       "name": "color-string",
       "version": "1.9.1",
       "license": "MIT",
+      "provider": "Heather Arthur",
       "licences": [
         {
           "file": "LICENSE",
@@ -710,6 +756,7 @@
       "name": "decode-uri-component",
       "version": "0.2.2",
       "license": "MIT",
+      "provider": "Sam Verschueren",
       "licences": [
         {
           "file": "license",
@@ -725,6 +772,7 @@
       "name": "escape-string-regexp",
       "version": "4.0.0",
       "license": "MIT",
+      "provider": "Sindre Sorhus",
       "licences": [
         {
           "file": "license",
@@ -740,6 +788,7 @@
       "name": "event-target-shim",
       "version": "5.0.1",
       "license": "MIT",
+      "provider": "Toru Nagashima",
       "licences": [
         {
           "file": "LICENSE",
@@ -755,6 +804,7 @@
       "name": "expo",
       "version": "57.0.27",
       "license": "MIT",
+      "provider": "Expo",
       "licences": [
         {
           "file": "LICENSE",
@@ -770,6 +820,7 @@
       "name": "expo-application",
       "version": "57.0.3",
       "license": "MIT",
+      "provider": "650 Industries, Inc.",
       "licences": [
         {
           "file": "LICENSE",
@@ -785,6 +836,7 @@
       "name": "expo-asset",
       "version": "57.0.19",
       "license": "MIT",
+      "provider": "650 Industries, Inc.",
       "licences": [
         {
           "file": "LICENSE",
@@ -800,6 +852,7 @@
       "name": "expo-constants",
       "version": "57.0.21",
       "license": "MIT",
+      "provider": "650 Industries, Inc.",
       "licences": [
         {
           "file": "LICENSE",
@@ -815,6 +868,7 @@
       "name": "expo-file-system",
       "version": "57.0.7",
       "license": "MIT",
+      "provider": "650 Industries, Inc.",
       "licences": [
         {
           "file": "LICENSE",
@@ -830,6 +884,7 @@
       "name": "expo-font",
       "version": "57.0.4",
       "license": "MIT",
+      "provider": "650 Industries, Inc.",
       "licences": [
         {
           "file": "LICENSE",
@@ -845,6 +900,7 @@
       "name": "expo-glass-effect",
       "version": "57.0.4",
       "license": "MIT",
+      "provider": "650 Industries, Inc.",
       "licences": [
         {
           "file": "LICENSE",
@@ -860,6 +916,7 @@
       "name": "expo-haptics",
       "version": "57.0.3",
       "license": "MIT",
+      "provider": "650 Industries, Inc.",
       "licences": [
         {
           "file": "LICENSE",
@@ -875,6 +932,7 @@
       "name": "expo-image",
       "version": "57.0.5",
       "license": "MIT",
+      "provider": "650 Industries, Inc.",
       "licences": [
         {
           "file": "LICENSE",
@@ -890,6 +948,7 @@
       "name": "expo-image-manipulator",
       "version": "57.0.21",
       "license": "MIT",
+      "provider": "650 Industries, Inc.",
       "licences": [
         {
           "file": "LICENSE",
@@ -905,6 +964,7 @@
       "name": "expo-image-picker",
       "version": "57.0.20",
       "license": "MIT",
+      "provider": "650 Industries, Inc.",
       "licences": [
         {
           "file": "LICENSE",
@@ -920,6 +980,7 @@
       "name": "expo-linking",
       "version": "57.0.12",
       "license": "MIT",
+      "provider": "650 Industries, Inc.",
       "licences": [
         {
           "file": "LICENSE",
@@ -935,6 +996,7 @@
       "name": "expo-local-authentication",
       "version": "57.0.3",
       "license": "MIT",
+      "provider": "650 Industries, Inc.",
       "licences": [
         {
           "file": "LICENSE",
@@ -950,6 +1012,7 @@
       "name": "expo-localization",
       "version": "57.0.2",
       "license": "MIT",
+      "provider": "650 Industries, Inc.",
       "licences": [
         {
           "file": "LICENSE",
@@ -965,6 +1028,7 @@
       "name": "expo-modules-core",
       "version": "57.0.21",
       "license": "MIT",
+      "provider": "650 Industries, Inc.",
       "licences": [
         {
           "file": "LICENSE",
@@ -980,6 +1044,7 @@
       "name": "expo-notifications",
       "version": "57.0.24",
       "license": "MIT",
+      "provider": "650 Industries, Inc.",
       "licences": [
         {
           "file": "LICENSE",
@@ -995,6 +1060,7 @@
       "name": "expo-router",
       "version": "57.0.25",
       "license": "MIT",
+      "provider": "650 Industries, Inc.",
       "licences": [
         {
           "file": null,
@@ -1019,6 +1085,7 @@
       "name": "expo-secure-store",
       "version": "57.0.4",
       "license": "MIT",
+      "provider": "650 Industries, Inc.",
       "licences": [
         {
           "file": "LICENSE",
@@ -1034,6 +1101,7 @@
       "name": "expo-status-bar",
       "version": "57.0.1",
       "license": "MIT",
+      "provider": "650 Industries, Inc.",
       "licences": [
         {
           "file": "LICENSE",
@@ -1049,6 +1117,7 @@
       "name": "expo-symbols",
       "version": "57.0.3",
       "license": "MIT",
+      "provider": "650 Industries, Inc.",
       "licences": [
         {
           "file": "LICENSE",
@@ -1064,6 +1133,7 @@
       "name": "expo-updates",
       "version": "57.0.25",
       "license": "MIT",
+      "provider": "650 Industries, Inc.",
       "licences": [
         {
           "file": null,
@@ -1080,6 +1150,7 @@
       "name": "fast-deep-equal",
       "version": "3.1.3",
       "license": "MIT",
+      "provider": "Evgeny Poberezkin",
       "licences": [
         {
           "file": "LICENSE",
@@ -1095,6 +1166,7 @@
       "name": "filter-obj",
       "version": "1.1.0",
       "license": "MIT",
+      "provider": "Sindre Sorhus",
       "licences": [
         {
           "file": "license",
@@ -1110,6 +1182,7 @@
       "name": "flow-enums-runtime",
       "version": "0.0.6",
       "license": "MIT",
+      "provider": null,
       "licences": [
         {
           "file": "LICENSE",
@@ -1125,6 +1198,7 @@
       "name": "html-parse-stringify",
       "version": "4.0.1",
       "license": "MIT",
+      "provider": "Henrik Joreteg",
       "licences": [
         {
           "file": "LICENSE",
@@ -1141,6 +1215,7 @@
       "name": "i18next",
       "version": "26.4.2",
       "license": "MIT",
+      "provider": "Jan Mühlemann",
       "licences": [
         {
           "file": "LICENSE",
@@ -1156,6 +1231,7 @@
       "name": "i18next-icu",
       "version": "2.5.0",
       "license": "MIT",
+      "provider": "Jan Mühlemann",
       "licences": [
         {
           "file": "LICENSE",
@@ -1171,6 +1247,7 @@
       "name": "intl-messageformat",
       "version": "11.2.15",
       "license": "BSD-3-Clause",
+      "provider": "Eric Ferraiuolo",
       "licences": [
         {
           "file": "LICENSE.md",
@@ -1186,6 +1263,7 @@
       "name": "invariant",
       "version": "2.2.4",
       "license": "MIT",
+      "provider": "Andres Suarez",
       "licences": [
         {
           "file": "LICENSE",
@@ -1201,6 +1279,7 @@
       "name": "is-arrayish",
       "version": "0.3.4",
       "license": "MIT",
+      "provider": "Qix",
       "licences": [
         {
           "file": "LICENSE",
@@ -1216,6 +1295,7 @@
       "name": "libphonenumber-js",
       "version": "1.13.15",
       "license": "MIT",
+      "provider": "catamphetamine",
       "licences": [
         {
           "file": "LICENSE",
@@ -1234,6 +1314,7 @@
       "name": "lucide-react-native",
       "version": "1.52.0",
       "license": "ISC",
+      "provider": "Eric Fennis",
       "licences": [
         {
           "file": "LICENSE",
@@ -1249,6 +1330,7 @@
       "name": "memoize-one",
       "version": "5.2.1",
       "license": "MIT",
+      "provider": "Alex Reardon",
       "licences": [
         {
           "file": "LICENSE",
@@ -1264,6 +1346,7 @@
       "name": "metro-runtime",
       "version": "0.84.5",
       "license": "MIT",
+      "provider": null,
       "licences": [
         {
           "file": null,
@@ -1280,6 +1363,7 @@
       "name": "nanoid",
       "version": "3.3.19",
       "license": "MIT",
+      "provider": "Andrey Sitnik",
       "licences": [
         {
           "file": "LICENSE",
@@ -1295,6 +1379,7 @@
       "name": "nativewind",
       "version": "4.2.7",
       "license": "MIT",
+      "provider": "Mark Lawlor",
       "licences": [
         {
           "file": "LICENSE",
@@ -1310,6 +1395,7 @@
       "name": "nullthrows",
       "version": "1.1.1",
       "license": "MIT",
+      "provider": "Andres Suarez",
       "licences": [
         {
           "file": "LICENSE",
@@ -1325,6 +1411,7 @@
       "name": "openapi-fetch",
       "version": "0.17.0",
       "license": "MIT",
+      "provider": "Drew Powers",
       "licences": [
         {
           "file": "LICENSE",
@@ -1340,6 +1427,7 @@
       "name": "promise",
       "version": "8.3.0",
       "license": "MIT",
+      "provider": "ForbesLindesay",
       "licences": [
         {
           "file": "LICENSE",
@@ -1355,6 +1443,7 @@
       "name": "query-string",
       "version": "7.1.3",
       "license": "MIT",
+      "provider": "Sindre Sorhus",
       "licences": [
         {
           "file": "license",
@@ -1370,6 +1459,7 @@
       "name": "react",
       "version": "19.3.0",
       "license": "MIT",
+      "provider": null,
       "licences": [
         {
           "file": "LICENSE",
@@ -1385,6 +1475,7 @@
       "name": "react-freeze",
       "version": "1.0.4",
       "license": "MIT",
+      "provider": null,
       "licences": [
         {
           "file": "LICENSE",
@@ -1400,6 +1491,7 @@
       "name": "react-i18next",
       "version": "17.0.16",
       "license": "MIT",
+      "provider": "Jan Mühlemann",
       "licences": [
         {
           "file": "LICENSE",
@@ -1415,6 +1507,7 @@
       "name": "react-is",
       "version": "19.3.0",
       "license": "MIT",
+      "provider": null,
       "licences": [
         {
           "file": "LICENSE",
@@ -1430,6 +1523,7 @@
       "name": "react-native",
       "version": "0.86.3",
       "license": "MIT",
+      "provider": null,
       "licences": [
         {
           "file": "LICENSE",
@@ -1445,6 +1539,7 @@
       "name": "react-native-css-interop",
       "version": "0.2.7",
       "license": "MIT",
+      "provider": "Mark Lawlor",
       "licences": [
         {
           "file": "LICENSE",
@@ -1460,6 +1555,7 @@
       "name": "react-native-is-edge-to-edge",
       "version": "1.3.1",
       "license": "MIT",
+      "provider": "Mathieu Acthernoene",
       "licences": [
         {
           "file": "LICENSE",
@@ -1475,6 +1571,7 @@
       "name": "react-native-reanimated",
       "version": "4.5.1",
       "license": "MIT",
+      "provider": "Krzysztof Magiera",
       "licences": [
         {
           "file": "LICENSE",
@@ -1490,6 +1587,7 @@
       "name": "react-native-safe-area-context",
       "version": "5.7.0",
       "license": "MIT",
+      "provider": "Janic Duplessis",
       "licences": [
         {
           "file": "LICENSE",
@@ -1505,6 +1603,7 @@
       "name": "react-native-screens",
       "version": "4.26.2",
       "license": "MIT",
+      "provider": "Krzysztof Magiera",
       "licences": [
         {
           "file": "LICENSE",
@@ -1520,6 +1619,7 @@
       "name": "react-native-svg",
       "version": "15.15.4",
       "license": "MIT",
+      "provider": null,
       "licences": [
         {
           "file": "LICENSE",
@@ -1535,6 +1635,7 @@
       "name": "react-native-worklets",
       "version": "0.10.1",
       "license": "MIT",
+      "provider": null,
       "licences": [
         {
           "file": "LICENSE",
@@ -1550,6 +1651,7 @@
       "name": "regenerator-runtime",
       "version": "0.13.11",
       "license": "MIT",
+      "provider": "Ben Newman",
       "licences": [
         {
           "file": "LICENSE",
@@ -1565,6 +1667,7 @@
       "name": "scheduler",
       "version": "0.27.0",
       "license": "MIT",
+      "provider": null,
       "licences": [
         {
           "file": "LICENSE",
@@ -1580,6 +1683,7 @@
       "name": "semver",
       "version": "7.8.5",
       "license": "ISC",
+      "provider": "GitHub Inc.",
       "licences": [
         {
           "file": "LICENSE",
@@ -1595,6 +1699,7 @@
       "name": "simple-swizzle",
       "version": "0.2.4",
       "license": "MIT",
+      "provider": "Qix",
       "licences": [
         {
           "file": "LICENSE",
@@ -1610,6 +1715,7 @@
       "name": "split-on-first",
       "version": "1.1.0",
       "license": "MIT",
+      "provider": "Sindre Sorhus",
       "licences": [
         {
           "file": "license",
@@ -1625,6 +1731,7 @@
       "name": "stacktrace-parser",
       "version": "0.1.11",
       "license": "MIT",
+      "provider": "Georg Tavonius",
       "licences": [
         {
           "file": "LICENSE",
@@ -1640,6 +1747,7 @@
       "name": "standard-navigation",
       "version": "0.0.5",
       "license": "MIT",
+      "provider": "Satyajit Sahoo",
       "licences": [
         {
           "file": null,
@@ -1656,6 +1764,7 @@
       "name": "strict-uri-encode",
       "version": "2.0.0",
       "license": "MIT",
+      "provider": "Kevin Mårtensson",
       "licences": [
         {
           "file": "license",
@@ -1671,6 +1780,7 @@
       "name": "tailwind-merge",
       "version": "3.7.0",
       "license": "MIT",
+      "provider": "Dany Castillo",
       "licences": [
         {
           "file": "LICENSE.md",
@@ -1686,6 +1796,7 @@
       "name": "use-sync-external-store",
       "version": "1.7.0",
       "license": "MIT",
+      "provider": null,
       "licences": [
         {
           "file": "LICENSE",
@@ -1701,6 +1812,7 @@
       "name": "warn-once",
       "version": "0.1.1",
       "license": "MIT",
+      "provider": "Satyajit Sahoo",
       "licences": [
         {
           "file": "LICENSE",
@@ -1716,6 +1828,7 @@
       "name": "whatwg-fetch",
       "version": "3.6.20",
       "license": "MIT",
+      "provider": null,
       "licences": [
         {
           "file": "LICENSE",
@@ -1731,6 +1844,7 @@
       "name": "whatwg-url-minimum",
       "version": "0.1.2",
       "license": "MIT",
+      "provider": "Phil Pluckthun",
       "licences": [
         {
           "file": "LICENSE.md",
@@ -1748,6 +1862,7 @@
       "name": "zod",
       "version": "4.6.7",
       "license": "MIT",
+      "provider": "Colin McDonnell",
       "licences": [
         {
           "file": "LICENSE",
@@ -1763,6 +1878,7 @@
       "name": "zustand",
       "version": "5.0.15",
       "license": "MIT",
+      "provider": "Paul Henschel",
       "licences": [
         {
           "file": "LICENSE",

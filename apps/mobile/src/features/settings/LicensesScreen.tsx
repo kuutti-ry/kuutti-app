@@ -8,15 +8,16 @@ import { LICENCES } from "./licences";
 import { licenseGroups } from "./license-families";
 import { SettingsPage } from "./SettingsPage";
 
-// Each package with its place in the list, which its own screen's link names.
-const GROUPS = licenseGroups(LICENCES.packages.map((entry, index) => ({ ...entry, index })));
+const GROUPS = licenseGroups(LICENCES.packages);
 
 /**
  * The packages whose code ships in this build, with their licences
  * (scripts/licenses.ts), in every build (#177, #287): in families by name,
  * each under a heading a screen reader can jump between (#376). Each package
- * is a row that opens its copyright lines and licence text (#416), its
- * version and licence heard as the row's value.
+ * is a row that opens nothing (#512), its name, then who provides it, its
+ * version and its licence, read together as one sentence; a package that
+ * names nobody has no provider. The texts the licences ask to go with every
+ * copy are behind the last row.
  */
 export function LicensesScreen() {
   const { t } = useT();
@@ -30,25 +31,28 @@ export function LicensesScreen() {
             {group.family ?? t("tech.licenses.other")}
           </Text>
           <RowGroup
-            rows={group.entries.map((entry) => {
-              const summary = t("tech.licenses.version", {
-                version: entry.version,
-                license: entry.license,
-              });
-              return {
-                key: `${entry.name}@${entry.version}`,
-                title: entry.name,
-                summary,
-                value: summary,
-                onPress: () => {
-                  tap();
-                  router.push(`/settings/licenses/${entry.index}`);
-                },
-              };
-            })}
+            rows={group.entries.map(({ name, provider, version, license }) => ({
+              key: `${name}@${version}`,
+              title: name,
+              summary: provider
+                ? t("tech.licenses.provided", { provider, version, license })
+                : t("tech.licenses.version", { version, license }),
+            }))}
           />
         </View>
       ))}
+      <RowGroup
+        rows={[
+          {
+            key: "texts",
+            title: t("tech.licenses.texts"),
+            onPress: () => {
+              tap();
+              router.push("/settings/licenses/texts");
+            },
+          },
+        ]}
+      />
     </SettingsPage>
   );
 }

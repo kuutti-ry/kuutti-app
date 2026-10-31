@@ -2,8 +2,8 @@
 
 export { FoundThemScreen } from "./FoundThemScreen";
 export { LicensesScreen } from "./LicensesScreen";
+export { LicenseTextsScreen } from "./LicenseTextsScreen";
 export { LockOfferScreen } from "./LockOfferScreen";
-export { PackageLicenseScreen } from "./PackageLicenseScreen";
 export { ScreenReaderHint } from "./ScreenReaderHint";
 export { SettingsScreen } from "./SettingsScreen";
 export { SupportScreen } from "./SupportScreen";

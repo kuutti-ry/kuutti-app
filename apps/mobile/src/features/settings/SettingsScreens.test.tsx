@@ -1,5 +1,5 @@
 import { CONSENT_VERSIONS } from "@kuutti/i18n";
-import { act, fireEvent, screen, waitFor } from "@testing-library/react-native";
+import { act, fireEvent, screen, waitFor, within } from "@testing-library/react-native";
 import { useLocales } from "expo-localization";
 import * as SecureStore from "expo-secure-store";
 import { DeviceEventEmitter, Linking, Platform, StyleSheet } from "react-native";
@@ -11,9 +11,9 @@ import { DeviceActions } from "./DeviceActions";
 import { LanguageChoices } from "./LanguageChoices";
 import { LegalSummary } from "./LegalSummary";
 import { LicensesScreen } from "./LicensesScreen";
+import { LicenseTextsScreen } from "./LicenseTextsScreen";
 import { LICENCES, type LicenceList } from "./licences";
 import { rememberOpenRow } from "./open-rows";
-import { PackageLicenseScreen } from "./PackageLicenseScreen";
 import { SettingsScreen } from "./SettingsScreen";
 import { SourcePanel } from "./SourcePanel";
 import { ThemeChoices } from "./ThemeChoices";
@@ -235,15 +235,9 @@ describe("the source code under its row", () => {
 });
 
 describe("the licences screen", () => {
-  it("lists the packages in families under headings, the rest last, each a row with its version and licence", async () => {
+  it("lists the packages in families under headings, the rest last", async () => {
     await renderWithTheme(<LicensesScreen />);
     expectPinnedHeader("Licences of the packages", "Back");
-    const expo = screen.getByRole("button", { name: "expo" });
-    expect(expo.props.accessibilityValue).toEqual({
-      text: expect.stringMatching(/^Version \d+\.\d+\.\d+, MIT$/),
-    });
-    // The version and licence are heard once, as the value, not again as a hint.
-    expect(expo.props.accessibilityHint).toBeUndefined();
     const headings = screen
       .getAllByRole("heading")
       .map((node) => node.props.children)
@@ -262,78 +256,247 @@ describe("the licences screen", () => {
     expect(at('"Expo"')).toBeLessThan(at('"expo-router"'));
     expect(at('"expo-router"')).toBeLessThan(at('"React Native"'));
     expect(at('"Other packages"')).toBeLessThan(at('"zod"'));
-    expect(screen.getAllByRole("button").length).toBe(LICENCES.packages.length + 1);
     noProblems();
   });
 
-  it("opens a package's licence by its place in the list (#416)", async () => {
+  it("reads each package as one row: its name, then who provides it, its version and licence (#512)", async () => {
+    await renderWithTheme(<LicensesScreen />);
+    const row = screen.getByLabelText("expo-router");
+    expect(row.props.accessible).toBe(true);
+    const sentence = /^650 Industries, Inc\., version \d+\.\d+\.\d+, MIT$/;
+    expect(row.props.accessibilityValue).toEqual({ text: expect.stringMatching(sentence) });
+    // Drawn as it is heard, under the name.
+    expect(within(row).getByText(sentence)).toBeTruthy();
+    expect(screen.getByLabelText("@expo/ui").props.accessibilityValue.text).toMatch(/^expo, /);
+    expect(LICENCES.packages.map((p) => screen.getAllByLabelText(p.name).length)).toEqual(
+      LICENCES.packages.map((p) => LICENCES.packages.filter((q) => q.name === p.name).length),
+    );
+  });
+
+  it("gives a package that names nobody no provider (#512)", async () => {
+    expect(LICENCES.packages.find((p) => p.name === "react")?.provider).toBeNull();
+    await renderWithTheme(<LicensesScreen />);
+    expect(screen.getByLabelText("react").props.accessibilityValue).toEqual({
+      text: expect.stringMatching(/^Version \d+\.\d+\.\d+, MIT$/),
+    });
+  });
+
+  it("opens nothing from a package and shows no licence text in the list (#512)", async () => {
+    await renderWithTheme(<LicensesScreen />);
+    // The way back and the one row to the texts are the only presses on the screen.
+    expect(screen.getAllByRole("button").map((node) => node.props.accessibilityLabel)).toEqual([
+      "Back",
+      "Licence texts",
+    ]);
+    expect(screen.queryByText(/hereby granted/)).toBeNull();
+    expect(screen.queryByText(/^Copyright/)).toBeNull();
+    expect(screen.queryByText(/^Licence \d/)).toBeNull();
+  });
+
+  it("opens the licence texts from one row, at the end of the list (#512)", async () => {
     const { __router: navigation } = jest.requireMock("expo-router") as {
       __router: { push: jest.Mock };
     };
     navigation.push.mockReset();
     await renderWithTheme(<LicensesScreen />);
-    await fireEvent.press(screen.getByRole("button", { name: "zod" }));
-    const at = LICENCES.packages.findIndex((p) => p.name === "zod");
-    expect(navigation.push).toHaveBeenCalledWith(`/settings/licenses/${at}`);
+    const flat = JSON.stringify(screen.toJSON());
+    const last = LICENCES.packages.at(-1)?.name;
+    expect(flat.indexOf(`"${last}"`)).toBeLessThan(flat.indexOf('"Licence texts"'));
+    noProblems();
+    await fireEvent.press(screen.getByRole("button", { name: "Licence texts" }));
+    expect(navigation.push).toHaveBeenCalledTimes(1);
+    expect(navigation.push).toHaveBeenCalledWith("/settings/licenses/texts");
   });
 
-  it("names the last family and the versions in the person's language", async () => {
-    store.set("kuutti.preference.locale", "fi");
-    await renderWithTheme(<LicensesScreen />);
-    expect(screen.getByRole("heading", { name: "Muut paketit" })).toBeTruthy();
-    expect(screen.getByRole("heading", { name: "Expo" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "zod" }).props.accessibilityValue.text).toMatch(
-      /^Versio /,
-    );
-  });
+  it.each([
+    ["fi", "Muut paketit", "Lisenssitekstit", /^Colin McDonnell, versio \d/, /^Versio \d/],
+    ["sv", "Övriga paket", "Licenstexter", /^Colin McDonnell, version \d/, /^Version \d/],
+  ])(
+    "speaks %s, the names and the licences as they are",
+    async (locale, other, texts, zod, react) => {
+      store.set("kuutti.preference.locale", locale);
+      await renderWithTheme(<LicensesScreen />);
+      expect(screen.getByRole("heading", { name: other })).toBeTruthy();
+      expect(screen.getByRole("heading", { name: "Expo" })).toBeTruthy();
+      expect(screen.getByRole("button", { name: texts })).toBeTruthy();
+      expect(screen.getByLabelText("zod").props.accessibilityValue.text).toMatch(zod);
+      expect(screen.getByLabelText("react").props.accessibilityValue.text).toMatch(react);
+    },
+  );
 });
 
-describe("a package's licence screen (#416)", () => {
-  const placeOf = (name: string) => LICENCES.packages.findIndex((p) => p.name === name);
+describe("the licence texts (#512)", () => {
+  const headings = () => screen.getAllByRole("heading").map((node) => node.props.children);
   const selectable = () =>
     screen
       .getAllByText(/./)
       .filter((node) => node.props.selectable)
       .map((node) => node.props.children);
+  const pkg = {
+    license: "MIT",
+    provider: null,
+    notices: [],
+  };
+  const list: LicenceList = {
+    packages: [
+      {
+        ...pkg,
+        name: "alpha",
+        version: "1.0.0",
+        licences: [
+          { file: "LICENSE", copyright: ["Copyright Alpha", "Copyright Friends"], text: "mit" },
+        ],
+      },
+      {
+        ...pkg,
+        name: "beta",
+        version: "2.0.0",
+        license: "MIT AND Apache-2.0",
+        licences: [
+          { file: "LICENSE", copyright: ["Copyright Beta"], text: "mit" },
+          { file: "LICENSE_FONT", copyright: [], text: "apache" },
+        ],
+      },
+      {
+        ...pkg,
+        name: "gamma",
+        version: "3.0.0",
+        licences: [
+          { file: "LICENSE", copyright: ["Copyright Gamma"], text: "mit" },
+          { file: "LICENSE-VENDORED", copyright: ["Copyright Vendor"], text: "mit" },
+        ],
+      },
+    ],
+    texts: { mit: ["Permission.", "As is."], apache: ["Apache License"] },
+  };
 
-  it("shows the copyright lines over the licence text, a paragraph each, every one selectable", async () => {
-    await renderWithTheme(<PackageLicenseScreen index={placeOf("intl-messageformat")} />);
-    expectPinnedHeader("intl-messageformat", "Back");
-    expect(screen.getByText(/^Version \d.*, BSD-3-Clause$/)).toBeTruthy();
-    expect(screen.getByRole("heading", { name: "Licence" })).toBeTruthy();
-    const texts = selectable();
-    expect(texts.slice(1, 3)).toEqual([
-      "Copyright (c) 2023, Oath Inc.",
-      "Licensed under the terms of the New BSD license. See below for terms.",
+  it("shows each text once, in the order the packages first name it, the packages under it", async () => {
+    await renderWithTheme(<LicenseTextsScreen list={list} />);
+    expectPinnedHeader("Licence texts", "Back");
+    expect(headings()).toEqual(["Licence texts", "Licence 1", "Packages", "Licence 2", "Packages"]);
+    expect(selectable()).toEqual([
+      "Permission.",
+      "As is.",
+      "alpha 1.0.0",
+      "Copyright Alpha",
+      "Copyright Friends",
+      "beta 2.0.0",
+      "Copyright Beta",
+      // Twice under the one text: each of its licences has its own lines.
+      "gamma 3.0.0",
+      "Copyright Gamma",
+      "gamma 3.0.0",
+      "Copyright Vendor",
+      "Apache License",
+      "beta 2.0.0",
     ]);
-    expect(texts).toContain(
-      "- Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following disclaimer in the documentation and/or other materials provided with the distribution.",
-    );
-    expect(screen.queryByText(/carries no licence file/)).toBeNull();
     noProblems();
   });
 
-  it("gives each of several licences a heading of its own, a whole text as its file has it", async () => {
-    await renderWithTheme(
-      <PackageLicenseScreen index={placeOf("@expo-google-fonts/material-symbols")} />,
-    );
-    expect(screen.getAllByRole("heading").map((node) => node.props.children)).toEqual([
-      "@expo-google-fonts/material-symbols",
+  it("shows each NOTICE once with the packages that ship it, last, and nothing for a text the list lacks", async () => {
+    const noticed: LicenceList = {
+      packages: [
+        {
+          ...pkg,
+          name: "first",
+          version: "1.0.0",
+          licences: [{ file: "LICENSE", copyright: [], text: "gone" }],
+          notices: ["n1"],
+        },
+        {
+          ...pkg,
+          name: "second",
+          version: "2.0.0",
+          licences: [{ file: "LICENSE", copyright: [], text: "gone" }],
+          notices: ["n1", "n2"],
+        },
+      ],
+      texts: { n1: ["Noticed", "---", "Copyright 2026 Someone", "---"], n2: ["Also noticed"] },
+    };
+    await renderWithTheme(<LicenseTextsScreen list={noticed} />);
+    expect(headings()).toEqual([
+      "Licence texts",
       "Licence 1",
-      "Licence 2",
+      "Packages",
+      "Notice",
+      "Packages",
+      "Notice",
+      "Packages",
     ]);
-    expect(screen.getByText("Copyright (c) 2020 Expo")).toBeTruthy();
-    expect(
-      screen.getByText(
-        "Apache License\nVersion 2.0, January 2004\nhttp://www.apache.org/licenses/",
-      ),
-    ).toBeTruthy();
+    // A repeated paragraph is shown each time, under a key of its own.
+    expect(selectable()).toEqual([
+      "first 1.0.0",
+      "second 2.0.0",
+      "Noticed",
+      "---",
+      "Copyright 2026 Someone",
+      "---",
+      "first 1.0.0",
+      "second 2.0.0",
+      "Also noticed",
+      "second 2.0.0",
+    ]);
+  });
+
+  it("carries every text of this build once, a paragraph each, and every package's copyright lines", async () => {
+    await renderWithTheme(<LicenseTextsScreen />);
+    const distinct = Object.keys(LICENCES.texts);
+    expect(headings().filter((name) => /^Licence \d/.test(name))).toHaveLength(distinct.length);
+    const shown = selectable();
+    const expected = [
+      ...Object.values(LICENCES.texts).flat(),
+      ...LICENCES.packages.flatMap((p) => [
+        ...p.licences.map(() => `${p.name} ${p.version}`),
+        ...p.licences.flatMap((l) => l.copyright),
+        ...p.licences.flatMap((l) =>
+          l.from
+            ? `The package carries no licence file of its own; the lines and the text above are from its upstream repository. Address: ${l.from}`
+            : [],
+        ),
+      ]),
+    ];
+    expect([...shown].sort()).toEqual(expected.sort());
+    expect(shown).toContain(
+      "- Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following disclaimer in the documentation and/or other materials provided with the distribution.",
+    );
+    expect(shown).toContain(
+      "Apache License\nVersion 2.0, January 2004\nhttp://www.apache.org/licenses/",
+    );
+    noProblems();
   });
 
   it("says where upstream has the lines and the text of a package that ships none", async () => {
-    await renderWithTheme(<PackageLicenseScreen index={placeOf("expo-router")} />);
+    const upstream: LicenceList = {
+      packages: [
+        {
+          ...pkg,
+          name: "bare",
+          version: "1.0.0",
+          licences: [
+            { file: "LICENSE", copyright: ["Copyright Bare"], text: "mit" },
+            {
+              file: null,
+              copyright: ["Copyright Upstream"],
+              text: "mit",
+              from: "https://example.invalid/LICENSE",
+            },
+          ],
+        },
+      ],
+      texts: list.texts,
+    };
+    await renderWithTheme(<LicenseTextsScreen list={upstream} />);
+    expect(screen.getAllByText(/^The package carries no licence file of its own/)).toHaveLength(1);
+    const texts = screen.getAllByText(/./).map((node) => node.props.children);
+    expect(texts.slice(texts.indexOf("Copyright Upstream"))).toEqual([
+      "Copyright Upstream",
+      "The package carries no licence file of its own; the lines and the text above are from its upstream repository. Address: https://example.invalid/LICENSE",
+    ]);
+  });
+
+  it("says it of this build's expo-router, one note for each of its two licences", async () => {
+    await renderWithTheme(<LicenseTextsScreen />);
     expect(screen.getByText("Copyright (c) 2017 React Navigation Contributors")).toBeTruthy();
-    expect(screen.getAllByText(/^The package carries no licence file of its own/)).toHaveLength(2);
     expect(
       screen.getByText(
         /Address: https:\/\/github\.com\/expo\/expo\/blob\/[0-9a-f]{40}\/packages\/expo-router\/src\/react-navigation\/LICENCE$/,
@@ -341,50 +504,21 @@ describe("a package's licence screen (#416)", () => {
     ).toBeTruthy();
   });
 
-  it("shows a NOTICE under its own heading, and nothing for a text the list lacks", async () => {
-    const list: LicenceList = {
-      packages: [
-        {
-          name: "noticed",
-          version: "1.0.0",
-          license: "Apache-2.0",
-          licences: [{ file: "LICENSE", copyright: [], text: "gone" }],
-          notices: ["n1"],
-        },
-      ],
-      texts: { n1: ["Noticed", "---", "Copyright 2026 Someone", "---"] },
-    };
-    await renderWithTheme(<PackageLicenseScreen index={0} list={list} />);
-    expect(screen.getAllByRole("heading").map((node) => node.props.children)).toEqual([
-      "noticed",
-      "Licence",
-      "Notice",
-    ]);
-    // A repeated paragraph is shown each time, under a key of its own.
-    expect(selectable()).toEqual([
-      "Version 1.0.0, Apache-2.0",
-      "Noticed",
-      "---",
-      "Copyright 2026 Someone",
-      "---",
-    ]);
-  });
-
-  it.each([-1, LICENCES.packages.length])(
-    "says so for a place %i that has no package",
-    async (index) => {
-      await renderWithTheme(<PackageLicenseScreen index={index} />);
-      expectPinnedHeader("Licences of the packages", "Back");
-      expect(screen.getByText("This build's list has no such package.")).toBeTruthy();
+  it.each([
+    ["fi", "Lisenssitekstit", "Lisenssi 1", "Paketit", "Huomautukset"],
+    ["sv", "Licenstexter", "Licens 1", "Paket", "Meddelanden"],
+  ])(
+    "names its headings in %s, the texts as written",
+    async (locale, title, first, packages, notice) => {
+      store.set("kuutti.preference.locale", locale);
+      const licence = { file: "LICENSE", copyright: [], text: "mit" };
+      const one = { ...pkg, name: "n", version: "1.0.0", licences: [licence], notices: ["apache"] };
+      await renderWithTheme(<LicenseTextsScreen list={{ ...list, packages: [one] }} />);
+      expect(headings()).toEqual([title, first, packages, notice, packages]);
+      expect(screen.getByText("Permission.")).toBeTruthy();
+      expect(screen.getByText("Apache License")).toBeTruthy();
     },
   );
-
-  it("names its headings in the person's language, the texts as written", async () => {
-    store.set("kuutti.preference.locale", "fi");
-    await renderWithTheme(<PackageLicenseScreen index={placeOf("zod")} />);
-    expect(screen.getByRole("heading", { name: "Lisenssi" })).toBeTruthy();
-    expect(screen.getByText(/^Permission is hereby granted/)).toBeTruthy();
-  });
 });
 
 describe("this device, under its row", () => {

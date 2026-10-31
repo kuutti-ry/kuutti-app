@@ -29,7 +29,7 @@ import RoundRoute from "../app/round";
 import FoundThemRoute from "../app/settings/found-them";
 import SettingsRoute from "../app/settings/index";
 import LicensesRoute from "../app/settings/licenses";
-import PackageLicenseRoute from "../app/settings/licenses/[id]";
+import LicenseTextsRoute from "../app/settings/licenses/texts";
 import SupportRoute from "../app/settings/support";
 import TechRoute from "../app/tech";
 
@@ -127,8 +127,8 @@ jest.mock("@/features/settings", () => {
   return {
     FoundThemScreen: probe("FoundThemScreen"),
     LicensesScreen: probe("LicensesScreen"),
+    LicenseTextsScreen: probe("LicenseTextsScreen"),
     LockOfferScreen: probe("LockOfferScreen"),
-    PackageLicenseScreen: probe("PackageLicenseScreen"),
     ScreenReaderHint: probe("ScreenReaderHint"),
     SettingsScreen: probe("SettingsScreen"),
     SupportScreen: probe("SupportScreen"),
@@ -177,6 +177,7 @@ describe("the screens without params", () => {
     ["/settings", SettingsRoute, "SettingsScreen"],
     ["/settings/found-them", FoundThemRoute, "FoundThemScreen"],
     ["/settings/licenses", LicensesRoute, "LicensesScreen"],
+    ["/settings/licenses/texts", LicenseTextsRoute, "LicenseTextsScreen"],
     ["/settings/support", SupportRoute, "SupportScreen"],
     ["/tech", TechRoute, "TechConfigScreen"],
   ] as const)("%s renders its screen, with nothing to hand it", async (_path, Route, name) => {
@@ -192,23 +193,6 @@ describe("the screens without params", () => {
   it("sends a link it has no screen for to the start", async () => {
     await render(<NotFoundRoute />);
     expect(screen.getByTestId("Redirect").props.children).toBe("/");
-  });
-});
-
-describe("a package's licence, /settings/licenses/[id] (#416)", () => {
-  it.each([
-    ["its place", { id: "7" }, 7],
-    ["the first", { id: "0" }, 0],
-    ["the first of a repeated place", { id: ["3", "4"] }, 3],
-    ["no place, without one", {}, -1],
-    ["no place for a word", { id: "zod" }, -1],
-    ["no place for a fraction", { id: "1.5" }, -1],
-    ["no place for a negative", { id: "-2" }, -1],
-    ["no place for an empty one", { id: "" }, -1],
-  ] as const)("hands the screen %s", async (_what, given, index) => {
-    params(given);
-    await render(<PackageLicenseRoute />);
-    expect(propsOf("PackageLicenseScreen")).toEqual({ index });
   });
 });
 
