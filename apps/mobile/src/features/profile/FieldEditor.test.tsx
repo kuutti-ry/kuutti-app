@@ -107,7 +107,7 @@ describe("FieldEditor: what the card shows (#515)", () => {
     ["languages", { languages: ["fi"] }, USED],
     ["monogamy", { monogamy: "monogamous" }, USED],
     ["hobbies", { hobbies: ["sauna"] }, NOT_USED],
-    ["height", { height: 171 }, NOT_USED],
+    ["height", { height: 171 }, USED],
     ["politics", { politics: ["vas"] }, NOT_USED],
     ["religion", { religion: "atheist" }, NOT_USED],
     ["occupationTitle", { occupationTitle: "Nurse" }, NOT_USED],

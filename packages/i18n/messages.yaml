@@ -587,7 +587,7 @@ profile.hide.showLabel:
 
 profile.hide.hidden:
   en: "Hidden from your card."
-  description: "Under the title of a hidden answer that nothing in matching reads, such as height or religion (#515). It must not say matching uses it: it does not."
+  description: "Under the title of a hidden answer that nothing in matching reads, such as a hobby or religion (#515). It must not say matching uses it: it does not."
   fi: "Piilotettu kortiltasi."
   sv: "Dolt från ditt kort."
   machine: { fi: true, sv: true }

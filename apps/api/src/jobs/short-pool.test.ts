@@ -736,6 +736,24 @@ describe("a deal-breaker on height through the night (#508)", () => {
     expect(byPerson.get(tall)?.notAnswered).toEqual([]);
   });
 
+  test("a height hidden from the card is compared all the same (#515)", async ({ ctx }) => {
+    const { a, tall, same, open } = await taller(ctx, "test-height-hidden");
+    await hidden(ctx.client, [tall, same], "height");
+    await buildRounds(await deps(ctx.client));
+
+    const hers = (await roundOf(ctx.client, a)).map((e) => e.candidate_id);
+    expect(new Set(hers)).toEqual(new Set([tall, open]));
+
+    const app = await appAt(ctx.client);
+    const { headers } = await signInAs(ctx.client, a);
+    const { entries } = await readToday(app, headers);
+    const byPerson = new Map(
+      (await roundOf(ctx.client, a)).map((e, index) => [e.candidate_id, entries?.[index]]),
+    );
+    // The card says nothing of it, as of one not given (ADR-042 §8).
+    expect(byPerson.get(tall)?.notAnswered).toEqual(["height"]);
+  });
+
   test("a short round offers to set it aside for the day", async ({ ctx }) => {
     const { a, same } = await taller(ctx, "test-height-relaxed");
     await buildRounds(await deps(ctx.client));
