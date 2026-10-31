@@ -32,9 +32,9 @@ import {
   DEMO_PERSONAS,
   DemoCommandError,
   describeTarget,
+  openPonds,
 } from "@kuutti/db/demo";
 import { hmacKeyFromHex } from "../src/identity/index.ts";
-import { countGates } from "../src/jobs/pond-gate.ts";
 import { takeSnapshot } from "../src/jobs/waitlist-snapshot.ts";
 import { loadConfig } from "../src/lib/config.ts";
 import { createLogger } from "../src/lib/logger.ts";
@@ -121,9 +121,9 @@ try {
   await pool.query("DELETE FROM waitlist_snapshot");
   const counted = await takeSnapshot({ db: pool, logger, now });
   console.log(JSON.stringify({ msg: "demo stories: counter recounted", ...counted }));
-  const gates = await countGates({ db: pool, logger, now });
-  console.log(JSON.stringify({ msg: "demo stories: gates counted", ...gates }));
-  // Iida's round for the day (#379), once the gates are counted; told before, it stays.
+  const opened = await openPonds(pool);
+  console.log(JSON.stringify({ msg: "demo stories: ponds opened", opened }));
+  // Iida's round for the day (#379), once her pond is open; told before, it stays.
   const rounds = await giveRounds({ db: pool, logger, now }, results);
   console.log(JSON.stringify({ msg: "demo stories: rounds", ...rounds }));
 } catch (error) {

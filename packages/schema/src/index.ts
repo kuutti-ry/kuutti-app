@@ -17,6 +17,7 @@ export * from "./matching.ts";
 export * from "./media.ts";
 export * from "./notifications.ts";
 export * from "./onboarding.ts";
+export * from "./ponds-admin.ts";
 export * from "./profile.ts";
 export * from "./profile-fields.ts";
 export * from "./report.ts";

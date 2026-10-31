@@ -502,7 +502,7 @@ export const HiddenField = z
 export type HiddenField = z.infer<typeof HiddenField>;
 
 /**
- * The optional fields as the screens after the gate ask them, one per
+ * The optional fields as the screens after onboarding ask them, one per
  * screen with "Ask me later", in the field sheet's order (#148, TD-16).
  * Intent and the identity label are onboarding's; a companion field shares
  * its screen with the one it belongs to.

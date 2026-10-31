@@ -26,7 +26,7 @@ import {
   sessionStore,
   wellKnownRoutes,
 } from "./identity/index.ts";
-import { gateOf } from "./jobs/pond-gate.ts";
+import { isComplete, matchingStatusOf } from "./jobs/pool.ts";
 import { buildRoundOf, relaxationOffers, relaxedCandidates } from "./jobs/round-builder.ts";
 import { requireAdmin } from "./lib/admin-middleware.ts";
 import { requireSession } from "./lib/auth-middleware.ts";
@@ -51,7 +51,7 @@ import { serverRequestId } from "./lib/request-id.ts";
 import { preferencesRoutes, readPreferences, roundRoutes } from "./matching/index.ts";
 import { type MediaDeps, photoAdminRoutes, photoRoutes, UPLOAD_ROUTE } from "./media/index.ts";
 import { createPush, notificationRoutes, type Push } from "./notifications/index.ts";
-import { pondRoutes } from "./pond/index.ts";
+import { pondAdminRoutes, pondRoutes } from "./pond/index.ts";
 import { buildCard, exportProfile, profileRoutes } from "./profile/index.ts";
 import { invitationRoutes } from "./rewards/index.ts";
 import {
@@ -246,7 +246,12 @@ export function createApp(deps: Deps) {
   // What a person chose to be notified of, and the notices in the app (#176, ADR-032).
   app.route("/", notificationRoutes(deps, guard));
   // Invitations and the reward they earn (#107, ADR-044).
-  app.route("/", invitationRoutes(deps, guard));
+  app.route(
+    "/",
+    invitationRoutes(deps, guard, (db, accountId) =>
+      isComplete(db, accountId, deps.now?.() ?? new Date()),
+    ),
+  );
   // The chat's live sockets (#349): who is in the app now, which the push asks too.
   const live =
     deps.live ??
@@ -308,11 +313,12 @@ export function createApp(deps: Deps) {
   app.route("/", accountAdminRoutes(deps, moderators));
   app.route("/", auditAdminRoutes(deps, admins));
   app.route("/", staffAdminRoutes(deps, admins));
-  // The gate's count reads across slices and lives with the jobs; the pond's route is handed it.
+  app.route("/", pondAdminRoutes(deps, admins));
+  // Completeness reads across slices and lives with the jobs; the pond's route is handed it.
   app.route(
     "/",
     pondRoutes(deps, guard, (accountId) =>
-      gateOf({ db: deps.db, logger: deps.logger, now: () => new Date() }, accountId),
+      matchingStatusOf({ db: deps.db, now: deps.now ?? (() => new Date()) }, accountId),
     ),
   );
   const builderDeps = () => ({

@@ -1,6 +1,6 @@
 import { type Queryable, SEED_PONDS } from "@kuutti/db";
 // biome-ignore lint/style/noRestrictedImports: a test of the builder over the synthetic population (#95); nothing of it is bundled
-import { generatePopulation, writePopulation } from "@kuutti/db/demo";
+import { generatePopulation, openPonds, writePopulation } from "@kuutti/db/demo";
 import { CONSENT_VERSIONS } from "@kuutti/i18n";
 import { type ProfileFields, RoundResponse } from "@kuutti/schema";
 import { type App, createApp } from "../app.ts";
@@ -8,6 +8,7 @@ import { CURRENT_CONSENT_VERSIONS, eraseAccount } from "../identity/index.ts";
 import { finnishDay } from "../lib/finnish-day.ts";
 import { exportRounds, inEachOthersPool, saveRound } from "../matching/index.ts";
 import { signInAs } from "../test/account.ts";
+import { cardShown } from "../test/cards.ts";
 import {
   captureLogger,
   describe,
@@ -16,14 +17,15 @@ import {
   test,
   testConfig,
 } from "../test/harness.ts";
-import { type PeopleOptions, people, pondNamed } from "../test/people.ts";
-import { countGates } from "./pond-gate.ts";
+import { openPond, type PeopleOptions, people, pondNamed } from "../test/people.ts";
+import { openPondIds, subjectsOfPond } from "./pool.ts";
 import { buildRoundOf, buildRounds, roundsJob } from "./round-builder.ts";
 
 // The round builder (#95, ADR-035, features/matching/rounds.feature): who
 // gets a round and whom it holds, the cooldowns, a conversation, the night
-// and the day's first read, and the whole synthetic population. The order's
-// rule alone is matching/round-order.test.ts.
+// and the day's first read, a block and a deal-breaker across the pond, and
+// the whole synthetic population. The order's rule alone is
+// matching/round-order.test.ts.
 
 /** 04:00 in Helsinki: the night of 2026-10-20. */
 const NIGHT = new Date("2026-10-20T01:00:00.000Z");
@@ -50,31 +52,12 @@ async function setConfig(db: Queryable, key: string, value: unknown) {
   );
 }
 
-/** Where the gate stands for these people: matching open, let in only, or waiting in the line. */
-async function gated(
-  db: Queryable,
-  pondId: string,
-  ids: readonly string[],
-  state: "open" | "admitted" | "waiting",
-) {
-  await db.query(
-    `INSERT INTO gate (account_id, pond_id, admitted_at, place_said, opened_at, counted_at)
-     SELECT id, $2,
-            CASE WHEN $3 <> 'waiting' THEN $4::timestamptz END,
-            CASE WHEN $3 = 'waiting' THEN 10 END,
-            CASE WHEN $3 = 'open' THEN $4::timestamptz END,
-            $4
-       FROM unnest($1::uuid[]) AS id`,
-    [ids, pondId, state, new Date(NIGHT.getTime() - 24 * 3600 * 1000)],
-  );
-}
-
-/** A pond, `women` women and `men` men in it, everybody's matching open. */
+/** An open pond, `women` women and `men` men in it. */
 async function pondOf(ctx: TestContext, slug: string, women: number, men: number) {
   const pond = await pondNamed(ctx.client, slug);
+  await openPond(ctx.client, pond);
   const her = await people(ctx.client, pond, women, WOMEN);
   const him = await people(ctx.client, pond, men, MEN);
-  await gated(ctx.client, pond, [...her, ...him], "open");
   return { pond, women: her, men: him };
 }
 
@@ -144,38 +127,50 @@ async function readToday(app: App, db: Queryable, accountId: string): Promise<Ro
   return RoundResponse.parse(await answer.json());
 }
 
+/** A block through the route, as a person sets one from a card they were shown. */
+async function blocks(app: App, db: Queryable, blocker: string, blocked: string) {
+  await cardShown(db, blocker, blocked);
+  const who = await signInAs(db, blocker);
+  const response = await app.request("/blocks", {
+    method: "POST",
+    headers: { ...who.headers, "content-type": "application/json" },
+    body: JSON.stringify({ accountId: blocked }),
+  });
+  expect(response.status).toBe(204);
+}
+
 describe("who gets a round", () => {
-  test("Everybody whose matching has opened gets a round for the day, and nobody else", async ({
+  test("Everybody complete in an open pond gets a round for the day, and nobody else", async ({
     ctx,
   }) => {
-    const pond = await pondNamed(ctx.client, "test-rounds-who");
-    const [a, b, c] = await people(ctx.client, pond, 3, WOMEN);
-    const men = await people(ctx.client, pond, 2, MEN);
+    const { pond, women, men } = await pondOf(ctx, "test-rounds-who", 1, 2);
+    const [a] = women;
+    const [b] = await people(ctx.client, pond, 1, WOMEN);
+    const closed = await pondNamed(ctx.client, "test-rounds-who-closed");
+    const [c] = await people(ctx.client, closed, 1, WOMEN);
+    await people(ctx.client, closed, 1, MEN);
     if (!a || !b || !c) throw new Error("people not written");
-    await gated(ctx.client, pond, [a, ...men], "open");
-    await gated(ctx.client, pond, [b], "admitted");
-    await gated(ctx.client, pond, [c], "waiting");
+    await ctx.client.query("DELETE FROM photo WHERE account_id = $1", [b]);
 
     const result = await buildRounds(await deps(ctx.client));
 
     expect(candidates(await roundOf(ctx.client, a)).sort()).toEqual([...men].sort());
     expect(await roundOf(ctx.client, b)).toBeNull();
     expect(await roundOf(ctx.client, c)).toBeNull();
-    // A's two cards, and each man's two: A and B, who is let in; C, waiting, is nobody's card.
+    // A's two cards, and each man's one: A; B, with no photos, is nobody's card.
     // How many, never whose.
-    expect(result).toEqual({ ponds: 1, built: 3, cards: 6, failed: 0 });
+    expect(result).toEqual({ ponds: 1, built: 3, cards: 4, failed: 0 });
   });
 
-  test("Somebody hidden from others, or not let in, is nobody's card", async ({ ctx }) => {
+  test("Somebody hidden from others, or not complete, is nobody's card", async ({ ctx }) => {
     const { pond, women } = await pondOf(ctx, "test-rounds-hidden", 1, 1);
     const [a] = women;
     if (!a) throw new Error("people not written");
     const [b] = await people(ctx.client, pond, 1, { ...MEN });
     const [c] = await people(ctx.client, pond, 1, { ...MEN });
     if (!b || !c) throw new Error("people not written");
-    await gated(ctx.client, pond, [b], "open");
     await ctx.client.query("UPDATE account SET state = 'shadow_banned' WHERE id = $1", [b]);
-    // C is complete but was never counted: no row at the gate.
+    await ctx.client.query("DELETE FROM photo WHERE account_id = $1", [c]);
 
     await buildRounds(await deps(ctx.client));
 
@@ -187,18 +182,16 @@ describe("who gets a round", () => {
     expect(candidates(await roundOf(ctx.client, b))).toEqual([a]);
   });
 
-  test("a person in another pond, or whose matching opened in a pond they left, gets nothing from this one", async ({
+  test("a person of another pond is nobody's card here, and that pond's switch is its own", async ({
     ctx,
   }) => {
-    const { pond, women } = await pondOf(ctx, "test-rounds-here", 1, 1);
+    const { women } = await pondOf(ctx, "test-rounds-here", 1, 1);
     const elsewhere = await pondNamed(ctx.client, "test-rounds-elsewhere");
-    const [moved] = await people(ctx.client, elsewhere, 1, MEN);
-    if (!moved) throw new Error("people not written");
-    // Opened in the first pond, then moved: the row is of a pond the person left.
-    await gated(ctx.client, pond, [moved], "open");
+    const [them] = await people(ctx.client, elsewhere, 1, MEN);
+    if (!them) throw new Error("people not written");
     await buildRounds(await deps(ctx.client));
-    expect(await roundOf(ctx.client, moved)).toBeNull();
-    expect(candidates(await roundOf(ctx.client, women[0] ?? ""))).not.toContain(moved);
+    expect(await roundOf(ctx.client, them)).toBeNull();
+    expect(candidates(await roundOf(ctx.client, women[0] ?? ""))).not.toContain(them);
   });
 
   test("Nobody to show makes an empty round, never a filler", async ({ ctx }) => {
@@ -207,7 +200,7 @@ describe("who gets a round", () => {
     // A man who seeks men only: in the pond, not in A's pool.
     const [b] = await people(ctx.client, pond, 1, { ...MEN, seeks: ["man"] });
     if (!a || !b) throw new Error("people not written");
-    await gated(ctx.client, pond, [a, b], "open");
+    await openPond(ctx.client, pond);
 
     await buildRounds(await deps(ctx.client));
 
@@ -234,7 +227,7 @@ describe("whom a round holds", () => {
     }
     const [two, one, none] = chosen;
     if (!a || !two || !one || !none) throw new Error("people not written");
-    await gated(ctx.client, pond, [a, two, one, none], "open");
+    await openPond(ctx.client, pond);
 
     await buildRounds(await deps(ctx.client));
 
@@ -308,7 +301,7 @@ describe("whom a round holds", () => {
     const [same] = await people(ctx.client, pond, 1, { ...MEN, fields: { field: ["tech"] } });
     const [apart] = await people(ctx.client, pond, 1, { ...MEN, fields: { field: ["health"] } });
     if (!a || !same || !apart) throw new Error("people not written");
-    await gated(ctx.client, pond, [a, same, apart], "open");
+    await openPond(ctx.client, pond);
 
     await buildRounds(await deps(ctx.client));
 
@@ -347,11 +340,10 @@ describe("when a round is built", () => {
     const [a] = await people(ctx.client, pond, 1, WOMEN);
     const men = await people(ctx.client, pond, 2, MEN);
     if (!a) throw new Error("people not written");
-    await gated(ctx.client, pond, men, "admitted");
     await buildRounds(await deps(ctx.client));
     expect(await roundOf(ctx.client, a)).toBeNull();
-    // A's matching opens after the night, at a first ask.
-    await gated(ctx.client, pond, [a], "open");
+    // The pond opens after the night.
+    await openPond(ctx.client, pond);
 
     const app = await appAt(ctx.client, NOON);
     const first = await readToday(app, ctx.client, a);
@@ -368,9 +360,8 @@ describe("when a round is built", () => {
   test("A person whose matching has not opened reads no round", async ({ ctx }) => {
     const pond = await pondNamed(ctx.client, "test-rounds-closed");
     const [a] = await people(ctx.client, pond, 1, WOMEN);
-    const men = await people(ctx.client, pond, 2, MEN);
+    await people(ctx.client, pond, 2, MEN);
     if (!a) throw new Error("people not written");
-    await gated(ctx.client, pond, [a, ...men], "admitted");
 
     const read = await readToday(await appAt(ctx.client, NOON), ctx.client, a);
 
@@ -462,7 +453,7 @@ describe("when a round is built", () => {
     expect(candidates(await roundOf(ctx.client, a))).toEqual([b]);
   });
 
-  test("nobody's round is built whose profile is no longer complete, though their gate is open", async ({
+  test("nobody's round is built whose profile is no longer complete, though their pond is open", async ({
     ctx,
   }) => {
     const { women } = await pondOf(ctx, "test-rounds-incomplete", 1, 1);
@@ -494,7 +485,7 @@ describe("when a round is built", () => {
     let raced = false;
     const db: Queryable = {
       query: (async (text: string, values?: unknown[]) => {
-        if (!raced && String(text).includes("FROM gate g JOIN account a")) {
+        if (!raced && String(text).includes("p.matching_open FROM account a")) {
           raced = true;
           expect(await buildRoundOf(await deps(ctx.client, NOON), a)).toBe(true);
         }
@@ -939,12 +930,11 @@ describe("the fish (#378, ADR-039)", () => {
 });
 
 describe("over the synthetic population", () => {
-  // Three hundred people, the gate's count and every round: about twelve
+  // Three hundred people and every round: about twelve
   // seconds here and more under CI's coverage, past the default fifteen.
   test("every open person gets a round, and nobody a candidate a hard filter excludes, in either direction", {
     timeout: 60_000,
   }, async ({ ctx }) => {
-    await setConfig(ctx.client, "gate_k", 5);
     // The population lives in the seed's ponds, which this database has not been given.
     for (const pond of SEED_PONDS) {
       await ctx.client.query(
@@ -955,47 +945,224 @@ describe("over the synthetic population", () => {
     }
     await writePopulation(ctx.client, generatePopulation({ size: 300, seed: 7 }), CONSENT_VERSIONS);
     // Without the photos release nobody has a face, so nobody is complete: three approved rows
-    // each, as the people of the other tests have, and the gate counts the population.
+    // each, as the people of the other tests have, and the demo commands' open ponds.
     await ctx.client.query(
       `INSERT INTO photo (account_id, key, blurhash, width, height, state, position)
        SELECT p.account_id, md5(p.account_id::text || n::text), 'LEHV6nWB2yk8pyo0adR*.7kCMdnj',
               800, 1067, 'approved', n
          FROM profile p, generate_series(0, 2) n`,
     );
-    const { logger } = await captureLogger();
-    await countGates({ db: ctx.client, logger, now: () => NIGHT });
+    await openPonds(ctx.client);
 
     const result = await buildRounds(await deps(ctx.client));
 
-    const { rows: open } = await ctx.client.query<{ account_id: string; pond_id: string }>(
-      `SELECT g.account_id, g.pond_id FROM gate g JOIN account a ON a.id = g.account_id
-        WHERE g.opened_at IS NOT NULL AND a.state IN ('active', 'shadow_banned')`,
-    );
-    expect(open.length).toBeGreaterThan(50);
-    expect(result.built).toBe(open.length);
-    expect(result.failed).toBe(0);
     // Everybody's pool facts, read as the builder reads them, to ask every card both ways.
-    const { subjectsOfPond } = await import("./pond-gate.ts");
-    const ponds = [...new Set(open.map((row) => row.pond_id))];
+    const ponds = await openPondIds(ctx.client);
     const everybody = new Map(
       (await Promise.all(ponds.map((pond) => subjectsOfPond(ctx.client, pond, NIGHT))))
         .flat()
         .map((subject) => [subject.id, subject]),
     );
-    for (const { account_id } of open) {
-      const round = await roundOf(ctx.client, account_id);
+    expect(everybody.size).toBeGreaterThan(50);
+    expect(result.built).toBe(everybody.size);
+    expect(result.failed).toBe(0);
+    for (const [accountId, owner] of everybody) {
+      const round = await roundOf(ctx.client, accountId);
       expect(round).not.toBeNull();
       expect((round ?? []).length).toBeLessThanOrEqual(10);
-      const owner = everybody.get(account_id);
-      if (!owner) throw new Error("an open person the builder cannot read");
       for (const card of round ?? []) {
         const candidate = everybody.get(card.candidate_id);
         expect(candidate?.visible).toBe(true);
-        expect(candidate?.admittedAt).not.toBeNull();
         if (!candidate) continue;
         expect(inEachOthersPool(owner.person, candidate.person)).toBe(true);
         expect(inEachOthersPool(candidate.person, owner.person)).toBe(true);
       }
     }
+  });
+});
+
+// features/safety/blocks.feature (#84, ADR-030 §3) and
+// features/matching/filters.feature (#87): nobody is shown to somebody who
+// did not opt into them, across a whole pond's rounds.
+describe("the filters across a pond's rounds", () => {
+  /** Women who seek women: every two of them are in each other's pool. */
+  const ALIKE: PeopleOptions = { ...WOMEN, seeks: ["woman"] };
+
+  async function alikePond(ctx: TestContext, slug: string, count: number) {
+    const pond = await pondNamed(ctx.client, slug);
+    await openPond(ctx.client, pond);
+    return { pond, ids: await people(ctx.client, pond, count, ALIKE) };
+  }
+
+  test("The round leaves a blocked pair out of each other's cards", async ({ ctx }) => {
+    const { ids } = await alikePond(ctx, "test-rounds-blocks", 4);
+    const [she, her, x, y] = ids;
+    if (!she || !her || !x || !y) throw new Error("people not written");
+    await blocks(await appAt(ctx.client, NIGHT), ctx.client, she, her);
+
+    await buildRounds(await deps(ctx.client));
+
+    expect(candidates(await roundOf(ctx.client, she)).sort()).toEqual([x, y].sort());
+    expect(candidates(await roundOf(ctx.client, her)).sort()).toEqual([x, y].sort());
+    expect(candidates(await roundOf(ctx.client, x)).sort()).toEqual([she, her, y].sort());
+  });
+
+  test("A block holds for a later account of either identity", async ({ ctx }) => {
+    const { pond, ids } = await alikePond(ctx, "test-rounds-blocks-later", 3);
+    const [a, b, c] = ids;
+    if (!a || !b || !c) throw new Error("people not written");
+    await blocks(await appAt(ctx.client, NIGHT), ctx.client, a, b);
+    // B deletes the account, the cooldown passes, and B comes back: a new
+    // account on the same identity (a complete person here, given B's identity).
+    await eraseAccount(await deps(ctx.client), b);
+    const [again] = await people(ctx.client, pond, 1, ALIKE);
+    if (!again) throw new Error("people not written");
+    await ctx.client.query(
+      "UPDATE account SET identity_id = (SELECT identity_id FROM account WHERE id = $2) WHERE id = $1",
+      [again, b],
+    );
+
+    await buildRounds(await deps(ctx.client));
+
+    expect(candidates(await roundOf(ctx.client, a))).toEqual([c]);
+    expect(candidates(await roundOf(ctx.client, again))).toEqual([c]);
+    // The card and the photos ask the same of the identities, both ways; the
+    // card builder and the photo route are held to it across a later account
+    // of either in profile/service.test.ts and media/budget.test.ts.
+    const between = async (one: string, other: string) =>
+      (
+        await ctx.client.query<{ blocked: boolean }>("SELECT blocked_between($1, $2) AS blocked", [
+          one,
+          other,
+        ])
+      ).rows[0]?.blocked;
+    expect(await between(a, again)).toBe(true);
+    expect(await between(again, a)).toBe(true);
+    expect(await between(c, again)).toBe(false);
+  });
+
+  test("The round leaves a pair a deal-breaker excludes out of each other's cards", async ({
+    ctx,
+  }) => {
+    const pond = await pondNamed(ctx.client, "test-rounds-deal-breakers");
+    await openPond(ctx.client, pond);
+    const [holder] = await people(ctx.client, pond, 1, {
+      ...ALIKE,
+      fields: { smoking: "never" },
+    });
+    const [smoker] = await people(ctx.client, pond, 1, {
+      ...ALIKE,
+      fields: { smoking: "regularly" },
+    });
+    // Somebody who did not answer, whom the holder lets through, and somebody who never smokes.
+    const [open] = await people(ctx.client, pond, 1, ALIKE);
+    const [never] = await people(ctx.client, pond, 1, { ...ALIKE, fields: { smoking: "never" } });
+    if (!holder || !smoker || !open || !never) throw new Error("people not written");
+    await ctx.client.query(
+      `INSERT INTO preferences (account_id, field, value, mode, include_unknown)
+       VALUES ($1, 'smoking', '["never"]'::jsonb, 'hard', true)`,
+      [holder],
+    );
+    const { logger, lines } = await captureLogger();
+
+    await buildRounds({ db: ctx.client, logger, now: () => NIGHT });
+
+    expect(candidates(await roundOf(ctx.client, holder)).sort()).toEqual([open, never].sort());
+    expect(candidates(await roundOf(ctx.client, smoker)).sort()).toEqual([open, never].sort());
+    // Nothing of anybody's answers or filters reaches the night's line.
+    expect(JSON.stringify(lines())).not.toMatch(/smoking|never|regularly/);
+
+    // The holder takes their own answer back: the deal-breaker is paused, and the next night shows both.
+    await ctx.client.query("UPDATE profile SET fields = fields - 'smoking' WHERE account_id = $1", [
+      holder,
+    ]);
+    const tomorrow = new Date(NIGHT.getTime() + 24 * 3600 * 1000);
+    await buildRounds(await deps(ctx.client, tomorrow));
+    expect(candidates(await roundOf(ctx.client, smoker, finnishDay(tomorrow)))).toContain(holder);
+  });
+
+  test("a deal-breaker on an option the registry no longer has, or a field off the whitelist, filters nothing", async ({
+    ctx,
+  }) => {
+    const { ids } = await alikePond(ctx, "test-rounds-stale-deal-breakers", 3);
+    const [holder, x, y] = ids;
+    if (!holder || !x || !y) throw new Error("people not written");
+    await ctx.client.query(
+      `UPDATE profile SET fields = fields || '{"smoking": "never", "drinking": "never"}'::jsonb
+        WHERE account_id = $1`,
+      [holder],
+    );
+    // Written by hand: rows the save would refuse today (ADR-009 §1: an option
+    // removed is a data change). Each would refuse the two, who answered
+    // neither, if it were read as a deal-breaker: drinking has options, but no
+    // deal-breaker may be set on it.
+    await ctx.client.query(
+      `INSERT INTO preferences (account_id, field, value, mode, include_unknown)
+       VALUES ($1, 'smoking', '["cigars"]'::jsonb, 'hard', false),
+              ($1, 'drinking', '["never"]'::jsonb, 'hard', false)`,
+      [holder],
+    );
+
+    await buildRounds(await deps(ctx.client));
+
+    expect(candidates(await roundOf(ctx.client, holder)).sort()).toEqual([x, y].sort());
+  });
+
+  test("an answer the registry no longer has is read as none, by the holder's deal-breaker and by the other's", async ({
+    ctx,
+  }) => {
+    const pond = await pondNamed(ctx.client, "test-rounds-stale-answers");
+    await openPond(ctx.client, pond);
+    // H accepts no children or no answer; C's answer is an option the registry dropped.
+    const [h, c] = await people(ctx.client, pond, 2, {
+      ...ALIKE,
+      fields: { smoking: "never", hasKids: "no" },
+    });
+    // P refuses smokers, then P's own answer becomes a dropped option: the deal-breaker is paused.
+    const [p] = await people(ctx.client, pond, 1, { ...ALIKE, fields: { smoking: "never" } });
+    const [smoker] = await people(ctx.client, pond, 1, {
+      ...ALIKE,
+      fields: { smoking: "regularly" },
+    });
+    if (!h || !c || !p || !smoker) throw new Error("people not written");
+    await ctx.client.query(
+      `INSERT INTO preferences (account_id, field, value, mode, include_unknown)
+       VALUES ($1, 'hasKids', '["no"]'::jsonb, 'hard', true),
+              ($2, 'smoking', '["never"]'::jsonb, 'hard', false)`,
+      [h, p],
+    );
+    for (const [account, stale] of [
+      [c, { hasKids: "maybe" }],
+      [p, { smoking: "cigars" }],
+    ] as const) {
+      await ctx.client.query(
+        "UPDATE profile SET fields = fields || $2::jsonb WHERE account_id = $1",
+        [account, JSON.stringify(stale)],
+      );
+    }
+
+    await buildRounds(await deps(ctx.client));
+
+    expect(candidates(await roundOf(ctx.client, h))).toContain(c);
+    expect(candidates(await roundOf(ctx.client, p))).toContain(smoker);
+    // The holder's own screen says the same of P's deal-breaker.
+    const who = await signInAs(ctx.client, p);
+    const app = await appAt(ctx.client, NIGHT);
+    const read = await app.request("/preferences/deal-breakers", { headers: who.headers });
+    expect(await read.json()).toMatchObject({ dealBreakers: [{ field: "smoking", paused: true }] });
+  });
+
+  test("a dance partner is a card for dance partners only (#175)", async ({ ctx }) => {
+    const pond = await pondNamed(ctx.client, "test-rounds-dance");
+    await openPond(ctx.client, pond);
+    const dancers = await people(ctx.client, pond, 2, { ...ALIKE, intent: "dance_partner" });
+    const [either] = await people(ctx.client, pond, 1, { ...ALIKE, intent: "open_to_either" });
+    const [dancer, partner] = dancers;
+    if (!dancer || !partner || !either) throw new Error("people not written");
+
+    await buildRounds(await deps(ctx.client));
+
+    expect(candidates(await roundOf(ctx.client, dancer))).toEqual([partner]);
+    expect(await roundOf(ctx.client, either)).toEqual([]);
   });
 });

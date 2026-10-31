@@ -29,8 +29,6 @@ export const SEED_PONDS = [
  * number here is a decision (ADR or a new config version), never a test edit.
  */
 export const MATCHING_CONFIG_V1 = {
-  gate_k: 30, // TD-10: matching opens per person at an eligible pool of 30
-  majority_share_max: 0.6, // TD-10, TD-13: majority gender at most 60 % of active accounts
   round_size: 12, // TD-11
   impression_cap_per_day: 40, // TD-11: per candidate
   like_budget_balanced: 12, // TD-14
@@ -175,8 +173,8 @@ export const MATCHING_CONFIG_V1 = {
   // the slug of a row in ponds. Version 2 names another (below); null once
   // people choose among several.
   default_pond: "suomi",
-  // #147 (the field sheet, ADR-015 §9): a change of gender or of whom one
-  // seeks is possible once in this many days, effective from the next count.
+  // #147 (the field sheet, ADR-060 §9): a change of gender is possible once in
+  // this many days.
   change_cadence_days: 30,
   // #149 (TD-16, the disclose-to-filter rule): how many deal-breakers a person
   // may set; two at launch, so a small pond is not cut to nothing.
@@ -234,7 +232,12 @@ const seedHetuHmac = (label: string): string =>
 
 export type SeedResult = { ponds: number; matchingConfig: number; identities: number };
 
-/** Idempotent: upserts keyed by slug and by (key, version). Safe to run on every boot of a preview. */
+/**
+ * Idempotent: upserts keyed by slug and by (key, version). Safe to run on every
+ * boot of a preview. It opens the ponds it writes on every run, a row a
+ * migration wrote first (0027) among them, so that development, previews and
+ * CI have rounds from the first start (ADR-060 §10). Production refuses it.
+ */
 export async function seed(pool: Pool, createdBy = "seed"): Promise<SeedResult> {
   const db = drizzle(pool);
 
@@ -246,6 +249,7 @@ export async function seed(pool: Pool, createdBy = "seed"): Promise<SeedResult> 
         nameNominative: pond.nameNominative,
         nameInessive: pond.nameInessive,
         parentId: null,
+        matchingOpen: true,
       })
       .onConflictDoUpdate({
         target: ponds.slug,
@@ -253,6 +257,7 @@ export async function seed(pool: Pool, createdBy = "seed"): Promise<SeedResult> 
           nameNominative: pond.nameNominative,
           nameInessive: pond.nameInessive,
           parentId: null,
+          matchingOpen: true,
         },
       });
   }

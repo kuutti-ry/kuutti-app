@@ -4,9 +4,11 @@
  * (#396).
  *
  * - The keys are the ones the migrations write: every `'key', '<json>'::jsonb`
- *   pair of an INSERT INTO "matching_config" in packages/db/drizzle. The seed
- *   carries the same rows (migrate.test.ts holds the two identical), and a
- *   deployed database holds only what the migrations wrote.
+ *   pair of an INSERT INTO "matching_config" in packages/db/drizzle, less those
+ *   a later DELETE FROM "matching_config" takes away, read in the migrations'
+ *   order (#500, ADR-060 §6). The seed carries the same rows (migrate.test.ts
+ *   holds the two identical), and a deployed database holds only what the
+ *   migrations wrote.
  * - The register names a key in a table's Where cell as a bare lowercase word
  *   in backticks, `round_size`. A constant is upper case and a file has a
  *   slash or a dot, so neither reads as a key.
@@ -27,13 +29,20 @@ const MIGRATIONS = join(ROOT, "packages", "db", "drizzle");
 const REGISTER = "docs/decisions.md";
 const KEY = /^[a-z][a-z0-9_]*$/;
 const PAIR = /'([a-z][a-z0-9_]*)',\s*'[^']*'::jsonb/g;
+const QUOTED = /'([a-z][a-z0-9_]*)'/g;
 const SEPARATOR = /^\|(\s*:?-+:?\s*\|)+\s*$/;
 
-function keysOf(sql: string): string[] {
-  return sql
-    .split(";")
-    .filter((statement) => /INSERT INTO "matching_config"/.test(statement))
-    .flatMap((statement) => [...statement.matchAll(PAIR)].map((pair) => pair[1] ?? ""));
+/** The keys that stand after a migration, given those that stood before it, statement by statement. */
+function keysAfter(before: readonly string[], sql: string): string[] {
+  const keys = new Set(before);
+  for (const statement of sql.split(";")) {
+    if (/INSERT INTO "matching_config"/.test(statement)) {
+      for (const pair of statement.matchAll(PAIR)) keys.add(pair[1] ?? "");
+    } else if (/DELETE FROM "matching_config"/.test(statement)) {
+      for (const quoted of statement.matchAll(QUOTED)) keys.delete(quoted[1] ?? "");
+    }
+  }
+  return [...keys];
 }
 
 function cells(row: string): string[] {
@@ -100,12 +109,28 @@ INSERT INTO "matching_config" ("version", "key", "value", "created_by")
 SELECT coalesce(max("version"), 0) + 1, 'default_pond', '"suomi"'::jsonb, 'migration:0025'
   FROM "matching_config" WHERE "key" = 'default_pond';
 INSERT INTO "ponds" ("slug", "name") VALUES ('suomi', 'Suomi');`;
-  const parsed = keysOf(sql);
+  const parsed = keysAfter([], sql);
   const expectedKeys = ["round_size", "photo_fetches_per_day", "default_pond"];
-  if (JSON.stringify(parsed) !== JSON.stringify(expectedKeys)) {
-    console.error(`✖ self-test, the migrations' keys: expected ${JSON.stringify(expectedKeys)}`);
-    console.error(`  got ${JSON.stringify(parsed)}`);
-    process.exit(1);
+  const deleted = keysAfter(
+    keysAfter(parsed, `DELETE FROM "matching_config" WHERE "key" IN ('round_size', 'gone');`),
+    `DELETE FROM "ponds" WHERE "slug" = 'default_pond';`,
+  );
+  const expectedDeleted = ["photo_fetches_per_day", "default_pond"];
+  const again = keysAfter(
+    deleted,
+    `INSERT INTO "matching_config" ("version", "key", "value") VALUES (1, 'round_size', '10'::jsonb);`,
+  );
+  const expectedAgain = ["photo_fetches_per_day", "default_pond", "round_size"];
+  for (const [what, got, expected] of [
+    ["the migrations' keys", parsed, expectedKeys],
+    ["a key a later migration deletes", deleted, expectedDeleted],
+    ["a key written again after it was deleted", again, expectedAgain],
+  ] as const) {
+    if (JSON.stringify(got) !== JSON.stringify(expected)) {
+      console.error(`✖ self-test, ${what}: expected ${JSON.stringify(expected)}`);
+      console.error(`  got ${JSON.stringify(got)}`);
+      process.exit(1);
+    }
   }
   const keys = ["round_size", "default_pond"];
   const header =
@@ -156,7 +181,7 @@ INSERT INTO "ponds" ("slug", "name") VALUES ('suomi', 'Suomi');`;
       process.exit(1);
     }
   }
-  console.log(`✔ check-decisions self-test: ${cases.length + 1} cases`);
+  console.log(`✔ check-decisions self-test: ${cases.length + 3} cases`);
 }
 
 if (process.argv.includes("--self-test")) selfTest();
@@ -164,10 +189,13 @@ if (process.argv.includes("--self-test")) selfTest();
 const keys = readdirSync(MIGRATIONS)
   .filter((file) => file.endsWith(".sql"))
   .sort()
-  .flatMap((file) => keysOf(readFileSync(join(MIGRATIONS, file), "utf8")));
+  .reduce<string[]>(
+    (held, file) => keysAfter(held, readFileSync(join(MIGRATIONS, file), "utf8")),
+    [],
+  );
 const problems = problemsOf(keys, readFileSync(join(ROOT, REGISTER), "utf8"));
 for (const problem of problems) console.error(`✖ ${problem}`);
 if (problems.length > 0) process.exit(1);
 console.log(
-  `✔ check-decisions: ${new Set(keys).size} matching_config keys, each with a row in ${REGISTER}`,
+  `✔ check-decisions: ${keys.length} matching_config keys, each with a row in ${REGISTER}`,
 );

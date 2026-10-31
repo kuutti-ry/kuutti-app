@@ -17,19 +17,26 @@ import { AppError } from "../lib/errors.ts";
 import type { Logger } from "../lib/logger.ts";
 import { matchingConfigNumber, readMatchingConfig } from "../lib/matching-config.ts";
 import { recordInvitationNotices } from "../notifications/index.ts";
-import { readGateRow } from "../pond/index.ts";
 import * as repo from "./repo.ts";
 
-// Invitations (#107, ADR-044): a code a person whose profile passed the pond
-// gate's test gives a friend, single use; the friend types it after the bank
-// login, before their own profile first passes the test, and the night it
-// does the invitation counts and its inviter earns matching_config
-// invitation_reward. Who invites, who may still redeem and what counts all
-// hang on one fact, a gate row (ADR-015), asked through the pond slice. The
-// code is shown once and kept as its SHA-256; it is in no log line, error
-// detail, event or export, and neither is anybody's id but the caller's.
+// Invitations (#107, ADR-044): a code a person whose profile is complete gives
+// a friend, single use; the friend types it after the bank login, before their
+// own profile is complete, and the night it is the invitation counts and its
+// inviter earns matching_config invitation_reward. Who invites, who may still
+// redeem and what counts all hang on one fact, completeness (ADR-060 §7), read
+// when asked by the reader the app hands in. The code is shown once and kept
+// as its SHA-256; it is in no log line, error detail, event or export, and
+// neither is anybody's id but the caller's.
 
-export type RewardsDeps = { db: Queryable; logger: Logger; now: () => Date };
+/** Whether the person's profile and onboarding are complete. Handed in: it reads across slices and lives with the jobs (rules/layout.md). */
+export type CompleteReader = (db: Queryable, accountId: string) => Promise<boolean>;
+
+export type RewardsDeps = {
+  db: Queryable;
+  logger: Logger;
+  now: () => Date;
+  complete: CompleteReader;
+};
 
 const INVITATION_REWARD_KEY = "invitation_reward";
 const INVITATIONS_OPEN_KEY = "invitations_open";
@@ -80,11 +87,12 @@ async function readInvitationReward(db: Queryable): Promise<InvitationReward> {
 const noAccount = () => new AppError(404, "not_found", "No live account");
 
 /**
- * Whether the person may still type a code (ADR-044 §6): their identity never
- * had an account erased, their profile has not passed the gate's test, they
- * redeemed none, and they gave the current terms and privacy consents, the
- * two that onboarding asks right after its welcome. `deletionCount` is read
- * by the caller, under the account's lock where it writes.
+ * Whether the person may still type a code (ADR-044 §6), their profile not
+ * being complete, which the caller asks: their identity never had an account
+ * erased, they redeemed none, and they gave the current terms and privacy
+ * consents, the two that onboarding asks right after its welcome.
+ * `deletionCount` is read by the caller, under the account's lock where it
+ * writes.
  */
 async function mayRedeem(
   db: Queryable,
@@ -96,7 +104,6 @@ async function mayRedeem(
   // the identity that it once redeemed would lift it, at the cost of keeping
   // that mark through erasure, a retention change (ADR-044 §6, Open 4).
   if (deletionCount > 0) return false;
-  if (await readGateRow(db, accountId)) return false;
   if (await repo.hasRedeemed(db, accountId)) return false;
   // One after the other: inside the redeem's transaction `db` is one connection.
   if (!(await currentConsent(db, accountId, "terms"))) return false;
@@ -104,19 +111,23 @@ async function mayRedeem(
 }
 
 /** The caller's invitations as the app shows them (`Invitations`): nothing of anybody invited. */
-export async function invitationsOf(db: Queryable, accountId: string): Promise<Invitations> {
+export async function invitationsOf(
+  deps: Pick<RewardsDeps, "db" | "complete">,
+  accountId: string,
+): Promise<Invitations> {
+  const { db } = deps;
   const deletionCount = await repo.deletionCountOf(db, accountId);
   if (deletionCount === null) throw noAccount();
-  const [gate, reward, open, counted, earned] = await Promise.all([
-    readGateRow(db, accountId),
+  const [complete, reward, open, counted, earned] = await Promise.all([
+    deps.complete(db, accountId),
     readInvitationReward(db),
     repo.listOpen(db, accountId, INVITATIONS_OPEN_CAP),
     repo.countCounted(db, accountId),
     repo.unspentOf(db, accountId),
   ]);
   return {
-    canInvite: gate !== null,
-    redeemable: gate === null && (await mayRedeem(db, accountId, deletionCount)),
+    canInvite: complete,
+    redeemable: !complete && (await mayRedeem(db, accountId, deletionCount)),
     reward,
     open: open.map((row) => ({ id: row.id, createdAt: row.createdAt.toISOString() })),
     counted,
@@ -125,8 +136,8 @@ export async function invitationsOf(db: Queryable, accountId: string): Promise<I
 }
 
 /**
- * A new invitation for a person whose profile has passed the gate's test, a
- * shadow-banned one's too (ADR-024 §7): 409 `invitation_not_yet` otherwise.
+ * A new invitation for a person whose profile is complete, a shadow-banned
+ * one's too (ADR-024 §7): 409 `invitation_not_yet` otherwise.
  * At most `invitations_open` open at once, never more than the contract's
  * ceiling, counted under the account row's lock in the statement that
  * inserts: 409 `invitations_full`. The code is answered here once.
@@ -139,7 +150,7 @@ export async function makeInvitation(
   const code = drawCode();
   const id = await transaction(deps.db, async (tx) => {
     if (!(await repo.lockAccount(tx, accountId))) throw noAccount();
-    if (!(await readGateRow(tx, accountId))) {
+    if (!(await deps.complete(tx, accountId))) {
       throw new AppError(
         409,
         "invitation_not_yet",
@@ -189,7 +200,8 @@ export async function redeemInvitation(
   await transaction(deps.db, async (tx) => {
     const caller = await repo.lockAccount(tx, input.accountId);
     if (!caller) throw noAccount();
-    if (!(await mayRedeem(tx, input.accountId, caller.deletionCount))) {
+    const complete = await deps.complete(tx, input.accountId);
+    if (complete || !(await mayRedeem(tx, input.accountId, caller.deletionCount))) {
       throw new AppError(409, "invitation_not_for_you", "This account cannot use an invitation");
     }
     if (!(await repo.redeem(tx, { accountId: input.accountId, codeHash, at }))) {
@@ -200,10 +212,11 @@ export async function redeemInvitation(
 
 /**
  * The night's count (ADR-044 §7), one transaction: every invitation redeemed
- * by somebody who now has a gate row, and not counted yet, is counted; its
- * inviter gets the units `invitation_reward` says tonight and one notice
+ * by somebody whose profile is complete now, and not counted yet, is counted;
+ * its inviter gets the units `invitation_reward` says tonight and one notice
  * (ADR-032). Counted once: a second run finds nothing. How many, and of what;
- * never who.
+ * never who. One redeemer at a time, on the one connection of the transaction;
+ * a night has few, since each redeems once ever.
  */
 export async function countInvitations(
   deps: RewardsDeps,
@@ -211,9 +224,13 @@ export async function countInvitations(
   const at = deps.now();
   return transaction(deps.db, async (tx) => {
     const reward = await readInvitationReward(tx);
-    const inviters = await repo.lockInviters(tx);
+    const redeemers: string[] = [];
+    for (const redeemer of await repo.uncountedRedeemers(tx)) {
+      if (await deps.complete(tx, redeemer)) redeemers.push(redeemer);
+    }
+    const inviters = await repo.lockInviters(tx, redeemers);
     if (inviters.length === 0) return { counted: 0, fish: 0, likes: 0 };
-    const counted = await repo.markCounted(tx, { inviters, at });
+    const counted = await repo.markCounted(tx, { inviters, redeemers, at });
     await repo.insertUnits(tx, { counted, reward, at });
     await recordInvitationNotices(tx, {
       counted: counted.map((c) => ({ accountId: c.inviterId, invitationId: c.invitationId })),

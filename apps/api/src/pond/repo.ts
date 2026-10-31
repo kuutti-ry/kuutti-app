@@ -1,6 +1,5 @@
 import type { Queryable } from "@kuutti/db";
-import type { PondSummary } from "@kuutti/schema";
-import { GATE_EMPTIED } from "./gate.ts";
+import type { AdminPond, PondSummary } from "@kuutti/schema";
 
 // Raw parameterised SQL for the same reason as identity/repo.ts: Deps.db is
 // the Queryable seam the test harness hands a rolled-back transaction through.
@@ -57,22 +56,46 @@ export async function setPondOfAccount(
   accountId: string,
   pondId: string,
 ): Promise<"set" | "no_pond" | "no_account"> {
-  // The place at the gate is a place in one pond (#94, ADR-015 §8): it stays
-  // behind with the pond, in the same statement, so nobody carries an
-  // admission along. The row is emptied, not removed: where the person
-  // stands in the new pond is for the next count to say, not for the asking.
-  const { rows: moved } = await db.query(
-    `WITH moved AS (
-       UPDATE account SET pond_id = $2
-       WHERE id = $1 AND state <> 'deleted' AND EXISTS (SELECT 1 FROM ponds WHERE id = $2)
-       RETURNING id),
-     behind AS (
-       UPDATE gate SET pond_id = $2, ${GATE_EMPTIED}
-       WHERE account_id IN (SELECT id FROM moved) AND pond_id <> $2)
-     SELECT id FROM moved`,
+  const moved = await db.query(
+    `UPDATE account SET pond_id = $2
+     WHERE id = $1 AND state <> 'deleted' AND EXISTS (SELECT 1 FROM ponds WHERE id = $2)`,
     [accountId, pondId],
   );
-  if (moved.length === 1) return "set";
+  if (moved.rowCount === 1) return "set";
   const { rows } = await db.query("SELECT 1 FROM ponds WHERE id = $1", [pondId]);
   return rows.length === 0 ? "no_pond" : "no_account";
+}
+
+const adminPondFrom = (r: Row): AdminPond => ({
+  ...pondFrom(r),
+  matchingOpen: r.matching_open as boolean,
+});
+
+/** Every pond with its switch, by name, for the panel (ADR-060 §2). */
+export async function listPondsForAdmin(db: Queryable): Promise<AdminPond[]> {
+  const { rows } = await db.query<Row>(
+    `SELECT ${COLUMNS}, matching_open FROM ponds ORDER BY name_nominative`,
+  );
+  return rows.map(adminPondFrom);
+}
+
+/**
+ * Sets a pond's switch, under the row's lock, and says what it was: `changed`
+ * is false for a press that met the switch as it was asked to be already, so
+ * two admins pressing at once write one audit row. Null for no such pond.
+ */
+export async function setMatchingOpen(
+  db: Queryable,
+  pondId: string,
+  open: boolean,
+): Promise<{ pond: AdminPond; changed: boolean } | null> {
+  const { rows } = await db.query<Row>(
+    `SELECT ${COLUMNS}, matching_open FROM ponds WHERE id = $1 FOR UPDATE`,
+    [pondId],
+  );
+  const row = rows[0];
+  if (!row) return null;
+  if (row.matching_open === open) return { pond: adminPondFrom(row), changed: false };
+  await db.query("UPDATE ponds SET matching_open = $2 WHERE id = $1", [pondId, open]);
+  return { pond: adminPondFrom({ ...row, matching_open: open }), changed: true };
 }

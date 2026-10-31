@@ -4,7 +4,7 @@ Feature: The short pool: coming back, relaxing a deal-breaker for the day, and w
   maintainer, 21/10/2026), everybody new comes first, and earlier people
   come back after them in a fixed order, labelled seen before. A short round
   offers to relax one of the person's own deal-breakers for the day, by how
-  much it widens the pool in the gate's steps; only the person's tap relaxes,
+  much it widens the pool in the counter's steps; only the person's tap relaxes,
   and one tap undoes it. Nothing else is ever relaxed, and nobody whose own
   filters exclude the person is ever let in. A like on a relaxed card reaches
   its person. Every card says which of the person's deal-breakers its person

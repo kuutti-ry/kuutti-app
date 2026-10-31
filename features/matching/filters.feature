@@ -2,9 +2,9 @@
 Feature: The filters, hard both ways, and the soft preferences that only order
   Nobody is shown to somebody who did not opt into them, in either direction
   (rule 7, the field sheet's mutual rule; #87). The hard filters are one
-  function, inEachOthersPool, which the gate's count and the round builder
-  both ask (ADR-015 §1). Gender and whom one seeks, the age window and what
-  one is here for are features/pond/gate.feature's examples; a block is
+  function, inEachOthersPool, which the round builder asks of everybody
+  (ADR-035 §2). Gender and whom one seeks, the age window and what one is
+  here for are the two outlines below; a block is
   features/safety/blocks.feature's. The deal-breakers are here. A
   deal-breaker (#149) filters on a field the holder answered themselves; with
   that answer taken back it is paused and filters nothing. An answer the
@@ -93,12 +93,58 @@ Feature: The filters, hard both ways, and the soft preferences that only order
     When "A" hides their own smoking answer from their card
     Then the deal-breaker is not paused, "C" is in "A"'s round and "B" is not
 
-  Scenario: The gate's count leaves a pair a deal-breaker excludes out of each other's pool
-    Given thirty-one people of one pond, each in every other's pool
+  Scenario: The round leaves a pair a deal-breaker excludes out of each other's cards
+    Given people of an open pond, each in every other's pool
     And one of them has a deal-breaker on smoking that another's answer does not pass
-    When the night counts the gates
-    Then neither of the two counts toward the other's figure
-    And after the holder takes their own smoking answer back, the next night counts both again
+    When the night builds the rounds
+    Then neither of the two is a card in the other's round
+    And after the holder takes their own smoking answer back, the next night shows them to each other
+
+  Scenario Outline: Two people are in each other's pool only when each passes what the other asked for
+    Given a <a_gender> of <a_age> who seeks <a_seeks> between <a_min> and <a_max>, here for <a_intent>
+    And a <b_gender> of <b_age> who seeks <b_seeks> between <b_min> and <b_max>, here for <b_intent>
+    Then they are <in> each other's pool, asked from either side
+
+    Examples:
+      | a_gender   | a_age | a_seeks          | a_min | a_max | a_intent       | b_gender   | b_age | b_seeks    | b_min | b_max | b_intent       | in     |
+      | woman      | 30    | man              | 25    | 40    | open_to_either | man        | 35    | woman      | 25    | 40    | open_to_either | in     |
+      | woman      | 30    | man              | 25    | 40    | open_to_either | man        | 35    | man        | 25    | 40    | open_to_either | not in |
+      | woman      | 30    | man              | 25    | 34    | open_to_either | man        | 35    | woman      | 25    | 40    | open_to_either | not in |
+      | woman      | 41    | man              | 25    | 45    | open_to_either | man        | 35    | woman      | 25    | 40    | open_to_either | not in |
+      | woman      | 30    | woman            | 25    | 40    | open_to_either | woman      | 28    | woman      | 25    | 40    | open_to_either | in     |
+      | non_binary | 30    | man,non_binary   | 25    | 40    | open_to_either | man        | 35    | non_binary | 25    | 40    | open_to_either | in     |
+      | non_binary | 30    | man              | 25    | 40    | open_to_either | man        | 35    | woman      | 25    | 40    | open_to_either | not in |
+      | woman      | 25    | man              | 25    | 40    | open_to_either | man        | 40    | woman      | 25    | 40    | open_to_either | in     |
+      | woman      | 30    | man              | 25    | 40    | long_term      | man        | 35    | woman      | 25    | 40    | long_term      | in     |
+      | woman      | 30    | man              | 25    | 40    | long_term      | man        | 35    | woman      | 25    | 40    | casual         | not in |
+      | woman      | 30    | man              | 25    | 40    | long_term      | man        | 35    | woman      | 25    | 40    | open_to_either | in     |
+      | woman      | 30    | man              | 25    | 40    | open_to_either | man        | 35    | woman      | 25    | 40    | casual         | in     |
+      | woman      | 30    | man              | 25    | 40    | casual         | man        | 35    | woman      | 25    | 40    | casual         | in     |
+      | woman      | 30    | man              | 25    | 40    | dance_partner  | man        | 35    | woman      | 25    | 40    | dance_partner  | in     |
+      | woman      | 30    | man              | 25    | 40    | dance_partner  | man        | 35    | woman      | 25    | 40    | long_term      | not in |
+      | woman      | 30    | man              | 25    | 40    | dance_partner  | man        | 35    | woman      | 25    | 40    | casual         | not in |
+      | woman      | 30    | man              | 25    | 40    | dance_partner  | man        | 35    | woman      | 25    | 40    | open_to_either | not in |
+
+  Scenario Outline: The sheet's examples of who is shown to whom, by gender and seek
+    Given a <a_gender> seeking <a_seeks> and a <b_gender> seeking <b_seeks>, both of thirty, both here for <intent> and open to any age
+    Then they are shown to each other: <shown>
+
+    Examples:
+      | a_gender   | a_seeks              | b_gender   | b_seeks              | intent         | shown |
+      | man        | man                  | man        | man                  | open_to_either | yes   |
+      | man        | man                  | man        | man                  | dance_partner  | yes   |
+      | woman      | woman,man            | man        | woman                | open_to_either | yes   |
+      | woman      | woman,man            | man        | woman                | dance_partner  | yes   |
+      | woman      | non_binary           | non_binary | woman                | open_to_either | yes   |
+      | woman      | non_binary           | non_binary | woman                | dance_partner  | yes   |
+      | woman      | non_binary           | non_binary | man                  | open_to_either | no    |
+      | woman      | non_binary           | non_binary | man                  | dance_partner  | no    |
+      | non_binary | woman                | woman      | man                  | open_to_either | no    |
+      | non_binary | woman                | woman      | man                  | dance_partner  | no    |
+      | man        | woman                | woman      | woman,man,non_binary | open_to_either | yes   |
+      | man        | woman                | woman      | woman,man,non_binary | dance_partner  | yes   |
+      | non_binary | woman,man,non_binary | man        | woman                | open_to_either | no    |
+      | non_binary | woman,man,non_binary | man        | woman                | dance_partner  | no    |
 
   Scenario Outline: Soft preferences count only what is similar from both sides
     Given one person who answered <mine> and another who answered <theirs>

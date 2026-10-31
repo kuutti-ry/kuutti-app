@@ -4,7 +4,6 @@ import { CONVERSATIONS_MAX, ExportedConversation } from "./chat.ts";
 import { StoredContact } from "./contact.ts";
 import { DEAL_BREAKERS_CAP, StoredDealBreaker } from "./deal-breakers.ts";
 import { ExportedFeedback } from "./feedback.ts";
-import { ExportedGate } from "./gate.ts";
 import { AuthPlatform, IdentityStanding, USER_AGENT_MAX } from "./identity.ts";
 import { ExportedRounds } from "./matching.ts";
 import {
@@ -151,9 +150,8 @@ export const AccountExport = z
       /** Self-declared (#46); null before onboarding and after erasure. */
       gender: Gender.nullable(),
       pond: PondSummary.nullable(),
-      /** When the gender, or whom one seeks, last changed from an earlier answer (#147); null until then and after erasure. */
+      /** When the gender last changed from an earlier answer (#147); null until then and after erasure. */
       genderChangedAt: z.iso.datetime().nullable(),
-      seeksChangedAt: z.iso.datetime().nullable(),
       /** The optional e-mail (#148): the person's own, in their own download; null when none is set. */
       email: z.string().max(EMAIL_MAX).nullable(),
       /** Whether the person told Kuutti they found somebody (#83); the reason is kept by no one's name. */
@@ -207,8 +205,6 @@ export const AccountExport = z
     photoCheck: ExportedPhotoCheck,
     /** What research holds (#50, ADR-011 §7 and §10): the enrolment, never the events and never the research_id. */
     research: ResearchExport,
-    /** The place at the pond gate (#94, ADR-015); null before the first count. */
-    gate: ExportedGate.nullable(),
     /** The person's own requests for a copy (#237), this one included, newest first, at most 1000; at most matching_config exports_per_day are answered per Finnish day. */
     exports: z.array(z.object({ at: z.iso.datetime() })).max(1000),
     /** What the person sent as feedback (#171), newest first, at most 1000, with whether a moderator has read it. */

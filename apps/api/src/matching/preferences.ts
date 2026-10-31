@@ -7,8 +7,6 @@ import {
 } from "@kuutti/schema";
 import { z } from "zod";
 import { AppError } from "../lib/errors.ts";
-import { matchingConfigNumber } from "../lib/matching-config.ts";
-import { admissionAnew } from "../pond/index.ts";
 
 // Raw parameterised SQL for the same reason as identity/repo.ts: Deps.db is
 // the Queryable seam the test harness hands a rolled-back transaction through.
@@ -21,7 +19,7 @@ import { admissionAnew } from "../pond/index.ts";
 const SEEKS = "seeks";
 const AGE_WINDOW = "age_window";
 
-/** A change of gender or of whom one seeks is possible once in this many days (#147, ADR-015 §9). */
+/** A change of gender is possible once in this many days (#147, ADR-060 §9). */
 export const CHANGE_CADENCE_KEY = "change_cadence_days";
 const DAY_MS = 86_400_000;
 
@@ -38,9 +36,6 @@ export function nextChangeFrom(changedAt: Date | null, cadenceDays: number, at: 
  * it reads on the caller's transaction, under the account row's lock.
  */
 export type SeeksConsentReader = (tx: Queryable, accountId: string) => Promise<boolean>;
-
-const sameSet = (a: readonly string[], b: readonly string[]) =>
-  a.length === b.length && a.every((value) => b.includes(value));
 
 type Row = { field: string; value: unknown };
 
@@ -89,12 +84,11 @@ export async function savePreferences(
   return transaction(db, async (tx) => {
     // The lock erasure takes first (ADR-009 §8): a save racing an erasure
     // lands before the deletes or sees the tombstone and writes nothing.
-    const live = await tx.query<{ gender: string | null; seeks_changed_at: Date | null }>(
-      "SELECT gender, seeks_changed_at FROM account WHERE id = $1 AND state <> 'deleted' FOR UPDATE",
+    const live = await tx.query(
+      "SELECT 1 FROM account WHERE id = $1 AND state <> 'deleted' FOR UPDATE",
       [accountId],
     );
-    const account = live.rows[0];
-    if (!account) return false;
+    if (live.rows.length === 0) return false;
     const { seeks, ageWindow } = update;
     // Read under the lock a withdrawal takes, as the profile's save does: a
     // save either lands before the withdrawal, whose clear then removes the
@@ -109,26 +103,6 @@ export async function savePreferences(
           fields: [SEEKS],
         },
       );
-    }
-    const before = await readPreferences(tx, accountId);
-    // A change of whom one seeks, once in the cadence (#147, ADR-015 §10): a
-    // lever on the figures otherwise. The first answer and the same answer
-    // again are no change; the window of ages is free. The time lives on the
-    // account, which a withdrawn consent does not clear, and an answer after
-    // a withdrawal counts as a change while a change is on record: the
-    // withdrawal is no way round.
-    const change =
-      seeks !== undefined &&
-      (before.seeks === null ? account.seeks_changed_at !== null : !sameSet(before.seeks, seeks));
-    if (change) {
-      const cadence = await matchingConfigNumber(tx, CHANGE_CADENCE_KEY);
-      const from = nextChangeFrom(account.seeks_changed_at, cadence, at);
-      if (from) {
-        throw new AppError(429, "change_too_soon", "Whom one seeks was changed recently", {
-          from: from.toISOString(),
-        });
-      }
-      await tx.query("UPDATE account SET seeks_changed_at = $2 WHERE id = $1", [accountId, at]);
     }
     const rows = [
       ...(seeks === undefined ? [] : [[SEEKS, seeks] as const]),
@@ -146,16 +120,6 @@ export async function savePreferences(
       );
       written += result.rowCount ?? 0;
     }
-    // Whom one seeks decides with whom one waits at the pond gate (#94,
-    // ADR-015 §9): joining a group that waits is decided anew by the next count.
-    if (seeks !== undefined) {
-      await admissionAnew(
-        tx,
-        accountId,
-        { gender: account.gender, seeks: before.seeks },
-        { gender: account.gender, seeks },
-      );
-    }
     return written === rows.length;
   });
 }
@@ -163,27 +127,19 @@ export async function savePreferences(
 /**
  * Withdrawing the special-category consent takes the seek answer with it
  * (ADR-019 §4, #146): the row goes, the age window stays, and onboarding asks
- * again. The place at the gate follows the change of seeks like any other.
+ * again.
  */
 export async function deleteSeeksOfAccount(db: Queryable, accountId: string): Promise<boolean> {
   return transaction(db, async (tx) => {
-    const live = await tx.query<{ gender: string | null }>(
-      "SELECT gender FROM account WHERE id = $1 AND state <> 'deleted' FOR UPDATE",
+    const live = await tx.query(
+      "SELECT 1 FROM account WHERE id = $1 AND state <> 'deleted' FOR UPDATE",
       [accountId],
     );
-    const account = live.rows[0];
-    if (!account) return false;
-    const before = await readPreferences(tx, accountId);
+    if (live.rows.length === 0) return false;
     await tx.query("DELETE FROM preferences WHERE account_id = $1 AND field = $2", [
       accountId,
       SEEKS,
     ]);
-    await admissionAnew(
-      tx,
-      accountId,
-      { gender: account.gender, seeks: before.seeks },
-      { gender: account.gender, seeks: null },
-    );
     return true;
   });
 }

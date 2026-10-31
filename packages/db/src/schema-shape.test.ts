@@ -62,7 +62,6 @@ describe("the tables", () => {
       "feedback",
       // "Löysin hänet": a count by day and reason, naming nobody (#83, ADR-040).
       "found_them_count",
-      "gate",
       "identity",
       // An invitation, and the units it earned its inviter (#107, ADR-044).
       "invitation",
@@ -184,7 +183,6 @@ describe("the foreign keys", () => {
       "email_code",
       "email_send",
       "feedback",
-      "gate",
       // The inviter and the redeemer of an invitation (#107): at either's
       // erasure the row goes, or that side's link is cut to null.
       "invitation",

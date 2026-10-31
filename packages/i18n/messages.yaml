@@ -727,7 +727,7 @@ profile.dealBreakers.open:
 
 profile.later.title:
   en: "While you wait"
-  description: "Heading of the optional fields' screens after the gate (#148, TD-16)."
+  description: "Heading of the optional fields' screens after onboarding (#148, TD-16)."
   fi: "Odotellessasi"
   sv: "Medan du väntar"
   machine: { fi: true, sv: true }
@@ -3167,7 +3167,7 @@ errors.like_budget_exceeded:
 
 errors.invitation_not_yet:
   en: "You can invite friends once your profile is complete."
-  description: "Invitations (409, #107, ADR-044 §1): only a person whose profile has passed the pond gate's completeness test may make an invitation. Nothing was saved."
+  description: "Invitations (409, #107, ADR-044 §1): only a person whose profile is complete may make an invitation. Nothing was saved."
   fi: "Voit kutsua ystäviä, kun profiilisi on valmis."
   sv: "Du kan bjuda in vänner när din profil är klar."
   machine: { fi: true, sv: true }
@@ -3181,7 +3181,7 @@ errors.invitations_full:
 
 errors.invitation_not_for_you:
   en: "This account cannot use an invitation code. A code is for someone new, before their profile is complete, and works once."
-  description: "Typing an invitation code (409, #107, ADR-044 §6): the person cannot use one: their profile has passed the gate's test already, they used a code before, the current terms are not accepted, or their identity had an account deleted before. Must not say which, and says nothing of the code, which was not looked up."
+  description: "Typing an invitation code (409, #107, ADR-044 §6): the person cannot use one: their profile is complete, they used a code before, the current terms are not accepted, or their identity had an account deleted before. Must not say which, and says nothing of the code, which was not looked up."
   fi: "Tällä tilillä ei voi käyttää kutsukoodia. Koodi on uudelle käyttäjälle ennen kuin profiili on valmis, ja se toimii vain kerran."
   sv: "Det här kontot kan inte använda en inbjudningskod. En kod är för någon ny, innan profilen är klar, och fungerar bara en gång."
   machine: { fi: true, sv: true }
@@ -3300,7 +3300,7 @@ errors.too_many_changes:
 
 errors.change_too_soon:
   en: "You changed this recently. A change is possible again once the waiting time has passed."
-  description: "PUT /account/gender or PUT /preferences (429): the gender or whom one seeks was changed less than change_cadence_days ago (#147, ADR-015 §9). No hostile wording: somebody transitioning must not hit a wall. The app adds the date (onboarding.changeFrom)."
+  description: "PUT /account/gender (429): the gender was changed less than change_cadence_days ago (#147, ADR-060 §9). No hostile wording: somebody transitioning must not hit a wall. The app adds the date (onboarding.changeFrom)."
   fi: "Muutit tätä äskettäin. Muutos on taas mahdollinen, kun odotusaika on kulunut."
   sv: "Du ändrade det här nyligen. En ändring är möjlig igen när väntetiden har gått."
   machine: { fi: true, sv: true }
@@ -3948,7 +3948,7 @@ onboarding.loading:
 
 onboarding.changeFrom:
   en: "Next change possible: {date}."
-  description: "Under errors.change_too_soon in onboarding: the day from which the gender, or whom one seeks, may be changed again, from the status's nextChange (#147, ADR-015 §9). {date} is d.M.yyyy (formatDate)."
+  description: "Under errors.change_too_soon in onboarding: the day from which the gender may be changed again, from the status's nextChange (#147, ADR-060 §9). {date} is d.M.yyyy (formatDate)."
   fi: "Seuraava muutos mahdollinen: {date}."
   sv: "Nästa ändring möjlig: {date}."
   machine: { fi: true, sv: true }
@@ -4150,10 +4150,10 @@ onboarding.research.later:
   machine: { fi: true, sv: true }
 
 onboarding.done:
-  en: "All set. Your place in line is on the home screen."
-  description: "Last line before the flow closes."
-  fi: "Valmista. Paikkasi jonossa näkyy etusivulla."
-  sv: "Klart. Din plats i kön finns på startsidan."
+  en: "All set. The home screen shows what comes next."
+  description: "Last line before the flow closes. No line and no place: nobody waits at the pond (#500, ADR-060)."
+  fi: "Valmista. Etusivulla näet, mitä seuraavaksi tapahtuu."
+  sv: "Klart. Startsidan visar vad som händer härnäst."
   machine: { fi: true, sv: true }
 
 onboarding.welcome.title:
@@ -6669,6 +6669,90 @@ admin.nav.staff:
   en: "Staff"
   description: "Admin panel, the menu entry of the staff list, admins only (#310)."
 
+admin.nav.ponds:
+  en: "Ponds"
+  description: "Admin panel, the menu entry of the ponds and their switches, admins only (#500, ADR-060)."
+
+admin.ponds.title:
+  en: "Ponds"
+  description: "Admin panel, the heading of the ponds (#500)."
+
+admin.ponds.explain:
+  en: "Matching in a pond opens when an admin turns it on here, and nothing else opens or closes it. People with a finished profile in a closed pond are told that it has not opened yet."
+  description: "Admin panel, ponds: what the switch is (#500, ADR-060 §1)."
+
+admin.ponds.refresh:
+  en: "Refresh"
+  description: "Admin panel, ponds: reads the list again."
+
+admin.ponds.loading:
+  en: "Loading the ponds…"
+  description: "Admin panel, ponds: while the list loads."
+
+admin.ponds.error:
+  en: "The ponds could not be loaded."
+  description: "Admin panel, ponds: when the list could not be read."
+
+admin.ponds.caption:
+  en: "{total, plural, one {# pond} other {# ponds}}"
+  description: "Admin panel, ponds: how many there are, above the list."
+
+admin.ponds.open:
+  en: "Open"
+  description: "Admin panel, ponds: matching is open in this pond; said in words, never by colour alone."
+
+admin.ponds.closed:
+  en: "Closed"
+  description: "Admin panel, ponds: matching is not open in this pond; said in words, never by colour alone."
+
+admin.ponds.turnOn:
+  en: "{pond}: open matching"
+  description: "Admin panel, ponds: the accessible name of the button that begins opening a pond (it reads admin.ponds.apply.open). {pond} is the pond's name, so a screen reader's list of buttons says which."
+
+admin.ponds.turnOff:
+  en: "{pond}: close matching"
+  description: "Admin panel, ponds: the accessible name of the button that begins closing a pond (it reads admin.ponds.apply.close). {pond} is the pond's name."
+
+admin.ponds.confirm.open.title:
+  en: "{pond}: open matching?"
+  description: "Admin panel, ponds: the confirm step's heading when opening a pond."
+
+admin.ponds.confirm.open.effect:
+  en: "Everybody with a finished profile in this pond is told that matching is open, and gets a round each night, or when they next open the app. Production builds no rounds yet, so there they are told it is open and no round comes."
+  description: "Admin panel, ponds: the effect of opening a pond in words (rules/admin.md). The night builds rounds, and the day's first read builds a missing one (ADR-035 §5), but neither in production until the maintainer has set how long rounds are kept (ADR-034 Open 2, ADR-035 Open 1); take that sentence out with that shortcut."
+
+admin.ponds.confirm.close.title:
+  en: "{pond}: close matching?"
+  description: "Admin panel, ponds: the confirm step's heading when closing a pond."
+
+admin.ponds.confirm.close.effect:
+  en: "No new rounds are built here from now on. Rounds already built stay for the day, and conversations go on. People with a finished profile are told that matching has not opened in their area yet."
+  description: "Admin panel, ponds: the effect of closing a pond in words (ADR-060 §1): closing builds no new round and ends no conversation."
+
+admin.ponds.apply.open:
+  en: "Open matching"
+  description: "Admin panel, ponds: what the button beside a closed pond reads, and the confirm step's button that opens it."
+
+admin.ponds.apply.close:
+  en: "Close matching"
+  description: "Admin panel, ponds: what the button beside an open pond reads, and the confirm step's button that closes it."
+
+admin.ponds.cancel:
+  en: "Cancel"
+  description: "Admin panel, ponds: leaves the confirm step with nothing changed."
+
+admin.ponds.failed:
+  en: "That did not go through. Nothing was changed."
+  description: "Admin panel, ponds: the confirm step's refusal in words, for any failure of the request."
+
+admin.ponds.opened:
+  en: "{pond}: matching is now open."
+  description: "Admin panel, ponds: said once a pond is open, in a live region."
+
+admin.ponds.closedNow:
+  en: "{pond}: matching is now closed."
+  description: "Admin panel, ponds: said once a pond is closed, in a live region."
+
 admin.audit.title:
   en: "Audit log"
   description: "Admin panel, the heading of the audit log's reader (#309)."
@@ -7916,10 +8000,10 @@ pond.waitlist.retry:
   sv: "Försök igen"
   machine: { fi: true, sv: true }
 
-# --- The pond gate (#94, ADR-015): where a person stands between a finished profile and the first round ---
+# --- The gate card (#500, ADR-060): whether matching is open for the person ---
 pond.gate.label:
   en: "When matching opens for you"
-  description: "Home screen, accessible name of the card that says where the person stands at the pond gate (#94): waiting to be let into the area, waiting for enough people who match, or open."
+  description: "Home screen, accessible name of the card that says whether matching is open for the person (#500): their profile lacks something, it is finished and their area has not opened, or open."
   fi: "Milloin seuranhaku avautuu sinulle"
   sv: "När matchningen öppnar för dig"
   machine: { fi: true, sv: true }
@@ -7933,51 +8017,16 @@ pond.gate.title:
 
 pond.gate.incomplete:
   en: "Matching opens for finished profiles. Yours still lacks something."
-  description: "Gate card when the person's profile or onboarding is not complete: nothing is counted for them yet. The profile screen says what is missing; this only says that something is."
+  description: "Gate card when the person's profile or onboarding is not complete. The profile screen says what is missing; this only says that something is."
   fi: "Seuranhaku avautuu valmiille profiileille. Sinun profiilistasi puuttuu vielä jotakin."
   sv: "Matchningen öppnar för färdiga profiler. I din saknas ännu något."
   machine: { fi: true, sv: true }
 
-pond.gate.pending:
-  en: "Your profile is finished. Where you stand is counted tonight."
-  description: "Gate card when the person is complete and the next nightly count is to say where they stand: after they chose another area, after a change of gender or of whom they seek that needs deciding anew, or on a first look that could not be decided for them alone."
-  fi: "Profiilisi on valmis. Tilanteesi lasketaan ensi yönä."
-  sv: "Din profil är färdig. Var du står räknas i natt."
-  machine: { fi: true, sv: true }
-
-pond.gate.waiting:
-  en: "You are among the next {within, number} in line for your area."
-  description: "Gate card when the person waits to be let into their pond. {within} is the place as it is said, in steps: 10, 20, 30; never an exact place, see pond.gate.steps. The pond is not named in the sentence (TD-17: no inflected pond name)."
-  fi: "Olet alueesi jonossa seuraavien {within, number} joukossa."
-  sv: "Du är bland de {within, number} närmaste i kön till ditt område."
-  machine: { fi: true, sv: true }
-
-pond.gate.waiting.why:
-  en: "People are let in so that no group becomes much larger than the other. Those who wait are let in in the order they registered: nobody who waits passes you, and nothing can be bought."
-  description: "Gate card, under the place in line: why there is a line at all (TD-10, TD-13). It names no gender and no percentage. The order holds among those who wait; people of the smaller group are let in without waiting, so the text must not promise that nobody at all is let in earlier. 'Nothing can be bought' is a promise of the product, not decoration."
-  fi: "Ihmisiä päästetään sisään niin, ettei mikään ryhmä kasva paljon toista suuremmaksi. Odottajat päästetään sisään rekisteröitymisjärjestyksessä: kukaan odottaja ei ohita sinua, eikä mitään voi ostaa."
-  sv: "Människor släpps in så att ingen grupp blir mycket större än den andra. De som väntar släpps in i den ordning de registrerade sig: ingen som väntar går före dig, och ingenting går att köpa."
-  machine: { fi: true, sv: true }
-
 pond.gate.closed:
-  en: "{needed, plural, one {About # more person is needed before matching opens for you.} other {About # more people are needed before matching opens for you.}}"
-  description: "Gate card when the person is let into their pond and their pool is below the threshold. {needed} is about how many more people are needed, at least 1, said in steps, see pond.gate.steps. 'About' is part of the promise: the number is never exact."
-  fi: "{needed, plural, one {Tarvitaan vielä noin # ihminen, ennen kuin seuranhaku avautuu sinulle.} other {Tarvitaan vielä noin # ihmistä, ennen kuin seuranhaku avautuu sinulle.}}"
-  sv: "{needed, plural, one {Det behövs ungefär # person till innan matchningen öppnar för dig.} other {Det behövs ungefär # personer till innan matchningen öppnar för dig.}}"
-  machine: { fi: true, sv: true }
-
-pond.gate.closed.who:
-  en: "They are people in your area who are what you seek, and who seek somebody like you."
-  description: "Gate card, under the number needed: who counts. Both directions: the people the person seeks, who also seek a person like them. No gender is named."
-  fi: "He ovat alueesi ihmisiä, jotka vastaavat sitä, mitä etsit, ja jotka etsivät sinun kaltaistasi."
-  sv: "De är människor i ditt område som är det du söker, och som söker någon som du."
-  machine: { fi: true, sv: true }
-
-pond.gate.steps:
-  en: "Numbers here are said in steps of {step, number}, so that they do not follow each person who comes or goes."
-  description: "Gate card, under the place in line and under the number needed: why the number is round and stands still for a while. {step} is the step (ten). It must not promise that one person never shows: a person who is the tenth does."
-  fi: "Luvut sanotaan tässä {step, number} ihmisen tarkkuudella, jotta ne eivät seuraa jokaista tulijaa ja lähtijää."
-  sv: "Siffrorna anges här i steg om {step, number}, så att de inte följer varje person som kommer eller lämnar."
+  en: "Your profile is finished. Matching has not opened in your area yet."
+  description: "Gate card when the person's profile is finished and matching has not opened in their pond: an admin opens a pond (#500, ADR-060). No date, no number and no reason. The pond is not named in the sentence (TD-17: no inflected pond name)."
+  fi: "Profiilisi on valmis. Seuranhaku ei ole vielä avautunut alueellasi."
+  sv: "Din profil är färdig. Matchningen har inte öppnat i ditt område än."
   machine: { fi: true, sv: true }
 
 pond.gate.open:
@@ -7989,21 +8038,21 @@ pond.gate.open:
 
 pond.gate.loading:
   en: "Looking…"
-  description: "Gate card while the person's gate loads."
+  description: "Gate card while it loads."
   fi: "Katsotaan…"
   sv: "Tittar…"
   machine: { fi: true, sv: true }
 
 pond.gate.failed:
   en: "Where you stand could not be read."
-  description: "Gate card when the person's gate could not be fetched."
+  description: "Gate card when it could not be fetched."
   fi: "Tilannettasi ei voitu lukea."
   sv: "Det gick inte att läsa var du står."
   machine: { fi: true, sv: true }
 
 pond.gate.retry:
   en: "Try again"
-  description: "Gate card, the button that fetches the person's gate again."
+  description: "Gate card, the button that fetches it again."
   fi: "Yritä uudelleen"
   sv: "Försök igen"
   machine: { fi: true, sv: true }
@@ -8132,7 +8181,7 @@ round.short.aside:
 
 round.short.more:
   en: "{more, plural, =0 {A few more people} one {About # more person} other {About # more people}}"
-  description: "Under a short-pool button (#99, ADR-042 §4): how much the relaxation widens the reader's pool, rounded down to the gate's step (matching_config waitlist_k, ten or more, ADR-015 §6); zero means fewer than a step. Never a count of cards."
+  description: "Under a short-pool button (#99, ADR-042 §4): how much the relaxation widens the reader's pool, rounded down to the counter's step (matching_config waitlist_k, ten or more); zero means fewer than a step. Never a count of cards."
   fi: "{more, plural, =0 {Muutama ihminen lisää} one {Noin # ihminen lisää} other {Noin # ihmistä lisää}}"
   sv: "{more, plural, =0 {Några fler personer} one {Ungefär # person till} other {Ungefär # fler personer}}"
   machine: { fi: true, sv: true }
@@ -9594,7 +9643,7 @@ settings.invite.earns:
 
 settings.invite.notYet:
   en: "You can invite friends once your profile is complete."
-  description: "The Invitations screen for a person whose profile has not passed the pond gate's test yet (#107, ADR-044 §1): no Make an invitation until then."
+  description: "The Invitations screen for a person whose profile is not complete (#107, ADR-044 §1): no Make an invitation until then."
   fi: "Voit kutsua ystäviä, kun profiilisi on valmis."
   sv: "Du kan bjuda in vänner när din profil är klar."
   machine: { fi: true, sv: true }
@@ -9767,7 +9816,7 @@ invite.redeem.title:
 
 invite.redeem.explain:
   en: "If a friend gave you a code, type it here. Their invitation counts once your profile is complete."
-  description: "The Invitations screen, under Have an invitation code? (#107, ADR-044 §7): the friend's invitation counts the night the person's profile first passes the gate's test."
+  description: "The Invitations screen, under Have an invitation code? (#107, ADR-044 §7): the friend's invitation counts the first night the person's profile is complete."
   fi: "Jos ystävä antoi sinulle koodin, kirjoita se tähän. Hänen kutsunsa lasketaan, kun profiilisi on valmis."
   sv: "Om en vän gav dig en kod, skriv in den här. Vännens inbjudan räknas när din profil är klar."
   machine: { fi: true, sv: true }
@@ -9810,7 +9859,7 @@ invite.step.title:
 
 invite.step.explain:
   en: "If a friend gave you an invitation code, type it here. You can also skip this and type it later in Settings, until your profile is complete."
-  description: "Onboarding's invitation step, under its title (#107): optional; Settings › Invitations takes the code until the profile passes the gate's test."
+  description: "Onboarding's invitation step, under its title (#107): optional; Settings › Invitations takes the code while the profile is not complete."
   fi: "Jos ystävä antoi sinulle kutsukoodin, kirjoita se tähän. Voit myös ohittaa tämän ja kirjoittaa koodin myöhemmin asetuksissa, kunnes profiilisi on valmis."
   sv: "Om en vän gav dig en inbjudningskod, skriv in den här. Du kan också hoppa över det här och skriva in koden senare i inställningarna, tills din profil är klar."
   machine: { fi: true, sv: true }

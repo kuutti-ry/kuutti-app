@@ -22,7 +22,7 @@ import {
   relaxedBy,
 } from "./pool.ts";
 
-// features/pond/gate.feature (#94, #147, ADR-015): who is in whose pool;
+// features/matching/filters.feature (#94, #147, ADR-015): who is in whose pool;
 // features/safety/blocks.feature (#84, ADR-030): a block, set by either;
 // features/matching/filters.feature (#87): the deal-breakers, both ways, and
 // the soft answers, which no pool reads.

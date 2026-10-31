@@ -65,17 +65,17 @@ const waitlistRoute = createRoute({
   },
 });
 
-// The person's own place at the gate (#94, ADR-015). What is said is the
-// person's alone and moves in steps; nothing of anybody else is in it.
+// Whether matching is open for the caller (#500, ADR-060 §4): the person's
+// alone, with nothing of anybody else in it.
 const gateRoute = createRoute({
   method: "get",
   path: "/gate",
-  summary: "Where the caller stands at the pond gate",
+  summary: "Whether matching is open for the caller",
   description:
-    "Between a finished profile and the first round (TD-10): on the pond's waitlist with a place, let in and waiting for enough people who match (how many more, in steps of `step`), or open. Counted nightly, and once when a person with a finished profile first asks.",
+    "Between a finished profile and the first round: incomplete while the profile or onboarding lacks something, closed once it is finished and matching has not opened in the caller's pond yet, open once it has. An admin opens a pond; nothing here counts anybody.",
   ...bearer,
   responses: {
-    200: { description: "The caller's gate.", ...json(GateResponse) },
+    200: { description: "What stands for the caller.", ...json(GateResponse) },
     401: unauthenticated,
   },
 });
@@ -97,9 +97,9 @@ const seeksRoute = createRoute({
 });
 
 /**
- * How the route learns the caller's gate. Handed in by the app: the count
- * reads across slices and lives with the nightly jobs (rules/layout.md), and
- * this slice does not import it.
+ * How the route learns what stands for the caller. Handed in by the app:
+ * completeness reads across slices and lives with the jobs (rules/layout.md),
+ * and this slice does not import it.
  */
 export type GateReader = (accountId: string) => Promise<GateResponse>;
 

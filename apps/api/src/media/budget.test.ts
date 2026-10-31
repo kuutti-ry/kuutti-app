@@ -518,7 +518,7 @@ describe("A block between the two (#84, ADR-030, features/safety/blocks.feature)
   });
 
   // features/safety/blocks.feature, "A block holds for a later account of
-  // either identity": the pool's half is in jobs/pond-gate.test.ts, the
+  // either identity": the pool's half is in jobs/round-builder.test.ts, the
   // card's in profile/service.test.ts, the photos' here. Both readers ask by
   // the accounts and the function answers by the identities, so a reader
   // that asked by account ids alone would fail here.

@@ -41,7 +41,7 @@ const feedback = tunable(
 const pond = tunable("default_pond", version(1, "paakaupunkiseutu"));
 const fetches = tunable("photo_fetches_per_day", version(1, { thumb: 600, card: 300, full: 60 }));
 const tips = tunable("photo_tips_on", version(1, true));
-const share = tunable("majority_share_max", version(1, 0.6));
+const share = tunable("contest_ratio_threshold", version(1, 0.6));
 
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
@@ -225,7 +225,7 @@ describe("the tunables", () => {
     expect(number.getByLabelText("Why the change")).toHaveValue("");
     expect(number.getByLabelText("Why the change")).toHaveAttribute("maxlength", "500");
     expect(number.getByLabelText("Why the change")).toBeRequired();
-    const fraction = await item("majority_share_max");
+    const fraction = await item("contest_ratio_threshold");
     expect(fraction.getByLabelText("New value")).toHaveAttribute("inputmode", "decimal");
     const text = await item("default_pond");
     expect(text.getByLabelText("New value")).toHaveValue("paakaupunkiseutu");
@@ -412,12 +412,12 @@ describe("the tunables", () => {
       value: 1000,
       reason: "Because the pilot said so",
     });
-    const fraction = await item("majority_share_max");
+    const fraction = await item("contest_ratio_threshold");
     review(fraction, "-0.1");
     expect(fraction.getByRole("alert")).toHaveTextContent("This is not a value of the key's type.");
     review(fraction, "0.55");
     expect(
-      fraction.getByText("Change majority_share_max? Now: 0.6. New: 0.55"),
+      fraction.getByText("Change contest_ratio_threshold? Now: 0.6. New: 0.55"),
     ).toBeInTheDocument();
   });
 

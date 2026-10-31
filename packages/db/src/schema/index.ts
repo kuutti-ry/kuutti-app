@@ -21,7 +21,6 @@ export {
 export { consent, consentKind } from "./consent.ts";
 export { feedback, feedbackKind, feedbackPlatform } from "./feedback.ts";
 export { foundReason, foundThemCount } from "./found-them.ts";
-export { gate } from "./gate.ts";
 export {
   type Account,
   account,

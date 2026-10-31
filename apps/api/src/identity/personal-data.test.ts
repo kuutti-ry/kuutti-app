@@ -42,7 +42,7 @@ const REGISTER: Record<string, Entry> = {
     by: "tombstoneAccount",
     stays: "id identity_id state state_changed_at registered_at deleted_at",
     cleared:
-      "birth_month birth_year email email_confirmed_at found_them_answered gender gender_changed_at paused_from pond_id sanctioned_from seeks_changed_at",
+      "birth_month birth_year email email_confirmed_at found_them_answered gender gender_changed_at paused_from pond_id sanctioned_from",
     exported: ["account"],
   },
   account_export: { erasure: "goes", by: "deleteExportsOfAccount", exported: ["exports"] },
@@ -111,7 +111,6 @@ const REGISTER: Record<string, Entry> = {
   },
   feedback: { erasure: "goes", by: "deleteFeedbackOfAccount", exported: ["feedback"] },
   found_them_count: { erasure: "nobody", why: "A count by day and reason (#83, ADR-040)." },
-  gate: { erasure: "goes", by: "deleteGateOfAccount", exported: ["gate"] },
   identity: {
     erasure: "stays",
     why: "Standing, the deletion count and the cooldown outlive the account (TD-7).",

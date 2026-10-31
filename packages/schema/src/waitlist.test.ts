@@ -3,6 +3,7 @@ import {
   moveFigures,
   PondSeeksResponse,
   publishCounts,
+  saidInStep,
   seeksBand,
   seeksShares,
   WAITLIST_K_MIN,
@@ -395,5 +396,18 @@ describe("the response", () => {
     expect(finishing(0)).toBe(true);
     expect(finishing(10)).toBe(true);
     for (const n of [1, 9, -1, 10.5]) expect(finishing(n)).toBe(false);
+  });
+});
+
+describe("a count about one person's pool", () => {
+  it.each([
+    [0, 10, 0],
+    [9, 10, 0],
+    [10, 10, 10],
+    [19, 10, 10],
+    [20, 10, 20],
+    [55, 20, 40],
+  ])("%i in steps of %i is said as %i, rounded down", (count, step, said) => {
+    expect(saidInStep(count, step)).toBe(said);
   });
 });

@@ -15,6 +15,7 @@ import { matchingConfigNumber } from "../lib/matching-config.ts";
 import { personOf, rateLimit } from "../lib/rate-limit.ts";
 import { dayWindow } from "../media/index.ts";
 import {
+  type CompleteReader,
   INVITATION_TRIES_PER_DAY_KEY,
   invitationsOf,
   makeInvitation,
@@ -42,7 +43,7 @@ const listRoute = createRoute({
   path: "/invitations",
   summary: "The caller's invitations",
   description:
-    "Whether the caller may invite (their profile has passed the pond gate's test) and may still type a code, what an invitation earns today (matching_config invitation_reward), their open invitations newest first, how many of theirs have counted, and what those earned that is not used yet. Never a code, and nothing of anybody invited.",
+    "Whether the caller may invite (their profile is complete) and may still type a code, what an invitation earns today (matching_config invitation_reward), their open invitations newest first, how many of theirs have counted, and what those earned that is not used yet. Never a code, and nothing of anybody invited.",
   ...bearer,
   responses: {
     200: { description: "The caller's invitations.", ...json(Invitations) },
@@ -56,14 +57,14 @@ const createInvitationRoute = createRoute({
   path: "/invitations",
   summary: "Make an invitation",
   description:
-    "A code for one friend, in two groups of five, shown here once: Kuutti keeps only its hash. For a caller whose profile has passed the pond gate's test; at most matching_config invitations_open open at once. The night the friend's profile first passes the same test, the invitation counts and the caller earns matching_config invitation_reward.",
+    "A code for one friend, in two groups of five, shown here once: Kuutti keeps only its hash. For a caller whose profile is complete; at most matching_config invitations_open open at once. The night the friend's profile first passes the same test, the invitation counts and the caller earns matching_config invitation_reward.",
   ...bearer,
   responses: {
     201: { description: "Made; the code is not shown again.", ...json(InvitationCreated) },
     401: unauthenticated,
     404: erased,
     409: errorContent(
-      "invitation_not_yet: the caller's profile has not passed the pond gate's test; invitations_full: as many invitations open as matching_config invitations_open allows. Nothing was written.",
+      "invitation_not_yet: the caller's profile is not complete; invitations_full: as many invitations open as matching_config invitations_open allows. Nothing was written.",
     ),
   },
 });
@@ -89,7 +90,7 @@ const redeemRoute = createRoute({
   path: "/invitations/redeem",
   summary: "Use an invitation code",
   description:
-    "A code typed by the caller, before their profile first passes the pond gate's test: case, spaces and hyphens do not matter. The caller is checked before the code is looked up. At most matching_config invitation_tries_per_day tries a Finnish day, whatever their answer.",
+    "A code typed by the caller, before their profile is complete: case, spaces and hyphens do not matter. The caller is checked before the code is looked up. At most matching_config invitation_tries_per_day tries a Finnish day, whatever their answer.",
   ...bearer,
   request: { body: { required: true, ...json(InvitationRedeemRequest) } },
   responses: {
@@ -103,7 +104,7 @@ const redeemRoute = createRoute({
       "invitation_unknown: no open invitation has that code; one used or the caller's own answers the same. not_found: the account was erased meanwhile.",
     ),
     409: errorContent(
-      "invitation_not_for_you: the caller cannot use a code: their profile has passed the test, they used one already, the current terms and privacy consents are not given, or their identity had an account erased before.",
+      "invitation_not_for_you: the caller cannot use a code: their profile is complete, they used one already, the current terms and privacy consents are not given, or their identity had an account erased before.",
     ),
     429: errorContent(
       "invitation_tries_exceeded: the day's tries are used; Retry-After is the wait until midnight in Finland.",
@@ -111,10 +112,14 @@ const redeemRoute = createRoute({
   },
 });
 
-export function invitationRoutes(deps: Deps, guard: MiddlewareHandler<AppEnv>) {
+export function invitationRoutes(
+  deps: Deps,
+  guard: MiddlewareHandler<AppEnv>,
+  complete: CompleteReader,
+) {
   const app = new OpenAPIHono<AppEnv>();
   const now = () => (deps.now ?? (() => new Date()))();
-  const rewards = () => ({ db: deps.db, logger: deps.logger, now });
+  const rewards = () => ({ db: deps.db, logger: deps.logger, now, complete });
   // On the routing paths themselves, which app.test.ts holds every guarded route to.
   for (const route of [listRoute, withdrawRoute]) app.use(route.getRoutingPath(), guard);
   // The day's tries (ADR-044 §6), as the chat counts a day's photo tries: every
@@ -147,7 +152,7 @@ export function invitationRoutes(deps: Deps, guard: MiddlewareHandler<AppEnv>) {
 
   app.openapi(listRoute, async (c) => {
     const { accountId } = callerOf(c);
-    return c.json(await invitationsOf(deps.db, accountId), 200);
+    return c.json(await invitationsOf(rewards(), accountId), 200);
   });
 
   app.openapi(createInvitationRoute, async (c) => {

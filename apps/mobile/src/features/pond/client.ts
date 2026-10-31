@@ -24,7 +24,7 @@ export async function fetchPondSeeks(): Promise<PondSeeks | null> {
   return PondSeeksResponse.parse(data).seeks;
 }
 
-/** The person's own place at the gate (#94, ADR-015): asked with their session. */
+/** Whether matching is open for the person (#500, ADR-060 §4): asked with their session. */
 export async function fetchGate(): Promise<GateResponse> {
   const { data, response } = await api.GET("/gate");
   if (!data) throw new ApiError(`gate answered ${response.status}`, response.status);

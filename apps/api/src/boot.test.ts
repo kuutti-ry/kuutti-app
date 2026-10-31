@@ -242,7 +242,6 @@ describe("boot", () => {
       "research-anonymity",
       "end-suspensions",
       "waitlist-snapshot",
-      "pond-gate",
       "invitation-count",
       "round-builder",
       "reject-unreviewed-photos",
@@ -270,7 +269,7 @@ describe("boot", () => {
       "research-export",
       "research-events-partitions",
     ]);
-    expect(jobs).toHaveLength(15);
+    expect(jobs).toHaveLength(14);
     // The prune asks the copy first; tonight no month is due, so the bucket is asked nothing.
     const partitions = jobs.find((j) => j.name === "research-events-partitions");
     expect(await partitions?.run()).toMatchObject({ dropped: 0, uncopied: 0 });

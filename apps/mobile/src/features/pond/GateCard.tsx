@@ -8,14 +8,11 @@ import { useHapticTap } from "@/theme/haptics";
 import { useGate } from "./useGate";
 
 /**
- * Where the person stands between a finished profile and the first round
- * (#94, ADR-015): in line for their area, let in and waiting for enough
- * people who match, or open. In words, with the reason beside every number:
- * why there is a line, who counts, and why the numbers are round. They are
- * shown as they were served, in steps; the card works nothing out of them.
- * Nothing here names a gender, and nothing can be tapped to move ahead.
- * Once matching is open, the card carries what the home screen hands it for
- * that: the way to today's round (#379).
+ * Whether matching is open for the person (#500, ADR-060 §4), one sentence for
+ * each of three things: the profile lacks something, it is finished and their
+ * area has not opened, or open. No number and nothing that can be tapped to
+ * move ahead. Once matching is open, the card carries what the home screen
+ * hands it for that: the way to today's round (#379).
  */
 export function GateCard({ whenOpen }: { whenOpen?: ReactNode }) {
   const { t } = useT();
@@ -44,21 +41,7 @@ export function GateCard({ whenOpen }: { whenOpen?: ReactNode }) {
             />
           )}
           {gate?.state === "incomplete" && <Text>{t("pond.gate.incomplete")}</Text>}
-          {gate?.state === "pending" && <Text>{t("pond.gate.pending")}</Text>}
-          {gate?.state === "waiting" && gate.within !== null && (
-            <>
-              <Text>{t("pond.gate.waiting", { within: gate.within })}</Text>
-              <Text variant="muted">{t("pond.gate.waiting.why")}</Text>
-              <Text variant="muted">{t("pond.gate.steps", { step: gate.step })}</Text>
-            </>
-          )}
-          {gate?.state === "closed" && gate.needed !== null && (
-            <>
-              <Text>{t("pond.gate.closed", { needed: gate.needed })}</Text>
-              <Text variant="muted">{t("pond.gate.closed.who")}</Text>
-              <Text variant="muted">{t("pond.gate.steps", { step: gate.step })}</Text>
-            </>
-          )}
+          {gate?.state === "closed" && <Text>{t("pond.gate.closed")}</Text>}
           {gate?.state === "open" && (
             <>
               <Text>{t("pond.gate.open")}</Text>

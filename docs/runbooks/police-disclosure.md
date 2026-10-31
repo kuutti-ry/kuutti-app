@@ -82,7 +82,7 @@ From the schema (`packages/db/src/schema/`). "Erasure" is the person deleting th
 | Reports the person filed or received (#84, ADR-030): the reason, the reporter's note if they wrote one, the time, and the moderators' decision with who decided and the sanction it led to; the blocks the person set or received, between the two identities, with the date | `report`, `block` | a report twelve months from filing, swept nightly, whoever of the two is erased; a block as long as the two identities, so it survives erasure |
 | What the person fetched and was shown: these rows name other people's photos. A fetch of a photo sent in a conversation has the purpose `message`, written once per viewer, photo and variant in a five-minute window, two reads at the same instant aside | `photo_access`, `card_shown` | until erasure; a `photo_access` row outlives the photo it names |
 | Devices: platform, a truncated user agent, when created, last used and revoked; no address | `session` | swept nightly 30 days after sign-out or revocation, or once expired (90 days after the device's last use, and a year after it signed in at most, ADR-058), and at erasure (`apps/api/src/identity/sessions.ts`) |
-| Consents, export requests, the place at the pond gate | `consent`, `account_export`, `gate` | until erasure |
+| Consents, export requests | `consent`, `account_export` | until erasure |
 | Sanctions, with staff's note | `sanction` | erasure keeps the open bans and suspensions (ADR-024 §8) |
 | Feedback the person sent, in their words | `feedback` | until erasure |
 | The photo check's notes | `photo_check_note` | twelve months, or erasure |

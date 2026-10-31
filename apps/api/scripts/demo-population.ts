@@ -48,6 +48,7 @@ import {
   describeTarget,
   facesForPopulation,
   generatePopulation,
+  openPonds,
   type PhotoAsset,
   PLACEHOLDER_PHOTO_PREFIX,
   parseDemoCommand,
@@ -57,7 +58,6 @@ import {
   writePopulation,
 } from "@kuutti/db/demo";
 import { CURRENT_CONSENT_VERSIONS } from "../src/identity/index.ts";
-import { countGates } from "../src/jobs/pond-gate.ts";
 import { takeSnapshot } from "../src/jobs/waitlist-snapshot.ts";
 import { type Config, loadConfig, parseConfig } from "../src/lib/config.ts";
 import { createLogger } from "../src/lib/logger.ts";
@@ -84,11 +84,7 @@ const { env, size, seed, action, photos } = command;
 const ponds = plannedPonds(size);
 // What this size does not show, against the first version of the config: a
 // small population is allowed, it is only said what it is too small for.
-const notShown = uncrossed(ponds, {
-  gateK: MATCHING_CONFIG_V1.gate_k,
-  majorityShareMax: MATCHING_CONFIG_V1.majority_share_max,
-  counterK: MATCHING_CONFIG_V1.waitlist_k,
-});
+const notShown = uncrossed(ponds, { counterK: MATCHING_CONFIG_V1.waitlist_k });
 
 if (action === "dry-run") {
   console.log(
@@ -240,9 +236,9 @@ try {
   await pool.query("DELETE FROM waitlist_snapshot");
   const counted = await takeSnapshot({ db: pool, logger, now: () => new Date() });
   console.log(JSON.stringify({ msg: "demo population: counter recounted", ...counted }));
-  // And the gates (#94): who is let into each pond, and for whom matching is open.
-  const gates = await countGates({ db: pool, logger, now: () => new Date() });
-  console.log(JSON.stringify({ msg: "demo population: gates counted", ...gates }));
+  // And the ponds open, so that these people have rounds (ADR-060 Open 1).
+  const opened = await openPonds(pool);
+  console.log(JSON.stringify({ msg: "demo population: ponds opened", opened }));
 } catch (error) {
   if (error instanceof DemoCommandError || error instanceof DemoError) {
     console.error(`✖ ${error.message}`);

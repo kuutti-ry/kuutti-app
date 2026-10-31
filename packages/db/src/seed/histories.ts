@@ -105,7 +105,7 @@ export const PERSONA_HISTORIES: readonly PersonaHistory[] = [
     },
     photos: 2,
     // The second face waits for a moderator: one approved photo is short of
-    // the two a profile needs (#56), so the gate and the profile wait.
+    // the two a profile needs (#56), so the home card and the profile wait.
     facesInReview: 1,
     // Four more pictures for the check (#142): no face, text and several
     // people are not accepted and Noa is told why, with no moderator asked;

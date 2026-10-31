@@ -5,15 +5,14 @@ import { type Queryable, transaction } from "../pool.ts";
  * app to the day's round, the four women of the round's cast in it, Henna
  * first, who liked her yesterday, so that Iida's like back is a match.
  *
- * Two things in it no route does, written as rows, as the conversations are:
+ * One thing in it no route does, written as rows, as the conversations are:
  * a like on the day before (a decision is taken on the day it is of, and the
- * day has ended), and a gate opened with a pool under `gate_k` (TD-10, ADR-015:
- * the count opens a gate at thirty people who can be shown; the stories have
- * four). The day's round itself is built by the round builder (#95) in the
- * API's demo commands, after the gates are counted, as the night builds it.
+ * day has ended). The day's round itself is built by the round builder (#95)
+ * in the API's demo commands, in a pond they have opened (`openPonds`), as the
+ * night builds it.
  */
 export type PersonaRound = {
-  /** Whose round the day has, by persona key: their gate is opened, once the count has let them in. */
+  /** Whose round the day has, by persona key. */
   of: string;
   /** Who liked them the day before, by persona key: each waits first in the round as liked you. */
   likedBy: readonly string[];
@@ -22,12 +21,11 @@ export type PersonaRound = {
 export const PERSONA_ROUNDS: readonly PersonaRound[] = [{ of: "iida", likedBy: ["henna"] }];
 
 /**
- * `opened`: gates opened now (none for one open before, or for somebody the
- * count has not let in); `liked`: likes written; `already`: a round of that
- * day the liker had before (the staging job runs again without a reset);
- * `missing`: a persona of the story has no account this time.
+ * `liked`: likes written; `already`: a round of that day the liker had before
+ * (the staging job runs again without a reset); `missing`: a persona of the
+ * story has no account this time.
  */
-export type RoundsResult = { opened: number; liked: number; already: number; missing: number };
+export type RoundsResult = { liked: number; already: number; missing: number };
 
 /** The Finnish calendar day of an instant, as YYYY-MM-DD (the API's `finnishDay`). */
 const finnishDay = (at: Date): string =>
@@ -46,19 +44,29 @@ function dayBefore(day: string): string {
 }
 
 /**
- * Opens each story's gate and writes the likes of the day before, between the
- * accounts the stories gave the personas, by key. A gate is opened only for
- * somebody the count has let in (`gate_opened_check`), so the count runs
- * first. A like is the liker's round of that day with the person as its one
- * card, seen and liked at midday; a round of that day the liker has already is
- * left as it is.
+ * Opens every pond, for the demo commands: their people need rounds (ADR-014,
+ * ADR-060 Open 1). Never an admin's switch: the commands refuse production. How
+ * many ponds it opened.
+ */
+export async function openPonds(db: Queryable): Promise<number> {
+  const { rowCount } = await db.query(
+    "UPDATE ponds SET matching_open = true WHERE NOT matching_open",
+  );
+  return rowCount ?? 0;
+}
+
+/**
+ * Writes the likes of the day before, between the accounts the stories gave the
+ * personas, by key. A like is the liker's round of that day with the person as
+ * its one card, seen and liked at midday; a round of that day the liker has
+ * already is left as it is.
  */
 export async function writeRounds(
   db: Queryable,
   accounts: ReadonlyMap<string, string>,
   now: Date,
 ): Promise<RoundsResult> {
-  const result: RoundsResult = { opened: 0, liked: 0, already: 0, missing: 0 };
+  const result: RoundsResult = { liked: 0, already: 0, missing: 0 };
   const yesterday = dayBefore(finnishDay(now));
   // Midday in Finland on the day before (noon in winter, one in summer).
   const noon = new Date(`${yesterday}T10:00:00Z`);
@@ -68,12 +76,6 @@ export async function writeRounds(
       result.missing += 1;
       continue;
     }
-    const opened = await db.query(
-      `UPDATE gate SET opened_at = $2
-        WHERE account_id = $1 AND admitted_at IS NOT NULL AND opened_at IS NULL`,
-      [of, now],
-    );
-    if (opened.rowCount) result.opened += 1;
     for (const key of story.likedBy) {
       const liker = accounts.get(key);
       if (!liker) {

@@ -56,8 +56,7 @@ Feature: Reporting somebody from a card or a conversation
   Scenario: The reported person learns nothing from any route
     Given "A" was shown "B"'s card
     When "A" reports "B"
-    Then "B"'s onboarding status, gate and export read as they did before, without a report, a block or "A"
-    And "B"'s gate moves only at a night's count, as when anybody leaves a pool
+    Then "B"'s onboarding status, whether matching is open and export read as they did before, without a report, a block or "A"
 
   Scenario: The night prunes reports older than twelve months
     Given reports filed just past and just inside twelve months, open and decided

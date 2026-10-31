@@ -10,7 +10,7 @@ Feature: The tunables in the panel
     Then "A"'s sixth feedback of the day is accepted
 
   Scenario: A change is a new version with its reason and who
-    Given gate_k is at version 1
+    Given liked_you_cap is at version 1
     When an admin changes it to 25 with the reason "Smaller ponds first"
     Then version 2 holds 25, by the admin's identity, with that reason
     And version 1 is kept, and the audit log has the change

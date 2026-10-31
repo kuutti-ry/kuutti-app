@@ -89,7 +89,7 @@ const pauseRoute = createRoute({
   path: "/account/pause",
   summary: "Take a break: pause this account",
   description:
-    "The account goes to paused (#170, ADR-022): the profile leaves every pool, counter and round, and every session of the account ends, this one included. Nothing is erased: the profile, the photos, the preferences, the consents and the place at the gate stay as they are, and the next bank login brings the account back as it was. The body confirms; the screen asks first.",
+    "The account goes to paused (#170, ADR-022): the profile leaves every pool, counter and round, and every session of the account ends, this one included. Nothing is erased: the profile, the photos, the preferences and the consents stay as they are, and the next bank login brings the account back as it was. The body confirms; the screen asks first.",
   ...bearer,
   request: { body: { required: true, ...json(AccountPauseRequest) } },
   responses: {

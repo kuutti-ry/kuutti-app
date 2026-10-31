@@ -4,14 +4,14 @@ Feature: Taking a break
   the profile leaves everybody's view, every device is signed out, and the next
   bank login brings everything back as it was. Nothing is erased; the erasure
   table (erasure.feature) is the only delete. That a paused account is in no
-  pool and no counter is held by pond/gate.feature and pond/waitlist.feature.
+  pool and no counter is held by pond/opening.feature and pond/waitlist.feature.
 
   Scenario: Taking a break hides the profile, ends every session and erases nothing
-    Given "A" is active on two devices with a profile, a photo, preferences, consents and a place at the gate
+    Given "A" is active on two devices with a profile, a photo, preferences and consents
     When "A" takes a break
     Then the account is paused with its former state kept aside
     And every session of "A" is ended and none of "A"'s tokens answers
-    And the profile, the photo, the preferences, the consents and the gate row are as they were
+    And the profile, the photo, the preferences and the consents are as they were
 
   Scenario: The next bank login resumes a paused account as it was
     Given "A" took a break

@@ -55,7 +55,6 @@ async function holdings(ctx: TestContext, accountId: string) {
     photo: await per("photo"),
     preferences: await per("preferences"),
     consent: await per("consent"),
-    gate: await per("gate"),
     gender: rows[0]?.gender,
     pond: rows[0]?.pond_id,
   };
@@ -110,12 +109,8 @@ describe("taking a break", () => {
        VALUES ($1, 'terms', 'v1', 'fi'), ($1, 'privacy', 'v1', 'fi')`,
       [a.accountId],
     );
-    await ctx.client.query("INSERT INTO gate (account_id, pond_id) VALUES ($1, $2)", [
-      a.accountId,
-      pondId,
-    ]);
     const before = await holdings(ctx, a.accountId);
-    expect(before).toMatchObject({ profile: 1, photo: 1, preferences: 2, consent: 2, gate: 1 });
+    expect(before).toMatchObject({ profile: 1, photo: 1, preferences: 2, consent: 2 });
     expect(await liveSessions(ctx, a.accountId)).toBe(2);
 
     expect((await pause(app, a.headers)).status).toBe(204);

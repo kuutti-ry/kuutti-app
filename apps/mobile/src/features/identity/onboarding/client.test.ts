@@ -27,7 +27,7 @@ const STATUS = {
   preferences: { seeks: ["man"], ageWindow: { min: 30, max: 40 } },
   consents: { terms: "v1", privacy: "v1", specialCategory: "s1", research: null },
   currentVersions: { terms: "v1", privacy: "v1", research: "v1", special_category: "s1" },
-  nextChange: { gender: null, seeks: null },
+  nextChange: { gender: null },
   missing: [],
   complete: true,
 };

@@ -1,9 +1,9 @@
 import { z } from "zod";
 
 // Invitations and the reward ledger they earn into (#107, ADR-044; TD-15): a
-// code a person whose profile passed the gate's test gives a friend, single
-// use, and what it earns its inviter the night the friend's profile first
-// passes it. Nothing here names, counts or dates anybody but the caller.
+// code a person whose profile is complete gives a friend, single use, and what
+// it earns its inviter the first night the friend's profile is complete.
+// Nothing here names, counts or dates anybody but the caller.
 
 /**
  * The code's format (ADR-044 §2), not a tunable: ten characters of
@@ -87,11 +87,11 @@ export type OpenInvitation = z.infer<typeof OpenInvitation>;
 export const Invitations = z
   .object({
     canInvite: z.boolean().meta({
-      description: "True once the person's profile has passed the pond gate's test.",
+      description: "True while the person's profile and onboarding are complete.",
     }),
     redeemable: z.boolean().meta({
       description:
-        "True while the person may still type a code: before their profile first passed the gate's test, with the current consents, no code used, and an identity never erased.",
+        "True while the person may type a code: their profile is not complete, with the current consents, no code used, and an identity never erased.",
     }),
     reward: InvitationReward.meta({
       description:

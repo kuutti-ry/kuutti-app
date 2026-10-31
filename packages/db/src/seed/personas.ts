@@ -244,7 +244,7 @@ export const DEMO_PERSONAS: readonly DemoPersona[] = [
     born: { year: 1990, month: 3, day: 11 },
     individual: 968,
     group: "history",
-    note: "Onboarded, with a complete profile: her gate open and a round for the day, four cards, the first of them Henna, who liked her. The round's flow likes, passes, likes back and blocks as her (#379).",
+    note: "Onboarded, with a complete profile: a round for the day, four cards, the first of them Henna, who liked her. The round's flow likes, passes, likes back and blocks as her (#379).",
   },
   {
     key: "henna",

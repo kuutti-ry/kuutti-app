@@ -79,8 +79,8 @@ describe("blocks and reports", () => {
     expect(readersOf(readsBlock)).toEqual([
       // The conversation: a block ends it for both, and its blocker never sees it again (ADR-030 §2, ADR-031 §2).
       "apps/api/src/chat/repo.ts",
-      // The gate's count: who is in whose pool (ADR-015 §1).
-      "apps/api/src/jobs/pond-gate.ts",
+      // Who is complete, and what their pools ask (ADR-060 §5).
+      "apps/api/src/jobs/pool.ts",
       // Today's round: seen and the decision ask at the write (ADR-030 §2, ADR-034).
       "apps/api/src/matching/rounds.ts",
       // The photos a card showed (ADR-008 §3).

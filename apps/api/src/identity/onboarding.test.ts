@@ -686,7 +686,7 @@ describe("onboarding and consents: the quiet branches", () => {
     });
     expect(res.status).toBe(200);
     expect(ConsentsResponse.parse(await res.json()).consents).toEqual([]);
-    // Nothing was there, so nothing goes: the seek row stays, and the cadence is not sidestepped (#147).
+    // Nothing was there, so nothing goes: the seek row stays.
     const seeks = await ctx.client.query(
       "SELECT value FROM preferences WHERE account_id = $1 AND field = 'seeks'",
       [a.accountId],

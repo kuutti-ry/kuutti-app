@@ -61,7 +61,7 @@ const spoken = (code: string) =>
 
 /**
  * Settings › Invitations (#107, ADR-044), the settings slice's page around
- * it. For a person whose profile has passed the gate's test: what an
+ * it. For a person whose profile is complete: what an
  * invitation earns today in words, Make an invitation, the code just made
  * (large, selectable, read a character at a time, shown this once since
  * Kuutti keeps only its hash) with Share the code, which hands the phone's
@@ -274,7 +274,7 @@ export function Invitations({
       ) : (
         <Text>{t("settings.invite.notYet")}</Text>
       )}
-      {/* A code from a friend, until the profile first passes the gate's test (ADR-044 §6). */}
+      {/* A code from a friend, while the profile is not complete (ADR-044 §6, ADR-060 §7). */}
       {(redeemable || redeemed) && (
         <View className="gap-3">
           <Text variant="title">{t("invite.redeem.title")}</Text>

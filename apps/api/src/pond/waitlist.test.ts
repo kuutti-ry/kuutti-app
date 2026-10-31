@@ -6,7 +6,7 @@ import { generatePopulation, POND_PLANS, writePopulation } from "@kuutti/db/demo
 import { CONSENT_VERSIONS } from "@kuutti/i18n";
 import { PondSeeksResponse, WaitlistResponse } from "@kuutti/schema";
 import { createApp } from "../app.ts";
-import { subjectsOfPond } from "../jobs/pond-gate.ts";
+import { subjectsOfPond } from "../jobs/pool.ts";
 import { takeSnapshot } from "../jobs/waitlist-snapshot.ts";
 import { signedInAccount, withMatchingConfig } from "../test/account.ts";
 import {
@@ -201,7 +201,7 @@ describe("the bar of whom a pond seeks (#507)", () => {
     expect(response.status).toBe(500);
   });
 
-  test("the demo population fills the bar, and stays out of every gate and round", {
+  test("the demo population fills the bar, and stays out of every pool and round", {
     timeout: 60_000,
   }, async ({ ctx }) => {
     for (const seeded of SEED_PONDS) {

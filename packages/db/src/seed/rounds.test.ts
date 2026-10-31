@@ -4,10 +4,10 @@ import { migrate } from "../migrate.ts";
 import { createPool, type Queryable } from "../pool.ts";
 import { withTemporaryDatabase } from "../test/temporary-database.ts";
 import { PERSONA_HISTORIES } from "./histories.ts";
-import { PERSONA_ROUNDS, writeRounds } from "./rounds.ts";
+import { openPonds, PERSONA_ROUNDS, writeRounds } from "./rounds.ts";
 
-// The round of the stories (#379): Iida's gate opened, and Henna's like of
-// her on the day before. Whether the cast pass each other's filters is the
+// The round of the stories (#379): Henna's like of Iida on the day before, and
+// the ponds the demo commands open. Whether the cast pass each other's filters is the
 // API's rule, tested beside it (apps/api/scripts/demo/demo-conversations.test.ts).
 
 const MIGRATIONS = resolve(import.meta.dirname, "../..", "drizzle");
@@ -30,8 +30,29 @@ describe("the round of the stories", () => {
   });
 });
 
+describe("the demo commands' ponds", () => {
+  it("opens every pond, and says how many it opened (#500, ADR-060)", async () => {
+    await withTemporaryDatabase(async (url) => {
+      const pool = createPool({ connectionString: url, max: 2 });
+      try {
+        await migrate(pool, MIGRATIONS);
+        await pool.query(
+          `INSERT INTO ponds (slug, name_nominative, name_inessive)
+           VALUES ('paakaupunkiseutu', 'Pääkaupunkiseutu', 'Pääkaupunkiseudulla')`,
+        );
+        expect(await openPonds(pool)).toBe(2);
+        const ponds = await pool.query("SELECT DISTINCT matching_open FROM ponds");
+        expect(ponds.rows).toEqual([{ matching_open: true }]);
+        expect(await openPonds(pool)).toBe(0);
+      } finally {
+        await pool.end();
+      }
+    });
+  });
+});
+
 describe("writing the round of the stories", () => {
-  const account = async (db: Queryable, hash: string, pondId: string, admitted: boolean) => {
+  const account = async (db: Queryable, hash: string, pondId: string) => {
     const identity = await db.query<{ id: string }>(
       "INSERT INTO identity (hetu_hmac, broker_subject) VALUES ($1, $1) RETURNING id",
       [hash],
@@ -41,15 +62,10 @@ describe("writing the round of the stories", () => {
        VALUES ($1, 'active', 1990, 1, $2) RETURNING id`,
       [identity.rows[0]?.id, pondId],
     );
-    const id = rows[0]?.id as string;
-    await db.query(
-      `INSERT INTO gate (account_id, pond_id, admitted_at, place_said) VALUES ($1, $2, $3, $4)`,
-      [id, pondId, admitted ? new Date("2026-10-19T02:00:00Z") : null, admitted ? null : 1],
-    );
-    return id;
+    return rows[0]?.id as string;
   };
 
-  it("opens the gate of somebody let in, writes the like of the day before once, and says who is missing", async () => {
+  it("writes the like of the day before once, and says who is missing", async () => {
     await withTemporaryDatabase(async (url) => {
       const pool = createPool({ connectionString: url, max: 2 });
       try {
@@ -59,8 +75,8 @@ describe("writing the round of the stories", () => {
            VALUES ('paakaupunkiseutu', 'Pääkaupunkiseutu', 'Pääkaupunkiseudulla') RETURNING id`,
         );
         const pondId = pond.rows[0]?.id as string;
-        const iida = await account(pool, "hash-iida", pondId, true);
-        const henna = await account(pool, "hash-henna", pondId, true);
+        const iida = await account(pool, "hash-iida", pondId);
+        const henna = await account(pool, "hash-henna", pondId);
         const accounts = new Map([
           ["iida", iida],
           ["henna", henna],
@@ -69,16 +85,10 @@ describe("writing the round of the stories", () => {
         const now = new Date("2026-10-20T21:30:00Z");
 
         expect(await writeRounds(pool, accounts, now)).toEqual({
-          opened: 1,
           liked: 1,
           already: 0,
           missing: 0,
         });
-        const gate = await pool.query<{ opened_at: Date }>(
-          "SELECT opened_at FROM gate WHERE account_id = $1",
-          [iida],
-        );
-        expect(gate.rows).toEqual([{ opened_at: now }]);
         const likes = await pool.query(
           `SELECT r.account_id, r.day::text AS day, e.position, e.candidate_id, e.reason, e.decision,
                   e.decided_at, e.seen_at, e.fish
@@ -99,26 +109,20 @@ describe("writing the round of the stories", () => {
           },
         ]);
 
-        // Again, as staging's job runs without a reset: nothing new, the gate as it was.
+        // Again, as staging's job runs without a reset: nothing new.
         expect(await writeRounds(pool, accounts, new Date("2026-10-20T22:00:00Z"))).toEqual({
-          opened: 0,
           liked: 0,
           already: 1,
           missing: 0,
         });
-        expect(
-          (await pool.query("SELECT opened_at FROM gate WHERE account_id = $1", [iida])).rows,
-        ).toEqual([{ opened_at: now }]);
 
-        // Nobody to open or like for: no account this time.
+        // Nobody to like for: no account this time.
         expect(await writeRounds(pool, new Map(), now)).toEqual({
-          opened: 0,
           liked: 0,
           already: 0,
           missing: 1,
         });
         expect(await writeRounds(pool, new Map([["iida", iida]]), now)).toEqual({
-          opened: 0,
           liked: 0,
           already: 0,
           missing: 1,
@@ -129,7 +133,7 @@ describe("writing the round of the stories", () => {
     });
   });
 
-  it("opens no gate for somebody the count has not let in", async () => {
+  it("takes the day before by the calendar", async () => {
     await withTemporaryDatabase(async (url) => {
       const pool = createPool({ connectionString: url, max: 2 });
       try {
@@ -139,8 +143,8 @@ describe("writing the round of the stories", () => {
            VALUES ('paakaupunkiseutu', 'Pääkaupunkiseutu', 'Pääkaupunkiseudulla') RETURNING id`,
         );
         const pondId = pond.rows[0]?.id as string;
-        const iida = await account(pool, "hash-iida", pondId, false);
-        const henna = await account(pool, "hash-henna", pondId, true);
+        const iida = await account(pool, "hash-iida", pondId);
+        const henna = await account(pool, "hash-henna", pondId);
         const result = await writeRounds(
           pool,
           new Map([
@@ -150,9 +154,7 @@ describe("writing the round of the stories", () => {
           // 00:30 in Finland on 30.3.2026: 24 hours back is still the 28th.
           new Date("2026-03-29T21:30:00Z"),
         );
-        expect(result).toEqual({ opened: 0, liked: 1, already: 0, missing: 0 });
-        const gate = await pool.query("SELECT opened_at FROM gate WHERE account_id = $1", [iida]);
-        expect(gate.rows).toEqual([{ opened_at: null }]);
+        expect(result).toEqual({ liked: 1, already: 0, missing: 0 });
         // The day before is the 29th by the calendar, a day of 23 hours (summer time began on it).
         const day = await pool.query("SELECT day::text AS day FROM rounds");
         expect(day.rows).toEqual([{ day: "2026-03-29" }]);

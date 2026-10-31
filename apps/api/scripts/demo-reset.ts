@@ -2,8 +2,8 @@
  * Returns the twenty-four personas to where they begin (#73, ADR-014 §12; on
  * staging #141, ADR-018): everybody erased through the erasure path and
  * forgotten, then the eighteen with a history given it anew, with their
- * conversations (#348) and, once the gates are counted, Iida's round for the
- * day (#379).
+ * conversations (#348) and, once the ponds are open, Iida's round for the day
+ * (#379).
  *
  *   pnpm demo:reset                  reset, then the histories
  *   pnpm demo:reset -- --bare        reset only: all twenty-four are newcomers
@@ -37,10 +37,10 @@ import {
   assertStagingProcess,
   DemoCommandError,
   describeTarget,
+  openPonds,
   PERSONA_HISTORIES,
 } from "@kuutti/db/demo";
 import { hmacKeyFromHex } from "../src/identity/index.ts";
-import { countGates } from "../src/jobs/pond-gate.ts";
 import { takeSnapshot } from "../src/jobs/waitlist-snapshot.ts";
 import { loadConfig, parseConfig } from "../src/lib/config.ts";
 import { createLogger, type Logger } from "../src/lib/logger.ts";
@@ -99,9 +99,9 @@ if (envArg !== undefined && process.env.APP_ENV !== undefined && envArg !== proc
 }
 
 /**
- * The counter and the gates after the people changed, then the round of the
- * stories, which needs the gates counted (#379): the same steps locally and
- * on staging.
+ * The counter after the people changed, the ponds opened, then the round of
+ * the stories, which needs its pond open (#379): the same steps locally and on
+ * staging.
  */
 async function recount(
   pool: ReturnType<typeof createPool>,
@@ -114,9 +114,9 @@ async function recount(
   await pool.query("DELETE FROM waitlist_snapshot");
   const counted = await takeSnapshot({ db: pool, logger, now });
   console.log(JSON.stringify({ msg: "demo reset: counter recounted", ...counted }));
-  // And the gates (#94): who is let into each pond, and for whom matching is open.
-  const gates = await countGates({ db: pool, logger, now });
-  console.log(JSON.stringify({ msg: "demo reset: gates counted", ...gates }));
+  // And the ponds open, so that the personas have rounds (ADR-060 Open 1).
+  const opened = await openPonds(pool);
+  console.log(JSON.stringify({ msg: "demo reset: ponds opened", opened }));
   if (results.length === 0) return;
   const rounds = await giveRounds({ db: pool, logger, now }, results);
   console.log(JSON.stringify({ msg: "demo reset: rounds", ...rounds }));

@@ -4,7 +4,6 @@ import { describe, expect } from "vitest";
 import { createApp } from "../app.ts";
 import { consentedAccount, signedInAccount, withMatchingConfig } from "../test/account.ts";
 import { captureLogger, type TestContext, test, testConfig } from "../test/harness.ts";
-import { pondNamed } from "../test/people.ts";
 import {
   deletePreferencesOfAccount,
   deleteSeeksOfAccount,
@@ -13,10 +12,9 @@ import {
 } from "./preferences.ts";
 
 // The preference routes' remaining branches (#46, #147, #149): every way the
-// guard refuses, a save that meets an erasure, rows that no longer parse,
-// the cadence once it has passed, and what a change of seeks does at the pond
-// gate. The hard rows are rule 7's: what is stored here is what the round
-// builder never crosses, in either direction.
+// guard refuses, a save that meets an erasure, rows that no longer parse, and
+// a withdrawn seek answer. The hard rows are rule 7's: what is stored here is
+// what the round builder never crosses, in either direction.
 
 type Headers = Record<string, string>;
 const json = (headers: Headers) => ({ ...headers, "content-type": "application/json" });
@@ -139,7 +137,7 @@ describe("a save that meets an erasure", () => {
     const me = await signedInAccount(ctx.client);
     const { app, logs } = await appWith(
       ctx,
-      erasedBefore(ctx, me.accountId, /^SELECT gender, seeks_changed_at FROM account/),
+      erasedBefore(ctx, me.accountId, /^SELECT 1 FROM account WHERE id = \$1 AND state <> /),
     );
     const res = await app.request("/preferences", {
       method: "PUT",
@@ -267,7 +265,7 @@ describe("a save that meets a withdrawal", () => {
     const me = await consentedAccount(ctx.client);
     const { app } = await appWith(
       ctx,
-      withdrawnBefore(ctx, me.accountId, /^SELECT gender, seeks_changed_at FROM account/),
+      withdrawnBefore(ctx, me.accountId, /^SELECT 1 FROM account WHERE id = \$1 AND state <> /),
     );
     const res = await app.request("/preferences", {
       method: "PUT",
@@ -280,34 +278,7 @@ describe("a save that meets a withdrawal", () => {
   });
 });
 
-describe("the cadence of a change, once it has passed", () => {
-  test("a change of whom one seeks after the cadence is allowed and starts the cadence again", async ({
-    ctx,
-  }) => {
-    const { app } = await appWith(ctx);
-    const me = await consentedAccount(ctx.client);
-    const put = (seeks: string[]) =>
-      app.request("/preferences", {
-        method: "PUT",
-        headers: json(me.headers),
-        body: JSON.stringify({ seeks }),
-      });
-    expect((await put(["woman"])).status).toBe(200);
-    // The last change was 31 days ago; the cadence is 30 (matching_config).
-    await ctx.client.query(
-      "UPDATE account SET seeks_changed_at = now() - interval '31 days' WHERE id = $1",
-      [me.accountId],
-    );
-    const before = Date.now();
-    expect((await put(["man"])).status).toBe(200);
-    const { rows } = await ctx.client.query<{ seeks_changed_at: Date }>(
-      "SELECT seeks_changed_at FROM account WHERE id = $1",
-      [me.accountId],
-    );
-    expect(rows[0]?.seeks_changed_at.getTime()).toBeGreaterThanOrEqual(before - 1000);
-    expect((await put(["non_binary"])).status).toBe(429);
-  });
-
+describe("the cadence of a change of gender", () => {
   test("nextChangeFrom: nothing on record, a change inside the cadence, and one past it", () => {
     const at = new Date("2026-10-11T12:00:00Z");
     expect(nextChangeFrom(null, 30, at)).toBeNull();
@@ -319,59 +290,8 @@ describe("the cadence of a change, once it has passed", () => {
   });
 });
 
-describe("a change of seeks at the pond gate (ADR-015 §9)", () => {
-  async function admitted(ctx: TestContext, accountId: string) {
-    const pond = await pondNamed(ctx.client, `test-pref-${accountId.slice(0, 8)}`);
-    await ctx.client.query("UPDATE account SET gender = 'man', pond_id = $2 WHERE id = $1", [
-      accountId,
-      pond,
-    ]);
-    await ctx.client.query(
-      `INSERT INTO gate (account_id, pond_id, admitted_at, pool_said, counted_at)
-       VALUES ($1, $2, now(), 20, now())`,
-      [accountId, pond],
-    );
-  }
-  const gateOf = async (ctx: TestContext, accountId: string) =>
-    (
-      await ctx.client.query<{ admitted: boolean; counted: boolean }>(
-        "SELECT admitted_at IS NOT NULL AS admitted, counted_at IS NOT NULL AS counted FROM gate WHERE account_id = $1",
-        [accountId],
-      )
-    ).rows[0];
-
-  test("seeking another gender too is decided anew; seeking fewer keeps the place", async ({
-    ctx,
-  }) => {
-    const { app } = await appWith(ctx);
-    const me = await consentedAccount(ctx.client);
-    await ctx.client.query(
-      `INSERT INTO preferences (account_id, field, value, mode, include_unknown)
-       VALUES ($1, 'seeks', '["woman", "non_binary"]', 'hard', false)`,
-      [me.accountId],
-    );
-    await admitted(ctx, me.accountId);
-    const put = (seeks: string[]) =>
-      app.request("/preferences", {
-        method: "PUT",
-        headers: json(me.headers),
-        body: JSON.stringify({ seeks }),
-      });
-    // Leaving a contest takes nothing back.
-    expect((await put(["woman"])).status).toBe(200);
-    expect(await gateOf(ctx, me.accountId)).toEqual({ admitted: true, counted: true });
-    // Joining one (after the cadence) empties the row for the next count.
-    await ctx.client.query(
-      "UPDATE account SET seeks_changed_at = now() - interval '31 days' WHERE id = $1",
-      [me.accountId],
-    );
-    expect((await put(["woman", "non_binary"])).status).toBe(200);
-    expect(await gateOf(ctx, me.accountId)).toEqual({ admitted: false, counted: false });
-  });
-
-  test("withdrawing the seek answer takes the row and keeps the age window and the place at the gate", async ({
-    ctx,
-  }) => {
+describe("withdrawing the seek answer", () => {
+  test("withdrawing the seek answer takes the row and keeps the age window", async ({ ctx }) => {
     const me = await signedInAccount(ctx.client);
     const other = await signedInAccount(ctx.client);
     for (const id of [me.accountId, other.accountId]) {
@@ -382,13 +302,11 @@ describe("a change of seeks at the pond gate (ADR-015 §9)", () => {
         [id],
       );
     }
-    await admitted(ctx, me.accountId);
     expect(await deleteSeeksOfAccount(ctx.client, me.accountId)).toBe(true);
     expect(await readPreferences(ctx.client, me.accountId)).toEqual({
       seeks: null,
       ageWindow: { min: 25, max: 35 },
     });
-    expect(await gateOf(ctx, me.accountId)).toEqual({ admitted: true, counted: true });
     expect((await readPreferences(ctx.client, other.accountId)).seeks).toEqual(["woman"]);
   });
 

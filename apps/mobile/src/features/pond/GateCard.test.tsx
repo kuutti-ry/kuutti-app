@@ -5,17 +5,12 @@ import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
 import { renderWithTheme } from "@/test/render";
 import { GateCard } from "./GateCard";
 
-// The gate card (#94, ADR-015): where the person stands, in words.
+// The gate card (#500, ADR-060 §4): whether matching is open for the person, in words.
 
 /** The screen gets the focus again, as on coming back to it (jest.setup.js). */
 const { __focus: focus } = jest.requireMock("expo-router") as { __focus: () => void };
 
-const gate = (state: Partial<GateResponse> & Pick<GateResponse, "state">): GateResponse => ({
-  within: null,
-  needed: null,
-  step: 10,
-  ...state,
-});
+const gate = (state: GateResponse["state"]): GateResponse => ({ state });
 
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
@@ -37,67 +32,35 @@ function answering(answers: Array<() => Response>) {
 const settle = () => act(() => new Promise<void>((resolve) => setTimeout(resolve, 20)));
 
 describe("GateCard", () => {
-  it("says about how many more are needed, who counts and why the number is round", async () => {
-    const calls = answering([() => json(gate({ state: "closed", needed: 20 }))]);
+  it("asks the gate and names itself", async () => {
+    const calls = answering([() => json(gate("closed"))]);
     const screen = await renderWithTheme(<GateCard />);
     await settle();
     expect(screen.getByLabelText("When matching opens for you")).toBeTruthy();
-    expect(
-      screen.getByText("About 20 more people are needed before matching opens for you."),
-    ).toBeTruthy();
-    expect(
-      screen.getByText(
-        "They are people in your area who are what you seek, and who seek somebody like you.",
-      ),
-    ).toBeTruthy();
-    expect(
-      screen.getByText(
-        "Numbers here are said in steps of 10, so that they do not follow each person who comes or goes.",
-      ),
-    ).toBeTruthy();
     expect(new URL(calls[0]?.url ?? "").pathname).toBe("/gate");
-  });
-
-  it("says one person in the singular", async () => {
-    answering([() => json(gate({ state: "closed", needed: 1 }))]);
-    const screen = await renderWithTheme(<GateCard />);
-    await settle();
-    expect(
-      screen.getByText("About 1 more person is needed before matching opens for you."),
-    ).toBeTruthy();
-  });
-
-  it("says the place in line in tens and why there is a line, naming no gender", async () => {
-    answering([() => json(gate({ state: "waiting", within: 20 }))]);
-    const screen = await renderWithTheme(<GateCard />);
-    await settle();
-    expect(screen.getByText("You are among the next 20 in line for your area.")).toBeTruthy();
-    const why = screen.getByText(/Those who wait are let in in the order they registered/);
-    expect(why).toBeTruthy();
-    expect(screen.getByText(/Numbers here are said in steps of 10/)).toBeTruthy();
-    expect(JSON.stringify(screen.toJSON())).not.toMatch(/\b(men|women|man|woman)\b/i);
   });
 
   it.each([
     ["open", "Matching is open for you."],
+    ["closed", "Your profile is finished. Matching has not opened in your area yet."],
     ["incomplete", "Matching opens for finished profiles. Yours still lacks something."],
-    ["pending", "Your profile is finished. Where you stand is counted tonight."],
-  ] as const)("says %s in one sentence and no number", async (state, text) => {
-    answering([() => json(gate({ state }))]);
+  ] as const)("says %s in one sentence, with no number and no gender", async (state, text) => {
+    answering([() => json(gate(state))]);
     const screen = await renderWithTheme(<GateCard />);
     await settle();
     expect(screen.getByText(text)).toBeTruthy();
     expect(screen.queryByText(/\d/)).toBeNull();
+    expect(JSON.stringify(screen.toJSON())).not.toMatch(/\b(men|women|man|woman)\b/i);
   });
 
   it.each([
-    ["open", gate({ state: "open" }), "Matching is open for you.", true],
-    ["closed", gate({ state: "closed", needed: 20 }), /more people are needed/, false],
-    ["pending", gate({ state: "pending" }), /counted tonight/, false],
+    ["open", "Matching is open for you.", true],
+    ["closed", "Your profile is finished. Matching has not opened in your area yet.", false],
+    ["incomplete", "Matching opens for finished profiles. Yours still lacks something.", false],
   ] as const)(
     "carries what the home screen hands it for an open gate only: %s (#379)",
-    async (_state, answer, words, shown) => {
-      answering([() => json(answer)]);
+    async (state, words, shown) => {
+      answering([() => json(gate(state))]);
       const screen = await renderWithTheme(<GateCard whenOpen={<View testID="round" />} />);
       await settle();
       expect(screen.getByText(words)).toBeTruthy();
@@ -108,7 +71,7 @@ describe("GateCard", () => {
   it("offers to try again when the gate could not be read, and reads it then", async () => {
     const calls = answering([
       () => json({ error: { code: "internal_error", message: "x", requestId: "r" } }, 500),
-      () => json(gate({ state: "open" })),
+      () => json(gate("open")),
     ]);
     const screen = await renderWithTheme(<GateCard />);
     await settle();
@@ -133,9 +96,9 @@ describe("GateCard", () => {
     let asked = 0;
     globalThis.fetch = jest.fn(async () => {
       asked += 1;
-      if (asked === 1) return json(gate({ state: "incomplete" }));
+      if (asked === 1) return json(gate("incomplete"));
       await held;
-      return json(gate({ state: "closed", needed: 30 }));
+      return json(gate("closed"));
     }) as unknown as typeof fetch;
     const screen = await renderWithTheme(<GateCard />);
     await settle();
@@ -156,7 +119,7 @@ describe("GateCard", () => {
     });
     await settle();
     expect(
-      screen.getByText("About 30 more people are needed before matching opens for you."),
+      screen.getByText("Your profile is finished. Matching has not opened in your area yet."),
     ).toBeTruthy();
   });
 
@@ -164,20 +127,17 @@ describe("GateCard", () => {
     // The environment's stand-in for the app's state records who listens.
     const listening = AppState.addEventListener as unknown as jest.Mock;
     listening.mockClear();
-    const calls = answering([
-      () => json(gate({ state: "pending" })),
-      () => json(gate({ state: "open" })),
-    ]);
+    const calls = answering([() => json(gate("closed")), () => json(gate("open"))]);
     const screen = await renderWithTheme(<GateCard />);
     await settle();
     expect(
-      screen.getByText("Your profile is finished. Where you stand is counted tonight."),
+      screen.getByText("Your profile is finished. Matching has not opened in your area yet."),
     ).toBeTruthy();
     const heard = listening.mock.calls.filter(([type]) => type === "change");
     expect(heard).toHaveLength(1);
     const listener = heard[0]?.[1] as (state: string) => void;
 
-    // Going to the background reads nothing; the morning after does.
+    // Going to the background reads nothing; coming back does.
     await act(async () => {
       listener("background");
     });
@@ -197,7 +157,7 @@ describe("GateCard", () => {
 
   it("keeps what it knew when a later read fails", async () => {
     answering([
-      () => json(gate({ state: "waiting", within: 10 })),
+      () => json(gate("closed")),
       () => json({ error: { code: "internal_error", message: "x", requestId: "r" } }, 500),
     ]);
     const screen = await renderWithTheme(<GateCard />);
@@ -206,12 +166,14 @@ describe("GateCard", () => {
       focus();
     });
     await settle();
-    expect(screen.getByText("You are among the next 10 in line for your area.")).toBeTruthy();
+    expect(
+      screen.getByText("Your profile is finished. Matching has not opened in your area yet."),
+    ).toBeTruthy();
     expect(screen.queryByText("Where you stand could not be read.")).toBeNull();
   });
 
-  it("refuses an answer that says a place and a number at once", async () => {
-    answering([() => json({ state: "closed", within: 10, needed: 10, step: 10 })]);
+  it("refuses an answer that carries a number", async () => {
+    answering([() => json({ state: "closed", needed: 10 })]);
     const screen = await renderWithTheme(<GateCard />);
     await settle();
     expect(screen.getByText("Where you stand could not be read.")).toBeTruthy();

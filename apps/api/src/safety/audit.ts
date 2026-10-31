@@ -25,6 +25,8 @@ const AUDIT_ACTIONS = [
   "report.view",
   "conversation.view",
   "report.decide",
+  // A pond's switch turned in the panel (#500, ADR-060 §2): `detail` says which way.
+  "pond.matching",
 ] as const;
 type AuditAction = (typeof AUDIT_ACTIONS)[number];
 
@@ -33,7 +35,7 @@ export type AuditEntry = {
   actorIdentityId: string | null;
   action: AuditAction;
   /** "any": an audit read narrowed to a subject id of no named type (#309). */
-  subjectType: "photo" | "feedback" | "account" | "config" | "report" | "any";
+  subjectType: "photo" | "feedback" | "account" | "config" | "report" | "pond" | "any";
   subjectId: string;
   detail?: Record<string, string | number | boolean | null>;
 };

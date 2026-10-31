@@ -23,7 +23,7 @@ import {
   test,
   testConfig,
 } from "../test/harness.ts";
-import { type PeopleOptions, people, pondNamed } from "../test/people.ts";
+import { openPond, type PeopleOptions, people, pondNamed } from "../test/people.ts";
 import { buildRounds } from "./round-builder.ts";
 
 // The short pool (#99, ADR-042, features/matching/short-pool.feature): the
@@ -66,15 +66,6 @@ async function setConfig(db: Queryable, key: string, value: unknown) {
   );
 }
 
-/** Everybody's matching open in the pond, as the gate leaves it. */
-async function opened(db: Queryable, pondId: string, ids: readonly string[]) {
-  await db.query(
-    `INSERT INTO gate (account_id, pond_id, admitted_at, opened_at, counted_at)
-     SELECT id, $2, $3, $3, $3 FROM unnest($1::uuid[]) AS id`,
-    [ids, pondId, new Date(NIGHT.getTime() - 24 * 3600 * 1000)],
-  );
-}
-
 /** A deal-breaker of the person's, stored as the deal-breakers route stores it. */
 async function dealBreaker(
   db: Queryable,
@@ -112,7 +103,7 @@ async function pondWith(
   const of: string[][] = [];
   for (const group of groups)
     of.push(await people(ctx.client, pond, group.count, men(group.fields)));
-  await opened(ctx.client, pond, [a, ...of.flat()]);
+  await openPond(ctx.client, pond);
   return { pond, a, of };
 }
 
@@ -474,6 +465,21 @@ describe("relaxing a deal-breaker for the day", () => {
     expect((await relax(app, headers, { field: "hasKids", kind: "aside" })).status).toBe(404);
   });
 
+  test("a round in a pond closed since is offered nothing, and relaxes nothing (ADR-060 §1)", async ({
+    ctx,
+  }) => {
+    const { a, pond } = await pondWith(ctx, "test-short-closed", [{ fields: {}, count: 2 }]);
+    await buildRounds(await deps(ctx.client));
+    const app = await appAt(ctx.client);
+    const { headers } = await signInAs(ctx.client, a);
+    expect((await offers(app, headers)).offers).not.toEqual([]);
+
+    await ctx.client.query("UPDATE ponds SET matching_open = false WHERE id = $1", [pond]);
+
+    expect(await offers(app, headers)).toEqual({ short: false, offers: [], relaxed: [] });
+    expect((await relax(app, headers, ASIDE)).status).toBe(404);
+  });
+
   test("a like on a card two relaxations let in reaches its person", async ({ ctx }) => {
     const { a, of } = await pondWith(ctx, "test-short-stacked-like", [
       { fields: { hasKids: "no" }, count: 1 },
@@ -710,7 +716,7 @@ describe("a deal-breaker on height through the night (#508)", () => {
     const [same] = await people(ctx.client, pond, 1, men({ height: 170 }));
     const [open] = await people(ctx.client, pond, 1, men({}));
     if (!tall || !same || !open) throw new Error("people not written");
-    await opened(ctx.client, pond, [a, tall, same, open]);
+    await openPond(ctx.client, pond);
     return { a, tall, same, open };
   }
 
@@ -851,10 +857,10 @@ describe("the routes' edges", () => {
         ...HER,
         fields: answered ? HER.fields : { hasKids: "yes_with_me" },
       });
-      const him = await people(ctx.client, pond, 2, men({}));
+      await people(ctx.client, pond, 2, men({}));
       if (!a) throw new Error("A not written");
       await dealBreaker(ctx.client, a, "smoking", ["never"], includeUnknown);
-      await opened(ctx.client, pond, [a, ...him]);
+      await openPond(ctx.client, pond);
       await buildRounds(await deps(ctx.client));
       const app = await appAt(ctx.client);
       const { headers } = await signInAs(ctx.client, a);
@@ -1001,7 +1007,7 @@ describe("the routes' edges", () => {
     const [other] = await people(ctx.client, pond, 1, HER);
     if (!other) throw new Error("other not written");
     await dealBreaker(ctx.client, other, "smoking", ["never"], false);
-    await opened(ctx.client, pond, [other]);
+    await openPond(ctx.client, pond);
     await buildRounds(await deps(ctx.client));
     const app = await appAt(ctx.client);
     const { headers } = await signInAs(ctx.client, a);

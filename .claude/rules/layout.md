@@ -16,7 +16,7 @@ Code is organised by feature slice, not by layer. There is no `controllers/`, `s
 | identity | heavy | thin | auth only | TD-1, TD-7 |
 | profile | medium | heavy | read | TD-16 |
 | media | heavy | medium | queue | TD-2, TD-8 |
-| pond | medium | thin | read | TD-10, TD-13 |
+| pond | medium | thin | switch | TD-10, TD-13 |
 | matching | heavy | heavy | none | TD-11, TD-12, TD-14 |
 | chat | heavy | heavy | snapshots | TD-3 |
 | safety | medium | thin | heavy | TD-5, TD-6 |
@@ -47,7 +47,7 @@ The seam between apps is shared vocabulary and one shared contract, never shared
 apps/api/src/
   <slice>/      routes.ts  service.ts  repo.ts  index.ts  *.test.ts
   lib/          db.ts  config.ts  logger.ts  s3.ts  ssm.ts  auth-middleware.ts
-  jobs/         the nightly runner and its jobs (waitlist snapshot, pond gate, the slices' sweeps)
+  jobs/         the nightly runner and its jobs (waitlist snapshot, who of a pond is complete, the slices' sweeps)
   app.ts
 
 apps/mobile/

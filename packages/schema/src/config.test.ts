@@ -31,7 +31,7 @@ const changed = {
   createdBy: "00000000-0000-4000-8000-000000000001",
   reason: "Smaller ponds first",
 };
-const gateK = { key: "gate_k", value: 25, version: 2, versions: [changed, seeded] };
+const likedYouCap = { key: "liked_you_cap", value: 25, version: 2, versions: [changed, seeded] };
 const many = <T>(n: number, item: T) => Array.from({ length: n }, () => item);
 
 describe("a key's name", () => {
@@ -64,7 +64,7 @@ describe("a key's name", () => {
   });
 
   it("is the route's only parameter, the same rule", () => {
-    expect(ConfigKeyParams.parse({ key: "gate_k" })).toEqual({ key: "gate_k" });
+    expect(ConfigKeyParams.parse({ key: "liked_you_cap" })).toEqual({ key: "liked_you_cap" });
     expect(refusal(ConfigKeyParams, { key: "Gate_k" })).toEqual(["invalid_format at key"]);
     expect(refusal(ConfigKeyParams, { key: "a".repeat(65) })).toEqual(["invalid_format at key"]);
     expect(refusal(ConfigKeyParams, {})).toEqual(["invalid_type at key"]);
@@ -144,23 +144,27 @@ describe("a version as the panel reads it", () => {
 
 describe("a key as the panel reads it", () => {
   it("takes a key with its versions, newest first", () => {
-    expect(ConfigKey.parse(gateK)).toEqual(gateK);
+    expect(ConfigKey.parse(likedYouCap)).toEqual(likedYouCap);
   });
 
   it("has at least one version and at most 1000", () => {
-    expect(refusal(ConfigKey, { ...gateK, versions: [] })).toEqual(["too_small at versions"]);
-    expect(ConfigKey.parse({ ...gateK, versions: [seeded] }).versions).toHaveLength(1);
-    expect(ConfigKey.parse({ ...gateK, versions: many(1000, seeded) }).versions).toHaveLength(1000);
-    expect(refusal(ConfigKey, { ...gateK, versions: many(1001, seeded) })).toEqual([
+    expect(refusal(ConfigKey, { ...likedYouCap, versions: [] })).toEqual(["too_small at versions"]);
+    expect(ConfigKey.parse({ ...likedYouCap, versions: [seeded] }).versions).toHaveLength(1);
+    expect(ConfigKey.parse({ ...likedYouCap, versions: many(1000, seeded) }).versions).toHaveLength(
+      1000,
+    );
+    expect(refusal(ConfigKey, { ...likedYouCap, versions: many(1001, seeded) })).toEqual([
       "too_big at versions",
     ]);
   });
 
   it("refuses a name outside the rule, version 0, a nested value and a version that does not parse", () => {
-    expect(refusal(ConfigKey, { ...gateK, key: "Gate_k" })).toEqual(["invalid_format at key"]);
-    expect(refusal(ConfigKey, { ...gateK, version: 0 })).toEqual(["too_small at version"]);
-    expect(refusal(ConfigKey, { ...gateK, value: [25] })).toEqual(["invalid_union at value"]);
-    expect(refusal(ConfigKey, { ...gateK, versions: [{ ...changed, reason: 7 }] })).toEqual([
+    expect(refusal(ConfigKey, { ...likedYouCap, key: "Gate_k" })).toEqual([
+      "invalid_format at key",
+    ]);
+    expect(refusal(ConfigKey, { ...likedYouCap, version: 0 })).toEqual(["too_small at version"]);
+    expect(refusal(ConfigKey, { ...likedYouCap, value: [25] })).toEqual(["invalid_union at value"]);
+    expect(refusal(ConfigKey, { ...likedYouCap, versions: [{ ...changed, reason: 7 }] })).toEqual([
       "invalid_type at versions.0.reason",
     ]);
   });
@@ -169,15 +173,15 @@ describe("a key as the panel reads it", () => {
 describe("the list of keys", () => {
   it("takes no keys, one, and 500", () => {
     expect(ConfigList.parse({ items: [] })).toEqual({ items: [] });
-    expect(ConfigList.parse({ items: [gateK] })).toEqual({ items: [gateK] });
-    expect(ConfigList.parse({ items: many(500, gateK) }).items).toHaveLength(500);
+    expect(ConfigList.parse({ items: [likedYouCap] })).toEqual({ items: [likedYouCap] });
+    expect(ConfigList.parse({ items: many(500, likedYouCap) }).items).toHaveLength(500);
   });
 
   it("refuses 501 keys, a missing list and a key that does not parse", () => {
-    expect(refusal(ConfigList, { items: many(501, gateK) })).toEqual(["too_big at items"]);
+    expect(refusal(ConfigList, { items: many(501, likedYouCap) })).toEqual(["too_big at items"]);
     expect(refusal(ConfigList, {})).toEqual(["invalid_type at items"]);
-    expect(refusal(ConfigList, [gateK])).toEqual(["invalid_type at "]);
-    expect(refusal(ConfigList, { items: [{ ...gateK, versions: [] }] })).toEqual([
+    expect(refusal(ConfigList, [likedYouCap])).toEqual(["invalid_type at "]);
+    expect(refusal(ConfigList, { items: [{ ...likedYouCap, versions: [] }] })).toEqual([
       "too_small at items.0.versions",
     ]);
   });
@@ -231,7 +235,7 @@ describe("an admin's change", () => {
   });
 
   it("refuses any key it does not define: the key, the version and the author are the API's", () => {
-    for (const extra of [{ key: "gate_k" }, { version: 3 }, { createdBy: "someone" }]) {
+    for (const extra of [{ key: "liked_you_cap" }, { version: 3 }, { createdBy: "someone" }]) {
       expect(refusal(ConfigChangeRequest, { ...change, ...extra })).toEqual([
         "unrecognized_keys at ",
       ]);

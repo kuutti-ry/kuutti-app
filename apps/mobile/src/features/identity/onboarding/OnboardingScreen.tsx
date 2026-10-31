@@ -205,12 +205,8 @@ export function OnboardingScreen() {
     if (current) scroll.current?.scrollTo({ y: 0, animated: false });
   }, [current]);
   const age = state.status === "ready" ? state.onboarding.age : null;
-  // From when a refused change is possible (#147): the gender's for the gender
-  // step, whom one seeks for the step that saves it.
-  const changeFrom =
-    state.status === "ready"
-      ? state.onboarding.nextChange[current === "gender" ? "gender" : "seeks"]
-      : null;
+  // From when a refused change of gender is possible (#147).
+  const changeFrom = state.status === "ready" ? state.onboarding.nextChange.gender : null;
   // The age step is open only while no window is stored (ADR-010 §13): a
   // withdrawal asks whom one seeks again and keeps the window, so the default
   // around the person's age is all this step ever starts from.

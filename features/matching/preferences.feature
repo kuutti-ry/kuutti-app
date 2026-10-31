@@ -61,10 +61,10 @@ Feature: The hard preferences of onboarding
     When the other reads its preferences
     Then it sees nothing set
 
-  Scenario: A change of whom one seeks is possible once in the cadence
+  Scenario: Whom one seeks can be changed as often as one wishes
     Given a signed-in account that set seeks and an age window
-    When it changes whom it seeks, and again within the cadence
-    Then the first change is stored, the second is refused as change_too_soon, the same answer again and another window of ages pass, and the onboarding status says from when
+    When it changes whom it seeks, and again, and again
+    Then every change is stored, and no status says from when another is possible
 
   Scenario: A change of gender is possible once in the cadence
     Given a signed-in account that declared a gender

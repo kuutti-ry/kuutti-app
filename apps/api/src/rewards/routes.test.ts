@@ -9,6 +9,7 @@ import {
   normaliseInvitationCode,
 } from "@kuutti/schema";
 import { type App, createApp } from "../app.ts";
+import { isComplete } from "../jobs/pool.ts";
 import { signedInAccount, withMatchingConfig } from "../test/account.ts";
 import { interleaved } from "../test/chat.ts";
 import {
@@ -19,13 +20,13 @@ import {
   test,
   testConfig,
 } from "../test/harness.ts";
-import { consented, earnedUnits, gated, hashOf, invitationOf } from "../test/invitations.ts";
+import { completed, consented, earnedUnits, hashOf, invitationOf } from "../test/invitations.ts";
 import { people } from "../test/people.ts";
 import { pidOf, waitsFor, watched, withTwoConnections } from "../test/races.ts";
 import { drawCode, hashInvitationCode, makeInvitation, redeemInvitation } from "./invitations.ts";
 
 // The invitation routes (#107, ADR-044): the caller's own, a new one past the
-// gate's test and up to the open ones' cap, its withdrawal, and a code typed
+// completeness and up to the open ones' cap, its withdrawal, and a code typed
 // with the caller checked first, one answer for every code that does not
 // work and the day's tries; each route's validation, nobody, the wrong
 // person, an account erased on the way, and the races on one code and on the
@@ -76,10 +77,10 @@ async function newcomer(db: Queryable): Promise<Person> {
   return who;
 }
 
-/** A person whose profile has passed the gate's test. */
+/** A person whose profile is complete. */
 async function inviter(db: Queryable): Promise<Person> {
   const who = await signedInAccount(db);
-  await gated(db, who.accountId);
+  await completed(db, who.accountId);
   return who;
 }
 
@@ -161,7 +162,7 @@ describe("the caller's invitations", () => {
 });
 
 describe("making and withdrawing an invitation", () => {
-  test("a person whose profile passed the gate's test makes one: the code shown once, kept as its hash alone", async ({
+  test("a person whose profile is complete makes one: the code shown once, kept as its hash alone", async ({
     ctx,
   }) => {
     const { app } = await appOn(ctx.client);
@@ -194,7 +195,7 @@ describe("making and withdrawing an invitation", () => {
     expect(hashInvitationCode("0123456789")).toBe(hashOf("0123456789"));
   });
 
-  test("a shadow-banned person invites as anybody does, and nobody before the gate's test", async ({
+  test("a shadow-banned person invites as anybody does, and nobody before their profile is complete", async ({
     ctx,
   }) => {
     const { app } = await appOn(ctx.client);
@@ -307,6 +308,29 @@ describe("typing a code", () => {
     expect(await errorCode(again)).toBe("invitation_not_for_you");
   });
 
+  test("a profile that lapses closes the way to a new invitation until it is complete again, and opens the way to a code (ADR-060 §7, Open 3)", async ({
+    ctx,
+  }) => {
+    const { app } = await appOn(ctx.client);
+    const a = await inviter(ctx.client);
+    expect(await listOf(app, a)).toMatchObject({ canInvite: true, redeemable: false });
+    const consent = (withdrawn: string) =>
+      ctx.client.query(
+        `UPDATE consent SET withdrawn_at = ${withdrawn} WHERE account_id = $1 AND kind = 'special_category'`,
+        [a.accountId],
+      );
+
+    await consent("now()");
+    expect(await listOf(app, a)).toMatchObject({ canInvite: false, redeemable: true });
+    const refused = await make(app, a);
+    expect(refused.status).toBe(409);
+    expect(await errorCode(refused)).toBe("invitation_not_yet");
+
+    await consent("NULL");
+    expect(await listOf(app, a)).toMatchObject({ canInvite: true, redeemable: false });
+    expect((await make(app, a)).status).toBe(201);
+  });
+
   test("one answer for a code unknown, used or the caller's own", async ({ ctx }) => {
     const { app } = await appOn(ctx.client);
     const a = await inviter(ctx.client);
@@ -315,8 +339,8 @@ describe("typing a code", () => {
     });
     const first = await newcomer(ctx.client);
     expect((await redeem(app, first, { code: "SEEDS-SEEDS" })).status).toBe(204);
-    // The caller's own: somebody whose profile has not passed the test any
-    // more, holding an invitation of their own (the gate's row went with a pond).
+    // The caller's own: somebody whose profile is not complete any more,
+    // holding an invitation of their own from when it was.
     const own = await newcomer(ctx.client);
     await invitationOf(ctx.client, own.accountId, { codeHash: hashInvitationCode("MYMYMMYMYM") });
     const answers: Array<{ code: string; message: string }> = [];
@@ -339,7 +363,7 @@ describe("typing a code", () => {
     expect(ownRows.rows).toEqual([]);
   });
 
-  test("the caller is asked before the code: a profile past the test, a code used, no consents or an identity erased before is invitation_not_for_you, and the code stays open", async ({
+  test("the caller is asked before the code: a complete profile, a code used, no consents or an identity erased before is invitation_not_for_you, and the code stays open", async ({
     ctx,
   }) => {
     const { app } = await appOn(ctx.client);
@@ -499,11 +523,11 @@ describe("nobody, and an account erased on the way", () => {
 });
 
 describe("races on committed rows", () => {
-  /** A pond, an inviter past the gate and two people who gave the consents, committed. */
+  /** An inviter whose profile is complete and two people who gave the consents, committed. */
   async function cast(db: Queryable) {
     const [a, n, m] = await people(db, null, 3);
     if (!a || !n || !m) throw new Error("cast not written");
-    await gated(db, a);
+    await completed(db, a);
     await consented(db, n);
     await consented(db, m);
     return { a, n, m };
@@ -514,7 +538,12 @@ describe("races on committed rows", () => {
       const { a, n, m } = await cast(pool);
       const id = await invitationOf(pool, a, { codeHash: hashInvitationCode("RACE0RACE0") });
       const { logger } = await captureLogger();
-      const deps = (db: Queryable) => ({ db, logger, now: () => T });
+      const deps = (db: Queryable) => ({
+        db,
+        logger,
+        now: () => T,
+        complete: (tx: Queryable, accountId: string) => isComplete(tx, accountId, T),
+      });
       const secondPid = await pidOf(second);
       const firstPid = await pidOf(first);
       await first.query("BEGIN");
@@ -541,7 +570,12 @@ describe("races on committed rows", () => {
          VALUES (2, 'invitations_open', '1'::jsonb, 'test')`,
       );
       const { logger } = await captureLogger();
-      const deps = (db: Queryable) => ({ db, logger, now: () => T });
+      const deps = (db: Queryable) => ({
+        db,
+        logger,
+        now: () => T,
+        complete: (tx: Queryable, accountId: string) => isComplete(tx, accountId, T),
+      });
       const firstPid = await pidOf(first);
       const secondPid = await pidOf(second);
       await first.query("BEGIN");
