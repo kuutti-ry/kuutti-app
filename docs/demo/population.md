@@ -12,7 +12,7 @@ pnpm demo:population
 
 Writes three hundred people into the database of the local environment, replacing the synthetic population that was there. The pond comes from the seed, which `pnpm env:up` has run. The pictures are a release of the private photos repository (`docs/demo/photo-prompts.md`), fetched and verified by `pnpm demo:assets` into `~/.cache/kuutti-demo-photos/v2`; this repository holds the manifest (`packages/db/src/seed/photos-manifest.ts`) and never a picture.
 
-After a write or a removal the public counter (#54) is counted anew over what is in the database now, so `GET /waitlist` and the card in the app show the ponds of the population at once. Left to itself the counter would not move: it counts once a day and moves in steps of ten people, which is right among people and would leave a demo showing yesterday's ponds. What may be said of a pond is decided as ever; the app keeps an answer for up to an hour.
+After a write or a removal the public counter (#54) is counted anew over what is in the database now, so `GET /ponds/counter` and the card in the app show the ponds of the population at once. Left to itself the counter would not move: it counts once a day and moves in steps of ten people, which is right among people and would leave a demo showing yesterday's ponds. What may be said of a pond is decided as ever; the app keeps an answer for up to an hour.
 
 | option | what it does |
 |---|---|
@@ -73,7 +73,7 @@ The home card's bar of whom people seek (#507, ADR-013 §12) counts finished pro
 | a terms consent of an older wording | it reads as none, as a real person's does until they accept the new one. So they are not complete: they are in nobody's pool, on nobody's card and in no round, and the personas' rounds and the e2e flows stand as they were |
 | everything else as drawn | their seek answers, consents and profiles are the population's own |
 
-They take the pond's finished figure with them: 50 people fewer are finishing. A test in `apps/api/src/pond/waitlist.test.ts` holds the whole of it, from the write to the shares, and that none of them is in anybody's pool. The bar shows after a write, and in production never (ADR-013 §16, and the command refuses production anyway). The command's line says how many it filled (`bar`). From 250 people up every band is full whatever the seed, which a test holds; smaller populations may fall short in the middle band and then show no bar.
+They take the pond's finished figure with them: 50 people fewer are finishing. A test in `apps/api/src/pond/counter.test.ts` holds the whole of it, from the write to the shares, and that none of them is in anybody's pool. The bar shows after a write, and in production never (ADR-013 §16, and the command refuses production anyway). The command's line says how many it filled (`bar`). From 250 people up every band is full whatever the seed, which a test holds; smaller populations may fall short in the middle band and then show no bar.
 
 ## What makes a synthetic person unmistakable
 

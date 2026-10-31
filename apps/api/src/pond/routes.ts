@@ -3,17 +3,16 @@ import {
   ErrorResponse,
   GateResponse,
   PondChoice,
+  PondCounterResponse,
   PondList,
-  PondSeeksResponse,
-  WaitlistResponse,
 } from "@kuutti/schema";
 import type { MiddlewareHandler } from "hono";
 import type { Deps } from "../app.ts";
 import { callerOf } from "../lib/auth-middleware.ts";
 import type { AppEnv } from "../lib/env.ts";
 import { AppError } from "../lib/errors.ts";
+import { readPondCounter } from "./counter.ts";
 import * as repo from "./repo.ts";
-import { readPondSeeks, readWaitlist } from "./waitlist.ts";
 
 const errorContent = (description: string) => ({
   description,
@@ -52,16 +51,22 @@ const chooseRoute = createRoute({
 
 // The one public route that carries figures (#54, ADR-013): aggregates per
 // pond, nothing below k, moving in steps of at least k people, no id but the
-// pond's. The waitlist site reads it from its allowlisted origin
-// (rules/api.md); the app reads it for the person's own pond.
-const waitlistRoute = createRoute({
+// pond's. The public site may read it from its allowlisted origin (rules/api.md).
+// The app reads it with the person's session, which adds the one thing a
+// session adds here, the bar of their own pond, and which is checked as on every
+// other route (ADR-013 §18).
+const counterRoute = createRoute({
   method: "get",
-  path: "/waitlist",
-  summary: "The waitlist counter",
+  path: "/ponds/counter",
+  summary: "The pond counter",
   description:
-    "Per pond: bank-verified people waiting, their split by self-declared gender, and how many are finishing their profile. A number is published only where at least k people stand behind it (k is in the answer), the split only when every cell is at least k, and a pond's numbers move only once at least k people have come or gone since they were last said. Counted once a day. No session needed.",
+    "Per pond: bank-verified people with the pond as theirs, their split by self-declared gender, and how many are finishing their profile. A number is published only where at least k people stand behind it (k is in the answer), the split only when every cell is at least k, and a pond's numbers move only once at least k people have come or gone since they were last said. Counted once a day. No session needed. With one, the answer is the caller's and is not cached, and the caller's own pond also says whom its people seek: whole percentages of three bands of finished profiles, those who seek men, those who seek both women and men, and those who seek women, null until every band holds at least k people.",
+  security: [{}, { session: [] }],
   responses: {
-    200: { description: "Every pond with what may be said of it.", ...json(WaitlistResponse) },
+    200: { description: "Every pond with what may be said of it.", ...json(PondCounterResponse) },
+    401: errorContent(
+      "A session was offered and does not stand: unauthenticated, session_expired or session_revoked. No session at all is the public answer.",
+    ),
   },
 });
 
@@ -80,22 +85,6 @@ const gateRoute = createRoute({
   },
 });
 
-// shortcut: a route of its own for the home card's bar, so that the public
-// counter's answer stays as it is while #500 renames it (#507, ADR-013 §12).
-// It goes into `GET /ponds/counter` with that rename.
-const seeksRoute = createRoute({
-  method: "get",
-  path: "/ponds/seeks",
-  summary: "Whom the people of the caller's pond seek",
-  description:
-    "Whole percentages of the three bands of the caller's own pond, from finished profiles: those who seek men, those who seek both women and men, and those who seek women. Null until every band holds at least k people. The bands move only once at least k finished profiles have come or gone. Counted once a day.",
-  ...bearer,
-  responses: {
-    200: { description: "The shares, or null.", ...json(PondSeeksResponse) },
-    401: unauthenticated,
-  },
-});
-
 /**
  * How the route learns what stands for the caller. Handed in by the app:
  * completeness reads across slices and lives with the jobs (rules/layout.md),
@@ -104,7 +93,7 @@ const seeksRoute = createRoute({
 export type GateReader = (accountId: string) => Promise<GateResponse>;
 
 /** The figures move at most once a day; an hour is short enough for the day's turn. */
-export const WAITLIST_CACHE_CONTROL = "public, max-age=3600";
+export const POND_COUNTER_CACHE_CONTROL = "public, max-age=3600";
 
 export function pondRoutes(
   deps: Deps,
@@ -112,27 +101,28 @@ export function pondRoutes(
   readGate: GateReader,
 ) {
   const app = new OpenAPIHono<AppEnv>();
-  const guarded = [listRoute, chooseRoute, gateRoute, seeksRoute];
+  const guarded = [listRoute, chooseRoute, gateRoute];
   for (const path of new Set(guarded.map((r) => r.getRoutingPath()))) {
     app.use(path, requireSession);
   }
+  app.use(counterRoute.getRoutingPath(), (c, next) =>
+    c.req.header("authorization") === undefined ? next() : requireSession(c, next),
+  );
 
   app.openapi(gateRoute, async (c) => {
     const { accountId } = callerOf(c);
     return c.json(await readGate(accountId), 200);
   });
 
-  app.openapi(seeksRoute, async (c) => {
-    const { accountId } = callerOf(c);
-    return c.json({ seeks: await readPondSeeks(deps.db, accountId) }, 200);
-  });
-
-  app.openapi(waitlistRoute, async (c) => {
+  app.openapi(counterRoute, async (c) => {
+    const accountId = c.get("accountId");
     // The read first, the header after it: a failure must not be answered as
-    // something a cache may keep for an hour.
-    const waitlist = await readWaitlist(deps.db);
-    c.header("Cache-Control", WAITLIST_CACHE_CONTROL);
-    return c.json(waitlist, 200);
+    // something a cache may keep for an hour. A session's answer keeps the
+    // guard's `no-store`: it holds that person's bar.
+    const counter = await readPondCounter(deps.db, accountId);
+    if (accountId === undefined) c.header("Cache-Control", POND_COUNTER_CACHE_CONTROL);
+    c.header("Vary", "Authorization");
+    return c.json(counter, 200);
   });
 
   app.openapi(listRoute, async (c) => {

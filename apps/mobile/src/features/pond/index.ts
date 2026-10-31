@@ -3,4 +3,4 @@
 export { choosePond, fetchPonds } from "./client";
 export { GateCard } from "./GateCard";
 export { pondName } from "./names";
-export { WaitlistCard } from "./WaitlistCard";
+export { PondCard } from "./PondCard";

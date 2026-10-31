@@ -78,18 +78,18 @@ function Hatched({
 export function SeeksBar({ seeks }: { seeks: PondSeeks }) {
   const { t } = useT();
   const bands = [
-    { band: "men", label: t("pond.waitlist.seeks.men", { share: seeks.men }) },
-    { band: "everyone", label: t("pond.waitlist.seeks.everyone", { share: seeks.everyone }) },
-    { band: "women", label: t("pond.waitlist.seeks.women", { share: seeks.women }) },
+    { band: "men", label: t("pond.counter.seeks.men", { share: seeks.men }) },
+    { band: "everyone", label: t("pond.counter.seeks.everyone", { share: seeks.everyone }) },
+    { band: "women", label: t("pond.counter.seeks.women", { share: seeks.women }) },
   ] as const;
   return (
     <View
       accessible
       accessibilityRole="image"
-      accessibilityLabel={t("pond.waitlist.seeks.label", seeks)}
+      accessibilityLabel={t("pond.counter.seeks.label", seeks)}
       className="gap-2 py-1"
     >
-      <Text variant="muted">{t("pond.waitlist.seeks.title")}</Text>
+      <Text variant="muted">{t("pond.counter.seeks.title")}</Text>
       <View className="flex-row gap-0.5">
         {bands.map(({ band }) => (
           <Hatched

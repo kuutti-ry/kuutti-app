@@ -1,7 +1,7 @@
 import { resolve } from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 import { createPool, migrate, withTemporaryDatabase } from "@kuutti/db";
-import { WaitlistResponse } from "@kuutti/schema";
+import { PondCounterResponse } from "@kuutti/schema";
 import { it } from "vitest";
 import { withMatchingConfig } from "../test/account.ts";
 import { captureLogger, describe, expect, type TestContext, test } from "../test/harness.ts";
@@ -10,12 +10,12 @@ import {
   countPonds,
   countsBands,
   ensureFirstSnapshot,
+  POND_COUNTER_LOCK_KEY,
+  pondCounterJob,
   takeSnapshot,
-  WAITLIST_LOCK_KEY,
-  waitlistJob,
-} from "./waitlist-snapshot.ts";
+} from "./pond-counter.ts";
 
-// features/pond/waitlist.feature (#54, ADR-013): who is counted, and when the
+// features/pond/counter.feature (#54, ADR-013): who is counted, and when the
 // figures move.
 
 const DAY_1 = new Date("2026-10-05T01:00:00Z"); // 04:00 in Helsinki
@@ -36,7 +36,7 @@ const bandsOf = async (ctx: TestContext, pond: string) => {
 };
 
 const listed = async (ctx: TestContext, pond: string) =>
-  WaitlistResponse.parse(await (await ctx.app.request("/waitlist")).json()).ponds.find(
+  PondCounterResponse.parse(await (await ctx.app.request("/ponds/counter")).json()).ponds.find(
     (p) => p.pond.id === pond,
   );
 
@@ -44,7 +44,7 @@ describe("the figures", () => {
   test("Only live accounts with a pond are counted, a shadow-banned one like any other", async ({
     ctx,
   }) => {
-    const pond = await pondNamed(ctx.client, "test-waitlist-counted");
+    const pond = await pondNamed(ctx.client, "test-counter-counted");
     await people(ctx.client, pond, 5, { gender: "woman", state: "registered" });
     await people(ctx.client, pond, 4, { gender: "man", state: "active" });
     await people(ctx.client, pond, 1, { gender: "woman", state: "shadow_banned" });
@@ -70,7 +70,7 @@ describe("the figures", () => {
   test("a shadow-banned account with a complete profile is not finishing, like an active one", async ({
     ctx,
   }) => {
-    const pond = await pondNamed(ctx.client, "test-waitlist-shadow");
+    const pond = await pondNamed(ctx.client, "test-counter-shadow");
     const [id] = await people(ctx.client, pond, 1, { gender: "woman", complete: true });
     expect((await countPonds(ctx.client)).get(pond)?.finishing).toBe(0);
     await ctx.client.query("UPDATE account SET state = 'shadow_banned' WHERE id = $1", [id]);
@@ -80,7 +80,7 @@ describe("the figures", () => {
   test("a ready line in place of a bio completes the profile, and neither leaves it finishing (#239)", async ({
     ctx,
   }) => {
-    const pond = await pondNamed(ctx.client, "test-waitlist-ready-line");
+    const pond = await pondNamed(ctx.client, "test-counter-ready-line");
     await people(ctx.client, pond, 1, { gender: "woman", complete: true, bio: "ready_line" });
     await people(ctx.client, pond, 1, { gender: "woman", complete: true, bio: "none" });
     expect((await countPonds(ctx.client)).get(pond)).toMatchObject({ verified: 2, finishing: 1 });
@@ -89,7 +89,7 @@ describe("the figures", () => {
   test("photos sent in conversations finish no profile: one whose approved photos are all of messages is finishing (#350)", async ({
     ctx,
   }) => {
-    const pond = await pondNamed(ctx.client, "test-waitlist-message-photos");
+    const pond = await pondNamed(ctx.client, "test-counter-message-photos");
     const [messagesOnly] = await people(ctx.client, pond, 2, { gender: "woman", complete: true });
     // The same three approved photos, sent in conversations instead.
     await ctx.client.query(
@@ -100,7 +100,7 @@ describe("the figures", () => {
   });
 
   test("A profile that is not complete counts as finishing", async ({ ctx }) => {
-    const pond = await pondNamed(ctx.client, "test-waitlist-finishing");
+    const pond = await pondNamed(ctx.client, "test-counter-finishing");
     await people(ctx.client, pond, 10, { gender: "woman", complete: true });
     await people(ctx.client, pond, 9, { gender: "man", state: "active" });
     await people(ctx.client, pond, 6, { state: "registered" });
@@ -111,7 +111,7 @@ describe("the figures", () => {
   test("The people finishing are counted in public only when they and the rest are none or at least k", async ({
     ctx,
   }) => {
-    const pond = await pondNamed(ctx.client, "test-waitlist-finishing-small");
+    const pond = await pondNamed(ctx.client, "test-counter-finishing-small");
     await people(ctx.client, pond, 3, { gender: "woman", complete: true });
     await people(ctx.client, pond, 9, { gender: "man", state: "active" });
     await taken(ctx, DAY_1);
@@ -121,7 +121,7 @@ describe("the figures", () => {
   test("a complete profile on an account that is not active yet is still finishing", async ({
     ctx,
   }) => {
-    const pond = await pondNamed(ctx.client, "test-waitlist-not-active");
+    const pond = await pondNamed(ctx.client, "test-counter-not-active");
     const [id] = await people(ctx.client, pond, 1, { gender: "woman", complete: true });
     await ctx.client.query("UPDATE account SET state = 'registered' WHERE id = $1", [id]);
     expect((await countPonds(ctx.client)).get(pond)?.finishing).toBe(1);
@@ -130,7 +130,7 @@ describe("the figures", () => {
   test("The figures of a pond move only once at least k people have come or gone", async ({
     ctx,
   }) => {
-    const pond = await pondNamed(ctx.client, "test-waitlist-steps");
+    const pond = await pondNamed(ctx.client, "test-counter-steps");
     await people(ctx.client, pond, 25, { gender: "woman" });
     expect((await taken(ctx, DAY_1)).day).toBe("2026-10-05");
     const said = await listed(ctx, pond);
@@ -146,7 +146,7 @@ describe("the figures", () => {
   });
 
   test("The accounts are counted at most once a day", async ({ ctx }) => {
-    const pond = await pondNamed(ctx.client, "test-waitlist-once");
+    const pond = await pondNamed(ctx.client, "test-counter-once");
     await people(ctx.client, pond, 25, { gender: "woman" });
     expect(await taken(ctx, DAY_1)).toMatchObject({ counted: true });
     const said = await listed(ctx, pond);
@@ -161,7 +161,7 @@ describe("the figures", () => {
       counted: false,
     });
     expect(await listed(ctx, pond)).toEqual(said);
-    expect(again.lines().map((l) => l.msg)).toContain("waitlist snapshot: counted today already");
+    expect(again.lines().map((l) => l.msg)).toContain("pond counter: counted today already");
 
     expect(await taken(ctx, DAY_2)).toMatchObject({ counted: true });
     expect(await listed(ctx, pond)).toMatchObject({ day: "2026-10-06", verified: 35 });
@@ -170,21 +170,21 @@ describe("the figures", () => {
   test("a pond that did not move is marked as counted too, its figures and their day as they were", async ({
     ctx,
   }) => {
-    const pond = await pondNamed(ctx.client, "test-waitlist-mark");
+    const pond = await pondNamed(ctx.client, "test-counter-mark");
     await people(ctx.client, pond, 25, { gender: "woman" });
     await taken(ctx, DAY_1);
     await people(ctx.client, pond, 3, { gender: "woman" });
     await taken(ctx, DAY_2);
     const { rows } = await ctx.client.query<{ day: string; verified: number; taken_at: Date }>(
       `SELECT to_char(day, 'YYYY-MM-DD') AS day, verified, taken_at
-       FROM waitlist_snapshot WHERE pond_id = $1`,
+       FROM pond_counter WHERE pond_id = $1`,
       [pond],
     );
     expect(rows).toEqual([{ day: "2026-10-05", verified: 25, taken_at: DAY_2 }]);
   });
 
   test("The figures do not move between two counts", async ({ ctx }) => {
-    const pond = await pondNamed(ctx.client, "test-waitlist-between");
+    const pond = await pondNamed(ctx.client, "test-counter-between");
     await people(ctx.client, pond, 11, { gender: "woman" });
     await taken(ctx, DAY_1);
     const said = await listed(ctx, pond);
@@ -200,7 +200,7 @@ describe("the figures", () => {
   test("one arrival and one departure a day never show, however many days pass", async ({
     ctx,
   }) => {
-    const pond = await pondNamed(ctx.client, "test-waitlist-quiet");
+    const pond = await pondNamed(ctx.client, "test-counter-quiet");
     await people(ctx.client, pond, 13, { gender: "woman" });
     await people(ctx.client, pond, 12, { gender: "man" });
     await people(ctx.client, pond, 10, { gender: "non_binary" });
@@ -226,7 +226,7 @@ describe("the figures", () => {
   test("figures said under k = 10 stand while k is raised, and are said again unchanged when it returns", async ({
     ctx,
   }) => {
-    const pond = await pondNamed(ctx.client, "test-waitlist-raised");
+    const pond = await pondNamed(ctx.client, "test-counter-raised");
     for (const gender of ["woman", "man", "non_binary"] as const) {
       await people(ctx.client, pond, 15, { gender });
     }
@@ -234,18 +234,18 @@ describe("the figures", () => {
     const said = await listed(ctx, pond);
     expect(said).toMatchObject({ verified: 45, split: { woman: 15, man: 15, nonBinary: 15 } });
 
-    await withMatchingConfig(ctx.client, { waitlist_k: 50 });
+    await withMatchingConfig(ctx.client, { pond_counter_k: 50 });
     await taken(ctx, DAY_2);
     expect(await listed(ctx, pond)).toMatchObject({ day: null, verified: null, split: null });
     await people(ctx.client, pond, 1, { gender: "woman" });
     await taken(ctx, DAY_3);
 
-    await withMatchingConfig(ctx.client, { waitlist_k: 10 });
+    await withMatchingConfig(ctx.client, { pond_counter_k: 10 });
     expect(await listed(ctx, pond)).toEqual(said);
   });
 
   test("a pond that was never said follows every count until it reaches k", async ({ ctx }) => {
-    const pond = await pondNamed(ctx.client, "test-waitlist-growing");
+    const pond = await pondNamed(ctx.client, "test-counter-growing");
     await people(ctx.client, pond, 4, { gender: "man" });
     await taken(ctx, DAY_1);
     expect(await listed(ctx, pond)).toMatchObject({ day: null, verified: null });
@@ -255,15 +255,15 @@ describe("the figures", () => {
   });
 
   test("there is one row per pond, zeros included, and no history", async ({ ctx }) => {
-    const chosen = await pondNamed(ctx.client, "test-waitlist-chosen");
-    const empty = await pondNamed(ctx.client, "test-waitlist-empty");
+    const chosen = await pondNamed(ctx.client, "test-counter-chosen");
+    const empty = await pondNamed(ctx.client, "test-counter-empty");
     await people(ctx.client, chosen, 2, { gender: "man" });
     await taken(ctx, DAY_1);
     await people(ctx.client, chosen, 30, { gender: "man" });
     await taken(ctx, DAY_2);
     const { rows } = await ctx.client.query<{ pond_id: string; verified: number; day: string }>(
       `SELECT pond_id, verified, to_char(day, 'YYYY-MM-DD') AS day
-       FROM waitlist_snapshot WHERE pond_id = ANY($1)`,
+       FROM pond_counter WHERE pond_id = ANY($1)`,
       [[chosen, empty]],
     );
     expect(rows).toHaveLength(2);
@@ -274,15 +274,15 @@ describe("the figures", () => {
   });
 
   test("the job logs how many ponds moved, and no figure of any pond", async ({ ctx }) => {
-    const pond = await pondNamed(ctx.client, "test-waitlist-log");
+    const pond = await pondNamed(ctx.client, "test-counter-log");
     await people(ctx.client, pond, 37, { gender: "man" });
     const { deps: d, lines } = await deps(ctx, DAY_1);
-    const job = waitlistJob(d);
-    expect(job.name).toBe("waitlist-snapshot");
+    const job = pondCounterJob(d);
+    expect(job.name).toBe("pond-counter");
     const result = await job.run();
     expect(result.ponds).toBeGreaterThanOrEqual(1);
     expect(result.moved).toBeGreaterThanOrEqual(1);
-    const logged = lines().filter((l) => l.msg === "waitlist snapshot");
+    const logged = lines().filter((l) => l.msg === "pond counter");
     expect(logged).toHaveLength(1);
     const keys = Object.keys(logged[0] ?? {});
     expect(keys).toEqual(expect.arrayContaining(["day", "moved", "ponds"]));
@@ -293,8 +293,8 @@ describe("the figures", () => {
   });
 
   test("the first figures are taken only when there are none", async ({ ctx }) => {
-    await ctx.client.query("DELETE FROM waitlist_snapshot");
-    await pondNamed(ctx.client, "test-waitlist-first");
+    await ctx.client.query("DELETE FROM pond_counter");
+    await pondNamed(ctx.client, "test-counter-first");
     const first = await ensureFirstSnapshot((await deps(ctx, DAY_1)).deps);
     expect(first?.day).toBe("2026-10-05");
     expect(await ensureFirstSnapshot((await deps(ctx, DAY_2)).deps)).toBeNull();
@@ -311,7 +311,7 @@ describe("two counts at once", () => {
       try {
         await migrate(pool, resolve(import.meta.dirname, "../../../../packages/db/drizzle"));
         const { logger } = await captureLogger();
-        const pond = await pondNamed(pool, "test-waitlist-parallel");
+        const pond = await pondNamed(pool, "test-counter-parallel");
         await people(pool, pond, 45, { gender: "woman" });
         await takeSnapshot({ db: pool, logger, now: () => DAY_1 });
         await people(pool, pond, 10, { gender: "woman" });
@@ -322,12 +322,12 @@ describe("two counts at once", () => {
         let second: Promise<unknown>;
         try {
           await first.query("BEGIN");
-          await first.query("SELECT pg_advisory_xact_lock($1)", [WAITLIST_LOCK_KEY]);
+          await first.query("SELECT pg_advisory_xact_lock($1)", [POND_COUNTER_LOCK_KEY]);
           await first.query(
-            "UPDATE waitlist_snapshot SET verified = 55, woman = 55, finishing = 55, day = $2 WHERE pond_id = $1",
+            "UPDATE pond_counter SET verified = 55, woman = 55, finishing = 55, day = $2 WHERE pond_id = $1",
             [pond, "2026-10-06"],
           );
-          await first.query("UPDATE waitlist_snapshot SET taken_at = $1", [DAY_2]);
+          await first.query("UPDATE pond_counter SET taken_at = $1", [DAY_2]);
           second = takeSnapshot({ db: pool, logger, now: () => DAY_2 });
           const waited = await Promise.race([second.then(() => "ran"), sleep(300, "waited")]);
           expect(waited).toBe("waited");
@@ -340,7 +340,7 @@ describe("two counts at once", () => {
         // The day has had its count: the second process counts nothing.
         expect(await second).toMatchObject({ moved: 0, counted: false });
         const { rows } = await pool.query<{ verified: number }>(
-          "SELECT verified FROM waitlist_snapshot WHERE pond_id = $1",
+          "SELECT verified FROM pond_counter WHERE pond_id = $1",
           [pond],
         );
         // Without the lock the second count would have seen neither the 55 nor
@@ -423,7 +423,7 @@ describe("the bands of the bar (#507)", () => {
     const { deps: job } = await deps(ctx, DAY_1);
     await takeSnapshot({ ...job, bands: false });
     const { rows } = await ctx.client.query<{ verified: number; seeks_men: number }>(
-      "SELECT verified, seeks_men FROM waitlist_snapshot WHERE pond_id = $1",
+      "SELECT verified, seeks_men FROM pond_counter WHERE pond_id = $1",
       [pond],
     );
     expect(rows[0]).toEqual({ verified: 12, seeks_men: 0 });
@@ -441,7 +441,7 @@ describe("the bands of the bar (#507)", () => {
     await people(ctx.client, pond, 11, { complete: true, consented: true, seeks: ["man"] });
     const { deps: job, lines } = await deps(ctx, DAY_1);
     await takeSnapshot(job);
-    const logged = lines().filter((l) => l.msg === "waitlist snapshot");
+    const logged = lines().filter((l) => l.msg === "pond counter");
     expect(logged).toHaveLength(1);
     // Its fields, every one, and not a search of its text: a number looked for
     // there is also found in the process id, which failed CI once in a while.
@@ -466,12 +466,12 @@ describe("the bands of the bar (#507)", () => {
     await taken(ctx, DAY_1);
     // As the migration leaves a row that was written before the bands.
     await ctx.client.query(
-      "UPDATE waitlist_snapshot SET seeks_men = 0, seeks_everyone = 0, seeks_women = 0",
+      "UPDATE pond_counter SET seeks_men = 0, seeks_everyone = 0, seeks_women = 0",
     );
     await people(ctx.client, pond, 1, { complete: true, consented: true, seeks: ["man"] });
     await taken(ctx, DAY_2);
     const { rows } = await ctx.client.query<{ verified: number; seeks_men: number }>(
-      "SELECT verified, seeks_men FROM waitlist_snapshot WHERE pond_id = $1",
+      "SELECT verified, seeks_men FROM pond_counter WHERE pond_id = $1",
       [pond],
     );
     expect(rows[0]).toEqual({ verified: 12, seeks_men: 13 });

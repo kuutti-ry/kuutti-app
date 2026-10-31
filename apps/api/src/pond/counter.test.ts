@@ -4,10 +4,10 @@ import { SEED_PONDS } from "@kuutti/db";
 // biome-ignore lint/style/noRestrictedImports: a test of the bar over the synthetic population.
 import { generatePopulation, POND_PLANS, writePopulation } from "@kuutti/db/demo";
 import { CONSENT_VERSIONS } from "@kuutti/i18n";
-import { PondSeeksResponse, WaitlistResponse } from "@kuutti/schema";
+import { ErrorResponse, PondCounterResponse } from "@kuutti/schema";
 import { createApp } from "../app.ts";
+import { takeSnapshot } from "../jobs/pond-counter.ts";
 import { subjectsOfPond } from "../jobs/pool.ts";
-import { takeSnapshot } from "../jobs/waitlist-snapshot.ts";
 import { signedInAccount, withMatchingConfig } from "../test/account.ts";
 import {
   captureLogger,
@@ -18,9 +18,10 @@ import {
   testConfig,
 } from "../test/harness.ts";
 import { people, pondNamed } from "../test/people.ts";
-import { WAITLIST_CACHE_CONTROL } from "./routes.ts";
+import { POND_COUNTER_CACHE_CONTROL } from "./routes.ts";
 
-// features/pond/waitlist.feature (#54, ADR-013): what the public may read.
+// features/pond/counter.feature (#54, ADR-013): what the public may read, and
+// what a session adds to it.
 
 const DAY = new Date("2026-10-05T01:00:00Z");
 const NEXT_DAY = new Date("2026-10-06T01:00:00Z");
@@ -38,8 +39,17 @@ async function personOf(ctx: TestContext, pond: string) {
   return person;
 }
 
-const askBar = async (ctx: TestContext, headers: Record<string, string>) =>
-  PondSeeksResponse.parse(await (await ctx.app.request("/ponds/seeks", { headers })).json()).seeks;
+/** The ponds whose bar an asker hears: the caller's own at most. */
+const barsHeardBy = async (ctx: TestContext, headers: Record<string, string>) =>
+  PondCounterResponse.parse(
+    await (await ctx.app.request("/ponds/counter", { headers })).json(),
+  ).ponds.filter((entry) => entry.seeks !== null);
+
+const askBar = async (ctx: TestContext, headers: Record<string, string>) => {
+  const heard = await barsHeardBy(ctx, headers);
+  expect(heard.length).toBeLessThanOrEqual(1);
+  return heard[0]?.seeks ?? null;
+};
 
 async function pondWithBands(
   ctx: TestContext,
@@ -58,7 +68,7 @@ const totalOf = async (ctx: TestContext, pond: string) =>
   (await read(ctx)).ponds.find((p) => p.pond.id === pond)?.verified;
 
 const read = async (ctx: TestContext) =>
-  WaitlistResponse.parse(await (await ctx.app.request("/waitlist")).json());
+  PondCounterResponse.parse(await (await ctx.app.request("/ponds/counter")).json());
 
 describe("the bar of whom a pond seeks (#507)", () => {
   describe("The bar is said only when every band is at least k", () => {
@@ -152,13 +162,16 @@ describe("the bar of whom a pond seeks (#507)", () => {
     expect(await askBar(ctx, mine.headers)).toEqual({ men: 40, everyone: 20, women: 40 });
     expect(await askBar(ctx, theirs.headers)).toEqual({ men: 20, everyone: 20, women: 60 });
 
-    const response = await ctx.app.request("/ponds/seeks", { headers: mine.headers });
+    expect((await barsHeardBy(ctx, mine.headers)).map((entry) => entry.pond.id)).toEqual([here]);
+    expect((await barsHeardBy(ctx, theirs.headers)).map((entry) => entry.pond.id)).toEqual([there]);
+
+    const response = await ctx.app.request("/ponds/counter", { headers: mine.headers });
     expect(response.status).toBe(200);
     expect(response.headers.get("cache-control")).toBe("no-store");
+    expect(response.headers.get("vary") ?? "").toMatch(/\bAuthorization\b/i);
     const text = await response.text();
-    expect(JSON.parse(text)).toEqual({ seeks: { men: 40, everyone: 20, women: 40 } });
-    expect(text).not.toContain(here);
     expect(text).not.toContain(mine.accountId);
+    expect(text).not.toMatch(/seeksMen|seeksEveryone|seeksWomen/);
   });
 
   test("Nobody hears a bar without a pond or without a session", async ({ ctx }) => {
@@ -166,17 +179,38 @@ describe("the bar of whom a pond seeks (#507)", () => {
     const nobody = await signedInAccount(ctx.client);
     await taken(ctx);
     expect(await askBar(ctx, nobody.headers)).toBeNull();
+    expect(await askBar(ctx, {})).toBeNull();
+  });
 
-    const refused = await ctx.app.request("/ponds/seeks");
-    expect(refused.status).toBe(401);
-    const stale = await ctx.app.request("/ponds/seeks", {
-      headers: { authorization: "Bearer not-a-session" },
-    });
-    expect(stale.status).toBe(401);
+  test("A session that does not stand is refused, not answered as the public", async ({ ctx }) => {
+    const pond = await pondWithBands(ctx, "test-bar-stale", [20, 10, 20]);
+    const expired = await personOf(ctx, pond);
+    const revoked = await personOf(ctx, pond);
+    await taken(ctx);
+    await ctx.client.query(
+      "UPDATE session SET access_expires_at = now() - interval '1 minute' WHERE id = $1",
+      [expired.sessionId],
+    );
+    await ctx.client.query("UPDATE session SET revoked_at = now() WHERE id = $1", [
+      revoked.sessionId,
+    ]);
+    const refusals = [
+      [{ authorization: "Bearer not-a-session" }, "unauthenticated"],
+      [{ authorization: "Basic a2V5OnZhbHVl" }, "unauthenticated"],
+      [{ authorization: "" }, "unauthenticated"],
+      [expired.headers, "session_expired"],
+      [revoked.headers, "session_revoked"],
+    ] as const;
+    for (const [headers, code] of refusals) {
+      const response = await ctx.app.request("/ponds/counter", { headers });
+      expect(response.status).toBe(401);
+      expect(ErrorResponse.parse(await response.json()).error.code).toBe(code);
+      expect(response.headers.get("cache-control")).not.toBe(POND_COUNTER_CACHE_CONTROL);
+    }
   });
 
   test("a pond nobody has counted yet has no bar", async ({ ctx }) => {
-    await ctx.client.query("DELETE FROM waitlist_snapshot");
+    await ctx.client.query("DELETE FROM pond_counter");
     const pond = await pondNamed(ctx.client, "test-bar-uncounted");
     const person = await personOf(ctx, pond);
     expect(await askBar(ctx, person.headers)).toBeNull();
@@ -186,9 +220,9 @@ describe("the bar of whom a pond seeks (#507)", () => {
     const pond = await pondWithBands(ctx, "test-bar-k", [12, 12, 12]);
     const person = await personOf(ctx, pond);
     await taken(ctx);
-    await withMatchingConfig(ctx.client, { waitlist_k: 13 });
+    await withMatchingConfig(ctx.client, { pond_counter_k: 13 });
     expect(await askBar(ctx, person.headers)).toBeNull();
-    await withMatchingConfig(ctx.client, { waitlist_k: 1 });
+    await withMatchingConfig(ctx.client, { pond_counter_k: 1 });
     expect(await askBar(ctx, person.headers)).not.toBeNull();
   });
 
@@ -196,8 +230,8 @@ describe("the bar of whom a pond seeks (#507)", () => {
     const pond = await pondWithBands(ctx, "test-bar-failure", [12, 12, 12]);
     const person = await personOf(ctx, pond);
     await taken(ctx);
-    await withMatchingConfig(ctx.client, { waitlist_k: "ten" });
-    const response = await ctx.app.request("/ponds/seeks", { headers: person.headers });
+    await withMatchingConfig(ctx.client, { pond_counter_k: "ten" });
+    const response = await ctx.app.request("/ponds/counter", { headers: person.headers });
     expect(response.status).toBe(500);
   });
 
@@ -225,27 +259,30 @@ describe("the bar of whom a pond seeks (#507)", () => {
     expect(await subjectsOfPond(ctx.client, pond, DAY)).toEqual([]);
   });
 
-  test("The public waitlist says nothing of whom anybody seeks", async ({ ctx }) => {
+  test("The public counter says nothing of whom anybody seeks", async ({ ctx }) => {
     const pond = await pondWithBands(ctx, "test-bar-public", [20, 10, 20]);
     const person = await personOf(ctx, pond);
     await taken(ctx);
     expect(await askBar(ctx, person.headers)).not.toBeNull();
-    const text = await (await ctx.app.request("/waitlist")).text();
-    expect(text).not.toMatch(/seeks|everyone/i);
-    const listed = WaitlistResponse.parse(JSON.parse(text)).ponds.find((p) => p.pond.id === pond);
+    const text = await (await ctx.app.request("/ponds/counter")).text();
+    expect(text).not.toMatch(/everyone/i);
+    const { ponds } = PondCounterResponse.parse(JSON.parse(text));
+    expect(ponds.filter((p) => p.seeks !== null)).toEqual([]);
+    const listed = ponds.find((p) => p.pond.id === pond);
     expect(Object.keys(listed ?? {}).sort()).toEqual([
       "day",
       "finishing",
       "pond",
+      "seeks",
       "split",
       "verified",
     ]);
   });
 });
 
-describe("the waitlist", () => {
+describe("the counter", () => {
   test("A pond below k publishes no number", async ({ ctx }) => {
-    const pond = await pondNamed(ctx.client, "test-waitlist-nine");
+    const pond = await pondNamed(ctx.client, "test-counter-nine");
     await people(ctx.client, pond, 9, { gender: "woman" });
     await taken(ctx);
     const body = await read(ctx);
@@ -271,7 +308,7 @@ describe("the waitlist", () => {
       async ({ women, men, nonBinary, undeclared, split }, { ctx }) => {
         const pond = await pondNamed(
           ctx.client,
-          `test-waitlist-split-${women}-${men}-${nonBinary}-${undeclared}`,
+          `test-counter-split-${women}-${men}-${nonBinary}-${undeclared}`,
         );
         await people(ctx.client, pond, women, { gender: "woman" });
         await people(ctx.client, pond, men, { gender: "man" });
@@ -289,16 +326,16 @@ describe("the waitlist", () => {
     );
   });
 
-  test("The waitlist answers without a session and names nobody", async ({ ctx }) => {
-    const pond = await pondNamed(ctx.client, "test-waitlist-public");
+  test("The counter answers without a session and names nobody", async ({ ctx }) => {
+    const pond = await pondNamed(ctx.client, "test-counter-public");
     const ids = await people(ctx.client, pond, 12, { gender: "woman", complete: true });
     const someone = await signedInAccount(ctx.client);
     await taken(ctx);
-    const response = await ctx.app.request("/waitlist");
+    const response = await ctx.app.request("/ponds/counter");
     expect(response.status).toBe(200);
-    expect(response.headers.get("cache-control")).toBe(WAITLIST_CACHE_CONTROL);
+    expect(response.headers.get("cache-control")).toBe(POND_COUNTER_CACHE_CONTROL);
     const text = await response.text();
-    const body = WaitlistResponse.parse(JSON.parse(text));
+    const body = PondCounterResponse.parse(JSON.parse(text));
     expect(Object.keys(body).sort()).toEqual(["k", "ponds"]);
     expect(body.ponds.find((p) => p.pond.id === pond)).toEqual({
       pond: expect.objectContaining({ id: pond }),
@@ -307,22 +344,24 @@ describe("the waitlist", () => {
       // Everyone here declared the same: the split would say it of each of them.
       split: null,
       finishing: 0,
+      seeks: null,
     });
     for (const id of [...ids, someone.accountId]) expect(text).not.toContain(id);
     expect(text).not.toMatch(/T\d\d:\d\d/); // a day, never a time of day
     expect(text).not.toContain("Aino");
     expect(text).not.toContain("bio");
-    // The same answer with a session: the route reads nothing of the caller.
-    const signedIn = await ctx.app.request("/waitlist", { headers: someone.headers });
+    // The same answer to a session with no pond, which a cache may not keep: it is theirs.
+    const signedIn = await ctx.app.request("/ponds/counter", { headers: someone.headers });
+    expect(signedIn.headers.get("cache-control")).toBe("no-store");
     expect(await signedIn.text()).toBe(text);
   });
 
   test("k comes from matching_config, and a larger k publishes less", async ({ ctx }) => {
-    const pond = await pondNamed(ctx.client, "test-waitlist-k");
+    const pond = await pondNamed(ctx.client, "test-counter-k");
     await people(ctx.client, pond, 16, { gender: "man" });
     await taken(ctx);
     expect((await read(ctx)).ponds.find((p) => p.pond.id === pond)?.verified).toBe(16);
-    await withMatchingConfig(ctx.client, { waitlist_k: 20 });
+    await withMatchingConfig(ctx.client, { pond_counter_k: 20 });
     const body = await read(ctx);
     expect(body.k).toBe(20);
     expect(body.ponds.find((p) => p.pond.id === pond)).toMatchObject({
@@ -336,11 +375,11 @@ describe("the waitlist", () => {
   test("a k below the floor in matching_config publishes nothing more: the floor holds", async ({
     ctx,
   }) => {
-    const pond = await pondNamed(ctx.client, "test-waitlist-floor");
+    const pond = await pondNamed(ctx.client, "test-counter-floor");
     await people(ctx.client, pond, 3, { gender: "woman" });
     await people(ctx.client, pond, 3, { gender: "man" });
     await people(ctx.client, pond, 3, { gender: "non_binary" });
-    await withMatchingConfig(ctx.client, { waitlist_k: 1 });
+    await withMatchingConfig(ctx.client, { pond_counter_k: 1 });
     await taken(ctx);
     const body = await read(ctx);
     expect(body.k).toBe(10);
@@ -352,8 +391,8 @@ describe("the waitlist", () => {
   });
 
   test("a failure is not answered as something a cache may keep", async ({ ctx }) => {
-    await withMatchingConfig(ctx.client, { waitlist_k: "ten" });
-    const response = await ctx.app.request("/waitlist");
+    await withMatchingConfig(ctx.client, { pond_counter_k: "ten" });
+    const response = await ctx.app.request("/ponds/counter");
     expect(response.status).toBe(500);
     expect(response.headers.get("cache-control")).toBeNull();
   });
@@ -362,7 +401,7 @@ describe("the waitlist", () => {
     const document = JSON.parse(
       readFileSync(resolve(import.meta.dirname, "../../openapi.json"), "utf8"),
     ) as { components: { schemas: Record<string, { properties: Record<string, unknown> }> } };
-    const pond = document.components.schemas.WaitlistPond?.properties ?? {};
+    const pond = document.components.schemas.PondCounterPond?.properties ?? {};
     expect(pond.verified).toEqual({ type: "integer", nullable: true, minimum: 10 });
     expect(pond.finishing).toEqual({
       type: "integer",
@@ -370,7 +409,7 @@ describe("the waitlist", () => {
       minimum: 0,
       not: { type: "integer", minimum: 1, maximum: 9 },
     });
-    const split = document.components.schemas.WaitlistSplit?.properties ?? {};
+    const split = document.components.schemas.PondCounterSplit?.properties ?? {};
     for (const cell of ["woman", "man", "nonBinary"]) {
       expect(split[cell]).toEqual({ type: "integer", minimum: 10 });
     }
@@ -386,8 +425,8 @@ describe("the waitlist", () => {
   test("before any figures exist every pond is listed with no number and no day", async ({
     ctx,
   }) => {
-    await ctx.client.query("DELETE FROM waitlist_snapshot");
-    const pond = await pondNamed(ctx.client, "test-waitlist-none");
+    await ctx.client.query("DELETE FROM pond_counter");
+    const pond = await pondNamed(ctx.client, "test-counter-none");
     await people(ctx.client, pond, 30, { gender: "woman" });
     const body = await read(ctx);
     expect(body.ponds.find((p) => p.pond.id === pond)).toEqual({
@@ -396,6 +435,7 @@ describe("the waitlist", () => {
       verified: null,
       split: null,
       finishing: null,
+      seeks: null,
     });
   });
 
@@ -408,19 +448,21 @@ describe("the waitlist", () => {
       logger,
       db: ctx.client,
     });
-    const site = await app.request("/waitlist", { headers: { origin: "https://kuutti.app" } });
+    const site = await app.request("/ponds/counter", { headers: { origin: "https://kuutti.app" } });
     expect(site.headers.get("access-control-allow-origin")).toBe("https://kuutti.app");
-    const other = await app.request("/waitlist", {
+    const other = await app.request("/ponds/counter", {
       headers: { origin: "https://scraper.example" },
     });
     expect(other.status).toBe(200);
     expect(other.headers.get("access-control-allow-origin")).toBeNull();
-    const none = await app.request("/waitlist");
+    const none = await app.request("/ponds/counter");
     // The answer is cacheable, so every form of it must say what it varies by:
-    // a cache that kept the site's answer must not hand its header to another origin.
+    // a cache that kept the site's answer must not hand its header to another
+    // origin, nor the public answer to somebody who asks with a session.
     for (const response of [site, other, none]) {
-      expect(response.headers.get("cache-control")).toBe(WAITLIST_CACHE_CONTROL);
+      expect(response.headers.get("cache-control")).toBe(POND_COUNTER_CACHE_CONTROL);
       expect(response.headers.get("vary") ?? "").toMatch(/\bOrigin\b/i);
+      expect(response.headers.get("vary") ?? "").toMatch(/\bAuthorization\b/i);
     }
   });
 });

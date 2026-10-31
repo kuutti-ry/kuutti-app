@@ -203,7 +203,7 @@ export const RESEARCH_FIELD_KEYS = PROFILE_FIELD_KEYS.filter((key) => PROFILE_FI
  * The floor of k for the research block (ADR-011 §9): a cell of pond, age band
  * and snapshot must hold at least this many pseudonyms in any copy that leaves
  * the operational database, and the nightly census warns when the live table
- * has a cell under it. The waitlist's floor (rules/schema.md), and like the
+ * has a cell under it. The counter's floor (rules/schema.md), and like the
  * retention a rule, not a `matching_config` row.
  */
 export const RESEARCH_K_MIN = 10;

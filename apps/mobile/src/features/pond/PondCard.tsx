@@ -7,60 +7,58 @@ import { useT } from "@/lib/locale";
 import { useHapticTap } from "@/theme/haptics";
 import { pondName } from "./names";
 import { SeeksBar } from "./SeeksBar";
-import { usePondSeeks } from "./usePondSeeks";
-import { useWaitlist } from "./useWaitlist";
+import { usePondCounter } from "./usePondCounter";
 
 /**
- * How the person's own pond is filling up (#54, ADR-013): the figures of the
- * public counter, in words. Below the threshold no number is said, here as
+ * How the person's own pond is filling up (#54, ADR-013): the counter's
+ * figures, in words. Below the threshold no number is said, here as
  * everywhere, and the card says why the numbers stand still for a while: they
  * move in steps of at least k people. The pond's name stands on a line of its
  * own, in the nominative and in the person's language (#174): no sentence is
  * built around it (TD-17). The bar of whom the people there seek stands under
  * the total, once the pond may say it (#507).
  */
-export function WaitlistCard({ pond }: { pond: PondSummary }) {
+export function PondCard({ pond }: { pond: PondSummary }) {
   const { t } = useT();
   const tap = useHapticTap();
-  const waitlist = useWaitlist(pond.id);
-  const seeks = usePondSeeks(pond.id, waitlist.attempt);
-  const figures = waitlist.status === "ready" ? waitlist.figures : null;
+  const counter = usePondCounter(pond.id);
+  const figures = counter.status === "ready" ? counter.figures : null;
 
   return (
     <Card className="w-full max-w-md">
-      <View accessibilityLabel={t("pond.waitlist.label")} className="gap-6">
+      <View accessibilityLabel={t("pond.counter.label")} className="gap-6">
         <CardHeader>
-          <CardDescription>{t("pond.waitlist.title")}</CardDescription>
+          <CardDescription>{t("pond.counter.title")}</CardDescription>
           <CardTitle>{pondName(t, pond)}</CardTitle>
         </CardHeader>
         <CardContent className="gap-2">
-          {waitlist.status === "loading" && (
-            <Text accessibilityLiveRegion="polite">{t("pond.waitlist.loading")}</Text>
+          {counter.status === "loading" && (
+            <Text accessibilityLiveRegion="polite">{t("pond.counter.loading")}</Text>
           )}
-          {waitlist.status === "failed" && (
+          {counter.status === "failed" && (
             <LoadFailed
-              headline={t("pond.waitlist.failed")}
-              error={waitlist.error}
+              headline={t("pond.counter.failed")}
+              error={counter.error}
               onRetry={() => {
                 tap();
-                waitlist.retry();
+                counter.retry();
               }}
             />
           )}
-          {waitlist.status === "ready" &&
+          {counter.status === "ready" &&
             (figures === null || figures.verified === null ? (
-              <Text>{t("pond.waitlist.small", { k: waitlist.k })}</Text>
+              <Text>{t("pond.counter.small", { k: counter.k })}</Text>
             ) : (
               <>
-                <Text>{t("pond.waitlist.verified", { people: figures.verified })}</Text>
-                {seeks && <SeeksBar seeks={seeks} />}
+                <Text>{t("pond.counter.verified", { people: figures.verified })}</Text>
+                {figures.seeks && <SeeksBar seeks={figures.seeks} />}
                 {figures.finishing !== null && (
-                  <Text>{t("pond.waitlist.finishing", { people: figures.finishing })}</Text>
+                  <Text>{t("pond.counter.finishing", { people: figures.finishing })}</Text>
                 )}
               </>
             ))}
-          {waitlist.status === "ready" && figures !== null && figures.verified !== null && (
-            <Text variant="muted">{t("pond.waitlist.steps", { k: waitlist.k })}</Text>
+          {counter.status === "ready" && figures !== null && figures.verified !== null && (
+            <Text variant="muted">{t("pond.counter.steps", { k: counter.k })}</Text>
           )}
         </CardContent>
       </View>

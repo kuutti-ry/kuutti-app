@@ -565,13 +565,13 @@ describe("PII in logs", () => {
       // The address's limit, on a route nobody signs in for, and on the two
       // starts it then sends back with a code.
       const byAddress = build({ RATE_LIMIT_PER_MINUTE: "1" });
-      const waitlist = { method: "GET", path: "/waitlist" };
+      const docs = { method: "GET", path: "/docs" };
       const starts = [
         { method: "GET", path: "/auth/start" },
         { method: "GET", path: "/admin/auth/start" },
       ];
       for (const client of [CLIENTS.ipv4, CLIENTS.ipv6]) {
-        expect(await twice(byAddress, waitlist, client)).toEqual([200, 429]);
+        expect(await twice(byAddress, docs, client)).toEqual([200, 429]);
         expect(await exercise(byAddress, starts, client)).toEqual([302, 302]);
       }
 

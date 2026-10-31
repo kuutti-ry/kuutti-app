@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Kuutti API",
-    "version": "0.91.0",
+    "version": "0.92.0",
     "description": "Free, non-commercial dating app for Finland. Every account is verified through a Finnish bank. Source: AGPL-3.0 with App Store exception."
   },
   "components": {
@@ -6281,15 +6281,91 @@
           "open"
         ]
       },
-      "PondSeeksResponse": {
+      "PondCounterResponse": {
         "type": "object",
         "properties": {
+          "k": {
+            "type": "integer",
+            "minimum": 10
+          },
+          "ponds": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PondCounterPond"
+            },
+            "maxItems": 500
+          }
+        },
+        "required": [
+          "k",
+          "ponds"
+        ],
+        "additionalProperties": false
+      },
+      "PondCounterPond": {
+        "type": "object",
+        "properties": {
+          "pond": {
+            "$ref": "#/components/schemas/PondSummary"
+          },
+          "day": {
+            "type": "string",
+            "nullable": true,
+            "format": "date"
+          },
+          "verified": {
+            "type": "integer",
+            "nullable": true,
+            "minimum": 10
+          },
+          "split": {
+            "$ref": "#/components/schemas/PondCounterSplit"
+          },
+          "finishing": {
+            "type": "integer",
+            "nullable": true,
+            "minimum": 0,
+            "not": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9
+            }
+          },
           "seeks": {
             "$ref": "#/components/schemas/PondSeeks"
           }
         },
         "required": [
+          "pond",
+          "day",
+          "verified",
+          "split",
+          "finishing",
           "seeks"
+        ],
+        "additionalProperties": false
+      },
+      "PondCounterSplit": {
+        "type": "object",
+        "nullable": true,
+        "properties": {
+          "woman": {
+            "type": "integer",
+            "minimum": 10
+          },
+          "man": {
+            "type": "integer",
+            "minimum": 10
+          },
+          "nonBinary": {
+            "type": "integer",
+            "minimum": 10
+          }
+        },
+        "required": [
+          "woman",
+          "man",
+          "nonBinary"
         ],
         "additionalProperties": false
       },
@@ -6317,90 +6393,6 @@
           "men",
           "everyone",
           "women"
-        ],
-        "additionalProperties": false
-      },
-      "WaitlistResponse": {
-        "type": "object",
-        "properties": {
-          "k": {
-            "type": "integer",
-            "minimum": 10
-          },
-          "ponds": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/WaitlistPond"
-            },
-            "maxItems": 500
-          }
-        },
-        "required": [
-          "k",
-          "ponds"
-        ],
-        "additionalProperties": false
-      },
-      "WaitlistPond": {
-        "type": "object",
-        "properties": {
-          "pond": {
-            "$ref": "#/components/schemas/PondSummary"
-          },
-          "day": {
-            "type": "string",
-            "nullable": true,
-            "format": "date"
-          },
-          "verified": {
-            "type": "integer",
-            "nullable": true,
-            "minimum": 10
-          },
-          "split": {
-            "$ref": "#/components/schemas/WaitlistSplit"
-          },
-          "finishing": {
-            "type": "integer",
-            "nullable": true,
-            "minimum": 0,
-            "not": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 9
-            }
-          }
-        },
-        "required": [
-          "pond",
-          "day",
-          "verified",
-          "split",
-          "finishing"
-        ],
-        "additionalProperties": false
-      },
-      "WaitlistSplit": {
-        "type": "object",
-        "nullable": true,
-        "properties": {
-          "woman": {
-            "type": "integer",
-            "minimum": 10
-          },
-          "man": {
-            "type": "integer",
-            "minimum": 10
-          },
-          "nonBinary": {
-            "type": "integer",
-            "minimum": 10
-          }
-        },
-        "required": [
-          "woman",
-          "man",
-          "nonBinary"
         ],
         "additionalProperties": false
       },
@@ -12551,50 +12543,33 @@
         }
       }
     },
-    "/ponds/seeks": {
+    "/ponds/counter": {
       "get": {
-        "summary": "Whom the people of the caller's pond seek",
-        "description": "Whole percentages of the three bands of the caller's own pond, from finished profiles: those who seek men, those who seek both women and men, and those who seek women. Null until every band holds at least k people. The bands move only once at least k finished profiles have come or gone. Counted once a day.",
+        "summary": "The pond counter",
+        "description": "Per pond: bank-verified people with the pond as theirs, their split by self-declared gender, and how many are finishing their profile. A number is published only where at least k people stand behind it (k is in the answer), the split only when every cell is at least k, and a pond's numbers move only once at least k people have come or gone since they were last said. Counted once a day. No session needed. With one, the answer is the caller's and is not cached, and the caller's own pond also says whom its people seek: whole percentages of three bands of finished profiles, those who seek men, those who seek both women and men, and those who seek women, null until every band holds at least k people.",
         "security": [
+          {},
           {
             "session": []
           }
         ],
         "responses": {
           "200": {
-            "description": "The shares, or null.",
+            "description": "Every pond with what may be said of it.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/PondSeeksResponse"
+                  "$ref": "#/components/schemas/PondCounterResponse"
                 }
               }
             }
           },
           "401": {
-            "description": "unauthenticated, session_expired or session_revoked.",
+            "description": "A session was offered and does not stand: unauthenticated, session_expired or session_revoked. No session at all is the public answer.",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/waitlist": {
-      "get": {
-        "summary": "The waitlist counter",
-        "description": "Per pond: bank-verified people waiting, their split by self-declared gender, and how many are finishing their profile. A number is published only where at least k people stand behind it (k is in the answer), the split only when every cell is at least k, and a pond's numbers move only once at least k people have come or gone since they were last said. Counted once a day. No session needed.",
-        "responses": {
-          "200": {
-            "description": "Every pond with what may be said of it.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/WaitlistResponse"
                 }
               }
             }
@@ -12917,7 +12892,7 @@
     "/rounds/{day}/relaxations": {
       "get": {
         "summary": "What today's round may relax, and what is relaxed",
-        "description": "For a short round (fewer ordered places than matching_config round_size, the liked-you and fish places aside), every deal-breaker of the caller's that is not paused and not relaxed today, each way it can be relaxed for the day: unanswered (let through those who did not answer its field) and aside (set it aside), each listed only when it would add somebody today, with more: how much it widens the caller's pool, rounded down to a step of matching_config waitlist_k. Counted on asking. Also the relaxations in force today. Never another filter (ADR-042).",
+        "description": "For a short round (fewer ordered places than matching_config round_size, the liked-you and fish places aside), every deal-breaker of the caller's that is not paused and not relaxed today, each way it can be relaxed for the day: unanswered (let through those who did not answer its field) and aside (set it aside), each listed only when it would add somebody today, with more: how much it widens the caller's pool, rounded down to a step of matching_config pond_counter_k. Counted on asking. Also the relaxations in force today. Never another filter (ADR-042).",
         "security": [
           {
             "session": []

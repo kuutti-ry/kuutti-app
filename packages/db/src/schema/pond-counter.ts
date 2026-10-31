@@ -2,9 +2,9 @@ import { date, integer, pgTable, timestamp, uuid } from "drizzle-orm/pg-core";
 import { ponds } from "./ponds.ts";
 
 /**
- * The figures the waitlist counter stands on (#54, ADR-013): one row per pond,
+ * The figures the pond counter stands on (#54, ADR-013): one row per pond,
  * written by the nightly job and served, after suppression, by the public
- * `GET /waitlist`. The counts are exact and internal; what may be said in
+ * `GET /ponds/counter`. The counts are exact and internal; what may be said in
  * public is decided when they are read (`publishCounts` in packages/schema),
  * so a change of k needs no rewrite. A row is replaced only when its pond has
  * moved by at least k (`moveFigures`), and `day` is the Finnish calendar day
@@ -16,7 +16,7 @@ import { ponds } from "./ponds.ts";
  * lost one that day, which is what erasure removed (TD-7). Aggregates only:
  * no account, no identity, nothing finer than a day.
  */
-export const waitlistSnapshot = pgTable("waitlist_snapshot", {
+export const pondCounter = pgTable("pond_counter", {
   pondId: uuid("pond_id")
     .primaryKey()
     .references(() => ponds.id),

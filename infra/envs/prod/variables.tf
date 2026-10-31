@@ -50,7 +50,7 @@ variable "admin_app_url" {
 }
 
 variable "cors_allowed_origins" {
-  description = "Browser origins the API answers (rule 8: the admin panel and the waitlist site only), comma separated: /kuutti/prod/cors-allowed-origins. The panel's origin must be here or its preflight fails."
+  description = "Browser origins the API answers (rule 8: the admin panel and the public site only), comma separated: /kuutti/prod/cors-allowed-origins. The panel's origin must be here or its preflight fails."
   type        = string
   default     = "https://admin.kuutti.app"
 }

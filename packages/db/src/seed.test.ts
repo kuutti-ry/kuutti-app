@@ -119,7 +119,7 @@ describe("seed", () => {
           message_photo_attempts_per_day: 30,
           message_photos_per_day: 10,
           messages_per_minute: 30,
-          waitlist_k: 10,
+          pond_counter_k: 10,
           default_pond: "suomi",
           change_cadence_days: 30,
           deal_breakers_max: 2,

@@ -204,7 +204,7 @@ const REGISTER: Record<string, Entry> = {
     exported: ["sanctions"],
   },
   session: { erasure: "goes", by: "deleteAccountSessions", exported: ["sessions"] },
-  waitlist_snapshot: { erasure: "nobody", why: "A pond's counts by day (ADR-013)." },
+  pond_counter: { erasure: "nobody", why: "A pond's counts by day (ADR-013)." },
 };
 
 /** The calls of eraseAccount that erase nothing themselves. */

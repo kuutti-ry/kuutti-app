@@ -55,7 +55,7 @@ variable "admin_app_url" {
 }
 
 variable "cors_allowed_origins" {
-  description = "Browser origins the API answers (rule 8: the admin panel and the waitlist site only), comma separated: /kuutti/staging/cors-allowed-origins. The panel's origin must be here or its preflight fails; its previews share it. A panel on a developer's laptop is not listed: the bank returns the one-time code to the hosted panel, so it could not finish a staging login anyway (ADR-025 §10)."
+  description = "Browser origins the API answers (rule 8: the admin panel and the public site only), comma separated: /kuutti/staging/cors-allowed-origins. The panel's origin must be here or its preflight fails; its previews share it. A panel on a developer's laptop is not listed: the bank returns the one-time code to the hosted panel, so it could not finish a staging login anyway (ADR-025 §10)."
   type        = string
   default     = "https://admin.staging.kuutti.app"
 }

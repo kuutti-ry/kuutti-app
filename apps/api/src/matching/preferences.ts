@@ -42,7 +42,7 @@ type Row = { field: string; value: unknown };
 /**
  * The two hard rows' stored values as the contract reads them: a value that no
  * longer parses reads as unset. Pure, so a reader of many accounts at once
- * (the waitlist counter, #54) decides exactly as the reader of one.
+ * (the pond counter, #54) decides exactly as the reader of one.
  */
 export function preferencesFrom(values: {
   seeks: unknown;

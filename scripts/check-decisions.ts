@@ -5,8 +5,9 @@
  *
  * - The keys are the ones the migrations write: every `'key', '<json>'::jsonb`
  *   pair of an INSERT INTO "matching_config" in packages/db/drizzle, less those
- *   a later DELETE FROM "matching_config" takes away, read in the migrations'
- *   order (#500, ADR-060 §6). The seed carries the same rows (migrate.test.ts
+ *   a later DELETE FROM "matching_config" takes away and under the name a later
+ *   UPDATE "matching_config" gives them, read in the migrations' order (#500,
+ *   ADR-060 §6, ADR-013 §17). The seed carries the same rows (migrate.test.ts
  *   holds the two identical), and a deployed database holds only what the
  *   migrations wrote.
  * - The register names a key in a table's Where cell as a bare lowercase word
@@ -30,6 +31,7 @@ const REGISTER = "docs/decisions.md";
 const KEY = /^[a-z][a-z0-9_]*$/;
 const PAIR = /'([a-z][a-z0-9_]*)',\s*'[^']*'::jsonb/g;
 const QUOTED = /'([a-z][a-z0-9_]*)'/g;
+const RENAME = /SET "key" = '([a-z][a-z0-9_]*)' WHERE "key" = '([a-z][a-z0-9_]*)'/;
 const SEPARATOR = /^\|(\s*:?-+:?\s*\|)+\s*$/;
 
 /** The keys that stand after a migration, given those that stood before it, statement by statement. */
@@ -40,6 +42,9 @@ function keysAfter(before: readonly string[], sql: string): string[] {
       for (const pair of statement.matchAll(PAIR)) keys.add(pair[1] ?? "");
     } else if (/DELETE FROM "matching_config"/.test(statement)) {
       for (const quoted of statement.matchAll(QUOTED)) keys.delete(quoted[1] ?? "");
+    } else if (/UPDATE "matching_config"/.test(statement)) {
+      const [, renamed, was] = statement.match(RENAME) ?? [];
+      if (renamed && was && keys.delete(was)) keys.add(renamed);
     }
   }
   return [...keys];
@@ -116,6 +121,14 @@ INSERT INTO "ponds" ("slug", "name") VALUES ('suomi', 'Suomi');`;
     `DELETE FROM "ponds" WHERE "slug" = 'default_pond';`,
   );
   const expectedDeleted = ["photo_fetches_per_day", "default_pond"];
+  const renamed = keysAfter(
+    keysAfter(
+      deleted,
+      `UPDATE "matching_config" SET "key" = 'first_pond' WHERE "key" = 'default_pond';`,
+    ),
+    `UPDATE "matching_config" SET "key" = 'unborn' WHERE "key" = 'never_written';`,
+  );
+  const expectedRenamed = ["photo_fetches_per_day", "first_pond"];
   const again = keysAfter(
     deleted,
     `INSERT INTO "matching_config" ("version", "key", "value") VALUES (1, 'round_size', '10'::jsonb);`,
@@ -124,6 +137,7 @@ INSERT INTO "ponds" ("slug", "name") VALUES ('suomi', 'Suomi');`;
   for (const [what, got, expected] of [
     ["the migrations' keys", parsed, expectedKeys],
     ["a key a later migration deletes", deleted, expectedDeleted],
+    ["a key a later migration renames", renamed, expectedRenamed],
     ["a key written again after it was deleted", again, expectedAgain],
   ] as const) {
     if (JSON.stringify(got) !== JSON.stringify(expected)) {
@@ -181,7 +195,7 @@ INSERT INTO "ponds" ("slug", "name") VALUES ('suomi', 'Suomi');`;
       process.exit(1);
     }
   }
-  console.log(`✔ check-decisions self-test: ${cases.length + 3} cases`);
+  console.log(`✔ check-decisions self-test: ${cases.length + 4} cases`);
 }
 
 if (process.argv.includes("--self-test")) selfTest();

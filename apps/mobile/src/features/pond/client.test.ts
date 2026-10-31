@@ -1,5 +1,5 @@
 import { saveSession } from "@/lib/session";
-import { choosePond, fetchGate, fetchPondSeeks, fetchPonds, fetchWaitlist } from "./client";
+import { choosePond, fetchGate, fetchPondCounter, fetchPonds } from "./client";
 
 // The pond as the app reads it (#54, #94, #174): each route parsed by its
 // contract, and an answer without data an ApiError with the status.
@@ -42,15 +42,17 @@ beforeEach(async () => {
 });
 
 describe("the pond client", () => {
-  it("reads the public waitlist without the session", async () => {
-    const waitlist = { k: 10, ponds: [] };
-    const seen = answering(json(waitlist), refusal(503));
-    expect(await fetchWaitlist()).toEqual(waitlist);
-    expect(pathOf(seen[0])).toBe("/waitlist");
-    expect(seen[0]?.headers.get("authorization")).toBeNull();
-    await expect(fetchWaitlist()).rejects.toMatchObject({
+  it("reads the counter with the session, which is what gives the person's pond its bar", async () => {
+    const seeks = { men: 30, everyone: 20, women: 50 };
+    const entry = { pond: POND, day: null, verified: null, split: null, finishing: null, seeks };
+    const counter = { k: 10, ponds: [entry] };
+    const seen = answering(json(counter), refusal(503));
+    expect(await fetchPondCounter()).toEqual(counter);
+    expect(pathOf(seen[0])).toBe("/ponds/counter");
+    expect(seen[0]?.headers.get("authorization")).toBe(`Bearer ${token("access")}`);
+    await expect(fetchPondCounter()).rejects.toMatchObject({
       status: 503,
-      message: "waitlist answered 503",
+      message: "counter answered 503",
     });
   });
 
@@ -65,22 +67,11 @@ describe("the pond client", () => {
     });
   });
 
-  it("reads the shares of the bar with the session, null when the pond may not say", async () => {
-    const seeks = { men: 30, everyone: 20, women: 50 };
-    const seen = answering(json({ seeks }), json({ seeks: null }), refusal(503));
-    expect(await fetchPondSeeks()).toEqual(seeks);
-    expect(pathOf(seen[0])).toBe("/ponds/seeks");
-    expect(seen[0]?.headers.get("authorization")).toBe(`Bearer ${token("access")}`);
-    expect(await fetchPondSeeks()).toBeNull();
-    await expect(fetchPondSeeks()).rejects.toMatchObject({
-      status: 503,
-      message: "seeks answered 503",
-    });
-  });
-
   it("refuses shares that break the contract", async () => {
-    answering(json({ seeks: { men: 0, everyone: 20, women: 80 } }));
-    await expect(fetchPondSeeks()).rejects.toThrow();
+    const seeks = { men: 0, everyone: 20, women: 80 };
+    const entry = { pond: POND, day: null, verified: null, split: null, finishing: null, seeks };
+    answering(json({ k: 10, ponds: [entry] }));
+    await expect(fetchPondCounter()).rejects.toThrow();
   });
 
   it("lists the ponds to choose from", async () => {

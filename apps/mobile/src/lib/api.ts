@@ -17,8 +17,8 @@ export class ApiError extends Error {
   }
 }
 
-/** Routes that never carry a session: the login itself, the probe, and the public waitlist counter (#54). */
-const ANONYMOUS = new Set(["/health", "/auth/exchange", "/auth/refresh", "/waitlist"]);
+/** Routes that never carry a session: the login itself and the probe. */
+const ANONYMOUS = new Set(["/health", "/auth/exchange", "/auth/refresh"]);
 
 const retryable = new WeakMap<Request, Request>();
 

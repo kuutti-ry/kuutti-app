@@ -6183,7 +6183,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/ponds/seeks": {
+    "/ponds/counter": {
         parameters: {
             query?: never;
             header?: never;
@@ -6191,56 +6191,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Whom the people of the caller's pond seek
-         * @description Whole percentages of the three bands of the caller's own pond, from finished profiles: those who seek men, those who seek both women and men, and those who seek women. Null until every band holds at least k people. The bands move only once at least k finished profiles have come or gone. Counted once a day.
-         */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description The shares, or null. */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["PondSeeksResponse"];
-                    };
-                };
-                /** @description unauthenticated, session_expired or session_revoked. */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ErrorResponse"];
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/waitlist": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * The waitlist counter
-         * @description Per pond: bank-verified people waiting, their split by self-declared gender, and how many are finishing their profile. A number is published only where at least k people stand behind it (k is in the answer), the split only when every cell is at least k, and a pond's numbers move only once at least k people have come or gone since they were last said. Counted once a day. No session needed.
+         * The pond counter
+         * @description Per pond: bank-verified people with the pond as theirs, their split by self-declared gender, and how many are finishing their profile. A number is published only where at least k people stand behind it (k is in the answer), the split only when every cell is at least k, and a pond's numbers move only once at least k people have come or gone since they were last said. Counted once a day. No session needed. With one, the answer is the caller's and is not cached, and the caller's own pond also says whom its people seek: whole percentages of three bands of finished profiles, those who seek men, those who seek both women and men, and those who seek women, null until every band holds at least k people.
          */
         get: {
             parameters: {
@@ -6257,7 +6209,16 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["WaitlistResponse"];
+                        "application/json": components["schemas"]["PondCounterResponse"];
+                    };
+                };
+                /** @description A session was offered and does not stand: unauthenticated, session_expired or session_revoked. No session at all is the public answer. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
                     };
                 };
             };
@@ -6616,7 +6577,7 @@ export interface paths {
         };
         /**
          * What today's round may relax, and what is relaxed
-         * @description For a short round (fewer ordered places than matching_config round_size, the liked-you and fish places aside), every deal-breaker of the caller's that is not paused and not relaxed today, each way it can be relaxed for the day: unanswered (let through those who did not answer its field) and aside (set it aside), each listed only when it would add somebody today, with more: how much it widens the caller's pool, rounded down to a step of matching_config waitlist_k. Counted on asking. Also the relaxations in force today. Never another filter (ADR-042).
+         * @description For a short round (fewer ordered places than matching_config round_size, the liked-you and fish places aside), every deal-breaker of the caller's that is not paused and not relaxed today, each way it can be relaxed for the day: unanswered (let through those who did not answer its field) and aside (set it aside), each listed only when it would add somebody today, with more: how much it widens the caller's pool, rounded down to a step of matching_config pond_counter_k. Counted on asking. Also the relaxations in force today. Never another filter (ADR-042).
          */
         get: {
             parameters: {
@@ -8627,30 +8588,28 @@ export interface components {
         };
         /** @enum {string} */
         GateState: "incomplete" | "closed" | "open";
-        PondSeeksResponse: {
-            seeks: components["schemas"]["PondSeeks"];
-        };
-        PondSeeks: {
-            men: number;
-            everyone: number;
-            women: number;
-        } | null;
-        WaitlistResponse: {
+        PondCounterResponse: {
             k: number;
-            ponds: components["schemas"]["WaitlistPond"][];
+            ponds: components["schemas"]["PondCounterPond"][];
         };
-        WaitlistPond: {
+        PondCounterPond: {
             pond: components["schemas"]["PondSummary"];
             /** Format: date */
             day: string | null;
             verified: number | null;
-            split: components["schemas"]["WaitlistSplit"];
+            split: components["schemas"]["PondCounterSplit"];
             finishing: number | null;
+            seeks: components["schemas"]["PondSeeks"];
         };
-        WaitlistSplit: {
+        PondCounterSplit: {
             woman: number;
             man: number;
             nonBinary: number;
+        } | null;
+        PondSeeks: {
+            men: number;
+            everyone: number;
+            women: number;
         } | null;
         PondList: {
             ponds: components["schemas"]["PondSummary"][];

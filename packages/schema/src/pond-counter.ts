@@ -2,8 +2,8 @@ import { z } from "zod";
 import { PondSummary } from "./onboarding.ts";
 
 /**
- * The waitlist counter (#54, ADR-013): per pond, how many bank-verified people
- * wait there, how they split by self-declared gender, and how many are still
+ * The pond counter (#54, ADR-013): per pond, how many bank-verified people have
+ * it as theirs, how they split by self-declared gender, and how many are still
  * finishing their profile. Public, so it is coarse on purpose, in two ways:
  * - a number is published only where at least k people stand behind it
  *   (`publishCounts`; rules/schema.md: gender counts are suppressed below k);
@@ -14,19 +14,19 @@ import { PondSummary } from "./onboarding.ts";
  */
 
 /**
- * The floor of k (rules/schema.md). `matching_config.waitlist_k` may raise the
+ * The floor of k (rules/schema.md). `matching_config.pond_counter_k` may raise the
  * threshold, never lower it: the floor is a rule, not a tunable, so no
  * configuration row can make the counter publish a cell of one.
  */
-export const WAITLIST_K_MIN = 10;
+export const POND_COUNTER_K_MIN = 10;
 
 /**
  * The threshold in force: the configured one, never below the floor. A
  * fraction is rounded up, the side that says less: 12.5 means 13, not 10.
  */
-export function waitlistK(configured: number): number {
-  if (!Number.isFinite(configured)) return WAITLIST_K_MIN;
-  return Math.max(WAITLIST_K_MIN, Math.ceil(configured));
+export function pondCounterK(configured: number): number {
+  if (!Number.isFinite(configured)) return POND_COUNTER_K_MIN;
+  return Math.max(POND_COUNTER_K_MIN, Math.ceil(configured));
 }
 
 /**
@@ -60,7 +60,7 @@ export function seeksBand(seeks: readonly string[] | null): keyof SeeksBands | n
 }
 
 /** The exact counts of one pond: internal, never served as they are. */
-export type WaitlistCounts = SeeksBands & {
+export type PondCounterCounts = SeeksBands & {
   /** Everyone who counts: a live account with this pond. */
   verified: number;
   woman: number;
@@ -70,54 +70,15 @@ export type WaitlistCounts = SeeksBands & {
   finishing: number;
 };
 
-export const WaitlistSplit = z
+export const PondCounterSplit = z
   .object({
-    woman: z.int().min(WAITLIST_K_MIN),
-    man: z.int().min(WAITLIST_K_MIN),
-    nonBinary: z.int().min(WAITLIST_K_MIN),
+    woman: z.int().min(POND_COUNTER_K_MIN),
+    man: z.int().min(POND_COUNTER_K_MIN),
+    nonBinary: z.int().min(POND_COUNTER_K_MIN),
   })
   .strict()
-  .meta({ id: "WaitlistSplit" });
-export type WaitlistSplit = z.infer<typeof WaitlistSplit>;
-
-export const WaitlistPond = z
-  .object({
-    pond: PondSummary,
-    /** The Finnish calendar day the pond's numbers last moved; null when none is published. */
-    day: z.iso.date().nullable(),
-    /** Null below k: the pond is listed, its size is not said. */
-    verified: z.int().min(WAITLIST_K_MIN).nullable(),
-    /** Null unless every cell is at least k and nobody's undeclared gender is a small remainder. */
-    split: WaitlistSplit.nullable(),
-    /**
-     * Null when it, or the rest of the pond, is between one and k-1: so none,
-     * or at least the floor. One integer with a rule, not a union: the OpenAPI
-     * generator writes a union's null branch as a schema that accepts anything,
-     * and the generated client type becomes `unknown`. The `not` says the
-     * same rule to a reader of the OpenAPI document.
-     */
-    finishing: z
-      .int()
-      .min(0)
-      .refine((n) => n === 0 || n >= WAITLIST_K_MIN, {
-        error: "the number finishing is none or at least the floor",
-      })
-      .meta({ not: { type: "integer", minimum: 1, maximum: WAITLIST_K_MIN - 1 } })
-      .nullable(),
-  })
-  .strict()
-  .meta({ id: "WaitlistPond" });
-export type WaitlistPond = z.infer<typeof WaitlistPond>;
-
-export const WaitlistResponse = z
-  .object({
-    /** The threshold in force, so a reader knows what a missing number means. */
-    k: z.int().min(WAITLIST_K_MIN),
-    ponds: z.array(WaitlistPond).max(500),
-  })
-  .strict()
-  .meta({ id: "WaitlistResponse" });
-export type WaitlistResponse = z.infer<typeof WaitlistResponse>;
+  .meta({ id: "PondCounterSplit" });
+export type PondCounterSplit = z.infer<typeof PondCounterSplit>;
 
 /**
  * The step of a band's share (#507, ADR-013 §13). A rule, not a tunable: near k
@@ -138,16 +99,52 @@ export const PondSeeks = z
   .meta({ id: "PondSeeks" });
 export type PondSeeks = z.infer<typeof PondSeeks>;
 
-export const PondSeeksResponse = z
+export const PondCounterPond = z
   .object({
-    /** Null without a pond, and until every band of the pond is at least k. */
+    pond: PondSummary,
+    /** The Finnish calendar day the pond's numbers last moved; null when none is published. */
+    day: z.iso.date().nullable(),
+    /** Null below k: the pond is listed, its size is not said. */
+    verified: z.int().min(POND_COUNTER_K_MIN).nullable(),
+    /** Null unless every cell is at least k and nobody's undeclared gender is a small remainder. */
+    split: PondCounterSplit.nullable(),
+    /**
+     * Null when it, or the rest of the pond, is between one and k-1: so none,
+     * or at least the floor. One integer with a rule, not a union: the OpenAPI
+     * generator writes a union's null branch as a schema that accepts anything,
+     * and the generated client type becomes `unknown`. The `not` says the
+     * same rule to a reader of the OpenAPI document.
+     */
+    finishing: z
+      .int()
+      .min(0)
+      .refine((n) => n === 0 || n >= POND_COUNTER_K_MIN, {
+        error: "the number finishing is none or at least the floor",
+      })
+      .meta({ not: { type: "integer", minimum: 1, maximum: POND_COUNTER_K_MIN - 1 } })
+      .nullable(),
+    /**
+     * Whom the pond's people seek, said to them alone: null but for the pond
+     * of the session that asks, and there until every band is at least k
+     * (ADR-013 §13, §18).
+     */
     seeks: PondSeeks.nullable(),
   })
   .strict()
-  .meta({ id: "PondSeeksResponse" });
-export type PondSeeksResponse = z.infer<typeof PondSeeksResponse>;
+  .meta({ id: "PondCounterPond" });
+export type PondCounterPond = z.infer<typeof PondCounterPond>;
 
-export type PublishedCounts = Pick<WaitlistPond, "verified" | "split" | "finishing">;
+export const PondCounterResponse = z
+  .object({
+    /** The threshold in force, so a reader knows what a missing number means. */
+    k: z.int().min(POND_COUNTER_K_MIN),
+    ponds: z.array(PondCounterPond).max(500),
+  })
+  .strict()
+  .meta({ id: "PondCounterResponse" });
+export type PondCounterResponse = z.infer<typeof PondCounterResponse>;
+
+export type PublishedCounts = Pick<PondCounterPond, "verified" | "split" | "finishing">;
 
 const NOTHING: PublishedCounts = { verified: null, split: null, finishing: null };
 
@@ -168,8 +165,8 @@ const noneOrMany = (n: number, k: number) => n === 0 || n >= k;
  * the whole) publish nothing: a broken row or a broken configuration fails
  * closed.
  */
-export function publishCounts(counts: WaitlistCounts | null, k: number): PublishedCounts {
-  if (!counts || !Number.isInteger(k) || k < WAITLIST_K_MIN) return NOTHING;
+export function publishCounts(counts: PondCounterCounts | null, k: number): PublishedCounts {
+  if (!counts || !Number.isInteger(k) || k < POND_COUNTER_K_MIN) return NOTHING;
   const cells = [counts.woman, counts.man, counts.nonBinary];
   const all = [counts.verified, counts.finishing, ...cells];
   if (all.some((n) => !Number.isInteger(n) || n < 0)) return NOTHING;
@@ -197,7 +194,7 @@ export function publishCounts(counts: WaitlistCounts | null, k: number): Publish
  * of their own here. A k below the floor and bands that cannot be say nothing.
  */
 export function seeksShares(bands: SeeksBands | null, k: number): PondSeeks | null {
-  if (!bands || !Number.isInteger(k) || k < WAITLIST_K_MIN) return null;
+  if (!bands || !Number.isInteger(k) || k < POND_COUNTER_K_MIN) return null;
   const { seeksMen, seeksEveryone, seeksWomen } = bands;
   const cells = [seeksMen, seeksEveryone, seeksWomen];
   if (cells.some((n) => !Number.isInteger(n) || n < k)) return null;
@@ -214,7 +211,7 @@ export function seeksShares(bands: SeeksBands | null, k: number): PondSeeks | nu
   return { men, everyone, women: 100 - men - everyone };
 }
 
-const sameCounts = (a: WaitlistCounts, b: WaitlistCounts) =>
+const sameCounts = (a: PondCounterCounts, b: PondCounterCounts) =>
   a.verified === b.verified &&
   a.woman === b.woman &&
   a.man === b.man &&
@@ -260,14 +257,14 @@ function peopleBehind(a: SeeksBands, b: SeeksBands): number {
  *   come, gone or changed band, whether or not the total moved.
  */
 export function moveFigures(
-  standing: WaitlistCounts | null,
-  today: WaitlistCounts,
+  standing: PondCounterCounts | null,
+  today: PondCounterCounts,
   k: number,
-): WaitlistCounts {
+): PondCounterCounts {
   if (standing === null) return today;
   if (sameCounts(standing, today)) return standing;
-  if (standing.verified < WAITLIST_K_MIN) return today;
-  const step = Math.max(k, WAITLIST_K_MIN);
+  if (standing.verified < POND_COUNTER_K_MIN) return today;
+  const step = Math.max(k, POND_COUNTER_K_MIN);
   const total = Math.abs(today.verified - standing.verified) >= step;
   const bands = peopleBehind(standing, today) >= step;
   if (!total && !bands) return standing;

@@ -1,21 +1,21 @@
 import { describe, expect, it } from "vitest";
 import {
   moveFigures,
-  PondSeeksResponse,
+  POND_COUNTER_K_MIN,
+  type PondCounterCounts,
+  PondCounterResponse,
+  PondSeeks,
+  pondCounterK,
   publishCounts,
   saidInStep,
   seeksBand,
   seeksShares,
-  WAITLIST_K_MIN,
-  type WaitlistCounts,
-  WaitlistResponse,
-  waitlistK,
-} from "./waitlist.ts";
+} from "./pond-counter.ts";
 
-// The rules of the waitlist counter (#54, ADR-013): what may be said, and when
+// The rules of the pond counter (#54, ADR-013): what may be said, and when
 // what is said may move.
 
-const counts = (over: Partial<WaitlistCounts>): WaitlistCounts => ({
+const counts = (over: Partial<PondCounterCounts>): PondCounterCounts => ({
   verified: 0,
   woman: 0,
   man: 0,
@@ -94,16 +94,16 @@ describe("publishCounts", () => {
     for (const k of [9, 5, 1, 0, -1, 10.5, Number.NaN]) {
       expect(publishCounts(pond, k)).toEqual(NOTHING);
     }
-    expect(WAITLIST_K_MIN).toBe(10);
-    expect(waitlistK(1)).toBe(10);
-    expect(waitlistK(10)).toBe(10);
-    expect(waitlistK(25)).toBe(25);
-    expect(waitlistK(Number.NaN)).toBe(10);
-    expect(waitlistK(Number.POSITIVE_INFINITY)).toBe(10);
+    expect(POND_COUNTER_K_MIN).toBe(10);
+    expect(pondCounterK(1)).toBe(10);
+    expect(pondCounterK(10)).toBe(10);
+    expect(pondCounterK(25)).toBe(25);
+    expect(pondCounterK(Number.NaN)).toBe(10);
+    expect(pondCounterK(Number.POSITIVE_INFINITY)).toBe(10);
     // A fraction is rounded up, the side that says less.
-    expect(waitlistK(12.5)).toBe(13);
-    expect(waitlistK(10.1)).toBe(11);
-    expect(waitlistK(9.9)).toBe(10);
+    expect(pondCounterK(12.5)).toBe(13);
+    expect(pondCounterK(10.1)).toBe(11);
+    expect(pondCounterK(9.9)).toBe(10);
   });
 
   it("fails closed on counts that cannot be", () => {
@@ -293,7 +293,7 @@ describe("seeksShares", () => {
       for (let everyone = 10; everyone < 90; everyone += 7) {
         for (let women = 10; women < 90; women += 7) {
           const shares = seeksShares(bands(men, everyone, women), 10);
-          expect(PondSeeksResponse.safeParse({ seeks: shares }).success).toBe(true);
+          expect(PondSeeks.safeParse(shares).success).toBe(true);
           expect((shares?.men ?? 0) + (shares?.everyone ?? 0) + (shares?.women ?? 0)).toBe(100);
         }
       }
@@ -328,7 +328,7 @@ describe("seeksShares", () => {
   it("never says 0 % of a band that holds at least k people", () => {
     const shares = seeksShares(bands(10, 10, 5000), 10);
     expect(shares).toEqual({ men: 5, everyone: 5, women: 90 });
-    expect(PondSeeksResponse.safeParse({ seeks: shares }).success).toBe(true);
+    expect(PondSeeks.safeParse(shares).success).toBe(true);
   });
 
   it("fails closed on bands that cannot be", () => {
@@ -338,20 +338,18 @@ describe("seeksShares", () => {
   });
 });
 
-describe("the bar's answer", () => {
+describe("the bar", () => {
   const valid = { men: 30, everyone: 20, women: 50 };
 
-  it("carries three shares or null, and nothing else", () => {
-    expect(PondSeeksResponse.parse({ seeks: valid })).toEqual({ seeks: valid });
-    expect(PondSeeksResponse.parse({ seeks: null })).toEqual({ seeks: null });
-    expect(PondSeeksResponse.safeParse({}).success).toBe(false);
-    expect(PondSeeksResponse.safeParse({ seeks: null, k: 10 }).success).toBe(false);
-    expect(PondSeeksResponse.safeParse({ seeks: { ...valid, count: 12 } }).success).toBe(false);
+  it("carries three shares and nothing else", () => {
+    expect(PondSeeks.parse(valid)).toEqual(valid);
+    expect(PondSeeks.safeParse({ men: 30, everyone: 70 }).success).toBe(false);
+    expect(PondSeeks.safeParse({ ...valid, count: 12 }).success).toBe(false);
   });
 
   it("cannot carry a share that is none, more than the whole, or off the step", () => {
     for (const men of [0, -1, 105, 30.5, 31, 1]) {
-      expect(PondSeeksResponse.safeParse({ seeks: { ...valid, men } }).success).toBe(false);
+      expect(PondSeeks.safeParse({ ...valid, men }).success).toBe(false);
     }
   });
 });
@@ -364,34 +362,56 @@ describe("the response", () => {
     nameInessive: "Otaniemessä",
     parentId: null,
   };
-  const hidden = { pond, day: null, verified: null, split: null, finishing: null };
+  const hidden = { pond, day: null, verified: null, split: null, finishing: null, seeks: null };
 
   it("carries a day, never a time, and no id but the pond's", () => {
-    const parsed = WaitlistResponse.parse({
+    const parsed = PondCounterResponse.parse({
       k: 10,
       ponds: [hidden, { ...hidden, day: "2026-09-27", verified: 25, finishing: 0 }],
     });
     expect(parsed.ponds).toHaveLength(2);
     expect(
-      WaitlistResponse.safeParse({ k: 10, ponds: [{ ...hidden, day: "2026-09-27T04:00:00Z" }] })
+      PondCounterResponse.safeParse({ k: 10, ponds: [{ ...hidden, day: "2026-09-27T04:00:00Z" }] })
         .success,
     ).toBe(false);
-    expect(WaitlistResponse.safeParse({ ...parsed, takenAt: "x" }).success).toBe(false);
+    expect(PondCounterResponse.safeParse({ ...parsed, takenAt: "x" }).success).toBe(false);
+  });
+
+  it("has a place for the bar on every pond, shares or null", () => {
+    const seeks = { men: 30, everyone: 20, women: 50 };
+    const parsed = (entry: unknown) => PondCounterResponse.safeParse({ k: 10, ponds: [entry] });
+    expect(parsed({ ...hidden, seeks }).success).toBe(true);
+    expect(parsed({ ...hidden, seeks: null }).success).toBe(true);
+    const { seeks: _left, ...without } = hidden;
+    expect(parsed(without).success).toBe(false);
+    expect(parsed({ ...hidden, seeks: { ...seeks, men: 31 } }).success).toBe(false);
+    expect(parsed({ ...hidden, seeks: { ...seeks, count: 12 } }).success).toBe(false);
+  });
+
+  it("has a place for the bar on every pond, shares or null", () => {
+    const seeks = { men: 30, everyone: 20, women: 50 };
+    const parsed = (entry: unknown) => PondCounterResponse.safeParse({ k: 10, ponds: [entry] });
+    expect(parsed({ ...hidden, seeks }).success).toBe(true);
+    expect(parsed({ ...hidden, seeks: null }).success).toBe(true);
+    const { seeks: _left, ...without } = hidden;
+    expect(parsed(without).success).toBe(false);
+    expect(parsed({ ...hidden, seeks: { ...seeks, men: 31 } }).success).toBe(false);
+    expect(parsed({ ...hidden, seeks: { ...seeks, count: 12 } }).success).toBe(false);
   });
 
   it("cannot carry a number under the floor, or a k under it", () => {
-    expect(WaitlistResponse.safeParse({ k: 9, ponds: [] }).success).toBe(false);
-    expect(WaitlistResponse.safeParse({ k: 10, ponds: [{ ...hidden, verified: 9 }] }).success).toBe(
-      false,
-    );
+    expect(PondCounterResponse.safeParse({ k: 9, ponds: [] }).success).toBe(false);
     expect(
-      WaitlistResponse.safeParse({
+      PondCounterResponse.safeParse({ k: 10, ponds: [{ ...hidden, verified: 9 }] }).success,
+    ).toBe(false);
+    expect(
+      PondCounterResponse.safeParse({
         k: 10,
         ponds: [{ ...hidden, verified: 25, split: { woman: 13, man: 12, nonBinary: 0 } }],
       }).success,
     ).toBe(false);
     const finishing = (n: number) =>
-      WaitlistResponse.safeParse({ k: 10, ponds: [{ ...hidden, verified: 25, finishing: n }] })
+      PondCounterResponse.safeParse({ k: 10, ponds: [{ ...hidden, verified: 25, finishing: n }] })
         .success;
     expect(finishing(0)).toBe(true);
     expect(finishing(10)).toBe(true);
