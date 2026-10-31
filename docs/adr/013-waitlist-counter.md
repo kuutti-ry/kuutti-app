@@ -1,6 +1,6 @@
 # ADR-013: The waitlist counter: who counts, what is said, and when it moves
 
-- Status: accepted (the residual edges under "What stays possible" and the open points at the end of the Consequences are the maintainer's to accept or change, #54), amended 2026-10-30 (§12 to §16: the bar of whom a pond seeks, #507)
+- Status: accepted (the residual edges under "What stays possible" and the open points at the end of the Consequences are the maintainer's to accept or change, #54), amended 2026-10-30 (§12 to §16: the bar of whom a pond seeks, #507); amended 2026-10-31 by ADR-060 (the per-person gate this record left to M4 is gone, and the counter stands, #500)
 - Date: 2026-09-27
 - Follows: TD-1 (every account is bank-verified), TD-7 (erasure), TD-10 and TD-13 (ponds; matching opens per person at a pool of `gate_k`), TD-14 (`seeks` is article 9 data), TD-17 (no inflected pond name), CLAUDE.md rules 6 and 8 and Product constraints, `.claude/rules/schema.md` (gender counts are suppressed below k = 10), `.claude/rules/api.md` (CORS: the waitlist site), `.claude/rules/layout.md`, ADR-009 §4 (completeness), ADR-010; issue #54
 

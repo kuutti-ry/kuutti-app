@@ -32,15 +32,15 @@ The account is active once the four matching answers and the two consents are th
 
 The home screen: "Kuutti", two cards and the way onward.
 
-- "People in your area": the counter of the pond, in tens, with the bar of whom people with a finished profile seek, which the population's fifty fill (population.md), and "n people are still finishing their profile." (ADR-013). With the population written, the numbers are of a pond over the gate.
-- "Matching": where Aino stands. With her photos pending: "Matching opens for finished profiles. Yours still lacks something." Once her photos are approved: "Your profile is finished. Where you stand is counted tonight." After the count (the runbook runs it): "You are among the next 10 in line for your area." or "Matching is open for you." (ADR-015: the women of the population are the smaller group, so she is let in; a man of the larger group is told his place in line).
+- "People in your area": the counter of the pond, in tens, with the bar of whom people with a finished profile seek, which the population's fifty fill (population.md), and "n people are still finishing their profile." (ADR-013).
+- "Matching": where Aino stands. With her photos pending: "Matching opens for finished profiles. Yours still lacks something." Once her photos are approved: "Matching is open for you.", since the demo commands open the ponds; in a pond an admin has closed, "Your profile is finished. Matching has not opened in your area yet." (ADR-060).
 - Below: "Your profile". The profile list holds the rest (#239): "Photos" and the sections, each with a check mark once done or how far it is filled, then "Your deal-breakers" (up to two, only on what she answered herself, #149) and, while a question is unanswered, "Fill in the rest while you wait" (the optional fields, one per screen, "Ask me later" on each, #148). The eye at the top opens her card.
 
 In "Your profile", show "Fill in the rest while you wait" for one field and skip it; show "Your deal-breakers": the field she has not answered says "To filter on this, share yours first."
 
 ## Scene 4: Sanna's card (1 min)
 
-Sign out (Settings, "Log out") and sign in as Sanna Korhonen (locally her button; on staging Nordea `DEMOUSER4`). Her story is complete: a profile, five approved photos, the gate open.
+Sign out (Settings, "Log out") and sign in as Sanna Korhonen (locally her button; on staging Nordea `DEMOUSER4`). Her story is complete: a profile, five approved photos, matching open.
 
 - Home: "Matching is open for you."
 - "Your profile" → the eye, "See your card": the card as others see it (#150): the first photo, "Sanna, 49", "Woman", the pond, one prompt answer, the other photos, the fields that are information (languages named in the reader's language, "Something long-term", the hobbies, "171 cm"), nothing that is a setting or a soft preference.

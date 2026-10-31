@@ -56,9 +56,6 @@ const saveRoute = createRoute({
       "consent_required: whom one seeks without the sensitive-answers consent of the current wording; nothing was saved, a window in the same request included.",
     ),
     404: errorContent("No live account (erased meanwhile)."),
-    429: errorContent(
-      "change_too_soon: whom one seeks was changed within matching_config change_cadence_days; nothing was saved, and GET /onboarding's nextChange.seeks says from when.",
-    ),
   },
 });
 

@@ -1,10 +1,10 @@
 # features/matching/rounds.feature
 Feature: The day's round, built: whom it holds and in which order
   The round builder's first cut (#95, ADR-035; the maintainer, 20/10/2026).
-  Everybody whose matching has opened (#94) gets one round a Finnish day:
-  at night after the gate's count, or at the day's first read when the night
-  built none. Its cards are people of the same pond who are seen by others
-  and let in, in each other's pool both ways (filters.feature), up to
+  Everybody complete in a pond an admin has opened (#500, ADR-060) gets one
+  round a Finnish day: at night, or at the day's first read when the night
+  built none. Its cards are people of the same pond who are complete and seen
+  by others, in each other's pool both ways (filters.feature), up to
   round_size, the most soft matches first, equal counts in an order of the
   day's and the person's own. Nobody is shown again while they cool down,
   nobody with whom one has a conversation, and nothing fills a short round.
@@ -12,8 +12,8 @@ Feature: The day's round, built: whom it holds and in which order
   ADR-037), oldest first, up to liked_you_cap. The order of coming back and
   relaxing a deal-breaker for the day are short-pool.feature's (#99, ADR-042).
 
-  Scenario: Everybody whose matching has opened gets a round for the day, and nobody else
-    Given "A" whose matching has opened, "B" who is let in but whose matching has not opened, and "C" who waits in the line
+  Scenario: Everybody complete in an open pond gets a round for the day, and nobody else
+    Given "A" complete in an open pond, "B" whose profile lacks its photos there, and "C" complete in a closed pond
     When the night builds the rounds
     Then "A" has today's round, and "B" and "C" have none
 
@@ -22,8 +22,8 @@ Feature: The day's round, built: whom it holds and in which order
     When the night builds the rounds
     Then "A"'s round is the one with two, then the one with one
 
-  Scenario: Somebody hidden from others, or not let in, is nobody's card
-    Given "A" whose matching has opened, "B" shadow-banned, and "C" whose profile is complete but who was never let in
+  Scenario: Somebody hidden from others, or not complete, is nobody's card
+    Given "A" in an open pond, "B" shadow-banned there, and "C" whose profile lacks its photos
     When the night builds the rounds
     Then neither "B" nor "C" is a card in "A"'s round
 
@@ -71,12 +71,12 @@ Feature: The day's round, built: whom it holds and in which order
     Then "A" has the same round, and one round_built for the day
 
   Scenario: The day's first read builds the round when the night built none
-    Given "A" whose matching opened after the night
+    Given "A" whose pond opened after the night
     When "A" reads today's round
     Then it has its cards, built then, and the next read is the same round
 
   Scenario: A person whose matching has not opened reads no round
-    Given "A" who is let in but whose matching has not opened
+    Given "A" complete in a pond nobody has opened
     When "A" reads today's round
     Then the day has no round, and none is written
 

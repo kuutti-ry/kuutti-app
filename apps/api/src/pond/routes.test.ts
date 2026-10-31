@@ -4,7 +4,7 @@ import { describe, expect } from "vitest";
 import { createApp } from "../app.ts";
 import { signedInAccount, signInAs } from "../test/account.ts";
 import { captureLogger, type TestContext, test, testConfig } from "../test/harness.ts";
-import { people, pondNamed } from "../test/people.ts";
+import { openPond, people, pondNamed } from "../test/people.ts";
 
 // features/pond/choice.feature (#46). Ponds are inserted inside the test's
 // transaction: the test database is migrated, not seeded.
@@ -187,7 +187,7 @@ describe("the pond routes' remaining branches", () => {
     let erased = false;
     const db = {
       async query(text: string, values?: unknown[]) {
-        if (!erased && text.trimStart().startsWith("WITH moved AS")) {
+        if (!erased && text.trimStart().startsWith("UPDATE account SET pond_id")) {
           erased = true;
           await ctx.client.query(
             "UPDATE account SET state = 'deleted', deleted_at = now() WHERE id = $1",
@@ -213,53 +213,6 @@ describe("the pond routes' remaining branches", () => {
     expect(lines().some((l) => l.msg === "pond chosen")).toBe(false);
   });
 
-  test("moving to another pond leaves the place at the gate behind; choosing the same pond again keeps it", async ({
-    ctx,
-  }) => {
-    const app = await appWith(ctx);
-    const a = await signedInAccount(ctx.client);
-    const espoo = await pond(ctx, "test-espoo");
-    const otaniemi = await pond(ctx, "test-otaniemi");
-    await ctx.client.query("UPDATE account SET pond_id = $2 WHERE id = $1", [a.accountId, espoo]);
-    await ctx.client.query(
-      `INSERT INTO gate (account_id, pond_id, admitted_at, place_said, pool_said, opened_at, counted_at)
-       VALUES ($1, $2, now(), NULL, 40, now(), now())`,
-      [a.accountId, espoo],
-    );
-    const gate = async () =>
-      (
-        await ctx.client.query(
-          `SELECT pond_id, admitted_at IS NOT NULL AS admitted, opened_at IS NOT NULL AS opened,
-                  counted_at IS NOT NULL AS counted, pool_said FROM gate WHERE account_id = $1`,
-          [a.accountId],
-        )
-      ).rows[0];
-    const choose = (pondId: string) =>
-      app.request("/account/pond", {
-        method: "PUT",
-        headers: json(a.headers),
-        body: JSON.stringify({ pondId }),
-      });
-
-    expect((await choose(espoo)).status).toBe(204);
-    expect(await gate()).toEqual({
-      pond_id: espoo,
-      admitted: true,
-      opened: true,
-      counted: true,
-      pool_said: 40,
-    });
-    expect((await choose(otaniemi)).status).toBe(204);
-    // Emptied, not removed, and what was said of the pool stays to be followed from.
-    expect(await gate()).toEqual({
-      pond_id: otaniemi,
-      admitted: false,
-      opened: false,
-      counted: false,
-      pool_said: 40,
-    });
-  });
-
   test("the gate is the caller's own, never cached, and says incomplete before a pond is chosen", async ({
     ctx,
   }) => {
@@ -270,32 +223,18 @@ describe("the pond routes' remaining branches", () => {
       consented: true,
       gender: "woman",
     });
-    await ctx.client.query(
-      `INSERT INTO gate (account_id, pond_id, admitted_at, pool_said, opened_at, counted_at)
-       VALUES ($1, $2, now(), 30, now(), now())`,
-      [open, pondId],
-    );
+    await openPond(ctx.client, pondId);
     const theirs = await signInAs(ctx.client, open ?? "");
     const mine = await signedInAccount(ctx.client);
 
     const opened = await app.request("/gate", { headers: theirs.headers });
     expect(opened.status).toBe(200);
     expect(opened.headers.get("cache-control")).toBe("no-store");
-    expect(GateResponse.parse(await opened.json())).toEqual({
-      state: "open",
-      within: null,
-      needed: null,
-      step: 10,
-    });
+    expect(GateResponse.parse(await opened.json())).toEqual({ state: "open" });
 
     const incomplete = await app.request("/gate", { headers: mine.headers });
     expect(incomplete.status).toBe(200);
     expect(incomplete.headers.get("cache-control")).toBe("no-store");
-    expect(GateResponse.parse(await incomplete.json())).toEqual({
-      state: "incomplete",
-      within: null,
-      needed: null,
-      step: 10,
-    });
+    expect(GateResponse.parse(await incomplete.json())).toEqual({ state: "incomplete" });
   });
 });

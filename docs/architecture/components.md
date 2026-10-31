@@ -137,7 +137,7 @@ Code inside each app is organised by slice, never by layer (`.claude/rules/layou
 | identity | yes | yes | yes: staff sign-in | yes | heavy, thin, auth only |
 | profile | yes | yes | no directory | no | medium, heavy, read |
 | media | yes | yes | yes: the photo queue | yes | heavy, medium, queue |
-| pond | yes | yes | no directory | yes | medium, thin, read |
+| pond | yes | yes | yes: the ponds' switches | yes | medium, thin, switch |
 | matching | yes | yes | no directory | yes | heavy, heavy, none |
 | chat | yes | yes | no directory | yes | heavy, heavy, snapshots |
 | safety | yes | yes | yes: the overview, reports, accounts, sanctions, automatic bans, feedback, staff, the audit log, matching_config | yes | medium, thin, heavy |
@@ -145,15 +145,15 @@ Code inside each app is organised by slice, never by layer (`.claude/rules/layou
 | rewards | yes | yes | no directory | no | light, light, none |
 | notifications | yes | yes | no directory | no | light, light, none |
 
-Besides the slices, the API has `health/`, `jobs/` (the nightly timer and the jobs that read across slices: the waitlist count, the pond gate, the invitation count, the round builder, and the round's push on its own timer), `lib/` and `test/`; the phone app has `home/` and `settings/` among its features, and `src/lib/`; the admin panel has `src/lib/` and `src/components/ui/` (shadcn/ui's components, ADR-050).
+Besides the slices, the API has `health/`, `jobs/` (the nightly timer and the jobs that read across slices: the waitlist count, the invitation count, who of a pond is complete, the round builder, and the round's push on its own timer), `lib/` and `test/`; the phone app has `home/` and `settings/` among its features, and `src/lib/`; the admin panel has `src/lib/` and `src/components/ui/` (shadcn/ui's components, ADR-050).
 
 1. **identity**: the bank login, accounts, sessions, re-registration, taking a break, staff sessions. In all three apps; specs in `features/identity`.
 2. **profile**: onboarding, profile fields and prompts, completeness. API and phone app.
 3. **media**: the photo pipeline, signed URLs, the automatic check and the human queue. In all three apps (the admin panel's photo queue); spec in `features/media`.
-4. **pond**: ponds, the waitlist counter and the gate's answer. API and phone app; specs in `features/pond`.
+4. **pond**: ponds, the waitlist counter, and the switch that opens matching in a pond. In all three apps (the admin panel's Ponds screen); specs in `features/pond`.
 5. **matching**: rounds, deal-breakers, likes, the fish, the match. API and phone app; specs in `features/matching`.
 6. **chat**: conversations, messages, the socket, contacts shared, the archive. API and phone app; specs in `features/chat`.
-7. **safety**: reports, blocks, sanctions, the audit log, the automatic shadow bans, velocity. In all three apps; the admin panel's screens are all in this slice. Specs in `features/safety`.
+7. **safety**: reports, blocks, sanctions, the audit log, the automatic shadow bans, velocity. In all three apps; the admin panel's screens are in this slice, but for the photo queue and the ponds. Specs in `features/safety`.
 8. **research**: the event registry's one door (`track`), the `research_id` mapping, the partitions and the research copy. The API alone has code; the phone app's directory holds a README only.
 9. **rewards**: invitations and the reward ledger. API and phone app.
 10. **notifications**: the notification choices, the notices in the app and the push (#102, ADR-055): whom to tell of a message, a match or the day's round, and the devices' tokens. API and phone app.

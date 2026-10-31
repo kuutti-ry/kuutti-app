@@ -9,6 +9,7 @@ import {
   DEMO_SUBJECT_PREFIX,
   DemoCommandError,
   OLDER_TERMS_VERSION,
+  openPonds,
   PERSONA_HISTORIES,
   parseDemoCommand,
   personaHetu,
@@ -25,7 +26,6 @@ import {
   NotArtificialError,
   REREGISTER_COOLDOWN_DAYS,
 } from "../../src/identity/index.ts";
-import { countGates } from "../../src/jobs/pond-gate.ts";
 import { finnishDay } from "../../src/lib/finnish-day.ts";
 import { staffSession } from "../../src/test/account.ts";
 import {
@@ -406,22 +406,19 @@ describe("the stories through the services", () => {
          FROM unnest($1::uuid[]) AS id, generate_series(0, 1) n`,
       [cast],
     );
-    // Before the count Iida is not let in: her gate stays shut (the guard on
-    // `admitted_at`) and the builder refuses a round behind a shut gate. Iida
-    // alone, so Henna is missing and her like waits for the commands' call.
+    // Before her pond opens the builder writes Iida no round. Iida alone, so
+    // Henna is missing and her like waits for the commands' call.
     const iidaOnly = results.filter((r) => r.key === "iida");
     expect(await giveRounds({ db: ctx.client, logger, now }, iidaOnly)).toEqual({
-      opened: 0,
       liked: 0,
       already: 0,
       missing: 1,
       standing: 0,
     });
-    // The commands' order: the gates counted, then one call, which opens the
-    // gate, writes the like and builds the round on it.
-    await countGates({ db: ctx.client, logger, now });
+    // The commands' order: the ponds opened, then one call, which writes the
+    // like and builds the round on it.
+    await openPonds(ctx.client);
     expect(await giveRounds({ db: ctx.client, logger, now }, results)).toEqual({
-      opened: 1,
       liked: 1,
       already: 0,
       missing: 0,
@@ -446,7 +443,6 @@ describe("the stories through the services", () => {
 
     // Staging's job runs again without a reset: the round and the like stay as they were.
     expect(await giveRounds({ db: ctx.client, logger, now }, results)).toEqual({
-      opened: 0,
       liked: 0,
       already: 1,
       missing: 0,

@@ -30,6 +30,16 @@ export function waitlistK(configured: number): number {
 }
 
 /**
+ * A count about one person's pool as they are told it, in the threshold's
+ * steps and rounded down, the side that says less: a figure that moved by one
+ * would answer what a person asks of it about one other person. The short
+ * round's offers say how much a relaxation widens the pool this way (ADR-042 §4).
+ */
+export function saidInStep(count: number, step: number): number {
+  return Math.floor(count / step) * step;
+}
+
+/**
  * The finished profiles by whom they seek (#507): men and not women, both, and
  * women and not men. Non-binary in the seek set moves no band, and somebody who
  * seeks neither women nor men stands in none.

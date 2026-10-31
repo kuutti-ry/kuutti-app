@@ -3321,7 +3321,7 @@ export interface paths {
         };
         /**
          * The caller's invitations
-         * @description Whether the caller may invite (their profile has passed the pond gate's test) and may still type a code, what an invitation earns today (matching_config invitation_reward), their open invitations newest first, how many of theirs have counted, and what those earned that is not used yet. Never a code, and nothing of anybody invited.
+         * @description Whether the caller may invite (their profile is complete) and may still type a code, what an invitation earns today (matching_config invitation_reward), their open invitations newest first, how many of theirs have counted, and what those earned that is not used yet. Never a code, and nothing of anybody invited.
          */
         get: {
             parameters: {
@@ -3364,7 +3364,7 @@ export interface paths {
         put?: never;
         /**
          * Make an invitation
-         * @description A code for one friend, in two groups of five, shown here once: Kuutti keeps only its hash. For a caller whose profile has passed the pond gate's test; at most matching_config invitations_open open at once. The night the friend's profile first passes the same test, the invitation counts and the caller earns matching_config invitation_reward.
+         * @description A code for one friend, in two groups of five, shown here once: Kuutti keeps only its hash. For a caller whose profile is complete; at most matching_config invitations_open open at once. The night the friend's profile first passes the same test, the invitation counts and the caller earns matching_config invitation_reward.
          */
         post: {
             parameters: {
@@ -3402,7 +3402,7 @@ export interface paths {
                         "application/json": components["schemas"]["ErrorResponse"];
                     };
                 };
-                /** @description invitation_not_yet: the caller's profile has not passed the pond gate's test; invitations_full: as many invitations open as matching_config invitations_open allows. Nothing was written. */
+                /** @description invitation_not_yet: the caller's profile is not complete; invitations_full: as many invitations open as matching_config invitations_open allows. Nothing was written. */
                 409: {
                     headers: {
                         [name: string]: unknown;
@@ -3493,7 +3493,7 @@ export interface paths {
         put?: never;
         /**
          * Use an invitation code
-         * @description A code typed by the caller, before their profile first passes the pond gate's test: case, spaces and hyphens do not matter. The caller is checked before the code is looked up. At most matching_config invitation_tries_per_day tries a Finnish day, whatever their answer.
+         * @description A code typed by the caller, before their profile is complete: case, spaces and hyphens do not matter. The caller is checked before the code is looked up. At most matching_config invitation_tries_per_day tries a Finnish day, whatever their answer.
          */
         post: {
             parameters: {
@@ -3542,7 +3542,7 @@ export interface paths {
                         "application/json": components["schemas"]["ErrorResponse"];
                     };
                 };
-                /** @description invitation_not_for_you: the caller cannot use a code: their profile has passed the test, they used one already, the current terms and privacy consents are not given, or their identity had an account erased before. */
+                /** @description invitation_not_for_you: the caller cannot use a code: their profile is complete, they used one already, the current terms and privacy consents are not given, or their identity had an account erased before. */
                 409: {
                     headers: {
                         [name: string]: unknown;
@@ -5997,7 +5997,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/gate": {
+    "/admin/ponds": {
         parameters: {
             query?: never;
             header?: never;
@@ -6005,8 +6005,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Where the caller stands at the pond gate
-         * @description Between a finished profile and the first round (TD-10): on the pond's waitlist with a place, let in and waiting for enough people who match (how many more, in steps of `step`), or open. Counted nightly, and once when a person with a finished profile first asks.
+         * Every pond with its switch
+         * @description Each pond and whether matching is open in it. Admins only.
          */
         get: {
             parameters: {
@@ -6017,7 +6017,145 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                /** @description The caller's gate. */
+                /** @description The ponds. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AdminPondList"];
+                    };
+                };
+                /** @description unauthenticated, session_expired or session_revoked. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description admin_forbidden: the role does not allow this. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/ponds/{id}/matching": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Open or close matching in a pond
+         * @description Sets the pond's switch. Open, the night and the day's first read build rounds for its complete people; closed, they build none, and rounds already built and conversations stay. Nothing else turns it. A press that finds the switch as it asks changes nothing and writes nothing. Admins only; written to audit_log.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["PondMatchingChange"];
+                };
+            };
+            responses: {
+                /** @description The pond as it now stands. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AdminPond"];
+                    };
+                };
+                /** @description Validation failed. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description unauthenticated, session_expired or session_revoked. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description admin_forbidden: the role does not allow this. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description No such pond. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/gate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Whether matching is open for the caller
+         * @description Between a finished profile and the first round: incomplete while the profile or onboarding lacks something, closed once it is finished and matching has not opened in the caller's pond yet, open once it has. An admin opens a pond; nothing here counts anybody.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description What stands for the caller. */
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -6911,15 +7049,6 @@ export interface paths {
                         "application/json": components["schemas"]["ErrorResponse"];
                     };
                 };
-                /** @description change_too_soon: whom one seeks was changed within matching_config change_cadence_days; nothing was saved, and GET /onboarding's nextChange.seeks says from when. */
-                429: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ErrorResponse"];
-                    };
-                };
             };
         };
         post?: never;
@@ -6952,8 +7081,6 @@ export interface components {
                 pond: components["schemas"]["PondSummary"];
                 /** Format: date-time */
                 genderChangedAt: string | null;
-                /** Format: date-time */
-                seeksChangedAt: string | null;
                 email: string | null;
                 foundThemAnswered: boolean;
                 /** Format: date-time */
@@ -7006,7 +7133,6 @@ export interface components {
             }[];
             photoCheck: components["schemas"]["ExportedPhotoCheck"];
             research: components["schemas"]["ResearchExport"];
-            gate: components["schemas"]["ExportedGate"];
             exports: {
                 /** Format: date-time */
                 at: string;
@@ -7237,18 +7363,6 @@ export interface components {
             since: string | null;
             consentVersion: string | null;
         };
-        ExportedGate: {
-            /** Format: uuid */
-            pondId: string;
-            /** Format: date-time */
-            admittedAt: string | null;
-            placeSaid: number | null;
-            poolSaid: number;
-            /** Format: date-time */
-            openedAt: string | null;
-            /** Format: date-time */
-            countedAt: string | null;
-        } | null;
         ExportedFeedback: {
             /** Format: date-time */
             at: string;
@@ -7826,8 +7940,6 @@ export interface components {
             nextChange: {
                 /** Format: date-time */
                 gender: string | null;
-                /** Format: date-time */
-                seeks: string | null;
             };
             missing: components["schemas"]["OnboardingStep"][];
             complete: boolean;
@@ -8494,14 +8606,27 @@ export interface components {
             /** Format: date-time */
             lastSignInAt: string | null;
         };
+        AdminPondList: {
+            items: components["schemas"]["AdminPond"][];
+        };
+        AdminPond: {
+            /** Format: uuid */
+            id: string;
+            slug: string;
+            name: string;
+            nameInessive: string;
+            /** Format: uuid */
+            parentId: string | null;
+            matchingOpen: boolean;
+        };
+        PondMatchingChange: {
+            open: boolean;
+        };
         GateResponse: {
             state: components["schemas"]["GateState"];
-            within: number | null;
-            needed: number | null;
-            step: number;
         };
         /** @enum {string} */
-        GateState: "incomplete" | "pending" | "waiting" | "closed" | "open";
+        GateState: "incomplete" | "closed" | "open";
         PondSeeksResponse: {
             seeks: components["schemas"]["PondSeeks"];
         };

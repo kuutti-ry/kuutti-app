@@ -236,7 +236,7 @@ describe("the onboarding steps", () => {
     preferences: { seeks: null, ageWindow: null },
     consents: { terms: null, privacy: null, specialCategory: null, research: null },
     currentVersions: { terms: "1", privacy: "1", research: "1", special_category: "1" },
-    nextChange: { gender: null, seeks: null },
+    nextChange: { gender: null },
     missing: [...ONBOARDING_STEPS],
     complete: false,
   };

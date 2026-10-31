@@ -13,7 +13,6 @@ import {
 } from "./identity/index.ts";
 import { invitationCountJob } from "./jobs/invitation-count.ts";
 import type { NightlyJob } from "./jobs/nightly.ts";
-import { gateJob } from "./jobs/pond-gate.ts";
 import { roundsJob } from "./jobs/round-builder.ts";
 import type { RoundPushDeps } from "./jobs/round-push.ts";
 import { countsBands, ensureFirstSnapshot, waitlistJob } from "./jobs/waitlist-snapshot.ts";
@@ -274,15 +273,13 @@ export async function boot({
     // The census of the research block: a cell under k is a warning (ADR-011 §9).
     researchAnonymityJob({ db: pool, logger }),
     // Suspensions past their day end (#307, ADR-024 §5), before the counter
-    // and the gate, so a person let back in is counted the same night.
+    // and the rounds, so a person let back in is counted the same night.
     { name: "end-suspensions", run: async () => ({ ended: await endSuspensions(pool, now()) }) },
     // The day's waitlist figures (#54): taken once a day, served all day.
     waitlistJob(waitlist),
-    // Who is let into each pond, and for whom matching opens (#94).
-    gateJob({ db: pool, logger, now }),
-    // The invitations whose redeemer's profile the gate's count has seen tonight (#107, ADR-044 §7).
+    // The invitations whose redeemer's profile is complete tonight (#107, ADR-044 §7).
     invitationCountJob({ db: pool, logger, now }),
-    // The day's round for everybody whose matching is open, after the gate (#95, ADR-035).
+    // The day's round for everybody complete in an open pond (#95, #500, ADR-035).
     // shortcut: none in production until the maintainer has set how long rounds
     // are kept (ADR-034 Open 2, ADR-035 Open 1); his answer lifts this and app.ts's twin.
     ...(config.APP_ENV === "production" ? [] : [roundsJob({ db: pool, logger, now })]),

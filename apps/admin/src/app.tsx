@@ -13,6 +13,7 @@ import {
   SlidersHorizontal,
   UserSearch,
   UsersRound,
+  Waves,
 } from "lucide-react";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { Link, NavLink, Route, Routes, useLocation } from "react-router";
@@ -21,6 +22,7 @@ import { Button } from "./components/ui/button.tsx";
 import { Loading } from "./components/ui/spinner.tsx";
 import { SignIn, useStaffSession } from "./features/identity/index.ts";
 import { PhotoQueue } from "./features/media/index.ts";
+import { PondList } from "./features/pond/index.ts";
 import {
   AccountLookup,
   AccountPage,
@@ -117,6 +119,13 @@ const SCREENS: readonly Screen[] = [
     roles: ["moderator", "admin"],
     element: <AccountPage />,
     inMenu: false,
+  },
+  {
+    path: "/ponds",
+    label: "admin.nav.ponds",
+    icon: Waves,
+    roles: ["admin"],
+    element: <PondList />,
   },
   {
     path: "/config",

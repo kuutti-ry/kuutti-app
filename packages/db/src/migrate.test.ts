@@ -526,9 +526,12 @@ describe("migrate", () => {
             "auto_shadow_ban_photo_fetches",
             "deal_breakers_max",
           ]);
+          // The gate's two keys stand here still: the seed has none of them, and 0094 deletes them (#500).
+          const gateKeys = ["gate_k", "majority_share_max"];
           expect(rows).toHaveLength(
             Object.keys(MATCHING_CONFIG_V1).filter((key) => !later.has(key)).length +
-              Object.keys(MATCHING_CONFIG_V2).filter((key) => !laterVersions.has(key)).length,
+              Object.keys(MATCHING_CONFIG_V2).filter((key) => !laterVersions.has(key)).length +
+              gateKeys.length,
           );
 
           expect(await migrate(pool, through0047)).toEqual({ state: "applied", applied: 1 });
@@ -566,15 +569,15 @@ describe("migrate", () => {
           );
           await pool.query(
             `INSERT INTO matching_config (version, key, value, valid_from, created_by, reason)
-             VALUES (2, 'gate_k', '25'::jsonb, '2026-10-16T09:00:00Z', 'admin', 'Smaller ponds first')`,
+             VALUES (2, 'round_size', '25'::jsonb, '2026-10-16T09:00:00Z', 'admin', 'Smaller ponds first')`,
           );
           const written = await pool.query<{ key: string; reason: string | null }>(
             `SELECT key, reason FROM matching_config
-             WHERE (key, version) IN (('default_pond', 3), ('gate_k', 2)) ORDER BY key`,
+             WHERE (key, version) IN (('default_pond', 3), ('round_size', 2)) ORDER BY key`,
           );
           expect(written.rows).toEqual([
             { key: "default_pond", reason: null },
-            { key: "gate_k", reason: "Smaller ponds first" },
+            { key: "round_size", reason: "Smaller ponds first" },
           ]);
         } finally {
           await pool.end();
@@ -583,6 +586,68 @@ describe("migrate", () => {
     } finally {
       rmSync(before0047, { recursive: true, force: true });
       rmSync(through0047, { recursive: true, force: true });
+    }
+  });
+
+  it("migrations 0093 and 0094 leave every pond closed, drop the gate and the date of whom one seeks, and delete the gate's two keys and no other (#500, ADR-060)", async () => {
+    const before0093 = migrationsBefore("0093_pond_matching_switch");
+    try {
+      await withTemporaryDatabase(async (url) => {
+        const pool = createPool({ connectionString: url, max: 2 });
+        try {
+          await migrate(pool, before0093);
+          await pool.query(
+            `INSERT INTO ponds (slug, name_nominative, name_inessive)
+             VALUES ('paakaupunkiseutu', 'Pääkaupunkiseutu', 'Pääkaupunkiseudulla')`,
+          );
+          const identity = await pool.query<{ id: string }>(
+            "INSERT INTO identity (hetu_hmac) VALUES ($1) RETURNING id",
+            ["0".repeat(64)],
+          );
+          // A person of the old gate, and a change of the key from the panel: both go.
+          const account = await pool.query<{ id: string; pond_id: string }>(
+            `INSERT INTO account (identity_id, pond_id, seeks_changed_at, gender_changed_at)
+             SELECT $1, id, now(), '2026-10-01T09:00:00Z' FROM ponds WHERE slug = 'suomi'
+             RETURNING id, pond_id`,
+            [identity.rows[0]?.id],
+          );
+          await pool.query(
+            "INSERT INTO gate (account_id, pond_id, opened_at, admitted_at) VALUES ($1, $2, now(), now())",
+            [account.rows[0]?.id, account.rows[0]?.pond_id],
+          );
+          await pool.query(
+            `INSERT INTO matching_config (version, key, value, created_by, reason)
+             VALUES (2, 'gate_k', '25'::jsonb, 'admin', 'Smaller ponds first')`,
+          );
+          const keys = async () =>
+            (
+              await pool.query<{ key: string; versions: number }>(
+                "SELECT key, count(*)::int AS versions FROM matching_config GROUP BY key ORDER BY key",
+              )
+            ).rows;
+          const before = await keys();
+          expect(before.map((row) => row.key)).toEqual(
+            expect.arrayContaining(["change_cadence_days", "gate_k", "majority_share_max"]),
+          );
+
+          expect((await migrate(pool, MIGRATIONS)).state).toBe("applied");
+
+          expect(await keys()).toEqual(
+            before.filter((row) => row.key !== "gate_k" && row.key !== "majority_share_max"),
+          );
+          const ponds = await pool.query("SELECT matching_open FROM ponds");
+          expect(ponds.rows).toEqual([{ matching_open: false }, { matching_open: false }]);
+          const table = await pool.query("SELECT to_regclass('public.gate') AS gate");
+          expect(table.rows).toEqual([{ gate: null }]);
+          const left = await pool.query("SELECT * FROM account");
+          expect(left.rows[0]).not.toHaveProperty("seeks_changed_at");
+          expect(left.rows[0]?.gender_changed_at).toEqual(new Date("2026-10-01T09:00:00Z"));
+        } finally {
+          await pool.end();
+        }
+      });
+    } finally {
+      rmSync(before0093, { recursive: true, force: true });
     }
   });
 
@@ -700,7 +765,6 @@ describe("migrate", () => {
           "events",
           "feedback",
           "found_them_count",
-          "gate",
           "identity",
           "invitation",
           "matching_config",

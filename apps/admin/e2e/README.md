@@ -32,7 +32,7 @@ What each step wrote is in `e2e/.out/setup.log`, the API's log in `e2e/.out/api.
 | `photos.spec.ts` | approves one photo and rejects another for a reason chosen on purpose; the picture loads through its signed URL; the count goes down |
 | `report.spec.ts` | opens Laura's report, finds the photo she pointed at first and shows it under the CSP, reads the frozen conversation, dismisses it through its confirm step |
 | `sanctions.spec.ts` | finds Riikka's page by account id, applies a suspension and lifts it, each through a confirm step; a confirm step by keyboard alone; takes down one of her approved photos for a reason chosen on purpose, and the page says so |
-| `roles.spec.ts` | an admin's screen (`/config`, `/audit`, `/staff`) answers a moderator with its refusal and asks the API nothing |
+| `roles.spec.ts` | an admin's screen (`/ponds`, `/config`, `/audit`, `/staff`) answers a moderator with its refusal and asks the API nothing |
 
 Every flow runs under a guard (`fixtures.ts`): any console error or warning, uncaught error or CSP violation on the panel fails it. The one exception is Saiga's absence (ADR-052): the build names its faces under `/fonts/`, which no runner has, and the browser's two warnings that it could not read one are expected. Flows match the panel's English texts of `messages.yaml`; a changed text breaks a flow, and the flow changes with it. They share one database and one worker, and none relies on another having run: a flow that decides something leaves it decided, and the next one reads what is there. For the same reason a flow cannot be retried on one stack (`--retries`, `--repeat-each`): its photos are decided and its report dismissed. A flaky flow is fixed, not retried.
 

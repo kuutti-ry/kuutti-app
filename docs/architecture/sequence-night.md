@@ -7,7 +7,7 @@ apps/api/src/jobs/round-push.ts
 infra/modules/observability/
 -->
 
-What the API does at night, from the system's side: the timer that runs inside the API's own process at 04:00 in Helsinki, the fifteen jobs it runs one after another, what each reads and writes, and how a failed job reaches the maintainer's mailbox through the log and an alarm. It is written for a contributor who adds or changes a job, and for whoever answers the alarm. There is no cron and no second process: the jobs are listed in the API's boot and run by a timer in the same process as HTTP and the socket. This view draws ADR-006 §2, ADR-011 §6 and §9, ADR-013, ADR-015, ADR-024 §5, ADR-029, ADR-030 §8, ADR-031 §8, ADR-035 and ADR-044 §7.
+What the API does at night, from the system's side: the timer that runs inside the API's own process at 04:00 in Helsinki, the fourteen jobs it runs one after another, what each reads and writes, and how a failed job reaches the maintainer's mailbox through the log and an alarm. It is written for a contributor who adds or changes a job, and for whoever answers the alarm. There is no cron and no second process: the jobs are listed in the API's boot and run by a timer in the same process as HTTP and the socket. This view draws ADR-006 §2, ADR-011 §6 and §9, ADR-013, ADR-015, ADR-024 §5, ADR-029, ADR-030 §8, ADR-031 §8, ADR-035 and ADR-044 §7.
 
 In these diagrams every arrow is built. Mermaid's sequence diagrams take a message's words as they are, so the labels are not in quotes, and they name an environment as `{env}`, staging or prod.
 
@@ -24,14 +24,13 @@ In these diagrams every arrow is built. Mermaid's sequence diagrams take a messa
 | 5 | `research-anonymity` | research | the events table | nothing; a warning when a cell is under k | everywhere |
 | 6 | `end-suspensions` | safety | sanctions | lifts each suspension past its day, settles the account | everywhere |
 | 7 | `waitlist-snapshot` | jobs | accounts, profiles, photos, preferences, ponds | the day's waitlist figures per pond | everywhere |
-| 8 | `pond-gate` | jobs | accounts, consents, profiles, photos, preferences, ponds, blocks | each person's gate row | everywhere |
-| 9 | `invitation-count` | rewards | invitations, gate rows | invitations counted, the inviter's reward units, a notice | everywhere |
-| 10 | `round-builder` | jobs, written through matching | accounts, profiles, photos, preferences, consents, blocks, gates, rounds, likes, conversations | the day's round and its cards | everywhere but production |
-| 11 | `reject-unreviewed-photos` | media | profile photos in the human queue | rejects those waiting past `photo_queue_reject_days` as not reviewed | everywhere |
-| 12 | `prune-photo-check-notes` | safety | the photo check's notes | deletes notes older than 365 days | everywhere |
-| 13 | `prune-reports` | safety | reports, their frozen copies, erased senders' sent photos | deletes reports older than 365 days, then the photos no copy holds, then their objects | everywhere; the objects where media is configured |
-| 14 | `archive-silent-conversations` | chat | conversations | archives the silent ones; a research event per person | everywhere |
-| 15 | `moderate-pending-photos` | media | photos pending with no recorded check, their stored card variant | the check's outcome | where media is configured |
+| 8 | `invitation-count` | rewards | invitations, accounts, consents, profiles, photos, preferences | invitations counted, the inviter's reward units, a notice | everywhere |
+| 9 | `round-builder` | jobs, written through matching | the ponds' switches, accounts, profiles, photos, preferences, consents, blocks, rounds, likes, conversations | the day's round and its cards | everywhere but production |
+| 10 | `reject-unreviewed-photos` | media | profile photos in the human queue | rejects those waiting past `photo_queue_reject_days` as not reviewed | everywhere |
+| 11 | `prune-photo-check-notes` | safety | the photo check's notes | deletes notes older than 365 days | everywhere |
+| 12 | `prune-reports` | safety | reports, their frozen copies, erased senders' sent photos | deletes reports older than 365 days, then the photos no copy holds, then their objects | everywhere; the objects where media is configured |
+| 13 | `archive-silent-conversations` | chat | conversations | archives the silent ones; a research event per person | everywhere |
+| 14 | `moderate-pending-photos` | media | photos pending with no recorded check, their stored card variant | the check's outcome | where media is configured |
 
 ## Part 1: the run, and a failure
 
@@ -113,16 +112,15 @@ sequenceDiagram
 ```mermaid
 sequenceDiagram
   accTitle: The night's jobs, part 3: the pond and the round
-  accDescr: Suspensions past their day end first, so a person let back in is counted the same night. Then the waitlist's figures, the gate's count, the invitations the gate's count has seen, and, outside production, each person's round for the Finnish day.
+  accDescr: Suspensions past their day end first, so a person let back in is counted the same night. Then the waitlist's figures, the invitations whose redeemer is complete, and, outside production, the Finnish day's round for each complete person of an open pond.
   autonumber 19
   participant api as The API's nightly run
   participant db as PostgreSQL
   api->>db: end-suspensions. Lift each suspension past its day and settle its account, one account per transaction
   api->>db: waitlist-snapshot. Under its lock, count each pond, and move its figures when k people came or went
-  api->>db: pond-gate. Under its lock, count each pond's gate, who is let in, the pool and place in steps, whose matching opens
-  api->>db: invitation-count. Count each invitation whose redeemer has a gate row now, give the inviter its units, write a notice
+  api->>db: invitation-count. Count each invitation whose redeemer is complete now, give the inviter its units, write a notice
   opt not in production
-    api->>db: round-builder. Write the Finnish day's round for each person whose matching is open
+    api->>db: round-builder. In each pond an admin has opened, write the Finnish day's round for each complete person
   end
 ```
 
@@ -130,9 +128,8 @@ sequenceDiagram
 
 19. `end-suspensions` (safety, #307, ADR-024 §5): every suspension still open past its day is lifted by nobody, and its account's state settled from the sanctions still open, one account per transaction. It runs before the counts so that a person let back in is counted the same night. A login on the end day before 04:00 is still refused: a `shortcut:` in `safety/sanctions.ts`.
 20. `waitlist-snapshot` (`jobs/`, #54, ADR-013): under its own advisory lock, counts the waitlist of each pond: live, bank-verified accounts with a pond. A pond's figures move only when at least k people have come or gone since they were taken, and the bands of whom its finished profiles seek on their own, in every environment but production (#507). The public waitlist route serves the figures all day, and a signed-in route the bands of the caller's own pond, as shares. A database with no figures gets its first ones at boot.
-21. `pond-gate` (`jobs/`, #94, ADR-015): under its own advisory lock, with every account it may write for held first, counts each pond's gate: who of a pond is let in, how large everybody's pool is and their place in the line, and for whom matching opens. The exact figures exist in memory only while it runs; what is written, said and logged is in steps (ADR-015 §6). It reads across slices, so it lives with the jobs.
-22. `invitation-count` (rewards, #107, ADR-044 §7): in one transaction, each invitation whose redeemer now has a gate row, and was not counted yet, is counted once; its inviter gets the units `matching_config invitation_reward` says tonight, and one notice in the app (ADR-032). Its line says how many and of what, never who.
-23. `round-builder` (`jobs/`, #95, ADR-035), after the gate: in each pond with an open gate, each person whose matching is open gets a round for the Finnish day, written through the matching slice's one writer. The people whose like waits on the person come first (ADR-037, ADR-039). Somebody the night did not build for gets theirs at the day's first read. Not in production, by night or by read, until the maintainer has set how long rounds are kept (ADR-034 Open 2, ADR-035 Open 1): a `shortcut:` in `boot.ts` and `app.ts`. The day's round is told later, at `matching_config round_push_hour` (9 in Helsinki), by a timer of its own in the same process and not by a nightly job: one push to each person whose round was built and who has not opened it, and who opened a round within `matching_config round_push_idle_days` (7), through Expo; a failed run is tried again three times five minutes apart, the same day (#102, ADR-055 §6; [Components](components.md), step 21).
+21. `invitation-count` (rewards, #107, ADR-044 §7, ADR-060 §7): in one transaction, each invitation not counted yet whose redeemer's profile and onboarding are complete now is counted once; its inviter gets the units `matching_config invitation_reward` says tonight, and one notice in the app (ADR-032). Its line says how many and of what, never who.
+22. `round-builder` (`jobs/`, #95, ADR-035, ADR-060 §5): in each pond an admin has opened, each complete person gets a round for the Finnish day, written through the matching slice's one writer. The people whose like waits on the person come first (ADR-037, ADR-039). Somebody the night did not build for gets theirs at the day's first read. Not in production, by night or by read, until the maintainer has set how long rounds are kept (ADR-034 Open 2, ADR-035 Open 1): a `shortcut:` in `boot.ts` and `app.ts`. The day's round is told later, at `matching_config round_push_hour` (9 in Helsinki), by a timer of its own in the same process and not by a nightly job: one push to each person whose round was built and who has not opened it, and who opened a round within `matching_config round_push_idle_days` (7), through Expo; a failed run is tried again three times five minutes apart, the same day (#102, ADR-055 §6; [Components](components.md), step 21).
 
 ## Part 4: photos, reports and silent conversations
 
@@ -140,7 +137,7 @@ sequenceDiagram
 sequenceDiagram
   accTitle: The night's jobs, part 4: photos, reports and silent conversations
   accDescr: Profile photos nobody decided in time are rejected as not reviewed. The photo check's notes and the reports past twelve months are deleted, and with the reports the sent photos of erased people that no copy holds any more, objects included. Silent conversations are archived, and the chat tells the open sockets. Where media is configured, photos the automatic check missed get one more look.
-  autonumber 24
+  autonumber 23
   participant api as The API's nightly run
   participant db as PostgreSQL
   participant bucket as The media bucket
@@ -163,25 +160,25 @@ sequenceDiagram
 
 ### Steps
 
-24. `reject-unreviewed-photos` (media, #376, ADR-006 §2): a profile photo in the human queue that nobody decided within `matching_config photo_queue_reject_days` is rejected as `not_reviewed`, a reason no moderator chooses. Nothing expires into visibility: the photo stays in its owner's list with the reason. The value 0 turns the job off.
-25. `prune-photo-check-notes` (safety, #253): the photo check's notes, which kind of photo the check did not show and when, are kept twelve months.
-26. `prune-reports` (safety, #84, #351, ADR-030 §8 and §12): in one transaction, every report filed more than twelve months ago goes, open or decided, with its frozen copy of a conversation; its block stays. Then every photo an erased person sent in a conversation that no copy holds any more goes, through the media slice's own erasure.
-27. After the commit, where media is configured, those photos' objects are deleted from the media bucket where nothing else shares them.
-28. `archive-silent-conversations` (chat, #348, TD-13, ADR-031 §8): in one transaction, the conversations with no message and no contact shared for `matching_config silent_match_archive_days` are locked, read afresh and archived, so one that a share brought back while the lock waited stays out. A closed conversation stays as it is, and a break stops no clock (ADR-022 §4). Each person in an archived conversation gets the research event `conversation_archived`, in bands.
-29. On commit, the conversation trigger notifies `kuutti_chat`, and the chat tells each side's live sockets that the conversation is archived (see Chat, steps 41 and 42). The next message brings it back.
-30. `moderate-pending-photos` (media, #49, ADR-006), where media is configured: up to 50 photos still pending with no check recorded, pending for more than ten minutes (a crash or a failed call), get one more look.
-31. The job reads each one's stored card variant from the bucket; one with no card variant is logged and counted as failed.
-32. The check is Rekognition through the instance role where `MODERATION=rekognition`, and otherwise the human queue for everything (ADR-006 §4).
-33. Each outcome is written as the upload's would be. A photo the check cannot reach stays pending: nothing expires into visibility.
+23. `reject-unreviewed-photos` (media, #376, ADR-006 §2): a profile photo in the human queue that nobody decided within `matching_config photo_queue_reject_days` is rejected as `not_reviewed`, a reason no moderator chooses. Nothing expires into visibility: the photo stays in its owner's list with the reason. The value 0 turns the job off.
+24. `prune-photo-check-notes` (safety, #253): the photo check's notes, which kind of photo the check did not show and when, are kept twelve months.
+25. `prune-reports` (safety, #84, #351, ADR-030 §8 and §12): in one transaction, every report filed more than twelve months ago goes, open or decided, with its frozen copy of a conversation; its block stays. Then every photo an erased person sent in a conversation that no copy holds any more goes, through the media slice's own erasure.
+26. After the commit, where media is configured, those photos' objects are deleted from the media bucket where nothing else shares them.
+27. `archive-silent-conversations` (chat, #348, TD-13, ADR-031 §8): in one transaction, the conversations with no message and no contact shared for `matching_config silent_match_archive_days` are locked, read afresh and archived, so one that a share brought back while the lock waited stays out. A closed conversation stays as it is, and a break stops no clock (ADR-022 §4). Each person in an archived conversation gets the research event `conversation_archived`, in bands.
+28. On commit, the conversation trigger notifies `kuutti_chat`, and the chat tells each side's live sockets that the conversation is archived (see Chat, steps 41 and 42). The next message brings it back.
+29. `moderate-pending-photos` (media, #49, ADR-006), where media is configured: up to 50 photos still pending with no check recorded, pending for more than ten minutes (a crash or a failed call), get one more look.
+30. The job reads each one's stored card variant from the bucket; one with no card variant is logged and counted as failed.
+31. The check is Rekognition through the instance role where `MODERATION=rekognition`, and otherwise the human queue for everything (ADR-006 §4).
+32. Each outcome is written as the upload's would be. A photo the check cannot reach stays pending: nothing expires into visibility.
 
 ## Where it lives
 
 - The timer and the list: `apps/api/src/jobs/nightly.ts` (`msUntilNightly` over `msUntilFinnishHour`, which the round's push uses too, `runNightly`, `scheduleNightly`), `apps/api/src/boot.ts` (the jobs, in order, and the two held back in production), `apps/api/src/index.ts` (`scheduleNightly` at start)
-- The jobs: `apps/api/src/identity/sessions.ts` and `admin-session.ts`; `apps/api/src/research/copy.ts`, `copy-store.ts`, `partitions.ts`, `anonymity.ts`; `apps/api/src/safety/sanctions.ts` (`endSuspensions`), `photo-check.ts`, `reports.ts` (`pruneReports`); `apps/api/src/jobs/waitlist-snapshot.ts`, `pond-gate.ts`, `invitation-count.ts` with `apps/api/src/rewards/invitations.ts`, `round-builder.ts` with `apps/api/src/matching/rounds.ts` (`saveRound`); `apps/api/src/media/moderation.ts` (`rejectUnreviewedPhotos`, `sweepPendingPhotos`); `apps/api/src/chat/archive.ts`
+- The jobs: `apps/api/src/identity/sessions.ts` and `admin-session.ts`; `apps/api/src/research/copy.ts`, `copy-store.ts`, `partitions.ts`, `anonymity.ts`; `apps/api/src/safety/sanctions.ts` (`endSuspensions`), `photo-check.ts`, `reports.ts` (`pruneReports`); `apps/api/src/jobs/waitlist-snapshot.ts`, `pool.ts`, `invitation-count.ts` with `apps/api/src/rewards/invitations.ts`, `round-builder.ts` with `apps/api/src/matching/rounds.ts` (`saveRound`); `apps/api/src/media/moderation.ts` (`rejectUnreviewedPhotos`, `sweepPendingPhotos`); `apps/api/src/chat/archive.ts`
 - The alarm: `infra/modules/observability/main.tf` (the topic, the e-mail subscription, the metric filter `nightly-failures`, the alarm `nightly-job-failed`), `infra/modules/compute/main.tf` and `templates/user_data.sh.tpl` (the log group and the `awslogs` driver), `infra/envs/staging/main.tf` and `infra/envs/prod/main.tf` (each composes it), `docs/runbooks/alerts.md`
-- Specs: `features/safety/sanctions.feature` (the night lifts a suspension), `features/pond/gate.feature`, `features/pond/waitlist.feature`, `features/matching/rounds.feature`, `features/media/moderation.feature`, `features/chat/conversations.feature`
-- ADRs: [ADR-006](../adr/006-photo-moderation.md) §2 and §4, [ADR-011](../adr/011-research-events.md) §6 and §9, [ADR-013](../adr/013-waitlist-counter.md), [ADR-015](../adr/015-pond-gate.md), [ADR-022](../adr/022-taking-a-break.md) §4, [ADR-024](../adr/024-sanctions.md) §5, [ADR-029](../adr/029-the-research-copy.md) §1 to §6 and §12, [ADR-030](../adr/030-reports-and-blocks.md) §8 and §12, [ADR-031](../adr/031-chat.md) §8, [ADR-032](../adr/032-notification-choices-and-notices.md), [ADR-034](../adr/034-the-round-record.md), [ADR-035](../adr/035-the-round-builder-first-cut.md), [ADR-037](../adr/037-liked-you-in-the-round.md), [ADR-039](../adr/039-the-fish.md), [ADR-044](../adr/044-invitations.md) §7
-- Issues: #35, #49, #50, #54, #84, #94, #95, #107, #194, #253, #307, #348, #351, #376; the alarm #11 and #194
+- Specs: `features/safety/sanctions.feature` (the night lifts a suspension), `features/pond/opening.feature`, `features/pond/waitlist.feature`, `features/matching/rounds.feature`, `features/media/moderation.feature`, `features/chat/conversations.feature`
+- ADRs: [ADR-006](../adr/006-photo-moderation.md) §2 and §4, [ADR-011](../adr/011-research-events.md) §6 and §9, [ADR-013](../adr/013-waitlist-counter.md), [ADR-060](../adr/060-no-waiting-at-the-pond.md), [ADR-022](../adr/022-taking-a-break.md) §4, [ADR-024](../adr/024-sanctions.md) §5, [ADR-029](../adr/029-the-research-copy.md) §1 to §6 and §12, [ADR-030](../adr/030-reports-and-blocks.md) §8 and §12, [ADR-031](../adr/031-chat.md) §8, [ADR-032](../adr/032-notification-choices-and-notices.md), [ADR-034](../adr/034-the-round-record.md), [ADR-035](../adr/035-the-round-builder-first-cut.md), [ADR-037](../adr/037-liked-you-in-the-round.md), [ADR-039](../adr/039-the-fish.md), [ADR-044](../adr/044-invitations.md) §7
+- Issues: #35, #49, #50, #54, #84, #95, #107, #194, #253, #307, #348, #351, #376, #500; the alarm #11 and #194
 
 ## Open
 

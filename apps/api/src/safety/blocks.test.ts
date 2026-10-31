@@ -8,7 +8,7 @@ import { listBlocksOfAccount, recordBlock } from "./blocks.ts";
 // blocked, what a second block answers, and the database function every
 // read that shows a person asks. Where a block holds is tested where it
 // holds: the pool (matching/pool.test.ts), the card (profile/service.test.ts),
-// the photos (media/budget.test.ts) and the gate (jobs/pond-gate.test.ts).
+// the photos (media/budget.test.ts) and the rounds (jobs/round-builder.test.ts).
 
 const UNKNOWN = "6f1c1c4e-9a8e-4a0b-9c3a-0c8d1e2f3a4b";
 

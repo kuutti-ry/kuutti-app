@@ -55,7 +55,7 @@ describe("the pond client", () => {
   });
 
   it("reads the person's place at the gate with the session", async () => {
-    const gate = { state: "open", within: null, needed: null, step: 10 };
+    const gate = { state: "open" };
     const seen = answering(json(gate), refusal(503));
     expect(await fetchGate()).toEqual(gate);
     expect(seen[0]?.headers.get("authorization")).toBe(`Bearer ${token("access")}`);

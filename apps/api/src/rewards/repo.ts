@@ -135,24 +135,32 @@ export async function redeem(
   return result.rowCount === 1;
 }
 
-/** An invitation the night may count, and whose: its redeemer has a gate row. */
-const COUNTABLE = `i.counted_at IS NULL AND i.redeemed_by_account_id IS NOT NULL
-  AND EXISTS (SELECT 1 FROM gate g WHERE g.account_id = i.redeemed_by_account_id)`;
+/** An invitation the night may count: redeemed, not counted, by one of the redeemers it found complete. */
+const COUNTABLE = `i.counted_at IS NULL AND i.redeemed_by_account_id = ANY($1::uuid[])`;
+
+/** Who redeemed an invitation that has not counted: the people the night asks completeness of. */
+export async function uncountedRedeemers(db: Queryable): Promise<string[]> {
+  const { rows } = await db.query<{ id: string }>(
+    `SELECT redeemed_by_account_id AS id FROM invitation
+      WHERE counted_at IS NULL AND redeemed_by_account_id IS NOT NULL
+      ORDER BY redeemed_by_account_id`,
+  );
+  return rows.map((row) => row.id);
+}
 
 /**
  * The inviters of the invitations the night may count, locked in id order
  * (`FOR SHARE`), before any invitation of theirs is touched: an erasure takes
  * the account first and its invitations after, and the count writes units
  * that point at the account, so the other order would leave each waiting for
- * the other. The gate is asked in SQL here, not through the pond slice's
- * reader, which reads one person's row: the night asks it of every
- * invitation in one statement, the same as the update that follows.
+ * the other.
  */
-export async function lockInviters(db: Queryable): Promise<string[]> {
+export async function lockInviters(db: Queryable, redeemers: readonly string[]): Promise<string[]> {
   const { rows } = await db.query<{ id: string }>(
     `SELECT a.id FROM account a
       WHERE a.id IN (SELECT i.inviter_account_id FROM invitation i WHERE ${COUNTABLE})
       ORDER BY a.id FOR SHARE OF a`,
+    [redeemers],
   );
   return rows.map((row) => row.id);
 }
@@ -163,13 +171,13 @@ export async function lockInviters(db: Queryable): Promise<string[]> {
  */
 export async function markCounted(
   db: Queryable,
-  input: { inviters: readonly string[]; at: Date },
+  input: { inviters: readonly string[]; redeemers: readonly string[]; at: Date },
 ): Promise<Array<{ invitationId: string; inviterId: string }>> {
   const { rows } = await db.query<{ id: string; inviter_account_id: string }>(
-    `UPDATE invitation i SET counted_at = $2
-      WHERE i.inviter_account_id = ANY($1::uuid[]) AND ${COUNTABLE}
+    `UPDATE invitation i SET counted_at = $3
+      WHERE ${COUNTABLE} AND i.inviter_account_id = ANY($2::uuid[])
       RETURNING i.id, i.inviter_account_id`,
-    [input.inviters, input.at],
+    [input.redeemers, input.inviters, input.at],
   );
   return rows.map((row) => ({ invitationId: row.id, inviterId: row.inviter_account_id }));
 }

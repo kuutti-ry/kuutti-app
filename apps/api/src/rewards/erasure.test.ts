@@ -2,10 +2,11 @@ import type { Queryable } from "@kuutti/db";
 import { InvitationCreated, Invitations, normaliseInvitationCode } from "@kuutti/schema";
 import type { App } from "../app.ts";
 import { eraseAccount } from "../identity/index.ts";
+import { isComplete } from "../jobs/pool.ts";
 import { signedInAccount } from "../test/account.ts";
 import { openExport } from "../test/export.ts";
 import { captureLogger, describe, expect, type TestContext, test } from "../test/harness.ts";
-import { consented, earnedUnits, gated, hashOf } from "../test/invitations.ts";
+import { completed, consented, earnedUnits, hashOf } from "../test/invitations.ts";
 import { countInvitations } from "./invitations.ts";
 
 // Invitations in erasure and the export (#107, ADR-044 §10, ADR-007,
@@ -28,7 +29,12 @@ const erase = async (ctx: TestContext, who: Person) =>
   );
 
 const countTonight = async (db: Queryable) =>
-  countInvitations({ db, logger: (await captureLogger()).logger, now: () => NIGHT });
+  countInvitations({
+    db,
+    logger: (await captureLogger()).logger,
+    now: () => NIGHT,
+    complete: (tx, accountId) => isComplete(tx, accountId, NIGHT),
+  });
 
 async function makeOne(app: App, who: Person): Promise<InvitationCreated> {
   const answer = await app.request("/invitations", { method: "POST", headers: who.headers });
@@ -45,16 +51,16 @@ async function use(app: App, who: Person, code: string) {
   expect(answer.status).toBe(204);
 }
 
-/** "A" past the gate with an open invitation, and "B", who used A's second one and whose profile has passed the test since, counted tonight. */
+/** "A", whose profile is complete, with an open invitation, and "B", who used A's second one and whose profile is complete since, counted tonight. */
 async function invitedAndCounted(ctx: TestContext) {
   const a = await signedInAccount(ctx.client);
-  await gated(ctx.client, a.accountId);
+  await completed(ctx.client, a.accountId);
   const open = await makeOne(ctx.app, a);
   const used = await makeOne(ctx.app, a);
   const b = await signedInAccount(ctx.client, undefined, { state: "registered" });
   await consented(ctx.client, b.accountId);
   await use(ctx.app, b, used.code);
-  await gated(ctx.client, b.accountId);
+  await completed(ctx.client, b.accountId);
   expect(await countTonight(ctx.client)).toEqual({ counted: 1, fish: 1, likes: 0 });
   return { a, b, open, used };
 }
@@ -149,10 +155,7 @@ describe("invitations in erasure", () => {
     expect(await usedOf(ctx.app, c)).toEqual(before.c);
     expect(
       await rowsOf(ctx.client, "SELECT state FROM account WHERE id = $1", b.accountId),
-    ).toEqual([{ state: "registered" }]);
-    expect(
-      await rowsOf(ctx.client, "SELECT 1 FROM gate WHERE account_id = $1", b.accountId),
-    ).toHaveLength(1);
+    ).toEqual([{ state: "active" }]);
   });
 
   test("An invitation whose inviter was erased never counts", async ({ ctx }) => {
@@ -161,13 +164,13 @@ describe("invitations in erasure", () => {
     // Another inviter's invitation counts the same night, so the night's
     // update runs with inviters to count and still leaves the orphan.
     const d = await signedInAccount(ctx.client);
-    await gated(ctx.client, d.accountId);
+    await completed(ctx.client, d.accountId);
     const theirs = await makeOne(ctx.app, d);
     const e = await signedInAccount(ctx.client, undefined, { state: "registered" });
     await consented(ctx.client, e.accountId);
     await use(ctx.app, e, theirs.code);
-    await gated(ctx.client, e.accountId);
-    await gated(ctx.client, c.accountId);
+    await completed(ctx.client, e.accountId);
+    await completed(ctx.client, c.accountId);
 
     expect(await countTonight(ctx.client)).toEqual({ counted: 1, fish: 1, likes: 0 });
     expect(
@@ -312,7 +315,7 @@ describe("invitations in the export", () => {
     ctx,
   }) => {
     const a = await signedInAccount(ctx.client);
-    await gated(ctx.client, a.accountId);
+    await completed(ctx.client, a.accountId);
     await earnedUnits(ctx.client, a.accountId, { likes: 1 }, NIGHT);
     const made = await makeOne(ctx.app, a);
     const b = await signedInAccount(ctx.client, undefined, { state: "registered" });

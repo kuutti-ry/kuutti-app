@@ -58,7 +58,7 @@ const waitlist: WaitlistResponse = {
   k: 10,
   ponds: [{ pond: POND, day: "2026-10-05", verified: 150, split: null, finishing: null }],
 };
-const gate: GateResponse = { state: "closed", within: null, needed: 20, step: 10 };
+const gate: GateResponse = { state: "closed" };
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
 const token = (seed: string) => (seed + "x".repeat(43)).slice(0, 43);
@@ -91,7 +91,9 @@ describe("HomeScreen", () => {
     // Both cards have fetched and painted before anything is pressed.
     expect(await screen.findByText("Otaniemi")).toBeTruthy();
     expect(
-      await screen.findByText("About 20 more people are needed before matching opens for you."),
+      await screen.findByText(
+        "Your profile is finished. Matching has not opened in your area yet.",
+      ),
     ).toBeTruthy();
     const user = userEvent.setup();
     await user.press(screen.getByRole("button", { name: "Your profile" }));
@@ -148,21 +150,22 @@ describe("HomeScreen", () => {
     await renderWithTheme(<HomeScreen />);
     expect(screen.getByRole("button", { name: "Your profile" })).toBeTruthy();
     expect(screen.queryByText("Otaniemi")).toBeNull();
-    expect(screen.queryByText(/more people are needed/)).toBeNull();
+    expect(screen.queryByText(/Matching has not opened/)).toBeNull();
   });
 
   it("leads to today's round from the gate card once matching is open, and not before (#379)", async () => {
     await renderWithTheme(<HomeScreen />);
     expect(
-      await screen.findByText("About 20 more people are needed before matching opens for you."),
+      await screen.findByText(
+        "Your profile is finished. Matching has not opened in your area yet.",
+      ),
     ).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Today's round" })).toBeNull();
 
     (globalThis.fetch as jest.Mock).mockImplementation(async (input: Request | string) => {
       const url = new URL(input instanceof Request ? input.url : input);
       if (url.pathname === "/waitlist") return json(waitlist);
-      if (url.pathname === "/gate")
-        return json({ state: "open", within: null, needed: null, step: 10 });
+      if (url.pathname === "/gate") return json({ state: "open" });
       return json({ error: { code: "not_found" } }, 404);
     });
     await renderWithTheme(<HomeScreen />);
@@ -180,15 +183,16 @@ describe("HomeScreen", () => {
     const heading = "Shall Kuutti tell you?";
     await renderWithTheme(<HomeScreen />);
     expect(
-      await screen.findByText("About 20 more people are needed before matching opens for you."),
+      await screen.findByText(
+        "Your profile is finished. Matching has not opened in your area yet.",
+      ),
     ).toBeTruthy();
     expect(screen.queryByText(heading)).toBeNull();
 
     (globalThis.fetch as jest.Mock).mockImplementation(async (input: Request | string) => {
       const url = new URL(input instanceof Request ? input.url : input);
       if (url.pathname === "/waitlist") return json(waitlist);
-      if (url.pathname === "/gate")
-        return json({ state: "open", within: null, needed: null, step: 10 });
+      if (url.pathname === "/gate") return json({ state: "open" });
       return json({ error: { code: "not_found" } }, 404);
     });
     await renderWithTheme(<HomeScreen />);

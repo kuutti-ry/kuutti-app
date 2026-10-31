@@ -42,7 +42,6 @@ function accountRow(identityId: string): Account {
     gender: null,
     pondId: null,
     genderChangedAt: null,
-    seeksChangedAt: null,
     email: null,
     foundThemAnswered: false,
     emailConfirmedAt: null,

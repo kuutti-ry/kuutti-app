@@ -24,7 +24,7 @@ Chosen 09/10/2026.
 | `faces/kerttu/1.jpg` … `4.jpg` | Kerttu's profile | 4 | a woman of 46, Swedish-speaking, by the sea with a book and coffee |
 | `faces/tapio/1.jpg` … `3.jpg` | nothing today: Tapio is banned and refused at login, and his story uploads nothing; the set lets a later story give him a profile without a new release | 3 | a man of 56 |
 | `faces/ilona/1.jpg` … `3.jpg` | nothing today: Ilona deleted her account and is refused at login; the same reason | 3 | a woman of 56 |
-| `faces/iida/1.jpg` … `3.jpg` | Iida's profile (complete): the persona of the round's flow, whose gate the reset opens (#379) | 3 | a woman of 36 |
+| `faces/iida/1.jpg` … `3.jpg` | Iida's profile (complete): the persona of the round's flow (#379) | 3 | a woman of 36 |
 | `faces/henna/1.jpg` … `2.jpg` | Henna's profile (complete): the card in Iida's round that liked her and becomes a match (#379) | 2 | a woman of 37 |
 | `faces/katja/1.jpg` … `2.jpg` | Katja's profile (complete): a card in Iida's round (#379) | 2 | a woman of 36 |
 | `faces/minna/1.jpg` … `2.jpg` | Minna's profile (complete): a card in Iida's round (#379) | 2 | a woman of 36 |

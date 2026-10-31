@@ -51,7 +51,6 @@ export type WriteResult = RemoveResult & { written: number; ponds: Record<string
 
 /** The tables that hold rows of an account, in an order in which they can be emptied. */
 const ACCOUNT_TABLES = [
-  "gate",
   "photo_access",
   "card_shown",
   // The photo check writes these on staging too, where the population's photos go through it (#253).

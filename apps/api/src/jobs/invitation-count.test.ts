@@ -5,7 +5,7 @@ import { eraseAccount } from "../identity/index.ts";
 import { applySanction } from "../safety/index.ts";
 import { signedInAccount, withMatchingConfig } from "../test/account.ts";
 import { captureLogger, describe, expect, type TestContext, test } from "../test/harness.ts";
-import { consented, gated, invitationOf } from "../test/invitations.ts";
+import { completed, consented, invitationOf } from "../test/invitations.ts";
 import { people } from "../test/people.ts";
 import { pidOf, waitsFor, watched, withTwoConnections } from "../test/races.ts";
 import { invitationCountJob } from "./invitation-count.ts";
@@ -30,10 +30,10 @@ async function count(db: Queryable) {
   return { result: await job.run(), lines };
 }
 
-/** An inviter past the gate, and a friend who typed their code, not past it yet. */
+/** An inviter whose profile is complete, and a friend who typed their code, whose profile is not. */
 async function invitedPair(ctx: TestContext): Promise<{ a: Person; friend: string; id: string }> {
   const a = await signedInAccount(ctx.client);
-  await gated(ctx.client, a.accountId);
+  await completed(ctx.client, a.accountId);
   const [friend] = await people(ctx.client, null, 1);
   if (!friend) throw new Error("friend not written");
   await consented(ctx.client, friend);
@@ -56,15 +56,15 @@ const unitsOf = async (db: Queryable, accountId: string) =>
   ).rows;
 
 describe("the night's count of invitations", () => {
-  test("an invitation counts the first night its redeemer has a gate row, with the night's reward and one notice, and once", async ({
+  test("an invitation counts the first night its redeemer's profile is complete, whether or not their pond is open, with the night's reward and one notice, and once", async ({
     ctx,
   }) => {
     const { a, friend, id } = await invitedPair(ctx);
-    // Redeemed, and the friend's profile has not passed the test: it waits.
+    // Redeemed, and the friend's profile is not complete: it waits.
     expect((await count(ctx.client)).result).toEqual({ counted: 0, fish: 0, likes: 0 });
     expect(await unitsOf(ctx.client, a.accountId)).toEqual([]);
 
-    await gated(ctx.client, friend);
+    await completed(ctx.client, friend);
     expect((await count(ctx.client)).result).toEqual({ counted: 1, fish: 1, likes: 0 });
     expect(await unitsOf(ctx.client, a.accountId)).toEqual([
       { kind: "fish", invitation_id: id, earned_at: T },
@@ -104,7 +104,7 @@ describe("the night's count of invitations", () => {
     ctx,
   }) => {
     const first = await invitedPair(ctx);
-    await gated(ctx.client, first.friend);
+    await completed(ctx.client, first.friend);
     await withMatchingConfig(ctx.client, { invitation_reward: { fish: 2, likes: 3 } });
     expect((await count(ctx.client)).result).toEqual({ counted: 1, fish: 2, likes: 3 });
     expect((await unitsOf(ctx.client, first.a.accountId)).map((u) => u.kind)).toEqual([
@@ -117,7 +117,7 @@ describe("the night's count of invitations", () => {
     expect((await noticesOf(ctx.app, first.a))[0]).toMatchObject({ reward: { fish: 2, likes: 3 } });
 
     const second = await invitedPair(ctx);
-    await gated(ctx.client, second.friend);
+    await completed(ctx.client, second.friend);
     await withMatchingConfig(ctx.client, { invitation_reward: { fish: 0, likes: 0 } });
     expect((await count(ctx.client)).result).toEqual({ counted: 1, fish: 0, likes: 0 });
     expect(await unitsOf(ctx.client, second.a.accountId)).toEqual([]);
@@ -128,23 +128,62 @@ describe("the night's count of invitations", () => {
     });
   });
 
+  test("a redeemer whose profile lapsed waits for the night it is complete again (ADR-060 §7)", async ({
+    ctx,
+  }) => {
+    const { a, friend, id } = await invitedPair(ctx);
+    await completed(ctx.client, friend);
+    await ctx.client.query(
+      "UPDATE consent SET withdrawn_at = now() WHERE account_id = $1 AND kind = 'special_category'",
+      [friend],
+    );
+    expect((await count(ctx.client)).result).toEqual({ counted: 0, fish: 0, likes: 0 });
+    await ctx.client.query(
+      "UPDATE consent SET withdrawn_at = NULL WHERE account_id = $1 AND kind = 'special_category'",
+      [friend],
+    );
+    expect((await count(ctx.client)).result).toEqual({ counted: 1, fish: 1, likes: 0 });
+    expect(await unitsOf(ctx.client, a.accountId)).toEqual([
+      { kind: "fish", invitation_id: id, earned_at: T },
+    ]);
+  });
+
+  test("of two redeemers of one inviter, the one who is complete counts and the other waits", async ({
+    ctx,
+  }) => {
+    const { a, friend, id } = await invitedPair(ctx);
+    const [other] = await people(ctx.client, null, 1);
+    if (!other) throw new Error("friend not written");
+    const waits = await invitationOf(ctx.client, a.accountId, { redeemedBy: other });
+    await completed(ctx.client, friend);
+
+    expect((await count(ctx.client)).result).toEqual({ counted: 1, fish: 1, likes: 0 });
+
+    const { rows } = await ctx.client.query<{ id: string; counted_at: Date | null }>(
+      "SELECT id, counted_at FROM invitation WHERE inviter_account_id = $1",
+      [a.accountId],
+    );
+    expect(rows.find((row) => row.id === id)?.counted_at).toEqual(T);
+    expect(rows.find((row) => row.id === waits)?.counted_at).toBeNull();
+  });
+
   test("an open invitation and one counted already stay as they are; a shadow-banned redeemer counts, and a banned inviter still earns", async ({
     ctx,
   }) => {
     const a = await signedInAccount(ctx.client);
-    await gated(ctx.client, a.accountId);
+    await completed(ctx.client, a.accountId);
     const open = await invitationOf(ctx.client, a.accountId);
     const [done] = await people(ctx.client, null, 1);
-    await gated(ctx.client, done as string);
+    await completed(ctx.client, done as string);
     const before = new Date("2026-10-01T01:00:00.000Z");
     await invitationOf(ctx.client, a.accountId, { redeemedBy: done, countedAt: before });
     const hidden = await invitedPair(ctx);
     await ctx.client.query("UPDATE account SET state = 'shadow_banned' WHERE id = $1", [
       hidden.friend,
     ]);
-    await gated(ctx.client, hidden.friend);
+    await completed(ctx.client, hidden.friend);
     const banned = await invitedPair(ctx);
-    await gated(ctx.client, banned.friend);
+    await completed(ctx.client, banned.friend);
     await ctx.client.query("UPDATE account SET state = 'banned' WHERE id = $1", [
       banned.a.accountId,
     ]);
@@ -165,7 +204,7 @@ describe("the night's count of invitations", () => {
     ctx,
   }) => {
     const { a, friend } = await invitedPair(ctx);
-    await gated(ctx.client, friend);
+    await completed(ctx.client, friend);
     const { logger, lines } = await captureLogger();
     await withMatchingConfig(ctx.client, { invitation_reward: { fish: 1, likes: 0, boosts: 1 } });
     const job = invitationCountJob({ db: ctx.client, logger, now: () => T });
@@ -188,7 +227,7 @@ describe("the night's count of invitations", () => {
     ctx,
   }) => {
     const { a, friend } = await invitedPair(ctx);
-    await gated(ctx.client, friend);
+    await completed(ctx.client, friend);
     await count(ctx.client);
     const warning = await applySanction(ctx.client, {
       accountId: a.accountId,
@@ -211,8 +250,8 @@ describe("the night's count of invitations", () => {
     await withTwoConnections("kuutti-107-count", async (pool, counting, erasing) => {
       const [a, friend] = await people(pool, null, 2);
       if (!a || !friend) throw new Error("cast not written");
-      await gated(pool, a);
-      await gated(pool, friend);
+      await completed(pool, a);
+      await completed(pool, friend);
       await invitationOf(pool, a, { redeemedBy: friend });
       const { logger } = await captureLogger();
       const countingPid = await pidOf(counting);

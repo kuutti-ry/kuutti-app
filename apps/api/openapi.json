@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Kuutti API",
-    "version": "0.90.2",
+    "version": "0.91.0",
     "description": "Free, non-commercial dating app for Finland. Every account is verified through a Finnish bank. Source: AGPL-3.0 with App Store exception."
   },
   "components": {
@@ -72,11 +72,6 @@
                 "nullable": true,
                 "format": "date-time"
               },
-              "seeksChangedAt": {
-                "type": "string",
-                "nullable": true,
-                "format": "date-time"
-              },
               "email": {
                 "type": "string",
                 "nullable": true,
@@ -101,7 +96,6 @@
               "gender",
               "pond",
               "genderChangedAt",
-              "seeksChangedAt",
               "email",
               "foundThemAnswered",
               "emailConfirmedAt"
@@ -279,9 +273,6 @@
           "research": {
             "$ref": "#/components/schemas/ResearchExport"
           },
-          "gate": {
-            "$ref": "#/components/schemas/ExportedGate"
-          },
           "exports": {
             "type": "array",
             "items": {
@@ -357,7 +348,6 @@
           "cardsShown",
           "photoCheck",
           "research",
-          "gate",
           "exports",
           "feedback",
           "sanctions",
@@ -1488,48 +1478,6 @@
           "enrolled",
           "since",
           "consentVersion"
-        ]
-      },
-      "ExportedGate": {
-        "type": "object",
-        "nullable": true,
-        "properties": {
-          "pondId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "admittedAt": {
-            "type": "string",
-            "nullable": true,
-            "format": "date-time"
-          },
-          "placeSaid": {
-            "type": "integer",
-            "nullable": true,
-            "minimum": 1
-          },
-          "poolSaid": {
-            "type": "integer",
-            "minimum": 0
-          },
-          "openedAt": {
-            "type": "string",
-            "nullable": true,
-            "format": "date-time"
-          },
-          "countedAt": {
-            "type": "string",
-            "nullable": true,
-            "format": "date-time"
-          }
-        },
-        "required": [
-          "pondId",
-          "admittedAt",
-          "placeSaid",
-          "poolSaid",
-          "openedAt",
-          "countedAt"
         ]
       },
       "ExportedFeedback": {
@@ -3630,16 +3578,10 @@
                 "type": "string",
                 "nullable": true,
                 "format": "date-time"
-              },
-              "seeks": {
-                "type": "string",
-                "nullable": true,
-                "format": "date-time"
               }
             },
             "required": [
-              "gender",
-              "seeks"
+              "gender"
             ]
           },
           "missing": {
@@ -6252,32 +6194,82 @@
           "lastSignInAt"
         ]
       },
+      "AdminPondList": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminPond"
+            },
+            "maxItems": 200
+          }
+        },
+        "required": [
+          "items"
+        ]
+      },
+      "AdminPond": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "slug": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 60
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "nameInessive": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "parentId": {
+            "type": "string",
+            "nullable": true,
+            "format": "uuid"
+          },
+          "matchingOpen": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "slug",
+          "name",
+          "nameInessive",
+          "parentId",
+          "matchingOpen"
+        ]
+      },
+      "PondMatchingChange": {
+        "type": "object",
+        "properties": {
+          "open": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "open"
+        ],
+        "additionalProperties": false
+      },
       "GateResponse": {
         "type": "object",
         "properties": {
           "state": {
             "$ref": "#/components/schemas/GateState"
-          },
-          "within": {
-            "type": "integer",
-            "nullable": true,
-            "minimum": 1
-          },
-          "needed": {
-            "type": "integer",
-            "nullable": true,
-            "minimum": 1
-          },
-          "step": {
-            "type": "integer",
-            "minimum": 10
           }
         },
         "required": [
-          "state",
-          "within",
-          "needed",
-          "step"
+          "state"
         ],
         "additionalProperties": false
       },
@@ -6285,8 +6277,6 @@
         "type": "string",
         "enum": [
           "incomplete",
-          "pending",
-          "waiting",
           "closed",
           "open"
         ]
@@ -9670,7 +9660,7 @@
     "/invitations": {
       "get": {
         "summary": "The caller's invitations",
-        "description": "Whether the caller may invite (their profile has passed the pond gate's test) and may still type a code, what an invitation earns today (matching_config invitation_reward), their open invitations newest first, how many of theirs have counted, and what those earned that is not used yet. Never a code, and nothing of anybody invited.",
+        "description": "Whether the caller may invite (their profile is complete) and may still type a code, what an invitation earns today (matching_config invitation_reward), their open invitations newest first, how many of theirs have counted, and what those earned that is not used yet. Never a code, and nothing of anybody invited.",
         "security": [
           {
             "session": []
@@ -9711,7 +9701,7 @@
       },
       "post": {
         "summary": "Make an invitation",
-        "description": "A code for one friend, in two groups of five, shown here once: Kuutti keeps only its hash. For a caller whose profile has passed the pond gate's test; at most matching_config invitations_open open at once. The night the friend's profile first passes the same test, the invitation counts and the caller earns matching_config invitation_reward.",
+        "description": "A code for one friend, in two groups of five, shown here once: Kuutti keeps only its hash. For a caller whose profile is complete; at most matching_config invitations_open open at once. The night the friend's profile first passes the same test, the invitation counts and the caller earns matching_config invitation_reward.",
         "security": [
           {
             "session": []
@@ -9749,7 +9739,7 @@
             }
           },
           "409": {
-            "description": "invitation_not_yet: the caller's profile has not passed the pond gate's test; invitations_full: as many invitations open as matching_config invitations_open allows. Nothing was written.",
+            "description": "invitation_not_yet: the caller's profile is not complete; invitations_full: as many invitations open as matching_config invitations_open allows. Nothing was written.",
             "content": {
               "application/json": {
                 "schema": {
@@ -9820,7 +9810,7 @@
     "/invitations/redeem": {
       "post": {
         "summary": "Use an invitation code",
-        "description": "A code typed by the caller, before their profile first passes the pond gate's test: case, spaces and hyphens do not matter. The caller is checked before the code is looked up. At most matching_config invitation_tries_per_day tries a Finnish day, whatever their answer.",
+        "description": "A code typed by the caller, before their profile is complete: case, spaces and hyphens do not matter. The caller is checked before the code is looked up. At most matching_config invitation_tries_per_day tries a Finnish day, whatever their answer.",
         "security": [
           {
             "session": []
@@ -9871,7 +9861,7 @@
             }
           },
           "409": {
-            "description": "invitation_not_for_you: the caller cannot use a code: their profile has passed the test, they used one already, the current terms and privacy consents are not given, or their identity had an account erased before.",
+            "description": "invitation_not_for_you: the caller cannot use a code: their profile is complete, they used one already, the current terms and privacy consents are not given, or their identity had an account erased before.",
             "content": {
               "application/json": {
                 "schema": {
@@ -12401,10 +12391,10 @@
         }
       }
     },
-    "/gate": {
+    "/admin/ponds": {
       "get": {
-        "summary": "Where the caller stands at the pond gate",
-        "description": "Between a finished profile and the first round (TD-10): on the pond's waitlist with a place, let in and waiting for enough people who match (how many more, in steps of `step`), or open. Counted nightly, and once when a person with a finished profile first asks.",
+        "summary": "Every pond with its switch",
+        "description": "Each pond and whether matching is open in it. Admins only.",
         "security": [
           {
             "session": []
@@ -12412,7 +12402,134 @@
         ],
         "responses": {
           "200": {
-            "description": "The caller's gate.",
+            "description": "The ponds.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminPondList"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "unauthenticated, session_expired or session_revoked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "admin_forbidden: the role does not allow this.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/ponds/{id}/matching": {
+      "post": {
+        "summary": "Open or close matching in a pond",
+        "description": "Sets the pond's switch. Open, the night and the day's first read build rounds for its complete people; closed, they build none, and rounds already built and conversations stay. Nothing else turns it. A press that finds the switch as it asks changes nothing and writes nothing. Admins only; written to audit_log.",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PondMatchingChange"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The pond as it now stands.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminPond"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "unauthenticated, session_expired or session_revoked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "admin_forbidden: the role does not allow this.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such pond.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/gate": {
+      "get": {
+        "summary": "Whether matching is open for the caller",
+        "description": "Between a finished profile and the first round: incomplete while the profile or onboarding lacks something, closed once it is finished and matching has not opened in the caller's pond yet, open once it has. An admin opens a pond; nothing here counts anybody.",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "What stands for the caller.",
             "content": {
               "application/json": {
                 "schema": {
@@ -13242,16 +13359,6 @@
           },
           "404": {
             "description": "No live account (erased meanwhile).",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "change_too_soon: whom one seeks was changed within matching_config change_cadence_days; nothing was saved, and GET /onboarding's nextChange.seeks says from when.",
             "content": {
               "application/json": {
                 "schema": {

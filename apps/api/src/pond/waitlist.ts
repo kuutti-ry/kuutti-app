@@ -22,7 +22,7 @@ import * as repo from "./repo.ts";
  * The table holds aggregates per pond, the same for every reader, so there is
  * no caller to scope by (rule 6 is about a session's own rows).
  */
-export const WAITLIST_K_KEY = "waitlist_k";
+const WAITLIST_K_KEY = "waitlist_k";
 
 /** The threshold in force: `matching_config.waitlist_k`, never below the floor of packages/schema. */
 export async function readWaitlistK(db: Queryable): Promise<number> {

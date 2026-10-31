@@ -6,7 +6,7 @@ import { generatePopulation, POND_PLANS, writePopulation } from "@kuutti/db/demo
 import { CONSENT_VERSIONS } from "@kuutti/i18n";
 import { PondSeeksResponse, WaitlistResponse } from "@kuutti/schema";
 import { createApp } from "../app.ts";
-import { subjectsOfPond } from "../jobs/pond-gate.ts";
+import { subjectsOfPond } from "../jobs/pool.ts";
 import { takeSnapshot } from "../jobs/waitlist-snapshot.ts";
 import { signedInAccount, withMatchingConfig } from "../test/account.ts";
 import {

@@ -36,11 +36,7 @@ const VERSIONS = {
   privacy: "test-privacy-1",
   special_category: "test-special-1",
 };
-const THRESHOLDS = {
-  gateK: MATCHING_CONFIG_V1.gate_k,
-  majorityShareMax: MATCHING_CONFIG_V1.majority_share_max,
-  counterK: MATCHING_CONFIG_V1.waitlist_k,
-};
+const THRESHOLDS = { counterK: MATCHING_CONFIG_V1.waitlist_k };
 /** From this many people up, the population shows everything it is there for. */
 const SHOWS_EVERYTHING_FROM = 174;
 
@@ -116,16 +112,14 @@ describe("the synthetic population", () => {
 
   it("crosses the thresholds it is there to cross", () => {
     const ponds = summarise(people);
-    const { gate_k: gate, majority_share_max: majority, waitlist_k: counterK } = MATCHING_CONFIG_V1;
-    // The one pond (#146): over the gate, men over the majority share, every cell at ten or more.
+    const { counterK } = THRESHOLDS;
+    // The one pond (#146): every cell at ten or more.
     expect(ponds.paakaupunkiseutu).toMatchObject({
       people: 276,
       woman: 88,
       man: 171,
       non_binary: 17,
     });
-    expect(ponds.paakaupunkiseutu?.people).toBeGreaterThanOrEqual(gate);
-    expect(ponds.paakaupunkiseutu?.largestShare).toBeGreaterThan(majority);
     for (const gender of Gender.options) {
       expect(ponds.paakaupunkiseutu?.[gender]).toBeGreaterThanOrEqual(counterK);
     }
@@ -150,7 +144,9 @@ describe("the synthetic population", () => {
     expect(uncrossed(plannedPonds(100), THRESHOLDS)).toEqual([
       "the pond has a cell under the counter's k, so it shows no split",
     ]);
-    expect(uncrossed(plannedPonds(20), THRESHOLDS)).toContain("the pond is under the gate");
+    expect(uncrossed({}, THRESHOLDS)).toEqual([
+      "the pond has a cell under the counter's k, so it shows no split",
+    ]);
   });
 
   it("passes the contracts a person's own answers pass", () => {

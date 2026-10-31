@@ -26,7 +26,7 @@ After a write or a removal the public counter (#54) is counted anew over what is
 
 ## Where it refuses to write
 
-Three hundred accounts that look bank-verified, among real people, would enter the public counter, count toward the gate and appear on people's cards. So:
+Three hundred accounts that look bank-verified, among real people, would enter the public counter and appear on people's cards. So:
 
 - it goes ahead only when the environment is `development`, `test` or `preview`, by `--env` and by `APP_ENV`, both when both are given;
 - it refuses an argument it does not know, so a mistyped `--dryrun` is not a write, and an argument given twice, so `--env production --env development` does not talk its own first word away;
@@ -38,10 +38,10 @@ One pond for now, the capital region (#146, ADR-010 §11): everybody who onboard
 
 | pond | people | women | men | non-binary | why |
 |---|---|---|---|---|---|
-| Pääkaupunkiseutu | 276 | 88 | 171 | 17 | over `gate_k` (30); men are 62 %, over `majority_share_max` (0.6), so the admission rule holds them back; every cell at ten or more, so the counter shows the split |
+| Pääkaupunkiseutu | 276 | 88 | 171 | 17 | every cell at ten or more, so the counter shows the split |
 | none | 24 | | | | registered at the bank and gone before the first onboarding step: no gender, no pond, no consent |
 
-These are exact counts, apportioned from shares by largest remainder, not draws: the thresholds are crossed by construction, from a population of 174 up (a test goes through every size; below that the non-binary cell is under the counter's k, and under 33 people the pond is under the gate). At another size 8 % never onboarded and the rest is in Pääkaupunkiseutu with the same gender shares.
+These are exact counts, apportioned from shares by largest remainder, not draws: the thresholds are crossed by construction, from a population of 174 up (a test goes through every size; below that the non-binary cell is under the counter's k). At another size 8 % never onboarded and the rest is in Pääkaupunkiseutu with the same gender shares.
 
 Everybody with a pond has a gender, because the app asks for the gender before the pond is assigned.
 
@@ -70,7 +70,7 @@ The home card's bar of whom people seek (#507, ADR-013 §12) counts finished pro
 | what they have | why |
 |---|---|
 | two approved `photo` rows with a `demo-placeholder-` key and no object | a finished profile needs two approved photos; no picture exists, and the rows are never asked for one. `--remove` and a replacement do not look for their objects |
-| a terms consent of an older wording | it reads as none, as a real person's does until they accept the new one. So the gate has no subject in them: they are in nobody's pool, on nobody's card and in no round, and the personas' gates and the e2e flows stand as they were |
+| a terms consent of an older wording | it reads as none, as a real person's does until they accept the new one. So they are not complete: they are in nobody's pool, on nobody's card and in no round, and the personas' rounds and the e2e flows stand as they were |
 | everything else as drawn | their seek answers, consents and profiles are the population's own |
 
 They take the pond's finished figure with them: 50 people fewer are finishing. A test in `apps/api/src/pond/waitlist.test.ts` holds the whole of it, from the write to the shares and past the gate. The bar shows after a write, and in production never (ADR-013 §16, and the command refuses production anyway). The command's line says how many it filled (`bar`). From 250 people up every band is full whatever the seed, which a test holds; smaller populations may fall short in the middle band and then show no bar.

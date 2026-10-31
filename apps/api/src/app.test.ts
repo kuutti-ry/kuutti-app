@@ -115,6 +115,11 @@ const STAFF_ROLES: { what: string; roles: string[]; keys: string[] }[] = [
     keys: ["GET /admin/sanctions/automatic"],
   },
   {
+    what: "the ponds and their switch to the admin role (#500, ADR-060 §2)",
+    roles: ADMINS,
+    keys: ["GET /admin/ponds", "POST /admin/ponds/:id/matching"],
+  },
+  {
     what: "the tunables, read and changed, to the admin role (#304, #305)",
     roles: ADMINS,
     keys: ["GET /admin/config", "POST /admin/config/:key"],

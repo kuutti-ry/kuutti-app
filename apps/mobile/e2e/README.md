@@ -55,7 +55,7 @@ Each flow has a persona to itself where it changes something that another flow r
 | `later-answer-on-card` | Sanna | two parties and the corgi on the card, and off again (#213) |
 | `politics-none-alone` | Sanna | ten parties and none of them, which stands alone; no note, no search, no switch |
 | `kids-labels` | Kerttu, Sanna | the future-kids answers follow having kids (#148) |
-| `home-and-tech` | Sanna | the area and its numbers, the gate in words; the tech screen's API |
+| `home-and-tech` | Sanna | the area and its numbers, matching open in words; the tech screen's API |
 | `email` | Sanna | malformed refused; valid saved, said unconfirmed and sent its code by the card itself (the local API's mail goes to its log, `MAIL=log`); a wrong code refused in words; removed, its code with it (#385, ADR-043). Each run sends Sanna one of the five codes of a Finnish day (`email_codes_per_day`): after five runs in a day, `pnpm demo:reset` first |
 | `research-switch` | Sanna | the opt-in recorded and withdrawn |
 | `notification-settings` | Sanna | Settings › Notifications, open under its row (#511), says that the choices decide what Kuutti tells the phones, and that this phone has not been asked yet whether Kuutti may notify it (no flow answers the phone's question; asking is jest's, #102); Messages switched off, kept on the server after a way round by home, then on again, so Sanna ends as she began (#176) |

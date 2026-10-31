@@ -27,10 +27,9 @@ import { BIOS, type Language, NAMES, OCCUPATION_TITLES, PROMPT_ANSWERS } from ".
  * anybody: the generator and its word lists are all there is.
  *
  * It is made to cross the product's thresholds, not only to fill screens:
- * the one pond is over the gate, over the majority share and, from enough
- * people up, shows the counter's split. The shares are exact counts, not
- * draws, so the thresholds are crossed by construction and not by luck; what
- * is drawn is who gets which age, name and words.
+ * from enough people up, the one pond shows the counter's split. The shares
+ * are exact counts, not draws, so the thresholds are crossed by construction
+ * and not by luck; what is drawn is who gets which age, name and words.
  *
  * Pure: no clock, no database. Every date derives from the epoch.
  */
@@ -59,15 +58,14 @@ export type PondPlan = {
 /**
  * Who lives where, and why: the data dictionary of docs/demo/population.md in
  * code. One pond for now, the capital region (#146, ADR-010 §11): it has to show everything at
- * once, so it is over the gate, has men over the majority share (the line the
- * admission rule draws) and, from enough people up, every counter cell at k.
+ * once, so from enough people up every counter cell is at k.
  */
 export const POND_PLANS: readonly PondPlan[] = [
   {
     slug: "paakaupunkiseutu",
     people: { share: 1 },
     genders: { woman: 0.32, man: 0.62, non_binary: 0.06 },
-    why: "over gate_k (30); men are 62 %, over majority_share_max (0.6), so the admission rule holds them back; from 174 people up every gender cell is at ten or more, so the counter shows the split",
+    why: "from 174 people up every gender cell is at ten or more, so the counter shows the split",
   },
 ];
 
@@ -340,7 +338,7 @@ function onboarded(
  * finished profiles, and without a release of faces the population has none,
  * so these get two photos that have no picture (`PLACEHOLDER_PHOTO_PREFIX`).
  * They have not accepted the terms' latest wording, a state real people are in,
- * so the night's count sees a finished profile, and no gate, round or card ever
+ * so the night's counter sees a finished profile, and no round or card ever
  * sees them. Nobody is added: they are people the generator drew anyway, picked
  * by what they drew, which leaves everybody else as they were.
  */
@@ -419,7 +417,7 @@ export function generatePopulation(options: PopulationOptions = {}): SyntheticPe
   return people;
 }
 
-export type PondSummary = Record<Gender, number> & { people: number; largestShare: number };
+export type PondSummary = Record<Gender, number> & { people: number };
 
 /** The same counts as `summarise(generatePopulation({ size }))`, without drawing anybody. */
 export function plannedPonds(size: number): Record<string, PondSummary> {
@@ -428,17 +426,12 @@ export function plannedPonds(size: number): Record<string, PondSummary> {
   for (const plan of POND_PLANS) {
     const people = sizes.ponds[plan.slug] ?? 0;
     if (people === 0) continue;
-    const counts = apportion(people, plan.genders);
-    ponds[plan.slug] = {
-      ...counts,
-      people,
-      largestShare: Math.max(counts.woman, counts.man, counts.non_binary) / people,
-    };
+    ponds[plan.slug] = { ...apportion(people, plan.genders), people };
   }
   return ponds;
 }
 
-export type Thresholds = { gateK: number; majorityShareMax: number; counterK: number };
+export type Thresholds = { counterK: number };
 
 /**
  * What a population of this size does not show, in words; empty when it shows
@@ -448,10 +441,6 @@ export type Thresholds = { gateK: number; majorityShareMax: number; counterK: nu
 export function uncrossed(ponds: Record<string, PondSummary>, t: Thresholds): string[] {
   const missing: string[] = [];
   const pond = ponds.paakaupunkiseutu;
-  if (!pond || pond.people < t.gateK) missing.push("the pond is under the gate");
-  if (!pond || pond.largestShare <= t.majorityShareMax) {
-    missing.push("the pond is not over the majority share");
-  }
   if (!pond || [pond.woman, pond.man, pond.non_binary].some((n) => n < t.counterK)) {
     missing.push("the pond has a cell under the counter's k, so it shows no split");
   }
@@ -468,14 +457,10 @@ export function summarise(people: readonly SyntheticPerson[]): Record<string, Po
       man: 0,
       non_binary: 0,
       people: 0,
-      largestShare: 0,
     };
     ponds[person.pond] = pond;
     pond[person.gender] += 1;
     pond.people += 1;
-  }
-  for (const pond of Object.values(ponds)) {
-    pond.largestShare = Math.max(pond.woman, pond.man, pond.non_binary) / pond.people;
   }
   return ponds;
 }

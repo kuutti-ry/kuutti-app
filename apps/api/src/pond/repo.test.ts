@@ -1,14 +1,19 @@
+import { randomUUID } from "node:crypto";
 import { describe, expect } from "vitest";
 import { signedInAccount } from "../test/account.ts";
 import { type TestContext, test } from "../test/harness.ts";
 import { pondNamed } from "../test/people.ts";
-import { admissionAnew, deleteGateOfAccount, exportGate, readGateRow } from "./gate.ts";
-import { findPondBySlug, findPondOfAccount, setPondOfAccount } from "./repo.ts";
+import {
+  findPondBySlug,
+  findPondOfAccount,
+  listPondsForAdmin,
+  setMatchingOpen,
+  setPondOfAccount,
+} from "./repo.ts";
 
-// The pond slice's rows (#46, #94): the ponds by slug and by account, the
-// choice and what it answers, and the row of a person's place at the gate
-// as it is read, decided anew, exported and erased. Each statement about a
-// person carries that person's account id (rule 6).
+// The pond slice's rows (#46, #500): the ponds by slug and by account, the
+// choice and what it answers, and the switch. Each statement about a person
+// carries that person's account id (rule 6).
 
 async function childPond(ctx: TestContext, slug: string, parentId: string) {
   const { rows } = await ctx.client.query<{ id: string }>(
@@ -17,26 +22,6 @@ async function childPond(ctx: TestContext, slug: string, parentId: string) {
     [slug, parentId],
   );
   return rows[0]?.id ?? "";
-}
-
-async function gateRow(
-  ctx: TestContext,
-  accountId: string,
-  pondId: string,
-  row: { admitted?: boolean; place?: number | null; opened?: boolean; counted?: boolean },
-) {
-  await ctx.client.query(
-    `INSERT INTO gate (account_id, pond_id, admitted_at, place_said, pool_said, opened_at, counted_at)
-     VALUES ($1, $2, $3, $4, 20, $5, $6)`,
-    [
-      accountId,
-      pondId,
-      row.admitted ? new Date("2026-10-01T03:00:00Z") : null,
-      row.place ?? null,
-      row.opened ? new Date("2026-10-02T03:00:00Z") : null,
-      row.counted === false ? null : new Date("2026-10-03T03:00:00Z"),
-    ],
-  );
 }
 
 describe("ponds by slug and by account", () => {
@@ -90,90 +75,35 @@ describe("ponds by slug and by account", () => {
   });
 });
 
-describe("the place at the gate, as a row", () => {
-  test("before the first count there is no row, and the export says so", async ({ ctx }) => {
-    const a = await signedInAccount(ctx.client);
-    expect(await readGateRow(ctx.client, a.accountId)).toBeNull();
-    expect(await exportGate(ctx.client, a.accountId)).toBeNull();
+describe("the switch of a pond, as a row (#500, ADR-060 §2)", () => {
+  test("every pond is listed with its switch, closed until it is turned", async ({ ctx }) => {
+    const pondId = await pondNamed(ctx.client, "test-repo-switch");
+    const listed = (await listPondsForAdmin(ctx.client)).find((pond) => pond.id === pondId);
+    expect(listed).toMatchObject({ slug: "test-repo-switch", matchingOpen: false });
   });
 
-  test("a row is read and exported as held: times as instants, and nulls as nulls", async ({
+  test("a press changes the switch once, says so, and says when there is no such pond", async ({
     ctx,
   }) => {
-    const pondId = await pondNamed(ctx.client, "test-repo-gate");
-    const opened = await signedInAccount(ctx.client);
-    const waiting = await signedInAccount(ctx.client);
-    await gateRow(ctx, opened.accountId, pondId, { admitted: true, opened: true });
-    await gateRow(ctx, waiting.accountId, pondId, { place: 10, counted: false });
-    expect(await exportGate(ctx.client, opened.accountId)).toEqual({
-      pondId,
-      admittedAt: "2026-10-01T03:00:00.000Z",
-      placeSaid: null,
-      poolSaid: 20,
-      openedAt: "2026-10-02T03:00:00.000Z",
-      countedAt: "2026-10-03T03:00:00.000Z",
+    const pondId = await pondNamed(ctx.client, "test-repo-press");
+    const other = await pondNamed(ctx.client, "test-repo-other");
+    expect(await setMatchingOpen(ctx.client, pondId, false)).toMatchObject({
+      pond: { id: pondId, matchingOpen: false },
+      changed: false,
     });
-    expect(await exportGate(ctx.client, waiting.accountId)).toEqual({
-      pondId,
-      admittedAt: null,
-      placeSaid: 10,
-      poolSaid: 20,
-      openedAt: null,
-      countedAt: null,
+    expect(await setMatchingOpen(ctx.client, pondId, true)).toMatchObject({
+      pond: { id: pondId, slug: "test-repo-press", matchingOpen: true },
+      changed: true,
     });
-    expect(await readGateRow(ctx.client, waiting.accountId)).toEqual({
-      pondId,
-      admittedAt: null,
-      placeSaid: 10,
-      poolSaid: 20,
-      openedAt: null,
-      countedAt: null,
+    expect(await setMatchingOpen(ctx.client, pondId, true)).toMatchObject({ changed: false });
+    expect(await setMatchingOpen(ctx.client, pondId, false)).toMatchObject({
+      pond: { matchingOpen: false },
+      changed: true,
     });
-  });
-
-  test("joining a contest empties the person's own row; leaving one, or having no row, changes nothing", async ({
-    ctx,
-  }) => {
-    const pondId = await pondNamed(ctx.client, "test-repo-anew");
-    const me = await signedInAccount(ctx.client);
-    const other = await signedInAccount(ctx.client);
-    const nobody = await signedInAccount(ctx.client);
-    await gateRow(ctx, me.accountId, pondId, { admitted: true, opened: true });
-    await gateRow(ctx, other.accountId, pondId, { admitted: true, opened: true });
-    const man = (seeks: string[]) => ({ gender: "man", seeks });
-
-    expect(await admissionAnew(ctx.client, me.accountId, man(["woman"]), man([]))).toBe(false);
-    expect(await readGateRow(ctx.client, me.accountId)).toMatchObject({
-      openedAt: expect.any(Date),
-    });
-
-    expect(
-      await admissionAnew(ctx.client, me.accountId, man(["woman"]), man(["woman", "non_binary"])),
-    ).toBe(true);
-    expect(await readGateRow(ctx.client, me.accountId)).toEqual({
-      pondId,
-      admittedAt: null,
-      placeSaid: null,
-      poolSaid: 20,
-      openedAt: null,
-      countedAt: null,
-    });
-    expect(await readGateRow(ctx.client, other.accountId)).toMatchObject({
-      admittedAt: expect.any(Date),
-      openedAt: expect.any(Date),
-    });
-    expect(await admissionAnew(ctx.client, nobody.accountId, man([]), man(["woman"]))).toBe(false);
-  });
-
-  test("erasure takes the person's row and nobody else's", async ({ ctx }) => {
-    const pondId = await pondNamed(ctx.client, "test-repo-erase");
-    const me = await signedInAccount(ctx.client);
-    const other = await signedInAccount(ctx.client);
-    await gateRow(ctx, me.accountId, pondId, { place: 20 });
-    await gateRow(ctx, other.accountId, pondId, { place: 10 });
-    expect(await deleteGateOfAccount(ctx.client, me.accountId)).toBe(1);
-    expect(await deleteGateOfAccount(ctx.client, me.accountId)).toBe(0);
-    expect(await readGateRow(ctx.client, me.accountId)).toBeNull();
-    expect(await readGateRow(ctx.client, other.accountId)).not.toBeNull();
+    expect(await setMatchingOpen(ctx.client, randomUUID(), true)).toBeNull();
+    const { rows } = await ctx.client.query("SELECT matching_open FROM ponds WHERE id = $1", [
+      other,
+    ]);
+    expect(rows).toEqual([{ matching_open: false }]);
   });
 });

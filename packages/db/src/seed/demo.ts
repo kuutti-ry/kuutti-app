@@ -78,6 +78,7 @@ export {
   uncrossed,
 } from "./population.ts";
 export {
+  openPonds,
   PERSONA_ROUNDS,
   type PersonaRound,
   type RoundsResult,

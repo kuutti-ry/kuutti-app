@@ -2,9 +2,9 @@
 # under itself, what an invitation earns, makes one and shows its code this once
 # (Kuutti keeps only its hash), hands the invitation's message to the
 # system's share sheet, and withdraws the open invitation after asking.
-# Sanna's profile passed the gate's test (`pnpm demo:reset` counts the
-# gates), so she may invite; the invitation she makes is withdrawn before the
-# end, so the flow leaves her as it found her. A run that stops half-way
+# Sanna's profile is complete, so she may invite; the invitation she makes
+# is withdrawn before the end, so the flow leaves her as it found her. A run
+# that stops half-way
 # leaves an invitation open, and after five such runs (`invitations_open`)
 # Make an invitation is refused: `pnpm demo:reset` first. The sheet is the
 # system's, in the phone's language, so the flow asserts only that the app's

@@ -3,7 +3,7 @@ Feature: Blocking somebody from a card or a conversation
   A person blocks somebody whose card they were shown (#84, ADR-030), or
   the other person of a conversation (#351), which ends it for both. From
   then on neither is shown to the other, in either direction, anywhere a
-  person is shown to a person: the pool, the gate's count, the card and its
+  person is shown to a person: the pool, the card and its
   photos, and the rounds, likes and matches when they come (rule 7). The
   block is between the two identities, so it holds for a later account of
   either, and it is final: no list and no unblock. Nobody is told, and
@@ -26,10 +26,10 @@ Feature: Blocking somebody from a card or a conversation
     When "A" blocks "B"
     Then neither is issued the other's photo in any variant, and each owner still reads their own
 
-  Scenario: The gate's count leaves a blocked pair out of each other's pool
-    Given a pond of thirty-one people who all fit, and gate_k thirty
-    When one of them blocks another and the night counts
-    Then the gate opens for the twenty-nine and the two stay one short
+  Scenario: The round leaves a blocked pair out of each other's cards
+    Given an open pond of people who all fit
+    When one of them blocks another and the night builds the rounds
+    Then neither of the two is a card in the other's round, and everybody else has both
 
   Scenario: Blocking again, or blocking somebody who blocked first, answers the same
     Given "A" and "B" were shown each other's cards

@@ -170,7 +170,6 @@ function anExport(): Record<string, unknown> {
       },
       stateChangedAt: null,
       genderChangedAt: null,
-      seeksChangedAt: null,
       email: null,
       emailConfirmedAt: null,
       foundThemAnswered: false,
@@ -209,7 +208,6 @@ function anExport(): Record<string, unknown> {
       carefulCheckUntil: at,
     },
     research: { enrolled: false, since: null, consentVersion: null, events: [] },
-    gate: null,
     exports: [{ at }],
     feedback: [
       {

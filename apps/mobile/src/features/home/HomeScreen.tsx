@@ -94,8 +94,8 @@ export function HomeScreen() {
           <View className="w-full max-w-md gap-4">
             {/* What must reach the person even without a push, unread, first (#176). */}
             <Notices />
-            {/* How the person's own pond is filling up (#54), and where they stand themselves (#94);
-                once matching is open, the way to today's round (#379) and the one offer of
+            {/* How the person's own pond is filling up (#54), and whether matching is open for them
+                (#500); once it is, the way to today's round (#379) and the one offer of
                 notifications, since now there is something to tell (#102, ADR-055 §9). */}
             {gate.pond && <WaitlistCard pond={gate.pond} />}
             {gate.pond && (

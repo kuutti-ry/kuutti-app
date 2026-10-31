@@ -1,4 +1,4 @@
-import { type AnyPgColumn, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { type AnyPgColumn, boolean, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
 
 /**
  * A pond is where matching happens: a campus, then a city, then a region.
@@ -13,5 +13,8 @@ export const ponds = pgTable("ponds", {
   nameNominative: text("name_nominative").notNull(),
   nameInessive: text("name_inessive").notNull(),
   parentId: uuid("parent_id").references((): AnyPgColumn => ponds.id),
+  // Whether matching is open here (#500, ADR-060): an admin's switch in the
+  // panel, false until one turns it on. No count, share or job ever sets it.
+  matchingOpen: boolean("matching_open").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });

@@ -327,10 +327,10 @@ function accountsOf(results: readonly HistoryResult[]): Map<string, string> {
 }
 
 /**
- * The round of the stories (#379), after the gates are counted: Iida's gate
- * opened and Henna's like of the day before (rows, `writeRounds`), then
- * Iida's round for the day through the round builder (#95), as the night
- * builds it, Henna first as liked you (ADR-037). `standing`: stories whose
+ * The round of the stories (#379), once the ponds are open: Henna's like of
+ * the day before (rows, `writeRounds`), then Iida's round for the day through
+ * the round builder (#95), as the night builds it, Henna first as liked you
+ * (ADR-037). `standing`: stories whose
  * round for the day stands now, built here or before (the builder's answer).
  */
 export async function giveRounds(

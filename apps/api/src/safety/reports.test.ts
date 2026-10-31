@@ -3,13 +3,12 @@ import { createPool, migrate, withTemporaryDatabase } from "@kuutti/db";
 import { ErrorResponse, GateResponse, REPORT_NOTE_MAX } from "@kuutti/schema";
 import { describe, expect, it } from "vitest";
 import { CURRENT_CONSENT_VERSIONS } from "../identity/index.ts";
-import { countGates } from "../jobs/pond-gate.ts";
 import { dayWindow } from "../media/index.ts";
 import { signedInAccount, signInAs, staffSession, withMatchingConfig } from "../test/account.ts";
 import { cardShown } from "../test/cards.ts";
 import { exportOf } from "../test/export.ts";
 import { captureLogger, type TestContext, test } from "../test/harness.ts";
-import { type PeopleOptions, people, pondNamed } from "../test/people.ts";
+import { openPond, type PeopleOptions, people, pondNamed } from "../test/people.ts";
 import { pruneReports, REPORT_RETENTION_DAYS, recordReport } from "./reports.ts";
 
 // features/safety/reports.feature (#84, ADR-030): the route, the reasons, the
@@ -22,9 +21,6 @@ const MARK = "qzxvkw";
 const NOTE = `He asked for my WhatsApp in the first line ${MARK}.`;
 const UNKNOWN = "6f1c1c4e-9a8e-4a0b-9c3a-0c8d1e2f3a4b";
 const DAY_MS = 86_400_000;
-// Two nights of the gate's count, 04:00 in Helsinki.
-const NIGHT_1 = new Date("2026-10-05T01:00:00Z");
-const NIGHT_2 = new Date("2026-10-06T01:00:00Z");
 /** Women who seek women, complete: every two of them are in each other's pool. */
 const ALIKE: PeopleOptions = { gender: "woman", seeks: ["woman"], complete: true, consented: true };
 
@@ -207,34 +203,17 @@ describe("what a report tells, and to whom", () => {
   });
 
   test("The reported person learns nothing from any route", async ({ ctx }) => {
-    // Two ponds alike of thirty people who all fit: each has twenty-nine
-    // others, so every gate is shut after the first night, and a thirty-first
-    // comes to each, so the next night would open them all. In one, A reports
-    // B; in the other, C narrows her own window so that D is out of it, which
-    // anybody may do (ADR-030 §3, §6).
-    await withMatchingConfig(ctx.client, { gate_k: 30, majority_share_max: 0.6 });
     const pond = await pondNamed(ctx.client, "test-report-learns-nothing");
-    const twin = await pondNamed(ctx.client, "test-report-window-twin");
-    const [a, b, rest] = (await people(ctx.client, pond, 3, ALIKE)) as [string, string, string];
-    const [c, d] = (await people(ctx.client, twin, 2, ALIKE)) as [string, string];
-    await people(ctx.client, pond, 27, ALIKE);
-    await people(ctx.client, twin, 28, ALIKE);
-    const { logger } = await captureLogger();
-    const night = (at: Date) => countGates({ db: ctx.client, logger, now: () => at });
-    await night(NIGHT_1);
-    await people(ctx.client, pond, 1, ALIKE);
-    await people(ctx.client, twin, 1, ALIKE);
+    await openPond(ctx.client, pond);
+    const [a, b] = (await people(ctx.client, pond, 2, ALIKE)) as [string, string];
     await cardShown(ctx.client, a, b);
-    const headersOf = async (id: string) => (await signInAs(ctx.client, id)).headers;
-    const asA = await headersOf(a);
-    const asB = await headersOf(b);
-    const asC = await headersOf(c);
-    const asD = await headersOf(d);
-    const asRest = await headersOf(rest);
-    const gateOf = async (headers: Record<string, string>) =>
-      GateResponse.parse(await (await ctx.app.request("/gate", { headers })).json());
+    const asA = (await signInAs(ctx.client, a)).headers;
+    const asB = (await signInAs(ctx.client, b)).headers;
     const read = async () => {
       const onboarding = await (await ctx.app.request("/onboarding", { headers: asB })).json();
+      const gate = GateResponse.parse(
+        await (await ctx.app.request("/gate", { headers: asB })).json(),
+      );
       // What B's own asking moves: the copy's time, the copies taken, the session's last use.
       const {
         exportedAt: _at,
@@ -242,33 +221,19 @@ describe("what a report tells, and to whom", () => {
         sessions: _sessions,
         ...document
       } = await exportOf(ctx.app, asB);
-      return { onboarding, gate: await gateOf(asB), document };
+      return { onboarding, gate, document };
     };
     const before = await read();
-    expect(before.gate).toMatchObject({ state: "closed", needed: 10 });
+    expect(before.gate).toEqual({ state: "open" });
     expect(
       (await report(ctx, asA, { accountId: b, reason: "harassment", note: NOTE })).status,
     ).toBe(204);
-    const narrower = await ctx.app.request("/preferences", {
-      method: "PUT",
-      headers: json(asC),
-      body: JSON.stringify({ seeks: ["woman"], ageWindow: { min: 50, max: 60 } }),
-    });
-    expect(narrower.status).toBe(200);
-    // The same day, everything B can ask reads as it did.
     const after = await read();
     expect(after).toEqual(before);
     expect(after.document.reports.items).toEqual([]);
     expect(after.document.blocks.items).toEqual([]);
     expect(JSON.stringify(after)).not.toContain(a);
     expect(JSON.stringify(after)).not.toContain(MARK);
-    // B's gate moves at the night's count alone, and exactly as D's does, whom
-    // C's window left out: one short of the thirty, while the rest open.
-    await night(NIGHT_2);
-    const [ofB, ofD] = [await gateOf(asB), await gateOf(asD)];
-    expect(ofB).toEqual(ofD);
-    expect(ofB).toMatchObject({ state: "closed", needed: 10 });
-    expect((await gateOf(asRest)).state).toBe("open");
   });
 });
 

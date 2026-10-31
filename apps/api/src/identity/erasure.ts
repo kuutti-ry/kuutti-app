@@ -25,7 +25,7 @@ import {
   exportNotifications,
   exportPushTokens,
 } from "../notifications/index.ts";
-import { deleteGateOfAccount, exportGate, findPondOfAccount } from "../pond/index.ts";
+import { findPondOfAccount } from "../pond/index.ts";
 import { eraseProfileOfAccount, exportProfile } from "../profile/index.ts";
 import { exportResearch, removeResearchSubject } from "../research/index.ts";
 import { eraseInvitationsOf, exportInvitations } from "../rewards/index.ts";
@@ -53,7 +53,6 @@ import { visibleState } from "./standing.ts";
 // identity row (with one more deletion and the cooldown), the audit log,
 // staff rows. Likes, matches, bookmarks and push tokens join here as their
 // slices land; the research_id mapping goes (#50), the events keyed by it stay.
-// The place at the pond gate (#94) goes, and is in the export as it is held.
 // The photo check's notes (#253) go too, and are in the export in plain words.
 // The consent rows go (ADR-010 §14): what they proved goes in the same
 // transaction, and the research events carry their own consent_version.
@@ -204,8 +203,6 @@ export async function eraseAccount(deps: ErasureDeps, accountId: string): Promis
     const invitations = await eraseInvitationsOf(tx, accountId);
     const sanctions = await deleteSanctionsOfAccount(tx, accountId);
     // Kept: the reports either way and the blocks on the identity (ADR-030 §8).
-    // The place at the pond gate (#94): where the person stood is theirs, and goes.
-    await deleteGateOfAccount(tx, accountId);
     const researchSubjects = await removeResearchSubject(tx, accountId);
     // A second deletion racing the first sees the live row above and the
     // tombstone here (READ COMMITTED re-evaluates after the other commit).
@@ -332,7 +329,6 @@ export async function exportAccount(
     preferences,
     consents,
     research,
-    gate,
     dealBreakers,
     photoCheck,
     exports,
@@ -350,7 +346,6 @@ export async function exportAccount(
     readPreferences(deps.db, accountId),
     exportConsents(deps.db, accountId),
     exportResearch(deps.db, accountId),
-    exportGate(deps.db, accountId),
     readDealBreakers(deps.db, accountId, profile?.fields ?? {}),
     exportPhotoCheck(deps, accountId, t),
     repo.listExportsOfAccount(deps.db, accountId, EXPORT_HISTORY_LIMIT),
@@ -386,7 +381,6 @@ export async function exportAccount(
       gender: account.gender,
       pond,
       genderChangedAt: account.genderChangedAt?.toISOString() ?? null,
-      seeksChangedAt: account.seeksChangedAt?.toISOString() ?? null,
       email: account.email,
       foundThemAnswered: account.foundThemAnswered,
       emailConfirmedAt: account.emailConfirmedAt?.toISOString() ?? null,
@@ -424,7 +418,6 @@ export async function exportAccount(
     cardsShown: photos.cardsShown,
     photoCheck,
     research,
-    gate,
     exports: exports.map((e) => ({ at: e.at.toISOString() })),
     feedback,
     // In words in the request's language too, as the photo check's notes are.

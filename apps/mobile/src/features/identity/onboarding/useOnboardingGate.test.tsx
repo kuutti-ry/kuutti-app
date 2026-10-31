@@ -46,7 +46,7 @@ const status = (missing: string[]) => ({
     research: VERSION,
     special_category: "2026-10-draft-2",
   },
-  nextChange: { gender: null, seeks: null },
+  nextChange: { gender: null },
   missing,
   complete: missing.length === 0,
 });

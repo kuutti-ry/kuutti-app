@@ -87,7 +87,7 @@ const STANDS_AS_ACTIVE = new Set(["active", "shadow_banned"]);
  * tables are the shared ones of packages/db, read only. Whether a profile is
  * complete is decided by `completeness()` itself, from the same facts the
  * profile screen gathers, so the counter and the screen cannot disagree. A band
- * holds only somebody whose consent to the answer is current, as the gate asks:
+ * holds only somebody whose consent to the answer is current, as the rounds ask:
  * a finished profile on an older wording is finished, and in no band.
  */
 export async function countPonds(

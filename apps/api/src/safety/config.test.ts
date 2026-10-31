@@ -116,25 +116,25 @@ describe("features/safety/config.feature", () => {
   });
 
   test("A change is a new version with its reason and who", async ({ ctx, api }) => {
-    const before = await versionsOf(ctx, "gate_k");
+    const before = await versionsOf(ctx, "liked_you_cap");
     expect(before.map((r) => r.version)).toEqual([1]);
     const admin = await staffSession(ctx.client, "admin");
 
-    const response = await change(api, admin.headers, "gate_k", {
+    const response = await change(api, admin.headers, "liked_you_cap", {
       value: 25,
       reason: "Smaller ponds first",
     });
     expect(response.status).toBe(200);
     const answer = ConfigChange.parse(await response.json());
     expect(answer).toMatchObject({
-      key: "gate_k",
+      key: "liked_you_cap",
       value: 25,
       version: 2,
       createdBy: admin.identityId,
       reason: "Smaller ponds first",
     });
 
-    const after = await versionsOf(ctx, "gate_k");
+    const after = await versionsOf(ctx, "liked_you_cap");
     expect(after).toHaveLength(2);
     expect(after[0]).toEqual(before[0]);
     const written = after[1];
@@ -146,7 +146,7 @@ describe("features/safety/config.feature", () => {
     });
     expect(written?.valid_from.toISOString()).toBe(T.toISOString());
     // Every reader takes it from here on.
-    expect(await matchingConfigNumber(ctx.client, "gate_k")).toBe(25);
+    expect(await matchingConfigNumber(ctx.client, "liked_you_cap")).toBe(25);
 
     expect(await configAudit(ctx)).toEqual([
       {
@@ -154,7 +154,7 @@ describe("features/safety/config.feature", () => {
         action: "config.change",
         subject_type: "config",
         subject_id: written?.id,
-        detail: { key: "gate_k", version: 2 },
+        detail: { key: "liked_you_cap", version: 2 },
       },
     ]);
   });
@@ -281,7 +281,7 @@ describe("changeConfig against the key's declaration", () => {
     const admin = await staffSession(ctx.client, "admin");
     const change = (value: number) =>
       changeConfig(ctx.client, {
-        key: "majority_share_max",
+        key: "contest_ratio_threshold",
         value,
         reason: "Trying it out",
         actor: admin.identityId,
@@ -332,8 +332,8 @@ describe("listConfig", () => {
       createdBy: "someone",
       reason: "Back to one pond",
     });
-    const single = (await listConfig(ctx.client)).find((i) => i.key === "gate_k");
-    expect(single).toMatchObject({ value: 30, version: 1 });
+    const single = (await listConfig(ctx.client)).find((i) => i.key === "liked_you_cap");
+    expect(single).toMatchObject({ value: 10, version: 1 });
     expect(single?.versions).toHaveLength(1);
     const budget = (await listConfig(ctx.client)).find((i) => i.key === "photo_fetches_per_day");
     expect(budget?.value).toEqual({ thumb: 600, card: 300, full: 60 });
@@ -397,9 +397,9 @@ describe("changeConfig", () => {
   });
 
   test.for([
-    ["a string for gate_k's number", "gate_k", "25", "number"],
+    ["a string for liked_you_cap's number", "liked_you_cap", "25", "number"],
     ["a number for default_pond's string", "default_pond", 1, "string"],
-    ["a boolean for gate_k's number", "gate_k", true, "number"],
+    ["a boolean for liked_you_cap's number", "liked_you_cap", true, "number"],
     ["a number for the budget's object", "photo_fetches_per_day", 600, "object"],
     ["the budget without full", "photo_fetches_per_day", { thumb: 600, card: 300 }, "object"],
     [

@@ -16,3 +16,5 @@ export { Overview } from "./Overview.tsx";
 export { ReportPage } from "./ReportPage.tsx";
 // The report queue (#311).
 export { ReportQueue } from "./ReportQueue.tsx";
+// A confirm step's request, which the ponds' switch uses too (#500).
+export { type Refusals, useSend } from "./use-send.ts";

@@ -27,13 +27,7 @@ import {
   readPreferences,
 } from "../matching/index.ts";
 import { listPhotos } from "../media/index.ts";
-import {
-  admissionAnew,
-  findPondBySlug,
-  findPondOfAccount,
-  listPonds,
-  setPondOfAccount,
-} from "../pond/index.ts";
+import { findPondBySlug, findPondOfAccount, listPonds, setPondOfAccount } from "../pond/index.ts";
 import { ageInYears, readProfile, withdrawSpecialCategoryAnswers } from "../profile/index.ts";
 import { enrolResearchSubject, removeResearchSubject, track } from "../research/index.ts";
 import * as repo from "./repo.ts";
@@ -228,7 +222,6 @@ export async function onboardingStatus(
     currentVersions: CURRENT_CONSENT_VERSIONS,
     nextChange: {
       gender: nextChangeFrom(account.genderChangedAt, cadence, now)?.toISOString() ?? null,
-      seeks: nextChangeFrom(account.seeksChangedAt, cadence, now)?.toISOString() ?? null,
     },
     missing,
     complete: missing.length === 0,
@@ -328,7 +321,7 @@ export async function withdrawConsentOf(
       await removeResearchSubject(tx, accountId);
     } else if (withdrawn.withdrawn > 0) {
       // Only a consent that was there takes the answers with it: a request
-      // without one changes nothing, and is no way round the cadence (#147).
+      // without one changes nothing.
       await deleteSeeksOfAccount(tx, accountId);
       await withdrawSpecialCategoryAnswers(
         { db: tx, logger: deps.logger, now: deps.now },
@@ -352,7 +345,10 @@ export async function declareGender(
     const before = await repo.lockGender(tx, accountId);
     if (before === undefined) return false;
     // A change from an earlier answer is possible once in the cadence (#147,
-    // ADR-015 §9), said without a wall: the date, never a reason.
+    // ADR-060 §9), said without a wall: the date, never a reason. A brake, not
+    // a lock: reading a pool again after a change of one's own gender says who
+    // seeks that gender, so the route needs a limit however it is reached,
+    // until #502 looks at the class.
     const change = before.gender !== null && before.gender !== gender;
     if (change) {
       const cadence = await matchingConfigNumber(tx, CHANGE_CADENCE_KEY);
@@ -363,12 +359,7 @@ export async function declareGender(
         });
       }
     }
-    if (!(await repo.setGender(tx, accountId, gender, change ? at : null))) return false;
-    // The gender decides for whom one competes at the pond gate (#94, ADR-015
-    // §9): joining a contest is decided anew by the next count.
-    const { seeks } = await readPreferences(tx, accountId);
-    await admissionAnew(tx, accountId, { gender: before.gender, seeks }, { gender, seeks });
-    return true;
+    return repo.setGender(tx, accountId, gender, change ? at : null);
   });
   if (!declared) throw new AppError(404, "not_found", "No live account");
   // The value stays out of the log: self-declared, and nobody's business there.

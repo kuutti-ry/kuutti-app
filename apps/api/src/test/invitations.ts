@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import type { Queryable } from "@kuutti/db";
 import { CONSENT_VERSIONS } from "@kuutti/i18n";
-import { pondNamed } from "./people.ts";
+import { completeProfiles, consentsOf, pondNamed } from "./people.ts";
 
 /**
  * Invitations and the reward ledger as a test of any slice sets them up
@@ -10,11 +10,17 @@ import { pondNamed } from "./people.ts";
  * real code: the invitations written are known by their hash alone.
  */
 
-/** The person's profile has passed the gate's test: a gate row, in a pond of its own, the account in it. */
-export async function gated(db: Queryable, accountId: string): Promise<void> {
+/** The person's profile and onboarding are complete (ADR-060 §7), in a pond of their own; a registered account becomes active, as onboarding makes it. */
+export async function completed(db: Queryable, accountId: string): Promise<void> {
   const pondId = await pondNamed(db, `invite-${randomUUID().slice(0, 8)}`);
-  await db.query("UPDATE account SET pond_id = $2 WHERE id = $1", [accountId, pondId]);
-  await db.query("INSERT INTO gate (account_id, pond_id) VALUES ($1, $2)", [accountId, pondId]);
+  await db.query(
+    `UPDATE account SET pond_id = $2, gender = 'woman',
+            state = CASE WHEN state = 'registered' THEN 'active' ELSE state END
+      WHERE id = $1`,
+    [accountId, pondId],
+  );
+  await consentsOf(db, [accountId]);
+  await completeProfiles(db, [accountId]);
 }
 
 /** The current terms and privacy consents, as onboarding leaves them after its welcome. */

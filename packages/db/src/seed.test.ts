@@ -39,8 +39,6 @@ describe("seed", () => {
         );
         // The decisions log numbers, read back from the database.
         expect(byKey).toEqual({
-          gate_k: 30,
-          majority_share_max: 0.6,
           round_size: 12,
           impression_cap_per_day: 40,
           like_budget_balanced: 12,
@@ -165,21 +163,47 @@ describe("seed", () => {
         await pool.query(
           `INSERT INTO matching_config (version, key, value, valid_from, created_by, reason) VALUES
              (3, 'default_pond', '"suomi"'::jsonb, '2026-10-16T09:00:00Z', 'admin', 'Open the country'),
-             (2, 'gate_k', '25'::jsonb, '2026-10-16T09:00:00Z', 'admin', 'Smaller ponds first')`,
+             (2, 'liked_you_cap', '25'::jsonb, '2026-10-16T09:00:00Z', 'admin', 'Smaller ponds first')`,
         );
         await seed(pool);
         expect(await withReason()).toEqual([
           { key: "default_pond", version: 3, value: "suomi", reason: "Open the country" },
-          { key: "gate_k", version: 2, value: 25, reason: "Smaller ponds first" },
+          { key: "liked_you_cap", version: 2, value: 25, reason: "Smaller ponds first" },
         ]);
         const latest = await pool.query<{ key: string; version: number }>(
           `SELECT key, max(version) AS version FROM matching_config
-           WHERE key IN ('default_pond', 'gate_k') GROUP BY key ORDER BY key`,
+           WHERE key IN ('default_pond', 'liked_you_cap') GROUP BY key ORDER BY key`,
         );
         expect(latest.rows).toEqual([
           { key: "default_pond", version: 3 },
-          { key: "gate_k", version: 2 },
+          { key: "liked_you_cap", version: 2 },
         ]);
+      } finally {
+        await pool.end();
+      }
+    });
+  });
+
+  it("opens the ponds it writes on every run, the one a migration wrote among them (#500, ADR-060 §10)", async () => {
+    await withTemporaryDatabase(async (url) => {
+      const pool = createPool({ connectionString: url, max: 1 });
+      const open = async () =>
+        (
+          await pool.query<{ slug: string; matching_open: boolean }>(
+            "SELECT slug, matching_open FROM ponds ORDER BY slug",
+          )
+        ).rows;
+      try {
+        await migrate(pool, MIGRATIONS);
+        expect(await open()).toEqual([{ slug: "suomi", matching_open: false }]);
+        await seed(pool);
+        expect(await open()).toEqual([
+          { slug: "paakaupunkiseutu", matching_open: true },
+          { slug: "suomi", matching_open: true },
+        ]);
+        await pool.query("UPDATE ponds SET matching_open = false");
+        await seed(pool);
+        expect((await open()).every((pond) => pond.matching_open)).toBe(true);
       } finally {
         await pool.end();
       }

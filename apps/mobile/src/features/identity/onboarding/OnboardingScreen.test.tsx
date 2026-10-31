@@ -142,7 +142,7 @@ function fakeApi(
         research: current(RESEARCH),
         special_category: SPECIAL,
       },
-      nextChange: { gender: server.genderFrom, seeks: null },
+      nextChange: { gender: server.genderFrom },
       missing,
       complete: missing.length === 0,
     };
@@ -838,7 +838,7 @@ describe("OnboardingScreen", () => {
     await waitFor(() => expect(router.replace).toHaveBeenCalledWith("/"));
     expect(screen.queryByText("Help us learn how matching works")).toBeNull();
     expect(screen.queryByRole("button", { name: "Yes, I take part" })).toBeNull();
-    expect(screen.getByText("All set. Your place in line is on the home screen.")).toBeTruthy();
+    expect(screen.getByText("All set. The home screen shows what comes next.")).toBeTruthy();
     // The words are the last thing saved; research is the screens before the bank's, and Settings'.
     expect(calls.filter((c) => c.method !== "GET").map((c) => c.path)).toEqual(["/profile"]);
     expect(server.consents.some((c) => c.kind === "research")).toBe(false);
