@@ -19,20 +19,41 @@ name: Each deal-breaker waits for an accepted answer, and leaving unsaved asks f
 # One on: it waits for an answer that is fine with her before it can be saved.
 - tapOn: "(Deal-breaker: Kids|Ehdoton raja: Lapset|Absolut gräns: Barn)(, .*)?"
 - assertVisible: "Fine with me|Sopii minulle|Okej för mig"
+# The save lies under the rows, the distance's last among them: scrolled to.
+- scrollUntilVisible:
+    element: "Save the deal-breakers|Tallenna rajat|Spara gränserna"
+    direction: DOWN
+    centerElement: true
+    timeout: 60000
 - assertVisible: "Pick at least one answer that is fine with you\\.|Valitse ainakin yksi vastaus, joka sopii sinulle\\.|Välj minst ett svar som är okej för dig\\."
 - assertVisible:
     text: "Save the deal-breakers|Tallenna rajat|Spara gränserna"
     enabled: false
+- scrollUntilVisible:
+    element: "No kids|Ei lapsia|Inga barn"
+    direction: UP
+    centerElement: true
+    timeout: 60000
 - tapOn: "No kids|Ei lapsia|Inga barn"
 - assertVisible:
     text: "No kids|Ei lapsia|Inga barn"
     selected: true
+- scrollUntilVisible:
+    element: "Save the deal-breakers|Tallenna rajat|Spara gränserna"
+    direction: DOWN
+    centerElement: true
+    timeout: 60000
 - assertNotVisible: "Pick at least one answer that is fine with you\\.|Valitse ainakin yksi vastaus, joka sopii sinulle\\.|Välj minst ett svar som är okej för dig\\."
 - assertVisible:
     text: "Save the deal-breakers|Tallenna rajat|Spara gränserna"
     enabled: true
 
 # Two on: the second is fine too.
+- scrollUntilVisible:
+    element: "(Deal-breaker: Smoking|Ehdoton raja: Tupakointi|Absolut gräns: Rökning)(, .*)?"
+    direction: UP
+    centerElement: true
+    timeout: 60000
 - tapOn: "(Deal-breaker: Smoking|Ehdoton raja: Tupakointi|Absolut gräns: Rökning)(, .*)?"
 - tapOn: "Never|En koskaan|Aldrig"
 
