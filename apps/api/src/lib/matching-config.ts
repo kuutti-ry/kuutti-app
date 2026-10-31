@@ -54,7 +54,7 @@ export async function matchingConfigNumbers<K extends string>(
   return out;
 }
 
-/** Each band's outer edge (ADR-061 §5), read once where a pool is read: the gate's count, the round builder. */
+/** Each band's outer edge (ADR-061 §5), read once where a pool is read. */
 export async function distanceEdges(db: Queryable): Promise<DistanceEdges> {
   const km = await matchingConfigNumbers(db, [
     "distance_nearby_km",

@@ -312,7 +312,7 @@ describe("listConfig", () => {
     const pond = (await listConfig(ctx.client)).find((i) => i.key === "default_pond");
     expect(pond).toMatchObject({ key: "default_pond", value: "suomi", version: 3 });
     expect(pond?.versions.map((v) => [v.version, v.value, v.createdBy])).toEqual([
-      [3, "suomi", "migration:0093"],
+      [3, "suomi", "migration:0095"],
       [2, "paakaupunkiseutu", "migration:0025"],
       [1, "suomi", "migration:0020"],
     ]);

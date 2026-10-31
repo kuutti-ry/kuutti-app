@@ -24,8 +24,7 @@ const DEFAULT_POND_KEY = "default_pond";
  * town again unless the same request says otherwise (§3), and a choice with
  * no area to show stays false. It changes whenever the person likes, with no
  * cadence, and the earlier home is overwritten (§1, §9); the time of the move
- * closes the day's short pool (§5). No gate row is touched, since no contest
- * reads a home, and a pond held stays.
+ * closes the day's short pool (§5). A pond held stays.
  */
 export async function saveHome(
   deps: HomeDeps,

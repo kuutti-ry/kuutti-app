@@ -798,7 +798,7 @@ describe("a deal-breaker on distance through the night (#514, ADR-061 §7)", () 
       if (!man) throw new Error("a man not written");
       men.push(man);
     }
-    await opened(ctx.client, pond, [a, ...men]);
+    await openPond(ctx.client, pond);
     return { a, men };
   }
 
@@ -970,7 +970,7 @@ describe("a deal-breaker on distance through the night (#514, ADR-061 §7)", () 
     const waited = await man(HOMES.far);
     const seen = await man(HOMES.nearby);
     const relaxedIn = await man(HOMES.around, { smoking: "regularly" });
-    await opened(ctx.client, pond, [a, fresh, waited, seen, relaxedIn]);
+    await openPond(ctx.client, pond);
     await shownBefore(ctx.client, waited, a, 1, "like");
     await shownBefore(ctx.client, a, seen, 45, null);
     await buildRounds(await deps(ctx.client));

@@ -239,10 +239,7 @@ describe("seed", () => {
         await migrate(pool, MIGRATIONS);
         expect(await open()).toEqual([{ slug: "suomi", matching_open: false }]);
         await seed(pool);
-        expect(await open()).toEqual([
-          { slug: "paakaupunkiseutu", matching_open: true },
-          { slug: "suomi", matching_open: true },
-        ]);
+        expect(await open()).toEqual([{ slug: "suomi", matching_open: true }]);
         await pool.query("UPDATE ponds SET matching_open = false");
         await seed(pool);
         expect((await open()).every((pond) => pond.matching_open)).toBe(true);

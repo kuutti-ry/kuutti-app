@@ -191,13 +191,6 @@ Feature: The filters, hard both ways, and the soft preferences that only order
     When the night builds the rounds
     Then "A" and "B" are in each other's rounds, "C" is not in "A"'s, and "A" is not in "C"'s
 
-  Scenario: The gate's count leaves a pair a distance deal-breaker excludes out of each other's pool
-    Given thirty-one people of one pond, each in every other's pool
-    And one of them has a deal-breaker on distance that another's home does not pass
-    When the night counts the gates
-    Then neither of the two counts toward the other's figure
-    And after the holder moves nearer, the next night counts both again
-
   Scenario: A short round offers a distance deal-breaker set aside, never for those who did not answer
     Given "A"'s deal-breaker on distance accepts nearby, and twelve people live further away
     When "A" reads today's relaxations

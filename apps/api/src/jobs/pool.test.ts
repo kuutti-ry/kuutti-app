@@ -1,7 +1,14 @@
 import type { Queryable } from "@kuutti/db";
-import { GateResponse, GateState, RoundResponse } from "@kuutti/schema";
+import {
+  CardPreviewResponse,
+  GateResponse,
+  GateState,
+  OnboardingStatus,
+  RoundResponse,
+} from "@kuutti/schema";
 import { createApp } from "../app.ts";
-import { signInAs, staffSession } from "../test/account.ts";
+import { pointOf } from "../pond/index.ts";
+import { signInAs, staffSession, withMatchingConfig } from "../test/account.ts";
 import { conversationBetween } from "../test/chat.ts";
 import {
   captureLogger,
@@ -12,7 +19,14 @@ import {
   testConfig,
 } from "../test/harness.ts";
 import { openPond, type PeopleOptions, people, pondNamed } from "../test/people.ts";
-import { isComplete, matchingStatusOf, openPondIds, openPondOf, subjectsOfPond } from "./pool.ts";
+import {
+  isComplete,
+  matchingStatusOf,
+  openPondIds,
+  openPondOf,
+  subjectOf,
+  subjectsOfPond,
+} from "./pool.ts";
 import { buildRounds } from "./round-builder.ts";
 
 // features/pond/opening.feature (#500, ADR-060): who is complete, what a
@@ -145,28 +159,6 @@ describe("what a person is told", () => {
     expect(await statusOf(ctx, mine)).toBe("closed");
     // The route takes no id: there is nobody else's to ask for.
     expect(await statusOf(ctx, mine, `?accountId=${theirs}`)).toBe("closed");
-  });
-
-  test("What stands for a person follows them to another pond", async ({ ctx }) => {
-    const open = await pondNamed(ctx.client, "test-move-open");
-    await openPond(ctx.client, open);
-    const shut = await pondNamed(ctx.client, "test-move-closed");
-    const [who] = await people(ctx.client, open, 1, ALIKE);
-    await people(ctx.client, shut, 1, ALIKE);
-    if (!who) throw new Error("person not written");
-    expect(await statusOf(ctx, who)).toBe("open");
-
-    const session = await signInAs(ctx.client, who);
-    const chosen = await ctx.app.request("/account/pond", {
-      method: "PUT",
-      headers: { ...session.headers, "content-type": "application/json" },
-      body: JSON.stringify({ pondId: shut }),
-    });
-    expect(chosen.status).toBe(204);
-
-    expect(await statusOf(ctx, who)).toBe("closed");
-    await night(ctx);
-    expect(await roundCount(ctx.client, who)).toBe(0);
   });
 
   test("the gate is not served without a session", async ({ ctx }) => {
@@ -322,5 +314,124 @@ describe("who is complete", () => {
     await openPond(ctx.client, pond);
     expect(await isComplete(ctx.client, whole, NIGHT)).toBe(true);
     expect(await openPondOf(ctx.client, whole)).toBe(pond);
+  });
+});
+
+describe("a home in the pool (#514, ADR-061)", () => {
+  const putHome = async (ctx: TestContext, accountId: string | undefined, postalCode: string) => {
+    const who = await signInAs(ctx.client, accountId ?? "");
+    return ctx.app.request("/account/home", {
+      method: "PUT",
+      headers: { ...who.headers, "content-type": "application/json" },
+      body: JSON.stringify({ postalCode }),
+    });
+  };
+  const statusRead = (ctx: TestContext, accountId: string | undefined) => async () => {
+    const who = await signInAs(ctx.client, accountId ?? "");
+    return OnboardingStatus.parse(
+      await (await ctx.app.request("/onboarding", { headers: who.headers })).json(),
+    );
+  };
+
+  test("An active account without a home is in nobody's pool, and the step opens", async ({
+    ctx,
+  }) => {
+    const pond = await pondNamed(ctx.client, "test-pool-no-home");
+    await openPond(ctx.client, pond);
+    const [she] = await people(ctx.client, pond, 1, { ...ALIKE, home: null });
+    await people(ctx.client, pond, 2, ALIKE);
+    expect(await statusOf(ctx, she)).toBe("incomplete");
+    expect((await subjectsOfPond(ctx.client, pond, NIGHT)).map((s) => s.id)).not.toContain(she);
+
+    const read = statusRead(ctx, she);
+    const before = await read();
+    expect(before.state).toBe("active");
+    expect(before.home).toBeNull();
+    expect(before.missing).toEqual(["home"]);
+    expect(before.complete).toBe(false);
+    const state = await ctx.client.query("SELECT state FROM account WHERE id = $1", [she]);
+    expect(state.rows).toEqual([{ state: "active" }]);
+
+    expect((await putHome(ctx, she, "00530")).status).toBe(200);
+    expect((await read()).missing).toEqual([]);
+    expect(await statusOf(ctx, she)).toBe("open");
+    expect((await subjectsOfPond(ctx.client, pond, NIGHT)).map((s) => s.id)).toContain(she);
+  });
+
+  test("A place the list no longer knows reads as no home, and the step opens again", async ({
+    ctx,
+  }) => {
+    const pond = await pondNamed(ctx.client, "test-pool-left-the-list");
+    const [she] = await people(ctx.client, pond, 1, ALIKE);
+    await ctx.client.query("UPDATE account SET home_place = '12345' WHERE id = $1", [she]);
+
+    const status = await statusRead(ctx, she)();
+    expect(status.home).toBeNull();
+    expect(status.missing).toContain("home");
+    expect(status.state).toBe("active");
+    const warned = ctx.logs().filter((line) => line.msg === "home reads as none");
+    expect(warned.length).toBeGreaterThan(0);
+    expect(warned[0]).toMatchObject({ accountId: she });
+    expect(JSON.stringify(ctx.logs())).not.toContain("12345");
+
+    expect(await statusOf(ctx, she)).toBe("incomplete");
+    expect(await subjectOf(ctx.client, pond, she ?? "", NIGHT)).toBeNull();
+
+    // A new one is taken like a first.
+    expect((await putHome(ctx, she, "00530")).status).toBe(200);
+    expect((await subjectOf(ctx.client, pond, she ?? "", NIGHT))?.person.home).toMatchObject(
+      pointOf("00530") ?? {},
+    );
+  });
+
+  test("A raised floor coarsens every read at once, and a lowered one gives back only what the row still holds", async ({
+    ctx,
+  }) => {
+    const pond = await pondNamed(ctx.client, "test-pool-floor");
+    const [area] = await people(ctx.client, pond, 1, { ...ALIKE, home: "00530" });
+    const [town] = await people(ctx.client, pond, 1, { ...ALIKE, home: "422" });
+    await ctx.client.query("UPDATE account SET home_shows_area = true WHERE id = $1", [area]);
+    const who = await signInAs(ctx.client, area ?? "");
+    const preview = async () =>
+      CardPreviewResponse.parse(
+        await (await ctx.app.request("/profile/card", { headers: who.headers })).json(),
+      ).card?.place;
+    const homeOf = async (id: string | undefined) =>
+      (await subjectOf(ctx.client, pond, id ?? "", NIGHT))?.person.home;
+    expect(await preview()).toEqual({ fi: "Kallio", sv: "Berghäll" });
+    expect(await homeOf(area)).toMatchObject(pointOf("00530") ?? {});
+
+    await withMatchingConfig(ctx.client, { home_min_inhabitants: 20000 });
+
+    // From the next read: the card says the town, and the band is measured from its centre.
+    expect(await preview()).toEqual({ fi: "Helsinki", sv: "Helsingfors" });
+    expect(await homeOf(area)).toMatchObject(pointOf("091") ?? {});
+    const stored = await ctx.client.query("SELECT home_place FROM account WHERE id = $1", [area]);
+    expect(stored.rows).toEqual([{ home_place: "00530" }]);
+
+    await withMatchingConfig(ctx.client, { home_min_inhabitants: 1 });
+
+    expect(await preview()).toEqual({ fi: "Kallio", sv: "Berghäll" });
+    expect(await homeOf(area)).toMatchObject(pointOf("00530") ?? {});
+    expect(await homeOf(town)).toMatchObject(pointOf("422") ?? {});
+    expect((await statusRead(ctx, town)()).home).toEqual({
+      town: { fi: "Joensuu", sv: "Joensuu" },
+      area: null,
+      showArea: false,
+    });
+  });
+
+  test("a home is carried to the pool with the edges of the same read", async ({ ctx }) => {
+    const pond = await pondNamed(ctx.client, "test-pool-edges");
+    const [she] = await people(ctx.client, pond, 1, ALIKE);
+    await withMatchingConfig(ctx.client, {
+      distance_nearby_km: 1,
+      distance_close_km: 2,
+      distance_around_km: 3,
+    });
+    expect((await subjectOf(ctx.client, pond, she ?? "", NIGHT))?.person.home).toEqual({
+      ...pointOf("00530"),
+      edges: { nearby: 1, close: 2, around: 3 },
+    });
   });
 });

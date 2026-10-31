@@ -127,7 +127,7 @@ describe("GET /admin/config", () => {
       value: "suomi",
       version: 3,
       versions: [
-        { version: 3, value: "suomi", createdBy: "migration:0093", reason: null },
+        { version: 3, value: "suomi", createdBy: "migration:0095", reason: null },
         { version: 2, value: "paakaupunkiseutu", createdBy: "migration:0025", reason: null },
         { version: 1, value: "suomi", createdBy: "migration:0020", reason: null },
       ],

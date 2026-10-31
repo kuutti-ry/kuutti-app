@@ -633,7 +633,7 @@ export type MessageParams = {
   "errors.photo_rejected_violence": Record<never, never>;
   "errors.photo_too_many_pixels": Record<never, never>;
   "errors.photo_unsupported": Record<never, never>;
-  "errors.pond_unknown": Record<never, never>;
+  "errors.postal_code_unknown": Record<never, never>;
   "errors.rate_limited": { "seconds": number };
   "errors.relaxations_changed": Record<never, never>;
   "errors.report_budget_exceeded": Record<never, never>;
@@ -794,6 +794,7 @@ export type MessageParams = {
   "onboarding.gender.non_binary": Record<never, never>;
   "onboarding.gender.title": Record<never, never>;
   "onboarding.gender.woman": Record<never, never>;
+  "onboarding.home.title": Record<never, never>;
   "onboarding.identityLabel.explain": Record<never, never>;
   "onboarding.identityLabel.skip": Record<never, never>;
   "onboarding.identityLabel.title": Record<never, never>;
@@ -806,8 +807,6 @@ export type MessageParams = {
   "onboarding.photos.explain": Record<never, never>;
   "onboarding.photos.open": Record<never, never>;
   "onboarding.photos.title": Record<never, never>;
-  "onboarding.pond.explain": Record<never, never>;
-  "onboarding.pond.title": Record<never, never>;
   "onboarding.progress": { "step": number; "total": number };
   "onboarding.prompts.explain": { "min": number };
   "onboarding.prompts.save": Record<never, never>;
@@ -816,7 +815,6 @@ export type MessageParams = {
   "onboarding.research.no": Record<never, never>;
   "onboarding.research.title": Record<never, never>;
   "onboarding.research.yes": Record<never, never>;
-  "onboarding.retry": Record<never, never>;
   "onboarding.seeks.allow": Record<never, never>;
   "onboarding.seeks.anyone": Record<never, never>;
   "onboarding.seeks.explain": Record<never, never>;
@@ -994,7 +992,6 @@ export type MessageParams = {
   "pond.gate.open": Record<never, never>;
   "pond.gate.retry": Record<never, never>;
   "pond.gate.title": Record<never, never>;
-  "pond.name.paakaupunkiseutu": Record<never, never>;
   "pond.name.suomi": Record<never, never>;
   "pond.waitlist.failed": Record<never, never>;
   "pond.waitlist.finishing": { "people": number };
@@ -1041,6 +1038,7 @@ export type MessageParams = {
   "profile.dealBreakers.answer": Record<never, never>;
   "profile.dealBreakers.back": Record<never, never>;
   "profile.dealBreakers.everyone": Record<never, never>;
+  "profile.dealBreakers.everyoneOf": { "field": string };
   "profile.dealBreakers.explain": { "max": number };
   "profile.dealBreakers.failed": Record<never, never>;
   "profile.dealBreakers.gated": Record<never, never>;
@@ -1063,6 +1061,7 @@ export type MessageParams = {
   "profile.error.generic": Record<never, never>;
   "profile.error.text_contact_details": Record<never, never>;
   "profile.failed": Record<never, never>;
+  "profile.field.distance": Record<never, never>;
   "profile.field.drinking": Record<never, never>;
   "profile.field.drugsAttitude": Record<never, never>;
   "profile.field.education": Record<never, never>;
@@ -1119,6 +1118,10 @@ export type MessageParams = {
   "profile.number.down": Record<never, never>;
   "profile.number.unset": Record<never, never>;
   "profile.number.up": Record<never, never>;
+  "profile.option.distance.around": Record<never, never>;
+  "profile.option.distance.close": Record<never, never>;
+  "profile.option.distance.far": Record<never, never>;
+  "profile.option.distance.nearby": Record<never, never>;
   "profile.option.drinking.never": Record<never, never>;
   "profile.option.drinking.often": Record<never, never>;
   "profile.option.drinking.rarely": Record<never, never>;
@@ -1335,6 +1338,18 @@ export type MessageParams = {
   "profile.optionWithKids.wantsKids.dont_want": Record<never, never>;
   "profile.optionWithKids.wantsKids.not_sure": Record<never, never>;
   "profile.optionWithKids.wantsKids.want": Record<never, never>;
+  "profile.place.back": Record<never, never>;
+  "profile.place.choice": Record<never, never>;
+  "profile.place.code": Record<never, never>;
+  "profile.place.explain": Record<never, never>;
+  "profile.place.failed": Record<never, never>;
+  "profile.place.matches": { "areas": number };
+  "profile.place.more": { "areas": number };
+  "profile.place.nearestTown": Record<never, never>;
+  "profile.place.onCard": { "place": string };
+  "profile.place.row": { "digits": string; "name": string };
+  "profile.place.saved": Record<never, never>;
+  "profile.place.title": Record<never, never>;
   "profile.progress.answered": { "answered": number; "total": number };
   "profile.progress.done": Record<never, never>;
   "profile.progress.photos": { "answered": number; "total": number };
@@ -1668,11 +1683,13 @@ export type MessageParams = {
   "tech.environment": { "environment": string };
   "tech.errorTest.send": Record<never, never>;
   "tech.errorTest.sent": Record<never, never>;
+  "tech.licenses.data": Record<never, never>;
   "tech.licenses.from": { "address": string };
   "tech.licenses.licenceAt": { "place": number };
   "tech.licenses.notice": Record<never, never>;
   "tech.licenses.other": Record<never, never>;
   "tech.licenses.packages": Record<never, never>;
+  "tech.licenses.postalAreas": Record<never, never>;
   "tech.licenses.provided": { "provider": string; "version": string; "license": string };
   "tech.licenses.texts": Record<never, never>;
   "tech.licenses.title": Record<never, never>;

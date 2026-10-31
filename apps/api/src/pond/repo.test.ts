@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { describe, expect } from "vitest";
 import { signedInAccount } from "../test/account.ts";
-import { type TestContext, test } from "../test/harness.ts";
+import { test } from "../test/harness.ts";
 import { pondNamed } from "../test/people.ts";
 import {
   findHomeOfAccount,

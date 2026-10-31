@@ -664,7 +664,7 @@ describe("distance (#514, ADR-061 §5 to §7)", () => {
       if (!man) throw new Error("a man not written");
       men.push(man);
     }
-    await gated(ctx.client, pond, [a, ...men], "open");
+    await openPond(ctx.client, pond);
     return { pond, a, men };
   }
 
@@ -834,10 +834,10 @@ describe("distance (#514, ADR-061 §5 to §7)", () => {
     const { pond, a, men } = await around(ctx, "test-distance-first-read", [HOMES.around]);
     const [b] = men;
     if (!b) throw new Error("people not written");
-    await ctx.client.query("DELETE FROM gate WHERE account_id = $1", [a]);
+    await ctx.client.query("UPDATE ponds SET matching_open = false WHERE id = $1", [pond]);
     await buildRounds(await deps(ctx.client));
     expect(await roundOf(ctx.client, a)).toBeNull();
-    await gated(ctx.client, pond, [a], "open");
+    await openPond(ctx.client, pond);
 
     const first = await readToday(await appAt(ctx.client, NOON), ctx.client, a);
 

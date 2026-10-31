@@ -484,7 +484,7 @@ describe("migrate", () => {
             )
           ).rows;
           // Versions 1 and 2 of the migrations before it, every one of them;
-          // the keys a later migration adds (0072, #378; 0048, #303; 0052, #84; 0054, #348; 0057, #350; 0061, #351; 0065, #105; 0068, #376; 0075, #86; 0078, #385; 0080, #107; 0082 and 0083, #102; 0095, #514) are not there yet.
+          // the keys a later migration adds (0072, #378; 0048, #303; 0052, #84; 0054, #348; 0057, #350; 0061, #351; 0065, #105; 0068, #376; 0075, #86; 0078, #385; 0080, #107; 0082 and 0083, #102; 0097, #514) are not there yet.
           const later = new Set([
             "moderation_response_hours",
             "reports_per_day",
@@ -598,6 +598,7 @@ describe("migrate", () => {
 
   it("migrations 0093 and 0094 leave every pond closed, drop the gate and the date of whom one seeks, and delete the gate's two keys and no other (#500, ADR-060)", async () => {
     const before0093 = migrationsBefore("0093_pond_matching_switch");
+    const through0094 = migrationsBefore("0095_one_pond");
     try {
       await withTemporaryDatabase(async (url) => {
         const pool = createPool({ connectionString: url, max: 2 });
@@ -637,7 +638,7 @@ describe("migrate", () => {
             expect.arrayContaining(["change_cadence_days", "gate_k", "majority_share_max"]),
           );
 
-          expect((await migrate(pool, MIGRATIONS)).state).toBe("applied");
+          expect((await migrate(pool, through0094)).state).toBe("applied");
 
           expect(await keys()).toEqual(
             before.filter((row) => row.key !== "gate_k" && row.key !== "majority_share_max"),
@@ -655,6 +656,7 @@ describe("migrate", () => {
       });
     } finally {
       rmSync(before0093, { recursive: true, force: true });
+      rmSync(through0094, { recursive: true, force: true });
     }
   });
 
@@ -795,9 +797,9 @@ describe("migrate", () => {
       )
     ).rows;
 
-  it("migration 0093 moves everybody and every place at the gate to suomi as they stand, and takes the capital, the ponds under it and every figure (#514, ADR-061 §8)", async () => {
-    const before = migrationsBefore("0093_one_pond");
-    const through = migrationsBefore("0094_account_home");
+  it("migration 0095 moves everybody to suomi as they stand, opens it where any pond was open, and takes the capital, the ponds under it and every figure (#514, ADR-061 §8)", async () => {
+    const before = migrationsBefore("0095_one_pond");
+    const through = migrationsBefore("0096_account_home");
     try {
       await withTemporaryDatabase(async (url) => {
         const pool = createPool({ connectionString: url, max: 2 });
@@ -808,6 +810,7 @@ describe("migrate", () => {
           const capital = await aPond(pool, "paakaupunkiseutu", null);
           const espoo = await aPond(pool, "espoo", capital);
           const otaniemi = await aPond(pool, "otaniemi", espoo);
+          await pool.query("UPDATE ponds SET matching_open = true WHERE id = $1", [capital]);
           const people = {
             capital: await aPerson(pool, "a", capital),
             espoo: await aPerson(pool, "b", espoo),
@@ -816,20 +819,8 @@ describe("migrate", () => {
             none: await aPerson(pool, "e", null, "registered"),
             tombstone: await aPerson(pool, "f", null, "deleted"),
           };
-          await pool.query(
-            `INSERT INTO gate (account_id, pond_id, admitted_at, place_said, pool_said, opened_at, counted_at) VALUES
-               ($1, $4, '2026-10-01T03:00:00Z', NULL, 30, '2026-10-02T03:00:00Z', '2026-10-30T03:00:00Z'),
-               ($2, $5, NULL, 3, 20, NULL, '2026-10-30T03:00:00Z'),
-               ($3, $6, '2026-10-03T03:00:00Z', NULL, 10, NULL, NULL)`,
-            [people.capital, people.espoo, people.suomi, capital, espoo, suomi],
-          );
           await figures(pool, capital);
           await figures(pool, suomi);
-          const gateColumns =
-            "account_id, admitted_at, place_said, pool_said, opened_at, counted_at";
-          const gateRows = async () =>
-            (await pool.query(`SELECT ${gateColumns} FROM gate ORDER BY account_id`)).rows;
-          const gateBefore = await gateRows();
 
           expect(await migrate(pool, through)).toEqual({ state: "applied", applied: 1 });
 
@@ -843,18 +834,15 @@ describe("migrate", () => {
           expect(await pondOf(people.suomi)).toEqual({ pond_id: suomi, state: "active" });
           expect(await pondOf(people.none)).toEqual({ pond_id: null, state: "registered" });
           expect(await pondOf(people.tombstone)).toEqual({ pond_id: null, state: "deleted" });
-          // Nobody is let out and no gate closes (TD-13): the rows stand, on the one pond.
-          expect(await gateRows()).toEqual(gateBefore);
-          const gatePonds = await pool.query<{ pond_id: string }>(
-            "SELECT DISTINCT pond_id FROM gate",
-          );
-          expect(gatePonds.rows).toEqual([{ pond_id: suomi }]);
+          // Nobody who had matching loses it: the capital was open, so the country is.
+          const open = await pool.query("SELECT matching_open FROM ponds");
+          expect(open.rows).toEqual([{ matching_open: true }]);
           // The boot counts afresh on an empty table.
           expect(await figuresLeft(pool)).toBe(0);
           expect(await versionsOf(pool, "default_pond")).toEqual([
             { version: 1, value: "suomi", created_by: "migration:0020", reason: null },
             { version: 2, value: "paakaupunkiseutu", created_by: "migration:0025", reason: null },
-            { version: 3, value: "suomi", created_by: "migration:0093", reason: null },
+            { version: 3, value: "suomi", created_by: "migration:0095", reason: null },
           ]);
         } finally {
           await pool.end();
@@ -866,9 +854,9 @@ describe("migrate", () => {
     }
   });
 
-  it("migration 0093 needs no capital: a database with only suomi, as production is, keeps its people and gate, and loses its figures all the same (#514)", async () => {
-    const before = migrationsBefore("0093_one_pond");
-    const through = migrationsBefore("0094_account_home");
+  it("migration 0095 needs no capital: a database with only suomi, as production is, keeps its people, stays closed, and loses its figures all the same (#514)", async () => {
+    const before = migrationsBefore("0095_one_pond");
+    const through = migrationsBefore("0096_account_home");
     try {
       await withTemporaryDatabase(async (url) => {
         const pool = createPool({ connectionString: url, max: 2 });
@@ -876,13 +864,8 @@ describe("migrate", () => {
           await migrate(pool, before);
           expect(await pondsOf(pool)).toEqual([{ slug: "suomi" }]);
           const suomi = await suomiId(pool);
-          const person = await aPerson(pool, "a", suomi);
+          await aPerson(pool, "a", suomi);
           await aPerson(pool, "b", null, "registered");
-          await pool.query(
-            `INSERT INTO gate (account_id, pond_id, admitted_at, pool_said, opened_at)
-             VALUES ($1, $2, '2026-10-01T03:00:00Z', 30, '2026-10-02T03:00:00Z')`,
-            [person, suomi],
-          );
           await figures(pool, suomi);
 
           expect(await migrate(pool, through)).toEqual({ state: "applied", applied: 1 });
@@ -892,18 +875,15 @@ describe("migrate", () => {
             "SELECT pond_id FROM account ORDER BY pond_id",
           );
           expect(accounts.rows).toEqual([{ pond_id: suomi }, { pond_id: null }]);
-          const gate = await pool.query(
-            "SELECT account_id, pond_id, pool_said, opened_at IS NOT NULL AS opened FROM gate",
-          );
-          expect(gate.rows).toEqual([
-            { account_id: person, pond_id: suomi, pool_said: 30, opened: true },
-          ]);
+          // Nothing was open, so nothing opens: that is an admin's (ADR-060 §1).
+          const open = await pool.query("SELECT matching_open FROM ponds");
+          expect(open.rows).toEqual([{ matching_open: false }]);
           expect(await figuresLeft(pool)).toBe(0);
           // Version 2 dangled here, naming a pond this database never had; version 3 mends it.
           expect((await versionsOf(pool, "default_pond")).at(-1)).toEqual({
             version: 3,
             value: "suomi",
-            created_by: "migration:0093",
+            created_by: "migration:0095",
             reason: null,
           });
         } finally {
@@ -916,8 +896,8 @@ describe("migrate", () => {
     }
   });
 
-  it("migrations 0093 and 0095 follow a value set in the panel with the next version, and leave its row and reason alone (#514, #305)", async () => {
-    const before = migrationsBefore("0093_one_pond");
+  it("migrations 0095 and 0097 follow a value set in the panel with the next version, and leave its row and reason alone (#514, #305)", async () => {
+    const before = migrationsBefore("0095_one_pond");
     try {
       await withTemporaryDatabase(async (url) => {
         const pool = createPool({ connectionString: url, max: 2 });
@@ -930,7 +910,7 @@ describe("migrate", () => {
                (4, 'deal_breakers_max', '5'::jsonb, 'admin', 'A few more')`,
           );
 
-          expect(await migrate(pool, MIGRATIONS)).toEqual({ state: "applied", applied: 4 });
+          expect(await migrate(pool, MIGRATIONS)).toEqual({ state: "applied", applied: 3 });
 
           expect((await versionsOf(pool, "default_pond")).slice(-2)).toEqual([
             {
@@ -939,12 +919,12 @@ describe("migrate", () => {
               created_by: "admin",
               reason: "Start with the capital",
             },
-            { version: 4, value: "suomi", created_by: "migration:0093", reason: null },
+            { version: 4, value: "suomi", created_by: "migration:0095", reason: null },
           ]);
           expect((await versionsOf(pool, "deal_breakers_max")).slice(-3)).toEqual([
             { version: 3, value: 4, created_by: "admin", reason: "Fewer at first" },
             { version: 4, value: 5, created_by: "admin", reason: "A few more" },
-            { version: 5, value: 7, created_by: "migration:0095", reason: null },
+            { version: 5, value: 7, created_by: "migration:0097", reason: null },
           ]);
         } finally {
           await pool.end();
@@ -955,8 +935,8 @@ describe("migrate", () => {
     }
   });
 
-  it("migration 0094 adds a home to nobody and a band to no entry, and takes only the bands there are (#514, ADR-061 §5)", async () => {
-    const before = migrationsBefore("0094_account_home");
+  it("migration 0096 adds a home to nobody and a band to no entry, and takes only the bands there are (#514, ADR-061 §5)", async () => {
+    const before = migrationsBefore("0096_account_home");
     try {
       await withTemporaryDatabase(async (url) => {
         const pool = createPool({ connectionString: url, max: 2 });
@@ -976,9 +956,11 @@ describe("migrate", () => {
           expect((await migrate(pool, MIGRATIONS)).state).toBe("applied");
 
           const homes = await pool.query(
-            "SELECT DISTINCT home_place, home_shows_area FROM account",
+            "SELECT DISTINCT home_place, home_shows_area, home_moved_at FROM account",
           );
-          expect(homes.rows).toEqual([{ home_place: null, home_shows_area: false }]);
+          expect(homes.rows).toEqual([
+            { home_place: null, home_shows_area: false, home_moved_at: null },
+          ]);
           const write = (band: string) =>
             pool.query("UPDATE round_entries SET distance = $1 RETURNING distance", [band]);
           const entries = await pool.query("SELECT distance FROM round_entries");

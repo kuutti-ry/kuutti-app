@@ -323,7 +323,7 @@ describe("deal-breakers", () => {
     ctx,
   }) => {
     const a = await signedInAccount(ctx.client);
-    // As migration 0095 leaves it: one on every field, and the distance.
+    // As migration 0097 leaves it: one on every field, and the distance.
     expect((await readDealBreakers(ctx.app, a.headers)).max).toBe(7);
     expect(
       (

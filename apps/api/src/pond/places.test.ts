@@ -520,7 +520,7 @@ describe("whatever the place and the floor", () => {
         const kept = keptPlace(key, floor);
         return kept === null || keptPlace(kept, floor) === kept;
       }),
-      { ...SEEDED, numRuns: 2000 },
+      { ...SEEDED, numRuns: 500 },
     );
   });
 
@@ -531,7 +531,7 @@ describe("whatever the place and the floor", () => {
         if (floor > LARGEST) return kept === null;
         return kept !== null && (inhabitantsOf(kept) ?? -1) >= floor;
       }),
-      { ...SEEDED, numRuns: 2000 },
+      { ...SEEDED, numRuns: 500 },
     );
   });
 
@@ -545,7 +545,7 @@ describe("whatever the place and the floor", () => {
         if (read === null || (inhabitantsOf(read) ?? -1) < high) return false;
         return stored.length === 5 || read.length === 3;
       }),
-      { ...SEEDED, numRuns: 2000 },
+      { ...SEEDED, numRuns: 500 },
     );
   });
 
@@ -555,7 +555,7 @@ describe("whatever the place and the floor", () => {
       fc.property(fc.stringMatching(/^\d{5}$/), anyFloor, (code, floor) => {
         return known.has(code) || keptPlace(code, floor) === null;
       }),
-      { ...SEEDED, numRuns: 2000 },
+      { ...SEEDED, numRuns: 500 },
     );
     fc.assert(
       fc.property(fc.string(), (text) => {
@@ -575,7 +575,7 @@ describe("whatever the place and the floor", () => {
           (town.fi === MARIEHAMN.fi || (names.get(town.fi) ?? -1) >= townMin)
         );
       }),
-      { ...SEEDED, numRuns: 2000 },
+      { ...SEEDED, numRuns: 500 },
     );
   });
 

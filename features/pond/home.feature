@@ -131,10 +131,10 @@ Feature: The home
   # Changing it, and the pond it sets (ADR-061 §1 and §8).
 
   Scenario: A home changes whenever the person likes, and the earlier one is gone
-    Given a person with a home and a place at the gate
+    Given a person with a home
     When they give another postal code, and another straight after
-    Then both are taken, no date is stored, and only the last home is held anywhere
-    And their pond and their place at the gate are as they were
+    Then both are taken, and only the last home is held anywhere, with the time of that move
+    And their pond is as it was
 
   Scenario: The home write sets the one pond, and reading the status sets nothing
     Given a pond whose slug matching_config names as the default pond
@@ -150,10 +150,10 @@ Feature: The home
 
   Scenario: An active account without a home is in nobody's pool, and the step opens
     Given an active account with a finished profile and no home
-    When the gates are counted and it reads its onboarding status
-    Then it stays active, it is in nobody's pool, its gate says incomplete, and the home is a missing step
-    When it gives a postal code from the list and the gates are counted
-    Then it is counted like anybody
+    When it reads its onboarding status and whether matching is open for it
+    Then it stays active, it is in nobody's pool, it is told something is missing, and the home is a missing step
+    When it gives a postal code from the list
+    Then it is in the pool like anybody
 
   Scenario: A place the list no longer knows reads as no home, and the step opens again
     Given an active account whose kept place has left the list

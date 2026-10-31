@@ -8,7 +8,7 @@ import { account, identity, matchingConfig, ponds, preferences, profile } from "
  * One pond, the whole country (ADR-061 §8), set by the API with a person's home
  * from matching_config.default_pond. Migration 0027 writes the same row, and a
  * second pond here would come back on every boot of a preview after migration
- * 0093 took it away.
+ * 0095 took it away.
  */
 export const SEED_PONDS = [
   {
@@ -173,12 +173,12 @@ export const MATCHING_CONFIG_V1 = {
   // #149 (TD-16, the disclose-to-filter rule): how many deal-breakers a person
   // may set; two at launch, so a small pond is not cut to nothing.
   deal_breakers_max: 2,
-  // #514 (ADR-061 §2, §3, migration 0095): a place kept has at least this many
+  // #514 (ADR-061 §2, §3, migration 0097): a place kept has at least this many
   // people, the one number no name, band or probe narrows anybody below; a
   // town on a card has at least the second.
   home_min_inhabitants: 3000,
   home_town_min_inhabitants: 20000,
-  // #514 (ADR-061 §5, migration 0095): the outer edges of the distance bands
+  // #514 (ADR-061 §5, migration 0097): the outer edges of the distance bands
   // in kilometres, nearby, close and around; far has none.
   distance_nearby_km: 5,
   distance_close_km: 15,
@@ -208,8 +208,8 @@ export const MATCHING_CONFIG_V2 = {
 
 /**
  * matching_config version 3: one pond, the whole country (ADR-061 §8, migration
- * 0093), and a seventh deal-breaker, the distance, which is no field (ADR-061
- * §7, migration 0095); the maintainer's of 31/10/2026.
+ * 0095), and a seventh deal-breaker, the distance, which is no field (ADR-061
+ * §7, migration 0097); the maintainer's of 31/10/2026.
  */
 export const MATCHING_CONFIG_V3 = {
   default_pond: "suomi",

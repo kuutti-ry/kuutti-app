@@ -425,15 +425,7 @@ describe("the features of the home", () => {
       consented: true,
       gender: "woman",
     });
-    await ctx.client.query(
-      `INSERT INTO gate (account_id, pond_id, admitted_at, pool_said, opened_at, counted_at)
-       VALUES ($1, $2, now(), 30, now(), now())`,
-      [person, pondId],
-    );
     const a = await signInAs(ctx.client, person ?? "");
-    const gate = async () =>
-      (await ctx.client.query("SELECT * FROM gate WHERE account_id = $1", [person])).rows[0];
-    const before = await gate();
 
     for (const postalCode of ["00100", "83960"]) {
       expect((await putHome(app, a.headers, { postalCode })).status).toBe(200);
@@ -454,7 +446,6 @@ describe("the features of the home", () => {
     ]);
     expect(row.home_moved_at).toEqual(expect.any(String));
     expect(row.pond_id).toBe(pondId);
-    expect(await gate()).toEqual(before);
   });
 
   test("The home write sets the one pond, and reading the status sets nothing", async ({ ctx }) => {
