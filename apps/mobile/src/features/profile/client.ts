@@ -4,6 +4,8 @@ import {
   DealBreakersResponse,
   type DealBreakersUpdate,
   ErrorResponse,
+  HomeSummary,
+  type HomeUpdate,
   type ProfileDocument,
   ProfileResponse,
   type ProfileUpdate,
@@ -74,6 +76,23 @@ export async function fetchCardPreview(): Promise<CardPreviewResponse> {
     ? { ...data.card, photos: data.card.photos.map(photoWithKnownDescription) }
     : data.card;
   return CardPreviewResponse.parse({ ...data, card });
+}
+
+/**
+ * A new home, what the card shows of it, or both (ADR-061 §1, §3), in the line
+ * of saves, so that the list and the card read what was stored. The digits go
+ * in this body and nowhere else: never a path, a query or a log (§9).
+ */
+export function saveHome(update: HomeUpdate): Promise<HomeSummary> {
+  const sent = lastSave.then(async () => {
+    const { data, error, response } = await api.PUT("/account/home", {
+      body: update as unknown as ApiComponents["schemas"]["HomeUpdate"],
+    });
+    if (!data) throw failed(response, error, "home");
+    return HomeSummary.parse(data);
+  });
+  lastSave = sent.catch(() => undefined);
+  return sent;
 }
 
 // The deal-breakers (#149) live with the preferences on the API and with the

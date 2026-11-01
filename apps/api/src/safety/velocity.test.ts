@@ -143,7 +143,7 @@ async function roundWithOne(db: Queryable, viewer: SignedIn): Promise<string> {
       accountId: viewer.accountId,
       day: finnishDay(T),
       ordering: "count",
-      entries: [{ candidateId: subject, reason: "matches_filters" }],
+      entries: [{ candidateId: subject, reason: "matches_filters", distance: "nearby" }],
     },
   );
   if (!built) throw new Error("round not built");

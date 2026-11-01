@@ -1,6 +1,7 @@
 import type {
   Completeness,
   HiddenField,
+  HomeSummary,
   ProfileDocument,
   ProfileFields,
   ProfileUpdate,
@@ -115,6 +116,8 @@ export function useProfile(held?: HeldDraft) {
   /** The document as the API last gave it, in the draft's shape. */
   const [saved, setSaved] = useState<ProfileUpdate>(EMPTY_PROFILE);
   const [completeness, setCompleteness] = useState<Completeness | null>(null);
+  /** Read-only: a home has its own route, and never passes through the draft (ADR-061 §9). */
+  const [home, setHome] = useState<HomeSummary | null>(null);
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState<ProfileNotice>(null);
   const mounted = useRef(true);
@@ -141,6 +144,7 @@ export function useProfile(held?: HeldDraft) {
       setSaved(document);
       if (resumed) setNotice(resumed.notice);
       setCompleteness(response.completeness);
+      setHome(response.home);
       setError(null);
       setStatus("ready");
     } catch (failure) {
@@ -189,6 +193,7 @@ export function useProfile(held?: HeldDraft) {
         setDraft((current) => withChanges(document, changesOf(submitted, current)));
       }
       setCompleteness(response.completeness);
+      setHome(response.home);
       return null;
     } catch (error) {
       const refusal = {
@@ -212,6 +217,7 @@ export function useProfile(held?: HeldDraft) {
     draft,
     saved,
     completeness,
+    home,
     saving,
     notice,
     changes,

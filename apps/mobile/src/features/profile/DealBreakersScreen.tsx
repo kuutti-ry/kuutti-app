@@ -1,10 +1,11 @@
 import {
-  DEAL_BREAKER_FIELDS,
-  type DealBreakerField,
+  DealBreakerField,
   type DealBreakersUpdate,
+  DISTANCE_FILTER_BANDS,
   dealBreakerOptions,
   LATER_FIELD_ORDER,
   PROFILE_FIELDS,
+  type ProfileFieldKey,
   type StoredDealBreaker,
 } from "@kuutti/schema";
 import { useRouter } from "expo-router";
@@ -30,6 +31,9 @@ import { useProfile } from "./useProfile";
 
 export const DEAL_BREAKERS_PATH = "/profile/deal-breakers" as const;
 
+/** The screen's rows, the registry's order with the distance last (ADR-061 §7). */
+const ROWS = DealBreakerField.options;
+
 type Row = { on: boolean; accept: string[]; includeUnknown: boolean };
 type Draft = Partial<Record<DealBreakerField, Row>>;
 // A new deal-breaker lets through who did not answer its field until switched off (TD-12, ADR-042 §8).
@@ -44,7 +48,7 @@ const draftOf = (stored: StoredDealBreaker[]): Draft => {
 
 /** What is sent: the deal-breakers that are on, in the registry's order. */
 const updateOf = (draft: Draft): DealBreakersUpdate => ({
-  dealBreakers: DEAL_BREAKER_FIELDS.flatMap((field) => {
+  dealBreakers: ROWS.flatMap((field) => {
     const row = draft[field];
     return row?.on ? [{ field, accept: row.accept, includeUnknown: row.includeUnknown }] : [];
   }),
@@ -58,9 +62,29 @@ const canonical = (draft: Draft) =>
 
 /** How many options lead the accept list before the search: the languages' first ten, as in their picker (#239). */
 const shownFirstOf = (field: DealBreakerField): number | undefined => {
+  if (field === "distance") return undefined;
   const spec = PROFILE_FIELDS[field];
   return spec.kind === "multi" ? spec.shownFirst : undefined;
 };
+
+/** Height and the distance take one relation of a row of buttons, where a list has its switch. */
+const isRelational = (field: DealBreakerField): boolean =>
+  field === "distance" || PROFILE_FIELDS[field].kind === "number";
+
+/** A distance filter takes every band up to the one chosen (ADR-061 §7). */
+const acceptOf = (field: DealBreakerField, relation: string): string[] =>
+  field === "distance"
+    ? DISTANCE_FILTER_BANDS.slice(
+        0,
+        (DISTANCE_FILTER_BANDS as readonly string[]).indexOf(relation) + 1,
+      )
+    : [relation];
+
+/** Which button stands for an accepted list: its farthest band, on the distance's row. */
+const isRelationChosen = (field: DealBreakerField, relation: string, accept: string[]): boolean =>
+  field === "distance"
+    ? DISTANCE_FILTER_BANDS.filter((band) => accept.includes(band)).at(-1) === relation
+    : accept.includes(relation);
 
 /**
  * The deal-breakers under the disclose-to-filter rule (#149, TD-16): up to
@@ -70,6 +94,9 @@ const shownFirstOf = (field: DealBreakerField): number | undefined => {
  * taken back is paused, said in words; the rows stay. #87 applies them in
  * the pool, both ways. Height has buttons where a list has its switch: one
  * relation to the person's own height, or Everyone, which is having none (#508).
+ * The distance has them too, a band and the nearer ones with it, and is never
+ * gated or paused, nor asks after those who did not answer, since everybody
+ * has a home (ADR-061 §7). The two Everyones are heard with their rows' names.
  */
 export function DealBreakersScreen() {
   const { t } = useT();
@@ -136,10 +163,8 @@ export function DealBreakersScreen() {
   }
 
   const own = profile.draft.fields as Record<string, unknown>;
-  const count = DEAL_BREAKER_FIELDS.filter((field) => draft[field]?.on).length;
-  const incomplete = DEAL_BREAKER_FIELDS.some(
-    (field) => draft[field]?.on && draft[field]?.accept.length === 0,
-  );
+  const count = ROWS.filter((field) => draft[field]?.on).length;
+  const incomplete = ROWS.some((field) => draft[field]?.on && draft[field]?.accept.length === 0);
   const set = (field: DealBreakerField, patch: Partial<Row>) => {
     setNotice(null);
     setDraft((previous) => ({ ...previous, [field]: { ...(previous[field] ?? OFF), ...patch } }));
@@ -157,7 +182,7 @@ export function DealBreakersScreen() {
       setNotice("limit");
       return;
     }
-    set(field, { on: true, accept: [relation] });
+    set(field, { on: true, accept: acceptOf(field, relation) });
   };
   const save = async () => {
     setSaving(true);
@@ -174,7 +199,7 @@ export function DealBreakersScreen() {
       setSaving(false);
     }
   };
-  const answerIt = (field: DealBreakerField) => (
+  const answerIt = (field: ProfileFieldKey) => (
     <Button
       variant="outline"
       onPress={() => {
@@ -208,11 +233,11 @@ export function DealBreakersScreen() {
       >
         <Text>{t("profile.dealBreakers.explain", { max })}</Text>
 
-        {DEAL_BREAKER_FIELDS.map((field) => {
+        {ROWS.map((field) => {
           const label = t(fieldLabelKey(field));
           const row = draft[field] ?? OFF;
-          const answered = own[field] !== undefined;
-          const relational = PROFILE_FIELDS[field].kind === "number";
+          const answered = field === "distance" || own[field] !== undefined;
+          const relational = isRelational(field);
           const options = dealBreakerOptions(field);
           const shown = visibleOptions(
             options,
@@ -264,6 +289,7 @@ export function DealBreakersScreen() {
                     {relational && (
                       <Chip
                         label={t("profile.dealBreakers.everyone")}
+                        heard={t("profile.dealBreakers.everyoneOf", { field: label })}
                         selected={!row.on}
                         onPress={() => {
                           tap();
@@ -272,7 +298,7 @@ export function DealBreakersScreen() {
                       />
                     )}
                     {shown.map((option) => {
-                      const selected = row.accept.includes(option);
+                      const selected = isRelationChosen(field, option, row.accept);
                       return (
                         <Chip
                           key={option}
@@ -295,7 +321,7 @@ export function DealBreakersScreen() {
                       );
                     })}
                   </View>
-                  {row.on && (
+                  {row.on && field !== "distance" && (
                     <View className="flex-row items-center justify-between gap-3">
                       <Text variant="small" className="flex-1">
                         {t("profile.dealBreakers.includeUnknown")}

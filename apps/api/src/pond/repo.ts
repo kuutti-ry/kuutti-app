@@ -4,8 +4,8 @@ import type { AdminPond, PondSummary } from "@kuutti/schema";
 // Raw parameterised SQL for the same reason as identity/repo.ts: Deps.db is
 // the Queryable seam the test harness hands a rolled-back transaction through.
 // Ponds are public structure, not user data: the list is the same for
-// everyone. The one statement about a person, setPondOfAccount, carries the
-// caller's account id (rule 6).
+// everyone. Every statement about a person carries the caller's account id
+// (rule 6).
 
 type Row = Record<string, unknown>;
 
@@ -32,12 +32,6 @@ export async function listPonds(db: Queryable): Promise<PondSummary[]> {
   return rows.map(pondFrom);
 }
 
-/** A pond by its slug: the default pond of matching_config is named that way (#146). */
-export async function findPondBySlug(db: Queryable, slug: string): Promise<PondSummary | null> {
-  const { rows } = await db.query<Row>(`SELECT ${COLUMNS} FROM ponds WHERE slug = $1`, [slug]);
-  return rows[0] ? pondFrom(rows[0]) : null;
-}
-
 export async function findPondOfAccount(
   db: Queryable,
   accountId: string,
@@ -50,20 +44,75 @@ export async function findPondOfAccount(
   return rows[0] ? pondFrom(rows[0]) : null;
 }
 
-/** The choice; a tombstone takes none (#51) and an unknown pond is refused. */
-export async function setPondOfAccount(
+/** A home as `account` holds it: the kept place's key, and whether the card shows its area (ADR-061 §2, §3). */
+export type StoredHome = { place: string | null; showsArea: boolean; movedAt: Date | null };
+
+type HomeRow = {
+  home_place: string | null;
+  home_shows_area: boolean;
+  home_moved_at: Date | null;
+};
+
+const storedHome = (row: HomeRow): StoredHome => ({
+  place: row.home_place,
+  showsArea: row.home_shows_area,
+  movedAt: row.home_moved_at,
+});
+
+/** The person's own home; a tombstone holds none, and nobody else's is read here (rule 6). */
+export async function findHomeOfAccount(
   db: Queryable,
   accountId: string,
-  pondId: string,
-): Promise<"set" | "no_pond" | "no_account"> {
-  const moved = await db.query(
-    `UPDATE account SET pond_id = $2
-     WHERE id = $1 AND state <> 'deleted' AND EXISTS (SELECT 1 FROM ponds WHERE id = $2)`,
-    [accountId, pondId],
+): Promise<StoredHome | null> {
+  const { rows } = await db.query<HomeRow>(
+    "SELECT home_place, home_shows_area, home_moved_at FROM account WHERE id = $1",
+    [accountId],
   );
-  if (moved.rowCount === 1) return "set";
-  const { rows } = await db.query("SELECT 1 FROM ponds WHERE id = $1", [pondId]);
-  return rows.length === 0 ? "no_pond" : "no_account";
+  return rows[0] ? storedHome(rows[0]) : null;
+}
+
+/**
+ * The home, under the lock erasure takes first (ADR-009 §8): a write racing an
+ * erasure lands before the tombstone, or finds it here and writes nothing.
+ * Null for no live account.
+ */
+export async function lockHomeOfAccount(
+  tx: Queryable,
+  accountId: string,
+): Promise<StoredHome | null> {
+  const { rows } = await tx.query<HomeRow>(
+    `SELECT home_place, home_shows_area, home_moved_at FROM account
+     WHERE id = $1 AND state <> 'deleted' FOR UPDATE`,
+    [accountId],
+  );
+  return rows[0] ? storedHome(rows[0]) : null;
+}
+
+/**
+ * The write of a home, and the one write of a pond (ADR-061 §8): in one
+ * statement, so that nobody has a home without one and the counter's
+ * `verified` still starts after a gender is declared. A pond already held
+ * stays. `place` null leaves the kept place as it is, and another place than
+ * the one held is a move, at `at` (§5). The pond the account has after it, null
+ * for none.
+ */
+export async function writeHomeOfAccount(
+  tx: Queryable,
+  accountId: string,
+  home: Pick<StoredHome, "place" | "showsArea">,
+  defaultPond: string | null,
+  at: Date,
+): Promise<string | null> {
+  const { rows } = await tx.query<{ pond_id: string | null }>(
+    `UPDATE account
+        SET home_moved_at = CASE WHEN $2::text <> home_place THEN $5 ELSE home_moved_at END,
+            home_place = COALESCE($2, home_place), home_shows_area = $3,
+            pond_id = COALESCE(pond_id, (SELECT id FROM ponds WHERE slug = $4))
+      WHERE id = $1
+      RETURNING pond_id`,
+    [accountId, home.place, home.showsArea, defaultPond, at],
+  );
+  return rows[0]?.pond_id ?? null;
 }
 
 const adminPondFrom = (r: Row): AdminPond => ({

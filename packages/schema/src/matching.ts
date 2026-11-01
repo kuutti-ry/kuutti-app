@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { DEAL_BREAKERS_CAP, DealBreakerField } from "./deal-breakers.ts";
+import { DistanceBand } from "./distance.ts";
 import { ProfileCard } from "./profile.ts";
 
 // Today's round (#96, TD-11, TD-12, ADR-034): what one person is shown on one
@@ -21,9 +22,10 @@ export type RoundReason = z.infer<typeof RoundReason>;
  * How a round's places that no rule forces were ordered (#95), named on
  * `round_built` so the research can tell the rounds of one ordering from
  * another's. `count` is approach 1, the soft matches counted without weights,
- * the first cut's (the maintainer, 20/10/2026); #98's buckets add the others.
+ * the first cut's (the maintainer, 20/10/2026); `band_count` puts the distance
+ * band before that count, nearest first (ADR-061 §6).
  */
-export const RoundOrdering = z.enum(["count"]).meta({ id: "RoundOrdering" });
+export const RoundOrdering = z.enum(["count", "band_count"]).meta({ id: "RoundOrdering" });
 export type RoundOrdering = z.infer<typeof RoundOrdering>;
 
 /** What the person decided about a card. Mirrors the database's round_decision. */
@@ -47,6 +49,8 @@ export const RoundEntry = z
     /** Null while undecided. */
     decision: RoundChoice.nullable(),
     card: ProfileCard,
+    /** How far the card's person lives, as it stood when the entry was written (ADR-061 §5): a home moved since says nothing new. Null on an entry from before distance. */
+    distance: DistanceBand.nullable(),
     /** The deal-breaker a `relaxed` card came in by (#99, ADR-042 §9); absent on every other card. */
     relaxedField: DealBreakerField.optional(),
     /**
@@ -216,6 +220,9 @@ export const ExportedRoundEntry = z
     decision: RoundChoice.nullable(),
     decisionInWords: z.string().nullable(),
     decidedAt: z.iso.datetime().nullable(),
+    /** The band the card carried (ADR-061 §5), in key and in words, kept as it stood that day; null on an entry from before #514. */
+    distance: DistanceBand.nullable(),
+    distanceInWords: z.string().nullable(),
   })
   .meta({ id: "ExportedRoundEntry" });
 export type ExportedRoundEntry = z.infer<typeof ExportedRoundEntry>;

@@ -1,5 +1,5 @@
 import { type Queryable, transaction } from "@kuutti/db";
-import { describePhoto, type TFunction } from "@kuutti/i18n";
+import { DEFAULT_LOCALE, describePhoto, type Locale, type TFunction } from "@kuutti/i18n";
 import type { AccountExport, ExportedPhotoCheck } from "@kuutti/schema";
 import { eraseConversationsOf, exportContacts, exportConversations } from "../chat/index.ts";
 import { AppError } from "../lib/errors.ts";
@@ -25,7 +25,7 @@ import {
   exportNotifications,
   exportPushTokens,
 } from "../notifications/index.ts";
-import { findPondOfAccount } from "../pond/index.ts";
+import { exportHome, findPondOfAccount } from "../pond/index.ts";
 import { eraseProfileOfAccount, exportProfile } from "../profile/index.ts";
 import { exportResearch, removeResearchSubject } from "../research/index.ts";
 import { eraseInvitationsOf, exportInvitations } from "../rewards/index.ts";
@@ -178,7 +178,7 @@ export async function eraseAccount(deps: ErasureDeps, accountId: string): Promis
     // Not in the summary: the line that logs it carries the account id.
     await deletePhotoCheckNotesOfAccount(tx, accountId);
     const profileRows = await eraseProfileOfAccount(tx, accountId);
-    // The two hard rows go (TD-7), and the tombstone keeps neither gender nor pond.
+    // The two hard rows go (TD-7), and the tombstone keeps neither gender, pond nor home.
     const preferences = await deletePreferencesOfAccount(tx, accountId);
     // The person's rounds, and the entries in which they are somebody's card,
     // others' likes on them included (TD-7, #96).
@@ -303,12 +303,15 @@ const EXPORT_HISTORY_LIMIT = 1000;
 
 /**
  * Everything Kuutti holds about the person, as of now: the document, and the
- * photo files it points to (#237). `t` is the request's language.
+ * photo files it points to (#237). `t` is the request's language, and `locale`
+ * says it for what the catalogue does not hold: a place's name is the list's
+ * (ADR-061 §3).
  */
 export async function exportAccount(
   deps: ExportDeps,
   accountId: string,
   t: TFunction,
+  locale: Locale = DEFAULT_LOCALE,
 ): Promise<{ document: AccountExport; files: ExportedPhotoFile[] }> {
   const account = await repo.findAccountById(deps.db, accountId);
   const identity = await repo.findIdentitySummaryForAccount(deps.db, accountId);
@@ -326,6 +329,7 @@ export async function exportAccount(
   );
   const [
     pond,
+    home,
     preferences,
     consents,
     research,
@@ -343,6 +347,7 @@ export async function exportAccount(
     invitations,
   ] = await Promise.all([
     findPondOfAccount(deps.db, accountId),
+    exportHome(deps.db, accountId, locale),
     readPreferences(deps.db, accountId),
     exportConsents(deps.db, accountId),
     exportResearch(deps.db, accountId),
@@ -380,6 +385,7 @@ export async function exportAccount(
       birthMonth: account.birthMonth,
       gender: account.gender,
       pond,
+      home,
       genderChangedAt: account.genderChangedAt?.toISOString() ?? null,
       email: account.email,
       foundThemAnswered: account.foundThemAnswered,
@@ -478,6 +484,8 @@ export async function exportAccount(
             ? t(`account.export.round.decision.${entry.decision}`)
             : null,
           decidedAt: entry.decidedAt?.toISOString() ?? null,
+          distance: entry.distance,
+          distanceInWords: entry.distance ? t(`profile.option.distance.${entry.distance}`) : null,
         })),
       })),
     },

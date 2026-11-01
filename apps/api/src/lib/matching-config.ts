@@ -1,4 +1,5 @@
 import type { Queryable } from "@kuutti/db";
+import type { DistanceEdges } from "@kuutti/schema";
 import { AppError } from "./errors.ts";
 
 /**
@@ -51,6 +52,20 @@ export async function matchingConfigNumbers<K extends string>(
     out[key] = value;
   }
   return out;
+}
+
+/** Each band's outer edge (ADR-061 §5), read once where a pool is read. */
+export async function distanceEdges(db: Queryable): Promise<DistanceEdges> {
+  const km = await matchingConfigNumbers(db, [
+    "distance_nearby_km",
+    "distance_close_km",
+    "distance_around_km",
+  ]);
+  return {
+    nearby: km.distance_nearby_km,
+    close: km.distance_close_km,
+    around: km.distance_around_km,
+  };
 }
 
 /**

@@ -51,8 +51,12 @@ async function roundOf(
       ordering: "count",
       entries: cards.map((card) =>
         "person" in card
-          ? { candidateId: card.person.accountId, reason: card.reason }
-          : { candidateId: card.accountId, reason: "matches_filters" as const },
+          ? { candidateId: card.person.accountId, reason: card.reason, distance: "nearby" as const }
+          : {
+              candidateId: card.accountId,
+              reason: "matches_filters" as const,
+              distance: "nearby" as const,
+            },
       ),
     },
   );

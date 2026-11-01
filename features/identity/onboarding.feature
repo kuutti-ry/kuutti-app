@@ -1,13 +1,14 @@
 # features/identity/onboarding.feature
 Feature: Onboarding and consents
   Matching cannot start without four answers (gender, seeks, an age window,
-  a pond) and nothing may start without two consents given for the exact
+  a home) and nothing may start without two consents given for the exact
   wording and version the person read (TD-17: the Finnish text is binding).
   The research opt-in has its own yes and can be withdrawn, and so can the
   special-category consent that the seek answer needs (ADR-019 §4). The
   account becomes active when everything required is there; the steps of
   the field sheet (name, intent, photos, prompts or a bio) are asked in the
-  same flow and keep it incomplete until done (#46, #146, ADR-010).
+  same flow and keep it incomplete until done (#46, #146, ADR-010). The home,
+  and the pond its write sets, are features/pond/home.feature's (ADR-061).
 
   The app asks the four norms, the terms, the privacy summary and research
   before the bank login (#418, ADR-010 §15). With no account yet, it holds
@@ -38,18 +39,13 @@ Feature: Onboarding and consents
 
   Scenario: The account becomes active when every required answer is there
     Given a registered account that has answered nothing
-    When it gives both consents, declares a gender, gives the special-category consent, sets seeks and an age window, and is given a pond
+    When it gives both consents, declares a gender, gives the special-category consent, sets seeks and an age window, and gives a postal code
     Then the status lists fewer missing steps after each answer, in the order the app asks, and the account is active at the end with the profile steps still open
 
   Scenario: The onboarding lists the profile steps the sheet asks, in its order
     Given an active account whose profile is empty
     When it saves a name, an intent and a bio, then uploads three photos
     Then the missing steps shrink from name, intent, photos and prompts or a bio to photos alone, and then to none
-
-  Scenario: An account gets the default pond without a pond step
-    Given a pond whose slug matching_config names as the default pond
-    When a registered account reads its onboarding
-    Then the account is in that pond and no pond step is missing
 
   Scenario: The seek consent is recorded with the answer and withdrawing it blanks the seek rows
     Given an onboarded account with a politics answer on its profile

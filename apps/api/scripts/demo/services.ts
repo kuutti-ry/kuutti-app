@@ -19,7 +19,7 @@ import {
 import type { Logger } from "../../src/lib/logger.ts";
 import { readPreferences, savePreferences } from "../../src/matching/index.ts";
 import { type MediaDeps, uploadPhoto } from "../../src/media/index.ts";
-import { findPondBySlug, setPondOfAccount } from "../../src/pond/index.ts";
+import { saveHome } from "../../src/pond/index.ts";
 import { saveProfile } from "../../src/profile/index.ts";
 import { DemoError } from "./bank.ts";
 import { giveHistory, type HistoryResult, type HistoryWriter } from "./histories.ts";
@@ -86,12 +86,8 @@ export function viaServices(context: ServicesContext): HistoryWriter {
         throw new DemoError(`${accountId}: no live account for the preferences`);
       }
     },
-    async pond(accountId, slug) {
-      const pond = await findPondBySlug(db, slug);
-      if (!pond) throw new DemoError(`no pond ${slug}: run the seed first`);
-      if ((await setPondOfAccount(db, accountId, pond.id)) !== "set") {
-        throw new DemoError(`${accountId}: the pond could not be set`);
-      }
+    async home(accountId, postalCode) {
+      await saveHome({ db, logger, now }, accountId, { postalCode });
     },
     async profile(accountId, update) {
       await saveProfile({ db, logger, now, readPreferences }, accountId, update);

@@ -15,7 +15,13 @@ import {
   PhotoVariant,
 } from "./media.ts";
 import { ExportedNotifications, ExportedPush } from "./notifications.ts";
-import { ConsentRecord, Gender, PondSummary, PreferencesResponse } from "./onboarding.ts";
+import {
+  ConsentRecord,
+  Gender,
+  PLACE_NAME_MAX,
+  PondSummary,
+  PreferencesResponse,
+} from "./onboarding.ts";
 import { ProfileDocument } from "./profile.ts";
 import { ExportedBlocks, ExportedReports } from "./report.ts";
 import { ResearchExport } from "./research.ts";
@@ -150,6 +156,14 @@ export const AccountExport = z
       /** Self-declared (#46); null before onboarding and after erasure. */
       gender: Gender.nullable(),
       pond: PondSummary.nullable(),
+      /** The home in words (ADR-061 §9): the place kept, the name the card shows and when it last moved, never a key; null before the step and after erasure. */
+      home: z
+        .object({
+          place: z.string().max(PLACE_NAME_MAX),
+          shownOnCard: z.string().max(PLACE_NAME_MAX),
+          movedAt: z.iso.datetime().nullable(),
+        })
+        .nullable(),
       /** When the gender last changed from an earlier answer (#147); null until then and after erasure. */
       genderChangedAt: z.iso.datetime().nullable(),
       /** The optional e-mail (#148): the person's own, in their own download; null when none is set. */

@@ -13,7 +13,7 @@ name: Home names the area with its numbers and the gate in words, and the wrench
 ---
 - runFlow: ../common/sign-in.yaml
 - assertVisible: "Your area|Alueesi|Ditt område"
-- assertVisible: "Capital Area|Pääkaupunkiseutu|Huvudstadsregionen"
+- assertVisible: "Finland|Suomi"
 - assertVisible: "\\d+ people have identified with their bank|\\d+ ihmistä on tunnistautunut pankkitunnuksilla|\\d+ personer har identifierat sig med bank-id"
 - assertVisible: ".*\\d+ percent are looking for everyone.*|.*\\d+ prosenttia etsii kaikkia.*|.*\\d+ procent söker alla.*"
 - assertVisible: "Matching|Seuranhaku|Matchning"

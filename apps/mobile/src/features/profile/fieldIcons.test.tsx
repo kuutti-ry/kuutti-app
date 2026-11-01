@@ -8,9 +8,10 @@ import { FIELD_ICONS, FieldLabel, HOBBY_GROUP_ICONS, HobbyGroupLabel } from "./f
 const hidden = { includeHiddenElements: true };
 
 describe("FIELD_ICONS", () => {
-  it("gives every field of the registry an icon, and names no other", () => {
-    expect(Object.keys(FIELD_ICONS).sort()).toEqual([...PROFILE_FIELD_KEYS].sort());
-    for (const key of PROFILE_FIELD_KEYS) expect(FIELD_ICONS[key]).toBeTruthy();
+  it("gives every field of the registry and the distance an icon, and names no other", () => {
+    const keys = [...PROFILE_FIELD_KEYS, "distance"] as const;
+    expect(Object.keys(FIELD_ICONS).sort()).toEqual([...keys].sort());
+    for (const key of keys) expect(FIELD_ICONS[key]).toBeTruthy();
   });
 
   it("gives each field an icon of its own", () => {
@@ -25,6 +26,13 @@ describe("FieldLabel", () => {
     expect(screen.getByText("Drinking")).toBeTruthy();
     expect(screen.getByTestId("field-icon-drinking", hidden)).toBeTruthy();
     expect(screen.queryByTestId("field-icon-drinking")).toBeNull();
+  });
+
+  it("names the distance, which is no field of the registry, the same way (ADR-061 §7)", async () => {
+    await renderWithTheme(<FieldLabel field="distance" />);
+    expect(screen.getByText("Distance")).toBeTruthy();
+    expect(screen.getByTestId("field-icon-distance", hidden)).toBeTruthy();
+    expect(screen.queryByTestId("field-icon-distance")).toBeNull();
   });
 
   it.each([

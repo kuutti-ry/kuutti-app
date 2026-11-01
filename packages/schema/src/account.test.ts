@@ -168,6 +168,7 @@ function anExport(): Record<string, unknown> {
         nameInessive: "Helsingissä",
         parentId: null,
       },
+      home: { place: "Kallio", shownOnCard: "Helsinki", movedAt: null },
       stateChangedAt: null,
       genderChangedAt: null,
       email: null,
@@ -299,6 +300,8 @@ function anExport(): Record<string, unknown> {
               decision: "like",
               decisionInWords: "Liked",
               decidedAt: at,
+              distance: "close",
+              distanceInWords: "Close",
             },
           ],
         },
@@ -355,9 +358,33 @@ describe("the account export", () => {
       birthMonth: null,
       gender: null,
       pond: null,
+      home: null,
     };
     erased.preferences = { seeks: null, ageWindow: null };
     expect(AccountExport.safeParse(erased).success).toBe(true);
+  });
+
+  it("says the home in words: the place kept and the name the card shows (ADR-061 §9)", () => {
+    const home = (value: unknown) => {
+      const copy = anExport();
+      copy.account = { ...(copy.account as object), home: value };
+      return copy;
+    };
+    expect(AccountExport.parse(anExport()).account.home).toEqual({
+      place: "Kallio",
+      shownOnCard: "Helsinki",
+      movedAt: null,
+    });
+    expect(AccountExport.safeParse(home({ place: "Kallio" })).success).toBe(false);
+    const moved = { place: "Kallio", shownOnCard: "Helsinki", movedAt: at };
+    expect(AccountExport.safeParse(home(moved)).success).toBe(true);
+    expect(AccountExport.safeParse(home({ ...moved, movedAt: "yesterday" })).success).toBe(false);
+    expect(AccountExport.safeParse(home({ ...moved, movedAt: undefined })).success).toBe(false);
+    expect(AccountExport.safeParse(home("00530")).success).toBe(false);
+    const long = "n".repeat(81);
+    expect(AccountExport.safeParse(home({ ...moved, place: long })).success).toBe(false);
+    expect(AccountExport.safeParse(home({ ...moved, shownOnCard: long })).success).toBe(false);
+    expect(AccountExport.safeParse(home(undefined)).success).toBe(false);
   });
 
   it("names the photo check's kinds from a closed list, and the end of the closer look or null (#253)", () => {

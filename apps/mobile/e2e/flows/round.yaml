@@ -36,6 +36,16 @@ name: Today's round shows one card at a time, liking back makes a match, Undo ta
 - assertNotVisible: "Send a fish|Lähetä kala|Skicka en fisk"
 # The day's likes, said beside the buttons from the first card (#524).
 - assertVisible: "10 likes left today|10 tykkäystä jäljellä tänään|10 gillanden kvar i dag"
+# Her town and how far, each a word under her name (ADR-061 §3, §5): Henna lives
+# the nearest of the four, and no digits or kilometres say it.
+- scrollUntilVisible:
+    element: "Nearby|Lähellä|I närheten"
+    direction: DOWN
+    centerElement: true
+    timeout: 60000
+- assertVisible: "Helsinki|Helsingfors"
+- assertNotVisible: ".*\\d{5}.*"
+- assertNotVisible: ".*\\d+ ?km.*"
 - waitForAnimationToEnd
 - tapOn: "Like|Tykkää|Gilla"
 - extendedWaitUntil:

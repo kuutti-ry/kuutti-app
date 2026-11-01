@@ -1,5 +1,6 @@
 import type { Queryable } from "@kuutti/db";
 import {
+  type DistanceBand,
   type Relaxation,
   type RelaxationKind,
   type RelaxationOffer,
@@ -12,12 +13,14 @@ import { finnishDay } from "../lib/finnish-day.ts";
 import type { Logger } from "../lib/logger.ts";
 import { matchingConfigNumbers } from "../lib/matching-config.ts";
 import {
+  bandBetween,
   comingBackOrder,
   inEachOthersPool,
   likedYouPlaces,
   type PoolPerson,
   pausedOf,
   type RelaxedCandidate,
+  type RoundCandidate,
   relaxationsOf,
   relaxedBy,
   roundOrder,
@@ -53,6 +56,9 @@ import { openPondIds, openPondOf, type Subject, subjectOf, subjectsOfPond } from
  * conversation with, never comes. Somebody whose like waits beyond the cap
  * waits for a later round and is no ordinary card meanwhile. A shadow-banned
  * person gets none of these places, and the likes wait for the lift.
+ *
+ * Every entry is written with the band between the two homes as they stand
+ * then (ADR-061 §5), however it came into the round.
  *
  * Nothing it reads or decides is logged but how many: whose round has whom
  * in it is the round record's, and the export's (ADR-034 §7).
@@ -189,7 +195,7 @@ async function buildPond(
       const saved = await saveRound(deps, {
         accountId: owner.id,
         day: round.day,
-        ordering: "count",
+        ordering: "band_count",
         entries,
       });
       if (saved) {
@@ -210,7 +216,7 @@ async function placesOf(
   owner: Subject,
   shown: readonly Subject[],
   round: { day: string; config: BuilderConfig },
-): Promise<{ candidateId: string; reason: RoundReason }[]> {
+): Promise<{ candidateId: string; reason: RoundReason; distance: DistanceBand }[]> {
   const history = await historyOf(db, owner.id, round.day, round.config);
   const waiting = (await waitingOn(db, owner.id, round.day, round.config)).filter(
     (like) => !history.refused.has(like.id),
@@ -257,22 +263,24 @@ async function placesOf(
     ...likedYou.map((candidate) => ({
       candidateId: candidate.id,
       reason: fish.has(candidate.id) ? ("fish" as const) : ("liked_you" as const),
+      distance: bandBetween(owner.person.home, candidate.person.home),
     })),
     ...ordered,
   ];
 }
 
 /**
- * The places no rule forces (ADR-042 §1): everybody new first, by their soft
- * matches; then, while room is left, people of earlier rounds past both
- * cooldowns, in the order they come back.
+ * The places no rule forces (ADR-042 §1): everybody new first, the nearest
+ * band first and then by their soft matches (ADR-061 §6); then, while room is
+ * left, people of earlier rounds past both cooldowns, in the order they come
+ * back, which no band moves.
  */
 function orderedPlaces(
   owner: Subject,
   candidates: readonly Subject[],
   history: History,
   round: { day: string; size: number },
-): { candidateId: string; reason: "matches_filters" | "seen_before" }[] {
+): { candidateId: string; reason: "matches_filters" | "seen_before"; distance: DistanceBand }[] {
   const fresh = roundOrder(
     owner,
     candidates.filter((subject) => !history.seen.has(subject.id)),
@@ -286,12 +294,19 @@ function orderedPlaces(
     }),
     { day: round.day, size: round.size - fresh.length },
   );
+  const distance = (candidate: RoundCandidate) =>
+    bandBetween(owner.person.home, candidate.person.home);
   return [
     ...fresh.map((candidate) => ({
       candidateId: candidate.id,
       reason: "matches_filters" as const,
+      distance: distance(candidate),
     })),
-    ...back.map((candidate) => ({ candidateId: candidate.id, reason: "seen_before" as const })),
+    ...back.map((candidate) => ({
+      candidateId: candidate.id,
+      reason: "seen_before" as const,
+      distance: distance(candidate),
+    })),
   ];
 }
 
@@ -344,12 +359,17 @@ export async function buildRoundOf(deps: BuilderDeps, accountId: string): Promis
   return stands();
 }
 
-/** The day's round of the person, with what the short pool reads of it, their pond and their history (ADR-042). */
+/**
+ * The day's round of the person, with what the short pool reads of it, their
+ * pond and their history (ADR-042). Null after a move too (ADR-061 §5): the
+ * short pool reads the pool as it stands, so it would answer afresh from every
+ * place typed. Until the next round a move says nothing new.
+ */
 async function todayOf(deps: BuilderDeps, accountId: string) {
   const at = deps.now();
   const day = finnishDay(at);
   const today = await relaxationsOf(deps.db, accountId, day);
-  if (!today) return null;
+  if (!today || today.moved) return null;
   const pondId = await openPondOf(deps.db, accountId);
   if (!pondId) return null;
   const subjects = await subjectsOfPond(deps.db, pondId, at);
@@ -390,7 +410,8 @@ const letsIn = (wider: PoolPerson, effective: PoolPerson) => (subject: Subject) 
  * What a short round may relax today (ADR-042 §4), counted now: each of the
  * person's own deal-breakers, not paused and not relaxed today, each way it
  * can be, with how much it widens the pool in the counter's steps, and listed
- * only when it would add somebody today. Null with no round today.
+ * only when it would add somebody today. Null with no round today, or after a
+ * move.
  */
 export async function relaxationOffers(
   deps: BuilderDeps,
@@ -431,10 +452,11 @@ export async function relaxationOffers(
 
 /**
  * Whom a relaxation lets in today, in the order they would come (ADR-042 §5):
- * new people first by their soft matches, then the order of coming back;
- * with the day's relaxations they were counted under, on top of which this
- * one loosens the person's filters.
- * Null for a relaxation the offers would not list: no round today, a field
+ * new people first, the nearest band first and then by their soft matches,
+ * then the order of coming back; with the day's relaxations they were counted
+ * under, on top of which this one loosens the person's filters.
+ * Null for a relaxation the offers would not list: no round today, a move since
+ * it was built, a field
  * that is no deal-breaker of the person's, a paused one, one relaxed today,
  * or `unanswered` where those people are let through already. The writer
  * takes as many as the room.
@@ -473,7 +495,9 @@ export async function relaxedCandidates(
     size: ROUND_ENTRIES_MAX,
   }).flatMap((place) => {
     const person = byId.get(place.candidateId);
-    return person ? [{ candidateId: place.candidateId, needs: needsOf(person) }] : [];
+    return person
+      ? [{ candidateId: place.candidateId, needs: needsOf(person), distance: place.distance }]
+      : [];
   });
   return { basis: t.today.relaxed, candidates };
 }

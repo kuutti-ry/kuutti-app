@@ -310,8 +310,9 @@ describe("listConfig", () => {
     ctx,
   }) => {
     const pond = (await listConfig(ctx.client)).find((i) => i.key === "default_pond");
-    expect(pond).toMatchObject({ key: "default_pond", value: "paakaupunkiseutu", version: 2 });
+    expect(pond).toMatchObject({ key: "default_pond", value: "suomi", version: 3 });
     expect(pond?.versions.map((v) => [v.version, v.value, v.createdBy])).toEqual([
+      [3, "suomi", "migration:0095"],
       [2, "paakaupunkiseutu", "migration:0025"],
       [1, "suomi", "migration:0020"],
     ]);
@@ -319,18 +320,18 @@ describe("listConfig", () => {
     const from = new Date("2026-10-15T06:30:00Z");
     await ctx.client.query(
       `INSERT INTO matching_config (version, key, value, valid_from, created_by, reason)
-       VALUES (3, 'default_pond', '"suomi"'::jsonb, $1, 'someone', 'Back to one pond')`,
+       VALUES (4, 'default_pond', '"kainuu"'::jsonb, $1, 'someone', 'A pond of its own')`,
       [from],
     );
     const again = (await listConfig(ctx.client)).find((i) => i.key === "default_pond");
-    expect(again).toMatchObject({ value: "suomi", version: 3 });
-    expect(again?.versions.map((v) => v.version)).toEqual([3, 2, 1]);
+    expect(again).toMatchObject({ value: "kainuu", version: 4 });
+    expect(again?.versions.map((v) => v.version)).toEqual([4, 3, 2, 1]);
     expect(again?.versions[0]).toEqual({
-      version: 3,
-      value: "suomi",
+      version: 4,
+      value: "kainuu",
       validFrom: from.toISOString(),
       createdBy: "someone",
-      reason: "Back to one pond",
+      reason: "A pond of its own",
     });
     const single = (await listConfig(ctx.client)).find((i) => i.key === "liked_you_cap");
     expect(single).toMatchObject({ value: 10, version: 1 });

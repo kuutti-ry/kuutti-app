@@ -9,6 +9,7 @@ import {
 import fc from "fast-check";
 import type { QueryResultRow } from "pg";
 import { describe, expect, it } from "vitest";
+import { homeRules } from "../pond/index.ts";
 import { signedInAccount, withMatchingConfig } from "../test/account.ts";
 import { captureLogger, type TestContext, test } from "../test/harness.ts";
 import { buildCard, type CardDeps, fieldsOnCard, sharedAnswers } from "./card.ts";
@@ -170,6 +171,102 @@ describe("the card for a viewer who is not the owner", () => {
     });
     expect(preview.card?.displayName).toBe("Aino");
     expect(preview.completeness).toEqual({ complete: false, missing: ["seeks", "age_window"] });
+  });
+});
+
+describe("what a card says of a home (#514, ADR-061 §3, features/pond/home.feature)", () => {
+  /** A complete person with this home, given through the route as a person gives it. */
+  async function subjectAt(ctx: TestContext, body: Record<string, unknown>) {
+    const subject = await signedInAccount(ctx.client);
+    await profileRow(ctx, subject.accountId);
+    await approvedPhotos(ctx, subject.accountId, 3);
+    const res = await ctx.app.request("/account/home", {
+      method: "PUT",
+      headers: { ...subject.headers, "content-type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    expect(res.status).toBe(200);
+    return subject;
+  }
+  async function cardOf(ctx: TestContext, subjectId: string) {
+    const { deps } = await depsOf(ctx, { readPreferences: onboarded });
+    const viewer = await signedInAccount(ctx.client);
+    const { card } = await buildCard(deps, {
+      viewerAccountId: viewer.accountId,
+      subjectAccountId: subjectId,
+    });
+    return card;
+  }
+
+  describe("A card says the town, or the area where the person asked for it, and nothing else of the home", () => {
+    test.for([
+      ["00530", false, "Helsinki", "Helsingfors", ["Kallio", "Berghäll"]],
+      ["00530", true, "Kallio", "Berghäll", ["Helsinki", "Helsingfors"]],
+      ["85100", false, "Raahe", "Brahestad", ["Kalajoki", "Kokkola"]],
+      ["85100", true, "Kalajoki Keskus", "Kalajoki centrum", ["Raahe", "Kokkola"]],
+      ["83960", false, "Joensuu", "Joensuu", ["Lieksa", "Koli"]],
+    ] as const)(
+      "%s, showing the area %s: %s, %s",
+      async ([code, showArea, fi, sv, never], { ctx }) => {
+        const subject = await subjectAt(ctx, { postalCode: code, showArea });
+        const card = await cardOf(ctx, subject.accountId);
+        expect(card?.place).toEqual({ fi, sv });
+        const text = JSON.stringify(card);
+        expect(text).not.toContain(`"${code}"`);
+        expect(text).not.toMatch(/homePlace|home_place|homeShowsArea/);
+        for (const name of never) expect(text).not.toContain(name);
+      },
+    );
+  });
+
+  test("Maarianhamina is a town at any size, so Åland is not sent across the sea", async ({
+    ctx,
+  }) => {
+    expect((await homeRules(ctx.client)).townMin).toBe(20000);
+    const subject = await subjectAt(ctx, { postalCode: "22150" });
+    expect((await cardOf(ctx, subject.accountId))?.place).toEqual({
+      fi: "Maarianhamina",
+      sv: "Mariehamn",
+    });
+  });
+
+  test("a card has no place without a home, nor for a key the list no longer knows", async ({
+    ctx,
+  }) => {
+    const { deps } = await depsOf(ctx, { readPreferences: onboarded });
+    const viewer = await signedInAccount(ctx.client);
+    const subject = await signedInAccount(ctx.client);
+    await profileRow(ctx, subject.accountId);
+    await approvedPhotos(ctx, subject.accountId, 3);
+    const read = () =>
+      buildCard(deps, { viewerAccountId: viewer.accountId, subjectAccountId: subject.accountId });
+    expect((await read()).card?.place).toBeNull();
+    await ctx.client.query("UPDATE account SET home_place = '12345' WHERE id = $1", [
+      subject.accountId,
+    ]);
+    expect((await read()).card?.place).toBeNull();
+  });
+
+  test("the owner's preview says the same name as anybody's card", async ({ ctx }) => {
+    const subject = await subjectAt(ctx, { postalCode: "00530", showArea: true });
+    const { deps } = await depsOf(ctx, { readPreferences: onboarded });
+    const own = await buildCard(deps, {
+      viewerAccountId: subject.accountId,
+      subjectAccountId: subject.accountId,
+    });
+    expect(own.card?.place).toEqual({ fi: "Kallio", sv: "Berghäll" });
+  });
+
+  test("a home changes no line of the card's log", async ({ ctx }) => {
+    const subject = await subjectAt(ctx, { postalCode: "00530", showArea: true });
+    const { deps, logs } = await depsOf(ctx, { readPreferences: onboarded });
+    const viewer = await signedInAccount(ctx.client);
+    await buildCard(deps, {
+      viewerAccountId: viewer.accountId,
+      subjectAccountId: subject.accountId,
+    });
+    expect(logs().some((line) => line.msg === "card served")).toBe(true);
+    expect(JSON.stringify(logs())).not.toMatch(/Kallio|Berghäll|"00530"/);
   });
 });
 

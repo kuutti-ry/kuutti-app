@@ -50,7 +50,7 @@ function card(n: number, name: string): ProfileCard {
     displayName: name,
     age: { years: 30 + n, verifiedByBank: true },
     gender: null,
-    pond: null,
+    place: null,
     photos: [],
     fields: {},
     bio: null,
@@ -64,7 +64,7 @@ const entry = (
   name: string,
   reason: RoundEntry["reason"] = "matches_filters",
   decision: RoundEntry["decision"] = null,
-): RoundEntry => ({ position, reason, decision, card: card(position, name) });
+): RoundEntry => ({ position, reason, decision, card: card(position, name), distance: null });
 
 const ROUND: RoundResponse = {
   day: DAY,
@@ -1513,6 +1513,47 @@ describe("the likes left (#524, ADR-036 §6)", () => {
   });
 });
 
+describe("how far each person lives (#514, ADR-061 §5)", () => {
+  const place = { fi: "Kallio", sv: "Berghäll" };
+  const placed = (at: RoundEntry, distance: RoundEntry["distance"]): RoundEntry => ({
+    ...at,
+    distance,
+    card: { ...at.card, place },
+  });
+  const round = (...entries: RoundEntry[]): RoundResponse => ({ ...ROUND, entries });
+
+  it("says the band each entry was written with, on the card, in words", async () => {
+    api(undefined, round(placed(entry(1, "Henna"), "close"), placed(entry(2, "Katja"), "far")));
+    await show();
+    expect(heading("Henna, 31")).toBeTruthy();
+    expect(screen.getByText("Kallio")).toBeTruthy();
+    expect(screen.getByText("Close")).toBeTruthy();
+    expect(screen.queryByText(/\d{5}|\bkm\b/)).toBeNull();
+    await press("Pass");
+    expect(heading("Katja, 32")).toBeTruthy();
+    expect(screen.getByText("Far")).toBeTruthy();
+    expect(screen.queryByText("Close")).toBeNull();
+    noProblems();
+  });
+
+  it("says no band for an entry from before distance, whose card still has its place", async () => {
+    api(undefined, round(placed(entry(1, "Henna"), null)));
+    await show();
+    expect(screen.getByText("Kallio")).toBeTruthy();
+    expect(screen.queryByText(/^(Nearby|Close|Around|Far)$/)).toBeNull();
+  });
+
+  it("leaves a card's band where the entry froze it, a day's read later too", async () => {
+    // The band is the entry's, so nothing on the phone reads a home to work one out.
+    const sent = api(undefined, round(placed(entry(1, "Henna"), "nearby")));
+    await show();
+    expect(screen.getByText("Nearby")).toBeTruthy();
+    expect(sent.calls.filter((c) => c.path === "/profile" || c.path === "/account/home")).toEqual(
+      [],
+    );
+  });
+});
+
 describe("the short pool (#99, ADR-042)", () => {
   const RELAXATIONS = `/rounds/${DAY}/relaxations`;
   const offered = {
@@ -1559,6 +1600,29 @@ describe("the short pool (#99, ADR-042)", () => {
     expect(screen.getByRole("button", { name: "Undo for today: Smoking" })).toBeTruthy();
     noProblems();
     expect(sent.reads()).toBe(1);
+  });
+
+  it("offers the distance like any deal-breaker, set aside and never by those who did not answer (ADR-061 §7)", async () => {
+    const aside = {
+      short: true,
+      offers: [{ field: "distance", kind: "aside", more: 10 }],
+      relaxed: [],
+    };
+    const card: RoundEntry = { ...relaxedCard, relaxedField: "distance" };
+    const sent = api((call) => {
+      if (call.path === RELAXATIONS && call.method === "GET") return json(aside);
+      if (call.path === RELAXATIONS) return json({ entries: [card] });
+      return undefined;
+    }, EMPTY);
+    await show();
+    await press("Set aside for today: Distance. About 10 more people");
+    expect(sent.calls.find((c) => c.method === "POST" && c.path === RELAXATIONS)?.body).toEqual({
+      field: "distance",
+      kind: "aside",
+    });
+    expect(screen.getByText("Relaxed for today: Distance")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Undo for today: Distance" })).toBeTruthy();
+    noProblems();
   });
 
   it("takes back the relaxation's undecided cards with one tap on a relaxed card", async () => {

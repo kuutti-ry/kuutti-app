@@ -13,7 +13,7 @@ import type { Mailer, MailMessage } from "../lib/mail.ts";
 import { signedInAccount, signInAs } from "../test/account.ts";
 import { CHALLENGE, VERIFIER } from "../test/attempt.ts";
 import { captureLogger, type TestContext, test, testConfig } from "../test/harness.ts";
-import { people, pondNamed } from "../test/people.ts";
+import { HOME, people, pondNamed } from "../test/people.ts";
 import { deriveArtificialIdentity, registerArtificial } from "./artificial.ts";
 import type { BrokerIdentity, IdentityBroker } from "./broker.ts";
 import { eraseAccount } from "./erasure.ts";
@@ -144,7 +144,12 @@ async function accountRow(ctx: TestContext, accountId: string) {
     email: string | null;
     gender: string | null;
     pond_id: string | null;
-  }>("SELECT state, email, gender, pond_id FROM account WHERE id = $1", [accountId]);
+    home_place: string | null;
+    home_shows_area: boolean;
+  }>(
+    "SELECT state, email, gender, pond_id, home_place, home_shows_area FROM account WHERE id = $1",
+    [accountId],
+  );
   return rows[0];
 }
 
@@ -317,6 +322,7 @@ describe("the status read racing another request", () => {
       state: "registered",
       gender: "woman",
       consented: true,
+      home: HOME,
     });
     await ctx.client.query(
       `INSERT INTO preferences (account_id, field, value, mode, include_unknown)
@@ -368,27 +374,53 @@ describe("the status read racing another request", () => {
     expect((await accountRow(ctx, me.accountId))?.state).toBe("deleted");
   });
 
-  test("an erasure just before the default pond is assigned puts no pond on the tombstone", async ({
+  test("an erasure just before the home is written answers 404 and leaves no home on the tombstone", async ({
     ctx,
   }) => {
-    // The one-pond world the default pond needs (ADR-010 §12), as onboarding.test.ts builds it.
-    await ctx.client.query(
-      "INSERT INTO ponds (slug, name_nominative, name_inessive) VALUES ('paakaupunkiseutu', 'Pääkaupunkiseutu', 'Pääkaupunkiseudulla') ON CONFLICT (slug) DO NOTHING",
-    );
-    await ctx.client.query("DELETE FROM ponds WHERE slug = 'suomi'");
     const me = await signedInAccount(ctx.client, undefined, { state: "registered" });
-    const db = interleaved(ctx.client, { before: /UPDATE account SET pond_id = \$2/ }, () =>
-      eraseOnOtherDevice(ctx, me.accountId),
+    // Its last read before the transaction: here on one connection the transaction's
+    // rollback would take the other request's erasure with it, which a commit never would.
+    const db = interleaved(
+      ctx.client,
+      { before: /SELECT value FROM matching_config WHERE key = \$1/ },
+      () => eraseOnOtherDevice(ctx, me.accountId),
     );
     const { app, logs } = await appOn(db);
-    const res = await app.request("/onboarding", { headers: me.headers });
+    const res = await app.request("/account/home", {
+      method: "PUT",
+      headers: { ...me.headers, "content-type": "application/json" },
+      body: JSON.stringify({ postalCode: "00530", showArea: true }),
+    });
     expect(db.ran()).toBe(true);
-    expect(res.status).toBe(200);
-    const status = OnboardingStatus.parse(await res.json());
-    expect(status.pond).toBeNull();
-    expect(status.missing).toContain("pond");
-    expect(logs().filter((l) => l.msg === "pond assigned")).toEqual([]);
-    expect(await accountRow(ctx, me.accountId)).toMatchObject({ state: "deleted", pond_id: null });
+    expect(res.status).toBe(404);
+    expect(ErrorResponse.parse(await res.json()).error.code).toBe("not_found");
+    expect(logs().filter((l) => l.msg === "home set")).toEqual([]);
+    expect(await accountRow(ctx, me.accountId)).toMatchObject({
+      state: "deleted",
+      pond_id: null,
+      home_place: null,
+      home_shows_area: false,
+    });
+  });
+
+  test("an erasure just after the home is written clears what it wrote", async ({ ctx }) => {
+    const me = await signedInAccount(ctx.client, undefined, { state: "registered" });
+    const db = interleaved(ctx.client, { after: /UPDATE account\s+SET home_moved_at/ }, () =>
+      eraseOnOtherDevice(ctx, me.accountId),
+    );
+    const { app } = await appOn(db);
+    await app.request("/account/home", {
+      method: "PUT",
+      headers: { ...me.headers, "content-type": "application/json" },
+      body: JSON.stringify({ postalCode: "00530", showArea: true }),
+    });
+    expect(db.ran()).toBe(true);
+    expect(await accountRow(ctx, me.accountId)).toMatchObject({
+      state: "deleted",
+      pond_id: null,
+      home_place: null,
+      home_shows_area: false,
+    });
   });
 });
 

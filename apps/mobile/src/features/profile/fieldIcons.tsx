@@ -1,5 +1,5 @@
 import type { PlainMessageKey } from "@kuutti/i18n";
-import type { HobbyGroup, ProfileFieldKey } from "@kuutti/schema";
+import type { DealBreakerField, HobbyGroup } from "@kuutti/schema";
 import type { LucideIcon } from "lucide-react-native";
 import Baby from "lucide-react-native/icons/baby";
 import Beer from "lucide-react-native/icons/beer";
@@ -18,6 +18,7 @@ import House from "lucide-react-native/icons/house";
 import IdCard from "lucide-react-native/icons/id-card";
 import Languages from "lucide-react-native/icons/languages";
 import Leaf from "lucide-react-native/icons/leaf";
+import MapPin from "lucide-react-native/icons/map-pin";
 import MoonStar from "lucide-react-native/icons/moon-star";
 import Palette from "lucide-react-native/icons/palette";
 import PawPrint from "lucide-react-native/icons/paw-print";
@@ -65,9 +66,10 @@ const PalmsUp = drawn(
  * sections, the later screens, the deal-breakers and on the card: a beer for
  * drinking, a cigarette for smoking, a tin for snus. Placeholders until the
  * designer draws the set; decorative, so the label alone names the field.
- * The religion's options keep their own symbols (glyphs.tsx).
+ * The religion's options keep their own symbols (glyphs.tsx). The distance
+ * among the deal-breakers has one too, being no field of the registry (ADR-061 §7).
  */
-export const FIELD_ICONS: Readonly<Record<ProfileFieldKey, LucideIcon>> = {
+export const FIELD_ICONS: Readonly<Record<DealBreakerField, LucideIcon>> = {
   intent: Compass,
   identityLabel: User,
   monogamy: HeartHandshake,
@@ -90,10 +92,11 @@ export const FIELD_ICONS: Readonly<Record<ProfileFieldKey, LucideIcon>> = {
   politics: Vote,
   religion: PalmsUp,
   zodiac: MoonStar,
+  distance: MapPin,
 };
 
 /** A field's label with its icon before it. */
-export function FieldLabel({ field, className }: { field: ProfileFieldKey; className?: string }) {
+export function FieldLabel({ field, className }: { field: DealBreakerField; className?: string }) {
   const { t } = useT();
   return (
     <View className={cn("flex-row items-center gap-2", className)}>

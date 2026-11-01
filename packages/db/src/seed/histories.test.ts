@@ -1,3 +1,4 @@
+import { postalMatches } from "@kuutti/schema/postal-areas";
 import { ageFromYearMonth } from "@kuutti-ry/tunnistus-oidc/hetu";
 import { describe, expect, it } from "vitest";
 import { PERSONA_HISTORIES, personaOf } from "./histories.ts";
@@ -20,6 +21,20 @@ describe("the stories of the personas", () => {
         expect(age, where).toBeGreaterThanOrEqual(min);
         expect(age, where).toBeLessThanOrEqual(max);
       }
+    }
+  });
+
+  it("type a home the list knows, and only Onni, who left at the bank, has none", () => {
+    for (const history of PERSONA_HISTORIES) {
+      if (history.key === "onni") {
+        expect(history.onboarding).toBeNull();
+        continue;
+      }
+      const home = history.onboarding?.home ?? "";
+      expect(
+        postalMatches(home, 2).map((area) => area.code),
+        history.key,
+      ).toEqual([home]);
     }
   });
 });

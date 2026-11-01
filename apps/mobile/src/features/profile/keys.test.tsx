@@ -1,4 +1,5 @@
-import { CompletenessItem } from "@kuutti/schema";
+import { createI18n, type Locale, typedT } from "@kuutti/i18n";
+import { CompletenessItem, DISTANCE_BANDS, type HomeSummary } from "@kuutti/schema";
 import { renderHook } from "@testing-library/react-native";
 import { LocaleProvider, useT } from "@/lib/locale";
 import {
@@ -6,8 +7,10 @@ import {
   fieldLabelKey,
   genderKey,
   optionKey,
+  placeName,
   presetKey,
   promptKey,
+  shownPlaceName,
 } from "./keys";
 
 // The registry's keys and the words for what the API names by kind (#47, #56):
@@ -26,6 +29,73 @@ describe("the profile's message keys", () => {
     expect(optionKey("intent", "long_term")).toBe("profile.option.intent.long_term");
     expect(promptKey("sunday")).toBe("profile.prompt.sunday");
     expect(presetKey("photos_speak")).toBe("profile.bioPreset.photos_speak");
+  });
+
+  it("name the distance, which is no field of the registry, the same way (ADR-061 §7)", () => {
+    expect(fieldLabelKey("distance")).toBe("profile.field.distance");
+    expect(optionKey("distance", "far")).toBe("profile.option.distance.far");
+  });
+
+  // The API builds the label's key from the field in the export (erasure.ts).
+  it.each(["en", "fi", "sv"] as const)("have the distance's words in %s, none a key", (locale) => {
+    const t = typedT(createI18n({ locale }));
+    const words = [
+      fieldLabelKey("distance"),
+      ...DISTANCE_BANDS.map((b) => optionKey("distance", b)),
+    ];
+    for (const key of words) expect(t(key)).not.toBe(key);
+    expect(new Set(words.map((key) => t(key))).size).toBe(words.length);
+  });
+
+  it("say the bands in the brief's English", () => {
+    const t = typedT(createI18n({ locale: "en" }));
+    expect(DISTANCE_BANDS.map((band) => t(optionKey("distance", band)))).toEqual([
+      "Nearby",
+      "Close",
+      "Around",
+      "Far",
+    ]);
+    expect(t(fieldLabelKey("distance"))).toBe("Distance");
+  });
+});
+
+describe("placeName", () => {
+  const KALLIO = { fi: "Kallio", sv: "Berghäll" };
+
+  it.each<[Locale, string]>([
+    ["en", "Kallio"],
+    ["fi", "Kallio"],
+    ["sv", "Berghäll"],
+    ["fi-x-stadi", "Kallio"],
+  ])("reads a place in %s as the list has it", (locale, name) => {
+    expect(placeName(KALLIO, locale)).toBe(name);
+  });
+
+  it("reads the pseudo-locale as the English it stands for", () => {
+    expect(placeName(KALLIO, "en-XA")).toBe("Kallio");
+  });
+});
+
+describe("shownPlaceName", () => {
+  const town = { fi: "Helsinki", sv: "Helsingfors" };
+  const area = { fi: "Kallio", sv: "Berghäll" };
+
+  it.each<[string, HomeSummary, string]>([
+    ["the town by default", { town, area, showArea: false }, "Helsinki"],
+    ["the area where the person chose it", { town, area, showArea: true }, "Kallio"],
+    ["the town where no area is kept", { town, area: null, showArea: false }, "Helsinki"],
+    [
+      "the town if the answer ever says area with none",
+      { town, area: null, showArea: true },
+      "Helsinki",
+    ],
+  ])("says %s", (_what, home, name) => {
+    expect(shownPlaceName(home, "en")).toBe(name);
+  });
+
+  it("says it in the reader's language", () => {
+    expect(shownPlaceName({ town, area, showArea: false }, "sv")).toBe("Helsingfors");
+    expect(shownPlaceName({ town, area, showArea: true }, "sv")).toBe("Berghäll");
   });
 });
 

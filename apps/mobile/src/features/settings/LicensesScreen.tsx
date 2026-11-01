@@ -1,3 +1,5 @@
+import { realLocale } from "@kuutti/i18n";
+import { POSTAL_AREAS_CREDIT } from "@kuutti/schema/postal-areas";
 import { useRouter } from "expo-router";
 import { View } from "react-native";
 import { RowGroup } from "@/components/RowGroup";
@@ -16,13 +18,17 @@ const GROUPS = licenseGroups(LICENCES.packages);
  * each under a heading a screen reader can jump between (#376). Each package
  * is a row that opens nothing (#512), its name, then who provides it, its
  * version and its licence, read together as one sentence; a package that
- * names nobody has no provider. The texts the licences ask to go with every
- * copy are behind the last row.
+ * names nobody has no provider. The data the app carries follows the
+ * packages (ADR-061 §4): where it comes from, on what terms and what Kuutti
+ * changed, as the list itself says it, in Finnish or English, and CC BY 4.0
+ * asks no more languages. The texts the licences ask to go with every copy are
+ * behind the last row.
  */
 export function LicensesScreen() {
-  const { t } = useT();
+  const { t, locale } = useT();
   const router = useRouter();
   const tap = useHapticTap();
+  const credit = realLocale(locale) === "fi" ? POSTAL_AREAS_CREDIT.fi : POSTAL_AREAS_CREDIT.en;
   return (
     <SettingsPage title={t("tech.licenses.title")}>
       {GROUPS.map((group) => (
@@ -41,6 +47,20 @@ export function LicensesScreen() {
           />
         </View>
       ))}
+      <View className="gap-2">
+        <Text variant="h3" accessibilityRole="header">
+          {t("tech.licenses.data")}
+        </Text>
+        <RowGroup
+          rows={[
+            {
+              key: "postal-areas",
+              title: t("tech.licenses.postalAreas"),
+              summary: `${credit.source} ${credit.changes}`,
+            },
+          ]}
+        />
+      </View>
       <RowGroup
         rows={[
           {

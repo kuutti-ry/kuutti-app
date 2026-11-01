@@ -31,6 +31,9 @@ export const roundReason = pgEnum("round_reason", [
 /** What a person decided about a card; undecided is no value, and expired is undecided on an ended day. */
 export const roundDecision = pgEnum("round_decision", ["like", "pass"]);
 
+/** How far a card's person lives (ADR-061 §5); never kilometres. A closed list, mirrored in packages/schema. */
+export const distanceBand = pgEnum("distance_band", ["nearby", "close", "around", "far"]);
+
 /**
  * A round (TD-11, #96, ADR-034): what one person is shown on one Finnish
  * calendar day, written by the round builder (#95) through `saveRound`. One
@@ -88,6 +91,10 @@ export const roundEntries = pgTable(
     relaxedField: text("relaxed_field"),
     // Every relaxation of the day it came in under, the tapped one first: undoing any takes it back, and a like on it waives them all (§6, §7).
     relaxedWith: text("relaxed_with").array().notNull().default(sql`'{}'::text[]`),
+    // The band between the two homes when the entry was written (ADR-061 §5):
+    // frozen, so that a home moved since says nothing new, and read by the
+    // card's line. Null on an entry from before #514.
+    distance: distanceBand("distance"),
   },
   (table) => [
     // One card per place: the read's order, the cascade, and #98's count of the day's likes.

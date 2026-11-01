@@ -34,7 +34,7 @@ const statusRoute = createRoute({
   path: "/onboarding",
   summary: "What the caller has answered and which steps of onboarding are still open",
   description:
-    "The steps of the field sheet in the order the app asks them, the answers so far, the consents given for the current wordings and the current versions. An account without a pond is put in the default pond here. When the four answers matching needs and the two consents are there and the account is still registered, it becomes active here; the profile steps keep `complete` false until they are done.",
+    "The steps of the field sheet in the order the app asks them, the answers so far, the consents given for the current wordings and the current versions. When the four answers matching needs and the two consents are there and the account is still registered, it becomes active here; the profile steps keep `complete` false until they are done.",
   ...bearer,
   responses: {
     200: { description: "The status.", ...json(OnboardingStatus) },

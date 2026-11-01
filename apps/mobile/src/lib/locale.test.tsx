@@ -19,7 +19,7 @@ function Probe() {
   return (
     <>
       <Text testID="title">{t("settings.title")}</Text>
-      <Text testID="plain">{t("onboarding.retry")}</Text>
+      <Text testID="plain">{t("load.retry")}</Text>
       <Text testID="preference">{settings.preference}</Text>
       <Text testID="device">{settings.deviceLocale}</Text>
       <Pressable

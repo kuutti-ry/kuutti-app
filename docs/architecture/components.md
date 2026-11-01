@@ -150,7 +150,7 @@ Besides the slices, the API has `health/`, `jobs/` (the nightly timer and the jo
 1. **identity**: the bank login, accounts, sessions, re-registration, taking a break, staff sessions. In all three apps; specs in `features/identity`.
 2. **profile**: onboarding, profile fields and prompts, completeness. API and phone app.
 3. **media**: the photo pipeline, signed URLs, the automatic check and the human queue. In all three apps (the admin panel's photo queue); spec in `features/media`.
-4. **pond**: ponds, the waitlist counter, and the switch that opens matching in a pond. In all three apps (the admin panel's Ponds screen); specs in `features/pond`.
+4. **pond**: ponds, a person's home (ADR-061), the waitlist counter, and the switch that opens matching in a pond. In all three apps (the admin panel's Ponds screen); specs in `features/pond`.
 5. **matching**: rounds, deal-breakers, likes, the fish, the match. API and phone app; specs in `features/matching`.
 6. **chat**: conversations, messages, the socket, contacts shared, the archive. API and phone app; specs in `features/chat`.
 7. **safety**: reports, blocks, sanctions, the audit log, the automatic shadow bans, velocity. In all three apps; the admin panel's screens are in this slice, but for the photo queue and the ponds. Specs in `features/safety`.

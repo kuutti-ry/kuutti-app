@@ -9,6 +9,8 @@ apps/api/src/lib/auth-middleware.ts
 apps/api/src/lib/push.ts
 apps/api/src/notifications/push.ts
 apps/api/src/notifications/tokens.ts
+apps/api/src/pond/home.ts
+apps/api/src/pond/places.ts
 apps/api/src/lib/ssm.ts
 apps/api/src/lib/cors.ts
 apps/api/src/lib/sentry.ts
@@ -22,14 +24,14 @@ infra/modules/media/
 infra/modules/research/
 -->
 
-Where a person's data lives, who can read it, and what crosses from one place to another: the phone, Telia, the box, the database and AWS's managed services. Part 1 follows the person's identity and the secrets that guard it; part 2 follows photos, research events and what leaves the box for logs and error reports. It is written for a reviewer of a change to identity, uploads, signed URLs, events or infrastructure, and for the `security-reviewer` agent, as the map behind `docs/security-checklist.md` and its four surfaces: the OIDC exchange with Telia, the hetu HMAC, session tokens, and signed URL issuance. It draws rules 1 to 6 and 8, TD-1, ADR-001 (secrets are never resources), ADR-005 (media delivery), ADR-006 (the check, staff, the audit), ADR-008 (the exposure budget), ADR-011 (research events), ADR-017 (the Telia kit), ADR-025 (the panel's host and CORS), ADR-027 (the bound code), ADR-029 (the research copy) and ADR-056 (attestation later). What is drawn is staging's. Production has run since 2026-10-24 without bank identification (ADR-049) and is drawn in [Deployment](deployment.md), part 5.
+Where a person's data lives, who can read it, and what crosses from one place to another: the phone, Telia, the box, the database and AWS's managed services. Part 1 follows the person's identity and the secrets that guard it; part 2 follows photos, research events and what leaves the box for logs and error reports. It is written for a reviewer of a change to identity, uploads, signed URLs, events or infrastructure, and for the `security-reviewer` agent, as the map behind `docs/security-checklist.md` and its four surfaces: the OIDC exchange with Telia, the hetu HMAC, session tokens, and signed URL issuance. It draws rules 1 to 6 and 8, TD-1, ADR-001 (secrets are never resources), ADR-005 (media delivery), ADR-006 (the check, staff, the audit), ADR-008 (the exposure budget), ADR-011 (research events), ADR-017 (the Telia kit), ADR-025 (the panel's host and CORS), ADR-027 (the bound code), ADR-029 (the research copy), ADR-056 (attestation later) and ADR-061 (the home). What is drawn is staging's. Production has run since 2026-10-24 without bank identification (ADR-049) and is drawn in [Deployment](deployment.md), part 5.
 
 ## Part 1: the person's identity and the secrets
 
 ```mermaid
 flowchart TB
   accTitle: Data and trust boundaries, part 1: the person's identity and the secrets
-  accDescr: The hetu travels from the bank through Telia to the API's callback inside an ID token encrypted to Kuutti's key, server to server, and never through the phone. In the callback's memory it becomes an HMAC under a key read from SSM, a year and month of birth and an age, and is dropped. The database keeps the HMAC, the year and month and the last login's references, and only hashes of tokens and codes. The phone keeps its own session tokens and each sign-in's verifier in its secure store. The instance role reads its own SSM prefix and is denied every other. A pull request's preview runs on the staging box under the same role, so its code can read every staging secret; the API's own code drops them, which is no boundary.
+  accDescr: The hetu travels from the bank through Telia to the API's callback inside an ID token encrypted to Kuutti's key, server to server, and never through the phone. In the callback's memory it becomes an HMAC under a key read from SSM, a year and month of birth and an age, and is dropped. The database keeps the HMAC, the year and month and the last login's references, and only hashes of tokens and codes. It also keeps a person's one home, a place the API works out in memory from the postal code the app sends. The phone keeps its own session tokens and each sign-in's verifier in its secure store. The instance role reads its own SSM prefix and is denied every other. A pull request's preview runs on the staging box under the same role, so its code can read every staging secret; the API's own code drops them, which is no boundary.
   subgraph phone["The phone"]
     b1["The app: its session tokens and each sign-in's verifier, in the secure store, this device only"]
     b2["The phone's browser: the bank login, with its cookies kept out of the app"]
@@ -50,7 +52,7 @@ flowchart TB
   end
   subgraph rds["The database: RDS PostgreSQL in private subnets"]
     b11["identity: hetu_hmac, the standing, and the last bank login's references"]
-    b12["account: birth_year and birth_month, and the gender the person declares"]
+    b12["account: birth_year and birth_month, the gender the person declares, and the one place kept of their home"]
     b13["sessions and sign-in attempts: SHA-256 hashes of every token, code and verifier"]
   end
   subgraph offline["Offline"]
@@ -72,6 +74,7 @@ flowchart TB
   b2 -->|"the deep link"| b1
   b1 -->|"the code and its verifier, then a bearer token on every request"| b5
   b5 -->|"token hashes, over TLS, from the API's security group only"| b13
+  b5 -->|"the place kept of a postal code looked up in memory"| b12
   b8 -->|"the same role"| b10
   b3 --- b1
   classDef notbuilt stroke-dasharray: 5 5
@@ -90,7 +93,7 @@ flowchart TB
 9. **SSM Parameter Store** holds the secrets as SecureStrings under `/kuutti/staging/`: `hetu-hmac-key`, `telia-signing-key`, `telia-encryption-key`, `cloudfront-signing-key`, `db-app-password` and `db-preview-password`. `/kuutti/prod/` holds `db-app-password` alone until bank identification and the media cutover (ADR-049 §1). They are created by hand, never as OpenTofu resources, so no value is in state (ADR-001). The plan role can list them and is denied `kms:Decrypt`. The non-secret configuration sits beside them as plain Strings that the apply writes.
 10. **The instance role** may read parameters under its own environment's prefix. An explicit deny on every other parameter wins over the wider allow that Session Manager's managed policy carries, so staging's box cannot read `/kuutti/prod/`. Decryption is allowed only through SSM and S3.
 11. **identity**: `hetu_hmac` (unique), the standing, and the latest bank login's references, Telia's `sub`, the session index, the token id, `auth_time`, `acr` and `amr`, rewritten at each login and kept for a police request that names one. Never the claims themselves.
-12. **account**: `birth_year` and `birth_month`, and the gender the person declares (rule 3). `pnpm check:schema-words` refuses any column for the hetu, legal sex, a full date of birth, a name from the bank or a network address.
+12. **account**: `birth_year` and `birth_month`, the gender the person declares (rule 3), and the home (#514, ADR-061). Suggestions run on the phone, so only a whole postal code leaves it, in the body of `PUT /account/home`; the API looks it up in memory and stores one place, `home_place`, with `home_shows_area` and the time of the latest move, `home_moved_at`: the postal area if `home_min_inhabitants` people live there and as many are left behind its municipality's key, its key then being the postal code itself, otherwise a municipality's number. A change overwrites, and erasure clears all three. `pnpm check:schema-words` refuses any column for the hetu, legal sex, a full date of birth, a name from the bank or a network address.
 13. **sessions and sign-in attempts**: only SHA-256 hashes of the access and refresh tokens, of the refresh token's part that stays for the session's life (`family_hash`, ADR-059), of the one-time codes and of the app's verifier (the challenge), and the attempt's state and nonce. The database sits in private subnets and admits only the API's security group, over TLS that the API verifies against the RDS certificates in its image.
 14. **The association's encrypted medium**: the HMAC key's one offline backup (the key is never rotated, rule 2) and the two Telia keys as generated. From it each key went into SSM once, by file reference, never on a command line (`infra/README.md`, Secrets).
 
@@ -139,7 +142,7 @@ flowchart TB
   b24 -->|"the event, by research_id"| b25
   b25 -->|"yesterday's events, put once each night by the API"| b21
   b27 -->|"lists and reads research/ only"| b21
-  b17 -->|"log lines without hetu, message text, e-mail, seeks or an address"| b22
+  b17 -->|"log lines without hetu, message text, e-mail, seeks, a home or an address"| b22
   b17 -->|"error reports"| b28
   b17 -->|"a push, never a text, a name or an account"| b29
   b29 -->|"wakes the phone with it"| b15
@@ -156,10 +159,10 @@ flowchart TB
 19. **Rekognition** receives the card variant, or a photo sent in a conversation at its full size, as JPEG bytes in three detect calls through the instance role, which may make exactly those three, and answers labels and faces. Nothing of ours is stored there (ADR-006 §1).
 20. **The media bucket's `media/`** holds three WebP variants per photo under a content key, never an original. The bucket is private, public access blocked; its policy admits only the distribution to `media/`, through origin access control, and the instance role may put, get and delete there, so a preview's code may too.
 21. **`research/`** in the same bucket, on staging only: one Parquet file per day of yesterday's events, put once with `If-None-Match: *` and never deleted, with the `research_id` and the registry's values and never an account id, an event id or text, each value only where at least k pseudonyms with a live research consent share it (ADR-029). Production writes no copy until ADR-029's ninety days are answered. The API's own code writes no copy from a preview. But a preview's code runs under staging's role, so it could read `research/` or write a day the night has not written yet, and that file would stand as the day's (ADR-029 §12).
-22. **CloudWatch Logs** gets every container's lines from the box: structured, with `account_id` and the request id, never the hetu, message text, an e-mail, `seeks` or a client address: the logger redacts the first four by field name, no line is ever given the address, and a test fails on any of them in a line. Kept 30 days.
+22. **CloudWatch Logs** gets every container's lines from the box: structured, with `account_id` and the request id, never the hetu, message text, an e-mail, `seeks` or a client address: the logger redacts the first four by field name, no line is ever given the address, and a test fails on any of them in a line. A home and a postal code reach no line either: the route's line names the account alone, and the logger redacts their names as a net (ADR-061 §9). Kept 30 days.
 23. **photo, photo_review, card_shown and photo_access**: a statement run by a person's own request carries the caller's `account_id` (rule 6). Staff's queue, views and decisions, behind the admin guard with an audit row first (ADR-006 §6), and the night's limit on the queue act across accounts by photo id. `photo_access` is the fetch log the exposure budget counts (ADR-008).
 24. **research_subject** maps an `account_id` to a random `research_id`, one row while the research consent lasts. Withdrawing the consent or erasing the account deletes it, and then nothing joins the events back to a person (ADR-011 §1).
-25. **events**: keyed by `research_id`, never `account_id`, and never message text (rule 5), in monthly partitions of the main Postgres, dropped past their 90 days (ADR-011).
+25. **events**: keyed by `research_id`, never `account_id`, and never message text (rule 5), carrying the pond and no home or band (ADR-061 §9), in monthly partitions of the main Postgres, dropped past their 90 days (ADR-011).
 26. **The admin panel** runs in a browser at its own origin, the only origin staging's CORS allowlist names (rule 8, ADR-025 §10). It calls the API with an eight-hour staff token, and every view of a photo and every decision writes an audit row first (ADR-006 §6). A pull request's preview API answers its own web origin as well, and no other.
 27. **The researcher** reaches `research/` through a role that may list and read there and nothing else, assumed through the Identity Center permission set `KuuttiResearchStaging` (the trust's wildcard suffix would also admit a set named `KuuttiResearchStaging_<anything>`, and only the maintainer creates sets); a CloudTrail trail logs every object call under `research/` into a bucket neither role can read (ADR-029 §10, §11).
 28. **Sentry** receives unhandled errors only, with the request's body, headers, cookies and query, local variables and extra data stripped before sending, and no tracing.
@@ -174,9 +177,10 @@ flowchart TB
 - Research: [apps/api/src/research](../../apps/api/src/research/README.md), [packages/db/src/schema/research.ts](../../packages/db/src/schema/research.ts), the copy's wiring in [boot.ts](../../apps/api/src/boot.ts), [infra/modules/research/main.tf](../../infra/modules/research/main.tf)
 - Logs and errors: [lib/logger.ts](../../apps/api/src/lib/logger.ts), [lib/sentry.ts](../../apps/api/src/lib/sentry.ts), [src/test/pii-in-logs.test.ts](../../apps/api/src/test/pii-in-logs.test.ts)
 - The schema's words: [scripts/check-schema-words.ts](../../scripts/check-schema-words.ts); the tables in [packages/db/src/schema/identity.ts](../../packages/db/src/schema/identity.ts)
+- The home: [apps/api/src/pond/home.ts](../../apps/api/src/pond/home.ts), [apps/api/src/pond/places.ts](../../apps/api/src/pond/places.ts)
 - The checklist: [docs/security-checklist.md](../security-checklist.md); the Telia side: [docs/vendors/telia.md](../vendors/telia.md)
-- ADRs: [ADR-001](../adr/001-infrastructure-as-code.md), [ADR-005](../adr/005-media-pipeline-and-delivery.md), [ADR-006](../adr/006-photo-moderation.md), [ADR-008](../adr/008-exposure-budget-and-client-address.md), [ADR-011](../adr/011-research-events.md), [ADR-014](../adr/014-demo-mode.md) §1, [ADR-017](../adr/017-tunnistus-oidc-package.md), [ADR-025](../adr/025-admin-host.md), [ADR-027](../adr/027-sign-in-code-bound-to-the-device.md), [ADR-029](../adr/029-the-research-copy.md), [ADR-056](../adr/056-attestation-later-no-screenshot-notice.md), [ADR-059](../adr/059-refresh-token-carries-its-session.md)
-- Issues: #32, #33 (the bank login), #35 (sessions), #490 (the refresh token's secret), #48, #49, #52 (photos), #50, #194 (research), #86 (anti-scraping: attestation later, ADR-056), #198 (CloudFront-only ingress)
+- ADRs: [ADR-001](../adr/001-infrastructure-as-code.md), [ADR-005](../adr/005-media-pipeline-and-delivery.md), [ADR-006](../adr/006-photo-moderation.md), [ADR-008](../adr/008-exposure-budget-and-client-address.md), [ADR-011](../adr/011-research-events.md), [ADR-014](../adr/014-demo-mode.md) §1, [ADR-017](../adr/017-tunnistus-oidc-package.md), [ADR-025](../adr/025-admin-host.md), [ADR-027](../adr/027-sign-in-code-bound-to-the-device.md), [ADR-029](../adr/029-the-research-copy.md), [ADR-056](../adr/056-attestation-later-no-screenshot-notice.md), [ADR-059](../adr/059-refresh-token-carries-its-session.md), [ADR-061](../adr/061-one-home-no-ponds.md)
+- Issues: #32, #33 (the bank login), #35 (sessions), #490 (the refresh token's secret), #48, #49, #52 (photos), #50, #194 (research), #86 (anti-scraping: attestation later, ADR-056), #198 (CloudFront-only ingress), #514 (the home)
 
 ## Open
 

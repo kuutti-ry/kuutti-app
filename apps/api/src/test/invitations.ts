@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import type { Queryable } from "@kuutti/db";
 import { CONSENT_VERSIONS } from "@kuutti/i18n";
-import { completeProfiles, consentsOf, pondNamed } from "./people.ts";
+import { completeProfiles, consentsOf, HOME, pondNamed } from "./people.ts";
 
 /**
  * Invitations and the reward ledger as a test of any slice sets them up
@@ -14,10 +14,10 @@ import { completeProfiles, consentsOf, pondNamed } from "./people.ts";
 export async function completed(db: Queryable, accountId: string): Promise<void> {
   const pondId = await pondNamed(db, `invite-${randomUUID().slice(0, 8)}`);
   await db.query(
-    `UPDATE account SET pond_id = $2, gender = 'woman',
+    `UPDATE account SET pond_id = $2, gender = 'woman', home_place = $3,
             state = CASE WHEN state = 'registered' THEN 'active' ELSE state END
       WHERE id = $1`,
-    [accountId, pondId],
+    [accountId, pondId, HOME],
   );
   await consentsOf(db, [accountId]);
   await completeProfiles(db, [accountId]);

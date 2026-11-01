@@ -14,7 +14,7 @@ import { listPhotos } from "@/features/media";
 import { useT } from "@/lib/locale";
 import { useHapticTap } from "@/theme/haptics";
 import { DEAL_BREAKERS_PATH } from "./DealBreakersScreen";
-import { completenessText } from "./keys";
+import { completenessText, shownPlaceName } from "./keys";
 import { FIRST_LATER_FIELD, laterPath, laterProgress } from "./later/LaterFieldScreen";
 import { type MarkStyle, ProgressMark, progressWords } from "./ProgressMark";
 import { isDone, type Progress, photoProgress, sectionProgress } from "./progress";
@@ -64,14 +64,15 @@ function useApprovedPhotos(): [number | null, () => void] {
  * The profile as a list (#227, ADR-009, ADR-019): the eye at the top that
  * opens the card as others see it, what the card still needs (said only
  * while something is missing, #239), then the
- * profile's parts, each with how far it is filled: the photos, the sections
- * (each its own screen that saves on leaving), the deal-breakers (#149) and,
- * while a later question is unanswered, the later screens (#148). Nothing is
+ * profile's parts, each with how far it is filled: the photos, the home
+ * (ADR-061), which is never unfilled and carries what the card says instead,
+ * the sections (each its own screen that saves on leaving), the deal-breakers
+ * (#149) and, while a later question is unanswered, the later screens (#148). Nothing is
  * edited here, so there is nothing to save; the list reads the profile and
  * the photos again when a screen hands back, and the marks follow.
  */
 export function ProfileScreen() {
-  const { t } = useT();
+  const { t, locale } = useT();
   const router = useRouter();
   const tap = useHapticTap();
   const profile = useProfile();
@@ -166,6 +167,12 @@ export function ProfileScreen() {
               // The photos are approved, not answered: their own words for a screen reader.
               photos && !isDone(photos) ? t("profile.progress.photos", photos) : undefined,
             ),
+            {
+              key: "place",
+              title: t("profile.place.title"),
+              summary: profile.home ? shownPlaceName(profile.home, locale) : undefined,
+              onPress: open("/profile/place"),
+            },
             ...PROFILE_SECTIONS.map((section, index) =>
               filled(
                 t,

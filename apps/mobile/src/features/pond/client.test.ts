@@ -1,7 +1,7 @@
 import { saveSession } from "@/lib/session";
-import { choosePond, fetchGate, fetchPondSeeks, fetchPonds, fetchWaitlist } from "./client";
+import { fetchGate, fetchPondSeeks, fetchWaitlist } from "./client";
 
-// The pond as the app reads it (#54, #94, #174): each route parsed by its
+// The pond as the app reads it (#54, #94): each route parsed by its
 // contract, and an answer without data an ApiError with the status.
 
 const token = (seed: string) => (seed + "x".repeat(43)).slice(0, 43);
@@ -9,14 +9,6 @@ const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
 const refusal = (status: number) =>
   json({ error: { code: "x", message: "x", requestId: "r" } }, status);
-
-const POND = {
-  id: "5f1c1c4e-9a8e-4a0b-9c3a-0c8d1e2f3a00",
-  slug: "espoo",
-  name: "Espoo",
-  nameInessive: "Espoossa",
-  parentId: null,
-};
 
 function answering(...answers: Response[]) {
   const seen: Request[] = [];
@@ -81,27 +73,5 @@ describe("the pond client", () => {
   it("refuses shares that break the contract", async () => {
     answering(json({ seeks: { men: 0, everyone: 20, women: 80 } }));
     await expect(fetchPondSeeks()).rejects.toThrow();
-  });
-
-  it("lists the ponds to choose from", async () => {
-    const seen = answering(json({ ponds: [POND] }), refusal(500));
-    expect(await fetchPonds()).toEqual({ ponds: [POND] });
-    expect(pathOf(seen[0])).toBe("/ponds");
-    await expect(fetchPonds()).rejects.toMatchObject({
-      status: 500,
-      message: "ponds answered 500",
-    });
-  });
-
-  it("chooses a pond by its id, and fails a refusal", async () => {
-    const seen = answering(new Response(null, { status: 204 }), refusal(404));
-    await expect(choosePond(POND.id)).resolves.toBeUndefined();
-    expect(seen[0]?.method).toBe("PUT");
-    expect(pathOf(seen[0])).toBe("/account/pond");
-    expect(JSON.parse(await (seen[0] as Request).text())).toEqual({ pondId: POND.id });
-    await expect(choosePond(POND.id)).rejects.toMatchObject({
-      status: 404,
-      message: "pond answered 404",
-    });
   });
 });

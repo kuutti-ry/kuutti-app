@@ -17,7 +17,7 @@ import {
   test,
   testConfig,
 } from "../test/harness.ts";
-import { openPond, type PeopleOptions, people, pondNamed } from "../test/people.ts";
+import { HOME, HOMES, openPond, type PeopleOptions, people, pondNamed } from "../test/people.ts";
 import { openPondIds, subjectsOfPond } from "./pool.ts";
 import { buildRoundOf, buildRounds, roundsJob } from "./round-builder.ts";
 
@@ -100,7 +100,7 @@ async function shownBefore(
     accountId: owner,
     day: daysBefore(days),
     ordering: "count",
-    entries: [{ candidateId: candidate, reason: "matches_filters" }],
+    entries: [{ candidateId: candidate, reason: "matches_filters", distance: "nearby" }],
   });
   if (!built) throw new Error("earlier round not written");
   if (opened) {
@@ -209,7 +209,9 @@ describe("who gets a round", () => {
 });
 
 describe("whom a round holds", () => {
-  test("A round holds at most round_size cards, the most soft matches first", async ({ ctx }) => {
+  test("A round holds at most round_size cards, and within a band the most soft matches come first", async ({
+    ctx,
+  }) => {
     await setConfig(ctx.client, "round_size", 2);
     const pond = await pondNamed(ctx.client, "test-rounds-size");
     const [a] = await people(ctx.client, pond, 1, {
@@ -601,7 +603,7 @@ describe("when a round is built", () => {
     ]);
   });
 
-  test("round_built names the ordering of the first cut", async ({ ctx }) => {
+  test("round_built names the ordering, the band before the count", async ({ ctx }) => {
     const { women } = await pondOf(ctx, "test-rounds-event", 1, 2);
     const [a] = women;
     if (!a) throw new Error("people not written");
@@ -625,7 +627,7 @@ describe("when a round is built", () => {
     );
     expect(rows.map((row) => row.props)).toEqual([
       {
-        ordering: "count",
+        ordering: "band_count",
         size: 2,
         matchesFilters: 2,
         likedYou: 0,
@@ -634,6 +636,236 @@ describe("when a round is built", () => {
         fish: 0,
       },
     ]);
+  });
+});
+
+describe("distance (#514, ADR-061 §5 to §7)", () => {
+  const NEXT_NIGHT = new Date(NIGHT.getTime() + 24 * 3600 * 1000);
+  const NEXT_DAY = finnishDay(NEXT_NIGHT);
+
+  /** Each card of a person's round with the band written on it, in order. */
+  async function bandsOf(db: Queryable, accountId: string, day = DAY) {
+    const { rows } = await db.query<{ candidate_id: string; distance: string | null }>(
+      `SELECT e.candidate_id, e.distance FROM rounds r JOIN round_entries e ON e.round_id = r.id
+        WHERE r.account_id = $1 AND r.day = $2 ORDER BY e.position`,
+      [accountId, day],
+    );
+    return rows.map((row) => [row.candidate_id, row.distance]);
+  }
+
+  /** "A", a woman living in Kallio, and one man at each home; everybody's matching open. */
+  async function around(ctx: TestContext, slug: string, homes: readonly string[]) {
+    const pond = await pondNamed(ctx.client, slug);
+    const [a] = await people(ctx.client, pond, 1, WOMEN);
+    if (!a) throw new Error("A not written");
+    const men: string[] = [];
+    for (const home of homes) {
+      const [man] = await people(ctx.client, pond, 1, { ...MEN, home });
+      if (!man) throw new Error("a man not written");
+      men.push(man);
+    }
+    await openPond(ctx.client, pond);
+    return { pond, a, men };
+  }
+
+  const moves = async (ctx: TestContext, accountId: string, postalCode: string) => {
+    const who = await signInAs(ctx.client, accountId);
+    const res = await ctx.app.request("/account/home", {
+      method: "PUT",
+      headers: { ...who.headers, "content-type": "application/json" },
+      body: JSON.stringify({ postalCode }),
+    });
+    expect(res.status).toBe(200);
+  };
+
+  test("the night writes a round nearest band first, whatever the soft matches, with each band", async ({
+    ctx,
+  }) => {
+    const { a, men } = await around(ctx, "test-distance-order", [
+      HOMES.far,
+      HOMES.around,
+      HOMES.close,
+      HOMES.nearby,
+    ]);
+    const [far, further, close, nearby] = men;
+    // The furthest is the most like her: it moves him up nothing.
+    await ctx.client.query(
+      `UPDATE profile SET fields = fields || '{"education": "amk", "drinking": "rarely"}'::jsonb
+        WHERE account_id = ANY($1::uuid[])`,
+      [[a, far]],
+    );
+
+    await buildRounds(await deps(ctx.client));
+
+    expect(await bandsOf(ctx.client, a)).toEqual([
+      [nearby, "nearby"],
+      [close, "close"],
+      [further, "around"],
+      [far, "far"],
+    ]);
+  });
+
+  test("A distance deal-breaker keeps the two out of each other's rounds", async ({ ctx }) => {
+    const { a, men } = await around(ctx, "test-distance-filter", [HOMES.nearby, HOMES.close]);
+    const [b, c] = men;
+    if (!b || !c) throw new Error("people not written");
+    await ctx.client.query(
+      `INSERT INTO preferences (account_id, field, value, mode, include_unknown)
+       VALUES ($1, 'distance', '["nearby"]', 'hard', true)`,
+      [a],
+    );
+
+    await buildRounds(await deps(ctx.client));
+
+    expect(candidates(await roundOf(ctx.client, a))).toEqual([b]);
+    expect(candidates(await roundOf(ctx.client, b))).toEqual([a]);
+    expect(candidates(await roundOf(ctx.client, c))).toEqual([]);
+  });
+
+  test("The liked-you places keep their order, whatever the band", async ({ ctx }) => {
+    const { a, men } = await around(ctx, "test-distance-liked", [HOMES.far, HOMES.nearby]);
+    const [b, c] = men;
+    if (!b || !c) throw new Error("people not written");
+    await shownBefore(ctx.client, b, a, 3, "like");
+    await shownBefore(ctx.client, c, a, 1, "like");
+
+    await buildRounds(await deps(ctx.client));
+
+    expect(await roundOf(ctx.client, a)).toEqual([
+      { candidate_id: b, reason: "liked_you" },
+      { candidate_id: c, reason: "liked_you" },
+    ]);
+    expect(await bandsOf(ctx.client, a)).toEqual([
+      [b, "far"],
+      [c, "nearby"],
+    ]);
+  });
+
+  test("Coming back keeps its order, whatever the band", async ({ ctx }) => {
+    const { a, men } = await around(ctx, "test-distance-back", [HOMES.far, HOMES.nearby]);
+    const [c, d] = men;
+    if (!c || !d) throw new Error("people not written");
+    await shownBefore(ctx.client, a, c, 45, null);
+    await shownBefore(ctx.client, a, d, 40, null);
+
+    await buildRounds(await deps(ctx.client));
+
+    expect(await roundOf(ctx.client, a)).toEqual([
+      { candidate_id: c, reason: "seen_before" },
+      { candidate_id: d, reason: "seen_before" },
+    ]);
+    expect(await bandsOf(ctx.client, a)).toEqual([
+      [c, "far"],
+      [d, "nearby"],
+    ]);
+  });
+
+  test("An entry keeps its band, so moving home and reading again says nothing new", async ({
+    ctx,
+  }) => {
+    const { a, men } = await around(ctx, "test-distance-frozen", [HOMES.close]);
+    const [b] = men;
+    if (!b) throw new Error("people not written");
+    await buildRounds(await deps(ctx.client));
+    const app = await appAt(ctx.client, NOON);
+    const said = async () =>
+      (await readToday(app, ctx.client, a)).entries?.map((entry) => entry.distance);
+    expect(await said()).toEqual(["close"]);
+
+    // Next door to B, and then B far away: the entry is what was written.
+    await moves(ctx, a, HOMES.close);
+    expect(await said()).toEqual(["close"]);
+    await moves(ctx, b, HOMES.far);
+    expect(await said()).toEqual(["close"]);
+  });
+
+  test("A new home and a changed edge count from the next round, never on an entry written", async ({
+    ctx,
+  }) => {
+    const { a, men } = await around(ctx, "test-distance-next", [HOMES.close, HOMES.nearby]);
+    const [b, c] = men;
+    if (!b || !c) throw new Error("people not written");
+    await buildRounds(await deps(ctx.client));
+    const written = [
+      [c, "nearby"],
+      [b, "close"],
+    ];
+    expect(await bandsOf(ctx.client, a)).toEqual(written);
+
+    // To B's own area, and with nearby ending at a kilometre.
+    await moves(ctx, a, HOMES.close);
+    await setConfig(ctx.client, "distance_nearby_km", 1);
+
+    expect(await bandsOf(ctx.client, a)).toEqual(written);
+    // A's round was never opened, so its people may come again (ADR-042 §1).
+    await buildRounds(await deps(ctx.client, NEXT_NIGHT));
+    expect(await bandsOf(ctx.client, a)).toEqual(written);
+    expect(await bandsOf(ctx.client, a, NEXT_DAY)).toEqual([
+      [b, "nearby"],
+      [c, "close"],
+    ]);
+  });
+
+  test("Only a round's entry says a band, and as a word", async ({ ctx }) => {
+    const { a, men } = await around(ctx, "test-distance-word", [HOMES.close]);
+    const [b] = men;
+    if (!b) throw new Error("people not written");
+    await buildRounds(await deps(ctx.client));
+    const app = await appAt(ctx.client, NOON);
+    const who = await signInAs(ctx.client, a);
+
+    const round = await app.request("/rounds/today", { headers: who.headers });
+    const text = await round.text();
+    const [entry] = RoundResponse.parse(JSON.parse(text)).entries ?? [];
+    expect(entry?.distance).toBe("close");
+    expect(entry?.card).not.toHaveProperty("distance");
+
+    const preview = await app.request("/profile/card", { headers: who.headers });
+    const own = await preview.text();
+    expect(JSON.parse(own).card).not.toHaveProperty("distance");
+    // The word, and no figure behind it: neither kilometres nor a centre says how far.
+    for (const answer of [text, own]) {
+      expect(answer).not.toMatch(/\b(km|kilomet\w*|metres?)\b/i);
+      expect(answer).not.toMatch(/"(x|y|edges|homePlace|home_place)"/);
+    }
+  });
+
+  test("a round built at the day's first read carries its bands too", async ({ ctx }) => {
+    const { pond, a, men } = await around(ctx, "test-distance-first-read", [HOMES.around]);
+    const [b] = men;
+    if (!b) throw new Error("people not written");
+    await ctx.client.query("UPDATE ponds SET matching_open = false WHERE id = $1", [pond]);
+    await buildRounds(await deps(ctx.client));
+    expect(await roundOf(ctx.client, a)).toBeNull();
+    await openPond(ctx.client, pond);
+
+    const first = await readToday(await appAt(ctx.client, NOON), ctx.client, a);
+
+    expect(first.entries?.map((entry) => entry.distance)).toEqual(["around"]);
+    expect(await bandsOf(ctx.client, a)).toEqual([[b, "around"]]);
+  });
+
+  test("a person whose home left the list is in nobody's round, and gets none", async ({ ctx }) => {
+    const { a, men } = await around(ctx, "test-distance-no-home", [HOMES.nearby, "12345"]);
+    const [b, gone] = men;
+    if (!b || !gone) throw new Error("people not written");
+
+    await buildRounds(await deps(ctx.client));
+
+    expect(candidates(await roundOf(ctx.client, a))).toEqual([b]);
+    expect(await roundOf(ctx.client, gone)).toBeNull();
+  });
+
+  test("an entry from before distance reads as no band", async ({ ctx }) => {
+    const { a } = await around(ctx, "test-distance-old", [HOMES.nearby]);
+    await buildRounds(await deps(ctx.client));
+    await ctx.client.query(
+      `UPDATE round_entries SET distance = NULL
+        WHERE round_id IN (SELECT id FROM rounds WHERE account_id = $1)`,
+      [a],
+    );
+    const round = await readToday(await appAt(ctx.client, NOON), ctx.client, a);
+    expect(round.entries?.map((entry) => entry.distance)).toEqual([null]);
   });
 });
 
@@ -917,7 +1149,7 @@ describe("the fish (#378, ADR-039)", () => {
     );
     expect(rows.map((row) => row.props)).toEqual([
       {
-        ordering: "count",
+        ordering: "band_count",
         size: 1,
         matchesFilters: 0,
         likedYou: 0,
@@ -943,7 +1175,11 @@ describe("over the synthetic population", () => {
         [pond.slug, pond.nameNominative, pond.nameInessive],
       );
     }
-    await writePopulation(ctx.client, generatePopulation({ size: 300, seed: 7 }), CONSENT_VERSIONS);
+    await writePopulation(
+      ctx.client,
+      generatePopulation({ size: 300, seed: 7, homes: { [HOME]: 1 } }),
+      CONSENT_VERSIONS,
+    );
     // Without the photos release nobody has a face, so nobody is complete: three approved rows
     // each, as the people of the other tests have, and the demo commands' open ponds.
     await ctx.client.query(

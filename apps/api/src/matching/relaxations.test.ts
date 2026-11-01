@@ -27,7 +27,11 @@ async function roundWith(db: Queryable, accountId: string, cards: string[]) {
     accountId,
     day: DAY,
     ordering: "count",
-    entries: cards.map((candidateId) => ({ candidateId, reason: "matches_filters" as const })),
+    entries: cards.map((candidateId) => ({
+      candidateId,
+      reason: "matches_filters" as const,
+      distance: "nearby" as const,
+    })),
   });
   if (!built) throw new Error("round not written");
   return built.roundId;
@@ -51,7 +55,8 @@ const completedAt = async (db: Queryable, roundId: string) =>
 const NO_MATCHES = { between: async () => null, open: async () => "" };
 
 /** People a relaxation lets in who need none of the day's other relaxations. */
-const as = (ids: string[]) => ids.map((candidateId) => ({ candidateId, needs: [] }));
+const as = (ids: string[]) =>
+  ids.map((candidateId) => ({ candidateId, needs: [], distance: "close" as const }));
 
 describe("the relaxation's writer", () => {
   test("refuses a deal-breaker relaxed since the route looked, and adds nothing", async ({
@@ -320,8 +325,8 @@ describe("the relaxation's writer", () => {
       relaxation: KIDS,
       basis: [ASIDE],
       candidates: [
-        { candidateId: c.accountId, needs: ["smoking"] },
-        { candidateId: d.accountId, needs: [] },
+        { candidateId: c.accountId, needs: ["smoking"], distance: "close" },
+        { candidateId: d.accountId, needs: [], distance: "close" },
       ],
     });
 

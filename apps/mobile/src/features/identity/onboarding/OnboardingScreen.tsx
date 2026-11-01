@@ -8,15 +8,17 @@ import {
   DISPLAY_NAME_MAX,
   GENDERS,
   type Gender,
+  type HomeSummary,
+  type HomeUpdate,
   type OnboardingStatus,
-  type PondSummary,
   PROFILE_FIELDS,
   type ProfileFields,
 } from "@kuutti/schema";
 import { useRouter } from "expo-router";
 import { useEffect, useRef, useState } from "react";
-import { ScrollView, View } from "react-native";
+import { type ScrollView, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { KeyboardScrollView } from "@/components/KeyboardScrollView";
 import { LoadFailed } from "@/components/LoadFailed";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -24,13 +26,16 @@ import { Input } from "@/components/ui/input";
 import { Stepper } from "@/components/ui/stepper";
 import { Switch } from "@/components/ui/switch";
 import { Text } from "@/components/ui/text";
-import { choosePond, fetchPonds, pondName } from "@/features/pond";
 import {
   BioEditor,
   optionKey,
+  PlaceChoice,
+  PlacePicker,
   PromptsEditor,
   profileErrorText,
+  saveHome,
   useProfile,
+  useSpokenOnIos,
 } from "@/features/profile";
 import { fetchInvitations, InvitationStep } from "@/features/rewards";
 import { useT } from "@/lib/locale";
@@ -50,7 +55,8 @@ type Step =
   | "seeks"
   | "intent"
   | "age"
-  | "pond"
+  | "home"
+  | "homeShown"
   | "photos"
   | "prompts"
   | "stuck"
@@ -58,13 +64,16 @@ type Step =
 
 /**
  * The screens, for "Step x of n"; the identity label shares the gender's
- * number. The pond is asked only where there is more than one (#174). The
- * welcome step and a friend's invitation code count no number: the consents
- * come before the bank login (#418), and the welcome step asks them again
- * only when they did not land or a wording changed since; the code is
- * offered once and never required (#107).
+ * number, and what the card shows shares the home's. The welcome step and a
+ * friend's invitation code count no number: the consents come before the bank
+ * login (#418), and the welcome step asks them again only when they did not
+ * land or a wording changed since; the code is offered once and never required
+ * (#107).
  */
-const STEPS: Step[] = ["name", "gender", "seeks", "intent", "age", "pond", "photos", "prompts"];
+const STEPS: Step[] = ["name", "gender", "seeks", "intent", "age", "home", "photos", "prompts"];
+
+/** The steps that follow another under its number. */
+const NUMBERED_AS: Partial<Record<Step, Step>> = { identityLabel: "gender", homeShown: "home" };
 
 /**
  * A friend's invitation code (#107): not asked yet, asked of the API and
@@ -78,6 +87,8 @@ type LocalAnswers = {
   invitation: InvitationOffer;
   /** A non-binary gender was just declared: the label is offered once, before the next step. */
   labelPending: boolean;
+  /** The home the API just took: what the card will say is shown once, with the choice if there is one. */
+  homeShown: HomeSummary | null;
 };
 
 /**
@@ -87,9 +98,9 @@ type LocalAnswers = {
  * it (ADR-010 §9), though since #418 they are given before the bank login
  * and the welcome step is the fallback (ADR-010 §15); a friend's invitation
  * code once, before the name, never required (#107); then the name, the
- * gender, whom one seeks, the intent, the age window, the photos, the
- * prompts. Research is asked before the bank and kept in Settings.
- * A step the screen cannot ask (a pond without a default) is "stuck".
+ * gender, whom one seeks, the intent, the age window, the home, the photos,
+ * the prompts. Research is asked before the bank and kept in Settings.
+ * A step of the contract this screen has no question for is "stuck".
  */
 function nextStep(status: OnboardingStatus, local: LocalAnswers): Step {
   const missing = new Set(status.missing);
@@ -103,8 +114,8 @@ function nextStep(status: OnboardingStatus, local: LocalAnswers): Step {
   if (missing.has("seeks")) return "seeks";
   if (missing.has("intent")) return "intent";
   if (missing.has("age_window")) return "age";
-  // Open only where more than one pond exists (#174, ADR-010 §12); with one, the API assigned it.
-  if (missing.has("pond")) return "pond";
+  if (missing.has("home")) return "home";
+  if (local.homeShown) return "homeShown";
   if (missing.has("photos")) return "photos";
   if (missing.has("prompts_or_bio")) return "prompts";
   if (missing.size > 0) return "stuck";
@@ -178,10 +189,13 @@ export function OnboardingScreen() {
   const [invitation, setInvitation] = useState<InvitationOffer>("unasked");
   const [seeks, setSeeks] = useState<Gender[]>([]);
   const [labelPending, setLabelPending] = useState(false);
+  const [homeShown, setHomeShown] = useState<HomeSummary | null>(null);
   const [gender, setGender] = useState<Gender | null>(null);
   const [ages, setAges] = useState<{ min: number; max: number } | null>(null);
   const current: Step | null =
-    state.status === "ready" ? nextStep(state.onboarding, { invitation, labelPending }) : null;
+    state.status === "ready"
+      ? nextStep(state.onboarding, { invitation, labelPending, homeShown })
+      : null;
   // Whether a code may still be typed, asked once the consents are given,
   // which the API's answer needs (ADR-044 §6): offered if so, and otherwise,
   // or when the read fails, the walk goes on without it.
@@ -213,18 +227,6 @@ export function OnboardingScreen() {
   useEffect(() => {
     if (current === "age" && ages === null && age !== null) setAges(defaultAgeWindow(age));
   }, [current, ages, age]);
-  // The ponds to choose from, read once the step is reached (#174): null while loading, [] when the read failed.
-  const [ponds, setPonds] = useState<PondSummary[] | null>(null);
-  useEffect(() => {
-    if (current !== "pond" || ponds !== null) return;
-    let live = true;
-    fetchPonds()
-      .then((list) => live && setPonds(list.ponds.filter((pond) => pond.parentId === null)))
-      .catch(() => live && setPonds([]));
-    return () => {
-      live = false;
-    };
-  }, [current, ponds]);
 
   const setField = (key: keyof ProfileFields, value: string | undefined) => {
     const fields: Record<string, unknown> = { ...profile.draft.fields };
@@ -234,6 +236,27 @@ export function OnboardingScreen() {
   };
   /** A profile step: the draft is saved, then the status read again. */
   const saveProfileStep = () => step(() => profile.save());
+  /** The home's two steps: the API's answer says what the card will say, for the second. */
+  const saveHomeStep = (update: HomeUpdate) =>
+    step(async () => setHomeShown(await saveHome(update)));
+
+  const profileFailed = profile.notice?.kind === "error";
+  // A change refused for its cadence is said as that (#147), an answer refused
+  // for its consent too (ADR-010 §16), a code the list lacks as that (ADR-061
+  // §4), a refused profile save in the profile's own words (#223), the rest as
+  // a step that did not go through. iOS has no live regions, so it is spoken.
+  const failure = !(failed || profileFailed)
+    ? null
+    : failedCode === "change_too_soon"
+      ? t("errors.change_too_soon")
+      : failedCode === "consent_required"
+        ? t("errors.special_category_locked")
+        : failedCode === "postal_code_unknown"
+          ? t("errors.postal_code_unknown")
+          : failed
+            ? t("onboarding.failed")
+            : profileErrorText(profile.notice, t);
+  useSpokenOnIos(failure);
 
   if (state.status === "loading" || profile.status === "loading") {
     return (
@@ -275,20 +298,16 @@ export function OnboardingScreen() {
   }
   const { onboarding } = state;
   const { draft, update } = profile;
-  const position = STEPS.indexOf(current === "identityLabel" ? "gender" : current) + 1;
+  const position = STEPS.indexOf(NUMBERED_AS[current] ?? current) + 1;
   const specialConsented =
     onboarding.consents.specialCategory === bundledVersion("special_category");
   const specialOutdated =
     bundledVersion("special_category") !== onboarding.currentVersions.special_category;
-  const profileFailed = profile.notice?.kind === "error";
 
   return (
     <SafeAreaView className="flex-1 bg-background">
-      <ScrollView
-        ref={scroll}
-        contentContainerClassName="flex-grow gap-6 p-6"
-        keyboardShouldPersistTaps="handled"
-      >
+      {/* The home's list lies under its field: a scroll reaches it past the keyboard. */}
+      <KeyboardScrollView ref={scroll} contentContainerClassName="flex-grow gap-6 p-6">
         <Text variant="h1" accessibilityRole="header">
           {t("onboarding.title")}
         </Text>
@@ -297,21 +316,7 @@ export function OnboardingScreen() {
             {t("onboarding.progress", { step: position, total: STEPS.length })}
           </Text>
         )}
-        {(failed || profileFailed) && (
-          <Text accessibilityLiveRegion="assertive">
-            {/* A change refused for its cadence is said as that (#147), an answer
-                refused for its consent too (ADR-010 §16), a refused profile save
-                in the profile's own words (#223), the rest as a step that did not
-                go through. */}
-            {failedCode === "change_too_soon"
-              ? t("errors.change_too_soon")
-              : failedCode === "consent_required"
-                ? t("errors.special_category_locked")
-                : failed
-                  ? t("onboarding.failed")
-                  : profileErrorText(profile.notice, t)}
-          </Text>
-        )}
+        {failure !== null && <Text accessibilityLiveRegion="assertive">{failure}</Text>}
         {failed && failedCode === "change_too_soon" && changeFrom && (
           <Text>
             {t("onboarding.changeFrom", { date: formatDate(locale, new Date(changeFrom)) })}
@@ -602,44 +607,37 @@ export function OnboardingScreen() {
           </View>
         )}
 
-        {current === "pond" && (
+        {current === "home" && (
           <View className="gap-4">
-            <Text variant="h2">{t("onboarding.pond.title")}</Text>
-            <Text>{t("onboarding.pond.explain")}</Text>
-            {ponds === null && (
-              <Text accessibilityLiveRegion="polite">{t("onboarding.loading")}</Text>
-            )}
-            {ponds !== null && ponds.length === 0 && (
-              <View className="gap-3">
-                <Text accessibilityLiveRegion="assertive">{t("onboarding.failed")}</Text>
-                <Button
-                  variant="outline"
-                  onPress={() => {
-                    tap();
-                    setPonds(null);
-                  }}
-                >
-                  {t("onboarding.retry")}
-                </Button>
-              </View>
-            )}
-            {ponds !== null && ponds.length > 0 && (
-              <View className="flex-row flex-wrap gap-2">
-                {ponds.map((pond) => (
-                  <Button
-                    key={pond.id}
-                    variant="outline"
-                    disabled={busy}
-                    onPress={() => {
-                      tap();
-                      void step(() => choosePond(pond.id));
-                    }}
-                  >
-                    {pondName(t, pond)}
-                  </Button>
-                ))}
-              </View>
-            )}
+            <Text variant="h2">{t("onboarding.home.title")}</Text>
+            <Text>{t("profile.place.explain")}</Text>
+            <PlacePicker
+              busy={busy}
+              refused={failedCode === "postal_code_unknown"}
+              onPick={(postalCode) => void saveHomeStep({ postalCode })}
+            />
+          </View>
+        )}
+
+        {/* Local, as the identity label is: an app closed here leaves the town, and the profile's row still offers this. */}
+        {current === "homeShown" && homeShown && (
+          <View className="gap-4">
+            <Text variant="h2">{t("profile.place.choice")}</Text>
+            <PlaceChoice
+              home={homeShown}
+              busy={busy}
+              onChoose={(showArea) => void saveHomeStep({ showArea })}
+            />
+            {/* Through `step`, so that a choice that failed is not said on the step after. */}
+            <Button
+              disabled={busy}
+              onPress={() => {
+                tap();
+                void step(async () => setHomeShown(null));
+              }}
+            >
+              {t("onboarding.continue")}
+            </Button>
           </View>
         )}
 
@@ -692,7 +690,7 @@ export function OnboardingScreen() {
         )}
 
         {current === "done" && <Text accessibilityLiveRegion="polite">{t("onboarding.done")}</Text>}
-      </ScrollView>
+      </KeyboardScrollView>
     </SafeAreaView>
   );
 }

@@ -65,7 +65,7 @@ export type SnapshotRows = {
   gender: string | null;
   birthYear: number | null;
   birthMonth: number | null;
-  /** The pond's slug, or null before the person chose one. */
+  /** The pond's slug, or null before the person has a home. */
   pond: string | null;
   /** The stored profile document's fields, as written; the registry filter decides what enters. */
   fields: unknown;

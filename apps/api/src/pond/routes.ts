@@ -2,8 +2,8 @@ import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
 import {
   ErrorResponse,
   GateResponse,
-  PondChoice,
-  PondList,
+  HomeSummary,
+  HomeUpdate,
   PondSeeksResponse,
   WaitlistResponse,
 } from "@kuutti/schema";
@@ -11,8 +11,7 @@ import type { MiddlewareHandler } from "hono";
 import type { Deps } from "../app.ts";
 import { callerOf } from "../lib/auth-middleware.ts";
 import type { AppEnv } from "../lib/env.ts";
-import { AppError } from "../lib/errors.ts";
-import * as repo from "./repo.ts";
+import { saveHome } from "./home.ts";
 import { readPondSeeks, readWaitlist } from "./waitlist.ts";
 
 const errorContent = (description: string) => ({
@@ -23,28 +22,19 @@ const json = <T>(schema: T) => ({ content: { "application/json": { schema } } })
 const bearer = { security: [{ session: [] }] };
 const unauthenticated = errorContent("unauthenticated, session_expired or session_revoked.");
 
-const listRoute = createRoute({
-  method: "get",
-  path: "/ponds",
-  summary: "The ponds a person can choose",
-  description:
-    "Every pond with both Finnish case forms (TD-17), parents first. Where matching happens (TD-10); the choice is one per account.",
-  ...bearer,
-  responses: {
-    200: { description: "The ponds.", ...json(PondList) },
-    401: unauthenticated,
-  },
-});
-
-const chooseRoute = createRoute({
+const homeRoute = createRoute({
   method: "put",
-  path: "/account/pond",
-  summary: "Choose the caller's pond",
+  path: "/account/home",
+  summary: "Set the caller's home, or what their card shows of it",
+  description:
+    "A postal code of five digits, whether the card shows the area instead of the town, or both. What is kept is a place of at least matching_config home_min_inhabitants people: the postal area, else its municipality, else the nearest municipality that has them. A new postal code starts from the town again unless the same request says otherwise, and showArea stays false where no area is kept. The home changes whenever the person likes. The write sets the account's pond if it has none. The answer names places and never carries digits.",
   ...bearer,
-  request: { body: { required: true, ...json(PondChoice) } },
+  request: { body: { required: true, ...json(HomeUpdate) } },
   responses: {
-    204: { description: "Chosen." },
-    400: errorContent("Validation failed, or pond_unknown."),
+    200: { description: "Saved; the home as its owner reads it.", ...json(HomeSummary) },
+    400: errorContent(
+      "validation_failed, or postal_code_unknown: five digits the list lacks. Both constant, repeating nothing that was sent.",
+    ),
     401: unauthenticated,
     404: errorContent("No live account (erased meanwhile)."),
   },
@@ -112,7 +102,7 @@ export function pondRoutes(
   readGate: GateReader,
 ) {
   const app = new OpenAPIHono<AppEnv>();
-  const guarded = [listRoute, chooseRoute, gateRoute, seeksRoute];
+  const guarded = [homeRoute, gateRoute, seeksRoute];
   for (const path of new Set(guarded.map((r) => r.getRoutingPath()))) {
     app.use(path, requireSession);
   }
@@ -135,18 +125,9 @@ export function pondRoutes(
     return c.json(waitlist, 200);
   });
 
-  app.openapi(listRoute, async (c) => {
-    return c.json({ ponds: await repo.listPonds(deps.db) }, 200);
-  });
-
-  app.openapi(chooseRoute, async (c) => {
-    const { pondId } = c.req.valid("json");
-    const { accountId } = callerOf(c);
-    const outcome = await repo.setPondOfAccount(deps.db, accountId, pondId);
-    if (outcome === "no_pond") throw new AppError(400, "pond_unknown", "No such pond", { pondId });
-    if (outcome === "no_account") throw new AppError(404, "not_found", "No live account");
-    deps.logger.info({ accountId, pondId }, "pond chosen");
-    return c.body(null, 204);
+  app.openapi(homeRoute, async (c) => {
+    const home = await saveHome(deps, callerOf(c).accountId, c.req.valid("json"));
+    return c.json(home, 200);
   });
 
   return app;

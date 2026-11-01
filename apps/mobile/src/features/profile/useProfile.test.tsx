@@ -1,4 +1,4 @@
-import type { HiddenField, ProfileUpdate } from "@kuutti/schema";
+import type { HiddenField, HomeSummary, ProfileUpdate } from "@kuutti/schema";
 import { act, renderHook, waitFor } from "@testing-library/react-native";
 import { saveSession } from "@/lib/session";
 import { changesOf, EMPTY_PROFILE, useProfile, withChanges } from "./useProfile";
@@ -21,11 +21,12 @@ const DOCUMENT: ProfileUpdate = {
   prompts: [{ key: "sunday", answer: "A long breakfast." }],
   hiddenFields: [],
 };
-const stored = (document: ProfileUpdate | null) => ({
+const stored = (document: ProfileUpdate | null, home: HomeSummary | null = null) => ({
   profile: document
     ? { ...document, specialCategoryConsent: null, updatedAt: "2026-09-26T10:00:00.000Z" }
     : null,
   completeness: { complete: false, missing: ["photos"] },
+  home,
 });
 
 type Answer = Response | Promise<Response>;
@@ -65,6 +66,69 @@ beforeEach(async () => {
     accessExpiresAt: "2030-01-01T00:15:00.000Z",
     refreshToken: `${token("family")}.${token("refresh")}`,
     refreshExpiresAt: "2030-04-01T00:00:00.000Z",
+  });
+});
+
+describe("useProfile: the home (ADR-061)", () => {
+  const HOME: HomeSummary = {
+    town: { fi: "Helsinki", sv: "Helsingfors" },
+    area: { fi: "Kallio", sv: "Berghäll" },
+    showArea: false,
+  };
+
+  it("reads it beside the document, with no home until the first read", async () => {
+    serve([() => json(stored(DOCUMENT, HOME))]);
+    const { result } = await ready();
+    expect(result.current.home).toEqual(HOME);
+  });
+
+  it("has none where the API says none", async () => {
+    serve([() => json(stored(DOCUMENT))]);
+    const { result } = await ready();
+    expect(result.current.home).toBeNull();
+  });
+
+  it("is never part of the draft, what a save sends or what leaving would lose", async () => {
+    const saved = serve(
+      [() => json(stored(DOCUMENT, HOME))],
+      [() => json(stored({ ...DOCUMENT, displayName: "Aino K." }, HOME))],
+    );
+    const { result } = await ready();
+    expect(result.current.draft).toEqual(DOCUMENT);
+    expect(result.current.dirty).toBe(false);
+    await act(async () => {
+      result.current.update({ displayName: "Aino K." });
+    });
+    await act(async () => {
+      await result.current.save();
+    });
+    expect(JSON.stringify(saved)).not.toContain("Kallio");
+    expect(result.current.home).toEqual(HOME);
+  });
+
+  it("follows what a save answers", async () => {
+    const moved = { ...HOME, showArea: true };
+    serve(
+      [() => json(stored(DOCUMENT, HOME))],
+      [() => json(stored({ ...DOCUMENT, displayName: "Aino K." }, moved))],
+    );
+    const { result } = await ready();
+    await act(async () => {
+      result.current.update({ displayName: "Aino K." });
+    });
+    await act(async () => {
+      await result.current.save();
+    });
+    expect(result.current.home).toEqual(moved);
+  });
+
+  it("keeps what it knew when a read again fails", async () => {
+    serve([() => json(stored(DOCUMENT, HOME)), () => refusal("internal_error", 500)]);
+    const { result } = await ready();
+    await act(async () => {
+      await result.current.reload();
+    });
+    expect(result.current.home).toEqual(HOME);
   });
 });
 
