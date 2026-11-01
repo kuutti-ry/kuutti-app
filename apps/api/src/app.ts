@@ -117,7 +117,7 @@ export const PUBLIC_ROUTES = new Set([
   "GET /openapi.json",
   "GET /docs",
   // Aggregates per pond, once a day, nothing below k (#54, ADR-013).
-  "GET /waitlist",
+  "GET /ponds/counter",
   "GET /auth/start",
   "GET /auth/callback",
   "POST /auth/exchange",

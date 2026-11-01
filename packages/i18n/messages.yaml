@@ -8007,100 +8007,100 @@ account.email.done:
   sv: "Klart"
   machine: { fi: true, sv: true }
 
-pond.waitlist.label:
+pond.counter.label:
   en: "People in your area"
-  description: "Home screen, accessible name of the card with the waitlist counter of the person's own pond (#54, ADR-013)."
+  description: "Home screen, accessible name of the card with the pond counter of the person's own pond (#54, ADR-013)."
   fi: "Ihmiset alueellasi"
   sv: "Människor i ditt område"
   machine: { fi: true, sv: true }
 
-pond.waitlist.title:
+pond.counter.title:
   en: "Your area"
-  description: "Waitlist card: the line above the pond's name. The name follows on a line of its own, in the nominative, never inside a sentence."
+  description: "Pond card: the line above the pond's name. The name follows on a line of its own, in the nominative, never inside a sentence."
   fi: "Alueesi"
   sv: "Ditt område"
   machine: { fi: true, sv: true }
 
-pond.waitlist.verified:
+pond.counter.verified:
   en: "{people, plural, one {# person has identified with their bank} other {# people have identified with their bank}}"
-  description: "Waitlist card: how many bank-verified people wait in the pond. {people} is at least the threshold k (ten), so never small."
+  description: "Pond card: how many bank-verified people have this pond as theirs. {people} is at least the threshold k (ten), so never small."
   fi: "{people, plural, one {# ihminen on tunnistautunut pankkitunnuksilla} other {# ihmistä on tunnistautunut pankkitunnuksilla}}"
   sv: "{people, plural, one {# person har identifierat sig med bank-id} other {# personer har identifierat sig med bank-id}}"
   machine: { fi: true, sv: true }
 
-pond.waitlist.seeks.title:
+pond.counter.seeks.title:
   en: "Whom people with a finished profile are looking for"
-  description: "Waitlist card, the line above the bar of whom the people of the area seek (#507). The bar is drawn from finished profiles only."
+  description: "Pond card, the line above the bar of whom the people of the area seek (#507). The bar is drawn from finished profiles only."
   fi: "Ketä valmiin profiilin tehneet etsivät"
   sv: "Vem personer med färdig profil söker"
   machine: { fi: true, sv: true }
 
-pond.waitlist.seeks.men:
+pond.counter.seeks.men:
   en: "{share, number} % men"
-  description: "Waitlist card, the bar's label for the people who seek men and not women. {share} is a share of the three bands together, in steps of five."
+  description: "Pond card, the bar's label for the people who seek men and not women. {share} is a share of the three bands together, in steps of five."
   fi: "{share, number} % miehiä"
   sv: "{share, number} % män"
   machine: { fi: true, sv: true }
 
-pond.waitlist.seeks.everyone:
+pond.counter.seeks.everyone:
   en: "{share, number} % everyone"
-  description: "Waitlist card, the bar's label for the people who seek both women and men. It stands in the middle of the bar, as the overlap of the two others. {share} is a share of the three bands together, in steps of five."
+  description: "Pond card, the bar's label for the people who seek both women and men. It stands in the middle of the bar, as the overlap of the two others. {share} is a share of the three bands together, in steps of five."
   fi: "{share, number} % kaikkia"
   sv: "{share, number} % alla"
   machine: { fi: true, sv: true }
 
-pond.waitlist.seeks.women:
+pond.counter.seeks.women:
   en: "{share, number} % women"
-  description: "Waitlist card, the bar's label for the people who seek women and not men. {share} is a share of the three bands together, in steps of five."
+  description: "Pond card, the bar's label for the people who seek women and not men. {share} is a share of the three bands together, in steps of five."
   fi: "{share, number} % naisia"
   sv: "{share, number} % kvinnor"
   machine: { fi: true, sv: true }
 
-pond.waitlist.seeks.label:
+pond.counter.seeks.label:
   en: "Of the people with a finished profile who are looking for men or women, {men, number} percent are looking for men. {everyone, number} percent are looking for everyone. {women, number} percent are looking for women."
-  description: "Waitlist card, what a screen reader says for the whole bar: one element, three sentences. Each number is a share of the three bands together, in steps of five, at least five."
+  description: "Pond card, what a screen reader says for the whole bar: one element, three sentences. Each number is a share of the three bands together, in steps of five, at least five."
   fi: "Valmiin profiilin tehneistä miehiä tai naisia etsivistä {men, number} prosenttia etsii miehiä. {everyone, number} prosenttia etsii kaikkia. {women, number} prosenttia etsii naisia."
   sv: "Av personerna med färdig profil som söker män eller kvinnor söker {men, number} procent män. {everyone, number} procent söker alla. {women, number} procent söker kvinnor."
   machine: { fi: true, sv: true }
 
-pond.waitlist.finishing:
+pond.counter.finishing:
   en: "{people, plural, =0 {Everyone has finished their profile.} one {# person is still finishing their profile.} other {# people are still finishing their profile.}}"
-  description: "Waitlist card: how many of the verified people have not completed their profile yet. Shown only when the number is zero or at least k (ten); the one form exists for the grammar, not for use."
+  description: "Pond card: how many of the verified people have not completed their profile yet. Shown only when the number is zero or at least k (ten); the one form exists for the grammar, not for use."
   fi: "{people, plural, =0 {Kaikki ovat saaneet profiilinsa valmiiksi.} one {# ihminen viimeistelee vielä profiiliaan.} other {# ihmistä viimeistelee vielä profiiliaan.}}"
   sv: "{people, plural, =0 {Alla har gjort klart sin profil.} one {# person håller fortfarande på med sin profil.} other {# personer håller fortfarande på med sin profil.}}"
   machine: { fi: true, sv: true }
 
-pond.waitlist.small:
+pond.counter.small:
   en: "Your area is just getting started. Numbers are shown only when at least {k, number} people are here."
-  description: "Waitlist card, below the threshold: no number is said about a small pond. {k} is the threshold. It names a condition, not a promise: numbers are never shown below {k}, and they may come a little later than at exactly {k}."
+  description: "Pond card, below the threshold: no number is said about a small pond. {k} is the threshold. It names a condition, not a promise: numbers are never shown below {k}, and they may come a little later than at exactly {k}."
   fi: "Alueesi on vasta alussa. Luvut näytetään vain, kun täällä on vähintään {k, number} ihmistä."
   sv: "Ditt område har precis kommit igång. Siffror visas bara när minst {k, number} personer finns här."
   machine: { fi: true, sv: true }
 
-pond.waitlist.steps:
+pond.counter.steps:
   en: "The numbers change only in steps of at least {k, number} people, so that one person does not show."
-  description: "Waitlist card, under the figures and the bar: why they stand still for a while. {k} is the threshold (ten): the figures of an area move in steps of at least that many people, the total as people come and go, the bar as they finish a profile or change whom they seek, so one person changes nothing in them. It says what the numbers do, not that nothing can ever be inferred."
+  description: "Pond card, under the figures and the bar: why they stand still for a while. {k} is the threshold (ten): the figures of an area move in steps of at least that many people, the total as people come and go, the bar as they finish a profile or change whom they seek, so one person changes nothing in them. It says what the numbers do, not that nothing can ever be inferred."
   fi: "Luvut muuttuvat vain vähintään {k, number} ihmisen askelin, jotta yksittäinen ihminen ei näy niistä."
   sv: "Siffrorna ändras bara i steg om minst {k, number} personer, så att en enskild person inte syns i dem."
   machine: { fi: true, sv: true }
 
-pond.waitlist.loading:
+pond.counter.loading:
   en: "Counting…"
-  description: "Waitlist card while the figures load."
+  description: "Pond card while the figures load."
   fi: "Lasketaan…"
   sv: "Räknar…"
   machine: { fi: true, sv: true }
 
-pond.waitlist.failed:
+pond.counter.failed:
   en: "The numbers could not be read."
-  description: "Waitlist card when the figures could not be fetched."
+  description: "Pond card when the figures could not be fetched."
   fi: "Lukuja ei voitu lukea."
   sv: "Siffrorna kunde inte läsas."
   machine: { fi: true, sv: true }
 
-pond.waitlist.retry:
+pond.counter.retry:
   en: "Try again"
-  description: "Waitlist card, the button that fetches the figures again."
+  description: "Pond card, the button that fetches the figures again."
   fi: "Yritä uudelleen"
   sv: "Försök igen"
   machine: { fi: true, sv: true }
@@ -8286,7 +8286,7 @@ round.short.aside:
 
 round.short.more:
   en: "{more, plural, =0 {A few more people} one {About # more person} other {About # more people}}"
-  description: "Under a short-pool button (#99, ADR-042 §4): how much the relaxation widens the reader's pool, rounded down to the counter's step (matching_config waitlist_k, ten or more); zero means fewer than a step. Never a count of cards."
+  description: "Under a short-pool button (#99, ADR-042 §4): how much the relaxation widens the reader's pool, rounded down to the counter's step (matching_config pond_counter_k, ten or more); zero means fewer than a step. Never a count of cards."
   fi: "{more, plural, =0 {Muutama ihminen lisää} one {Noin # ihminen lisää} other {Noin # ihmistä lisää}}"
   sv: "{more, plural, =0 {Några fler personer} one {Ungefär # person till} other {Ungefär # fler personer}}"
   machine: { fi: true, sv: true }

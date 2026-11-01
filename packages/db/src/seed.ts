@@ -160,9 +160,9 @@ export const MATCHING_CONFIG_V1 = {
   // #350: the sends one account may try in a day, refused ones included; the
   // route's limiter counts them, since a refused photo is stored nowhere.
   message_photo_attempts_per_day: 30,
-  // #54 (ADR-013, rules/schema.md): the public waitlist counter says a number
+  // #54 (ADR-013, rules/schema.md): the public counter says a number
   // only where at least this many people stand behind it.
-  waitlist_k: 10,
+  pond_counter_k: 10,
   // #146 (ADR-010 §10): the pond every account is put in when it has none;
   // the slug of a row in ponds. Version 2 named another, version 3 this one
   // again (below).

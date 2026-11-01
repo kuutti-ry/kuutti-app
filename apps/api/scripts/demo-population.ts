@@ -57,7 +57,7 @@ import {
   writePopulation,
 } from "@kuutti/db/demo";
 import { CURRENT_CONSENT_VERSIONS } from "../src/identity/index.ts";
-import { takeSnapshot } from "../src/jobs/waitlist-snapshot.ts";
+import { takeSnapshot } from "../src/jobs/pond-counter.ts";
 import { type Config, loadConfig, parseConfig } from "../src/lib/config.ts";
 import { createLogger } from "../src/lib/logger.ts";
 import { createMediaDeps, deleteOrphanedObjects, type MediaDeps } from "../src/media/index.ts";
@@ -84,7 +84,7 @@ const { env, size, seed, action, photos } = command;
 const ponds = plannedPonds(size);
 // What this size does not show, against the first version of the config: a
 // small population is allowed, it is only said what it is too small for.
-const notShown = uncrossed(ponds, { counterK: MATCHING_CONFIG_V1.waitlist_k });
+const notShown = uncrossed(ponds, { counterK: MATCHING_CONFIG_V1.pond_counter_k });
 
 if (action === "dry-run") {
   console.log(
@@ -233,7 +233,7 @@ try {
   }
   // The figures the counter stood on are of the ponds as they were: gone, and
   // counted anew. Only here, where the target has been asked what it is.
-  await pool.query("DELETE FROM waitlist_snapshot");
+  await pool.query("DELETE FROM pond_counter");
   const counted = await takeSnapshot({ db: pool, logger, now: () => new Date() });
   console.log(JSON.stringify({ msg: "demo population: counter recounted", ...counted }));
   // And the ponds open, so that these people have rounds (ADR-060 Open 1).

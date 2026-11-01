@@ -15,7 +15,7 @@ import { HOME, openPond, people, pondNamed } from "../test/people.ts";
 import { readHome } from "./home.ts";
 
 // PUT /account/home (#514, ADR-061, features/pond/home.feature) and the gate's
-// route. The other routes' figures are waitlist.test.ts. The database is real
+// route. The other routes' figures are counter.test.ts. The database is real
 // and rolled back; the one statement this file spies on is the digits' path.
 
 const json = (headers: Record<string, string>) => ({

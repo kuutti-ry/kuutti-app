@@ -687,6 +687,20 @@
       "when": 1793475769210,
       "tag": "0097_home_distance_config",
       "breakpoints": true
+    },
+    {
+      "idx": 98,
+      "version": "7",
+      "when": 1793516181623,
+      "tag": "0098_pond_counter",
+      "breakpoints": true
+    },
+    {
+      "idx": 99,
+      "version": "7",
+      "when": 1793516182381,
+      "tag": "0099_pond_counter_key",
+      "breakpoints": true
     }
   ]
 }

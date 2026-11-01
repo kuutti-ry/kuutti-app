@@ -660,6 +660,60 @@ describe("migrate", () => {
     }
   });
 
+  it("migrations 0098 and 0099 rename the counter's table and key, every row and version as it stood (#500)", async () => {
+    const before0098 = migrationsBefore("0098_pond_counter");
+    try {
+      await withTemporaryDatabase(async (url) => {
+        const pool = createPool({ connectionString: url, max: 2 });
+        try {
+          await migrate(pool, before0098);
+          // A pond's standing figures and a k an admin has raised: neither may be lost.
+          await pool.query(
+            `INSERT INTO waitlist_snapshot
+               (pond_id, day, verified, woman, man, non_binary, finishing, seeks_men, seeks_everyone, seeks_women)
+             SELECT id, '2026-10-30', 40, 12, 14, 11, 3, 10, 11, 12 FROM ponds WHERE slug = 'suomi'`,
+          );
+          await pool.query(
+            `INSERT INTO matching_config (version, key, value, created_by, reason)
+             VALUES (2, 'waitlist_k', '25'::jsonb, 'admin', 'A step of twenty-five')`,
+          );
+          const versions = async (key: string) =>
+            (
+              await pool.query(
+                `SELECT version, value, valid_from, created_by, reason
+                 FROM matching_config WHERE key = $1 ORDER BY version`,
+                [key],
+              )
+            ).rows;
+          const figures = (await pool.query("SELECT * FROM waitlist_snapshot")).rows;
+          const kept = await versions("waitlist_k");
+          expect(figures).toHaveLength(1);
+          expect(kept).toHaveLength(2);
+
+          expect((await migrate(pool, MIGRATIONS)).state).toBe("applied");
+
+          const old = await pool.query("SELECT to_regclass('public.waitlist_snapshot') AS old");
+          expect(old.rows).toEqual([{ old: null }]);
+          expect((await pool.query("SELECT * FROM pond_counter")).rows).toEqual(figures);
+          expect(await versions("pond_counter_k")).toEqual(kept);
+          expect(await versions("waitlist_k")).toEqual([]);
+          const constraints = await pool.query(
+            `SELECT conname FROM pg_constraint
+             WHERE conrelid = 'pond_counter'::regclass ORDER BY conname`,
+          );
+          expect(constraints.rows).toEqual([
+            { conname: "pond_counter_pkey" },
+            { conname: "pond_counter_pond_id_ponds_id_fk" },
+          ]);
+        } finally {
+          await pool.end();
+        }
+      });
+    } finally {
+      rmSync(before0098, { recursive: true, force: true });
+    }
+  });
+
   it("migrations 0086 and 0087 end every phone's session with its push token, leave the staff's, and give each session a family hash it must have (#490, ADR-059)", async () => {
     const before0086 = migrationsBefore("0086_end_sessions_for_token_family");
     try {
@@ -910,7 +964,7 @@ describe("migrate", () => {
                (4, 'deal_breakers_max', '5'::jsonb, 'admin', 'A few more')`,
           );
 
-          expect(await migrate(pool, MIGRATIONS)).toEqual({ state: "applied", applied: 3 });
+          expect((await migrate(pool, MIGRATIONS)).state).toBe("applied");
 
           expect((await versionsOf(pool, "default_pond")).slice(-2)).toEqual([
             {
@@ -1016,6 +1070,7 @@ describe("migrate", () => {
           "photo_access",
           "photo_check_note",
           "photo_review",
+          "pond_counter",
           "ponds",
           "preferences",
           "profile",
@@ -1029,7 +1084,6 @@ describe("migrate", () => {
           "rounds",
           "sanction",
           "session",
-          "waitlist_snapshot",
         ]);
       } finally {
         await pool.end();

@@ -60,6 +60,7 @@ export {
   pushPlatform,
   pushToken,
 } from "./notifications.ts";
+export { pondCounter } from "./pond-counter.ts";
 export { ponds } from "./ponds.ts";
 export {
   preferenceMode,
@@ -85,4 +86,3 @@ export {
   sanctionRule,
 } from "./safety.ts";
 export { session } from "./sessions.ts";
-export { waitlistSnapshot } from "./waitlist.ts";

@@ -24,7 +24,7 @@ import { captureLogger, type LogLine, TEST_DATABASE_URL, testConfig } from "./te
 import { testSigningKeys } from "./test/media.ts";
 
 // The boot sequence (index.ts is only the process around it) against a
-// database of its own: a boot migrates, counts the waitlist and, for a
+// database of its own: a boot migrates, counts the counter and, for a
 // preview, creates and seeds a database, all of which commits. The shared
 // test database stays as the transactional tests expect it. Nothing goes to
 // the network: discovery is a stub or the Telia double, Sentry is a fake.
@@ -61,7 +61,7 @@ const MOCK_ISSUER = "http://127.0.0.1:8080/ftn";
 const WARN = 40;
 const ERROR = 50;
 
-/** The messages of the boot's own steps, in the order the boot logged them; the waitlist count has a test of its own. */
+/** The messages of the boot's own steps, in the order the boot logged them; the pond counter has a test of its own. */
 const STEPS = new Set([
   "error reporting",
   "bank identification",
@@ -241,7 +241,7 @@ describe("boot", () => {
       "research-events-partitions",
       "research-anonymity",
       "end-suspensions",
-      "waitlist-snapshot",
+      "pond-counter",
       "invitation-count",
       "round-builder",
       "reject-unreviewed-photos",
@@ -314,38 +314,36 @@ describe("boot", () => {
     expect((await pool.query("SELECT 1 AS one")).rows).toEqual([{ one: 1 }]);
   });
 
-  it("counts the waitlist of a database with no figures yet, last, and does not count it again", async () => {
+  it("counts the ponds of a database with no figures yet, last, and does not count it again", async () => {
     const admin = createPool({ connectionString: databaseUrl, max: 1 });
     try {
-      await admin.query("DELETE FROM waitlist_snapshot");
+      await admin.query("DELETE FROM pond_counter");
       const first = await booted();
       const messages = first.lines().map((l) => l.msg);
-      expect(line(first.lines, "waitlist snapshot")).toMatchObject({ counted: true });
-      expect(messages.indexOf("waitlist snapshot")).toBeGreaterThan(messages.indexOf("media"));
-      const { rows } = await admin.query<{ n: string }>(
-        "SELECT count(*) AS n FROM waitlist_snapshot",
-      );
+      expect(line(first.lines, "pond counter")).toMatchObject({ counted: true });
+      expect(messages.indexOf("pond counter")).toBeGreaterThan(messages.indexOf("media"));
+      const { rows } = await admin.query<{ n: string }>("SELECT count(*) AS n FROM pond_counter");
       expect(Number(rows[0]?.n)).toBeGreaterThan(0);
 
       const second = await booted();
-      expect(second.lines().filter((l) => /^waitlist snapshot/.test(l.msg ?? ""))).toEqual([]);
+      expect(second.lines().filter((l) => /^pond counter/.test(l.msg ?? ""))).toEqual([]);
     } finally {
       await admin.end();
     }
   });
 
-  it("logs a first waitlist count that fails and boots all the same", async () => {
+  it("logs a first count that fails and boots all the same", async () => {
     const admin = createPool({ connectionString: databaseUrl, max: 1 });
     // The counter's table gone for the length of one boot: the count fails as a broken database would.
-    await admin.query("ALTER TABLE waitlist_snapshot RENAME TO waitlist_snapshot_away");
+    await admin.query("ALTER TABLE pond_counter RENAME TO pond_counter_away");
     try {
       const { app, lines } = await booted();
-      const failed = line(lines, "first waitlist snapshot failed");
-      expect(failed).toMatchObject({ level: ERROR, job: "waitlist-snapshot" });
+      const failed = line(lines, "first pond counter failed");
+      expect(failed).toMatchObject({ level: ERROR, job: "pond-counter" });
       expect(JSON.stringify(failed?.err)).toContain("42P01");
       expect((await app.request("/health")).status).toBe(200);
     } finally {
-      await admin.query("ALTER TABLE waitlist_snapshot_away RENAME TO waitlist_snapshot");
+      await admin.query("ALTER TABLE pond_counter_away RENAME TO pond_counter");
       await admin.end();
     }
   });

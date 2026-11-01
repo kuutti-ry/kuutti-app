@@ -396,7 +396,7 @@ function composeDatabaseUrl(env: z.infer<typeof Env>, preview: boolean): string 
 /**
  * Browser origins are refused unless named here (rule 8: no product web
  * surface). Development allows the Metro web target and the admin SPA's Vite
- * server; deployed environments name exactly the admin SPA, the waitlist site,
+ * server; deployed environments name exactly the admin SPA, the public site,
  * or the preview's own origin.
  */
 function allowedOrigins(env: z.infer<typeof Env>): ReadonlySet<string> {
