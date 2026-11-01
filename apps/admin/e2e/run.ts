@@ -114,6 +114,10 @@ async function main(argv: string[]): Promise<number> {
     CORS_ALLOWED_ORIGINS: panel,
     // The mock bank takes any redirect URI (services/mock-idp/README.md).
     OIDC_REDIRECT_URI: `${api}/auth/callback`,
+    // The reset and the flows are one address inside one minute: the reset spends some seventy
+    // of the 120 requests a minute that address has (docs/demo/runbook.md) and the flows' sign-ins
+    // the rest, so with a persona more the last flows were refused. No flow here tests that limit.
+    RATE_LIMIT_PER_MINUTE: "600",
   };
   const stack = new Stack(databaseUrl, store, env);
   try {
