@@ -39,11 +39,6 @@ Feature: A pond opens when an admin opens it
     When each asks
     Then each is told their own, and naming the other in the request changes nothing
 
-  Scenario: What stands for a person follows them to another pond
-    Given a complete person in an open pond
-    When they choose a pond nobody has opened
-    Then they are told that it has not opened yet, and the night builds them no round
-
   Scenario: Closing a pond builds no new round and ends no conversation
     Given an open pond where "A" has today's round and a conversation
     When an admin closes the pond

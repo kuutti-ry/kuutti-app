@@ -242,6 +242,7 @@ export function RoundScreen() {
             {current.entry.decision !== null && <Text>{t(REVISIT[current.entry.decision])}</Text>}
             <ProfileCardView
               card={current.entry.card}
+              distance={current.entry.distance}
               // No block or report while a decision is on its way: one finishing
               // after the next card took this one's place would never take the
               // blocked person off, and Undo would bring them back (ADR-030 §11).

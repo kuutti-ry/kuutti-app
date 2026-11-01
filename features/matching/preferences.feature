@@ -10,7 +10,8 @@ Feature: The hard preferences of onboarding
   person answered themselves: a filter on what one will not say about
   oneself is the one-sidedness the design document targets. Taking the own
   answer back pauses the filter, which is read, never stored. #87 applies
-  them in the pool, both ways.
+  them in the pool, both ways. The seventh, distance (#514, ADR-061 §7), is on
+  no field: everybody has a home, so it waits for nobody's answer.
 
   Scenario Outline: The hard rows refuse what matching cannot use
     Given a signed-in account
@@ -85,6 +86,9 @@ Feature: The hard preferences of onboarding
       | the same field twice                              | 400    |
       | a deal-breaker on height accepting no relation of height | 400 |
       | a deal-breaker on height accepting two relations  | 400    |
+      | a deal-breaker on distance accepting no band      | 400    |
+      | a deal-breaker on distance accepting far          | 400    |
+      | a deal-breaker on distance past what the config allows | 400 |
 
   Scenario: Deal-breakers are stored as hard rows beside onboarding's and paused while the own answer is missing
     Given a signed-in account with seeks, an age window and answers on smoking and kids
@@ -95,6 +99,12 @@ Feature: The hard preferences of onboarding
     Given a signed-in account that answered its height
     When it asks for somebody taller, then somebody shorter, then everyone
     Then each relation is a hard row that reads back as saved, a second one replaces the first, and everyone leaves no row
+
+  Scenario: A deal-breaker on distance is stored as the bands it accepts, on no answer of one's own
+    Given a signed-in account that answered nothing on its profile
+    When it accepts nearby, then nearby and close, then everyone
+    Then each is a hard row that reads back as saved, a second one replaces the first, and everyone leaves no row
+    And it is never paused, and it lets through those who did not answer, whatever the request said
 
   Scenario: The deal-breakers of another account are never served
     Given two accounts, one with a deal-breaker set

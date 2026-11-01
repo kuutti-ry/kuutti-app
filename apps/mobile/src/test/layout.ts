@@ -19,6 +19,25 @@ function wordsIn(node: HostNode): string[] {
 }
 
 /**
+ * Whether a text is cut at the largest text size (CLAUDE.md Accessibility): a
+ * fixed height, or a line count where the text does not shrink to fit its
+ * lines (the header's title, #467, is never cut).
+ */
+export function hasCutText(tree: HostNode | HostNode[] | null): boolean {
+  let cut = false;
+  for (const root of Array.isArray(tree) ? tree : tree ? [tree] : []) {
+    each(root, (node) => {
+      if (node.type !== "Text") return;
+      const style = ([] as unknown[]).concat(node.props.style ?? []) as { height?: unknown }[];
+      const counted =
+        node.props.numberOfLines !== undefined && node.props.adjustsFontSizeToFit !== true;
+      if (counted || style.some((s) => s?.height !== undefined)) cut = true;
+    });
+  }
+  return cut;
+}
+
+/**
  * A screen's title and its back arrow are pinned: on screen, and inside no
  * scroll view, so they stay at the top however far the content scrolls.
  */

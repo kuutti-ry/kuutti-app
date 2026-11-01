@@ -13,6 +13,7 @@ import {
   ConversationList,
   Gender,
   OnboardingStatus,
+  PostalCode,
   PreferencesUpdate,
   ProfileResponse,
   ProfileUpdate,
@@ -81,11 +82,6 @@ const lastDayOfMonth = (at: Date) =>
 
 async function world(ctx: TestContext, overrides: Record<string, string> = {}) {
   const { logger, lines } = await captureLogger();
-  // The pond the histories name, and the default pond (#146): the test database has no seed.
-  await ctx.client.query(
-    `INSERT INTO ponds (slug, name_nominative, name_inessive) VALUES ('paakaupunkiseutu', 'Pääkaupunkiseutu', 'Pääkaupunkiseudulla')
-     ON CONFLICT (slug) DO NOTHING`,
-  );
   const config = testConfig({
     HETU_HMAC_KEY: randomBytes(32).toString("hex"),
     OIDC_ISSUER: ISSUER,
@@ -127,6 +123,7 @@ describe("the histories are what a person's own answers would be", () => {
           }).success,
           history.key,
         ).toBe(true);
+        expect(PostalCode.safeParse(history.onboarding.home).success, history.key).toBe(true);
       }
       if (history.profile) {
         expect(ProfileUpdate.safeParse(history.profile).success, history.key).toBe(true);
@@ -748,7 +745,7 @@ describe.skipIf(!reachable)("the personas, through the mock bank", () => {
     expect(sanna.profile.profile?.displayName).toBe("Sanna");
     expect(sanna.profile.completeness.missing).toEqual(["photos"]);
 
-    // Registered and gone: nothing answered. With two ponds to choose from, the pond is asked too (ADR-010 §12).
+    // Registered and gone: nothing answered, the home among it (ADR-061 §1).
     expect((await as("onni")).onboarding.missing).toEqual([
       "terms",
       "privacy",
@@ -757,9 +754,9 @@ describe.skipIf(!reachable)("the personas, through the mock bank", () => {
       "seeks",
       "intent",
       "age_window",
+      "home",
       "photos",
       "prompts_or_bio",
-      "pond",
     ]);
     expect((await as("noa")).onboarding.gender).toBe("non_binary");
 

@@ -67,6 +67,30 @@
               "pond": {
                 "$ref": "#/components/schemas/PondSummary"
               },
+              "home": {
+                "type": "object",
+                "nullable": true,
+                "properties": {
+                  "place": {
+                    "type": "string",
+                    "maxLength": 80
+                  },
+                  "shownOnCard": {
+                    "type": "string",
+                    "maxLength": 80
+                  },
+                  "movedAt": {
+                    "type": "string",
+                    "nullable": true,
+                    "format": "date-time"
+                  }
+                },
+                "required": [
+                  "place",
+                  "shownOnCard",
+                  "movedAt"
+                ]
+              },
               "genderChangedAt": {
                 "type": "string",
                 "nullable": true,
@@ -95,6 +119,7 @@
               "birthMonth",
               "gender",
               "pond",
+              "home",
               "genderChangedAt",
               "email",
               "foundThemAnswered",
@@ -109,7 +134,7 @@
             "items": {
               "$ref": "#/components/schemas/StoredDealBreaker"
             },
-            "maxItems": 6
+            "maxItems": 7
           },
           "consents": {
             "type": "array",
@@ -487,7 +512,8 @@
           "wantsKids",
           "smoking",
           "languages",
-          "height"
+          "height",
+          "distance"
         ]
       },
       "ConsentRecord": {
@@ -2096,7 +2122,7 @@
             "items": {
               "$ref": "#/components/schemas/ExportedRelaxation"
             },
-            "maxItems": 6
+            "maxItems": 7
           },
           "entries": {
             "type": "array",
@@ -2194,6 +2220,13 @@
             "type": "string",
             "nullable": true,
             "format": "date-time"
+          },
+          "distance": {
+            "$ref": "#/components/schemas/DistanceBand"
+          },
+          "distanceInWords": {
+            "type": "string",
+            "nullable": true
           }
         },
         "required": [
@@ -2205,7 +2238,9 @@
           "seenAt",
           "decision",
           "decisionInWords",
-          "decidedAt"
+          "decidedAt",
+          "distance",
+          "distanceInWords"
         ]
       },
       "RoundReason": {
@@ -2225,6 +2260,17 @@
           "like",
           "pass",
           "fish",
+          null
+        ]
+      },
+      "DistanceBand": {
+        "type": "string",
+        "nullable": true,
+        "enum": [
+          "nearby",
+          "close",
+          "around",
+          "far",
           null
         ]
       },
@@ -3262,11 +3308,15 @@
           },
           "completeness": {
             "$ref": "#/components/schemas/Completeness"
+          },
+          "home": {
+            "$ref": "#/components/schemas/HomeSummary"
           }
         },
         "required": [
           "profile",
-          "completeness"
+          "completeness",
+          "home"
         ]
       },
       "Completeness": {
@@ -3296,6 +3346,52 @@
           "bio_or_prompts",
           "seeks",
           "age_window"
+        ]
+      },
+      "HomeSummary": {
+        "type": "object",
+        "nullable": true,
+        "properties": {
+          "town": {
+            "$ref": "#/components/schemas/PlaceName"
+          },
+          "area": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PlaceName"
+              },
+              {
+                "nullable": true
+              }
+            ]
+          },
+          "showArea": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "town",
+          "area",
+          "showArea"
+        ]
+      },
+      "PlaceName": {
+        "type": "object",
+        "properties": {
+          "fi": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "sv": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          }
+        },
+        "required": [
+          "fi",
+          "sv"
         ]
       },
       "ProfileUpdate": {
@@ -3392,8 +3488,15 @@
           "gender": {
             "$ref": "#/components/schemas/Gender"
           },
-          "pond": {
-            "$ref": "#/components/schemas/PondSummary"
+          "place": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PlaceName"
+              },
+              {
+                "nullable": true
+              }
+            ]
           },
           "photos": {
             "type": "array",
@@ -3451,7 +3554,7 @@
           "displayName",
           "age",
           "gender",
-          "pond",
+          "place",
           "photos",
           "fields",
           "bio",
@@ -3520,6 +3623,9 @@
           },
           "pond": {
             "$ref": "#/components/schemas/PondSummary"
+          },
+          "home": {
+            "$ref": "#/components/schemas/HomeSummary"
           },
           "preferences": {
             "$ref": "#/components/schemas/PreferencesResponse"
@@ -3600,6 +3706,7 @@
           "age",
           "gender",
           "pond",
+          "home",
           "preferences",
           "consents",
           "currentVersions",
@@ -3646,9 +3753,9 @@
           "seeks",
           "intent",
           "age_window",
+          "home",
           "photos",
-          "prompts_or_bio",
-          "pond"
+          "prompts_or_bio"
         ]
       },
       "GenderUpdate": {
@@ -6396,32 +6503,18 @@
         ],
         "additionalProperties": false
       },
-      "PondList": {
+      "HomeUpdate": {
         "type": "object",
         "properties": {
-          "ponds": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/PondSummary"
-            },
-            "maxItems": 200
-          }
-        },
-        "required": [
-          "ponds"
-        ]
-      },
-      "PondChoice": {
-        "type": "object",
-        "properties": {
-          "pondId": {
+          "postalCode": {
             "type": "string",
-            "format": "uuid"
+            "pattern": "^\\d{5}$",
+            "description": "Five digits, checked against the list of postal areas."
+          },
+          "showArea": {
+            "type": "boolean"
           }
         },
-        "required": [
-          "pondId"
-        ],
         "additionalProperties": false
       },
       "RoundResponse": {
@@ -6471,6 +6564,9 @@
           "card": {
             "$ref": "#/components/schemas/ProfileCard"
           },
+          "distance": {
+            "$ref": "#/components/schemas/DistanceBand"
+          },
           "relaxedField": {
             "$ref": "#/components/schemas/DealBreakerField"
           },
@@ -6479,14 +6575,15 @@
             "items": {
               "$ref": "#/components/schemas/DealBreakerField"
             },
-            "maxItems": 6
+            "maxItems": 7
           }
         },
         "required": [
           "position",
           "reason",
           "decision",
-          "card"
+          "card",
+          "distance"
         ]
       },
       "RoundDecisionAnswer": {
@@ -6544,14 +6641,14 @@
             "items": {
               "$ref": "#/components/schemas/RelaxationOffer"
             },
-            "maxItems": 12
+            "maxItems": 14
           },
           "relaxed": {
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/Relaxation"
             },
-            "maxItems": 6
+            "maxItems": 7
           }
         },
         "required": [
@@ -6640,12 +6737,12 @@
             "items": {
               "$ref": "#/components/schemas/StoredDealBreaker"
             },
-            "maxItems": 6
+            "maxItems": 7
           },
           "max": {
             "type": "integer",
             "minimum": 0,
-            "maximum": 6
+            "maximum": 7
           }
         },
         "required": [
@@ -6661,7 +6758,7 @@
             "items": {
               "$ref": "#/components/schemas/DealBreaker"
             },
-            "maxItems": 6
+            "maxItems": 7
           }
         },
         "required": [
@@ -8528,7 +8625,7 @@
     "/profile": {
       "get": {
         "summary": "The caller's profile and what it still needs",
-        "description": "The profile as saved (null before the first save) and the completeness rule's verdict (what is missing before the profile can enter a round).",
+        "description": "The profile as saved (null before the first save), the completeness rule's verdict (what is missing before the profile can enter a round), and the home in names, which PUT /account/home writes and this document never does.",
         "security": [
           {
             "session": []
@@ -8665,7 +8762,7 @@
     "/onboarding": {
       "get": {
         "summary": "What the caller has answered and which steps of onboarding are still open",
-        "description": "The steps of the field sheet in the order the app asks them, the answers so far, the consents given for the current wordings and the current versions. An account without a pond is put in the default pond here. When the four answers matching needs and the two consents are there and the account is still registered, it becomes active here; the profile steps keep `complete` false until they are done.",
+        "description": "The steps of the field sheet in the order the app asks them, the answers so far, the consents given for the current wordings and the current versions. When the four answers matching needs and the two consents are there and the account is still registered, it becomes active here; the profile steps keep `complete` false until they are done.",
         "security": [
           {
             "session": []
@@ -12577,42 +12674,10 @@
         }
       }
     },
-    "/ponds": {
-      "get": {
-        "summary": "The ponds a person can choose",
-        "description": "Every pond with both Finnish case forms (TD-17), parents first. Where matching happens (TD-10); the choice is one per account.",
-        "security": [
-          {
-            "session": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "The ponds.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/PondList"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "unauthenticated, session_expired or session_revoked.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/account/pond": {
+    "/account/home": {
       "put": {
-        "summary": "Choose the caller's pond",
+        "summary": "Set the caller's home, or what their card shows of it",
+        "description": "A postal code of five digits, whether the card shows the area instead of the town, or both. What is kept is a place of at least matching_config home_min_inhabitants people: the postal area, else its municipality, else the nearest municipality that has them. A new postal code starts from the town again unless the same request says otherwise, and showArea stays false where no area is kept. The home changes whenever the person likes. The write sets the account's pond if it has none. The answer names places and never carries digits.",
         "security": [
           {
             "session": []
@@ -12623,17 +12688,24 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/PondChoice"
+                "$ref": "#/components/schemas/HomeUpdate"
               }
             }
           }
         },
         "responses": {
-          "204": {
-            "description": "Chosen."
+          "200": {
+            "description": "Saved; the home as its owner reads it.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HomeSummary"
+                }
+              }
+            }
           },
           "400": {
-            "description": "Validation failed, or pond_unknown.",
+            "description": "validation_failed, or postal_code_unknown: five digits the list lacks. Both constant, repeating nothing that was sent.",
             "content": {
               "application/json": {
                 "schema": {
@@ -12668,7 +12740,7 @@
     "/rounds/today": {
       "get": {
         "summary": "Today's round",
-        "description": "The Finnish day and its cards in order, each with why it is there and the caller's own decision. The first read of a day builds the caller's round once their matching has opened; entries null while they have none, an empty list for a round with nobody to show. A card that cannot be shown now is left out. fishToSend says whether the fish's budget lets the caller send one today, one of matching_config fish_budget in the calendar week (fish_window_days counted from a Monday) or an earned one, never how many. likesLeft says how many of the day's likes the caller has left, from matching_config like_budget_balanced down to zero, by the count that refuses a like. Serving a card writes the shown record and counts against matching_config exposure_cards_per_day (ADR-008).",
+        "description": "The Finnish day and its cards in order, each with why it is there, how far its person lives as it stood when the entry was written, and the caller's own decision. The first read of a day builds the caller's round once their matching has opened; entries null while they have none, an empty list for a round with nobody to show. A card that cannot be shown now is left out. fishToSend says whether the fish's budget lets the caller send one today, one of matching_config fish_budget in the calendar week (fish_window_days counted from a Monday) or an earned one, never how many. likesLeft says how many of the day's likes the caller has left, from matching_config like_budget_balanced down to zero, by the count that refuses a like. Serving a card writes the shown record and counts against matching_config exposure_cards_per_day (ADR-008).",
         "security": [
           {
             "session": []
@@ -13140,7 +13212,7 @@
     "/preferences/deal-breakers": {
       "get": {
         "summary": "The caller's deal-breakers",
-        "description": "Each with whether it is paused: a deal-breaker waits while the person's own answer on its field is missing (#149, the disclose-to-filter rule). `max` is how many a person may have.",
+        "description": "Each with whether it is paused: a deal-breaker waits while the person's own answer on its field is missing (#149, the disclose-to-filter rule). One on distance has no field and is never paused. `max` is how many a person may have.",
         "security": [
           {
             "session": []
@@ -13171,7 +13243,7 @@
       },
       "put": {
         "summary": "Set the caller's deal-breakers",
-        "description": "The whole set, at most `max`, each on a distinct whitelisted field the person has answered themselves, accepting options the field has. Hard rows: #87 applies them in the pool, both ways.",
+        "description": "The whole set, at most `max`, each on a distinct whitelisted field the person has answered themselves, accepting options the field has. One on distance has no field: it accepts the bands up to nearby, close or around, and lets through those who did not answer whatever the request says, since nobody can leave it unanswered. Hard rows: #87 applies them in the pool, both ways.",
         "security": [
           {
             "session": []
@@ -13199,7 +13271,7 @@
             }
           },
           "400": {
-            "description": "Validation failed: more than allowed, a field twice, or an answer the field has not.",
+            "description": "Validation failed: more than allowed, a field twice, an answer the field has not, or bands that do not run up to one.",
             "content": {
               "application/json": {
                 "schema": {

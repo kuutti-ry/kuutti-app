@@ -14,7 +14,7 @@ const provide = (i18n: Parameters<typeof I18nProvider>[0]["i18n"], ...children: 
 
 function Probe() {
   const { t, locale } = useT();
-  return createElement("p", { lang: locale }, t("onboarding.retry"));
+  return createElement("p", { lang: locale }, t("load.retry"));
 }
 
 describe("the React binding", () => {
@@ -50,7 +50,7 @@ describe("the React binding", () => {
   it("offers the pseudo-locale when a dev build hands it in", () => {
     const i18n = createReactI18n({
       locale: "en-XA",
-      pseudo: { "onboarding.retry": "［Trýý áágááííñ］" },
+      pseudo: { "load.retry": "［Trýý áágááííñ］" },
     });
     expect(renderToStaticMarkup(provide(i18n, createElement(Probe)))).toBe(
       '<p lang="en-XA">［Trýý áágááííñ］</p>',

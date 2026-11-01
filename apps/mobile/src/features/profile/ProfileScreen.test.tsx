@@ -1,5 +1,11 @@
-import { LATER_FIELD_ORDER, PROFILE_FIELDS, type ProfileFieldKey } from "@kuutti/schema";
+import {
+  type HomeSummary,
+  LATER_FIELD_ORDER,
+  PROFILE_FIELDS,
+  type ProfileFieldKey,
+} from "@kuutti/schema";
 import { act, fireEvent, screen, waitFor } from "@testing-library/react-native";
+import { useLocales } from "expo-localization";
 import type * as React from "react";
 import { saveSession } from "@/lib/session";
 import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
@@ -57,14 +63,19 @@ const approved = (n: number) => ({
  * GET /profile answering each read with the next list of what is missing, the
  * last one again after that; `document` the stored profile (none by
  * default); `photos` the photo list's photos (none by default), or "failing"
- * for a list that cannot be read.
+ * for a list that cannot be read; `home` the person's home (none by default).
  */
 function fakeApi(
   missingByRead: string[][],
   {
     document,
     photos = [],
-  }: { document?: Document; photos?: ReturnType<typeof approved>[] | "failing" } = {},
+    home = null,
+  }: {
+    document?: Document;
+    photos?: ReturnType<typeof approved>[] | "failing";
+    home?: HomeSummary | null;
+  } = {},
 ) {
   let reads = 0;
   let photoReads = 0;
@@ -88,6 +99,7 @@ function fakeApi(
             }
           : null,
         completeness: { complete: missing.length === 0, missing },
+        home,
       });
     }
     if (path === "/photos" && request.method === "GET") {
@@ -124,6 +136,74 @@ beforeEach(async () => {
 });
 
 describe("ProfileScreen", () => {
+  describe("the home's row (#514, ADR-061)", () => {
+    const town = { fi: "Helsinki", sv: "Helsingfors" };
+    const area = { fi: "Kallio", sv: "Berghäll" };
+    const ready = async (home: HomeSummary | null) => {
+      fakeApi([[]], { home });
+      await show(<ProfileScreen />);
+      await waitFor(() => expect(screen.getByText("The basics")).toBeTruthy());
+    };
+
+    it("stands between the photos and the sections, and opens the home's screen", async () => {
+      await ready({ town, area, showArea: false });
+      const rows = screen.getAllByRole("button").map((node) => node.props.accessibilityLabel);
+      expect(rows.indexOf("Home")).toBe(rows.indexOf("Photos") + 1);
+      expect(rows.indexOf("Home")).toBeLessThan(rows.indexOf("The basics"));
+      await press(screen.getByRole("button", { name: "Home" }));
+      expect(router.push).toHaveBeenCalledWith("/profile/place");
+    });
+
+    it.each([
+      ["the town", { town, area, showArea: false }, "Helsinki"],
+      ["the area the person chose", { town, area, showArea: true }, "Kallio"],
+      ["the town where no area is kept", { town, area: null, showArea: false }, "Helsinki"],
+    ])("says %s, what the card says, heard as the hint", async (_what, home, name) => {
+      await ready(home);
+      expect(screen.getByText(name)).toBeTruthy();
+      expect(screen.getByRole("button", { name: "Home" }).props.accessibilityHint).toBe(name);
+    });
+
+    it("says the name in the reader's language, and never digits", async () => {
+      (useLocales as jest.Mock).mockReturnValue([{ languageTag: "sv-FI" }]);
+      try {
+        fakeApi([[]], { home: { town, area, showArea: false } });
+        await show(<ProfileScreen />);
+        await waitFor(() => expect(screen.getByText("Hem")).toBeTruthy());
+        expect(screen.getByText("Helsingfors")).toBeTruthy();
+        expect(screen.queryByText(/\d{5}/)).toBeNull();
+      } finally {
+        (useLocales as jest.Mock).mockReturnValue([{ languageTag: "en-US" }]);
+      }
+    });
+
+    it("carries no mark or progress: a home is there or the step is open", async () => {
+      await ready({ town, area, showArea: false });
+      expect(progressValue("Home")).toBeUndefined();
+    });
+
+    it("has nothing under its title for somebody with no home, and still opens", async () => {
+      await ready(null);
+      const row = screen.getByRole("button", { name: "Home" });
+      expect(row.props.accessibilityHint).toBeUndefined();
+      await press(row);
+      expect(router.push).toHaveBeenCalledWith("/profile/place");
+    });
+
+    it("reads a new home when the list is back in front", async () => {
+      const api = fakeApi([[]], { home: { town, area, showArea: false } });
+      await show(<ProfileScreen />);
+      await waitFor(() => expect(screen.getByText("Helsinki")).toBeTruthy());
+      fakeApi([[]], { home: { town, area, showArea: true } });
+      await act(async () => {
+        focus();
+        await settle();
+      });
+      await waitFor(() => expect(screen.getByText("Kallio")).toBeTruthy());
+      expect(api.reads()).toBe(1);
+    });
+  });
+
   it("keeps the title, the way back and the card's button pinned above the list", async () => {
     fakeApi([["display_name", "photos"]]);
     await show(<ProfileScreen />);
@@ -140,6 +220,7 @@ describe("ProfileScreen", () => {
     expect(screen.getByText("At least 2 approved photos")).toBeTruthy();
     for (const title of [
       "Photos",
+      "Home",
       "Prompts",
       "Relationship and kids",
       "Work and education",
@@ -157,8 +238,8 @@ describe("ProfileScreen", () => {
     expect(screen.queryByRole("button", { name: "Save" })).toBeNull();
     expect(screen.queryAllByText(/^profile\./)).toEqual([]);
     const found = pressables(screen.toJSON() as HostNode);
-    // The back arrow and the eye, the photos and seven sections, the deal-breakers and the later questions.
-    expect(found).toHaveLength(12);
+    // The back arrow and the eye, the photos, the home and seven sections, the deal-breakers and the later questions.
+    expect(found).toHaveLength(13);
     expect(found.flatMap((node) => a11yProblems(node))).toEqual([]);
   });
 
@@ -302,7 +383,7 @@ describe("ProfileScreen", () => {
       if (new URL(request.url).pathname === "/photos") {
         return json({ photos: [approved(1), approved(2)], maxPhotos: 6, tips: [] });
       }
-      return json({ profile: null, completeness: { complete: true, missing: [] } });
+      return json({ profile: null, completeness: { complete: true, missing: [] }, home: null });
     }) as unknown as typeof fetch;
     await show(<ProfileScreen />);
     expect(screen.getByText("Your profile could not be loaded.")).toBeTruthy();

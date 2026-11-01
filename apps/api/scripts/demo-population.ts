@@ -47,7 +47,6 @@ import {
   type DemoEnvironment,
   describeTarget,
   facesForPopulation,
-  generatePopulation,
   openPonds,
   type PhotoAsset,
   PLACEHOLDER_PHOTO_PREFIX,
@@ -64,6 +63,7 @@ import { createLogger } from "../src/lib/logger.ts";
 import { createMediaDeps, deleteOrphanedObjects, type MediaDeps } from "../src/media/index.ts";
 import { SPECIAL_CATEGORY_CONSENT_VERSION } from "../src/profile/index.ts";
 import { DemoError, whyNotTheLocalStore } from "./demo/bank.ts";
+import { populationWithHomes } from "./demo/homes.ts";
 import { loadAssets, uploadFaces } from "./demo/photos.ts";
 
 function fail(message: string, code = 1): never {
@@ -196,7 +196,7 @@ try {
     const result = await removePopulation(pool);
     console.log(JSON.stringify({ msg: "demo population removed", env, ...result }));
   } else {
-    const people = generatePopulation({ size, seed });
+    const people = populationWithHomes({ size, seed });
     const result = await writePopulation(pool, people, {
       ...CURRENT_CONSENT_VERSIONS,
       special_category: SPECIAL_CATEGORY_CONSENT_VERSION,

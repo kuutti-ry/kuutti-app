@@ -437,6 +437,25 @@ describe("GET /admin/accounts/{id}", () => {
     expect(text).not.toMatch(/hetu|broker|research|mail|check_?note|sanctioned_?from/i);
   });
 
+  test("A moderator reads no home", async ({ ctx, api }) => {
+    const moderator = await staffSession(ctx.client, "moderator");
+    const a = await signedInAccount(ctx.client);
+    const given = await api.app.request("/account/home", {
+      method: "PUT",
+      headers: { ...a.headers, "content-type": "application/json" },
+      body: JSON.stringify({ postalCode: "00530", showArea: true }),
+    });
+    expect(given.status).toBe(200);
+
+    const response = await open(api, moderator.headers, a.accountId);
+    expect(response.status).toBe(200);
+    const text = await response.text();
+    expect(JSON.parse(text)).not.toHaveProperty("home");
+    expect(text).not.toContain('"00530"');
+    expect(text).not.toMatch(/Kallio|Berghäll|Helsinki|Helsingfors/);
+    expect(text).not.toMatch(/homePlace|home_place|homeShowsArea|postalCode/);
+  });
+
   test("lists the audit rows about the account and its photos, and none about another person or the person's feedback", async ({
     ctx,
     api,

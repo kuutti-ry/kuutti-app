@@ -17,7 +17,7 @@ import {
   test,
   testConfig,
 } from "../test/harness.ts";
-import { people, pondNamed } from "../test/people.ts";
+import { HOME, people, pondNamed } from "../test/people.ts";
 import { POND_COUNTER_CACHE_CONTROL } from "./routes.ts";
 
 // features/pond/counter.feature (#54, ADR-013): what the public may read, and
@@ -245,7 +245,7 @@ describe("the bar of whom a pond seeks (#507)", () => {
         [seeded.slug, seeded.nameNominative, seeded.nameInessive],
       );
     }
-    const people = generatePopulation();
+    const people = generatePopulation({ homes: { [HOME]: 1 } });
     await writePopulation(ctx.client, people, CONSENT_VERSIONS);
     const { rows } = await ctx.client.query<{ id: string }>(
       "SELECT id FROM ponds WHERE slug = $1",

@@ -1,9 +1,11 @@
 # The card is what others see (#47, ADR-019 §2): it leads with the main photo,
 # the name with the age (every account is bank-verified, so the card does not
-# say so, #239), then the gender and the area, the
+# say so, #239), then the gender and the town, the
 # prompts and the bio, and the information fields with their labels, several
 # answers joined by commas; soft fields (education, drinking) never show, and
-# a finished profile has no list of what is missing. Sanna's history after
+# a finished profile has no list of what is missing. Her home is a name, never
+# digits, and how far is a round's to say, so her own card has no band (ADR-061
+# §3, §5). Sanna's history after
 # `pnpm demo:reset` (packages/db/src/seed/histories.ts); read only.
 appId: fi.kuutti.app
 name: The card leads with the photo, the name and the age, and shows the information fields but nothing soft
@@ -22,7 +24,9 @@ name: The card leads with the photo, the name and the age, and shows the informa
     timeout: 60000
 - assertNotVisible: ".*verified.*|.*varmistettu.*|.*verifierad.*"
 - assertVisible: "Woman|Nainen|Kvinna"
-- assertVisible: "Capital Area|Pääkaupunkiseutu|Huvudstadsregionen"
+- assertVisible: "Espoo|Esbo"
+- assertNotVisible: ".*\\d{5}.*"
+- assertNotVisible: "Nearby|Lähellä|I närheten|Close|Melko lähellä|Ganska nära|Around|Samoilla seuduilla|I trakten|Far|Kauempana|Längre bort"
 - scrollUntilVisible:
     element: "Arkkitehti, joka piirtää.*"
     direction: DOWN

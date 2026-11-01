@@ -159,6 +159,10 @@ export async function writePopulation(
     if (!person.label.startsWith(DEMO_LABEL_PREFIX)) {
       throw new Error(`not a synthetic person: ${person.label}`);
     }
+    // In nobody's pool, with nothing to say so (ADR-061 §1): refused, not written.
+    if (person.pond !== null && person.home === null) {
+      throw new Error(`${person.label} has no home: generatePopulation needs the places`);
+    }
   }
   return transaction(db, async (tx) => {
     const { removed, spared } = await removePopulation(tx);
@@ -171,7 +175,7 @@ export async function writePopulation(
     const ponds: Record<string, number> = {};
     for (const person of people) {
       const pondId = person.pond === null ? null : pondIds.get(person.pond);
-      if (pondId === undefined) throw new Error(`no pond ${person.pond}: run the seed first`);
+      if (pondId === undefined) throw new Error(`no pond ${person.pond} in this database`);
       if (person.pond !== null) ponds[person.pond] = (ponds[person.pond] ?? 0) + 1;
 
       const identity = await tx.query<{ id: string }>(
@@ -181,8 +185,9 @@ export async function writePopulation(
       );
       const account = await tx.query<{ id: string }>(
         `INSERT INTO account
-           (identity_id, state, state_changed_at, birth_year, birth_month, gender, pond_id, registered_at)
-         VALUES ($1, $2::account_state, $3, $4, $5, $6::gender, $7, $8) RETURNING id`,
+           (identity_id, state, state_changed_at, birth_year, birth_month, gender, pond_id,
+            home_place, home_shows_area, registered_at)
+         VALUES ($1, $2::account_state, $3, $4, $5, $6::gender, $7, $8, $9, $10) RETURNING id`,
         [
           identity.rows[0]?.id,
           person.state,
@@ -191,6 +196,8 @@ export async function writePopulation(
           person.birthMonth,
           person.gender,
           pondId,
+          person.home?.place ?? null,
+          person.home?.showsArea ?? false,
           person.registeredAt,
         ],
       );

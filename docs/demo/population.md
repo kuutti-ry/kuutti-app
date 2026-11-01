@@ -10,14 +10,14 @@ Data dictionary of `pnpm demo:population` (#73, ADR-014 §8 to §10). The popula
 pnpm demo:population
 ```
 
-Writes three hundred people into the database of the local environment, replacing the synthetic population that was there. The pond comes from the seed, which `pnpm env:up` has run. The pictures are a release of the private photos repository (`docs/demo/photo-prompts.md`), fetched and verified by `pnpm demo:assets` into `~/.cache/kuutti-demo-photos/v2`; this repository holds the manifest (`packages/db/src/seed/photos-manifest.ts`) and never a picture.
+Writes three hundred people into the database of the local environment, replacing the synthetic population that was there. The pond is the one every database has (migration 0027). The pictures are a release of the private photos repository (`docs/demo/photo-prompts.md`), fetched and verified by `pnpm demo:assets` into `~/.cache/kuutti-demo-photos/v2`; this repository holds the manifest (`packages/db/src/seed/photos-manifest.ts`) and never a picture.
 
-After a write or a removal the public counter (#54) is counted anew over what is in the database now, so `GET /ponds/counter` and the card in the app show the ponds of the population at once. Left to itself the counter would not move: it counts once a day and moves in steps of ten people, which is right among people and would leave a demo showing yesterday's ponds. What may be said of a pond is decided as ever; the app keeps an answer for up to an hour.
+After a write or a removal the public counter (#54) is counted anew over what is in the database now, so `GET /ponds/counter` and the card in the app show the population at once. Left to itself the counter would not move: it counts once a day and moves in steps of ten people, which is right among people and would leave a demo showing yesterday's figures. What may be said of a pond is decided as ever; the app keeps an answer for up to an hour.
 
 | option | what it does |
 |---|---|
 | `-- --size 5000` | as many people as asked, 1 to 5,000. From 235 people up the population shows everything it is there for; a smaller one is written too, and the command says what it does not show (`notShown`) |
-| `-- --seed 7` | other people in the same ponds |
+| `-- --seed 7` | other people in the same pond, in other homes |
 | `-- --photos` | faces of the release for the people, drawn by seed (none, a few or the whole grid), through the upload pipeline like anybody's; `pnpm demo:assets` fetches the release first. Locally the faces are approved as a moderator would (the local check queues everything); on staging Rekognition decides |
 | `-- --dry-run` | prints the counts per pond and writes nothing; it does not connect |
 | `-- --remove` | removes the synthetic population and writes nobody |
@@ -34,16 +34,35 @@ Three hundred accounts that look bank-verified, among real people, would enter t
 
 ## Who lives where, and why
 
-One pond for now, the capital region (#146, ADR-010 §11): everybody who onboarded is in Pääkaupunkiseutu, and the pond has to show everything at once.
+One pond, the whole country (ADR-061 §8): everybody who onboarded is in Suomi, and the pond has to show everything at once. Where in the country each of them lives is their home, below.
 
 | pond | people | women | men | non-binary | why |
 |---|---|---|---|---|---|
-| Pääkaupunkiseutu | 276 | 88 | 171 | 17 | every cell at ten or more, so the counter shows the split |
-| none | 24 | | | | registered at the bank and gone before the first onboarding step: no gender, no pond, no consent |
+| Suomi | 276 | 88 | 171 | 17 | every cell at ten or more, so the counter shows the split |
+| none | 24 | | | | registered at the bank and gone before the first onboarding step: no gender, no pond, no home, no consent |
 
-These are exact counts, apportioned from shares by largest remainder, not draws: the thresholds are crossed by construction, from a population of 174 up (a test goes through every size; below that the non-binary cell is under the counter's k). At another size 8 % never onboarded and the rest is in Pääkaupunkiseutu with the same gender shares.
+These are exact counts, apportioned from shares by largest remainder, not draws: the thresholds are crossed by construction, from a population of 174 up (a test goes through every size; below that the non-binary cell is under the counter's k). At another size 8 % never onboarded and the rest is in Suomi with the same gender shares.
 
-Everybody with a pond has a gender, because the app asks for the gender before the pond is assigned.
+Everybody with a pond has a gender and a home: the app asks for the gender before the home, and writing the home is what sets the pond (ADR-061 §8).
+
+### Where the homes are
+
+The real list, by inhabitants: everybody is drawn a postal area as likely as its people make it, and keeps what a person there keeps (ADR-061 §2). So the population is spread as Finland is, and most people are far from any one home. These are what the defaults make on the list of 2026, of the 276 who onboarded; a new list moves them.
+
+| what | people | |
+|---|---|---|
+| a postal area of their own | 187 | an area of at least `home_min_inhabitants` (3,000) with as many left in the rest of its municipality; 68 % of them, where 71 % of the country's people do. 41 show the area's name on the card |
+| a municipality | 89 | their area is too small, so its municipality is kept, or the nearest large enough where that is too small as well. The card shows the town, and nothing else can be chosen |
+
+| seen from | nearby | close | around | far |
+|---|---|---|---|---|
+| Kallio, 00530 | 10 | 38 | 28 | 200 |
+
+By the nearest town, which is what every card but those 41 says, they are in 49: Helsinki 28, Seinäjoki 17, Oulu 14, Kuopio and Pori 10 each, Hämeenlinna 9, and the rest fewer.
+
+The list and the rule are the API's, and there is one of each (ADR-061 §2, §4), so the generator in `packages/db` is handed the places with the people behind them, by `populationHomes` in `apps/api/scripts/demo/homes.ts`, as the writer is handed the consents' versions. Nobody here types a code: the key goes straight onto the account, the same key a person's code would leave there. The personas do type theirs, through the route (`packages/db/src/seed/histories.ts`).
+
+The homes are drawn last, from a stream of their own: a test holds that a person is the same to the byte with any list or none, so what is said of the people below did not move when they got homes. Without the places everybody has a pond and no home, which nobody's pool would hold and nothing would report, so the writer refuses them.
 
 ## What is drawn
 
@@ -54,6 +73,7 @@ Everybody with a pond has a gender, because the app asks for the gender before t
 | language | Finnish 70 %, Swedish 8 %, English 22 %: the language the consents were shown in and the profile is written in |
 | seeks | by own gender. Women: men 78 %, women 8 %, several 14 %. Men: women 82 %, men 7 %, several 11 %. Non-binary people: all three 50 %, two of them 40 %, non-binary only 10 % |
 | age window | from 2 to 8 years under the person's age (never under 18) to 2 to 10 years over it (never over 99) |
+| home | a kept place by the people behind it, as above; of those who keep an area, 20 % show its name on the card, and the rest the town, where a home starts |
 | consents | terms, privacy and the special-category consent of the seek screen for everybody who onboarded (#146); the profile's own record of that consent, the one politics and religion need (ADR-019 §4), for 35 % of those with a profile, given with the others. No research consent: the product writes it together with its mapping row, synthetic people emit no events, and theirs would muddy the first real numbers |
 | profile | 88 % of those who onboarded have one |
 | display name | a given name from the list of the person's gender; the lists hold names with å, ä and ö and one in another script (Юлия) |

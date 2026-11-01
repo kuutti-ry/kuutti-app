@@ -2,7 +2,7 @@ import { act, fireEvent, screen, waitFor } from "@testing-library/react-native";
 import { PixelRatio } from "react-native";
 import { saveSession } from "@/lib/session";
 import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
-import { expectPinnedHeader } from "@/test/layout";
+import { expectPinnedHeader, hasCutText } from "@/test/layout";
 import { renderWithTheme } from "@/test/render";
 import { MAX_FONT_SCALE } from "@/theme/a11y";
 import { CardPreviewScreen } from "./CardPreviewScreen";
@@ -23,13 +23,7 @@ const card = {
   displayName: "Aino",
   age: { years: 36, verifiedByBank: true },
   gender: "non_binary",
-  pond: {
-    id: "5f1c1c4e-9a8e-4a0b-9c3a-0c8d1e2f3a00",
-    slug: "espoo",
-    name: "Espoo",
-    nameInessive: "Espoossa",
-    parentId: null,
-  },
+  place: { fi: "Espoo", sv: "Esbo" },
   photos: [
     { id: PHOTO_A, blurhash: "LEHV6nWB2yk8pyo0adR*.7kCMdnj", width: 1200, height: 1600 },
     { id: PHOTO_B, blurhash: "LEHV6nWB2yk8pyo0adR*.7kCMdnj", width: 1200, height: 1600 },
@@ -114,6 +108,8 @@ describe("CardPreviewScreen", () => {
     expect(screen.getByText("Non-binary")).toBeTruthy();
     expect(screen.getByText("Genderfluid")).toBeTruthy();
     expect(screen.getByText("Espoo")).toBeTruthy();
+    // The owner's preview says where, and never how far (ADR-061 §5): only a round's entry has a band.
+    expect(screen.queryByText(/^(Nearby|Close|Around|Far)$/)).toBeNull();
     // Languages in the reader's language, as every option (ADR-019 §3, #238); what both answered said in words.
     expect(screen.getByText("Finnish, English (you too)")).toBeTruthy();
     expect(screen.getByText("Yoga (you too), Hiking")).toBeTruthy();
@@ -166,26 +162,7 @@ describe("CardPreviewScreen", () => {
     expect(screen.getByText("Yoga (you too), Hiking")).toBeTruthy();
     expect(screen.getByText("I can whistle with my mouth full.")).toBeTruthy();
     // No fixed-height text container anywhere on the card (CLAUDE.md Accessibility).
-    // A line count is one only where the text is cut at it; a text that
-    // shrinks to fit its lines (the header's title, #467) is never cut.
-    const fixed = (node: unknown): boolean => {
-      if (Array.isArray(node)) return node.some(fixed);
-      if (!node || typeof node !== "object") return false;
-      const { type, props, children } = node as {
-        type?: string;
-        props?: { style?: unknown; numberOfLines?: number; adjustsFontSizeToFit?: boolean };
-        children?: unknown;
-      };
-      if (type === "Text") {
-        const style = ([] as unknown[]).concat(props?.style ?? []) as { height?: unknown }[];
-        const cut = props?.numberOfLines !== undefined && props.adjustsFontSizeToFit !== true;
-        if (cut || style.some((s) => s?.height !== undefined)) {
-          return true;
-        }
-      }
-      return fixed(children);
-    };
-    expect(fixed(screen.toJSON())).toBe(false);
+    expect(hasCutText(screen.toJSON() as HostNode)).toBe(false);
     const found = pressables(screen.toJSON() as HostNode);
     expect(found.flatMap((node) => a11yProblems(node))).toEqual([]);
   });

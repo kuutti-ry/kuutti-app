@@ -10,6 +10,7 @@ import {
 } from "@kuutti/schema";
 import { AppError } from "../lib/errors.ts";
 import { listApprovedPhotos } from "../media/index.ts";
+import { readHome } from "../pond/index.ts";
 import { track } from "../research/index.ts";
 import {
   type CardDeps,
@@ -97,15 +98,17 @@ function noteDropped(deps: CardDeps, row: repo.ProfileRow | null): void {
 }
 
 export async function readProfile(deps: CardDeps, accountId: string): Promise<ProfileResponse> {
-  const [row, consent, approved] = await Promise.all([
+  const [row, consent, approved, home] = await Promise.all([
     repo.findProfile(deps.db, accountId),
     readConsent(deps, accountId),
     listApprovedPhotos(deps.db, accountId),
+    readHome(deps, accountId),
   ]);
   noteDropped(deps, row);
   return {
     profile: row ? toDocument(row, consent) : null,
     completeness: await completenessOf(deps, accountId, row, approved.length),
+    home,
   };
 }
 
@@ -159,7 +162,11 @@ export async function saveProfile(
     complete: completenessNow.complete,
     approvedPhotos: approved.length,
   });
-  return { profile: toDocument(row, consent), completeness: completenessNow };
+  return {
+    profile: toDocument(row, consent),
+    completeness: completenessNow,
+    home: await readHome(deps, accountId),
+  };
 }
 
 /** Erasure (#51): the profile row, inside the caller's transaction. */

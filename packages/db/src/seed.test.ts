@@ -1,15 +1,22 @@
 import { spawn } from "node:child_process";
 import { resolve } from "node:path";
+import { postalMatches } from "@kuutti/schema/postal-areas";
 import { describe, expect, it } from "vitest";
 import { migrate } from "./migrate.ts";
 import { createPool } from "./pool.ts";
-import { MATCHING_CONFIG_V1, MATCHING_CONFIG_V2, SEED_PONDS, seed } from "./seed.ts";
+import {
+  MATCHING_CONFIG_V1,
+  MATCHING_CONFIG_V2,
+  MATCHING_CONFIG_V3,
+  SEED_PONDS,
+  seed,
+} from "./seed.ts";
 import { withTemporaryDatabase } from "./test/temporary-database.ts";
 
 const MIGRATIONS = resolve(import.meta.dirname, "..", "drizzle");
 
 describe("seed", () => {
-  it("is idempotent and writes the pond tree and matching_config versions 1 and 2", async () => {
+  it("is idempotent and writes the one pond and matching_config versions 1, 2 and 3", async () => {
     await withTemporaryDatabase(async (url) => {
       const pool = createPool({ connectionString: url, max: 2 });
       try {
@@ -25,11 +32,8 @@ describe("seed", () => {
           `SELECT c.slug, p.slug AS parent, c.name_inessive AS inessive
            FROM ponds c LEFT JOIN ponds p ON p.id = c.parent_id ORDER BY c.slug`,
         );
-        // Two ponds side by side, the capital region and the rest of the country (#174, ADR-010 §12); the tree waits for the postal-code ponds.
-        expect(tree.rows).toEqual([
-          { slug: "paakaupunkiseutu", parent: null, inessive: "Pääkaupunkiseudulla" },
-          { slug: "suomi", parent: null, inessive: "Suomessa" },
-        ]);
+        // One pond, the country (ADR-061 §8): a second row here would come back on every preview's boot.
+        expect(tree.rows).toEqual([{ slug: "suomi", parent: null, inessive: "Suomessa" }]);
 
         const config = await pool.query<{ key: string; value: number; version: number }>(
           "SELECT key, value, version FROM matching_config ORDER BY key, version",
@@ -123,6 +127,12 @@ describe("seed", () => {
           default_pond: "suomi",
           change_cadence_days: 30,
           deal_breakers_max: 2,
+          // #514: the home and the distance, the maintainer's of 31/10/2026.
+          home_min_inhabitants: 3000,
+          home_town_min_inhabitants: 20000,
+          distance_nearby_km: 5,
+          distance_close_km: 15,
+          distance_around_km: 50,
         });
         expect(byKey).toEqual(MATCHING_CONFIG_V1);
         // Version 2 (ADR-010 §11): the one pond is the capital region, and it wins over version 1;
@@ -138,6 +148,38 @@ describe("seed", () => {
           deal_breakers_max: 6,
         });
         expect(later).toEqual(MATCHING_CONFIG_V2);
+        // Version 3 (ADR-061 §7, §8): the one pond is the country again, and the distance is a seventh deal-breaker.
+        const latest = Object.fromEntries(
+          config.rows.filter((r) => r.version === 3).map((r) => [r.key, r.value]),
+        );
+        expect(latest).toEqual({ default_pond: "suomi", deal_breakers_max: 7 });
+        expect(latest).toEqual(MATCHING_CONFIG_V3);
+        expect(config.rows.filter((r) => r.version > 3)).toEqual([]);
+      } finally {
+        await pool.end();
+      }
+    });
+  });
+
+  it("gives the seeded live account a home on the list and the pond the home's route would set, and nobody else one (ADR-061 §2, §8)", async () => {
+    await withTemporaryDatabase(async (url) => {
+      const pool = createPool({ connectionString: url, max: 2 });
+      try {
+        await migrate(pool, MIGRATIONS);
+        await seed(pool);
+        const { rows } = await pool.query<{
+          state: string;
+          home_place: string | null;
+          home_shows_area: boolean;
+          slug: string | null;
+        }>(
+          `SELECT a.state, a.home_place, a.home_shows_area, p.slug
+           FROM account a LEFT JOIN ponds p ON p.id = a.pond_id`,
+        );
+        expect(rows).toEqual([
+          { state: "active", home_place: "00530", home_shows_area: false, slug: "suomi" },
+        ]);
+        expect(postalMatches(rows[0]?.home_place ?? "", 1)).toHaveLength(1);
       } finally {
         await pool.end();
       }
@@ -162,12 +204,12 @@ describe("seed", () => {
         // Two changes from the panel, then a preview's next boot seeds again.
         await pool.query(
           `INSERT INTO matching_config (version, key, value, valid_from, created_by, reason) VALUES
-             (3, 'default_pond', '"suomi"'::jsonb, '2026-10-16T09:00:00Z', 'admin', 'Open the country'),
+             (4, 'default_pond', '"suomi"'::jsonb, '2026-10-16T09:00:00Z', 'admin', 'Open the country'),
              (2, 'liked_you_cap', '25'::jsonb, '2026-10-16T09:00:00Z', 'admin', 'Smaller ponds first')`,
         );
         await seed(pool);
         expect(await withReason()).toEqual([
-          { key: "default_pond", version: 3, value: "suomi", reason: "Open the country" },
+          { key: "default_pond", version: 4, value: "suomi", reason: "Open the country" },
           { key: "liked_you_cap", version: 2, value: 25, reason: "Smaller ponds first" },
         ]);
         const latest = await pool.query<{ key: string; version: number }>(
@@ -175,7 +217,7 @@ describe("seed", () => {
            WHERE key IN ('default_pond', 'liked_you_cap') GROUP BY key ORDER BY key`,
         );
         expect(latest.rows).toEqual([
-          { key: "default_pond", version: 3 },
+          { key: "default_pond", version: 4 },
           { key: "liked_you_cap", version: 2 },
         ]);
       } finally {
@@ -197,10 +239,7 @@ describe("seed", () => {
         await migrate(pool, MIGRATIONS);
         expect(await open()).toEqual([{ slug: "suomi", matching_open: false }]);
         await seed(pool);
-        expect(await open()).toEqual([
-          { slug: "paakaupunkiseutu", matching_open: true },
-          { slug: "suomi", matching_open: true },
-        ]);
+        expect(await open()).toEqual([{ slug: "suomi", matching_open: true }]);
         await pool.query("UPDATE ponds SET matching_open = false");
         await seed(pool);
         expect((await open()).every((pond) => pond.matching_open)).toBe(true);

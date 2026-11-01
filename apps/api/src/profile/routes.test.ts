@@ -462,7 +462,7 @@ describe("profile routes", () => {
       "fields",
       "gender",
       "photos",
-      "pond",
+      "place",
       "prompts",
       "shared",
     ]);
@@ -542,7 +542,7 @@ describe("profile routes", () => {
       fields: update.fields,
     });
     expect(body.card?.photos.map((p) => p.id)).toEqual([approved]);
-    expect(body.card?.pond).toBeNull();
+    expect(body.card?.place).toBeNull();
     expect(body.completeness.missing).toEqual(["photos", "seeks", "age_window"]);
     // The pending upload becomes the second approved photo: enough for
     // completeness on photos; the tip for one more is on GET /photos (#287).

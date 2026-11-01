@@ -54,6 +54,26 @@ describe("logger redaction", () => {
     expect(out).toContain("acc-1");
   });
 
+  it("never writes a postal code or a kept place, at the top of a line or one level down (#514)", async () => {
+    const { logger, lines } = await captureLogger();
+    logger.info(
+      {
+        postalCode: "00530",
+        homePlace: "00500",
+        home_place: "00100",
+        update: { postalCode: "83960" },
+        account: { homePlace: "422", home_place: "091" },
+        accountId: "acc-1",
+      },
+      "probe",
+    );
+    const out = JSON.stringify(lines());
+    for (const key of ["00530", "00500", "00100", "83960", "422", "091"]) {
+      expect(out).not.toContain(`"${key}"`);
+    }
+    expect(out).toContain("acc-1");
+  });
+
   it("keeps stack frames but not the message on the stack's first line", async () => {
     const { logger, lines } = await captureLogger();
     logger.error({ err: new Error("duplicate key value (email)=(a@b.fi)") }, "unhandled error");

@@ -2,8 +2,8 @@
 # in the field sheet's order, every answer a button (#146, ADR-010 §9 to §13):
 # the name; the gender, and the label only after non-binary; whom one seeks,
 # which waits for the article 9 consent on the same screen; the intent; the
-# ages as two steppers around the person's own age; the area, one button per
-# pond (#174); three photos; a bio; home. The norms with both texts, and
+# ages as two steppers around the person's own age; the home, a postal code
+# and what the card shows of it (#514); three photos; a bio; home. The norms with both texts, and
 # research, come before the bank (#418, ADR-010 §15): on a fresh phone
 # bank-login.yaml accepts them there; on a phone that recorded them at an
 # earlier sign-in, the welcome step asks Onni for the texts, counting no step
@@ -121,13 +121,33 @@ name: A registered person is taken through onboarding one question per screen, a
 - assertVisible: "33"
 - tapOn: "Continue|Jatka|Fortsätt"
 
-# 6: two ponds without a parent, so the area is the person's choice (#174).
+# 6: the home, typed into a number field nothing focuses by itself, and the
+# area chosen from the list under it. A row's label says the digits one at a
+# time, so a row is found by its name (ADR-061 §1).
 - extendedWaitUntil:
     visible: "Where do you live\\?|Missä asut\\?|Var bor du\\?"
     timeout: 15000
 - assertVisible: "Step 6 of 8|Vaihe 6 / 8|Steg 6 av 8"
-- assertVisible: "Finland|Suomi"
-- tapOn: "Capital Area|Pääkaupunkiseutu|Huvudstadsregionen"
+- assertVisible: "Your postal code tells Kuutti how far people are\\..*|Postinumerosi kertoo Kuutille.*|Ditt postnummer berättar för Kuutti.*"
+# The field, below its label of the same name; an empty field has no text to match.
+- tapOn:
+    below: "Postal code|Postinumero|Postnummer"
+- inputText: "00530"
+- tapOn: "Where do you live\\?|Missä asut\\?|Var bor du\\?"
+- tapOn: ".*(Kallio|Berghäll).*"
+
+# Still 6: Kallio is large enough to keep, so the card may show it or the town,
+# and the screen says which it will (ADR-061 §3).
+- extendedWaitUntil:
+    visible: "What should your card show\\?|Mitä korttisi näyttää\\?|Vad ska ditt kort visa\\?"
+    timeout: 15000
+- assertVisible: "Step 6 of 8|Vaihe 6 / 8|Steg 6 av 8"
+- assertVisible: "On your card: Helsinki|Kortillasi: Helsinki|På ditt kort: Helsingfors"
+- tapOn: "Kallio|Berghäll"
+- extendedWaitUntil:
+    visible: "On your card: Kallio|Kortillasi: Kallio|På ditt kort: Berghäll"
+    timeout: 15000
+- tapOn: "Continue|Jatka|Fortsätt"
 
 # 7: three photos, the reason first, through the system picker one at a time.
 - extendedWaitUntil:
@@ -177,10 +197,10 @@ name: A registered person is taken through onboarding one question per screen, a
     timeout: 60000
 - tapOn: "Save and continue|Tallenna ja jatka|Spara och fortsätt"
 
-# Home straight after the bio: research was asked before the bank. The chosen
-# area's counter; the photos wait in the local queue, so matching waits for them.
+# Home straight after the bio: research was asked before the bank. The one
+# pond's counter; the photos wait in the local queue, so matching waits for them.
 - extendedWaitUntil:
     visible: "Your area|Alueesi|Ditt område"
     timeout: 15000
-- assertVisible: "Capital Area|Pääkaupunkiseutu|Huvudstadsregionen"
+- assertVisible: "Finland|Suomi"
 - assertVisible: "Matching opens for finished profiles\\. Yours still lacks something\\.|Seuranhaku avautuu valmiille profiileille\\. Sinun profiilistasi puuttuu vielä jotakin\\.|Matchningen öppnar för färdiga profiler\\. I din saknas ännu något\\."

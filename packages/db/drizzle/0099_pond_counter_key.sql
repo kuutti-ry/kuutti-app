@@ -7,5 +7,5 @@
 -- the two identical).
 UPDATE "matching_config" SET "key" = 'pond_counter_k' WHERE "key" = 'waitlist_k';
 -- A table renamed keeps its primary key's name, which the schema DSL does not
--- see and 0095 could not move.
+-- see and 0098 could not move.
 ALTER TABLE "pond_counter" RENAME CONSTRAINT "waitlist_snapshot_pkey" TO "pond_counter_pkey";

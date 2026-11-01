@@ -71,11 +71,57 @@ export const PondSummary = z
   .meta({ id: "PondSummary" });
 export type PondSummary = z.infer<typeof PondSummary>;
 
-export const PondList = z.object({ ponds: z.array(PondSummary).max(200) }).meta({ id: "PondList" });
-export type PondList = z.infer<typeof PondList>;
+/**
+ * A home postal code as it is typed (ADR-061 §1): five digits, never an enum
+ * of the list, which would put 3,018 values into the contract and into every
+ * refusal. A refusal of this pattern quotes the pattern, never the input (§9).
+ */
+export const PostalCode = z
+  .string()
+  .regex(/^\d{5}$/)
+  .meta({ description: "Five digits, checked against the list of postal areas." });
 
-export const PondChoice = z.object({ pondId: z.uuid() }).strict().meta({ id: "PondChoice" });
-export type PondChoice = z.infer<typeof PondChoice>;
+export const PLACE_NAME_MAX = 80;
+
+/** A place by Statistics Finland's names (ADR-061 §3): English reads Finnish, and no sentence is built around a name (TD-17). */
+export const PlaceName = z
+  .object({
+    fi: z.string().min(1).max(PLACE_NAME_MAX),
+    sv: z.string().min(1).max(PLACE_NAME_MAX),
+  })
+  .meta({ id: "PlaceName" });
+export type PlaceName = z.infer<typeof PlaceName>;
+
+/**
+ * A home as its owner reads it (ADR-061 §3): the nearest town, the area's name
+ * where an area is kept (null where a municipality is), and whether the card
+ * shows that area instead of the town. Names only, never digits or a key.
+ */
+export const HomeSummary = z
+  .object({
+    town: PlaceName,
+    area: PlaceName.nullable(),
+    showArea: z.boolean(),
+  })
+  .meta({ id: "HomeSummary" });
+export type HomeSummary = z.infer<typeof HomeSummary>;
+
+/**
+ * A new home, what the card shows, or both (ADR-061 §1, §3): the choice goes
+ * alone, since the digits may be gone by then. A new code starts from the town
+ * again unless the same request says otherwise.
+ */
+export const HomeUpdate = z
+  .object({
+    postalCode: PostalCode.optional(),
+    showArea: z.boolean().optional(),
+  })
+  .strict()
+  .refine((update) => update.postalCode !== undefined || update.showArea !== undefined, {
+    message: "a postal code, what the card shows or both",
+  })
+  .meta({ id: "HomeUpdate" });
+export type HomeUpdate = z.infer<typeof HomeUpdate>;
 
 /**
  * The kinds of consent: the two nothing may start without, the research
@@ -145,10 +191,9 @@ export type ConsentsResponse = z.infer<typeof ConsentsResponse>;
  * The steps of onboarding in the order the app asks them (#146, the field
  * sheet): the two consents on the welcome screen, the name, the gender, whom
  * one seeks (with the special-category consent), the intent, the age window,
- * three photos, two prompts or a bio. The pond is a step only while there is
- * a choice: more than one pond without a parent, or no default (ADR-010 §12);
- * with one, the API assigns it from `matching_config.default_pond`.
- * Research is never one of them.
+ * the home, three photos, two prompts or a bio. Writing the home also sets the
+ * pond, of which there is one, from `matching_config.default_pond` (ADR-061
+ * §8). Research is never one of them.
  */
 export const ONBOARDING_STEPS = [
   "terms",
@@ -158,9 +203,9 @@ export const ONBOARDING_STEPS = [
   "seeks",
   "intent",
   "age_window",
+  "home",
   "photos",
   "prompts_or_bio",
-  "pond",
 ] as const;
 export const OnboardingStep = z.enum(ONBOARDING_STEPS).meta({ id: "OnboardingStep" });
 export type OnboardingStep = z.infer<typeof OnboardingStep>;
@@ -174,7 +219,7 @@ export const ACTIVATION_STEPS: readonly OnboardingStep[] = [
   "gender",
   "seeks",
   "age_window",
-  "pond",
+  "home",
   "terms",
   "privacy",
 ];
@@ -186,6 +231,8 @@ export const OnboardingStatus = z
     age: z.int().min(AGE_MIN).max(130),
     gender: Gender.nullable(),
     pond: PondSummary.nullable(),
+    /** The person's home in names (ADR-061 §3); null before the step, and for a place the list no longer knows, which opens the step again (§2). */
+    home: HomeSummary.nullable(),
     preferences: PreferencesResponse,
     consents: z.object({
       /** The version accepted, when it is the current one; an old consent reads as null. */

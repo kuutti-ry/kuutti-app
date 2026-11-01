@@ -22,9 +22,10 @@ The steps in the order the sheet asks them (ADR-010, #146), one screen each, "Co
 4. Whom she seeks: one to three; under it the line "I consent to Kuutti storing whom I seek" (the article 9 consent, ADR-019 §4). Choose men.
 5. Intent: long-term, casual, or open to either.
 6. Age window: buttons, not a number field, around her own age.
-7. Photos: "Add photos", at least three. From the camera roll: three or more of her five pictures (the runbook put them there). Each goes through the pipeline: resized, EXIF stripped, three variants, a blurhash, the check. Locally the check queues everything, so the grid shows them pending; on staging Rekognition approves a face within seconds.
-8. "A few words": two prompts of twelve, or a bio of fifty characters.
-9. Done. The pond is assigned by the API (one pond for now, "Pääkaupunkiseutu"); there is no pond step.
+7. "Where do you live?": "Your postal code tells Kuutti how far people are. Others see a town or your area by name, never the digits." Type five digits; the names under the field come from a list on the phone, so a half-typed home never reaches the server. Then "What should your card show?": the town or, where her area is large enough to keep, the area, which she may choose. Where none is, the step says "Your card shows the nearest town." Say what happened: what is kept is a place of at least three thousand people, and the home changes whenever she likes (ADR-061).
+8. Photos: "Add photos", at least three. From the camera roll: three or more of her five pictures (the runbook put them there). Each goes through the pipeline: resized, EXIF stripped, three variants, a blurhash, the check. Locally the check queues everything, so the grid shows them pending; on staging Rekognition approves a face within seconds.
+9. "A few words": two prompts of twelve, or a bio of fifty characters.
+10. Done. Writing the home also set the pond, of which there is one, the whole country; there is no pond step.
 
 The account is active once the four matching answers and the two consents are there (ADR-010 §6); the profile steps may be finished later.
 
@@ -34,7 +35,7 @@ The home screen: "Kuutti", two cards and the way onward.
 
 - "People in your area": the counter of the pond, in tens, with the bar of whom people with a finished profile seek, which the population's fifty fill (population.md), and "n people are still finishing their profile." (ADR-013).
 - "Matching": where Aino stands. With her photos pending: "Matching opens for finished profiles. Yours still lacks something." Once her photos are approved: "Matching is open for you.", since the demo commands open the ponds; in a pond an admin has closed, "Your profile is finished. Matching has not opened in your area yet." (ADR-060).
-- Below: "Your profile". The profile list holds the rest (#239): "Photos" and the sections, each with a check mark once done or how far it is filled, then "Your deal-breakers" (up to two, only on what she answered herself, #149) and, while a question is unanswered, "Fill in the rest while you wait" (the optional fields, one per screen, "Ask me later" on each, #148). The eye at the top opens her card.
+- Below: "Your profile". The profile list holds the rest (#239): "Photos" and the sections, each with a check mark once done or how far it is filled, then "Your deal-breakers" (up to seven: distance, which everybody can set, and the others only on what she answered herself, #149, ADR-061 §7) and, while a question is unanswered, "Fill in the rest while you wait" (the optional fields, one per screen, "Ask me later" on each, #148). The eye at the top opens her card.
 
 In "Your profile", show "Fill in the rest while you wait" for one field and skip it; show "Your deal-breakers": the field she has not answered says "To filter on this, share yours first."
 
@@ -43,7 +44,7 @@ In "Your profile", show "Fill in the rest while you wait" for one field and skip
 Sign out (Settings, "Log out") and sign in as Sanna Korhonen (locally her button; on staging Nordea `DEMOUSER4`). Her story is complete: a profile, five approved photos, matching open.
 
 - Home: "Matching is open for you."
-- "Your profile" → the eye, "See your card": the card as others see it (#150): the first photo, "Sanna, 49", "Woman", the pond, one prompt answer, the other photos, the fields that are information (languages named in the reader's language, "Something long-term", the hobbies, "171 cm"), nothing that is a setting or a soft preference.
+- "Your profile" → the eye, "See your card": the card as others see it (#150): the first photo, "Sanna, 49", "Woman", "Espoo", the town of the home she typed, one prompt answer, the other photos, the fields that are information (languages named in the reader's language, "Something long-term", the hobbies, "171 cm"), nothing that is a setting or a soft preference, and no distance, which only a round's card has.
 
 ## Scene 5: Today's round (3 min)
 
@@ -52,13 +53,13 @@ Locally only. Sign out and sign in as Iida Mattila (her button). She and the fou
 Her round is right only on the Finnish day of the reset that built it. On a later day the builder makes her a round of Henna alone: Katja, Minna and Riikka were shown on the reset's day and wait out `shown_cooldown_days` (thirty, TD-12), and Henna's like still waits while Iida has not decided on her card (once she has, the round is empty). So the reset for this scene is run on the morning of the demo, and the morning's checks sign in as Iida (`runbook.md`).
 
 1. Home: "Matching is open for you." and under it "Today's round".
-2. The first card is Henna's, labelled "Liked you": a like waits first in the round, and never unlabelled (ADR-037). Like and Pass are buttons at the bottom, never a swipe: Pass an outlined rectangle at the left, Like a filled pill at the right, each with its word. On her card there is no fish: a fish would only answer her like.
+2. The first card is Henna's, labelled "Liked you": a like waits first in the round, and never unlabelled (ADR-037). Under the name her town and "Nearby": a distance is a word on a round's card, never kilometres, and it stays what it was when the round was built, whoever moves (ADR-061 §5). Like and Pass are buttons at the bottom, never a swipe: Pass an outlined rectangle at the left, Like a filled pill at the right, each with its word. On her card there is no fish: a fish would only answer her like.
 3. Like: "It's a match", and "Go to the conversation" opens it, empty but for the composer (ADR-038). Back returns to the round.
 4. The next card says "Matches your filters". Show "Send a fish" above Like and Pass: a like with a mark, first in the other person's round, few in a rolling window (ADR-039). Pass, then Undo in the header: the card comes back with "You passed on this person. You can change that until midnight." (ADR-034 §5). Like.
 5. The third card: "Block or report" beside the name, the same dialog as anywhere (ADR-030 §11). Report and block, a reason, a few words, Send report; Done, and the card is gone.
 6. The last card, then "That was today's round. The next one comes tomorrow." No count, no countdown, nothing loads more.
 
-Which of Katja, Minna and Riikka comes when is the day's order (the soft matches, ties by a hash of the day, ADR-035), so tell it by the cards, not by a script. Once a release carries faces for the population's pool (v2 has none), a population with faces written before the reset may put women of it whom Iida's pool takes in among them, and into her later rounds too. A match and a report are final: `pnpm demo:reset` gives Iida her round anew, for the day it runs.
+Katja, Minna and Riikka come nearest first (ADR-061 §6): each lives in a band of her own from Iida's home, Close, Around and Far, so the soft matches and the day's hash have nothing left to decide among them (`packages/db/src/seed/histories.ts`, and a test holds it to the list). Once a release carries faces for the population's pool (v2 has none), a population with faces written before the reset may put women of it whom Iida's pool takes in among them, and into her later rounds too. A match and a report are final: `pnpm demo:reset` gives Iida her round anew, for the day it runs.
 
 ## Scene 6: The moderation queue (2 min)
 
@@ -79,7 +80,7 @@ Two logins the product refuses, by the code that refuses anybody (TD-7).
 
 As Aino again: Settings → the account card.
 
-- "Your Kuutti data": the export, everything held about her, as JSON (ADR-007): the account, the profile, the preferences and deal-breakers, every consent ever given, the research mapping, the photos with short-lived links.
+- "Your Kuutti data": the export, everything held about her, as JSON (ADR-007): the account, her home in words, never a code, the profile, the preferences and deal-breakers, every consent ever given, the research mapping, the photos with short-lived links.
 - "Delete your account?" → "Delete everything": the erasure path. She is signed out; a sign-in within thirty days is refused with the date, as Ilona's was.
 
 Then `pnpm demo:reset` (locally) or the reset in the container (staging): everybody back to where they begin, the stories told anew.

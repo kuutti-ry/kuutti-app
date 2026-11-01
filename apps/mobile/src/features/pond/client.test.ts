@@ -1,22 +1,21 @@
 import { saveSession } from "@/lib/session";
-import { choosePond, fetchGate, fetchPondCounter, fetchPonds } from "./client";
+import { fetchGate, fetchPondCounter } from "./client";
 
-// The pond as the app reads it (#54, #94, #174): each route parsed by its
+// The pond as the app reads it (#54, #94): each route parsed by its
 // contract, and an answer without data an ApiError with the status.
 
+const POND = {
+  id: "0b1c1c4e-9a8e-4a0b-9c3a-0c8d1e2f3a01",
+  slug: "suomi",
+  name: "Suomi",
+  nameInessive: "Suomessa",
+  parentId: null,
+};
 const token = (seed: string) => (seed + "x".repeat(43)).slice(0, 43);
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
 const refusal = (status: number) =>
   json({ error: { code: "x", message: "x", requestId: "r" } }, status);
-
-const POND = {
-  id: "5f1c1c4e-9a8e-4a0b-9c3a-0c8d1e2f3a00",
-  slug: "espoo",
-  name: "Espoo",
-  nameInessive: "Espoossa",
-  parentId: null,
-};
 
 function answering(...answers: Response[]) {
   const seen: Request[] = [];
@@ -72,27 +71,5 @@ describe("the pond client", () => {
     const entry = { pond: POND, day: null, verified: null, split: null, finishing: null, seeks };
     answering(json({ k: 10, ponds: [entry] }));
     await expect(fetchPondCounter()).rejects.toThrow();
-  });
-
-  it("lists the ponds to choose from", async () => {
-    const seen = answering(json({ ponds: [POND] }), refusal(500));
-    expect(await fetchPonds()).toEqual({ ponds: [POND] });
-    expect(pathOf(seen[0])).toBe("/ponds");
-    await expect(fetchPonds()).rejects.toMatchObject({
-      status: 500,
-      message: "ponds answered 500",
-    });
-  });
-
-  it("chooses a pond by its id, and fails a refusal", async () => {
-    const seen = answering(new Response(null, { status: 204 }), refusal(404));
-    await expect(choosePond(POND.id)).resolves.toBeUndefined();
-    expect(seen[0]?.method).toBe("PUT");
-    expect(pathOf(seen[0])).toBe("/account/pond");
-    expect(JSON.parse(await (seen[0] as Request).text())).toEqual({ pondId: POND.id });
-    await expect(choosePond(POND.id)).rejects.toMatchObject({
-      status: 404,
-      message: "pond answered 404",
-    });
   });
 });

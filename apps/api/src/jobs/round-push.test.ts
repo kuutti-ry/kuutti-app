@@ -40,7 +40,11 @@ async function roundOf(db: Queryable, owner: string, cards: string[], at: Date =
       accountId: owner,
       day: finnishDay(at),
       ordering: "count",
-      entries: cards.map((candidateId) => ({ candidateId, reason: "matches_filters" })),
+      entries: cards.map((candidateId) => ({
+        candidateId,
+        reason: "matches_filters",
+        distance: "nearby",
+      })),
     },
   );
   if (!built) throw new Error("round not built");

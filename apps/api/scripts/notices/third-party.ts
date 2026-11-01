@@ -14,7 +14,8 @@
  * (@kuutti/notices), so a package installed twice gives the copy that
  * shipped. libvips and the libraries built into it are their own part
  * (notices/libvips.json), since what LGPL-3.0 asks of them is more than a
- * notice.
+ * notice. The list of postal areas is data and no package, credited in a part
+ * of its own from what `pnpm places` wrote (ADR-061 §4).
  *
  * scripts/notices.ts runs it after tsup.
  */
@@ -27,6 +28,7 @@ import {
   shippedPackageDirs,
   type Upstream,
 } from "@kuutti/notices";
+import { POSTAL_AREAS_CREDIT } from "@kuutti/schema/postal-areas";
 
 const API = resolve(import.meta.dirname, "../..");
 const ROOT = resolve(API, "../..");
@@ -213,8 +215,8 @@ Public License 3.0 with an additional permission (/app/LICENSE and
 /health. Its dist/ bundles the code of the packages below, and its
 node_modules/@img holds sharp's prebuilt addon and libvips. Each package
 follows with its copyright lines and the number of its licence's text, then
-libvips and the libraries built into it, then the texts, each once, as their
-files have them.`;
+libvips and the libraries built into it, then the postal list it carries,
+then the texts, each once, as their files have them.`;
 
 /** What LGPL-3.0 4(a) and GPL-3.0 6(d) ask to be said beside the object code of libvips. */
 function libvipsIntro(part: LibvipsPart, number: (key: string) => number): string {
@@ -244,10 +246,31 @@ in case its own address moves or goes.`;
 }
 
 /**
+ * What CC BY 4.0 asks to be said of the list of postal areas in dist/ (#514,
+ * ADR-061 §4): whose it is, the licence, and what Kuutti changed. It is data of
+ * Statistics Finland's and no package, so nothing of the metafile finds it.
+ */
+function postalList(): string {
+  const { en, sourceUrl } = POSTAL_AREAS_CREDIT;
+  return `${RULE}
+THE POSTAL LIST
+
+dist/ carries a list of Finland's postal areas and municipalities, used to
+read a person's home. It is not under the licence of this image's code, and
+Statistics Finland has not endorsed Kuutti or this use of it.
+
+${en.source}
+
+${en.changes}
+
+Source: ${sourceUrl}`;
+}
+
+/**
  * The notices file: what it is, each package with its copyright lines and
  * the number of each text, libvips' part with each library built into it,
- * and the texts once each in the order first named, a blank line between
- * any two.
+ * the postal list, and the texts once each in the order first named, a blank
+ * line between any two.
  */
 export function render(notices: Notices, part: LibvipsPart): string {
   const order = new Map<string, number>();
@@ -288,7 +311,7 @@ export function render(notices: Notices, part: LibvipsPart): string {
   });
   const all: Record<string, string> = { ...part.texts, ...notices.texts };
   const texts = [...order].map(([key, n]) => `${RULE}\nText ${n}\n\n${all[key]}`);
-  return `${[HEADER, ...packages, intro, ...libraries, ...texts].join("\n\n")}\n`;
+  return `${[HEADER, ...packages, intro, ...libraries, postalList(), ...texts].join("\n\n")}\n`;
 }
 
 /** The files it reads and writes; the defaults are the build's. */

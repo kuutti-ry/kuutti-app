@@ -9,7 +9,7 @@ How a demo is prepared and checked, locally and on staging (#144). The story its
 1. `pnpm env:up`: the database, the S3 stand-in, the mock bank, the API, Metro.
 2. `pnpm demo:assets`: the release of pictures into `~/.cache/kuutti-demo-photos/v2`, verified. Without it nobody has a photo and the storyboard's photo scenes do not work.
 3. `pnpm demo:reset`: everybody forgotten through the erasure path, then the eighteen stories through the API's own routes, with their pictures (Sanna 5, Noa 2 + the queue's 4, Kerttu 4, and the round's cast: Iida 3, Henna, Katja, Minna and Riikka 2 each, from release v3; the faces approved locally but Noa's second, the negatives queued), the stories' conversations, then the counter counted and the ponds opened, then Iida's round (#379). Her round is the Finnish day's on which the reset ran, so for scene 5 the reset is run again on the morning of (below).
-4. `pnpm demo:population -- --photos`: three hundred people in the one pond, with faces of the pool by seed; the counter counted anew and the ponds opened.
+4. `pnpm demo:population -- --photos`: three hundred people in the one pond, each with a home somewhere in Finland (`population.md`), with faces of the pool by seed; the counter counted anew and the ponds opened.
 5. Aino's camera roll: `xcrun simctl addmedia booted ~/.cache/kuutti-demo-photos/v2/faces/aino/*.jpg` (the simulator must be booted). On a device, AirDrop the five files.
 6. `pnpm dev:mobile` and open the dev client on the simulator; the tech config screen (the wrench on the home screen) shows the API it talks to.
 7. The admin panel: `pnpm dev:admin` at `http://localhost:5173`; the moderator is a persona that was given the role after its first login: `pnpm --filter @kuutti/db moderator -- grant <hetu_hmac> moderator --by "<your name>"`, the hash from the API's log line of that login (`infra/README.md`, Staff). Use Mikael: a moderator persona is spared by the reset, so never one with a story.
@@ -25,6 +25,8 @@ Staging holds no real person (ADR-018). The three commands run inside the API's 
 5. Aino's five pictures on the phone's camera roll (AirDrop).
 6. The admin panel at `https://admin.staging.kuutti.app` (`infra/README.md`, Admin panel), the moderator granted as above, on the bed's identity. A panel on the laptop cannot finish a staging login: the bank sends it back to the hosted panel.
 
+Steps 2 and 3 are also what give staging its homes after a deploy that brought them (ADR-061). A persona whose story was given before is resumed and never retold, so `node dist/demo-stories.js` alone leaves it without one, and the population of an older deploy has none either: they stay active, read as having no home and are in nobody's pool, and no error says so.
+
 ## The morning of
 
 Locally, first `pnpm demo:reset` again, on the day of the demo: Iida's round (scene 5) is built for the day the reset runs, and on a later day it is Henna alone (`storyboard.md`). The reset leaves the population and the camera roll as they are; with Mikael the moderator (step 7), it names him as spared and exits with an error, after doing the rest. On staging scene 5 is not shown, and nothing is run again.
@@ -33,9 +35,9 @@ Locally, first `pnpm demo:reset` again, on the day of the demo: Iida's round (sc
 |---|---|---|
 | the API answers | `curl -s localhost:3000/health` | `curl -s https://api.staging.kuutti.app/health`: the commit is `main`'s |
 | the build | the dev client opens Metro | the tech config screen: channel `staging`, the API above, the runtime's fingerprint matches the installed build |
-| the counter | `curl -s localhost:3000/ponds/counter`: Pääkaupunkiseutu with a total and a split | the same against staging |
+| the counter | `curl -s localhost:3000/ponds/counter`: Suomi with a total and a split | the same against staging |
 | matching | sign in as Sanna: "Matching is open for you." | the same, through Nordea `DEMOUSER4` |
-| the round | sign in as Iida, Today's round: Henna first, "Liked you", and three more, Katja, Minna and Riikka in the day's order (with a population whose pool has faces, which v2 does not give, women of it may come among them); look, decide nothing (a decision is final, or until midnight). Henna alone: the reset ran on another day, so reset again. No Today's round on home: the reset did not reach the round; read its log (a cache of a release older than v3 stops it at Iida, step 2) | none: scene 5 runs locally only |
+| the round | sign in as Iida, Today's round: Henna first, "Liked you" and Nearby, and three more nearest first, Katja Close, Minna Around and Riikka Far (with a population whose pool has faces, which v2 does not give, women of it may come among them, in the order of their bands); look, decide nothing (a decision is final, or until midnight). Henna alone: the reset ran on another day, so reset again. No Today's round on home: the reset did not reach the round; read its log (a cache of a release older than v3 stops it at Iida, step 2) | none: scene 5 runs locally only |
 | the queue | the panel lists Noa's four negatives and her second face | empty: the check decides Noa's pictures itself (her faces and the EXIF one approved, the landscape, the text and the group picture rejected with their reasons) |
 | the refusals | Tapio refused as banned, Ilona with the date | the same, through OP and Aktia |
 | the camera roll | the five pictures are there | the same |

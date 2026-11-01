@@ -75,13 +75,13 @@ const empty = (): PondCounterCounts => ({
 
 /**
  * A shadow-banned account counts exactly like an active one, here and in
- * `finishing`. Left out, its owner could find the ban out: move between two
- * ponds, or take a photo away, and watch whether the figures ever follow.
+ * `finishing`. Left out, its owner could find the ban out: take a photo away,
+ * and watch whether the figures ever follow.
  */
 const STANDS_AS_ACTIVE = new Set(["active", "shadow_banned"]);
 
 /**
- * Exact counts per pond, for ponds somebody chose. One read over every account
+ * Exact counts per pond, for the ponds people are in. One read over every account
  * that counts, with no account id in what comes back: this is a nightly
  * aggregate, not a caller's data (rule 6 is about a session's own rows). The
  * tables are the shared ones of packages/db, read only. Whether a profile is
@@ -148,7 +148,7 @@ export type SnapshotResult = { day: string; ponds: number; moved: number; counte
 
 /**
  * Counts every pond and moves the figures of those that have moved far enough.
- * Every pond has a row, a pond nobody chose one of zeros, so the list never
+ * Every pond has a row, a pond nobody is in one of zeros, so the list never
  * says which ponds are small by leaving them out. One row per pond: the
  * figures that are replaced are gone, and no series of daily counts is kept.
  *

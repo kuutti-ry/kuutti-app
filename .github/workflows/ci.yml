@@ -46,6 +46,10 @@ jobs:
       # on the runner, never an environment (#200).
       - name: load:smoke refuses production and keeps its budgets
         run: node scripts/load-smoke.ts --self-test
+      # The list of postal areas from a fixture, never the network: what it writes, and that
+      # nothing fetched can become code in a generated file (#514, ADR-061 §4).
+      - name: places writes the lists and refuses what it should
+        run: node scripts/places.ts --self-test
       # What the hooks hold an agent to, over stand-ins of a session's transcript
       # and of GitHub (#525).
       - name: The pull request duties refuse what they should

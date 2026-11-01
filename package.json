@@ -47,7 +47,8 @@
     "demo:population": "pnpm --filter @kuutti/api run demo:population",
     "demo:reset": "pnpm --filter @kuutti/api run demo:reset",
     "demo:stories": "pnpm --filter @kuutti/api run demo:stories",
-    "demo:assets": "pnpm --filter @kuutti/api run demo:assets"
+    "demo:assets": "pnpm --filter @kuutti/api run demo:assets",
+    "places": "node scripts/places.ts"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.15",

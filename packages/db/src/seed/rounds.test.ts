@@ -70,10 +70,7 @@ describe("writing the round of the stories", () => {
       const pool = createPool({ connectionString: url, max: 2 });
       try {
         await migrate(pool, MIGRATIONS);
-        const pond = await pool.query<{ id: string }>(
-          `INSERT INTO ponds (slug, name_nominative, name_inessive)
-           VALUES ('paakaupunkiseutu', 'Pääkaupunkiseutu', 'Pääkaupunkiseudulla') RETURNING id`,
-        );
+        const pond = await pool.query<{ id: string }>("SELECT id FROM ponds WHERE slug = 'suomi'");
         const pondId = pond.rows[0]?.id as string;
         const iida = await account(pool, "hash-iida", pondId);
         const henna = await account(pool, "hash-henna", pondId);
@@ -138,10 +135,7 @@ describe("writing the round of the stories", () => {
       const pool = createPool({ connectionString: url, max: 2 });
       try {
         await migrate(pool, MIGRATIONS);
-        const pond = await pool.query<{ id: string }>(
-          `INSERT INTO ponds (slug, name_nominative, name_inessive)
-           VALUES ('paakaupunkiseutu', 'Pääkaupunkiseutu', 'Pääkaupunkiseudulla') RETURNING id`,
-        );
+        const pond = await pool.query<{ id: string }>("SELECT id FROM ponds WHERE slug = 'suomi'");
         const pondId = pond.rows[0]?.id as string;
         const iida = await account(pool, "hash-iida", pondId);
         const henna = await account(pool, "hash-henna", pondId);

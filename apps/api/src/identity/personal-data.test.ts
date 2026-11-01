@@ -42,7 +42,7 @@ const REGISTER: Record<string, Entry> = {
     by: "tombstoneAccount",
     stays: "id identity_id state state_changed_at registered_at deleted_at",
     cleared:
-      "birth_month birth_year email email_confirmed_at found_them_answered gender gender_changed_at paused_from pond_id sanctioned_from",
+      "birth_month birth_year email email_confirmed_at found_them_answered gender gender_changed_at home_moved_at home_place home_shows_area paused_from pond_id sanctioned_from",
     exported: ["account"],
   },
   account_export: { erasure: "goes", by: "deleteExportsOfAccount", exported: ["exports"] },

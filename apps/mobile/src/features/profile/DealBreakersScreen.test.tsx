@@ -1,4 +1,5 @@
 import { act, fireEvent, screen, waitFor } from "@testing-library/react-native";
+import { useLocales } from "expo-localization";
 import type * as React from "react";
 import { saveSession } from "@/lib/session";
 import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
@@ -48,7 +49,7 @@ function fakeApi(fields: Record<string, unknown>, dealBreakers: DealBreaker[] = 
   const stored = () => ({
     dealBreakers: server.dealBreakers.map((d) => ({
       ...d,
-      paused: server.fields[d.field] === undefined,
+      paused: d.field !== "distance" && server.fields[d.field] === undefined,
     })),
     max,
   });
@@ -67,6 +68,7 @@ function fakeApi(fields: Record<string, unknown>, dealBreakers: DealBreaker[] = 
           updatedAt: "2026-10-08T10:00:00.000Z",
         },
         completeness: { complete: false, missing: ["photos"] },
+        home: null,
       });
     }
     if (path === "/preferences/deal-breakers" && request.method === "GET") return json(stored());
@@ -260,7 +262,7 @@ describe("DealBreakersScreen", () => {
       fakeApi(answeredAll);
       await ready();
       expect(screen.queryByLabelText("Deal-breaker: Height")).toBeNull();
-      expect(selected("Everyone")).toBe(true);
+      expect(selected("Everyone, Height")).toBe(true);
       for (const name of ["Taller than me", "My height or taller", "Shorter than me"]) {
         expect(selected(name)).toBe(false);
       }
@@ -276,7 +278,7 @@ describe("DealBreakersScreen", () => {
       await ready();
       await press(button("Taller than me"));
       expect(selected("Taller than me")).toBe(true);
-      expect(selected("Everyone")).toBe(false);
+      expect(selected("Everyone, Height")).toBe(false);
       // On from the start (ADR-042 §8), as with every deal-breaker.
       expect(
         screen.getByLabelText("Also people who did not answer").props.accessibilityState?.checked,
@@ -289,8 +291,8 @@ describe("DealBreakersScreen", () => {
       await press(button("Save the deal-breakers"));
       await waitFor(() => expect(screen.getByText("Saved.")).toBeTruthy());
 
-      await press(button("Everyone"));
-      expect(selected("Everyone")).toBe(true);
+      await press(button("Everyone, Height"));
+      expect(selected("Everyone, Height")).toBe(true);
       expect(selected("Shorter than me")).toBe(false);
       expect(screen.queryByLabelText("Also people who did not answer")).toBeNull();
       await press(button("Save the deal-breakers"));
@@ -304,7 +306,7 @@ describe("DealBreakersScreen", () => {
       ]);
       await ready();
       expect(selected("My height or taller")).toBe(true);
-      expect(selected("Everyone")).toBe(false);
+      expect(selected("Everyone, Height")).toBe(false);
       expect(
         screen.getByLabelText("Also people who did not answer").props.accessibilityState?.checked,
       ).toBe(false);
@@ -319,7 +321,7 @@ describe("DealBreakersScreen", () => {
       await ready();
       await press(button("Taller than me"));
       expect(screen.getByText("That is 1 already.")).toBeTruthy();
-      expect(selected("Everyone")).toBe(true);
+      expect(selected("Everyone, Height")).toBe(true);
       expect(selected("Taller than me")).toBe(false);
     });
 
@@ -336,7 +338,7 @@ describe("DealBreakersScreen", () => {
       await ready();
       expect(screen.getByText("To filter on this, share yours first.")).toBeTruthy();
       expect(screen.queryByRole("button", { name: "Taller than me" })).toBeNull();
-      expect(screen.queryByRole("button", { name: "Everyone" })).toBeNull();
+      expect(screen.queryByRole("button", { name: "Everyone, Height" })).toBeNull();
       await press(button("Answer it"));
       expect(router.push).toHaveBeenCalledWith("/profile/later/height");
     });
@@ -348,9 +350,158 @@ describe("DealBreakersScreen", () => {
       await ready();
       expect(screen.getByText("Paused until you answer it yourself.")).toBeTruthy();
       expect(selected("Taller than me")).toBe(true);
-      await press(button("Everyone"));
+      await press(button("Everyone, Height"));
       await press(button("Save the deal-breakers"));
       await waitFor(() => expect(puts).toEqual([[]]));
+    });
+  });
+
+  describe("the distance row (#514, ADR-061 §7)", () => {
+    const button = (name: string) => screen.getByRole("button", { name });
+    const selected = (name: string) => button(name).props.accessibilityState?.selected;
+    const ready = async () => {
+      await show(<DealBreakersScreen />);
+      await waitFor(() => expect(screen.getByText("Deal-breakers")).toBeTruthy());
+    };
+    const save = async (puts: DealBreaker[][], saves: number) => {
+      await press(button("Save the deal-breakers"));
+      await waitFor(() => expect(puts).toHaveLength(saves));
+    };
+
+    it("is the last row: four buttons, no switch, nothing on those who did not answer", async () => {
+      fakeApi(answeredAll);
+      await ready();
+      expect(screen.getByText("Distance")).toBeTruthy();
+      expect(screen.queryByLabelText("Deal-breaker: Distance")).toBeNull();
+      expect(selected("Everyone, Distance")).toBe(true);
+      for (const name of ["Nearby", "Close", "Around"]) expect(selected(name)).toBe(false);
+      // Far accepted is no filter, so there is no such button.
+      expect(screen.queryByRole("button", { name: "Far" })).toBeNull();
+      expect(screen.queryByText("Fine with me")).toBeNull();
+      expect(screen.queryByLabelText("Also people who did not answer")).toBeNull();
+      checkA11y();
+      const flat = JSON.stringify(screen.toJSON());
+      expect(flat.indexOf('"Height"')).toBeLessThan(flat.indexOf('"Distance"'));
+    });
+
+    it("is open with nothing answered: a home is everybody's, so it is never gated", async () => {
+      fakeApi({});
+      await ready();
+      expect(selected("Everyone, Distance")).toBe(true);
+      // Every field of the registry asks first; the distance does not, so one fewer than the rows.
+      expect(screen.getAllByText("To filter on this, share yours first.")).toHaveLength(6);
+      await press(button("Close"));
+      expect(selected("Close")).toBe(true);
+    });
+
+    it("is heard apart from height's Everyone, drawn alike", async () => {
+      fakeApi(answeredAll);
+      await ready();
+      expect(screen.getAllByText("Everyone")).toHaveLength(2);
+      expect(button("Everyone, Height")).toBeTruthy();
+      expect(button("Everyone, Distance")).toBeTruthy();
+      expect(screen.queryByRole("button", { name: "Everyone" })).toBeNull();
+      await press(button("Close"));
+      expect(selected("Everyone, Height")).toBe(true);
+      expect(selected("Everyone, Distance")).toBe(false);
+    });
+
+    it("takes a band with the nearer ones, one button chosen, and saves them as a list", async () => {
+      const { puts } = fakeApi(answeredAll);
+      await ready();
+      await press(button("Close"));
+      expect(selected("Close")).toBe(true);
+      expect(selected("Nearby")).toBe(false);
+      expect(selected("Around")).toBe(false);
+      expect(selected("Everyone, Distance")).toBe(false);
+      // Nothing on those who did not answer, once it is on either: everybody has a home.
+      expect(screen.queryByLabelText("Also people who did not answer")).toBeNull();
+      checkA11y();
+      await save(puts, 1);
+      await press(button("Around"));
+      await save(puts, 2);
+      await press(button("Nearby"));
+      await save(puts, 3);
+      expect(puts).toEqual([
+        [{ field: "distance", accept: ["nearby", "close"], includeUnknown: true }],
+        [{ field: "distance", accept: ["nearby", "close", "around"], includeUnknown: true }],
+        [{ field: "distance", accept: ["nearby"], includeUnknown: true }],
+      ]);
+    });
+
+    it.each([
+      ["a list of one", ["nearby"], "Nearby"],
+      ["a band with the nearer ones", ["nearby", "close"], "Close"],
+      ["every band a filter takes", ["nearby", "close", "around"], "Around"],
+      ["a list in another order", ["close", "nearby"], "Close"],
+      ["a list with a gap", ["nearby", "around"], "Around"],
+    ])("shows %s by its farthest band", async (_what, accept, chosen) => {
+      fakeApi(answeredAll, [{ field: "distance", accept, includeUnknown: true }]);
+      await ready();
+      for (const name of ["Nearby", "Close", "Around"]) {
+        expect(selected(name)).toBe(name === chosen);
+      }
+    });
+
+    it("comes off on Everyone, and saved it is gone", async () => {
+      const { puts } = fakeApi(answeredAll, [
+        { field: "distance", accept: ["nearby"], includeUnknown: true },
+      ]);
+      await ready();
+      await press(button("Everyone, Distance"));
+      expect(selected("Everyone, Distance")).toBe(true);
+      expect(selected("Nearby")).toBe(false);
+      await save(puts, 1);
+      expect(puts).toEqual([[]]);
+    });
+
+    it("is never paused, whatever the person has not answered", async () => {
+      fakeApi({}, [{ field: "distance", accept: ["nearby"], includeUnknown: true }]);
+      await ready();
+      expect(screen.queryByText("Paused until you answer it yourself.")).toBeNull();
+      expect(selected("Nearby")).toBe(true);
+    });
+
+    it("counts a first band against the limit, and a seventh as one more", async () => {
+      fakeApi(answeredAll, [{ field: "smoking", accept: ["never"], includeUnknown: false }], 1);
+      await ready();
+      await press(button("Nearby"));
+      expect(screen.getByText("That is 1 already.")).toBeTruthy();
+      expect(selected("Everyone, Distance")).toBe(true);
+    });
+
+    it("never counts a change of band against the limit", async () => {
+      fakeApi(answeredAll, [{ field: "distance", accept: ["nearby"], includeUnknown: true }], 1);
+      await ready();
+      await press(button("Around"));
+      expect(screen.queryByText("That is 1 already.")).toBeNull();
+      expect(selected("Around")).toBe(true);
+    });
+
+    it("asks before a band chosen and not saved is left", async () => {
+      fakeApi(answeredAll);
+      await ready();
+      await press(button("Close"));
+      expect(swipe()).toEqual({ gestureEnabled: false });
+      const left = await leave();
+      expect(left.preventDefault).toHaveBeenCalled();
+      expect(screen.getByText("Leave without saving?")).toBeTruthy();
+    });
+
+    it.each([
+      ["fi-FI", "Etäisyys", "Kaikki, Etäisyys", ["Lähellä", "Melko lähellä", "Samoilla seuduilla"]],
+      ["sv-FI", "Avstånd", "Alla, Avstånd", ["I närheten", "Ganska nära", "I trakten"]],
+    ])("speaks %s", async (tag, label, everyone, bands) => {
+      (useLocales as jest.Mock).mockReturnValue([{ languageTag: tag }]);
+      try {
+        fakeApi(answeredAll);
+        await show(<DealBreakersScreen />);
+        await waitFor(() => expect(screen.getByText(label)).toBeTruthy());
+        expect(button(everyone)).toBeTruthy();
+        for (const band of bands) expect(button(band)).toBeTruthy();
+      } finally {
+        (useLocales as jest.Mock).mockReturnValue([{ languageTag: "en-US" }]);
+      }
     });
   });
 

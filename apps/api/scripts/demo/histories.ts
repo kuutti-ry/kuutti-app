@@ -18,7 +18,6 @@ import {
   ConsentsResponse,
   type Gender,
   OnboardingStatus,
-  PondList,
   type PreferencesUpdate,
   type ProfileUpdate,
   SessionResponse,
@@ -65,7 +64,8 @@ export type HistoryWriter = {
   ): Promise<void>;
   gender(accountId: string, gender: Gender): Promise<void>;
   preferences(accountId: string, update: PreferencesUpdate): Promise<void>;
-  pond(accountId: string, slug: string): Promise<void>;
+  /** The code as a person types it: the API keeps what it keeps of it, and writing it sets the pond (ADR-061 §2, §8). */
+  home(accountId: string, postalCode: string): Promise<void>;
   profile(accountId: string, update: ProfileUpdate): Promise<void>;
   /** The pictures through the upload pipeline (rule 4), as anybody's; the ids, in order. */
   photos(accountId: string, pictures: readonly Uint8Array[]): Promise<string[]>;
@@ -134,11 +134,8 @@ export function viaRoutes(context: HistoryContext): HistoryWriter {
     async preferences(accountId, update) {
       await as(accountId, "PUT", "/preferences", update);
     },
-    async pond(accountId, slug) {
-      const { ponds } = PondList.parse(await as(accountId, "GET", "/ponds"));
-      const pond = ponds.find((p) => p.slug === slug);
-      if (!pond) throw new DemoError(`no pond ${slug}: run the seed first`);
-      await as(accountId, "PUT", "/account/pond", { pondId: pond.id });
+    async home(accountId, postalCode) {
+      await as(accountId, "PUT", "/account/home", { postalCode });
     },
     async profile(accountId, update) {
       await as(accountId, "PUT", "/profile", update);
@@ -224,7 +221,7 @@ export async function giveHistory(
       seeks: history.onboarding.seeks,
       ageWindow: history.onboarding.ageWindow,
     });
-    await writer.pond(accountId, history.onboarding.pond);
+    await writer.home(accountId, history.onboarding.home);
   }
   if (history.profile) await writer.profile(accountId, history.profile);
   // The pictures (#142), through the pipeline like anybody's: the faces of the

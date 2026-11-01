@@ -1,6 +1,7 @@
-import type { ProfileCard } from "@kuutti/schema";
+import { DISTANCE_BANDS, type ProfileCard } from "@kuutti/schema";
 import { act, fireEvent, screen, waitFor, within } from "@testing-library/react-native";
 import { Image } from "expo-image";
+import { useLocales } from "expo-localization";
 import * as SecureStore from "expo-secure-store";
 import { AccessibilityInfo } from "react-native";
 import { saveSession } from "@/lib/session";
@@ -42,7 +43,7 @@ const bare: ProfileCard = {
   displayName: "Aino",
   age: { years: 36, verifiedByBank: true },
   gender: null,
-  pond: null,
+  place: null,
   photos: [],
   fields: {},
   bio: null,
@@ -83,6 +84,80 @@ describe("ProfileCardView", () => {
     expect(texts(screen.toJSON())).toEqual(["Aino, 36"]);
     expect(screen.queryByRole("image")).toBeNull();
     expect(globalThis.fetch).not.toHaveBeenCalled();
+  });
+
+  describe("the place and how far (#514, ADR-061)", () => {
+    const place = { fi: "Kallio", sv: "Berghäll" };
+
+    it("says the place on a line of its own, then the band, after the gender and before the words", async () => {
+      await renderWithTheme(
+        <ProfileCardView
+          card={{ ...bare, gender: "woman", place, bio: "Long walks." }}
+          distance="close"
+        />,
+      );
+      expect(texts(screen.toJSON())).toEqual([
+        "Aino, 36",
+        "Woman",
+        "Kallio",
+        "Close",
+        "Long walks.",
+      ]);
+    });
+
+    it.each([
+      ["en-US", ["Nearby", "Close", "Around", "Far"]],
+      ["fi-FI", ["Lähellä", "Melko lähellä", "Samoilla seuduilla", "Kauempana"]],
+      ["sv-FI", ["I närheten", "Ganska nära", "I trakten", "Längre bort"]],
+    ])("says each band in words, for a %s reader", async (tag, words) => {
+      (useLocales as jest.Mock).mockReturnValue([{ languageTag: tag }]);
+      try {
+        for (const [at, band] of DISTANCE_BANDS.entries()) {
+          await renderWithTheme(<ProfileCardView card={bare} distance={band} />);
+          expect(screen.getByText(words[at] as string)).toBeTruthy();
+        }
+      } finally {
+        (useLocales as jest.Mock).mockReturnValue([{ languageTag: "en-US" }]);
+      }
+    });
+
+    it.each([
+      ["no band on a card from outside a round", undefined],
+      ["no band on an entry from before distance", null],
+    ])("says %s", async (_what, distance) => {
+      await renderWithTheme(<ProfileCardView card={{ ...bare, place }} distance={distance} />);
+      expect(texts(screen.toJSON())).toEqual(["Aino, 36", "Kallio"]);
+    });
+
+    it("says no place for somebody without a home, and a band all the same", async () => {
+      await renderWithTheme(<ProfileCardView card={bare} distance="far" />);
+      expect(texts(screen.toJSON())).toEqual(["Aino, 36", "Far"]);
+    });
+
+    it.each([
+      ["en-US", "Kallio"],
+      ["fi-FI", "Kallio"],
+      ["sv-FI", "Berghäll"],
+    ])("reads the place as the list has it, for a %s reader", async (tag, name) => {
+      (useLocales as jest.Mock).mockReturnValue([{ languageTag: tag }]);
+      try {
+        await renderWithTheme(<ProfileCardView card={{ ...bare, place }} />);
+        expect(screen.getByText(name)).toBeTruthy();
+      } finally {
+        (useLocales as jest.Mock).mockReturnValue([{ languageTag: "en-US" }]);
+      }
+    });
+
+    it("says it in words alone: no digits, no kilometres, no colour of its own", async () => {
+      await renderWithTheme(<ProfileCardView card={{ ...bare, place }} distance="nearby" />);
+      for (const line of texts(screen.toJSON())) {
+        expect(line).not.toMatch(/\d{5}|\bkm\b/);
+      }
+      // The muted line of every fact on the card, like the gender's: the word is the meaning.
+      expect(screen.getByText("Nearby").props.className).toBe(
+        screen.getByText("Kallio").props.className,
+      );
+    });
   });
 
   it("shows the bio the person wrote rather than a placeholder", async () => {

@@ -15,9 +15,10 @@ import { account } from "./identity.ts";
  * (rules/db.md): one row per field. Deal-breakers are mode = hard rows, and
  * the pool asks both parties' hard rows (#87, ADR-015 §15). Onboarding (#46)
  * writes the two hard rows nothing can start without, `seeks` and
- * `age_window`; the deal-breakers over profile fields are hard rows too
- * (#149). Nothing writes a soft row: a soft preference is the person's own
- * answer (#87, ADR-019 §1), so `soft` is a value of the enum nothing uses.
+ * `age_window`; the deal-breakers are hard rows too, over profile fields
+ * (#149) and over the distance, which is no field (ADR-061 §7). Nothing
+ * writes a soft row: a soft preference is the person's own answer (#87,
+ * ADR-019 §1), so `soft` is a value of the enum nothing uses.
  * The rows go with the account at erasure (TD-7).
  */
 export const preferenceMode = pgEnum("preference_mode", ["hard", "soft"]);

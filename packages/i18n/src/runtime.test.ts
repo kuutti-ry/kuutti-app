@@ -101,7 +101,7 @@ describe("selects and fallbacks", () => {
 
   it("serve English for a language without a catalogue", () => {
     const t = typedT(createI18n({ locale: "de" as "en" }));
-    expect(t("onboarding.retry")).toBe("Try again");
+    expect(t("load.retry")).toBe("Try again");
   });
 });
 
@@ -250,7 +250,7 @@ describe("Stadi", () => {
     expect(tIn("fi")("round.like")).toBe("Tykkää");
   });
 
-  it.each([["onboarding.retry"], ["legal.terms.title"], ["push.round"]] as const)(
+  it.each([["load.retry"], ["legal.terms.title"], ["push.round"]] as const)(
     "is the Finnish text where a key has none: %s",
     (key) => {
       expect(stadi(key)).toBe(tIn("fi")(key));
@@ -278,7 +278,7 @@ describe("Stadi", () => {
   it("is the same for a t fixed to it on an instance in another language (the API's)", () => {
     const fixed = typedT(createI18n({ locale: "en" }), "fi-x-stadi");
     expect(fixed("round.like")).toBe("Digaan");
-    expect(fixed("onboarding.retry")).toBe("Yritä uudelleen");
+    expect(fixed("load.retry")).toBe("Yritä uudelleen");
   });
 
   it("stays out of a release", () => {

@@ -1,14 +1,15 @@
 import { createHash } from "node:crypto";
-import type { ProfileFields } from "@kuutti/schema";
-import { inEachOthersPool, type PoolPerson } from "./pool.ts";
+import { DISTANCE_BANDS, type ProfileFields } from "@kuutti/schema";
+import { bandBetween, inEachOthersPool, type PoolPerson } from "./pool.ts";
 import { softMatches } from "./soft.ts";
 
 /**
  * The places of a round that no rule forces (#95, ADR-035, the maintainer's
  * first cut of 20/10/2026): everybody in each other's pool, both ways
- * (rule 7), minus whom a hidden field keeps apart, the most soft matches
- * first (approach 1, counted without weights), up to the round's size. Equal
- * counts are ordered by a hash of the day, the owner and the candidate: a
+ * (rule 7), minus whom a hidden field keeps apart, the nearest band first
+ * (ADR-061 §6: with one pond nothing else keeps people local), then the most
+ * soft matches (approach 1, counted without weights), up to the round's size.
+ * Equal counts are ordered by a hash of the day, the owner and the candidate: a
  * different order for every person and every day, and the same one whenever
  * that day's round is built again. Pure; which people may be candidates at
  * all (visible, let in, not cooling down) is the builder's to say.
@@ -95,11 +96,12 @@ export function roundOrder(
       .filter((other) => mayMeet(owner, other))
       .map((other) => ({
         other,
+        band: DISTANCE_BANDS.indexOf(bandBetween(owner.person.home, other.person.home)),
         count: softMatches(owner.person.fields, other.person.fields),
         tie: tieOf(round.day, owner.id, other.id),
       }))
       // Two candidates never share a hash: they are two ids.
-      .sort((a, b) => b.count - a.count || (a.tie < b.tie ? -1 : 1))
+      .sort((a, b) => a.band - b.band || b.count - a.count || (a.tie < b.tie ? -1 : 1))
       .slice(0, Math.max(0, round.size))
       .map(({ other }) => other)
   );

@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { PhotoCaption, PhotoDescription, PhotoId } from "./media.ts";
-import { Gender, PondSummary } from "./onboarding.ts";
+import { Gender, HomeSummary, PlaceName } from "./onboarding.ts";
 import { CARD_FIELD_KEYS, HiddenField, PROFILE_FIELDS, ProfileFields } from "./profile-fields.ts";
 
 /**
@@ -138,6 +138,8 @@ export const ProfileResponse = z
     /** Null until the first save. */
     profile: ProfileDocument.nullable(),
     completeness: Completeness,
+    /** The home as its owner reads it (ADR-061 §3): read-only here, since a home is written by its own route and never by the document. */
+    home: HomeSummary.nullable(),
   })
   .meta({ id: "ProfileResponse" });
 export type ProfileResponse = z.infer<typeof ProfileResponse>;
@@ -173,8 +175,8 @@ export const ProfileCard = z
     }),
     /** Self-declared (#146), display only (ADR-019 §1); null before the gender step. The identity label, if any, is in `fields`. */
     gender: Gender.nullable(),
-    /** Where the person matches (#46); null until onboarding set it. */
-    pond: PondSummary.nullable(),
+    /** The name the person's home shows (ADR-061 §3): the nearest town, or their area where they chose it, never digits; null without a home. */
+    place: PlaceName.nullable(),
     photos: z.array(CardPhoto).max(50),
     /** The info and hard fields of the registry (ADR-019 §2), less what the person hides (#150, #515). */
     fields: ProfileFields,

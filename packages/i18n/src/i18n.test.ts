@@ -16,8 +16,8 @@ import { enXA } from "./pseudo.ts";
 
 describe("t()", () => {
   it("renders a key in English and in Finnish", () => {
-    expect(typedT(createI18n({ locale: "en" }))("onboarding.retry")).toBe("Try again");
-    expect(typedT(createI18n({ locale: "fi" }))("onboarding.retry")).toBe("Yritä uudelleen");
+    expect(typedT(createI18n({ locale: "en" }))("load.retry")).toBe("Try again");
+    expect(typedT(createI18n({ locale: "fi" }))("load.retry")).toBe("Yritä uudelleen");
   });
 
   it("formats ICU arguments and plurals per locale", () => {
@@ -38,18 +38,18 @@ describe("t()", () => {
   });
 
   it("offers en-XA only when a dev build hands the catalogue in", () => {
-    expect(typedT(createI18n({ locale: "en-XA", pseudo: enXA }))("onboarding.retry")).toBe(
+    expect(typedT(createI18n({ locale: "en-XA", pseudo: enXA }))("load.retry")).toBe(
       "［Trýý áágááííñ］",
     );
-    expect(typedT(createI18n({ locale: "en-XA" }))("onboarding.retry")).toBe("Try again");
+    expect(typedT(createI18n({ locale: "en-XA" }))("load.retry")).toBe("Try again");
   });
 
   it("changes language on one instance, and a fixed t ignores the change (the API's per-request t)", async () => {
     const i18n = createI18n({ locale: "en" });
     const fixedFi = typedT(i18n, "fi");
     await i18n.changeLanguage("sv");
-    expect(typedT(i18n)("onboarding.retry")).toBe("Försök igen");
-    expect(fixedFi("onboarding.retry")).toBe("Yritä uudelleen");
+    expect(typedT(i18n)("load.retry")).toBe("Försök igen");
+    expect(fixedFi("load.retry")).toBe("Yritä uudelleen");
   });
 
   it("makes an unknown key and wrong arguments type errors", () => {
@@ -61,8 +61,8 @@ describe("t()", () => {
     t("errors.rate_limited");
     // @ts-expect-error seconds is a number
     t("errors.rate_limited", { seconds: "3" });
-    // @ts-expect-error onboarding.retry takes no arguments
-    t("onboarding.retry", { extra: 1 });
+    // @ts-expect-error load.retry takes no arguments
+    t("load.retry", { extra: 1 });
     expect(t("home.title")).toBe("Kuutti");
   });
 });

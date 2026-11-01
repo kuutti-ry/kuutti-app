@@ -1,9 +1,10 @@
 # Deal-breakers (#149, TD-16, features/matching/preferences.feature): at most
-# deal_breakers_max (6) of them, one per field the person answered themselves,
-# so at six the limit refuses nobody; that refusal is the screen's test and the
-# API's, with a lower number. One with no accepted answer cannot be saved, and
-# leaving with the set unsaved asks first. Sanna answered all six fields and
-# has none set; the flow saves nothing, so it leaves her as it found her.
+# deal_breakers_max (7) of them, one per field the person answered themselves
+# and the distance, so at seven the limit refuses nobody; that refusal is the
+# screen's test and the API's, with a lower number. One with no accepted answer
+# cannot be saved, and leaving with the set unsaved asks first. Sanna answered
+# all six fields and has none set; the flow saves nothing, so it leaves her as
+# it found her.
 appId: fi.kuutti.app
 name: Each deal-breaker waits for an accepted answer, and leaving unsaved asks first
 ---
@@ -12,26 +13,47 @@ name: Each deal-breaker waits for an accepted answer, and leaving unsaved asks f
 - extendedWaitUntil:
     visible: "Deal-breakers|Ehdottomat rajat|Absoluta gränser"
     timeout: 15000
-- assertVisible: "Up to 6\\. Only on what you answered yourself.*|Enintään 6\\. Vain siitä, mihin vastasit itse.*|Högst 6\\. Bara om det du själv svarat på.*"
+- assertVisible: "Up to 7\\. Only on what you answered yourself.*|Enintään 7\\. Vain siitä, mihin vastasit itse.*|Högst 7\\. Bara om det du själv svarat på.*"
 - assertNotVisible: "To filter on this, share yours first\\.|Suodattaaksesi tällä kerro ensin omasi\\.|För att filtrera på det här, dela ditt eget först\\."
 
 # One on: it waits for an answer that is fine with her before it can be saved.
 - tapOn: "(Deal-breaker: Kids|Ehdoton raja: Lapset|Absolut gräns: Barn)(, .*)?"
 - assertVisible: "Fine with me|Sopii minulle|Okej för mig"
+# The save lies under the rows, the distance's last among them: scrolled to.
+- scrollUntilVisible:
+    element: "Save the deal-breakers|Tallenna rajat|Spara gränserna"
+    direction: DOWN
+    centerElement: true
+    timeout: 60000
 - assertVisible: "Pick at least one answer that is fine with you\\.|Valitse ainakin yksi vastaus, joka sopii sinulle\\.|Välj minst ett svar som är okej för dig\\."
 - assertVisible:
     text: "Save the deal-breakers|Tallenna rajat|Spara gränserna"
     enabled: false
+- scrollUntilVisible:
+    element: "No kids|Ei lapsia|Inga barn"
+    direction: UP
+    centerElement: true
+    timeout: 60000
 - tapOn: "No kids|Ei lapsia|Inga barn"
 - assertVisible:
     text: "No kids|Ei lapsia|Inga barn"
     selected: true
+- scrollUntilVisible:
+    element: "Save the deal-breakers|Tallenna rajat|Spara gränserna"
+    direction: DOWN
+    centerElement: true
+    timeout: 60000
 - assertNotVisible: "Pick at least one answer that is fine with you\\.|Valitse ainakin yksi vastaus, joka sopii sinulle\\.|Välj minst ett svar som är okej för dig\\."
 - assertVisible:
     text: "Save the deal-breakers|Tallenna rajat|Spara gränserna"
     enabled: true
 
 # Two on: the second is fine too.
+- scrollUntilVisible:
+    element: "(Deal-breaker: Smoking|Ehdoton raja: Tupakointi|Absolut gräns: Rökning)(, .*)?"
+    direction: UP
+    centerElement: true
+    timeout: 60000
 - tapOn: "(Deal-breaker: Smoking|Ehdoton raja: Tupakointi|Absolut gräns: Rökning)(, .*)?"
 - tapOn: "Never|En koskaan|Aldrig"
 
@@ -42,7 +64,7 @@ name: Each deal-breaker waits for an accepted answer, and leaving unsaved asks f
     centerElement: true
     timeout: 60000
 - tapOn: "(Deal-breaker: Languages|Ehdoton raja: Kielet|Absolut gräns: Språk)(, .*)?"
-- assertNotVisible: "That is 6 already\\.|Niitä on jo 6\\.|Det är redan 6\\."
+- assertNotVisible: "That is 7 already\\.|Niitä on jo 7\\.|Det är redan 7\\."
 - assertVisible:
     text: "1|(Deal-breaker: Languages|Ehdoton raja: Kielet|Absolut gräns: Språk), on"
     rightOf: "Languages|Kielet|Språk"

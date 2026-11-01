@@ -1,4 +1,5 @@
 import { CONSENT_VERSIONS } from "@kuutti/i18n";
+import { POSTAL_AREAS_CREDIT } from "@kuutti/schema/postal-areas";
 import { act, fireEvent, screen, waitFor, within } from "@testing-library/react-native";
 import { useLocales } from "expo-localization";
 import * as SecureStore from "expo-secure-store";
@@ -249,6 +250,7 @@ describe("the licences screen", () => {
       "Sentry",
       "FormatJS",
       "Other packages",
+      "Data",
     ]);
     // A package sits under its family's heading, before the next one.
     const flat = JSON.stringify(screen.toJSON());
@@ -271,6 +273,53 @@ describe("the licences screen", () => {
     expect(LICENCES.packages.map((p) => screen.getAllByLabelText(p.name).length)).toEqual(
       LICENCES.packages.map((p) => LICENCES.packages.filter((q) => q.name === p.name).length),
     );
+  });
+
+  describe("the data the app carries (#514, ADR-061 §4)", () => {
+    it("stands after the packages and before the texts, read and not pressed", async () => {
+      await renderWithTheme(<LicensesScreen />);
+      const flat = JSON.stringify(screen.toJSON());
+      const at = (text: string) => flat.indexOf(text);
+      expect(at('"Other packages"')).toBeLessThan(at('"Data"'));
+      expect(at('"Data"')).toBeLessThan(at('"Postal areas"'));
+      expect(at('"Postal areas"')).toBeLessThan(at('"Licence texts"'));
+      const row = screen.getByLabelText("Postal areas");
+      expect(row.props.accessible).toBe(true);
+      expect(row.props.accessibilityValue.text).toBe(
+        `${POSTAL_AREAS_CREDIT.en.source} ${POSTAL_AREAS_CREDIT.en.changes}`,
+      );
+      noProblems();
+    });
+
+    it("says the source, the date, the licence and what Kuutti changed, as CC BY 4.0 asks", async () => {
+      await renderWithTheme(<LicensesScreen />);
+      const { text } = screen.getByLabelText("Postal areas").props.accessibilityValue;
+      const [year, month, day] = POSTAL_AREAS_CREDIT.date.split("-");
+      expect(text).toContain("Statistics Finland");
+      expect(text).toContain(`${Number(day)}.${Number(month)}.${year}`);
+      expect(text).toContain(POSTAL_AREAS_CREDIT.licence);
+      expect(text).toContain(POSTAL_AREAS_CREDIT.licenceUrl);
+      expect(text).toContain("Changed by Kuutti");
+      // Drawn as it is heard.
+      expect(within(screen.getByLabelText("Postal areas")).getByText(text)).toBeTruthy();
+    });
+
+    it.each([
+      ["fi-FI", "Aineistot", "Postinumeroalueet", POSTAL_AREAS_CREDIT.fi],
+      // The list has its words in Finnish and English; a Swedish reader takes the English.
+      ["sv-FI", "Data", "Postnummerområden", POSTAL_AREAS_CREDIT.en],
+    ])("speaks %s", async (tag, heading, title, credit) => {
+      (useLocales as jest.Mock).mockReturnValue([{ languageTag: tag }]);
+      try {
+        await renderWithTheme(<LicensesScreen />);
+        expect(await screen.findByText(heading)).toBeTruthy();
+        expect(screen.getByLabelText(title).props.accessibilityValue.text).toBe(
+          `${credit.source} ${credit.changes}`,
+        );
+      } finally {
+        (useLocales as jest.Mock).mockReturnValue([{ languageTag: "en-US" }]);
+      }
+    });
   });
 
   it("gives a package that names nobody no provider (#512)", async () => {

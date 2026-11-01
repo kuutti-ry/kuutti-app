@@ -2,6 +2,7 @@ import {
   AccountState,
   CONSENT_KINDS,
   ConversationCloseKind,
+  DISTANCE_BANDS,
   FoundReason,
   GENDERS,
   MessageKind,
@@ -129,6 +130,36 @@ describe("the tables", () => {
       "account.birth_year",
       "account.birth_month",
     ]);
+  });
+});
+
+describe("a person's home (ADR-061)", () => {
+  const column = (table: string, name: string) =>
+    byName.get(table)?.columns.find((candidate) => candidate.name === name);
+  const named = (table: string, words: RegExp) =>
+    byName
+      .get(table)
+      ?.columns.map((candidate) => candidate.name)
+      .filter((name) => words.test(name));
+
+  it("is one place kept, the card's choice and the time of the latest move, on the account (§1, §2, §5)", () => {
+    expect(column("account", "home_place")?.getSQLType()).toBe("text");
+    expect(column("account", "home_place")?.notNull).toBe(false);
+    expect(column("account", "home_shows_area")?.getSQLType()).toBe("boolean");
+    expect(column("account", "home_shows_area")?.notNull).toBe(true);
+    expect(column("account", "home_shows_area")?.default).toBe(false);
+    expect(column("account", "home_moved_at")?.getSQLType()).toBe("timestamp with time zone");
+    expect(column("account", "home_moved_at")?.notNull).toBe(false);
+    expect(named("account", /home|postal|place|location/)).toEqual([
+      "home_place",
+      "home_shows_area",
+      "home_moved_at",
+    ]);
+  });
+
+  it("gives a round's entry a frozen band, null on an entry from before it (§5)", () => {
+    expect(column("round_entries", "distance")?.getSQLType()).toBe("distance_band");
+    expect(column("round_entries", "distance")?.notNull).toBe(false);
   });
 });
 
@@ -501,6 +532,8 @@ describe("the enums", () => {
     // Why a card is in a round, and what was decided about it (#96).
     expect(enums.round_reason).toEqual(RoundReason.options);
     expect(enums.round_decision).toEqual(RoundDecision.options);
+    // How far a card's person lives, in the only words there are for it (ADR-061 §5).
+    expect(enums.distance_band).toEqual([...DISTANCE_BANDS]);
     // How a deal-breaker is relaxed for the day (#99).
     expect(enums.relaxation_kind).toEqual(RelaxationKind.options);
     expect(enums.report_outcome).toEqual(ReportOutcome.options);

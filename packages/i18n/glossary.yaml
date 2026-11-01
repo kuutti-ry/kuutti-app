@@ -11,7 +11,13 @@ Kuutti:
   sv: Kuutti
 
 pond:
-  definition: The group of people a member meets within, usually a city or region. One of the app's own words, used as a common noun ("your pond"). Pond names themselves come from the database with their case forms and are never built in a message.
+  definition: The group of people a member meets within; there is one, all of Finland. One of the app's own words, used as a common noun ("your pond"). Pond names themselves come from the database with their case forms and are never built in a message.
+
+home:
+  definition: The one place a member says they live, given as a postal code and asked of everybody. The postal code is what they type; others see a name, a town or their area, never the digits. Not a word for the app's home screen, and not a word for a town or an area in general.
+
+distance bands:
+  definition: How far another person lives, always one of four words, nearest first - Nearby, Close, Around, Far. They stand alone on a card and on the buttons of a filter, and never mean a number of kilometres, which is a setting behind them. Far says only that; it must not read as a judgement of the person.
 
 round:
   definition: The small, fixed set of profiles a member receives once a day. There is no feed and nothing loads after it; the word should sound finite and calm.

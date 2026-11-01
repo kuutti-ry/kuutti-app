@@ -64,7 +64,7 @@ const dealBreakersRoute = createRoute({
   path: "/preferences/deal-breakers",
   summary: "The caller's deal-breakers",
   description:
-    "Each with whether it is paused: a deal-breaker waits while the person's own answer on its field is missing (#149, the disclose-to-filter rule). `max` is how many a person may have.",
+    "Each with whether it is paused: a deal-breaker waits while the person's own answer on its field is missing (#149, the disclose-to-filter rule). One on distance has no field and is never paused. `max` is how many a person may have.",
   ...bearer,
   responses: {
     200: { description: "The deal-breakers.", ...json(DealBreakersResponse) },
@@ -77,13 +77,13 @@ const saveDealBreakersRoute = createRoute({
   path: "/preferences/deal-breakers",
   summary: "Set the caller's deal-breakers",
   description:
-    "The whole set, at most `max`, each on a distinct whitelisted field the person has answered themselves, accepting options the field has. Hard rows: #87 applies them in the pool, both ways.",
+    "The whole set, at most `max`, each on a distinct whitelisted field the person has answered themselves, accepting options the field has. One on distance has no field: it accepts the bands up to nearby, close or around, and lets through those who did not answer whatever the request says, since nobody can leave it unanswered. Hard rows: #87 applies them in the pool, both ways.",
   ...bearer,
   request: { body: { required: true, ...json(DealBreakersUpdate) } },
   responses: {
     200: { description: "Saved; the deal-breakers as stored.", ...json(DealBreakersResponse) },
     400: errorContent(
-      "Validation failed: more than allowed, a field twice, or an answer the field has not.",
+      "Validation failed: more than allowed, a field twice, an answer the field has not, or bands that do not run up to one.",
     ),
     401: unauthenticated,
     404: errorContent("No live account (erased meanwhile)."),

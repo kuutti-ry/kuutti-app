@@ -2,14 +2,14 @@ import { useRouter } from "expo-router";
 import { type ReactNode, type RefObject, useCallback, useEffect, useRef } from "react";
 import {
   Keyboard,
-  KeyboardAvoidingView,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
   Platform,
-  ScrollView,
+  type ScrollView,
   type View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { KeyboardScrollView } from "@/components/KeyboardScrollView";
 import { ScreenHeader } from "@/components/ScreenHeader";
 import { useT } from "@/lib/locale";
 import { useReducedMotion } from "@/theme/useReducedMotion";
@@ -129,13 +129,8 @@ export function useReveal(): { scrollProps: ScrollProps; reveal: (part: View) =>
 
 /**
  * One screen a settings row opens (#287), and the list itself (#511): the
- * pinned way back, and the settings below it. A field low on the page stays in sight above the
- * keyboard (#103, the contacts' last card): iOS insets the scroll view and
- * scrolls the field up itself. Android draws the app edge to edge, so the
- * window no longer resizes for the keyboard (as in the conversation's
- * composer): the padding ends the scroll view at the keyboard's top, and
- * Android's scroll view then scrolls the focused field into view as it
- * shrinks. Padding on iOS too would take the keyboard's height twice.
+ * pinned way back, and the settings below it, a field low on the page staying
+ * in sight above the keyboard (#103, the contacts' last card).
  */
 export function SettingsPage({
   title,
@@ -160,20 +155,9 @@ export function SettingsPage({
           router.back();
         }}
       />
-      <KeyboardAvoidingView
-        className="flex-1"
-        behavior="padding"
-        enabled={Platform.OS === "android"}
-      >
-        <ScrollView
-          {...scrollProps}
-          contentContainerClassName="gap-6 p-6"
-          keyboardShouldPersistTaps="handled"
-          automaticallyAdjustKeyboardInsets
-        >
-          {children}
-        </ScrollView>
-      </KeyboardAvoidingView>
+      <KeyboardScrollView {...scrollProps} contentContainerClassName="gap-6 p-6">
+        {children}
+      </KeyboardScrollView>
     </SafeAreaView>
   );
 }

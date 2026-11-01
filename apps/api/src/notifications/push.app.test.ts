@@ -577,7 +577,11 @@ describe("a match's push through the routes (ADR-055 §5)", () => {
         accountId: owner.accountId,
         day: finnishDay(at),
         ordering: "count",
-        entries: cards.map((card) => ({ candidateId: card.accountId, reason: "matches_filters" })),
+        entries: cards.map((card) => ({
+          candidateId: card.accountId,
+          reason: "matches_filters",
+          distance: "nearby",
+        })),
       },
     );
     if (!built) throw new Error("round not built");

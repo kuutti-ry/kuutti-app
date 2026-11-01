@@ -16,6 +16,7 @@ import {
   RoundDecisionUpdate,
   RoundEntry,
   RoundEntryParams,
+  RoundOrdering,
   RoundResponse,
   sinceSeenBand,
 } from "./matching.ts";
@@ -44,6 +45,31 @@ describe("the band since a card was seen", () => {
     [86_400_000, "10m_plus"],
   ] as const)("reads %d ms as %s, a clock stepped back as the shortest", (ms, band) => {
     expect(sinceSeenBand(ms)).toBe(band);
+  });
+});
+
+describe("the ordering of a round", () => {
+  it("names the soft count, and the band before it (ADR-061 §6)", () => {
+    expect(RoundOrdering.options).toEqual(["count", "band_count"]);
+    expect(codes(RoundOrdering, "band")).toEqual(["invalid_value"]);
+  });
+});
+
+describe("an entry's distance", () => {
+  const distance = RoundEntry.shape.distance;
+
+  it.each(["nearby", "close", "around", "far"])("is the band %s", (band) => {
+    expect(distance.parse(band)).toBe(band);
+  });
+
+  it("is null on an entry from before it, and must be said", () => {
+    expect(distance.parse(null)).toBeNull();
+    expect(codes(distance, undefined)).toEqual(["invalid_value"]);
+  });
+
+  it("is never kilometres", () => {
+    expect(codes(distance, 12)).toEqual(["invalid_value"]);
+    expect(codes(distance, "12 km")).toEqual(["invalid_value"]);
   });
 });
 
@@ -212,7 +238,7 @@ describe("relaxing a deal-breaker for the day (#99, ADR-042)", () => {
 
   it("lets a card carry the field it came in by and who did not answer, or neither, as an older API sends it", () => {
     const card = RoundEntry.shape.card;
-    const base = { position: 1, reason: "relaxed", decision: null };
+    const base = { position: 1, reason: "relaxed", decision: null, distance: null };
     expect(RoundEntry.shape.relaxedField.safeParse(undefined).success).toBe(true);
     expect(RoundEntry.shape.notAnswered.safeParse(["smoking", "languages"]).success).toBe(true);
     expect(RoundEntry.shape.notAnswered.safeParse(["intent"]).success).toBe(false);
@@ -233,8 +259,16 @@ describe("relaxing a deal-breaker for the day (#99, ADR-042)", () => {
       decision: null,
       decisionInWords: null,
       decidedAt: null,
+      distance: "nearby",
+      distanceInWords: "Nearby",
     };
     expect(ExportedRoundEntry.parse(entry).relaxedField).toBe("smoking");
+    // Null on an entry from before the band; never a number, nor a word of no band.
+    expect(
+      ExportedRoundEntry.parse({ ...entry, distance: null, distanceInWords: null }).distance,
+    ).toBeNull();
+    expect(ExportedRoundEntry.safeParse({ ...entry, distance: 4 }).success).toBe(false);
+    expect(ExportedRoundEntry.safeParse({ ...entry, distance: "next door" }).success).toBe(false);
     expect(
       ExportedRoundEntry.parse({ ...entry, relaxedField: null, relaxedFieldInWords: null })
         .relaxedField,

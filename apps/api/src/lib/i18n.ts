@@ -134,7 +134,7 @@ export const ERROR_MESSAGE_KEYS = {
   too_many_changes: "errors.too_many_changes",
   change_too_soon: "errors.change_too_soon",
   filter_unanswered: "errors.filter_unanswered",
-  pond_unknown: "errors.pond_unknown",
+  postal_code_unknown: "errors.postal_code_unknown",
   admin_not_allowed: "errors.admin_not_allowed",
   admin_forbidden: "errors.admin_forbidden",
 } as const satisfies Record<string, MessageKey>;

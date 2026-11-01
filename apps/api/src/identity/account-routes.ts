@@ -324,6 +324,7 @@ export function accountRoutes(deps: Deps, requireSession: MiddlewareHandler<AppE
         { ...erasureDeps, version: deps.config.APP_VERSION },
         callerOf(c).accountId,
         tOf(c),
+        c.get("locale"),
       );
     } catch (error) {
       // The wait until the day rolls, as the photo and card routes say it.
