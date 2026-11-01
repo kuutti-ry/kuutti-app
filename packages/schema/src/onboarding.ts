@@ -59,14 +59,12 @@ export type PreferencesResponse = z.infer<typeof PreferencesResponse>;
 export const GenderUpdate = z.object({ gender: Gender }).strict().meta({ id: "GenderUpdate" });
 export type GenderUpdate = z.infer<typeof GenderUpdate>;
 
-/** A pond with both case forms: the app never inflects (TD-17). */
+/** The pond, the one row there is (ADR-061 §8): it says the same to everybody. */
 export const PondSummary = z
   .object({
     id: z.uuid(),
     slug: z.string().min(1).max(60),
     name: z.string().min(1).max(80),
-    nameInessive: z.string().min(1).max(80),
-    parentId: z.uuid().nullable(),
   })
   .meta({ id: "PondSummary" });
 export type PondSummary = z.infer<typeof PondSummary>;
@@ -192,8 +190,7 @@ export type ConsentsResponse = z.infer<typeof ConsentsResponse>;
  * sheet): the two consents on the welcome screen, the name, the gender, whom
  * one seeks (with the special-category consent), the intent, the age window,
  * the home, three photos, two prompts or a bio. Writing the home also sets the
- * pond, of which there is one, from `matching_config.default_pond` (ADR-061
- * §8). Research is never one of them.
+ * pond, of which there is one (ADR-061 §8). Research is never one of them.
  */
 export const ONBOARDING_STEPS = [
   "terms",
@@ -230,7 +227,6 @@ export const OnboardingStatus = z
     /** Whole years from the bank-verified year and month (rule 3): the age window's default is built around it. */
     age: z.int().min(AGE_MIN).max(130),
     gender: Gender.nullable(),
-    pond: PondSummary.nullable(),
     /** The person's home in names (ADR-061 §3); null before the step, and for a place the list no longer knows, which opens the step again (§2). */
     home: HomeSummary.nullable(),
     preferences: PreferencesResponse,

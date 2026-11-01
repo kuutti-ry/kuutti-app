@@ -5,7 +5,6 @@ import {
   formatDateTime,
   formatHeight,
   formatNumber,
-  formatPond,
   formatTime,
   parseAcceptLanguage,
   RELEASED_LOCALES,
@@ -136,14 +135,5 @@ describe("formatting", () => {
     // ICU's own "short" date is a two-digit year, and a message has no time
     // zone, so the hour is the runner's: day first and the 24-hour dot are the point.
     expect(i18n.t("test.when", { at })).toMatch(/^19\/09\/26 \d\d\.\d\d$/);
-  });
-
-  it("reads a pond's case form from the database and never builds one", () => {
-    // The shape of PondSummary: every case form is required, so none is dropped silently.
-    const helsinki = { name: "Helsinki", nameInessive: "Helsingissä" };
-    expect(formatPond(helsinki, "inessive", "fi")).toBe("Helsingissä");
-    expect(formatPond(helsinki, "inessive", "en")).toBe("Helsinki");
-    expect(formatPond(helsinki, "inessive", "sv")).toBe("Helsinki");
-    expect(formatPond(helsinki, "nominative", "fi")).toBe("Helsinki");
   });
 });

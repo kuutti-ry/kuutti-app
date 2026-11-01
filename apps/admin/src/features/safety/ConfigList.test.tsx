@@ -38,7 +38,7 @@ const feedback = tunable(
   version(2, 5, { createdBy: ADMIN, reason: "Five is enough for now" }),
   version(1, 3),
 );
-const pond = tunable("default_pond", version(1, "paakaupunkiseutu"));
+const word = tunable("sample_word", version(1, "first"));
 const fetches = tunable("photo_fetches_per_day", version(1, { thumb: 600, card: 300, full: 60 }));
 const tips = tunable("photo_tips_on", version(1, true));
 const share = tunable("contest_ratio_threshold", version(1, 0.6));
@@ -130,7 +130,7 @@ describe("the tunables", () => {
     expect(screen.getByText("Loading the tunables…")).toHaveAttribute("aria-busy", "true");
     await waitFor(() => expect(lists(calls)).toHaveLength(1));
     expect(screen.getByText("Loading the tunables…")).toBeInTheDocument();
-    answer(json({ items: [feedback, pond, fetches, tips] }));
+    answer(json({ items: [feedback, word, fetches, tips] }));
     expect(await screen.findByText("4 tunables")).toBeInTheDocument();
     expect(screen.queryByText("Loading the tunables…")).toBeNull();
     expect(screen.getByRole("heading", { level: 2, name: "Tunables" })).toBeInTheDocument();
@@ -139,7 +139,7 @@ describe("the tunables", () => {
     const lines = screen.getAllByRole("listitem").map((li) => li.querySelector("summary"));
     expect(lines.map((line) => line?.textContent)).toEqual([
       "feedback_per_day version 2: 5",
-      "default_pond version 1: paakaupunkiseutu",
+      "sample_word version 1: first",
       'photo_fetches_per_day version 1: {"thumb":600,"card":300,"full":60}',
       "photo_tips_on version 1: true",
     ]);
@@ -180,7 +180,7 @@ describe("the tunables", () => {
   });
 
   it("says one tunable in the singular", async () => {
-    fetchMock([listOf(pond)]);
+    fetchMock([listOf(word)]);
     show();
     expect(await screen.findByText("1 tunable")).toBeInTheDocument();
   });
@@ -188,7 +188,7 @@ describe("the tunables", () => {
   it("reloads on refresh", async () => {
     let page = 0;
     const calls = fetchMock([
-      (req) => (isList(req) ? json({ items: page++ === 0 ? [pond] : [pond, tips] }) : null),
+      (req) => (isList(req) ? json({ items: page++ === 0 ? [word] : [word, tips] }) : null),
     ]);
     show();
     expect(await screen.findByText("1 tunable")).toBeInTheDocument();
@@ -217,7 +217,7 @@ describe("the tunables", () => {
   });
 
   it("labels every control of a key's form, a count's input asking for whole numbers", async () => {
-    fetchMock([listOf(feedback, pond, fetches, share)]);
+    fetchMock([listOf(feedback, word, fetches, share)]);
     show();
     const number = await item("feedback_per_day");
     expect(number.getByLabelText("New value")).toHaveValue("5");
@@ -227,8 +227,8 @@ describe("the tunables", () => {
     expect(number.getByLabelText("Why the change")).toBeRequired();
     const fraction = await item("contest_ratio_threshold");
     expect(fraction.getByLabelText("New value")).toHaveAttribute("inputmode", "decimal");
-    const text = await item("default_pond");
-    expect(text.getByLabelText("New value")).toHaveValue("paakaupunkiseutu");
+    const text = await item("sample_word");
+    expect(text.getByLabelText("New value")).toHaveValue("first");
     expect(text.getByLabelText("New value")).toHaveAttribute("inputmode", "text");
     const object = await item("photo_fetches_per_day");
     expect(object.getByLabelText("New value").tagName).toBe("TEXTAREA");
@@ -275,9 +275,9 @@ describe("the tunables", () => {
   });
 
   it("keeps every other key open and its draft as it was after a change", async () => {
-    const calls = fetchMock([listOf(feedback, pond), changeAnswers(() => json(wrote(changed)))]);
+    const calls = fetchMock([listOf(feedback, word), changeAnswers(() => json(wrote(changed)))]);
     show();
-    const other = await item("default_pond");
+    const other = await item("sample_word");
     fireEvent.change(other.getByLabelText("New value"), { target: { value: "helsinki" } });
     fireEvent.change(other.getByLabelText("Why the change"), { target: { value: "A draft" } });
     const at = await item("feedback_per_day");
@@ -466,25 +466,25 @@ describe("the tunables", () => {
 
   it("sends a string for a string key, even when it reads as a number", async () => {
     const calls = fetchMock([
-      listOf(pond),
-      changeAnswers(() => json(wrote(tunable("default_pond", version(2, "12"), ...pond.versions)))),
+      listOf(word),
+      changeAnswers(() => json(wrote(tunable("sample_word", version(2, "12"), ...word.versions)))),
     ]);
     show();
-    const at = await item("default_pond");
+    const at = await item("sample_word");
     review(at, " 12 ");
-    expect(at.getByText("Change default_pond? Now: paakaupunkiseutu. New: 12")).toBeInTheDocument();
+    expect(at.getByText("Change sample_word? Now: first. New: 12")).toBeInTheDocument();
     fireEvent.click(at.getByRole("button", { name: "Change it" }));
     await waitFor(() => expect(posts(calls)).toHaveLength(1));
     expect(posts(calls)[0]).toMatchObject({
-      path: "/admin/config/default_pond",
+      path: "/admin/config/sample_word",
       body: { value: "12", reason: "Because the pilot said so" },
     });
   });
 
   it("refuses an empty string for a string key", async () => {
-    const calls = fetchMock([listOf(pond)]);
+    const calls = fetchMock([listOf(word)]);
     show();
-    const at = await item("default_pond");
+    const at = await item("sample_word");
     review(at, "  ");
     expect(at.getByRole("alert")).toHaveTextContent("This is not a value of the key's type.");
     expect(posts(calls)).toEqual([]);

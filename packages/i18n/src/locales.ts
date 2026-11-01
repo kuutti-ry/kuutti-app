@@ -43,7 +43,7 @@ export const LOCALE_NAMES: Record<AnyLocale, string> = {
 
 /**
  * The real language a locale reads as, for whatever cannot take a made-up one:
- * the bank's chooser, a consent record, a country's name, a pond's case forms.
+ * the bank's chooser, a consent record, a country's name.
  * The pseudo-locale and anything that is not ours read English.
  */
 export function realLocale(locale: string): RealLocale {

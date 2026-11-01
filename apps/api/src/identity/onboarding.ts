@@ -27,7 +27,6 @@ import {
   readPreferences,
 } from "../matching/index.ts";
 import { listPhotos } from "../media/index.ts";
-import { findPondOfAccount } from "../pond/index.ts";
 import {
   ageInYears,
   clearIdentityLabel,
@@ -142,15 +141,13 @@ export async function onboardingStatus(
   ) {
     throw new AppError(404, "not_found", "No live account");
   }
-  const [preferences, consents, profile, photos, cadence, pond] = await Promise.all([
+  const [preferences, consents, profile, photos, cadence] = await Promise.all([
     readPreferences(deps.db, accountId),
     // The newest active row per kind, however long the history (#65 review).
     repo.activeConsents(deps.db, accountId),
     readProfile({ ...deps, readPreferences }, accountId),
     listPhotos(deps.db, accountId),
     matchingConfigNumber(deps.db, CHANGE_CADENCE_KEY),
-    // Read, never set: the home's write sets the one pond (ADR-061 §8).
-    findPondOfAccount(deps.db, accountId),
   ]);
   const now = deps.now();
   const { home } = profile;
@@ -189,7 +186,6 @@ export async function onboardingStatus(
     state: visibleState(state),
     age: ageInYears(account.birthYear, account.birthMonth, now),
     gender: account.gender,
-    pond,
     home,
     preferences,
     consents: {

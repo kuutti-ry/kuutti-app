@@ -833,7 +833,7 @@ describe("EmailScreen", () => {
       return false;
     };
     for (const element of [
-      screen.getByText("While you wait"),
+      screen.getByText("When you have a moment"),
       screen.getByText("A way to stay in touch"),
       screen.getByLabelText("E-mail address"),
       screen.getByText(TEXT.codeSent()),

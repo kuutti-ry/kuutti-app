@@ -357,10 +357,8 @@ describe("the bar", () => {
 describe("the response", () => {
   const pond = {
     id: "0b1c1c4e-9a8e-4a0b-9c3a-0c8d1e2f3a01",
-    slug: "otaniemi",
-    name: "Otaniemi",
-    nameInessive: "Otaniemessä",
-    parentId: null,
+    slug: "suomi",
+    name: "Suomi",
   };
   const hidden = { pond, day: null, verified: null, split: null, finishing: null, seeks: null };
 

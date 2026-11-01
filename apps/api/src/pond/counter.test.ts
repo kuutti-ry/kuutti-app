@@ -240,9 +240,9 @@ describe("the bar of whom a pond seeks (#507)", () => {
   }, async ({ ctx }) => {
     for (const seeded of SEED_PONDS) {
       await ctx.client.query(
-        `INSERT INTO ponds (slug, name_nominative, name_inessive) VALUES ($1, $2, $3)
+        `INSERT INTO ponds (slug, name_nominative) VALUES ($1, $2)
          ON CONFLICT (slug) DO NOTHING`,
-        [seeded.slug, seeded.nameNominative, seeded.nameInessive],
+        [seeded.slug, seeded.nameNominative],
       );
     }
     const people = generatePopulation({ homes: { [HOME]: 1 } });
@@ -338,7 +338,7 @@ describe("the counter", () => {
     const body = PondCounterResponse.parse(JSON.parse(text));
     expect(Object.keys(body).sort()).toEqual(["k", "ponds"]);
     expect(body.ponds.find((p) => p.pond.id === pond)).toEqual({
-      pond: expect.objectContaining({ id: pond }),
+      pond: { id: pond, slug: "test-counter-public", name: "Pond test-counter-public" },
       day: "2026-10-05",
       verified: 12,
       // Everyone here declared the same: the split would say it of each of them.
@@ -346,6 +346,8 @@ describe("the counter", () => {
       finishing: 0,
       seeks: null,
     });
+    // The tree and the case form are gone from what the public reads (#500).
+    expect(text).not.toMatch(/parentId|nameInessive/);
     for (const id of [...ids, someone.accountId]) expect(text).not.toContain(id);
     expect(text).not.toMatch(/T\d\d:\d\d/); // a day, never a time of day
     expect(text).not.toContain("Aino");

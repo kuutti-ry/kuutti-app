@@ -1,2 +1,2 @@
-// Public surface of the pond slice in apps/admin: the ponds and their switches, admins only (#500).
-export { PondList } from "./PondList.tsx";
+// Public surface of the pond slice in apps/admin: the switch that opens matching, admins only (#500).
+export { MatchingSwitch } from "./MatchingSwitch.tsx";

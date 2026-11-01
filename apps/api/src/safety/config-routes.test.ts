@@ -123,13 +123,13 @@ describe("GET /admin/config", () => {
       "SELECT DISTINCT key FROM matching_config ORDER BY key",
     );
     expect(items.map((i) => i.key)).toEqual(rows.map((r) => r.key));
-    expect(items.find((i) => i.key === "default_pond")).toMatchObject({
-      value: "suomi",
+    expect(items.find((i) => i.key === "deal_breakers_max")).toMatchObject({
+      value: 7,
       version: 3,
       versions: [
-        { version: 3, value: "suomi", createdBy: "migration:0095", reason: null },
-        { version: 2, value: "paakaupunkiseutu", createdBy: "migration:0025", reason: null },
-        { version: 1, value: "suomi", createdBy: "migration:0020", reason: null },
+        { version: 3, value: 7, createdBy: "migration:0097", reason: null },
+        { version: 2, value: 6, createdBy: "migration:0092", reason: null },
+        { version: 1, value: 2, createdBy: "migration:0024", reason: null },
       ],
     });
     expect(items.find((i) => i.key === "photo_fetches_per_day")?.value).toEqual({
@@ -220,10 +220,10 @@ describe("POST /admin/config/{key}", () => {
     ctx,
     api,
   }) => {
-    await withMatchingConfig(ctx.client, { config_routes_flag: true });
+    await withMatchingConfig(ctx.client, { config_routes_flag: true, config_routes_word: "one" });
     const staff = await admin(ctx);
     for (const [key, value, version] of [
-      ["default_pond", "paakaupunkiseutu", 4],
+      ["config_routes_word", "another", 2],
       ["config_routes_flag", false, 2],
       ["photo_fetches_per_day", { full: 30, card: 300, thumb: 600 }, 2],
     ] as const) {
@@ -321,11 +321,12 @@ describe("POST /admin/config/{key}", () => {
     ctx,
     api,
   }) => {
+    await withMatchingConfig(ctx.client, { config_routes_word: "one" });
     const staff = await admin(ctx);
     const before = await footprint(ctx);
     for (const [key, value, expected] of [
       ["round_size", "10", "number"],
-      ["default_pond", 1, "string"],
+      ["config_routes_word", 1, "string"],
       ["photo_fetches_per_day", { thumb: 600, card: 300 }, "object"],
       ["photo_fetches_per_day", 600, "object"],
       // A count keeps its wholeness and sign: a fraction there answers 500 for everyone.

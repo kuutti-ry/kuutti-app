@@ -128,7 +128,7 @@ describe("LaterFieldScreen", () => {
   it("asks the first field with the progress, skips without writing, and saves before moving on", async () => {
     const { puts } = fakeApi(named({}));
     await show(<LaterFieldScreen field="hasKids" />);
-    await waitFor(() => expect(screen.getByText("While you wait")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("When you have a moment")).toBeTruthy());
     expect(screen.getByText("0 of 16 answered")).toBeTruthy();
     expect(screen.getByText(/One question at a time/)).toBeTruthy();
     expect(screen.getByText("No kids")).toBeTruthy();
@@ -149,8 +149,8 @@ describe("LaterFieldScreen", () => {
     router.back.mockClear();
     router.dismissTo.mockClear();
     await show(<LaterFieldScreen field="hasKids" />);
-    await waitFor(() => expect(screen.getByText("While you wait")).toBeTruthy());
-    expectPinnedHeader("While you wait", "Back to your profile");
+    await waitFor(() => expect(screen.getByText("When you have a moment")).toBeTruthy());
+    expectPinnedHeader("When you have a moment", "Back to your profile");
     await press(screen.getByRole("button", { name: "Yes, living with me" }));
     await press(screen.getByRole("button", { name: "Back to your profile" }));
     expect(router.dismissTo).toHaveBeenCalledWith("/profile");
@@ -163,7 +163,7 @@ describe("LaterFieldScreen", () => {
     const { puts } = fakeApi(named({}));
     navigation.dispatch.mockClear();
     await show(<LaterFieldScreen field="hasKids" />);
-    await waitFor(() => expect(screen.getByText("While you wait")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("When you have a moment")).toBeTruthy());
     expect((await leave()).preventDefault).not.toHaveBeenCalled();
     await press(screen.getByRole("button", { name: "Yes, living with me" }));
     expect(navigation.setOptions.mock.lastCall?.[0]).toEqual({ gestureEnabled: false });
@@ -187,7 +187,7 @@ describe("LaterFieldScreen", () => {
   it("puts an answer back on Ask me later, so a question passed over holds nothing to ask about", async () => {
     const { puts } = fakeApi(named({}));
     await show(<LaterFieldScreen field="hasKids" />);
-    await waitFor(() => expect(screen.getByText("While you wait")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("When you have a moment")).toBeTruthy());
     await press(screen.getByRole("button", { name: "Yes, living with me" }));
     await press(screen.getByRole("button", { name: "Ask me later" }));
     expect(router.push).toHaveBeenCalledWith("/profile/later/wantsKids");
@@ -203,7 +203,7 @@ describe("LaterFieldScreen", () => {
   it("saves a Hide with the answer on Save and continue, and drops it on Ask me later (#515)", async () => {
     const { puts } = fakeApi(named({}));
     await show(<LaterFieldScreen field="hasKids" />);
-    await waitFor(() => expect(screen.getByText("While you wait")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("When you have a moment")).toBeTruthy());
     await press(screen.getByRole("button", { name: "Yes, living with me" }));
     await press(screen.getByRole("button", { name: "Hide from your card: Kids" }));
     await press(screen.getByRole("button", { name: "Ask me later" }));
@@ -390,7 +390,7 @@ describe("LaterFieldScreen", () => {
     expect(screen.getByText("Kuutti's server had a problem. Try again in a moment.")).toBeTruthy();
     failing = false;
     await press(screen.getByRole("button", { name: "Try again" }));
-    await waitFor(() => expect(screen.getByText("While you wait")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("When you have a moment")).toBeTruthy());
   });
 
   /** The profile read as usual; a save waits for the test, or is refused with a code. */
@@ -422,7 +422,7 @@ describe("LaterFieldScreen", () => {
   it("gives any other refusal the generic line", async () => {
     refusingSaves("validation_failed");
     await show(<LaterFieldScreen field="smoking" />);
-    await waitFor(() => expect(screen.getByText("While you wait")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("When you have a moment")).toBeTruthy());
     await press(screen.getByRole("button", { name: "Never" }));
     await press(screen.getByRole("button", { name: "Save and continue" }));
     expect(screen.getByText("Saving did not work. Check the fields and try again.")).toBeTruthy();
@@ -432,7 +432,7 @@ describe("LaterFieldScreen", () => {
   it("says it is saving and holds both buttons meanwhile", async () => {
     const server = refusingSaves(null);
     await show(<LaterFieldScreen field="smoking" />);
-    await waitFor(() => expect(screen.getByText("While you wait")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("When you have a moment")).toBeTruthy());
     await press(screen.getByRole("button", { name: "Never" }));
     await press(screen.getByRole("button", { name: "Save and continue" }));
     expect(screen.getByText("Saving…")).toBeTruthy();
@@ -467,7 +467,7 @@ describe("LaterFieldScreen", () => {
       await settle();
       return rendered;
     });
-    await waitFor(() => expect(screen.getByText("While you wait")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("When you have a moment")).toBeTruthy());
     await press(screen.getByRole("button", { name: "Save and continue" }));
     await press(screen.getByRole("button", { name: arrow }));
     await act(async () => {
@@ -505,7 +505,7 @@ describe("LaterFieldScreen", () => {
       render(underProviders(<LaterFieldScreen field="hasKids" />), { wrapper: StrictMode });
       await settle();
     });
-    await waitFor(() => expect(screen.getByText("While you wait")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("When you have a moment")).toBeTruthy());
     await press(screen.getByRole("button", { name: "No kids" }));
     await press(screen.getByRole("button", { name: "Save and continue" }));
     await waitFor(() => expect(puts).toHaveLength(1));
@@ -550,7 +550,7 @@ describe("LaterFieldScreen", () => {
       const { puts } = fakeApi(named({}));
       const popped = popping(puts);
       await show(<LaterFieldScreen field="hasKids" once />);
-      await waitFor(() => expect(screen.getByText("While you wait")).toBeTruthy());
+      await waitFor(() => expect(screen.getByText("When you have a moment")).toBeTruthy());
       await press(button(ARROW));
       expect(popped).toHaveLength(1);
       expect(popped[0]?.preventDefault).not.toHaveBeenCalled();
@@ -563,7 +563,7 @@ describe("LaterFieldScreen", () => {
       const { puts } = fakeApi(named({}));
       const popped = popping(puts);
       await show(<LaterFieldScreen field="hasKids" once />);
-      await waitFor(() => expect(screen.getByText("While you wait")).toBeTruthy());
+      await waitFor(() => expect(screen.getByText("When you have a moment")).toBeTruthy());
       await press(button("Yes, living with me"));
       await press(button(ARROW));
       expect(popped[0]?.preventDefault).toHaveBeenCalled();
@@ -608,7 +608,7 @@ describe("LaterFieldScreen", () => {
       refusingSaves("validation_failed");
       const popped = popping();
       await show(<LaterFieldScreen field="smoking" once />);
-      await waitFor(() => expect(screen.getByText("While you wait")).toBeTruthy());
+      await waitFor(() => expect(screen.getByText("When you have a moment")).toBeTruthy());
       await press(button("Never"));
       await press(button(SAVE));
       expect(screen.getByText("Saving did not work. Check the fields and try again.")).toBeTruthy();
@@ -628,7 +628,7 @@ describe("LaterFieldScreen", () => {
         const { puts } = fakeApi(named({}));
         const popped = popping(puts);
         await show(<LaterFieldScreen field="hasKids" once />);
-        await waitFor(() => expect(screen.getByText("While you wait")).toBeTruthy());
+        await waitFor(() => expect(screen.getByText("When you have a moment")).toBeTruthy());
         for (const name of taps) await press(button(name));
         await press(button(SKIP));
         expect(popped).toHaveLength(1);
@@ -642,7 +642,7 @@ describe("LaterFieldScreen", () => {
     it("stays on the first field when it is answered already: the person came for this one", async () => {
       fakeApi(named({ hasKids: "no" }));
       await show(<LaterFieldScreen field="hasKids" once />);
-      await waitFor(() => expect(screen.getByText("While you wait")).toBeTruthy());
+      await waitFor(() => expect(screen.getByText("When you have a moment")).toBeTruthy());
       await waitFor(() => expect(chosen("No kids")).toBe(true));
       expect(router.replace).not.toHaveBeenCalled();
     });

@@ -24,7 +24,7 @@ name: A deal-breaker is offered only on what the person answered, and Answer it 
     text: "Answer it|Vastaa|Svara"
     index: 1
 - extendedWaitUntil:
-    visible: "While you wait|Odotellessasi|Medan du väntar"
+    visible: "When you have a moment|Kun sinulla on hetki|När du har en stund"
     timeout: 15000
 - assertVisible: "Kids|Lapset|Barn"
 - assertVisible: "No kids|Ei lapsia|Inga barn"

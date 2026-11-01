@@ -22,8 +22,8 @@
 # docs/i18n/translation-review-guide.md is the review.
 #
 # Never inflect a dynamic value: proper nouns and user values stand in nominative
-# positions only ("in {pond}" is banned; ponds carry their case forms in the
-# database). legal.* keys take a consent_version and never a machine flag.
+# positions only ("in {pond}" is banned). legal.* keys take a consent_version and
+# never a machine flag.
 # After editing: `pnpm i18n:build`, and commit src/generated with it.
 
 
@@ -943,10 +943,10 @@ profile.place.failed:
   machine: { fi: true, sv: true }
 
 profile.later.title:
-  en: "While you wait"
-  description: "Heading of the optional fields' screens after onboarding (#148, TD-16)."
-  fi: "Odotellessasi"
-  sv: "Medan du väntar"
+  en: "When you have a moment"
+  description: "Heading of the optional fields' screens after onboarding (#148, TD-16). Nobody waits for anything here (#500): the fields can be answered whenever the person likes."
+  fi: "Kun sinulla on hetki"
+  sv: "När du har en stund"
   machine: { fi: true, sv: true }
 
 profile.later.back:
@@ -999,10 +999,10 @@ profile.later.done:
   machine: { fi: true, sv: true }
 
 profile.later.open:
-  en: "Fill in the rest while you wait"
+  en: "Fill in the rest when you have a moment"
   description: "Row on the profile list that opens the later screens (#148), shown while a later field is unanswered (#239)."
-  fi: "Täydennä loput odotellessasi"
-  sv: "Fyll i resten medan du väntar"
+  fi: "Täydennä loput, kun sinulla on hetki"
+  sv: "Fyll i resten när du har en stund"
   machine: { fi: true, sv: true }
 
 profile.later.search:
@@ -4492,13 +4492,6 @@ onboarding.home.title:
   sv: "Var bor du?"
   machine: { fi: true, sv: true }
 
-pond.name.suomi:
-  en: "Finland"
-  description: "The name of the pond with slug suomi, by language (#174): the one pond there is, the whole country (ADR-061 §8). Nominative only; no sentence is built around it."
-  fi: "Suomi"
-  sv: "Finland"
-  machine: { fi: true, sv: true }
-
 onboarding.intent.title:
   en: "What are you here for?"
   description: "Heading of the intent step (#146)."
@@ -6784,10 +6777,6 @@ admin.account.gender:
   en: "Gender"
   description: "Admin panel, a person's page, profile label: self-declared (#306)."
 
-admin.account.pond:
-  en: "Pond"
-  description: "Admin panel, a person's page, profile label (#306)."
-
 admin.account.bio:
   en: "Bio"
   description: "Admin panel, a person's page, profile label (#306)."
@@ -6900,89 +6889,81 @@ admin.nav.staff:
   en: "Staff"
   description: "Admin panel, the menu entry of the staff list, admins only (#310)."
 
-admin.nav.ponds:
-  en: "Ponds"
-  description: "Admin panel, the menu entry of the ponds and their switches, admins only (#500, ADR-060)."
+admin.nav.matching:
+  en: "Matching"
+  description: "Admin panel, the menu entry of the switch that opens matching, admins only (#500, ADR-060)."
 
-admin.ponds.title:
-  en: "Ponds"
-  description: "Admin panel, the heading of the ponds (#500)."
+admin.matching.title:
+  en: "Matching"
+  description: "Admin panel, the heading of the switch that opens matching (#500)."
 
-admin.ponds.explain:
-  en: "Matching in a pond opens when an admin turns it on here, and nothing else opens or closes it. People with a finished profile in a closed pond are told that it has not opened yet."
-  description: "Admin panel, ponds: what the switch is (#500, ADR-060 §1)."
+admin.matching.explain:
+  en: "Matching opens for the whole country when an admin turns it on here, and nothing else opens or closes it. Until then, people with a finished profile are told that it has not opened yet."
+  description: "Admin panel, matching: what the switch is (#500, ADR-060 §1, ADR-061 §8)."
 
-admin.ponds.refresh:
+admin.matching.refresh:
   en: "Refresh"
-  description: "Admin panel, ponds: reads the list again."
+  description: "Admin panel, matching: reads the switch again."
 
-admin.ponds.loading:
-  en: "Loading the ponds…"
-  description: "Admin panel, ponds: while the list loads."
+admin.matching.loading:
+  en: "Loading…"
+  description: "Admin panel, matching: while the switch loads."
 
-admin.ponds.error:
-  en: "The ponds could not be loaded."
-  description: "Admin panel, ponds: when the list could not be read."
+admin.matching.error:
+  en: "Whether matching is open could not be read."
+  description: "Admin panel, matching: when the switch could not be read."
 
-admin.ponds.caption:
-  en: "{total, plural, one {# pond} other {# ponds}}"
-  description: "Admin panel, ponds: how many there are, above the list."
+admin.matching.where:
+  en: "All of Finland"
+  description: "Admin panel, matching: what the switch covers, beside its state. There is one pond, the country (ADR-061 §8)."
 
-admin.ponds.open:
+admin.matching.open:
   en: "Open"
-  description: "Admin panel, ponds: matching is open in this pond; said in words, never by colour alone."
+  description: "Admin panel, matching: matching is open; said in words, never by colour alone."
 
-admin.ponds.closed:
+admin.matching.closed:
   en: "Closed"
-  description: "Admin panel, ponds: matching is not open in this pond; said in words, never by colour alone."
+  description: "Admin panel, matching: matching is not open; said in words, never by colour alone."
 
-admin.ponds.turnOn:
-  en: "{pond}: open matching"
-  description: "Admin panel, ponds: the accessible name of the button that begins opening a pond (it reads admin.ponds.apply.open). {pond} is the pond's name, so a screen reader's list of buttons says which."
+admin.matching.confirm.open.title:
+  en: "Open matching?"
+  description: "Admin panel, matching: the confirm step's heading when opening matching."
 
-admin.ponds.turnOff:
-  en: "{pond}: close matching"
-  description: "Admin panel, ponds: the accessible name of the button that begins closing a pond (it reads admin.ponds.apply.close). {pond} is the pond's name."
+admin.matching.confirm.open.effect:
+  en: "Everybody with a finished profile is told that matching is open, and gets a round each night, or when they next open the app. Production builds no rounds yet, so there they are told it is open and no round comes."
+  description: "Admin panel, matching: the effect of opening matching in words (rules/admin.md). The night builds rounds, and the day's first read builds a missing one (ADR-035 §5), but neither in production until the maintainer has set how long rounds are kept (ADR-034 Open 2, ADR-035 Open 1); take that sentence out with that shortcut."
 
-admin.ponds.confirm.open.title:
-  en: "{pond}: open matching?"
-  description: "Admin panel, ponds: the confirm step's heading when opening a pond."
+admin.matching.confirm.close.title:
+  en: "Close matching?"
+  description: "Admin panel, matching: the confirm step's heading when closing matching."
 
-admin.ponds.confirm.open.effect:
-  en: "Everybody with a finished profile in this pond is told that matching is open, and gets a round each night, or when they next open the app. Production builds no rounds yet, so there they are told it is open and no round comes."
-  description: "Admin panel, ponds: the effect of opening a pond in words (rules/admin.md). The night builds rounds, and the day's first read builds a missing one (ADR-035 §5), but neither in production until the maintainer has set how long rounds are kept (ADR-034 Open 2, ADR-035 Open 1); take that sentence out with that shortcut."
+admin.matching.confirm.close.effect:
+  en: "No new rounds are built from now on. Rounds already built stay for the day, and conversations go on. People with a finished profile are told that matching has not opened yet."
+  description: "Admin panel, matching: the effect of closing matching in words (ADR-060 §1): closing builds no new round and ends no conversation."
 
-admin.ponds.confirm.close.title:
-  en: "{pond}: close matching?"
-  description: "Admin panel, ponds: the confirm step's heading when closing a pond."
-
-admin.ponds.confirm.close.effect:
-  en: "No new rounds are built here from now on. Rounds already built stay for the day, and conversations go on. People with a finished profile are told that matching has not opened in their area yet."
-  description: "Admin panel, ponds: the effect of closing a pond in words (ADR-060 §1): closing builds no new round and ends no conversation."
-
-admin.ponds.apply.open:
+admin.matching.apply.open:
   en: "Open matching"
-  description: "Admin panel, ponds: what the button beside a closed pond reads, and the confirm step's button that opens it."
+  description: "Admin panel, matching: what the button reads while matching is closed, and the confirm step's button that opens it."
 
-admin.ponds.apply.close:
+admin.matching.apply.close:
   en: "Close matching"
-  description: "Admin panel, ponds: what the button beside an open pond reads, and the confirm step's button that closes it."
+  description: "Admin panel, matching: what the button reads while matching is open, and the confirm step's button that closes it."
 
-admin.ponds.cancel:
+admin.matching.cancel:
   en: "Cancel"
-  description: "Admin panel, ponds: leaves the confirm step with nothing changed."
+  description: "Admin panel, matching: leaves the confirm step with nothing changed."
 
-admin.ponds.failed:
+admin.matching.failed:
   en: "That did not go through. Nothing was changed."
-  description: "Admin panel, ponds: the confirm step's refusal in words, for any failure of the request."
+  description: "Admin panel, matching: the confirm step's refusal in words, for any failure of the request."
 
-admin.ponds.opened:
-  en: "{pond}: matching is now open."
-  description: "Admin panel, ponds: said once a pond is open, in a live region."
+admin.matching.opened:
+  en: "Matching is now open."
+  description: "Admin panel, matching: said once matching is open, in a live region."
 
-admin.ponds.closedNow:
-  en: "{pond}: matching is now closed."
-  description: "Admin panel, ponds: said once a pond is closed, in a live region."
+admin.matching.closedNow:
+  en: "Matching is now closed."
+  description: "Admin panel, matching: said once matching is closed, in a live region."
 
 admin.audit.title:
   en: "Audit log"
@@ -8133,30 +8114,23 @@ account.email.done:
   sv: "Klart"
   machine: { fi: true, sv: true }
 
-pond.counter.label:
-  en: "People in your area"
-  description: "Home screen, accessible name of the card with the pond counter of the person's own pond (#54, ADR-013)."
-  fi: "Ihmiset alueellasi"
-  sv: "Människor i ditt område"
-  machine: { fi: true, sv: true }
-
 pond.counter.title:
-  en: "Your area"
-  description: "Pond card: the line above the pond's name. The name follows on a line of its own, in the nominative, never inside a sentence."
-  fi: "Alueesi"
-  sv: "Ditt område"
+  en: "People on Kuutti"
+  description: "Home screen, the heading of the card that says how many people are on Kuutti (#54, ADR-013), and its accessible name. There is one pond, the whole of Finland (ADR-061 §8), so the card names no area (#500)."
+  fi: "Ihmiset Kuutissa"
+  sv: "Människor på Kuutti"
   machine: { fi: true, sv: true }
 
 pond.counter.verified:
   en: "{people, plural, one {# person has identified with their bank} other {# people have identified with their bank}}"
-  description: "Pond card: how many bank-verified people have this pond as theirs. {people} is at least the threshold k (ten), so never small."
+  description: "Pond card: how many bank-verified people are on Kuutti. {people} is at least the threshold k (ten), so never small."
   fi: "{people, plural, one {# ihminen on tunnistautunut pankkitunnuksilla} other {# ihmistä on tunnistautunut pankkitunnuksilla}}"
   sv: "{people, plural, one {# person har identifierat sig med bank-id} other {# personer har identifierat sig med bank-id}}"
   machine: { fi: true, sv: true }
 
 pond.counter.seeks.title:
   en: "Whom people with a finished profile are looking for"
-  description: "Pond card, the line above the bar of whom the people of the area seek (#507). The bar is drawn from finished profiles only."
+  description: "Pond card, the line above the bar of whom people on Kuutti seek (#507). The bar is drawn from finished profiles only."
   fi: "Ketä valmiin profiilin tehneet etsivät"
   sv: "Vem personer med färdig profil söker"
   machine: { fi: true, sv: true }
@@ -8197,15 +8171,15 @@ pond.counter.finishing:
   machine: { fi: true, sv: true }
 
 pond.counter.small:
-  en: "Your area is just getting started. Numbers are shown only when at least {k, number} people are here."
-  description: "Pond card, below the threshold: no number is said about a small pond. {k} is the threshold. It names a condition, not a promise: numbers are never shown below {k}, and they may come a little later than at exactly {k}."
-  fi: "Alueesi on vasta alussa. Luvut näytetään vain, kun täällä on vähintään {k, number} ihmistä."
-  sv: "Ditt område har precis kommit igång. Siffror visas bara när minst {k, number} personer finns här."
+  en: "Kuutti is just getting started. Numbers are shown only when at least {k, number} people are here."
+  description: "Pond card, below the threshold: no number is said while few people are here. {k} is the threshold. It names a condition, not a promise: numbers are never shown below {k}, and they may come a little later than at exactly {k}."
+  fi: "Kuutti on vasta alussa. Luvut näytetään vain, kun täällä on vähintään {k, number} ihmistä."
+  sv: "Kuutti har precis kommit igång. Siffror visas bara när minst {k, number} personer finns här."
   machine: { fi: true, sv: true }
 
 pond.counter.steps:
   en: "The numbers change only in steps of at least {k, number} people, so that one person does not show."
-  description: "Pond card, under the figures and the bar: why they stand still for a while. {k} is the threshold (ten): the figures of an area move in steps of at least that many people, the total as people come and go, the bar as they finish a profile or change whom they seek, so one person changes nothing in them. It says what the numbers do, not that nothing can ever be inferred."
+  description: "Pond card, under the figures and the bar: why they stand still for a while. {k} is the threshold (ten): the figures move in steps of at least that many people, the total as people come and go, the bar as they finish a profile or change whom they seek, so one person changes nothing in them. It says what the numbers do, not that nothing can ever be inferred."
   fi: "Luvut muuttuvat vain vähintään {k, number} ihmisen askelin, jotta yksittäinen ihminen ei näy niistä."
   sv: "Siffrorna ändras bara i steg om minst {k, number} personer, så att en enskild person inte syns i dem."
   machine: { fi: true, sv: true }
@@ -8224,24 +8198,10 @@ pond.counter.failed:
   sv: "Siffrorna kunde inte läsas."
   machine: { fi: true, sv: true }
 
-pond.counter.retry:
-  en: "Try again"
-  description: "Pond card, the button that fetches the figures again."
-  fi: "Yritä uudelleen"
-  sv: "Försök igen"
-  machine: { fi: true, sv: true }
-
 # --- The gate card (#500, ADR-060): whether matching is open for the person ---
-pond.gate.label:
-  en: "When matching opens for you"
-  description: "Home screen, accessible name of the card that says whether matching is open for the person (#500): their profile lacks something, it is finished and their area has not opened, or open."
-  fi: "Milloin seuranhaku avautuu sinulle"
-  sv: "När matchningen öppnar för dig"
-  machine: { fi: true, sv: true }
-
 pond.gate.title:
   en: "Matching"
-  description: "Gate card: the line above the state. One word, a heading."
+  description: "Gate card: the line above the state, and the card's accessible name. One word, a heading. The card says whether matching is open for the person (#500): their profile lacks something, it is finished and matching has not opened, or open."
   fi: "Seuranhaku"
   sv: "Matchning"
   machine: { fi: true, sv: true }
@@ -8254,15 +8214,15 @@ pond.gate.incomplete:
   machine: { fi: true, sv: true }
 
 pond.gate.closed:
-  en: "Your profile is finished. Matching has not opened in your area yet."
-  description: "Gate card when the person's profile is finished and matching has not opened in their pond: an admin opens a pond (#500, ADR-060). No date, no number and no reason. The pond is not named in the sentence (TD-17: no inflected pond name)."
-  fi: "Profiilisi on valmis. Seuranhaku ei ole vielä avautunut alueellasi."
-  sv: "Din profil är färdig. Matchningen har inte öppnat i ditt område än."
+  en: "Your profile is finished. Matching has not opened yet."
+  description: "Gate card when the person's profile is finished and matching has not opened: an admin opens it, for the whole country (#500, ADR-060, ADR-061 §8). No date, no number and no reason."
+  fi: "Profiilisi on valmis. Seuranhaku ei ole vielä avautunut."
+  sv: "Din profil är färdig. Matchningen har inte öppnat än."
   machine: { fi: true, sv: true }
 
 pond.gate.open:
   en: "Matching is open for you."
-  description: "Gate card when matching has opened for the person. It promises no round and no date: the rounds come with a later version."
+  description: "Gate card when matching has opened for the person. It promises no round and no date: production builds no rounds yet (ADR-035 Open 1)."
   fi: "Seuranhaku on sinulle auki."
   sv: "Matchningen är öppen för dig."
   machine: { fi: true, sv: true }
@@ -8275,17 +8235,10 @@ pond.gate.loading:
   machine: { fi: true, sv: true }
 
 pond.gate.failed:
-  en: "Where you stand could not be read."
+  en: "Matching could not be checked."
   description: "Gate card when it could not be fetched."
-  fi: "Tilannettasi ei voitu lukea."
-  sv: "Det gick inte att läsa var du står."
-  machine: { fi: true, sv: true }
-
-pond.gate.retry:
-  en: "Try again"
-  description: "Gate card, the button that fetches it again."
-  fi: "Yritä uudelleen"
-  sv: "Försök igen"
+  fi: "Seuranhakua ei voitu tarkistaa."
+  sv: "Det gick inte att kontrollera matchningen."
   machine: { fi: true, sv: true }
 
 # --- Today's round (#379, ADR-034): one card at a time, like and pass, come back tomorrow ---
@@ -9239,13 +9192,6 @@ home.gate.failed:
   sv: "Din kontoinställning kunde inte kontrolleras."
   machine: { fi: true, sv: true }
 
-home.gate.retry:
-  en: "Check again"
-  description: "Button under home.gate.failed: reads GET /onboarding again."
-  fi: "Tarkista uudelleen"
-  sv: "Kontrollera igen"
-  machine: { fi: true, sv: true }
-
 home.welcomeBack:
   en: "Welcome back. Your profile is visible again."
   description: "Home screen, one line after a bank login that ended a break (#170)."
@@ -9874,7 +9820,7 @@ settings.invite.loadFailed:
 
 settings.invite.intro:
   en: "Invite a friend with a code. They get the app at kuutti.app, sign in with their bank and type the code before their profile is complete. Each code works once."
-  description: "The Invitations screen, the opening line for a person who may invite (#107, ADR-044 §1, §2): the friend types the code after the bank login, before their profile passes the gate's test; single use."
+  description: "The Invitations screen, the opening line for a person who may invite (#107, ADR-044 §1, §2): the friend types the code after the bank login, before their profile is complete (ADR-060 §7); single use."
   fi: "Kutsu ystävä koodilla. Hän lataa sovelluksen osoitteesta kuutti.app, kirjautuu pankkitunnuksillaan ja kirjoittaa koodin ennen kuin hänen profiilinsa on valmis. Jokainen koodi toimii kerran."
   sv: "Bjud in en vän med en kod. Vännen hämtar appen på kuutti.app, loggar in med sina bankkoder och skriver in koden innan profilen är klar. Varje kod fungerar en gång."
   machine: { fi: true, sv: true }

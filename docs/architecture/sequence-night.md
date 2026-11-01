@@ -25,7 +25,7 @@ In these diagrams every arrow is built. Mermaid's sequence diagrams take a messa
 | 6 | `end-suspensions` | safety | sanctions | lifts each suspension past its day, settles the account | everywhere |
 | 7 | `pond-counter` | jobs | accounts, profiles, photos, preferences, ponds | the day's figures per pond | everywhere |
 | 8 | `invitation-count` | rewards | invitations, accounts, consents, profiles, photos, preferences | invitations counted, the inviter's reward units, a notice | everywhere |
-| 9 | `round-builder` | jobs, written through matching | the ponds' switches, accounts, profiles, photos, preferences, consents, blocks, rounds, likes, conversations | the day's round and its cards | everywhere but production |
+| 9 | `round-builder` | jobs, written through matching | the pond's switch, accounts, profiles, photos, preferences, consents, blocks, rounds, likes, conversations | the day's round and its cards | everywhere but production |
 | 10 | `reject-unreviewed-photos` | media | profile photos in the human queue | rejects those waiting past `photo_queue_reject_days` as not reviewed | everywhere |
 | 11 | `prune-photo-check-notes` | safety | the photo check's notes | deletes notes older than 365 days | everywhere |
 | 12 | `prune-reports` | safety | reports, their frozen copies, erased senders' sent photos | deletes reports older than 365 days, then the photos no copy holds, then their objects | everywhere; the objects where media is configured |

@@ -90,7 +90,7 @@ name: Withdrawing the sensitive-answers consent asks whom one seeks again with t
 
 # Not the ages: the window stayed. Not research either (#250, #418): straight home.
 - extendedWaitUntil:
-    visible: "Your area|Alueesi|Ditt område"
+    visible: "People on Kuutti|Ihmiset Kuutissa|Människor på Kuutti"
     timeout: 15000
 - assertNotVisible: "What ages\\?|Minkä ikäisiä\\?|Vilka åldrar\\?"
 - assertNotVisible: "Help us learn how matching works|Auta meitä oppimaan, miten yhdistäminen toimii|Hjälp oss lära hur matchningen fungerar"

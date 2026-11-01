@@ -49,7 +49,7 @@ name: The messages switch in Settings, Notifications, goes off, is kept on the s
 # as it was; the row comes back open, as it was left.
 - openLink: kuutti://
 - extendedWaitUntil:
-    visible: "Your area|Alueesi|Ditt område"
+    visible: "People on Kuutti|Ihmiset Kuutissa|Människor på Kuutti"
     timeout: 15000
 - openLink: kuutti://settings
 - runFlow:

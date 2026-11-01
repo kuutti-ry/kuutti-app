@@ -30,7 +30,7 @@ async function researchConsent(ctx: TestContext, headers: Record<string, string>
 /** Gender, a pond and a profile document with a closed-list value, a text value and a retired option. */
 async function onboarded(ctx: TestContext, accountId: string) {
   const pond = await ctx.client.query<{ id: string }>(
-    `INSERT INTO ponds (slug, name_nominative, name_inessive) VALUES ('test-research-pond', 'Pond', 'Pondissa') RETURNING id`,
+    "INSERT INTO ponds (slug, name_nominative) VALUES ('test-research-pond', 'Pond') RETURNING id",
   );
   await ctx.client.query("UPDATE account SET gender = 'woman', pond_id = $2 WHERE id = $1", [
     accountId,

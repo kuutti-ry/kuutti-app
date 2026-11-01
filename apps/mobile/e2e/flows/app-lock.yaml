@@ -84,7 +84,7 @@ name: A passcode set in Settings locks the app at a cold start and back from the
     notVisible: "Kuutti is locked|Kuutti on lukittu|Kuutti är låst"
     timeout: 15000
 - extendedWaitUntil:
-    visible: "Your area|Alueesi|Ditt område"
+    visible: "People on Kuutti|Ihmiset Kuutissa|Människor på Kuutti"
     timeout: 15000
 
 # Back from the background with no time allowed: locked again.

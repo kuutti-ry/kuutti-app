@@ -309,29 +309,29 @@ describe("listConfig", () => {
   test("gives each key its latest value and version, and its versions newest first", async ({
     ctx,
   }) => {
-    const pond = (await listConfig(ctx.client)).find((i) => i.key === "default_pond");
-    expect(pond).toMatchObject({ key: "default_pond", value: "suomi", version: 3 });
-    expect(pond?.versions.map((v) => [v.version, v.value, v.createdBy])).toEqual([
-      [3, "suomi", "migration:0095"],
-      [2, "paakaupunkiseutu", "migration:0025"],
-      [1, "suomi", "migration:0020"],
+    const key = (await listConfig(ctx.client)).find((i) => i.key === "deal_breakers_max");
+    expect(key).toMatchObject({ key: "deal_breakers_max", value: 7, version: 3 });
+    expect(key?.versions.map((v) => [v.version, v.value, v.createdBy])).toEqual([
+      [3, 7, "migration:0097"],
+      [2, 6, "migration:0092"],
+      [1, 2, "migration:0024"],
     ]);
 
     const from = new Date("2026-10-15T06:30:00Z");
     await ctx.client.query(
       `INSERT INTO matching_config (version, key, value, valid_from, created_by, reason)
-       VALUES (4, 'default_pond', '"kainuu"'::jsonb, $1, 'someone', 'A pond of its own')`,
+       VALUES (4, 'deal_breakers_max', '5'::jsonb, $1, 'someone', 'Fewer at first')`,
       [from],
     );
-    const again = (await listConfig(ctx.client)).find((i) => i.key === "default_pond");
-    expect(again).toMatchObject({ value: "kainuu", version: 4 });
+    const again = (await listConfig(ctx.client)).find((i) => i.key === "deal_breakers_max");
+    expect(again).toMatchObject({ value: 5, version: 4 });
     expect(again?.versions.map((v) => v.version)).toEqual([4, 3, 2, 1]);
     expect(again?.versions[0]).toEqual({
       version: 4,
-      value: "kainuu",
+      value: 5,
       validFrom: from.toISOString(),
       createdBy: "someone",
-      reason: "A pond of its own",
+      reason: "Fewer at first",
     });
     const single = (await listConfig(ctx.client)).find((i) => i.key === "liked_you_cap");
     expect(single).toMatchObject({ value: 10, version: 1 });
@@ -399,7 +399,7 @@ describe("changeConfig", () => {
 
   test.for([
     ["a string for liked_you_cap's number", "liked_you_cap", "25", "number"],
-    ["a number for default_pond's string", "default_pond", 1, "string"],
+    ["a number for a string", "config_test_word", 1, "string"],
     ["a boolean for liked_you_cap's number", "liked_you_cap", true, "number"],
     ["a number for the budget's object", "photo_fetches_per_day", 600, "object"],
     ["the budget without full", "photo_fetches_per_day", { thumb: 600, card: 300 }, "object"],
@@ -413,7 +413,7 @@ describe("changeConfig", () => {
   ] as const)(
     "refuses %s with config_shape, expecting %s, and writes nothing",
     async ([, key, value, expected], { ctx }) => {
-      await withMatchingConfig(ctx.client, { config_test_flag: true });
+      await withMatchingConfig(ctx.client, { config_test_flag: true, config_test_word: "word" });
       const admin = await staffSession(ctx.client, "admin");
       const before = await versionsOf(ctx, key);
       const attempt = changeConfig(ctx.client, {

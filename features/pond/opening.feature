@@ -3,9 +3,11 @@ Feature: A pond opens when an admin opens it
   Nobody waits at the pond (#500, ADR-060; the maintainer, 29/10/2026). Matching
   in a pond opens the day an admin turns its switch on in the panel, after a
   confirm step, and nothing else opens or closes it: no count, no share and no
-  night. Matching is open for a person when their pond is open and their
-  profile and onboarding are complete, and they are told one of three things,
-  with no number, no step and no place in a line.
+  night. There is one pond, the whole country (ADR-061 §8), so this is one
+  switch, called Matching in the panel (#500, the maintainer, 01/11/2026).
+  Matching is open for a person when the pond is open
+  and their profile and onboarding are complete, and they are told one of three
+  things, with no number, no step and no place in a line.
 
   Scenario: Matching opens in a pond when an admin opens it, and not before
     Given a pond nobody has opened, with thirty-one people who all fit
@@ -35,7 +37,7 @@ Feature: A pond opens when an admin opens it
     And the shadow-banned person has a round of their own, like anybody
 
   Scenario: Another person's state is never served
-    Given two people, one in an open pond and one in a closed one
+    Given two people in an open pond, one finished and one not
     When each asks
     Then each is told their own, and naming the other in the request changes nothing
 

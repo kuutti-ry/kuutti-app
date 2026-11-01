@@ -1,28 +1,21 @@
 import { act, renderHook, waitFor } from "@testing-library/react-native";
 import { usePondCounter } from "./usePondCounter";
 
-// What the counter says of one pond (#54): its figures, none when the
-// list does not name it, a failure with a retry, and an answer for a pond
-// that is no longer asked about is dropped.
+// What the counter says of the one pond (#54): its figures, none when the
+// list is empty, a failure with a retry, and the answer of a read that a retry
+// replaced is dropped.
 
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
-const pond = (n: number) => ({
-  id: `0b4f3a0e-7c2f-4e2b-9a9a-1a2b3c4d5e${n.toString().padStart(2, "0")}`,
-  slug: `pond-${n}`,
-  name: `Pond ${n}`,
-  nameInessive: `Pond ${n}`,
-  parentId: null,
-});
-const entry = (n: number, verified: number) => ({
-  pond: pond(n),
+const ENTRY = {
+  pond: { id: "0b4f3a0e-7c2f-4e2b-9a9a-1a2b3c4d5e01", slug: "suomi", name: "Suomi" },
   day: "2026-10-05",
-  verified,
+  verified: 150,
   split: null,
   finishing: null,
   seeks: null,
-});
-const COUNTER = { k: 10, ponds: [entry(1, 150), entry(2, 40)] };
+};
+const COUNTER = { k: 10, ponds: [ENTRY] };
 
 function pendingReads() {
   const waiting: Array<(response: Response) => void> = [];
@@ -36,48 +29,46 @@ function pendingReads() {
 }
 
 describe("usePondCounter", () => {
-  it("gives the figures of the asked pond and the step they are said in", async () => {
+  it("gives the pond's figures and the step they are said in", async () => {
     globalThis.fetch = jest.fn(async () => json(COUNTER)) as unknown as typeof fetch;
-    const { result } = await renderHook(() => usePondCounter(pond(2).id));
+    const { result } = await renderHook(() => usePondCounter());
     await waitFor(() => expect(result.current.status).toBe("ready"));
-    expect(result.current).toMatchObject({ status: "ready", k: 10, figures: entry(2, 40) });
+    expect(result.current).toMatchObject({ status: "ready", k: 10, figures: ENTRY });
   });
 
-  it("has no figures for a pond the list does not name", async () => {
-    globalThis.fetch = jest.fn(async () => json(COUNTER)) as unknown as typeof fetch;
-    const { result } = await renderHook(() => usePondCounter(pond(9).id));
+  it("has no figures when the list is empty", async () => {
+    globalThis.fetch = jest.fn(async () => json({ k: 10, ponds: [] })) as unknown as typeof fetch;
+    const { result } = await renderHook(() => usePondCounter());
     await waitFor(() => expect(result.current.status).toBe("ready"));
     expect(result.current).toMatchObject({ k: 10, figures: null });
   });
 
   it("fails, and loads again on a retry", async () => {
     const waiting = pendingReads();
-    const { result } = await renderHook(() => usePondCounter(pond(1).id));
+    const { result } = await renderHook(() => usePondCounter());
     await act(async () => waiting.shift()?.(json({ error: { code: "internal_error" } }, 503)));
     expect(result.current.status).toBe("failed");
     await act(async () => result.current.retry());
     expect(result.current.status).toBe("loading");
     await act(async () => waiting.shift()?.(json(COUNTER)));
-    expect(result.current).toMatchObject({ status: "ready", figures: entry(1, 150) });
+    expect(result.current).toMatchObject({ status: "ready", figures: ENTRY });
   });
 
-  it("drops the answer, or the failure, for a pond no longer asked about", async () => {
+  it("drops the answer, or the failure, of a read that a retry replaced", async () => {
     const waiting = pendingReads();
-    const { result, rerender } = await renderHook(({ id }: { id: string }) => usePondCounter(id), {
-      initialProps: { id: pond(1).id },
-    });
-    await rerender({ id: pond(2).id });
+    const { result } = await renderHook(() => usePondCounter());
+    await act(async () => result.current.retry());
     const [first, second] = waiting;
     await act(async () => first?.(json(COUNTER)));
     expect(result.current.status).toBe("loading");
     await act(async () => second?.(json(COUNTER)));
-    expect(result.current).toMatchObject({ figures: entry(2, 40) });
-    await rerender({ id: pond(1).id });
-    await rerender({ id: pond(2).id });
+    expect(result.current).toMatchObject({ figures: ENTRY });
+    await act(async () => result.current.retry());
+    await act(async () => result.current.retry());
     const [, , third, fourth] = waiting;
     await act(async () => third?.(json({ error: { code: "internal_error" } }, 503)));
     expect(result.current.status).toBe("loading");
     await act(async () => fourth?.(json(COUNTER)));
-    expect(result.current).toMatchObject({ status: "ready", figures: entry(2, 40) });
+    expect(result.current).toMatchObject({ status: "ready", figures: ENTRY });
   });
 });

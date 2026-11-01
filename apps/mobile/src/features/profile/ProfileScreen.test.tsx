@@ -121,7 +121,6 @@ function fakeApi(
         state: "active",
         age: 36,
         gender: answer,
-        pond: null,
         home: null,
         preferences: { seeks: ["man"], ageWindow: { min: 25, max: 40 } },
         consents: { terms: "t", privacy: "p", specialCategory: "s", research: null },
@@ -323,7 +322,7 @@ describe("ProfileScreen", () => {
     expect(screen.queryByText("1/6")).toBeNull();
     // No mark on What you seek or the later questions: neither is a part one fills.
     expect(progressValue("What you seek")).toBeUndefined();
-    expect(progressValue("Fill in the rest while you wait")).toBeUndefined();
+    expect(progressValue("Fill in the rest when you have a moment")).toBeUndefined();
   });
 
   it("keeps the marks' turns on the rows there are: the section that left the list takes none (#542)", async () => {
@@ -408,7 +407,7 @@ describe("ProfileScreen", () => {
         "Hobbies",
         "Beliefs",
         "What you seek",
-        "Fill in the rest while you wait",
+        "Fill in the rest when you have a moment",
       ]);
     });
   });
@@ -487,7 +486,9 @@ describe("ProfileScreen", () => {
     fakeApi([[]], { document: { fields: all } });
     await show(<ProfileScreen />);
     await waitFor(() => expect(progressValue("Hobbies")).toBe("Done"));
-    expect(screen.queryByRole("button", { name: "Fill in the rest while you wait" })).toBeNull();
+    expect(
+      screen.queryByRole("button", { name: "Fill in the rest when you have a moment" }),
+    ).toBeNull();
     expect(screen.getByRole("button", { name: "What you seek" })).toBeTruthy();
   });
 
@@ -499,7 +500,9 @@ describe("ProfileScreen", () => {
     fakeApi([[]], { document: { fields: all } });
     await show(<ProfileScreen />);
     await waitFor(() => expect(progressValue("Lifestyle")).toBe("5 of 6 answered"));
-    expect(screen.getByRole("button", { name: "Fill in the rest while you wait" })).toBeTruthy();
+    expect(
+      screen.getByRole("button", { name: "Fill in the rest when you have a moment" }),
+    ).toBeTruthy();
   });
 
   it("opens the photos, a section, the card from the eye, What you seek and the later questions", async () => {
@@ -510,7 +513,7 @@ describe("ProfileScreen", () => {
     await press(screen.getByRole("button", { name: "Lifestyle" }));
     await press(screen.getByRole("button", { name: "See your card" }));
     await press(screen.getByRole("button", { name: "What you seek" }));
-    await press(screen.getByRole("button", { name: "Fill in the rest while you wait" }));
+    await press(screen.getByRole("button", { name: "Fill in the rest when you have a moment" }));
     expect(router.push.mock.calls.map(([path]) => path)).toEqual([
       "/photos",
       "/profile/section/lifestyle",

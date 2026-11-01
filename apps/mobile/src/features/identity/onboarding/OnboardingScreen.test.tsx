@@ -48,13 +48,6 @@ const TERMS = versionOf("terms");
 const PRIVACY = versionOf("privacy");
 const RESEARCH = versionOf("research");
 const SPECIAL = versionOf("special_category");
-const POND = {
-  id: "5f1c1c4e-9a8e-4a0b-9c3a-0c8d1e2f3a00",
-  slug: "suomi",
-  name: "Suomi",
-  nameInessive: "Suomessa",
-  parentId: null,
-};
 /** The answers of the fake home route, by code: an area kept, and one too small to keep. */
 const HOMES: Readonly<Record<string, HomeSummary>> = {
   "00530": {
@@ -98,9 +91,8 @@ function fakeApi(
     genderFrom: string | null;
     /** The API refuses whom one seeks: the consent went while the step was open (ADR-010 §16). */
     seeksRefused: boolean;
-    /** The home as the API reads it back; its write sets the one pond (ADR-061 §8). */
+    /** The home as the API reads it back. */
     home: HomeSummary | null;
-    pond: typeof POND | null;
   } = {
     gender: null,
     seeks: null,
@@ -111,7 +103,6 @@ function fakeApi(
     genderFrom: null,
     seeksRefused: false,
     home: null,
-    pond: null,
   };
   const calls: { method: string; path: string; body: unknown }[] = [];
   const has = (kind: string, version: string) =>
@@ -137,7 +128,6 @@ function fakeApi(
       state: missing.some((step) => ACTIVATION.includes(step)) ? "registered" : "active",
       age: options.age ?? 36,
       gender: server.gender,
-      pond: server.pond,
       home: server.home,
       preferences: { seeks: server.seeks, ageWindow: server.ageWindow },
       consents: {
@@ -212,7 +202,6 @@ function fakeApi(
           return json({ error }, 400);
         }
         server.home = found;
-        server.pond = POND;
       }
       if (showArea !== undefined && server.home) server.home = { ...server.home, showArea };
       return json(server.home);
@@ -346,7 +335,6 @@ describe("OnboardingScreen", () => {
     await flush();
     await waitFor(() => expect(screen.getByText("What should your card show?")).toBeTruthy());
     expect(screen.getByText("Step 6 of 8")).toBeTruthy();
-    expect(server.pond).toEqual(POND);
     checkA11y();
     await press(screen.getByRole("button", { name: "Kallio" }));
     await flush();

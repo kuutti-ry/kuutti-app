@@ -9,7 +9,7 @@
 3. `pnpm i18n:build`, and commit `src/generated/` with the YAML. CI fails when they drift, like the OpenAPI types (ADR-003).
 4. Use it: `t("profile.bio.required")`, `t("errors.rate_limited", { seconds })`. An unknown key, a missing argument or a wrong argument type does not compile.
 
-Never inflect a dynamic value: `in {pond}` and `{pond}ssa` fail the check. A pond's case form comes from the database through `formatPond(pond, "inessive", locale)`.
+Never inflect a dynamic value: `in {name}` and `{name}ssa` fail the check. A sentence that would need a case form is written so that it does not.
 
 ## Stadi (#521)
 
@@ -38,7 +38,7 @@ A native reviewer reads machine text and approves it; `docs/i18n/translation-rev
 |---|---|
 | `messages.yaml`, `glossary.yaml` | the text and the product vocabulary |
 | `src/generated/` | one catalogue per locale, the `en-XA` pseudo-locale, and `MessageKey` / `MessageParams`; generated, committed |
-| `src/index.ts` | `createI18n`, `typedT`, `resolveLocale`, `realLocale`, `parseAcceptLanguage`, `formatDate`, `formatNumber`, `formatPond` |
+| `src/index.ts` | `createI18n`, `typedT`, `resolveLocale`, `realLocale`, `parseAcceptLanguage`, `formatDate`, `formatNumber` |
 | `src/react.tsx` (`@kuutti/i18n/react`) | `createReactI18n`, `I18nProvider`, `useT` for app and admin; the API never imports it |
 | `src/pseudo.ts` (`@kuutti/i18n/pseudo`) | the `en-XA` catalogue, a separate entry so only a dev build bundles it |
 | `src/legal.ts` | `legalPageUrl`: the full text of a legal wording on the website, at the anchor of its version (#208) |

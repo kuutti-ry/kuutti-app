@@ -44,8 +44,8 @@ let batch = 0;
 
 export async function pondNamed(db: Queryable, slug: string): Promise<string> {
   const { rows } = await db.query<{ id: string }>(
-    `INSERT INTO ponds (slug, name_nominative, name_inessive) VALUES ($1, $2, $3) RETURNING id`,
-    [slug, `Pond ${slug}`, `Pondissa ${slug}`],
+    "INSERT INTO ponds (slug, name_nominative) VALUES ($1, $2) RETURNING id",
+    [slug, `Pond ${slug}`],
   );
   const id = rows[0]?.id;
   if (!id) throw new Error("test pond not written");

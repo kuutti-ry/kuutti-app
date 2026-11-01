@@ -242,8 +242,6 @@ export function AccountPage() {
                 <dd>{page.age ?? "–"}</dd>
                 <dt>{t("admin.account.gender")}</dt>
                 <dd>{page.gender ?? "–"}</dd>
-                <dt>{t("admin.account.pond")}</dt>
-                <dd>{page.pond ?? "–"}</dd>
                 <dt>{t("admin.account.bio")}</dt>
                 <dd>
                   {page.profile.bio ??

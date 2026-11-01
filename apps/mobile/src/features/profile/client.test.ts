@@ -35,7 +35,6 @@ const STATUS = {
   state: "active",
   age: 36,
   gender: "woman",
-  pond: null,
   home: null,
   preferences: PREFERENCES,
   consents: { terms: "v1", privacy: "v1", specialCategory: "s1", research: null },

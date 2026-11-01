@@ -137,16 +137,11 @@ Feature: The home
     And their pond is as it was
 
   Scenario: The home write sets the one pond, and reading the status sets nothing
-    Given a pond whose slug matching_config names as the default pond
+    Given the one pond
     When a registered account reads its onboarding status
     Then it has no pond, and no step asks for one
     When it gives a postal code from the list
     Then it is in that pond
-
-  Scenario: A home write that would leave the account with no pond fails loudly and keeps nothing
-    Given matching_config names no live pond as the default pond
-    When an account with no pond gives a postal code from the list
-    Then the answer is 500, no home is kept, and the step stays open
 
   Scenario: An active account without a home is in nobody's pool, and the step opens
     Given an active account with a finished profile and no home

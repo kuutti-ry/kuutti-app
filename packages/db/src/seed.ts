@@ -5,16 +5,14 @@ import type { Pool } from "./pool.ts";
 import { account, identity, matchingConfig, ponds, preferences, profile } from "./schema/index.ts";
 
 /**
- * One pond, the whole country (ADR-061 §8), set by the API with a person's home
- * from matching_config.default_pond. Migration 0027 writes the same row, and a
- * second pond here would come back on every boot of a preview after migration
- * 0095 took it away.
+ * One pond, the whole country (ADR-061 §8), set by the API with a person's
+ * home. Migration 0027 writes the same row, and a second pond here would come
+ * back on every boot of a preview after migration 0095 took it away.
  */
 export const SEED_PONDS = [
   {
     slug: "suomi",
     nameNominative: "Suomi",
-    nameInessive: "Suomessa",
   },
 ] as const;
 
@@ -163,10 +161,6 @@ export const MATCHING_CONFIG_V1 = {
   // #54 (ADR-013, rules/schema.md): the public counter says a number
   // only where at least this many people stand behind it.
   pond_counter_k: 10,
-  // #146 (ADR-010 §10): the pond every account is put in when it has none;
-  // the slug of a row in ponds. Version 2 named another, version 3 this one
-  // again (below).
-  default_pond: "suomi",
   // #147 (the field sheet, ADR-060 §9): a change of gender is possible once in
   // this many days.
   change_cadence_days: 30,
@@ -186,14 +180,12 @@ export const MATCHING_CONFIG_V1 = {
 } as const;
 
 /**
- * matching_config version 2 (ADR-010 §11, migration 0025): the one pond is the
- * capital region. Version 1 keeps its row as migration 0020 wrote it; the
- * latest version of a key wins (apps/api/src/lib/matching-config.ts). The
- * round is ten cards (#95, ADR-035, migration 0069), the maintainer's of
- * 20/10/2026 for the round builder's first cut.
+ * matching_config version 2: version 1 keeps its row, and the latest version
+ * of a key wins (apps/api/src/lib/matching-config.ts). The round is ten cards
+ * (#95, ADR-035, migration 0069), the maintainer's of 20/10/2026 for the round
+ * builder's first cut.
  */
 export const MATCHING_CONFIG_V2 = {
-  default_pond: "paakaupunkiseutu",
   round_size: 10,
   // #98 (ADR-036, migration 0070): ten likes a day for everybody, the first cut's.
   like_budget_balanced: 10,
@@ -207,12 +199,10 @@ export const MATCHING_CONFIG_V2 = {
 } as const;
 
 /**
- * matching_config version 3: one pond, the whole country (ADR-061 §8, migration
- * 0095), and a seventh deal-breaker, the distance, which is no field (ADR-061
- * §7, migration 0097); the maintainer's of 31/10/2026.
+ * matching_config version 3: a seventh deal-breaker, the distance, which is no
+ * field (ADR-061 §7, migration 0097); the maintainer's of 31/10/2026.
  */
 export const MATCHING_CONFIG_V3 = {
-  default_pond: "suomi",
   deal_breakers_max: 7,
 } as const;
 
@@ -264,18 +254,11 @@ export async function seed(pool: Pool, createdBy = "seed"): Promise<SeedResult> 
       .values({
         slug: pond.slug,
         nameNominative: pond.nameNominative,
-        nameInessive: pond.nameInessive,
-        parentId: null,
         matchingOpen: true,
       })
       .onConflictDoUpdate({
         target: ponds.slug,
-        set: {
-          nameNominative: pond.nameNominative,
-          nameInessive: pond.nameInessive,
-          parentId: null,
-          matchingOpen: true,
-        },
+        set: { nameNominative: pond.nameNominative, matchingOpen: true },
       });
   }
 
@@ -333,7 +316,7 @@ export async function seed(pool: Pool, createdBy = "seed"): Promise<SeedResult> 
         const [pond] = await db
           .select({ id: ponds.id })
           .from(ponds)
-          .where(eq(ponds.slug, MATCHING_CONFIG_V3.default_pond));
+          .where(eq(ponds.slug, SEED_PONDS[0].slug));
         await db
           .update(account)
           .set({ gender: "woman", pondId: pond?.id ?? null, homePlace: SEED_HOME_PLACE })

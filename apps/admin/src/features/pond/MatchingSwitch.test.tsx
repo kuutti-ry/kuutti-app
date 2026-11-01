@@ -4,22 +4,19 @@ import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { i18n } from "../../i18n.ts";
 import { setTokenSource } from "../../lib/api.ts";
-import { PondList } from "./PondList.tsx";
+import { MatchingSwitch } from "./MatchingSwitch.tsx";
 
-// The ponds and their switches as an admin turns them (#500, ADR-060 §1, §2):
-// each pond's state in a word, a confirm step that says the effect, the row
-// updated in place, and every refusal in the step's own words. Requests are
-// answered by a fake fetch keyed on method and path.
+// The switch that opens matching as an admin turns it (#500, ADR-060 §1, §2):
+// its state in a word, a confirm step that says the effect, the state updated
+// in place, and every refusal in the step's own words. Requests are answered by
+// a fake fetch keyed on method and path.
 
 const SUOMI = "3c9d0f5e-1a2b-4c3d-8e9f-0a1b2c3d4e5f";
-const CAPITAL = "7a2d2d5f-0b9f-4b1c-8d4b-1d9e2f3a4b5c";
 
-const pond = (id: string, name: string, matchingOpen: boolean) => ({
-  id,
-  slug: name.toLowerCase(),
-  name,
-  nameInessive: `${name}ssa`,
-  parentId: null,
+const pond = (matchingOpen: boolean) => ({
+  id: SUOMI,
+  slug: "suomi",
+  name: "Suomi",
   matchingOpen,
 });
 
@@ -61,14 +58,12 @@ function show() {
   render(
     <I18nProvider i18n={i18n}>
       <MemoryRouter>
-        <PondList />
+        <MatchingSwitch />
       </MemoryRouter>
     </I18nProvider>,
   );
 }
 
-const rowOf = async (name: string) =>
-  (await screen.findByText(name)).closest("li") as HTMLLIElement;
 const step = () => screen.getByRole("dialog");
 
 beforeEach(() => setTokenSource(() => "t".repeat(43)));
@@ -78,72 +73,75 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe("the ponds", () => {
+describe("the switch", () => {
   it("is busy while it loads, and says what the switch is", async () => {
-    fetchMock([listing()]);
+    fetchMock([listing(pond(false))]);
     show();
-    expect(screen.getByText("Loading the ponds…")).toHaveAttribute("aria-busy", "true");
+    expect(screen.getByText("Loading…")).toHaveAttribute("aria-busy", "true");
+    expect(screen.getByRole("heading", { name: "Matching" })).toBeInTheDocument();
     expect(
-      screen.getByText(/Matching in a pond opens when an admin turns it on here/),
+      screen.getByText(/Matching opens for the whole country when an admin turns it on here/),
     ).toBeInTheDocument();
-    await screen.findByRole("list");
-    expect(screen.queryByText("Loading the ponds…")).toBeNull();
+    await screen.findByText("All of Finland");
+    expect(screen.queryByText("Loading…")).toBeNull();
   });
 
-  it("says each pond's state in a word, and offers the press that changes it", async () => {
-    fetchMock([listing(pond(SUOMI, "Suomi", false), pond(CAPITAL, "Pääkaupunkiseutu", true))]);
-    show();
-    const closed = within(await rowOf("Suomi"));
-    expect(closed.getByText("Closed")).toBeInTheDocument();
-    expect(closed.getByRole("button", { name: "Suomi: open matching" })).toBeInTheDocument();
-    const open = within(await rowOf("Pääkaupunkiseutu"));
-    expect(open.getByText("Open")).toBeInTheDocument();
-    expect(
-      open.getByRole("button", { name: "Pääkaupunkiseutu: close matching" }),
-    ).toBeInTheDocument();
-    expect(screen.getByText("2 ponds")).toBeInTheDocument();
-  });
+  it.each([
+    [false, "Closed", "Open matching"],
+    [true, "Open", "Close matching"],
+  ])(
+    "says its state in a word, and offers the press that changes it (%s)",
+    async (open, word, press) => {
+      fetchMock([listing(pond(open))]);
+      show();
+      expect(await screen.findByText(word)).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: press })).toBeInTheDocument();
+      // One switch, so no list and no pond's name to tell it from another.
+      expect(screen.queryByRole("list")).toBeNull();
+      expect(screen.queryByText("Suomi")).toBeNull();
+    },
+  );
 
-  it("says one pond in the singular", async () => {
-    fetchMock([listing(pond(SUOMI, "Suomi", false))]);
+  it("offers no press when the list holds no pond", async () => {
+    const calls = fetchMock([listing()]);
     show();
-    expect(await screen.findByText("1 pond")).toBeInTheDocument();
+    await waitFor(() => expect(calls.filter(isList)).toHaveLength(1));
+    await waitFor(() => expect(screen.queryByText("Loading…")).toBeNull());
+    expect(screen.queryByRole("button", { name: "Open matching" })).toBeNull();
   });
 
   it.each([
     ["the API fails", () => failure("internal_error", 500)],
     ["the answer is not the contract", () => json({ items: [{ id: "suomi" }] })],
-  ])("says the list could not be loaded when %s", async (_, respond) => {
+  ])("says the switch could not be read when %s", async (_, respond) => {
     vi.spyOn(console, "error").mockImplementation(() => undefined);
     fetchMock([(req) => (isList(req) ? respond() : null)]);
     show();
-    expect(await screen.findByText("The ponds could not be loaded.")).toBeInTheDocument();
-    expect(screen.queryByRole("list")).toBeNull();
+    expect(
+      await screen.findByText("Whether matching is open could not be read."),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("All of Finland")).toBeNull();
   });
 
-  it("reads the list again on Refresh", async () => {
-    const calls = fetchMock([listing(pond(SUOMI, "Suomi", false))]);
+  it("reads the switch again on Refresh", async () => {
+    const calls = fetchMock([listing(pond(false))]);
     show();
-    await screen.findByRole("list");
+    await screen.findByText("All of Finland");
     fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
     await waitFor(() => expect(calls.filter(isList)).toHaveLength(2));
   });
 });
 
 describe("turning the switch", () => {
-  it("opens a pond through a confirm step that says the effect, and updates its row in place", async () => {
-    const calls = fetchMock([
-      listing(pond(SUOMI, "Suomi", false), pond(CAPITAL, "Pääkaupunkiseutu", false)),
-      pressing(() => json(pond(SUOMI, "Suomi", true))),
-    ]);
+  it("opens matching through a confirm step that says the effect, and updates the state in place", async () => {
+    const calls = fetchMock([listing(pond(false)), pressing(() => json(pond(true)))]);
     show();
-    const row = await rowOf("Suomi");
-    const button = within(row).getByRole("button", { name: "Suomi: open matching" });
+    const button = await screen.findByRole("button", { name: "Open matching" });
     button.focus();
     fireEvent.click(button);
 
     const dialog = within(step());
-    expect(dialog.getByRole("heading", { name: "Suomi: open matching?" })).toBeInTheDocument();
+    expect(dialog.getByRole("heading", { name: "Open matching?" })).toBeInTheDocument();
     expect(dialog.getByText(/gets a round each night/)).toBeInTheDocument();
     expect(dialog.getByText(/Production builds no rounds yet/)).toBeInTheDocument();
     // Nothing is sent before the step's own button.
@@ -154,47 +152,41 @@ describe("turning the switch", () => {
     const press = calls.find(isPress);
     expect(press && path(press)).toBe(`/admin/ponds/${SUOMI}/matching`);
     expect(await press?.clone().json()).toEqual({ open: true });
-    expect(within(await rowOf("Suomi")).getByText("Open")).toBeInTheDocument();
-    expect(within(await rowOf("Pääkaupunkiseutu")).getByText("Closed")).toBeInTheDocument();
-    expect(screen.getByText("Suomi: matching is now open.")).toBeInTheDocument();
-    // The row was updated from the answer, never read again.
+    expect(await screen.findByText("Open")).toBeInTheDocument();
+    expect(screen.getByText("Matching is now open.")).toBeInTheDocument();
+    // The state was updated from the answer, never read again.
     expect(calls.filter(isList)).toHaveLength(1);
   });
 
-  it("closes a pond through its own step, which says what stays", async () => {
-    const calls = fetchMock([
-      listing(pond(SUOMI, "Suomi", true)),
-      pressing(() => json(pond(SUOMI, "Suomi", false))),
-    ]);
+  it("closes matching through its own step, which says what stays", async () => {
+    const calls = fetchMock([listing(pond(true)), pressing(() => json(pond(false)))]);
     show();
-    fireEvent.click(await screen.findByRole("button", { name: "Suomi: close matching" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Close matching" }));
     const dialog = within(step());
-    expect(dialog.getByRole("heading", { name: "Suomi: close matching?" })).toBeInTheDocument();
+    expect(dialog.getByRole("heading", { name: "Close matching?" })).toBeInTheDocument();
     expect(dialog.getByText(/conversations go on/)).toBeInTheDocument();
+    expect(dialog.getByText(/matching has not opened yet/)).toBeInTheDocument();
     fireEvent.click(dialog.getByRole("button", { name: "Close matching" }));
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     expect(await calls.find(isPress)?.clone().json()).toEqual({ open: false });
-    expect(screen.getByText("Suomi: matching is now closed.")).toBeInTheDocument();
-    expect(within(await rowOf("Suomi")).getByText("Closed")).toBeInTheDocument();
+    expect(screen.getByText("Matching is now closed.")).toBeInTheDocument();
+    expect(await screen.findByText("Closed")).toBeInTheDocument();
   });
 
   it("clears what it last said when the next step opens, so the next press is heard", async () => {
-    fetchMock([
-      listing(pond(SUOMI, "Suomi", false)),
-      pressing(() => json(pond(SUOMI, "Suomi", true))),
-    ]);
+    fetchMock([listing(pond(false)), pressing(() => json(pond(true)))]);
     show();
-    fireEvent.click(await screen.findByRole("button", { name: "Suomi: open matching" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Open matching" }));
     fireEvent.click(within(step()).getByRole("button", { name: "Open matching" }));
-    await screen.findByText("Suomi: matching is now open.");
-    fireEvent.click(screen.getByRole("button", { name: "Suomi: close matching" }));
-    expect(screen.queryByText("Suomi: matching is now open.")).toBeNull();
+    await screen.findByText("Matching is now open.");
+    fireEvent.click(screen.getByRole("button", { name: "Close matching" }));
+    expect(screen.queryByText("Matching is now open.")).toBeNull();
   });
 
   it("leaves with nothing sent on Cancel, and gives the focus back", async () => {
-    const calls = fetchMock([listing(pond(SUOMI, "Suomi", false))]);
+    const calls = fetchMock([listing(pond(false))]);
     show();
-    const button = await screen.findByRole("button", { name: "Suomi: open matching" });
+    const button = await screen.findByRole("button", { name: "Open matching" });
     button.focus();
     fireEvent.click(button);
     fireEvent.click(within(step()).getByRole("button", { name: "Cancel" }));
@@ -208,27 +200,24 @@ describe("turning the switch", () => {
     ["the pond is gone", () => failure("not_found", 404)],
     ["the answer is not the contract", () => json({ id: SUOMI })],
   ])("says that it did not go through when %s, and changes nothing", async (_, respond) => {
-    fetchMock([listing(pond(SUOMI, "Suomi", false)), pressing(respond)]);
+    fetchMock([listing(pond(false)), pressing(respond)]);
     show();
-    fireEvent.click(await screen.findByRole("button", { name: "Suomi: open matching" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Open matching" }));
     fireEvent.click(within(step()).getByRole("button", { name: "Open matching" }));
     expect(
       await within(step()).findByText("That did not go through. Nothing was changed."),
     ).toBeInTheDocument();
-    expect(within(await rowOf("Suomi")).getByText("Closed")).toBeInTheDocument();
+    expect(screen.getByText("Closed")).toBeInTheDocument();
   });
 
   it("closes the step on a 403 with no words of its own: the shell says it", async () => {
-    fetchMock([
-      listing(pond(SUOMI, "Suomi", false)),
-      pressing(() => failure("admin_forbidden", 403)),
-    ]);
+    fetchMock([listing(pond(false)), pressing(() => failure("admin_forbidden", 403))]);
     show();
-    fireEvent.click(await screen.findByRole("button", { name: "Suomi: open matching" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Open matching" }));
     fireEvent.click(within(step()).getByRole("button", { name: "Open matching" }));
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     expect(screen.queryByText("That did not go through. Nothing was changed.")).toBeNull();
-    expect(within(await rowOf("Suomi")).getByText("Closed")).toBeInTheDocument();
+    expect(screen.getByText("Closed")).toBeInTheDocument();
   });
 
   it("sends one request while one is out, however often it is pressed", async () => {
@@ -236,14 +225,14 @@ describe("turning the switch", () => {
     const held = new Promise<Response>((resolve) => {
       answer = resolve;
     });
-    const calls = fetchMock([listing(pond(SUOMI, "Suomi", false)), pressing(() => held)]);
+    const calls = fetchMock([listing(pond(false)), pressing(() => held)]);
     show();
-    fireEvent.click(await screen.findByRole("button", { name: "Suomi: open matching" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Open matching" }));
     const apply = within(step()).getByRole("button", { name: "Open matching" });
     fireEvent.click(apply);
     await waitFor(() => expect(apply).toHaveAttribute("aria-busy", "true"));
     fireEvent.click(apply);
-    answer(json(pond(SUOMI, "Suomi", true)));
+    answer(json(pond(true)));
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     expect(calls.filter(isPress)).toHaveLength(1);
   });

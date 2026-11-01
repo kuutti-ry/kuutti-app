@@ -47,7 +47,7 @@ name: The session, the theme and the language survive closing and reopening the 
 
 - stopApp
 - runFlow: ../common/open-app.yaml
-- assertVisible: "Ditt område"
+- assertVisible: "Människor på Kuutti"
 - openLink: kuutti://settings
 - extendedWaitUntil:
     visible: "Inställningar"

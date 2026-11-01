@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Kuutti API",
-    "version": "0.94.0",
+    "version": "0.95.0",
     "description": "Free, non-commercial dating app for Finland. Every account is verified through a Finnish bank. Source: AGPL-3.0 with App Store exception."
   },
   "components": {
@@ -412,24 +412,12 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 80
-          },
-          "nameInessive": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 80
-          },
-          "parentId": {
-            "type": "string",
-            "nullable": true,
-            "format": "uuid"
           }
         },
         "required": [
           "id",
           "slug",
-          "name",
-          "nameInessive",
-          "parentId"
+          "name"
         ]
       },
       "PreferencesResponse": {
@@ -3621,9 +3609,6 @@
           "gender": {
             "$ref": "#/components/schemas/Gender"
           },
-          "pond": {
-            "$ref": "#/components/schemas/PondSummary"
-          },
           "home": {
             "$ref": "#/components/schemas/HomeSummary"
           },
@@ -3705,7 +3690,6 @@
           "state",
           "age",
           "gender",
-          "pond",
           "home",
           "preferences",
           "consents",
@@ -5970,11 +5954,6 @@
             "nullable": true,
             "maxLength": 40
           },
-          "pond": {
-            "type": "string",
-            "nullable": true,
-            "maxLength": 80
-          },
           "profile": {
             "type": "object",
             "nullable": true,
@@ -6064,7 +6043,6 @@
           "suspensionEndsAt",
           "age",
           "gender",
-          "pond",
           "profile",
           "photos",
           "feedback",
@@ -6333,16 +6311,6 @@
             "minLength": 1,
             "maxLength": 80
           },
-          "nameInessive": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 80
-          },
-          "parentId": {
-            "type": "string",
-            "nullable": true,
-            "format": "uuid"
-          },
           "matchingOpen": {
             "type": "boolean"
           }
@@ -6351,8 +6319,6 @@
           "id",
           "slug",
           "name",
-          "nameInessive",
-          "parentId",
           "matchingOpen"
         ]
       },

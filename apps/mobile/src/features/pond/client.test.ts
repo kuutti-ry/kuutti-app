@@ -8,8 +8,6 @@ const POND = {
   id: "0b1c1c4e-9a8e-4a0b-9c3a-0c8d1e2f3a01",
   slug: "suomi",
   name: "Suomi",
-  nameInessive: "Suomessa",
-  parentId: null,
 };
 const token = (seed: string) => (seed + "x".repeat(43)).slice(0, 43);
 const json = (body: unknown, status = 200) =>

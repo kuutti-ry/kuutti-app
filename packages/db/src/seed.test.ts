@@ -28,12 +28,9 @@ describe("seed", () => {
         const pondCount = await pool.query<{ n: string }>("SELECT count(*) AS n FROM ponds");
         expect(Number(pondCount.rows[0]?.n)).toBe(SEED_PONDS.length);
 
-        const tree = await pool.query<{ slug: string; parent: string | null; inessive: string }>(
-          `SELECT c.slug, p.slug AS parent, c.name_inessive AS inessive
-           FROM ponds c LEFT JOIN ponds p ON p.id = c.parent_id ORDER BY c.slug`,
-        );
+        const pondRows = await pool.query("SELECT slug, name_nominative FROM ponds");
         // One pond, the country (ADR-061 §8): a second row here would come back on every preview's boot.
-        expect(tree.rows).toEqual([{ slug: "suomi", parent: null, inessive: "Suomessa" }]);
+        expect(pondRows.rows).toEqual([{ slug: "suomi", name_nominative: "Suomi" }]);
 
         const config = await pool.query<{ key: string; value: number; version: number }>(
           "SELECT key, value, version FROM matching_config ORDER BY key, version",
@@ -124,7 +121,6 @@ describe("seed", () => {
           message_photos_per_day: 10,
           messages_per_minute: 30,
           pond_counter_k: 10,
-          default_pond: "suomi",
           change_cadence_days: 30,
           deal_breakers_max: 2,
           // #514: the home and the distance, the maintainer's of 31/10/2026.
@@ -135,24 +131,22 @@ describe("seed", () => {
           distance_around_km: 50,
         });
         expect(byKey).toEqual(MATCHING_CONFIG_V1);
-        // Version 2 (ADR-010 §11): the one pond is the capital region, and it wins over version 1;
-        // the round is ten cards (#95, ADR-035), and ten likes a day (#98, ADR-036).
+        // Version 2 wins over version 1: the round is ten cards (#95, ADR-035), and ten likes a day (#98, ADR-036).
         const later = Object.fromEntries(
           config.rows.filter((r) => r.version === 2).map((r) => [r.key, r.value]),
         );
         expect(later).toEqual({
-          default_pond: "paakaupunkiseutu",
           round_size: 10,
           like_budget_balanced: 10,
           auto_shadow_ban_photo_fetches: 200,
           deal_breakers_max: 6,
         });
         expect(later).toEqual(MATCHING_CONFIG_V2);
-        // Version 3 (ADR-061 §7, §8): the one pond is the country again, and the distance is a seventh deal-breaker.
+        // Version 3 (ADR-061 §7): the distance is a seventh deal-breaker.
         const latest = Object.fromEntries(
           config.rows.filter((r) => r.version === 3).map((r) => [r.key, r.value]),
         );
-        expect(latest).toEqual({ default_pond: "suomi", deal_breakers_max: 7 });
+        expect(latest).toEqual({ deal_breakers_max: 7 });
         expect(latest).toEqual(MATCHING_CONFIG_V3);
         expect(config.rows.filter((r) => r.version > 3)).toEqual([]);
       } finally {
@@ -204,20 +198,20 @@ describe("seed", () => {
         // Two changes from the panel, then a preview's next boot seeds again.
         await pool.query(
           `INSERT INTO matching_config (version, key, value, valid_from, created_by, reason) VALUES
-             (4, 'default_pond', '"suomi"'::jsonb, '2026-10-16T09:00:00Z', 'admin', 'Open the country'),
+             (4, 'deal_breakers_max', '5'::jsonb, '2026-10-16T09:00:00Z', 'admin', 'Fewer at first'),
              (2, 'liked_you_cap', '25'::jsonb, '2026-10-16T09:00:00Z', 'admin', 'Smaller ponds first')`,
         );
         await seed(pool);
         expect(await withReason()).toEqual([
-          { key: "default_pond", version: 4, value: "suomi", reason: "Open the country" },
+          { key: "deal_breakers_max", version: 4, value: 5, reason: "Fewer at first" },
           { key: "liked_you_cap", version: 2, value: 25, reason: "Smaller ponds first" },
         ]);
         const latest = await pool.query<{ key: string; version: number }>(
           `SELECT key, max(version) AS version FROM matching_config
-           WHERE key IN ('default_pond', 'liked_you_cap') GROUP BY key ORDER BY key`,
+           WHERE key IN ('deal_breakers_max', 'liked_you_cap') GROUP BY key ORDER BY key`,
         );
         expect(latest.rows).toEqual([
-          { key: "default_pond", version: 4 },
+          { key: "deal_breakers_max", version: 4 },
           { key: "liked_you_cap", version: 2 },
         ]);
       } finally {

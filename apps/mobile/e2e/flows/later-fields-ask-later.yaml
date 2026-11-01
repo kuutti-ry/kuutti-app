@@ -16,13 +16,13 @@ name: Fill in the rest walks the unanswered fields in order, and Ask me later wr
     timeout: 15000
 - waitForAnimationToEnd
 - scrollUntilVisible:
-    element: "Fill in the rest while you wait|Täydennä loput odotellessasi|Fyll i resten medan du väntar"
+    element: "Fill in the rest when you have a moment|Täydennä loput, kun sinulla on hetki|Fyll i resten när du har en stund"
     direction: DOWN
     centerElement: true
     timeout: 60000
-- tapOn: "Fill in the rest while you wait|Täydennä loput odotellessasi|Fyll i resten medan du väntar"
+- tapOn: "Fill in the rest when you have a moment|Täydennä loput, kun sinulla on hetki|Fyll i resten när du har en stund"
 - extendedWaitUntil:
-    visible: "While you wait|Odotellessasi|Medan du väntar"
+    visible: "When you have a moment|Kun sinulla on hetki|När du har en stund"
     timeout: 15000
 - assertVisible: "9 of 16 answered|9 / 16 vastattu|9 av 16 besvarade"
 - assertVisible: "One question at a time, each optional\\..*|Yksi kysymys kerrallaan, jokainen vapaaehtoinen\\..*|En fråga i taget, var och en frivillig\\..*"

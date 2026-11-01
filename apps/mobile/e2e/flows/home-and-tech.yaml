@@ -1,19 +1,18 @@
-# The home screen of an onboarded person (#53, #54, #500): the area in the
-# person's language with its numbers in steps of ten, whether matching is open
-# in words, and the way to the profile, which holds the photos, the
+# The home screen of an onboarded person (#53, #54, #500): how many people are
+# on Kuutti, in the person's language and in steps of ten, whether matching is
+# open in words, and the way to the profile, which holds the photos, the
 # deal-breakers and the later questions (#239). Outside production the wrench opens
 # the tech screen, which names the environment and the API it talks to.
-# The numbers need the synthetic population (`pnpm demo:population`): an area
-# shows them from ten people up. The demo commands open the ponds, so matching
+# The numbers need the synthetic population (`pnpm demo:population`): the card
+# shows them from ten people up. The demo commands open the pond, so matching
 # is open for Sanna; `apps/mobile/src/features/pond/GateCard.test.tsx` has the
 # other two states. The bar of whom people seek comes from the population's
 # fifty people who count as finished for it and for nothing else. Read only.
 appId: fi.kuutti.app
-name: Home names the area with its numbers and the gate in words, and the wrench names the API
+name: Home says how many people are on Kuutti and the gate in words, and the wrench names the API
 ---
 - runFlow: ../common/sign-in.yaml
-- assertVisible: "Your area|Alueesi|Ditt område"
-- assertVisible: "Finland|Suomi"
+- assertVisible: "People on Kuutti|Ihmiset Kuutissa|Människor på Kuutti"
 - assertVisible: "\\d+ people have identified with their bank|\\d+ ihmistä on tunnistautunut pankkitunnuksilla|\\d+ personer har identifierat sig med bank-id"
 - assertVisible: ".*\\d+ percent are looking for everyone.*|.*\\d+ prosenttia etsii kaikkia.*|.*\\d+ procent söker alla.*"
 - assertVisible: "Matching|Seuranhaku|Matchning"
@@ -25,7 +24,7 @@ name: Home names the area with its numbers and the gate in words, and the wrench
     centerElement: true
     timeout: 60000
 - assertNotVisible: "Your deal-breakers|Ehdottomat rajasi|Dina absoluta gränser"
-- assertNotVisible: "Fill in the rest while you wait|Täydennä loput odotellessasi|Fyll i resten medan du väntar"
+- assertNotVisible: "Fill in the rest when you have a moment|Täydennä loput, kun sinulla on hetki|Fyll i resten när du har en stund"
 
 - openLink: kuutti://tech
 - extendedWaitUntil:
