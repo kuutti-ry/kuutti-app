@@ -57,8 +57,9 @@ function ItemEditor({
   if (item === "bio") return <BioEditor draft={draft} update={update} />;
   if (item === "prompts") return <PromptsEditor draft={draft} update={update} />;
   // The identity label is offered after a non-binary gender only, in
-  // onboarding (the registry's rule, #146); here it shows when it was
-  // given, to change or clear it, and is not offered to everyone.
+  // onboarding and on the gender screen (the registry's rule, #146, #552);
+  // here it shows when it was given, to change or clear it, and is not
+  // offered to everyone.
   if (item === "identityLabel" && draft.fields.identityLabel === undefined) return null;
   return <FieldEditor field={item} draft={draft} update={update} />;
 }

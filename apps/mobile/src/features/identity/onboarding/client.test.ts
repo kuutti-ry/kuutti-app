@@ -2,7 +2,6 @@ import { ApiError } from "@/lib/api";
 import { saveSession } from "@/lib/session";
 import {
   consentLocale,
-  declareGender,
   fetchConsents,
   fetchOnboarding,
   giveConsent,
@@ -93,23 +92,6 @@ describe("the onboarding client", () => {
     const error = await fetchOnboarding().catch((caught: unknown) => caught);
     expect(error).toBeInstanceOf(ApiError);
     expect(error).toMatchObject({ status: 502, code: undefined });
-  });
-
-  it("declares the gender, and says why the API refused one", async () => {
-    const seen = answering(({ body }) =>
-      (body as { gender: string }).gender === "man"
-        ? refusal("gender_change_too_soon", 429)
-        : new Response(null, { status: 204 }),
-    );
-    await expect(declareGender("woman")).resolves.toBeUndefined();
-    await expect(declareGender("man")).rejects.toMatchObject({
-      status: 429,
-      code: "gender_change_too_soon",
-    });
-    expect(seen.map((c) => [c.method, c.path, c.body])).toEqual([
-      ["PUT", "/account/gender", { gender: "woman" }],
-      ["PUT", "/account/gender", { gender: "man" }],
-    ]);
   });
 
   it("reads the consents, and fails on a refusal", async () => {

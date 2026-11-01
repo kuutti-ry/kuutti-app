@@ -3,7 +3,6 @@ import {
   type ConsentKind,
   ConsentsResponse,
   ErrorResponse,
-  type Gender,
   OnboardingStatus,
   type WithdrawableConsentKind,
 } from "@kuutti/schema";
@@ -25,11 +24,6 @@ export async function fetchOnboarding(): Promise<OnboardingStatus> {
   const { data, error, response } = await api.GET("/onboarding");
   if (!data) throw failed(response, error, "onboarding");
   return OnboardingStatus.parse(data);
-}
-
-export async function declareGender(gender: Gender): Promise<void> {
-  const { error, response } = await api.PUT("/account/gender", { body: { gender } });
-  if (!response.ok) throw failed(response, error, "gender");
 }
 
 /** The consent texts exist in fi, sv and en; Stadi reads the Finnish, the pseudo-locale the English. */

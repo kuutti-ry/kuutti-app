@@ -3,9 +3,11 @@
 export { BioEditor } from "./BioEditor";
 export { CardPreviewScreen } from "./CardPreviewScreen";
 export { ConfirmLeaveDialog, holdLinkWhileUnsaved, useConfirmLeave } from "./ConfirmLeave";
-export { saveHome, savePreferences } from "./client";
+export { saveGender, saveHome, savePreferences } from "./client";
 export { DEAL_BREAKERS_PATH, DealBreakersScreen } from "./DealBreakersScreen";
 export { profileErrorText } from "./errorText";
+export { GenderChips, IdentityLabelChips } from "./gender/GenderChips";
+export { GenderScreen } from "./gender/GenderScreen";
 export { fieldLabelKey, optionKey } from "./keys";
 export { LaterFieldScreen } from "./later/LaterFieldScreen";
 export { PlaceChoice, PlacePicker, useSpokenOnIos } from "./PlaceEditor";

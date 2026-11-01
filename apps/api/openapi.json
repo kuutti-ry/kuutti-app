@@ -8795,7 +8795,7 @@
     "/account/gender": {
       "put": {
         "summary": "Declare the caller's gender",
-        "description": "Self-declared, one of a closed list (rule 3); nothing from the bank informs it.",
+        "description": "Self-declared, one of a closed list (rule 3); nothing from the bank informs it. The first answer and the same answer again are free; a change is possible once in `change_cadence_days`. A change away from non-binary clears the identity label.",
         "security": [
           {
             "session": []
@@ -8837,6 +8837,16 @@
           },
           "404": {
             "description": "No live account (erased meanwhile).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "change_too_soon: the gender was changed within the cadence, and GET /onboarding's nextChange says from when.",
             "content": {
               "application/json": {
                 "schema": {

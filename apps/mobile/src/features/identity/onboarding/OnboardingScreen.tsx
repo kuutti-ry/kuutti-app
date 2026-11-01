@@ -1,4 +1,4 @@
-import { CONSENT_VERSIONS, formatDate, type PlainMessageKey, realLocale } from "@kuutti/i18n";
+import { CONSENT_VERSIONS, formatDate, realLocale } from "@kuutti/i18n";
 import {
   AGE_MAX,
   AGE_MIN,
@@ -6,7 +6,6 @@ import {
   bioOrPromptsComplete,
   type ConsentKind,
   DISPLAY_NAME_MAX,
-  GENDERS,
   type Gender,
   type HomeSummary,
   type HomeUpdate,
@@ -28,12 +27,15 @@ import { Switch } from "@/components/ui/switch";
 import { Text } from "@/components/ui/text";
 import {
   BioEditor,
+  GenderChips,
+  IdentityLabelChips,
   optionKey,
   PlaceChoice,
   PlacePicker,
   PromptsEditor,
   profileErrorText,
   SeeksChips,
+  saveGender,
   saveHome,
   savePreferences,
   useProfile,
@@ -45,7 +47,7 @@ import { useHapticTap } from "@/theme/haptics";
 import { rememberAgreed } from "../agreements";
 import { NormsAndConsents } from "../BeforeSignIn";
 import { LegalTextLink } from "../LegalTextLink";
-import { consentLocale, declareGender, giveConsent } from "./client";
+import { consentLocale, giveConsent } from "./client";
 import { useOnboarding } from "./useOnboarding";
 
 type Step =
@@ -147,12 +149,6 @@ export function defaultAgeWindow(age: number): { min: number; max: number } {
     max: Math.max(Math.min(AGE_MAX, age + 5), AGE_MIN),
   };
 }
-
-const GENDER_TEXT: Record<Gender, PlainMessageKey> = {
-  woman: "onboarding.gender.woman",
-  man: "onboarding.gender.man",
-  non_binary: "onboarding.gender.non_binary",
-};
 
 function Chip({
   label,
@@ -397,19 +393,7 @@ export function OnboardingScreen() {
           <View className="gap-4">
             <Text variant="h2">{t("onboarding.gender.title")}</Text>
             <Text>{t("onboarding.gender.explain")}</Text>
-            <View className="flex-row flex-wrap gap-2">
-              {GENDERS.map((option) => (
-                <Chip
-                  key={option}
-                  label={t(GENDER_TEXT[option])}
-                  selected={gender === option}
-                  onPress={() => {
-                    tap();
-                    setGender(option);
-                  }}
-                />
-              ))}
-            </View>
+            <GenderChips chosen={gender} onChoose={setGender} />
             <Button
               disabled={busy || gender === null}
               onPress={() => {
@@ -417,7 +401,7 @@ export function OnboardingScreen() {
                 if (!gender) return;
                 // The label is offered after a non-binary gender only, by design (ADR-019 §1).
                 setLabelPending(gender === "non_binary");
-                void step(() => declareGender(gender));
+                void step(() => saveGender(gender));
               }}
             >
               {t("onboarding.continue")}
@@ -429,22 +413,10 @@ export function OnboardingScreen() {
           <View className="gap-4">
             <Text variant="h2">{t("onboarding.identityLabel.title")}</Text>
             <Text>{t("onboarding.identityLabel.explain")}</Text>
-            <View className="flex-row flex-wrap gap-2">
-              {PROFILE_FIELDS.identityLabel.options.map((option) => (
-                <Chip
-                  key={option}
-                  label={t(optionKey("identityLabel", option))}
-                  selected={draft.fields.identityLabel === option}
-                  onPress={() => {
-                    tap();
-                    setField(
-                      "identityLabel",
-                      draft.fields.identityLabel === option ? undefined : option,
-                    );
-                  }}
-                />
-              ))}
-            </View>
+            <IdentityLabelChips
+              chosen={draft.fields.identityLabel}
+              onChange={(label) => setField("identityLabel", label)}
+            />
             <Button
               disabled={busy || profile.saving || draft.fields.identityLabel === undefined}
               onPress={() => {

@@ -4,8 +4,10 @@ import {
   DealBreakersResponse,
   type DealBreakersUpdate,
   ErrorResponse,
+  type Gender,
   HomeSummary,
   type HomeUpdate,
+  OnboardingStatus,
   PreferencesResponse,
   type PreferencesUpdate,
   type ProfileDocument,
@@ -92,6 +94,29 @@ export function saveHome(update: HomeUpdate): Promise<HomeSummary> {
     });
     if (!data) throw failed(response, error, "home");
     return HomeSummary.parse(data);
+  });
+  lastSave = sent.catch(() => undefined);
+  return sent;
+}
+
+// The gender is the account's and no part of the document, and GET /onboarding
+// is the one read that says it with its limit. It lives with the profile here
+// all the same (#552): onboarding asks it once, the profile's row keeps it. In
+// the line of saves: the list reads what the screen stored on leaving.
+export type OwnGender = { gender: Gender | null; nextChange: string | null };
+
+export async function fetchOwnGender(): Promise<OwnGender> {
+  await lastSave;
+  const { data, error, response } = await api.GET("/onboarding");
+  if (!data) throw failed(response, error, "onboarding");
+  const { gender, nextChange } = OnboardingStatus.parse(data);
+  return { gender, nextChange: nextChange.gender };
+}
+
+export function saveGender(gender: Gender): Promise<void> {
+  const sent = lastSave.then(async () => {
+    const { error, response } = await api.PUT("/account/gender", { body: { gender } });
+    if (!response.ok) throw failed(response, error, "gender");
   });
   lastSave = sent.catch(() => undefined);
   return sent;

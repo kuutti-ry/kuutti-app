@@ -358,6 +358,39 @@ describe("the status read racing another request", () => {
     expect((await accountRow(ctx, me.accountId))?.state).toBe("active");
   });
 
+  test("a label saved just before a change away from non-binary goes with the change", async ({
+    ctx,
+  }) => {
+    const me = await signedInAccount(ctx.client);
+    const declare = (gender: string): Call => ({
+      method: "PUT",
+      path: "/account/gender",
+      body: { gender },
+    });
+    const profile = (fields: object): Call => ({
+      method: "PUT",
+      path: "/profile",
+      body: { displayName: "Aino", bio: null, bioPreset: null, fields, prompts: [] },
+    });
+    const plain = await appOn(ctx.client);
+    await send(plain.app, me.headers, declare("non_binary"));
+    await send(plain.app, me.headers, profile({ intent: "casual" }));
+    // The account row's lock is the last moment a save can land first and be
+    // cleared. One that waits for the commit writes what it was given
+    // (declareGender's shortcut).
+    const db = interleaved(ctx.client, { before: /SELECT gender, gender_changed_at/ }, async () =>
+      send(plain.app, me.headers, profile({ intent: "casual", identityLabel: "genderfluid" })),
+    );
+    const { app } = await appOn(db);
+    expect((await send(app, me.headers, declare("man"))).status).toBe(204);
+    expect(db.ran()).toBe(true);
+    const { rows } = await ctx.client.query<{ fields: Record<string, unknown> }>(
+      "SELECT fields FROM profile WHERE account_id = $1",
+      [me.accountId],
+    );
+    expect(rows[0]?.fields).toEqual({ intent: "casual" });
+  });
+
   test("an erasure just before the activation activates nothing and answers with the state it read", async ({
     ctx,
   }) => {

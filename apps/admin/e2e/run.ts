@@ -344,6 +344,9 @@ class Stack {
       return login.accessToken;
     };
 
+    // `recent` orders by the bank's auth_time, in whole seconds: signed in within the same second
+    // as the stories' last persona, Mikael could be listed second, and the role went to them.
+    await new Promise((resolve) => setTimeout(resolve, 1100));
     await session(MODERATOR);
     const recent = this.moderator(["recent"]).split("\n")[0]?.split(" ")[0] ?? "";
     this.moderator(["grant", recent, "moderator", "--by", "e2e:admin"]);

@@ -47,6 +47,11 @@ Feature: Onboarding and consents
     When it saves a name, an intent and a bio, then uploads three photos
     Then the missing steps shrink from name, intent, photos and prompts or a bio to photos alone, and then to none
 
+  Scenario: A change away from non-binary clears the identity label
+    Given a non-binary person whose profile has an identity label and a hide on it
+    When they change their gender to another
+    Then the label is gone from the profile and the rest of it stays, the hide with it
+
   Scenario: The seek consent is recorded with the answer and withdrawing it blanks the seek rows
     Given an onboarded account with a politics answer on its profile
     When it withdraws the special-category consent
