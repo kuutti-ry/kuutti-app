@@ -1,29 +1,29 @@
 import { DISPLAY_NAME_MAX, type ProfileUpdate } from "@kuutti/schema";
-import { useNavigation, useRouter } from "expo-router";
-import { useEffect, useEffectEvent, useRef, useState } from "react";
+import { useRouter } from "expo-router";
+import { useEffect } from "react";
 import { ScrollView, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LoadFailed } from "@/components/LoadFailed";
 import { ScreenHeader } from "@/components/ScreenHeader";
-import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Text } from "@/components/ui/text";
 import { useT } from "@/lib/locale";
-import { currentSession } from "@/lib/session";
 import { BioEditor } from "./BioEditor";
+import { ConfirmLeaveDialog } from "./ConfirmLeave";
 import { profileErrorText } from "./errorText";
 import { FieldEditor } from "./FieldEditor";
 import { PromptsEditor } from "./PromptsEditor";
-import { findSection, type SectionItem, sectionPath, sectionTitleKey } from "./sections";
+import {
+  findSection,
+  INTENT_SECTION,
+  type SectionId,
+  type SectionItem,
+  sectionAnswerPath,
+  sectionPath,
+  sectionTitleKey,
+} from "./sections";
 import { type HeldDraft, useProfile } from "./useProfile";
+import { useRefusedDraft, useSaveOnLeave } from "./useSaveOnLeave";
 
 type Update = (patch: Partial<ProfileUpdate>) => void;
 
@@ -57,39 +57,27 @@ function ItemEditor({
   if (item === "bio") return <BioEditor draft={draft} update={update} />;
   if (item === "prompts") return <PromptsEditor draft={draft} update={update} />;
   // The identity label is offered after a non-binary gender only, in
-  // onboarding (the registry's rule, #146); here it shows when it was
-  // given, to change or clear it, and is not offered to everyone.
+  // onboarding and on the gender screen (the registry's rule, #146, #552);
+  // here it shows when it was given, to change or clear it, and is not
+  // offered to everyone.
   if (item === "identityLabel" && draft.fields.identityLabel === undefined) return null;
   return <FieldEditor field={item} draft={draft} update={update} />;
 }
 
 /**
- * Changes the API refused after their section had gone, by section (#238). A
- * refused section comes back on top of whatever is open; each section saves
- * only its own changes onto the document as stored (useProfile), so neither
- * undoes the other.
+ * One section of the profile (#227): its editors only, and no Save button: it
+ * saves on leaving (`useSaveOnLeave`), and a refusal brings it back with the
+ * draft and the reason. Not a save per tap: each save is a `profile_saved`
+ * research event (ADR-011), and a refused bio is best said on the screen that
+ * holds it. Each section saves only its own changes onto the document as
+ * stored (useProfile). What one is here for says beside its answer what the
+ * answer does, and goes back to What you seek (#542). Opened for one answer
+ * (`once`, the deal-breakers' "Answer it"), the arrow says it goes back there.
  */
-const refusedDrafts = new Map<string, HeldDraft>();
-
-/**
- * One section of the profile (#227): its editors only, and no Save button.
- * Leaving (the back button, the swipe, Android's back key) saves the
- * section's changes once when something changed. The leaving is never held
- * up: held, the native swipe on iOS popped the screen, put it back and popped
- * it again (#238). So the save goes as the screen goes, and a refusal brings
- * the section back with the draft and the reason, and asks before leaving
- * without saving. Not a save per tap: each save is a `profile_saved` research
- * event (ADR-011), and a refused bio is best said on the screen that holds it.
- */
-export function SectionScreen({ section: id }: { section: string }) {
+export function SectionScreen({ section: id, once = false }: { section: string; once?: boolean }) {
   const { t } = useT();
   const router = useRouter();
-  const navigation = useNavigation();
-  // Read once: a section opened again for a refused draft takes it up.
-  const [held] = useState(() => refusedDrafts.get(id));
-  useEffect(() => {
-    refusedDrafts.delete(id);
-  }, [id]);
+  const held = useRefusedDraft<HeldDraft>(id);
   const profile = useProfile(held);
   const { draft, update } = profile;
   const section = findSection(id);
@@ -97,22 +85,16 @@ export function SectionScreen({ section: id }: { section: string }) {
   useEffect(() => {
     if (!section) router.replace("/profile");
   }, [section, router]);
-
-  const [asking, setAsking] = useState(held !== undefined);
-  // Once per screen: saved on the way out, or let go unsaved on the word.
-  const left = useRef(false);
-  const onLeave = useEffectEvent(() => {
-    if (left.current || !section || !profile.dirty) return;
-    left.current = true;
-    const { changes } = profile;
-    void profile.save().then((notice) => {
-      // A session that ended has taken the person to the sign-in, and the draft with it.
-      if (!notice || !currentSession()) return;
-      refusedDrafts.set(id, { changes, notice });
-      router.push(sectionPath(section.id));
-    });
+  const leaving = useSaveOnLeave<HeldDraft>({
+    screen: id,
+    path: once ? sectionAnswerPath(id as SectionId) : sectionPath(id as SectionId),
+    held: held !== undefined,
+    save: () => {
+      if (!profile.dirty) return null;
+      const { changes } = profile;
+      return profile.save().then((notice) => notice && { changes, notice });
+    },
   });
-  useEffect(() => navigation.addListener("beforeRemove", () => onLeave()), [navigation]);
 
   if (!section) return null;
 
@@ -143,7 +125,13 @@ export function SectionScreen({ section: id }: { section: string }) {
     <SafeAreaView className="flex-1 bg-background">
       <ScreenHeader
         title={t(sectionTitleKey(section.id))}
-        backLabel={t("profile.section.back")}
+        backLabel={t(
+          once
+            ? "profile.later.backOnce"
+            : section.id === INTENT_SECTION
+              ? "profile.seek.back"
+              : "profile.section.back",
+        )}
         onBack={() => router.back()}
       />
       <ScrollView
@@ -154,6 +142,8 @@ export function SectionScreen({ section: id }: { section: string }) {
           <Text accessibilityLiveRegion="assertive">{profileErrorText(profile.notice, t)}</Text>
         )}
 
+        {section.id === INTENT_SECTION && <Text>{t("profile.seek.intent.explain")}</Text>}
+
         {/* No note on the article 9 consent over politics and religion: Settings is the
             one place that names it and takes it back (ADR-019 §4, #204, #239). */}
         {section.items.map((item) => (
@@ -161,29 +151,7 @@ export function SectionScreen({ section: id }: { section: string }) {
         ))}
       </ScrollView>
 
-      <Dialog open={asking} onOpenChange={setAsking}>
-        <DialogContent closeLabel={t("profile.discard.close")}>
-          <DialogHeader>
-            <DialogTitle>{t("profile.discard.title")}</DialogTitle>
-            <DialogDescription>{profileErrorText(profile.notice, t)}</DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onPress={() => setAsking(false)}>
-              {t("profile.discard.keep")}
-            </Button>
-            <Button
-              variant="destructive"
-              onPress={() => {
-                left.current = true;
-                setAsking(false);
-                router.back();
-              }}
-            >
-              {t("profile.discard.leave")}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <ConfirmLeaveDialog {...leaving} reason={profileErrorText(profile.notice, t)} />
     </SafeAreaView>
   );
 }

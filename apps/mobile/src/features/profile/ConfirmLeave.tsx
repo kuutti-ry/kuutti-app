@@ -72,6 +72,10 @@ export function useConfirmLeave(unsaved: boolean, discard: () => void) {
       discard();
       pending?.go();
     },
+    /** Nothing is unsaved any more, ahead of the render that says so: for a pop in the same breath as a save or a discard. */
+    letGo: () => {
+      unsavedNow.current = false;
+    },
   };
 }
 
@@ -99,15 +103,25 @@ export function holdLinkWhileUnsaved(
   return path;
 }
 
-/** The question itself, in the words of the sections' dialog (#227). */
-export function ConfirmLeaveDialog({ asking, keep, leave }: ReturnType<typeof useConfirmLeave>) {
+/** The question itself (#227): why nothing was saved where a save was refused, else that something is unsaved. */
+export function ConfirmLeaveDialog({
+  asking,
+  keep,
+  leave,
+  reason,
+}: {
+  asking: boolean;
+  keep: () => void;
+  leave: () => void;
+  reason?: string;
+}) {
   const { t } = useT();
   return (
     <Dialog open={asking} onOpenChange={(open) => !open && keep()}>
       <DialogContent closeLabel={t("profile.discard.close")}>
         <DialogHeader>
           <DialogTitle>{t("profile.discard.title")}</DialogTitle>
-          <DialogDescription>{t("profile.discard.unsaved")}</DialogDescription>
+          <DialogDescription>{reason ?? t("profile.discard.unsaved")}</DialogDescription>
         </DialogHeader>
         <DialogFooter>
           <Button variant="outline" onPress={keep}>

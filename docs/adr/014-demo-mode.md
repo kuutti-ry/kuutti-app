@@ -69,4 +69,5 @@ The issue's first plan for the personas was a `demo=<persona>` query on `GET /au
 
 ## History
 
+- 2026-11-01 (#542): a twenty-fifth persona, Ritva, with a nineteenth history and no photos, in nobody's pool, whom the flow of What you seek has to itself. The maintainer asked for one rather than sharing Elina. The mock bank's short list now holds twenty-one names, which took a shorter head on the page.
 - 2026-10-31 (#514, ADR-061 §1 and §8): the population's plan moves to `suomi`, and §8 follows what the plan had already become: one pond since ADR-010 §11, not the four this record began with. A person without a home is in nobody's pool, so everybody here who onboarded has one: a persona types a postal code through `PUT /account/home`, as a person does, and the kept place comes from the API's own rule, and the population draws homes by the people behind each place. Staging needs `demo-reset` and `demo-population` after the deploy that carries this, or everybody there reads as having no home (`infra/README.md`).

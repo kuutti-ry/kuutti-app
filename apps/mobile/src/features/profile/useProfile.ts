@@ -98,6 +98,10 @@ const toUpdate = (profile: ProfileDocument): ProfileUpdate => ({
   hiddenFields: profile.hiddenFields,
 });
 
+/** Saves changes onto the document as stored when the save goes (#238). */
+export const saveChanges = (changes: ProfileChanges) =>
+  saveProfile((stored) => withChanges(stored ? toUpdate(stored) : EMPTY_PROFILE, changes));
+
 /**
  * The person's profile as a draft they edit (#47): the API stores the
  * document, answers it back with what is still missing, and the screen shows
@@ -180,9 +184,7 @@ export function useProfile(held?: HeldDraft) {
         .map((p) => ({ key: p.key, answer: p.answer.trim() })),
     });
     try {
-      const response = await saveProfile((stored) =>
-        withChanges(stored ? toUpdate(stored) : EMPTY_PROFILE, changes),
-      );
+      const response = await saveChanges(changes);
       if (!mounted.current) return null;
       // The stored document becomes the draft, with anything typed while the
       // save was in flight put back on it; otherwise those keystrokes would vanish.

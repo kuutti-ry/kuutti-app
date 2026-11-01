@@ -4,8 +4,12 @@ import {
   DealBreakersResponse,
   type DealBreakersUpdate,
   ErrorResponse,
+  type Gender,
   HomeSummary,
   type HomeUpdate,
+  OnboardingStatus,
+  PreferencesResponse,
+  type PreferencesUpdate,
   type ProfileDocument,
   ProfileResponse,
   type ProfileUpdate,
@@ -90,6 +94,52 @@ export function saveHome(update: HomeUpdate): Promise<HomeSummary> {
     });
     if (!data) throw failed(response, error, "home");
     return HomeSummary.parse(data);
+  });
+  lastSave = sent.catch(() => undefined);
+  return sent;
+}
+
+// The gender is the account's and no part of the document, and GET /onboarding
+// is the one read that says it with its limit. It lives with the profile here
+// all the same (#552): onboarding asks it once, the profile's row keeps it. In
+// the line of saves: the list reads what the screen stored on leaving.
+export type OwnGender = { gender: Gender | null; nextChange: string | null };
+
+export async function fetchOwnGender(): Promise<OwnGender> {
+  await lastSave;
+  const { data, error, response } = await api.GET("/onboarding");
+  if (!data) throw failed(response, error, "onboarding");
+  const { gender, nextChange } = OnboardingStatus.parse(data);
+  return { gender, nextChange: nextChange.gender };
+}
+
+export function saveGender(gender: Gender): Promise<void> {
+  const sent = lastSave.then(async () => {
+    const { error, response } = await api.PUT("/account/gender", { body: { gender } });
+    if (!response.ok) throw failed(response, error, "gender");
+  });
+  lastSave = sent.catch(() => undefined);
+  return sent;
+}
+
+// What one seeks lives with the profile here (#542): onboarding asks it once,
+// What you seek keeps it. In the line of saves, as a section is: the list reads
+// what a screen stored on leaving.
+export async function fetchPreferences(): Promise<PreferencesResponse> {
+  await lastSave;
+  const { data, error, response } = await api.GET("/preferences");
+  if (!data) throw failed(response, error, "preferences");
+  return PreferencesResponse.parse(data);
+}
+
+export function savePreferences(update: PreferencesUpdate): Promise<PreferencesResponse> {
+  const sent = lastSave.then(async () => {
+    // The generated body type spells the strict object with an index signature the zod type has no room for (ADR-003).
+    const { data, error, response } = await api.PUT("/preferences", {
+      body: update as unknown as ApiComponents["schemas"]["PreferencesUpdate"],
+    });
+    if (!data) throw failed(response, error, "preferences");
+    return PreferencesResponse.parse(data);
   });
   lastSave = sent.catch(() => undefined);
   return sent;

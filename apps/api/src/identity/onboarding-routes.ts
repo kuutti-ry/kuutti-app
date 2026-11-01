@@ -46,7 +46,8 @@ const genderRoute = createRoute({
   method: "put",
   path: "/account/gender",
   summary: "Declare the caller's gender",
-  description: "Self-declared, one of a closed list (rule 3); nothing from the bank informs it.",
+  description:
+    "Self-declared, one of a closed list (rule 3); nothing from the bank informs it. The first answer and the same answer again are free; a change is possible once in `change_cadence_days`. A change away from non-binary clears the identity label.",
   ...bearer,
   request: { body: { required: true, ...json(GenderUpdate) } },
   responses: {
@@ -54,6 +55,9 @@ const genderRoute = createRoute({
     400: errorContent("Validation failed."),
     401: unauthenticated,
     404: errorContent("No live account (erased meanwhile)."),
+    429: errorContent(
+      "change_too_soon: the gender was changed within the cadence, and GET /onboarding's nextChange says from when.",
+    ),
   },
 });
 

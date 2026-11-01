@@ -1,16 +1,21 @@
+import type { PreferencesUpdate } from "@kuutti/schema";
 import { ApiError } from "@/lib/api";
 import { saveSession } from "@/lib/session";
 import {
   fetchCardPreview,
   fetchDealBreakers,
+  fetchOwnGender,
+  fetchPreferences,
   fetchProfile,
   saveDealBreakers,
+  saveGender,
   saveHome,
+  savePreferences,
   saveProfile,
 } from "./client";
 
-// The profile routes as the app calls them (#47, #149): what each sends, the
-// contract it parses, and a refusal as an ApiError with the envelope's code.
+// The profile routes as the app calls them (#47, #149, #542, #552): what each sends,
+// the contract it parses, and a refusal as an ApiError with the envelope's code.
 
 const token = (seed: string) => (seed + "x".repeat(43)).slice(0, 43);
 const json = (body: unknown, status = 200) =>
@@ -24,6 +29,21 @@ const EMPTY = {
   home: null,
 };
 const DEAL_BREAKERS = { dealBreakers: [], max: 3 };
+const PREFERENCES = { seeks: ["woman", "non_binary"], ageWindow: { min: 30, max: 40 } };
+const FROM = "2026-12-01T12:00:00.000Z";
+const STATUS = {
+  state: "active",
+  age: 36,
+  gender: "woman",
+  pond: null,
+  home: null,
+  preferences: PREFERENCES,
+  consents: { terms: "v1", privacy: "v1", specialCategory: "s1", research: null },
+  currentVersions: { terms: "v1", privacy: "v1", research: "v1", special_category: "s1" },
+  nextChange: { gender: FROM },
+  missing: [],
+  complete: true,
+};
 
 function answering(...answers: Response[]) {
   const seen: Request[] = [];
@@ -170,6 +190,119 @@ describe("the profile client", () => {
       answering(refusal("internal_error", 500), json(EMPTY));
       await expect(saveHome({ showArea: true })).rejects.toMatchObject({ status: 500 });
       expect(await fetchProfile()).toEqual(EMPTY);
+    });
+  });
+
+  describe("the person's own gender (#552)", () => {
+    it("reads the gender with its limit from the status, and fails a refusal with its code", async () => {
+      const seen = answering(json(STATUS), refusal("internal_error", 500));
+      expect(await fetchOwnGender()).toEqual({ gender: "woman", nextChange: FROM });
+      expect(seen[0]?.method).toBe("GET");
+      expect(pathOf(seen[0])).toBe("/onboarding");
+      await expect(fetchOwnGender()).rejects.toMatchObject({
+        name: "ApiError",
+        status: 500,
+        code: "internal_error",
+        message: "onboarding answered 500",
+      });
+    });
+
+    it("reads no gender yet, and no limit, as none", async () => {
+      answering(json({ ...STATUS, gender: null, nextChange: { gender: null } }));
+      expect(await fetchOwnGender()).toEqual({ gender: null, nextChange: null });
+    });
+
+    it("refuses a read outside the contract", async () => {
+      answering(json({ ...STATUS, gender: "robot" }));
+      await expect(fetchOwnGender()).rejects.toThrow();
+    });
+
+    it("saves the gender, and says why the API refused one", async () => {
+      const seen = answering(new Response(null, { status: 204 }), refusal("change_too_soon", 429));
+      await expect(saveGender("woman")).resolves.toBeUndefined();
+      await expect(saveGender("man")).rejects.toMatchObject({
+        name: "ApiError",
+        status: 429,
+        code: "change_too_soon",
+        message: "gender answered 429",
+      });
+      expect(seen.map((request) => [request.method, pathOf(request)])).toEqual([
+        ["PUT", "/account/gender"],
+        ["PUT", "/account/gender"],
+      ]);
+      expect(await seen[1]?.clone().json()).toEqual({ gender: "man" });
+    });
+
+    it("leaves the line open after a refusal", async () => {
+      answering(refusal("change_too_soon", 429), json(EMPTY));
+      await expect(saveGender("man")).rejects.toMatchObject({ status: 429 });
+      expect(await fetchProfile()).toEqual(EMPTY);
+    });
+  });
+
+  describe("what one seeks (#542)", () => {
+    it("reads the answers, and fails a refusal with its code", async () => {
+      const seen = answering(json(PREFERENCES), refusal("internal_error", 500));
+      expect(await fetchPreferences()).toEqual(PREFERENCES);
+      expect(seen[0]?.method).toBe("GET");
+      expect(pathOf(seen[0])).toBe("/preferences");
+      await expect(fetchPreferences()).rejects.toMatchObject({
+        name: "ApiError",
+        status: 500,
+        code: "internal_error",
+        message: "preferences answered 500",
+      });
+    });
+
+    it("reads no answer yet as none, for the screens to send the person to onboarding", async () => {
+      answering(json({ seeks: null, ageWindow: null }));
+      expect(await fetchPreferences()).toEqual({ seeks: null, ageWindow: null });
+    });
+
+    it("leaves the code out when a refused read is not the error envelope", async () => {
+      answering(new Response("Bad gateway", { status: 502 }));
+      const error = await fetchPreferences().catch((caught: unknown) => caught);
+      expect(error).toBeInstanceOf(ApiError);
+      expect(error).toMatchObject({ status: 502, code: undefined });
+    });
+
+    it("refuses a read outside the contract", async () => {
+      answering(json({ seeks: ["somebody"], ageWindow: null }));
+      await expect(fetchPreferences()).rejects.toThrow();
+    });
+
+    it.each<[string, PreferencesUpdate]>([
+      ["whom one seeks", { seeks: ["woman", "non_binary"] }],
+      ["the ages", { ageWindow: { min: 30, max: 40 } }],
+      ["both", { seeks: ["man"], ageWindow: { min: 18, max: 18 } }],
+    ])("saves %s as given, and answers what the API stored", async (_what, update) => {
+      const seen = answering(json(PREFERENCES));
+      expect(await savePreferences(update)).toEqual(PREFERENCES);
+      expect(seen[0]?.method).toBe("PUT");
+      expect(pathOf(seen[0])).toBe("/preferences");
+      expect(JSON.parse(await (seen[0] as Request).text())).toEqual(update);
+    });
+
+    it("says why the API refused a save: the code decides what the screens do with it", async () => {
+      answering(refusal("consent_required", 403));
+      await expect(savePreferences({ seeks: ["man"] })).rejects.toMatchObject({
+        name: "ApiError",
+        status: 403,
+        code: "consent_required",
+        message: "preferences answered 403",
+      });
+    });
+
+    it("leaves the code out when a refused save is not the error envelope", async () => {
+      answering(new Response("Bad gateway", { status: 502 }));
+      const error = await savePreferences({ seeks: ["man"] }).catch((caught: unknown) => caught);
+      expect(error).toBeInstanceOf(ApiError);
+      expect(error).toMatchObject({ status: 502, code: undefined });
+    });
+
+    it("refuses a save's answer outside the contract", async () => {
+      answering(json({ seeks: "man", ageWindow: null }));
+      await expect(savePreferences({ seeks: ["man"] })).rejects.toThrow();
     });
   });
 
@@ -338,5 +471,161 @@ describe("the profile client: a save on its way (#238)", () => {
     waiting[0]?.answer(Promise.reject(new TypeError("Network request failed")) as never);
     await expect(save).rejects.toBeInstanceOf(TypeError);
     expect(await fetchProfile()).toEqual(EMPTY);
+  });
+
+  describe("the gender, in the same line (#552)", () => {
+    it("holds a read of the gender until a save has landed: the row shows what was stored", async () => {
+      const waiting = holding();
+      const save = saveGender("man");
+      const read = fetchOwnGender();
+      await flush();
+      expect(sent(waiting)).toEqual(["PUT /account/gender"]);
+      waiting[0]?.answer(new Response(null, { status: 204 }));
+      await save;
+      await flush();
+      expect(sent(waiting)).toEqual(["PUT /account/gender", "GET /onboarding"]);
+      waiting[1]?.answer(json({ ...STATUS, gender: "man" }));
+      expect((await read).gender).toBe("man");
+    });
+
+    it("holds every read of the profile until the gender has landed, as the API takes a word with it", async () => {
+      const waiting = holding();
+      const save = saveGender("woman");
+      const read = fetchProfile();
+      await flush();
+      expect(sent(waiting)).toEqual(["PUT /account/gender"]);
+      waiting[0]?.answer(new Response(null, { status: 204 }));
+      await save;
+      await flush();
+      expect(sent(waiting)).toEqual(["PUT /account/gender", "GET /profile"]);
+      waiting[1]?.answer(json(EMPTY));
+      await read;
+    });
+
+    it("waits for a save before it", async () => {
+      const waiting = holding();
+      const first = saveProfile(() => update);
+      const second = saveGender("man");
+      await flush();
+      expect(sent(waiting)).toEqual(["GET /profile"]);
+      waiting[0]?.answer(json(EMPTY));
+      await flush();
+      waiting[1]?.answer(json(EMPTY));
+      await first;
+      await flush();
+      expect(sent(waiting)).toEqual(["GET /profile", "PUT /profile", "PUT /account/gender"]);
+      waiting[2]?.answer(new Response(null, { status: 204 }));
+      await second;
+    });
+  });
+
+  describe("what one seeks, in the same line (#542)", () => {
+    const bodyOf = async (waiting: ReturnType<typeof holding>, index: number) =>
+      JSON.parse(await (waiting[index] as (typeof waiting)[number]).request.text());
+
+    it("holds a read of the answers until a section's save has landed: the list shows what was stored", async () => {
+      const waiting = holding();
+      const save = saveProfile(() => update);
+      const read = fetchPreferences();
+      await flush();
+      expect(sent(waiting)).toEqual(["GET /profile"]);
+      waiting[0]?.answer(json(EMPTY));
+      await flush();
+      expect(sent(waiting)).toEqual(["GET /profile", "PUT /profile"]);
+      waiting[1]?.answer(json(EMPTY));
+      await save;
+      await flush();
+      expect(sent(waiting)).toEqual(["GET /profile", "PUT /profile", "GET /preferences"]);
+      waiting[2]?.answer(json(PREFERENCES));
+      expect(await read).toEqual(PREFERENCES);
+    });
+
+    it("holds every read until a save of the answers has landed", async () => {
+      const waiting = holding();
+      const save = savePreferences({ seeks: ["man"] });
+      const reads = [fetchPreferences(), fetchProfile(), fetchCardPreview(), fetchDealBreakers()];
+      await flush();
+      expect(sent(waiting)).toEqual(["PUT /preferences"]);
+      waiting[0]?.answer(json(PREFERENCES));
+      expect(await save).toEqual(PREFERENCES);
+      await flush();
+      expect(sent(waiting).slice(1).sort()).toEqual([
+        "GET /preferences",
+        "GET /preferences/deal-breakers",
+        "GET /profile",
+        "GET /profile/card",
+      ]);
+      for (const { answer } of waiting.slice(1)) answer(refusal("internal_error", 500));
+      for (const read of reads) await expect(read).rejects.toBeInstanceOf(ApiError);
+    });
+
+    it("lands two saves in the order they were made, the second only once the first has its answer", async () => {
+      const waiting = holding();
+      const first = savePreferences({ seeks: ["man"] });
+      const second = savePreferences({ ageWindow: { min: 30, max: 40 } });
+      await flush();
+      expect(sent(waiting)).toEqual(["PUT /preferences"]);
+      expect(await bodyOf(waiting, 0)).toEqual({ seeks: ["man"] });
+      waiting[0]?.answer(json(PREFERENCES));
+      await first;
+      await flush();
+      expect(sent(waiting)).toEqual(["PUT /preferences", "PUT /preferences"]);
+      expect(await bodyOf(waiting, 1)).toEqual({ ageWindow: { min: 30, max: 40 } });
+      waiting[1]?.answer(json(PREFERENCES));
+      expect(await second).toEqual(PREFERENCES);
+    });
+
+    it("takes its turn among a section's saves, whichever goes first", async () => {
+      const waiting = holding();
+      const preferences = savePreferences({ seeks: ["man"] });
+      const section = saveProfile(() => update);
+      const after = savePreferences({ ageWindow: { min: 30, max: 40 } });
+      await flush();
+      expect(sent(waiting)).toEqual(["PUT /preferences"]);
+      waiting[0]?.answer(json(PREFERENCES));
+      await preferences;
+      await flush();
+      expect(sent(waiting)).toEqual(["PUT /preferences", "GET /profile"]);
+      waiting[1]?.answer(json(EMPTY));
+      await flush();
+      expect(sent(waiting)).toEqual(["PUT /preferences", "GET /profile", "PUT /profile"]);
+      waiting[2]?.answer(json(EMPTY));
+      await section;
+      await flush();
+      expect(sent(waiting).at(-1)).toBe("PUT /preferences");
+      waiting[3]?.answer(json(PREFERENCES));
+      expect(await after).toEqual(PREFERENCES);
+    });
+
+    it("lets the next save and the read after it through when one is refused", async () => {
+      const waiting = holding();
+      const refused = savePreferences({ seeks: ["man"] });
+      const next = savePreferences({ seeks: ["woman"] });
+      const read = fetchPreferences();
+      await flush();
+      expect(sent(waiting)).toEqual(["PUT /preferences"]);
+      waiting[0]?.answer(refusal("consent_required", 403));
+      await expect(refused).rejects.toMatchObject({ code: "consent_required" });
+      await flush();
+      expect(sent(waiting)).toEqual(["PUT /preferences", "PUT /preferences"]);
+      expect(await bodyOf(waiting, 1)).toEqual({ seeks: ["woman"] });
+      waiting[1]?.answer(json(PREFERENCES));
+      expect(await next).toEqual(PREFERENCES);
+      await flush();
+      waiting[2]?.answer(json(PREFERENCES));
+      expect(await read).toEqual(PREFERENCES);
+      expect(sent(waiting)).toEqual(["PUT /preferences", "PUT /preferences", "GET /preferences"]);
+    });
+
+    it("lets the next through when one failed on the network", async () => {
+      const waiting = holding();
+      const lost = savePreferences({ seeks: ["man"] });
+      await flush();
+      globalThis.fetch = jest.fn(async () => json(PREFERENCES)) as unknown as typeof fetch;
+      waiting[0]?.answer(Promise.reject(new TypeError("Network request failed")) as never);
+      await expect(lost).rejects.toBeInstanceOf(TypeError);
+      expect(await savePreferences({ seeks: ["woman"] })).toEqual(PREFERENCES);
+      expect(await fetchPreferences()).toEqual(PREFERENCES);
+    });
   });
 });

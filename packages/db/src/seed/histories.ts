@@ -2,7 +2,7 @@ import type { Gender, ProfileUpdate } from "@kuutti/schema";
 import { DEMO_PERSONAS, type DemoPersona } from "./personas.ts";
 
 /**
- * What the eighteen personas "with a history" have done before the demo begins
+ * What the nineteen personas "with a history" have done before the demo begins
  * (#73, ADR-014 §12). The ages follow the codes of Telia's test persons
  * (#140), and each age window holds its persona's own age (a test says so).
  * Data only: `pnpm demo:reset` gives a persona its history by logging it in
@@ -469,6 +469,32 @@ export const PERSONA_HISTORIES: readonly PersonaHistory[] = [
       prompts: [],
     },
     photos: 2,
+    afterwards: "nothing",
+  },
+  // What you seek's (#542): in no other persona's pool, by her age and her
+  // window, so the flow that changes what she seeks changes nothing another
+  // reads. No photos: the release has no face of her.
+  {
+    key: "ritva",
+    locale: "fi",
+    onboarding: {
+      gender: "woman",
+      seeks: ["man"],
+      ageWindow: { min: 60, max: 72 },
+      home: "40100",
+    },
+    profile: {
+      displayName: "Ritva",
+      bio: "Eläkkeellä oleva kirjastonhoitaja, joka lukee kaiken minkä ehtii ja hoitaa palstaa Jyväskylässä. Etsin seuraa kävelyille ja konsertteihin.",
+      bioPreset: null,
+      fields: {
+        languages: ["fi", "en"],
+        intent: "long_term",
+        hobbies: ["reading", "gardening"],
+      },
+      prompts: [],
+    },
+    photos: 0,
     afterwards: "nothing",
   },
 ];

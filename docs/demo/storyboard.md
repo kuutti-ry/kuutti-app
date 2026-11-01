@@ -35,9 +35,9 @@ The home screen: "Kuutti", two cards and the way onward.
 
 - "People in your area": the counter of the pond, in tens, with the bar of whom people with a finished profile seek, which the population's fifty fill (population.md), and "n people are still finishing their profile." (ADR-013).
 - "Matching": where Aino stands. With her photos pending: "Matching opens for finished profiles. Yours still lacks something." Once her photos are approved: "Matching is open for you.", since the demo commands open the ponds; in a pond an admin has closed, "Your profile is finished. Matching has not opened in your area yet." (ADR-060).
-- Below: "Your profile". The profile list holds the rest (#239): "Photos" and the sections, each with a check mark once done or how far it is filled, then "Your deal-breakers" (up to seven: distance, which everybody can set, and the others only on what she answered herself, #149, ADR-061 §7) and, while a question is unanswered, "Fill in the rest while you wait" (the optional fields, one per screen, "Ask me later" on each, #148). The eye at the top opens her card.
+- Below: "Your profile". The profile list holds the rest (#239): "Photos" and the sections, each with a check mark once done or how far it is filled, then "What you seek", which holds whom she seeks, the ages, what she is here for and "Your deal-breakers" (up to seven: distance, which everybody can set, and the others only on what she answered herself, #149, ADR-061 §7) and, while a question is unanswered, "Fill in the rest while you wait" (the optional fields, one per screen, "Ask me later" on each, #148). The eye at the top opens her card.
 
-In "Your profile", show "Fill in the rest while you wait" for one field and skip it; show "Your deal-breakers": the field she has not answered says "To filter on this, share yours first."
+In "Your profile", show "Fill in the rest while you wait" for one field and skip it; open "What you seek" and show "Your deal-breakers": the field she has not answered says "To filter on this, share yours first."
 
 ## Scene 4: Sanna's card (1 min)
 

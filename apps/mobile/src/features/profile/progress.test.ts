@@ -20,7 +20,8 @@ describe("sectionProgress", () => {
     expect(Object.fromEntries(PROFILE_SECTIONS.map(({ id }) => [id, of(id, profile())]))).toEqual({
       basics: { answered: 0, total: 4 },
       prompts: { answered: 0, total: PROMPTS_MAX },
-      relationship: { answered: 0, total: 4 },
+      intent: { answered: 0, total: 1 },
+      relationship: { answered: 0, total: 3 },
       work: { answered: 0, total: 3 },
       lifestyle: { answered: 0, total: 6 },
       hobbies: { answered: 0, total: 1 },

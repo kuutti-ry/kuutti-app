@@ -14,6 +14,12 @@ name: Taking one's own answer back pauses the deal-breaker on it, and answering 
 - waitForAnimationToEnd
 - tapOn: "(Deal-breaker: Smoking|Ehdoton raja: Tupakointi|Absolut gräns: Rökning)(, .*)?"
 - tapOn: "Never|En koskaan|Aldrig"
+# The save lies under the rows, the distance's last among them: scrolled to.
+- scrollUntilVisible:
+    element: "Save the deal-breakers|Tallenna rajat|Spara gränserna"
+    direction: DOWN
+    centerElement: true
+    timeout: 60000
 - tapOn: "Save the deal-breakers|Tallenna rajat|Spara gränserna"
 - extendedWaitUntil:
     visible: "Saved\\.|Tallennettu\\.|Sparat\\."
@@ -60,10 +66,7 @@ name: Taking one's own answer back pauses the deal-breaker on it, and answering 
     centerElement: true
     timeout: 60000
 - tapOn: "Save and continue|Tallenna ja jatka|Spara och fortsätt"
-- extendedWaitUntil:
-    notVisible: "Smoking|Tupakointi|Rökning"
-    timeout: 15000
-- openLink: kuutti://profile/deal-breakers
+# Back where Answer it was pressed (#542), not on through the later questions.
 - extendedWaitUntil:
     visible: "Deal-breakers|Ehdottomat rajat|Absoluta gränser"
     timeout: 15000
@@ -72,6 +75,11 @@ name: Taking one's own answer back pauses the deal-breaker on it, and answering 
 
 # Back as it began: no deal-breaker.
 - tapOn: "(Deal-breaker: Smoking|Ehdoton raja: Tupakointi|Absolut gräns: Rökning)(, .*)?"
+- scrollUntilVisible:
+    element: "Save the deal-breakers|Tallenna rajat|Spara gränserna"
+    direction: DOWN
+    centerElement: true
+    timeout: 60000
 - tapOn: "Save the deal-breakers|Tallenna rajat|Spara gränserna"
 - extendedWaitUntil:
     visible: "Saved\\.|Tallennettu\\.|Sparat\\."

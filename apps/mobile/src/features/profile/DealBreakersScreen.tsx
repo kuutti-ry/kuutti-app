@@ -8,8 +8,8 @@ import {
   type ProfileFieldKey,
   type StoredDealBreaker,
 } from "@kuutti/schema";
-import { useRouter } from "expo-router";
-import { useCallback, useEffect, useState } from "react";
+import { useFocusEffect, useRouter } from "expo-router";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ScrollView, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LoadFailed } from "@/components/LoadFailed";
@@ -25,8 +25,8 @@ import { fetchDealBreakers, saveDealBreakers } from "./client";
 import { Chip, SEARCHABLE_FROM, visibleOptions } from "./FieldEditor";
 import { FieldLabel } from "./fieldIcons";
 import { fieldLabelKey, optionKey } from "./keys";
-import { laterPath } from "./later/LaterFieldScreen";
-import { sectionOf, sectionPath } from "./sections";
+import { laterAnswerPath } from "./later/LaterFieldScreen";
+import { sectionAnswerPath, sectionOf } from "./sections";
 import { useProfile } from "./useProfile";
 
 export const DEAL_BREAKERS_PATH = "/profile/deal-breakers" as const;
@@ -114,6 +114,17 @@ export function DealBreakersScreen() {
   const [seen, setSeen] = useState<Partial<Record<DealBreakerField, readonly string[]>>>({});
   const [notice, setNotice] = useState<"saved" | "failed" | "limit" | null>(null);
   const [saving, setSaving] = useState(false);
+  // An answer given from "Answer it" opens its row, so the person's own answers
+  // are read again on the way back; the draft is this screen's and stays. The
+  // first focus is the mount, which the hook reads already.
+  const { reload } = profile;
+  const shown = useRef(false);
+  useFocusEffect(
+    useCallback(() => {
+      if (shown.current) void reload();
+      shown.current = true;
+    }, [reload]),
+  );
 
   const load = useCallback(async () => {
     setStatus("loading");
@@ -207,11 +218,12 @@ export function DealBreakersScreen() {
         // A field of the later screens opens its own; the rest (monogamy) is
         // answered in the section that holds it (10/10/2026: "Answer it" on
         // relationship structure opened the first unanswered later field
-        // instead; #239: not the list again, on top of the one below).
+        // instead; #239: not the list again, on top of the one below). Either
+        // way the answer comes back here (#542).
         router.push(
           (LATER_FIELD_ORDER as readonly string[]).includes(field)
-            ? laterPath(field)
-            : sectionPath(sectionOf(field)),
+            ? laterAnswerPath(field)
+            : sectionAnswerPath(sectionOf(field)),
         );
       }}
     >
@@ -221,7 +233,7 @@ export function DealBreakersScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-background">
-      {/* Back to where it was opened: the profile, or the e-mail at the end of the later screens. */}
+      {/* Back to where it was opened: What you seek, or the e-mail at the end of the later screens. */}
       <ScreenHeader
         title={t("profile.dealBreakers.title")}
         backLabel={t("profile.dealBreakers.back")}

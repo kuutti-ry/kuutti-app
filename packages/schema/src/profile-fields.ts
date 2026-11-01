@@ -309,7 +309,7 @@ export const PROFILE_FIELDS = {
     preferenceAbout: "hard",
     research: true,
   }),
-  /** Offered after a non-binary gender only, by the screen (#146); display only, never matching. */
+  /** Offered after a non-binary gender only, by the screen (#146), and cleared by a change away from it (#552); display only, never matching. */
   identityLabel: single(
     [
       "agender",

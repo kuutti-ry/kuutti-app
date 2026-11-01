@@ -879,15 +879,15 @@ describe.skipIf(!reachable)("the personas, through the mock bank", () => {
     const count = async (sql: string) =>
       Number((await ctx.client.query<{ n: string }>(sql)).rows[0]?.n);
     const personas = `broker_subject = ANY(ARRAY[${DEMO_PERSONAS.map((p) => `'${p.key}'`).join(",")}])`;
-    // The eighteen with a history, Aino, and Aino's name at the other bank.
-    expect(await count(`SELECT count(*) AS n FROM identity WHERE ${personas}`)).toBe(20);
+    // The nineteen with a history, Aino, and Aino's name at the other bank.
+    expect(await count(`SELECT count(*) AS n FROM identity WHERE ${personas}`)).toBe(21);
     // Tapio's ban, which his erasure keeps on the identity (ADR-024 §8).
     expect(await count("SELECT count(*) AS n FROM sanction")).toBe(1);
 
     const result = await resetPersonas({ db: ctx.client, logger, now });
-    // Nineteen identities of the mock bank; eighteen accounts were live (Ilona's was a tombstone
+    // Twenty identities of the mock bank; nineteen accounts were live (Ilona's was a tombstone
     // already, Tapio's was banned and is taken as it is).
-    expect(result).toEqual({ identities: 19, erased: 18, objects: 0, spared: [] });
+    expect(result).toEqual({ identities: 20, erased: 19, objects: 0, spared: [] });
     expect(await count(`SELECT count(*) AS n FROM identity WHERE ${personas}`)).toBe(1);
     expect(
       await count(

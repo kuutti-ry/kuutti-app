@@ -1,4 +1,4 @@
-import { CONSENT_VERSIONS, formatDate, type PlainMessageKey, realLocale } from "@kuutti/i18n";
+import { CONSENT_VERSIONS, formatDate, realLocale } from "@kuutti/i18n";
 import {
   AGE_MAX,
   AGE_MIN,
@@ -6,7 +6,6 @@ import {
   bioOrPromptsComplete,
   type ConsentKind,
   DISPLAY_NAME_MAX,
-  GENDERS,
   type Gender,
   type HomeSummary,
   type HomeUpdate,
@@ -28,12 +27,17 @@ import { Switch } from "@/components/ui/switch";
 import { Text } from "@/components/ui/text";
 import {
   BioEditor,
+  GenderChips,
+  IdentityLabelChips,
   optionKey,
   PlaceChoice,
   PlacePicker,
   PromptsEditor,
   profileErrorText,
+  SeeksChips,
+  saveGender,
   saveHome,
+  savePreferences,
   useProfile,
   useSpokenOnIos,
 } from "@/features/profile";
@@ -43,7 +47,7 @@ import { useHapticTap } from "@/theme/haptics";
 import { rememberAgreed } from "../agreements";
 import { NormsAndConsents } from "../BeforeSignIn";
 import { LegalTextLink } from "../LegalTextLink";
-import { consentLocale, declareGender, giveConsent, savePreferences } from "./client";
+import { consentLocale, giveConsent } from "./client";
 import { useOnboarding } from "./useOnboarding";
 
 type Step =
@@ -89,6 +93,12 @@ type LocalAnswers = {
   labelPending: boolean;
   /** The home the API just took: what the card will say is shown once, with the choice if there is one. */
   homeShown: HomeSummary | null;
+  /**
+   * The seeks step started from a stored answer, and only Continue ends it:
+   * to the API the consent alone answers the step, which would go with a
+   * change on the chips unsaved.
+   */
+  seeksHeld: boolean;
 };
 
 /**
@@ -111,7 +121,7 @@ function nextStep(status: OnboardingStatus, local: LocalAnswers): Step {
   if (missing.has("name")) return "name";
   if (missing.has("gender")) return "gender";
   if (local.labelPending) return "identityLabel";
-  if (missing.has("seeks")) return "seeks";
+  if (missing.has("seeks") || local.seeksHeld) return "seeks";
   if (missing.has("intent")) return "intent";
   if (missing.has("age_window")) return "age";
   if (missing.has("home")) return "home";
@@ -139,17 +149,6 @@ export function defaultAgeWindow(age: number): { min: number; max: number } {
     max: Math.max(Math.min(AGE_MAX, age + 5), AGE_MIN),
   };
 }
-
-const GENDER_TEXT: Record<Gender, PlainMessageKey> = {
-  woman: "onboarding.gender.woman",
-  man: "onboarding.gender.man",
-  non_binary: "onboarding.gender.non_binary",
-};
-const SEEKS_TEXT: Record<Gender, PlainMessageKey> = {
-  woman: "onboarding.seeks.woman",
-  man: "onboarding.seeks.man",
-  non_binary: "onboarding.seeks.non_binary",
-};
 
 function Chip({
   label,
@@ -187,14 +186,15 @@ export function OnboardingScreen() {
   const { state, busy, failed, failedCode, reload, step } = useOnboarding();
   const profile = useProfile();
   const [invitation, setInvitation] = useState<InvitationOffer>("unasked");
-  const [seeks, setSeeks] = useState<Gender[]>([]);
+  const [seeks, setSeeks] = useState<Gender[] | null>(null);
+  const [seeksHeld, setSeeksHeld] = useState(false);
   const [labelPending, setLabelPending] = useState(false);
   const [homeShown, setHomeShown] = useState<HomeSummary | null>(null);
   const [gender, setGender] = useState<Gender | null>(null);
   const [ages, setAges] = useState<{ min: number; max: number } | null>(null);
   const current: Step | null =
     state.status === "ready"
-      ? nextStep(state.onboarding, { invitation, labelPending, homeShown })
+      ? nextStep(state.onboarding, { invitation, labelPending, homeShown, seeksHeld })
       : null;
   // Whether a code may still be typed, asked once the consents are given,
   // which the API's answer needs (ADR-044 §6): offered if so, and otherwise,
@@ -218,6 +218,14 @@ export function OnboardingScreen() {
   useEffect(() => {
     if (current) scroll.current?.scrollTo({ y: 0, animated: false });
   }, [current]);
+  // A stored answer is where the step starts: only an outdated consent leaves
+  // one here (a withdrawal takes it), and a new wording asks everybody at once.
+  const storedSeeks = state.status === "ready" ? state.onboarding.preferences.seeks : null;
+  useEffect(() => {
+    if (current !== "seeks" || seeks !== null) return;
+    setSeeks(storedSeeks ?? []);
+    setSeeksHeld(storedSeeks !== null);
+  }, [current, seeks, storedSeeks]);
   const age = state.status === "ready" ? state.onboarding.age : null;
   // From when a refused change of gender is possible (#147).
   const changeFrom = state.status === "ready" ? state.onboarding.nextChange.gender : null;
@@ -299,6 +307,7 @@ export function OnboardingScreen() {
   const { onboarding } = state;
   const { draft, update } = profile;
   const position = STEPS.indexOf(NUMBERED_AS[current] ?? current) + 1;
+  const chosenSeeks = seeks ?? [];
   const specialConsented =
     onboarding.consents.specialCategory === bundledVersion("special_category");
   const specialOutdated =
@@ -384,19 +393,7 @@ export function OnboardingScreen() {
           <View className="gap-4">
             <Text variant="h2">{t("onboarding.gender.title")}</Text>
             <Text>{t("onboarding.gender.explain")}</Text>
-            <View className="flex-row flex-wrap gap-2">
-              {GENDERS.map((option) => (
-                <Chip
-                  key={option}
-                  label={t(GENDER_TEXT[option])}
-                  selected={gender === option}
-                  onPress={() => {
-                    tap();
-                    setGender(option);
-                  }}
-                />
-              ))}
-            </View>
+            <GenderChips chosen={gender} onChoose={setGender} />
             <Button
               disabled={busy || gender === null}
               onPress={() => {
@@ -404,7 +401,7 @@ export function OnboardingScreen() {
                 if (!gender) return;
                 // The label is offered after a non-binary gender only, by design (ADR-019 §1).
                 setLabelPending(gender === "non_binary");
-                void step(() => declareGender(gender));
+                void step(() => saveGender(gender));
               }}
             >
               {t("onboarding.continue")}
@@ -416,22 +413,10 @@ export function OnboardingScreen() {
           <View className="gap-4">
             <Text variant="h2">{t("onboarding.identityLabel.title")}</Text>
             <Text>{t("onboarding.identityLabel.explain")}</Text>
-            <View className="flex-row flex-wrap gap-2">
-              {PROFILE_FIELDS.identityLabel.options.map((option) => (
-                <Chip
-                  key={option}
-                  label={t(optionKey("identityLabel", option))}
-                  selected={draft.fields.identityLabel === option}
-                  onPress={() => {
-                    tap();
-                    setField(
-                      "identityLabel",
-                      draft.fields.identityLabel === option ? undefined : option,
-                    );
-                  }}
-                />
-              ))}
-            </View>
+            <IdentityLabelChips
+              chosen={draft.fields.identityLabel}
+              onChange={(label) => setField("identityLabel", label)}
+            />
             <Button
               disabled={busy || profile.saving || draft.fields.identityLabel === undefined}
               onPress={() => {
@@ -460,29 +445,7 @@ export function OnboardingScreen() {
           <View className="gap-4">
             <Text variant="h2">{t("onboarding.seeks.title")}</Text>
             <Text>{t("onboarding.seeks.explain")}</Text>
-            <View className="flex-row flex-wrap gap-2">
-              {GENDERS.map((option) => (
-                <Chip
-                  key={option}
-                  label={t(SEEKS_TEXT[option])}
-                  selected={seeks.includes(option)}
-                  onPress={() => {
-                    tap();
-                    setSeeks((s) =>
-                      s.includes(option) ? s.filter((g) => g !== option) : [...s, option],
-                    );
-                  }}
-                />
-              ))}
-              <Chip
-                label={t("onboarding.seeks.anyone")}
-                selected={seeks.length === GENDERS.length}
-                onPress={() => {
-                  tap();
-                  setSeeks([...GENDERS]);
-                }}
-              />
-            </View>
+            <SeeksChips chosen={chosenSeeks} onChange={setSeeks} />
             {/* Article 9: the consent on the screen that collects the answer (ADR-019 §4). */}
             <Card>
               <CardHeader>
@@ -527,10 +490,13 @@ export function OnboardingScreen() {
             </Card>
             {/* Saved on leaving the screen (ADR-010 §13): an app closed before the ages keeps it. */}
             <Button
-              disabled={busy || seeks.length === 0 || !specialConsented}
+              disabled={busy || chosenSeeks.length === 0 || !specialConsented}
               onPress={() => {
                 tap();
-                void step(() => savePreferences({ seeks }));
+                void step(async () => {
+                  await savePreferences({ seeks: chosenSeeks });
+                  setSeeksHeld(false);
+                });
               }}
             >
               {t("onboarding.continue")}

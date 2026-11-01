@@ -1,0 +1,143 @@
+# What you seek (#542): a list of its own, opened from the profile, with whom,
+# the ages, what one is here for and the deal-breakers. The first three open a
+# screen with no Save button, and the deal-breakers keep theirs. A change is
+# kept by going back and read again on the way in, as often as one wishes. The
+# only gender chosen stays chosen and says why, and what one is here for changes
+# and never clears. Ritva seeks men aged 60 to 72 for something long-term, and
+# she is this flow's alone; it ends as it began. A run that stops half-way leaves
+# a change: `pnpm demo:reset` puts her back.
+appId: fi.kuutti.app
+name: What you seek lists whom, the ages, why and the deal-breakers, and each change is kept by going back
+---
+- runFlow:
+    file: ../common/sign-in.yaml
+    env:
+      PERSONA: Ritva Lahtinen
+- openLink: kuutti://profile
+- extendedWaitUntil:
+    visible: "(The basics|Perustiedot|Grunderna)(, .*)?"
+    timeout: 15000
+- waitForAnimationToEnd
+- scrollUntilVisible:
+    element: "(What you seek|Mitä etsit|Vad du söker)(, .*)?"
+    direction: DOWN
+    centerElement: true
+    timeout: 60000
+- tapOn: "(What you seek|Mitä etsit|Vad du söker)(, .*)?"
+- extendedWaitUntil:
+    visible: "These work both ways.*|Nämä toimivat molempiin suuntiin.*|De här gäller åt båda håll.*"
+    timeout: 15000
+- waitForAnimationToEnd
+- assertVisible: "(Whom are you looking for\\?|Ketä etsit\\?|Vem söker du\\?)(, .*)?"
+- assertVisible: "(What ages\\?|Minkä ikäisiä\\?|Vilka åldrar\\?)(, .*)?"
+- assertVisible: "(What are you here for\\?|Mitä etsit täältä\\?|Vad är du här för\\?)(, .*)?"
+- assertVisible: "(Your deal-breakers|Ehdottomat rajasi|Dina absoluta gränser)(, .*)?"
+
+# Whom: from the stored answer. The only one chosen stays chosen, and says why.
+- tapOn: "(Whom are you looking for\\?|Ketä etsit\\?|Vem söker du\\?)(, .*)?"
+- extendedWaitUntil:
+    visible:
+      text: "Men|Miehiä|Män"
+      selected: true
+    timeout: 15000
+- waitForAnimationToEnd
+- tapOn: "Men|Miehiä|Män"
+- assertVisible: "Keep at least one\\.|Pidä ainakin yksi\\.|Behåll minst en\\."
+- assertVisible:
+    text: "Men|Miehiä|Män"
+    selected: true
+# A second one ends the refusal, and going back keeps it.
+- tapOn: "Women|Naisia|Kvinnor"
+- assertNotVisible: "Keep at least one\\.|Pidä ainakin yksi\\.|Behåll minst en\\."
+- tapOn: "Back to what you seek|Takaisin siihen, mitä etsit|Tillbaka till vad du söker"
+- extendedWaitUntil:
+    visible: "These work both ways.*|Nämä toimivat molempiin suuntiin.*|De här gäller åt båda håll.*"
+    timeout: 15000
+- waitForAnimationToEnd
+- tapOn: "(Whom are you looking for\\?|Ketä etsit\\?|Vem söker du\\?)(, .*)?"
+- extendedWaitUntil:
+    visible:
+      text: "Women|Naisia|Kvinnor"
+      selected: true
+    timeout: 15000
+- assertVisible:
+    text: "Men|Miehiä|Män"
+    selected: true
+- waitForAnimationToEnd
+# Back as she began, which is no limit either: as often as one wishes (ADR-060 §9).
+- tapOn: "Women|Naisia|Kvinnor"
+- tapOn: "Back to what you seek|Takaisin siihen, mitä etsit|Tillbaka till vad du söker"
+- extendedWaitUntil:
+    visible: "These work both ways.*|Nämä toimivat molempiin suuntiin.*|De här gäller åt båda håll.*"
+    timeout: 15000
+- waitForAnimationToEnd
+
+# The ages: a year at a time, kept by going back.
+- tapOn: "(What ages\\?|Minkä ikäisiä\\?|Vilka åldrar\\?)(, .*)?"
+- extendedWaitUntil:
+    visible: "60"
+    timeout: 15000
+- assertVisible: "72"
+- waitForAnimationToEnd
+- tapOn: "Youngest, one year older|Nuorin, vuotta vanhempi|Yngsta, ett år äldre"
+- assertVisible: "61"
+- tapOn: "Back to what you seek|Takaisin siihen, mitä etsit|Tillbaka till vad du söker"
+- extendedWaitUntil:
+    visible: "These work both ways.*|Nämä toimivat molempiin suuntiin.*|De här gäller åt båda håll.*"
+    timeout: 15000
+- waitForAnimationToEnd
+- tapOn: "(What ages\\?|Minkä ikäisiä\\?|Vilka åldrar\\?)(, .*)?"
+- extendedWaitUntil:
+    visible: "61"
+    timeout: 15000
+- waitForAnimationToEnd
+- tapOn: "Youngest, one year younger|Nuorin, vuotta nuorempi|Yngsta, ett år yngre"
+- assertVisible: "60"
+- tapOn: "Back to what you seek|Takaisin siihen, mitä etsit|Tillbaka till vad du söker"
+- extendedWaitUntil:
+    visible: "These work both ways.*|Nämä toimivat molempiin suuntiin.*|De här gäller åt båda håll.*"
+    timeout: 15000
+- waitForAnimationToEnd
+
+# What she is here for: its own screen, where a second press clears nothing.
+- tapOn: "(What are you here for\\?|Mitä etsit täältä\\?|Vad är du här för\\?)(, .*)?"
+- extendedWaitUntil:
+    visible: "This also decides who sees you.*|Tämä ratkaisee myös.*|Det här avgör också.*"
+    timeout: 15000
+- waitForAnimationToEnd
+- assertVisible:
+    text: "Something long-term|Jotain pitkäaikaista|Något långvarigt"
+    selected: true
+- tapOn: "Something long-term|Jotain pitkäaikaista|Något långvarigt"
+- assertVisible:
+    text: "Something long-term|Jotain pitkäaikaista|Något långvarigt"
+    selected: true
+- tapOn: "Back to what you seek|Takaisin siihen, mitä etsit|Tillbaka till vad du söker"
+- extendedWaitUntil:
+    visible: "These work both ways.*|Nämä toimivat molempiin suuntiin.*|De här gäller åt båda håll.*"
+    timeout: 15000
+- waitForAnimationToEnd
+
+# The deal-breakers are one row, and today's screen behind it.
+- tapOn: "(Your deal-breakers|Ehdottomat rajasi|Dina absoluta gränser)(, .*)?"
+- extendedWaitUntil:
+    visible: "Deal-breakers|Ehdottomat rajat|Absoluta gränser"
+    timeout: 15000
+- waitForAnimationToEnd
+- tapOn: "Back|Takaisin|Tillbaka"
+- extendedWaitUntil:
+    visible: "These work both ways.*|Nämä toimivat molempiin suuntiin.*|De här gäller åt båda håll.*"
+    timeout: 15000
+- waitForAnimationToEnd
+
+# One answer, one door: the profile's own section no longer asks it.
+- tapOn: "Back to your profile|Takaisin profiiliisi|Tillbaka till din profil"
+- extendedWaitUntil:
+    visible: "(The basics|Perustiedot|Grunderna)(, .*)?"
+    timeout: 15000
+- waitForAnimationToEnd
+- tapOn: "(Relationship and kids|Parisuhde ja lapset|Relation och barn)(, .*)?"
+- extendedWaitUntil:
+    visible: "Relationship structure|Suhteen muoto|Relationsform"
+    timeout: 15000
+- assertNotVisible: "Something long-term|Jotain pitkäaikaista|Något långvarigt"

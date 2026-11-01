@@ -194,10 +194,10 @@ profile.section.relationship.title:
   machine: { fi: true, sv: true }
 
 profile.section.relationship.summary:
-  en: "What you are looking for, relationship structure and kids"
-  description: "Second line of the relationship section's row on the profile list (#227): what the section holds; a screen reader hears it as the row's hint."
-  fi: "Mitä etsit, suhteen muoto ja lapset"
-  sv: "Vad du söker, relationsform och barn"
+  en: "Relationship structure and kids"
+  description: "Second line of the relationship section's row on the profile list (#227): what the section holds, what one is here for having moved to What you seek (#542); a screen reader hears it as the row's hint."
+  fi: "Suhteen muoto ja lapset"
+  sv: "Relationsform och barn"
   machine: { fi: true, sv: true }
 
 profile.section.work.title:
@@ -629,7 +629,7 @@ profile.dealBreakers.title:
 
 profile.dealBreakers.back:
   en: "Back"
-  description: "Screen-reader label of the back arrow of the deal-breakers screen: back to where it was opened, the profile or the e-mail screen; with changes not saved it asks first."
+  description: "Screen-reader label of the back arrow of the deal-breakers screen: back to where it was opened, What you seek or the e-mail screen; with changes not saved it asks first."
   fi: "Takaisin"
   sv: "Tillbaka"
   machine: { fi: true, sv: true }
@@ -734,9 +734,128 @@ profile.dealBreakers.failed:
 
 profile.dealBreakers.open:
   en: "Your deal-breakers"
-  description: "Row on the profile list and button on the e-mail screen that opens the deal-breakers (#149, #239)."
+  description: "Row on What you seek and button on the e-mail screen that opens the deal-breakers (#149, #239, #542)."
   fi: "Ehdottomat rajasi"
   sv: "Dina absoluta gränser"
+  machine: { fi: true, sv: true }
+
+profile.seek.title:
+  en: "What you seek"
+  description: "Title of the list of what a person seeks (#542): its row on the profile and its screen's heading."
+  fi: "Mitä etsit"
+  sv: "Vad du söker"
+  machine: { fi: true, sv: true }
+
+profile.seek.summary:
+  en: "Whom, what ages, what you are here for and your deal-breakers"
+  description: "Second line of the row on the profile that opens What you seek (#542): what the list holds, never an answer; a screen reader hears it as the row's hint."
+  fi: "Ketä, minkä ikäisiä, mitä etsit täältä ja ehdottomat rajasi"
+  sv: "Vem, vilka åldrar, vad du är här för och dina absoluta gränser"
+  machine: { fi: true, sv: true }
+
+profile.seek.back:
+  en: "Back to what you seek"
+  description: "Screen-reader label of the back arrow of the screens What you seek opens (#542); going back saves the screen."
+  fi: "Takaisin siihen, mitä etsit"
+  sv: "Tillbaka till vad du söker"
+  machine: { fi: true, sv: true }
+
+profile.seek.explain:
+  en: "These work both ways: they decide whom you see and who sees you. Conversations you already have stay as they are."
+  description: "Line at the top of What you seek (#542): every answer here is a filter both ways. It names no moment and no absolute, since today's cards stand until the next round (the register's open row, ADR-034 Open 5)."
+  fi: "Nämä toimivat molempiin suuntiin: ne ratkaisevat, keitä näet ja ketkä näkevät sinut. Keskustelusi pysyvät ennallaan."
+  sv: "De här gäller åt båda håll: de avgör vilka du ser och vilka som ser dig. Samtal du redan har förblir som de är."
+  machine: { fi: true, sv: true }
+
+profile.seek.whom.explain:
+  en: "Pick everyone you want to see. It also decides who sees you."
+  description: "Lead text of the screen that changes whom one seeks (#542). Not the seeks step's text, whose 'ever' a change does not keep while today's cards stand."
+  fi: "Valitse kaikki, joita haluat nähdä. Se ratkaisee myös, ketkä näkevät sinut."
+  sv: "Välj alla du vill se. Det avgör också vilka som ser dig."
+  machine: { fi: true, sv: true }
+
+profile.seek.whom.keepOne:
+  en: "Keep at least one."
+  description: "Said when the person presses the only gender they seek (#542): it stays chosen, since whom one seeks takes one to three."
+  fi: "Pidä ainakin yksi."
+  sv: "Behåll minst en."
+  machine: { fi: true, sv: true }
+
+profile.seek.ages.explain:
+  en: "Between {min, number} and {max, number}. It also decides who sees you."
+  description: "Lead text of the screen that changes the age window (#542); {min} and {max} are the bounds."
+  fi: "Väliltä {min, number}–{max, number}. Se ratkaisee myös, ketkä näkevät sinut."
+  sv: "Mellan {min, number} och {max, number}. Det avgör också vilka som ser dig."
+  machine: { fi: true, sv: true }
+
+profile.seek.ages.summary:
+  en: "Youngest {min, number}, oldest {max, number}"
+  description: "The age window under its row on What you seek (#542): words rather than a dash, which a screen reader does not read as a range."
+  fi: "Nuorin {min, number}, vanhin {max, number}"
+  sv: "Yngsta {min, number}, äldsta {max, number}"
+  machine: { fi: true, sv: true }
+
+profile.seek.failed:
+  en: "It could not be saved. Try again."
+  description: "Said when a change on the screens of whom one seeks, the ages and the gender could not be saved (#542, #552). None of them can hold a wrong answer, so only the server or the network can be at fault: nothing here asks the person to check anything."
+  fi: "Tallentaminen ei onnistunut. Yritä uudelleen."
+  sv: "Det gick inte att spara. Försök igen."
+  machine: { fi: true, sv: true }
+
+profile.seek.intent.explain:
+  en: "This also decides who sees you: people who want the same thing. Open to either covers long-term and casual."
+  description: "Lead text of the screen that changes what one is here for (#542). Not the intent step's text, which says it can be changed later; the second sentence names the option Open to either."
+  fi: "Tämä ratkaisee myös, ketkä näkevät sinut: ne, jotka haluavat samaa. Avoin kummallekin kattaa pitkäaikaisen ja rennon."
+  sv: "Det här avgör också vilka som ser dig: de som vill samma sak. Öppen för båda omfattar långvarigt och avslappnat."
+  machine: { fi: true, sv: true }
+
+profile.seek.dealBreakers.none:
+  en: "None"
+  description: "Under the deal-breakers' row on What you seek when none is set (#542)."
+  fi: "Ei yhtään"
+  sv: "Inga"
+  machine: { fi: true, sv: true }
+
+profile.seek.dealBreakers.paused:
+  en: "{field} (paused)"
+  description: "A deal-breaker that waits for the person's own answer, named under the row on What you seek (#542); {field} is the field's label."
+  fi: "{field} (tauolla)"
+  sv: "{field} (pausad)"
+  machine: { fi: true, sv: true }
+
+profile.gender.title:
+  en: "Gender"
+  description: "Row on the profile list and title of the screen it opens, where the person changes their gender after sign-up (#552)."
+  fi: "Sukupuoli"
+  sv: "Kön"
+  machine: { fi: true, sv: true }
+
+profile.gender.explain:
+  en: "This is on your card, so a change reaches everybody who can see you. After a change, the next one is possible only after a waiting time."
+  description: "Lead of the gender screen (#552): a change shows on the card, and the limit is said before it can bite (the maintainer, 01/11/2026), in the neutral words of errors.change_too_soon and with no number."
+  fi: "Tämä näkyy kortillasi, joten muutos näkyy kaikille, jotka näkevät sinut. Muutoksen jälkeen seuraava on mahdollinen vasta odotusajan jälkeen."
+  sv: "Det här visas på ditt kort, så en ändring når alla som kan se dig. Efter en ändring är nästa möjlig först efter en väntetid."
+  machine: { fi: true, sv: true }
+
+profile.gender.waiting:
+  en: "You changed this recently. Next change possible: {date}."
+  description: "Gender screen while gender's limit runs, said on arrival and when another gender is pressed, and the reason of a save refused with change_too_soon (#552, ADR-060 §9). No hostile wording: somebody transitioning must not hit a wall. {date} is d.M.yyyy with the time (formatDateTime), since the limit ends at the moment of the last change plus its days: a date alone would still refuse for hours on the day it named."
+  fi: "Muutit tätä äskettäin. Seuraava muutos mahdollinen: {date}."
+  sv: "Du ändrade det här nyligen. Nästa ändring möjlig: {date}."
+  machine: { fi: true, sv: true }
+
+profile.gender.labelGoes:
+  en: "This also takes away the word you chose for it."
+  description: "Gender screen, when another gender is chosen while an identity label is stored: a change away from non-binary clears the label (#552, ADR-019 §1). The word is the one asked for under onboarding.identityLabel.title."
+  fi: "Samalla poistuu sana, jonka valitsit sille."
+  sv: "Då försvinner också ordet du valde för det."
+  machine: { fi: true, sv: true }
+
+profile.gender.label.explain:
+  en: "The word is shown on your card and never used for matching."
+  description: "Gender screen, under onboarding.identityLabel.title: the identity label is offered while non-binary is chosen and none is stored (#552). There is nothing to skip here: with none chosen, none is saved. It names its subject because a screen reader hears it alone, right after a gender is pressed, and gender is what matching does use. profile.hide.hidden stands in its place where a hide on the label is stored."
+  fi: "Sana näkyy kortillasi, eikä sitä käytetä yhdistämiseen."
+  sv: "Ordet visas på ditt kort och används aldrig för matchning."
   machine: { fi: true, sv: true }
 
 profile.place.title:
@@ -835,6 +954,13 @@ profile.later.back:
   description: "Screen-reader label of the back arrow of the optional fields' screens: it leaves the questions for the profile in one step; with an answer not saved it asks first."
   fi: "Takaisin profiiliisi"
   sv: "Tillbaka till din profil"
+  machine: { fi: true, sv: true }
+
+profile.later.backOnce:
+  en: "Back to your deal-breakers"
+  description: "Screen-reader label of the back arrow of a later question or a section opened from the deal-breakers' Answer it, which goes back there (#542)."
+  fi: "Takaisin ehdottomiin rajoihisi"
+  sv: "Tillbaka till dina absoluta gränser"
   machine: { fi: true, sv: true }
 
 profile.later.progress:
@@ -3426,7 +3552,7 @@ errors.too_many_changes:
 
 errors.change_too_soon:
   en: "You changed this recently. A change is possible again once the waiting time has passed."
-  description: "PUT /account/gender (429): the gender was changed less than change_cadence_days ago (#147, ADR-060 §9). No hostile wording: somebody transitioning must not hit a wall. The app adds the date (onboarding.changeFrom)."
+  description: "PUT /account/gender (429): the gender was changed less than change_cadence_days ago (#147, ADR-060 §9). No hostile wording: somebody transitioning must not hit a wall. Onboarding adds the date (onboarding.changeFrom); the gender screen says it in profile.gender.waiting, and these words only if it cannot read the date."
   fi: "Muutit tätä äskettäin. Muutos on taas mahdollinen, kun odotusaika on kulunut."
   sv: "Du ändrade det här nyligen. En ändring är möjlig igen när väntetiden har gått."
   machine: { fi: true, sv: true }
@@ -4333,7 +4459,7 @@ onboarding.name.explain:
 
 onboarding.identityLabel.title:
   en: "A word for it, if you like"
-  description: "Heading of the identity label step, shown after a non-binary gender only (#146)."
+  description: "Heading of the identity label step, shown after a non-binary gender only (#146), and of the same offer on the gender screen (#552)."
   fi: "Sana sille, jos haluat"
   sv: "Ett ord för det, om du vill"
   machine: { fi: true, sv: true }

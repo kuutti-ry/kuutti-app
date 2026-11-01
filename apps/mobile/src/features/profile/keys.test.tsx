@@ -1,5 +1,5 @@
 import { createI18n, type Locale, typedT } from "@kuutti/i18n";
-import { CompletenessItem, DISTANCE_BANDS, type HomeSummary } from "@kuutti/schema";
+import { CompletenessItem, DISTANCE_BANDS, GENDERS, type HomeSummary } from "@kuutti/schema";
 import { renderHook } from "@testing-library/react-native";
 import { LocaleProvider, useT } from "@/lib/locale";
 import {
@@ -10,6 +10,7 @@ import {
   placeName,
   presetKey,
   promptKey,
+  seeksKey,
   shownPlaceName,
 } from "./keys";
 
@@ -56,6 +57,17 @@ describe("the profile's message keys", () => {
       "Far",
     ]);
     expect(t(fieldLabelKey("distance"))).toBe("Distance");
+  });
+
+  // A woman one seeks is said apart from a woman one is: the seeks step's words (#146, #542).
+  it.each([
+    ["en", ["Women", "Men", "Non-binary people"]],
+    ["fi", ["Naisia", "Miehiä", "Muunsukupuolisia"]],
+    ["sv", ["Kvinnor", "Män", "Icke-binära personer"]],
+  ] as const)("say whom one seeks in %s, a word for every gender", (locale, words) => {
+    const t = typedT(createI18n({ locale }));
+    expect(GENDERS).toEqual(["woman", "man", "non_binary"]);
+    expect(GENDERS.map((gender) => t(seeksKey(gender)))).toEqual(words);
   });
 });
 

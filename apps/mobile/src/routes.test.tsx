@@ -20,6 +20,8 @@ import PhotosRoute from "../app/photos/index";
 import CardPreviewRoute from "../app/profile/card";
 // biome-ignore lint/style/noRestrictedImports: a route file, not a slice internal
 import DealBreakersRoute from "../app/profile/deal-breakers";
+// biome-ignore lint/style/noRestrictedImports: a route file, not a slice internal
+import GenderRoute from "../app/profile/gender";
 import ProfileRoute from "../app/profile/index";
 // biome-ignore lint/style/noRestrictedImports: a route file, not a slice internal
 import LaterFieldRoute from "../app/profile/later/[field]";
@@ -27,6 +29,12 @@ import LaterFieldRoute from "../app/profile/later/[field]";
 import PlaceRoute from "../app/profile/place";
 // biome-ignore lint/style/noRestrictedImports: a route file, not a slice internal
 import ProfileSectionRoute from "../app/profile/section/[id]";
+// biome-ignore lint/style/noRestrictedImports: a route file, not a slice internal
+import SeekAgesRoute from "../app/profile/seek/ages";
+// biome-ignore lint/style/noRestrictedImports: a route file, not a slice internal
+import SeekRoute from "../app/profile/seek/index";
+// biome-ignore lint/style/noRestrictedImports: a route file, not a slice internal
+import SeekWhomRoute from "../app/profile/seek/whom";
 import RoundRoute from "../app/round";
 import FoundThemRoute from "../app/settings/found-them";
 import SettingsRoute from "../app/settings/index";
@@ -115,11 +123,15 @@ jest.mock("@/features/profile", () => {
   return {
     CardPreviewScreen: probe("CardPreviewScreen"),
     DealBreakersScreen: probe("DealBreakersScreen"),
+    GenderScreen: probe("GenderScreen"),
     holdLinkWhileUnsaved: jest.fn((path: string) => path),
     LaterFieldScreen: probe("LaterFieldScreen"),
     PlaceScreen: probe("PlaceScreen"),
     ProfileScreen: probe("ProfileScreen"),
     SectionScreen: probe("SectionScreen"),
+    SeekAgesScreen: probe("SeekAgesScreen"),
+    SeekScreen: probe("SeekScreen"),
+    SeekWhomScreen: probe("SeekWhomScreen"),
   };
 });
 jest.mock("@/features/settings", () => {
@@ -176,7 +188,11 @@ describe("the screens without params", () => {
     ["/profile", ProfileRoute, "ProfileScreen"],
     ["/profile/card", CardPreviewRoute, "CardPreviewScreen"],
     ["/profile/deal-breakers", DealBreakersRoute, "DealBreakersScreen"],
+    ["/profile/gender", GenderRoute, "GenderScreen"],
     ["/profile/place", PlaceRoute, "PlaceScreen"],
+    ["/profile/seek", SeekRoute, "SeekScreen"],
+    ["/profile/seek/ages", SeekAgesRoute, "SeekAgesScreen"],
+    ["/profile/seek/whom", SeekWhomRoute, "SeekWhomScreen"],
     ["/round", RoundRoute, "RoundScreen"],
     ["/settings", SettingsRoute, "SettingsScreen"],
     ["/settings/found-them", FoundThemRoute, "FoundThemScreen"],
@@ -399,21 +415,33 @@ describe("the profile's routes with a param", () => {
   it("hands a later field's key to its screen, and an empty one when the link has none", async () => {
     params({ field: "smoking" });
     const view = await render(<LaterFieldRoute />);
-    expect(propsOf("LaterFieldScreen")).toEqual({ field: "smoking" });
+    expect(propsOf("LaterFieldScreen")).toEqual({ field: "smoking", once: false });
     await view.unmount();
     params({});
     await render(<LaterFieldRoute />);
-    expect(propsOf("LaterFieldScreen")).toEqual({ field: "" });
+    expect(propsOf("LaterFieldScreen")).toEqual({ field: "", once: false });
+  });
+
+  it("says a later field was opened for its one answer when the link says once (#542)", async () => {
+    params({ field: "smoking", once: "1" });
+    await render(<LaterFieldRoute />);
+    expect(propsOf("LaterFieldScreen")).toEqual({ field: "smoking", once: true });
   });
 
   it("hands a section's id to its screen, and an empty one when the link has none", async () => {
     params({ id: "basics" });
     const view = await render(<ProfileSectionRoute />);
-    expect(propsOf("SectionScreen")).toEqual({ section: "basics" });
+    expect(propsOf("SectionScreen")).toEqual({ section: "basics", once: false });
     await view.unmount();
     params({});
     await render(<ProfileSectionRoute />);
-    expect(propsOf("SectionScreen")).toEqual({ section: "" });
+    expect(propsOf("SectionScreen")).toEqual({ section: "", once: false });
+  });
+
+  it("says a section was opened for its one answer when the link says once (#542)", async () => {
+    params({ id: "relationship", once: "1" });
+    await render(<ProfileSectionRoute />);
+    expect(propsOf("SectionScreen")).toEqual({ section: "relationship", once: true });
   });
 });
 
