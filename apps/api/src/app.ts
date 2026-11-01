@@ -358,7 +358,8 @@ export function createApp(deps: Deps) {
         }
       },
       // shortcut: nothing is built in production until the maintainer has set how long
-      // rounds are kept (ADR-034 Open 2, ADR-035 Open 1); his answer lifts this and boot.ts's twin.
+      // rounds are kept (ADR-034 Open 2, ADR-035 Open 1) and the filters are asked on read
+      // and on `decide` (#502, his word on #542): both lift this and boot.ts's twin.
       deps.config.APP_ENV === "production"
         ? async () => false
         : (accountId) => buildRoundOf(builderDeps(), accountId),

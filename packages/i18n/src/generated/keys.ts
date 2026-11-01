@@ -1397,6 +1397,7 @@ export type MessageParams = {
   "profile.seek.dealBreakers.none": Record<never, never>;
   "profile.seek.dealBreakers.paused": { "field": string };
   "profile.seek.explain": Record<never, never>;
+  "profile.seek.failed": Record<never, never>;
   "profile.seek.intent.explain": Record<never, never>;
   "profile.seek.summary": Record<never, never>;
   "profile.seek.title": Record<never, never>;

@@ -30,9 +30,11 @@ async function readSeeking(): Promise<Seeking | null> {
  * What the list of What you seek and its two screens read (#542). Nobody
  * without the answers or the consent sees a row for them: the consent is given
  * on the seeks step and taken back in Settings (ADR-019 §4), so a person who
- * lost it here, on another phone or to a new wording, goes to onboarding, which
- * asks. A read again keeps what is shown until the answer is there, and a
- * failed one takes nothing away, as the profile's does.
+ * lost it here, on another phone or to a new wording, goes back to Home, whose
+ * gate sends them to onboarding, which asks; replaced from here, onboarding's
+ * end left a second Home over the profile. A read again keeps what is shown
+ * until the answer is there, and a failed one takes nothing away, as the
+ * profile's does; after a failure it says it is loading, as the profile's does.
  */
 export function useSeeking() {
   const router = useRouter();
@@ -45,11 +47,12 @@ export function useSeeking() {
     };
   }, []);
   const load = useCallback(async () => {
+    setState((was) => (was.status === "error" ? { status: "loading" } : was));
     try {
       const seeking = await readSeeking();
       if (!mounted.current) return;
       if (seeking) setState({ status: "ready", seeking });
-      else router.replace("/onboarding");
+      else router.dismissTo("/");
     } catch (error) {
       setState((was) => (was.status === "ready" ? was : { status: "error", error }));
     }
@@ -60,23 +63,18 @@ export function useSeeking() {
   return { ...state, reload: load };
 }
 
-/** A refused change, held to bring its screen back with the reason. */
-export type HeldChange<Draft> = { draft: Draft; code: string | undefined };
-
 /**
  * Saves a change as its screen goes (`useSaveOnLeave`). Refused, the change is
  * held for its screen, unless the consent is what is gone: an answer with no
  * consent has nowhere to go, so nothing is held, and the list's read sends the
- * person to onboarding (ADR-010 §16).
+ * person on to onboarding (ADR-010 §16).
  */
 export const savedOrHeld = <Draft>(
   update: PreferencesUpdate,
   draft: Draft,
-): Promise<HeldChange<Draft> | null> =>
+): Promise<Draft | null> =>
   savePreferences(update).then(
     () => null,
-    (error: unknown) => {
-      const code = error instanceof ApiError ? error.code : undefined;
-      return code === "consent_required" ? null : { draft, code };
-    },
+    (error: unknown) =>
+      error instanceof ApiError && error.code === "consent_required" ? null : draft,
   );

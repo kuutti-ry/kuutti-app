@@ -92,6 +92,15 @@ export function LaterFieldScreen({ field, once = false }: { field: string; once?
     if (next) router.replace(laterPath(next));
   }, [once, index, key, loadedFields, router]);
   const leaving = useConfirmLeave(profile.status === "ready" && profile.dirty, () => update(saved));
+  // Left while its save was on the way, the screen moves on no more: with
+  // `once`, a second pop would take what opened it.
+  const here = useRef(true);
+  useEffect(() => {
+    here.current = true;
+    return () => {
+      here.current = false;
+    };
+  }, []);
   if (index < 0 || !key) return null;
   const companion = LATER_COMPANIONS[key];
 
@@ -166,7 +175,7 @@ export function LaterFieldScreen({ field, once = false }: { field: string; once?
           onPress={() => {
             tap();
             void profile.save().then((refusal) => {
-              if (!refusal) moveOn();
+              if (!refusal && here.current) moveOn();
             });
           }}
         >

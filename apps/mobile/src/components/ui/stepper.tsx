@@ -68,7 +68,8 @@ export function Stepper({
         >
           <Icon as={Minus} />
         </Button>
-        <Text variant="h2" accessibilityLiveRegion="polite">
+        {/* A value, not a heading: drawn as one and heard as what it is. */}
+        <Text variant="h2" role="none" accessibilityLiveRegion="polite">
           {shown}
         </Text>
         <Button

@@ -281,7 +281,8 @@ export async function boot({
     invitationCountJob({ db: pool, logger, now }),
     // The day's round for everybody complete in an open pond (#95, #500, ADR-035).
     // shortcut: none in production until the maintainer has set how long rounds
-    // are kept (ADR-034 Open 2, ADR-035 Open 1); his answer lifts this and app.ts's twin.
+    // are kept (ADR-034 Open 2, ADR-035 Open 1) and the filters are asked on read
+    // and on `decide` (#502, his word on #542): both lift this and app.ts's twin.
     ...(config.APP_ENV === "production" ? [] : [roundsJob({ db: pool, logger, now })]),
     // A photo nobody decided in photo_queue_reject_days is rejected as not reviewed (#376),
     // wherever there is a queue, Rekognition or none.

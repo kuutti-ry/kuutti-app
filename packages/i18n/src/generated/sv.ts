@@ -1005,6 +1005,7 @@ export const sv: Readonly<Record<string, string>> = {
   "profile.seek.dealBreakers.none": "Inga",
   "profile.seek.dealBreakers.paused": "{field} (pausad)",
   "profile.seek.explain": "De här gäller åt båda håll: de avgör vilka du ser och vilka som ser dig. Samtal du redan har förblir som de är.",
+  "profile.seek.failed": "Det gick inte att spara. Försök igen.",
   "profile.seek.intent.explain": "Det här avgör också vilka som ser dig: de som vill samma sak. Öppen för båda omfattar långvarigt och avslappnat.",
   "profile.seek.summary": "Vem, vilka åldrar, vad du är här för och dina absoluta gränser",
   "profile.seek.title": "Vad du söker",

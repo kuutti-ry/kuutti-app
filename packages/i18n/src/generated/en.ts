@@ -1396,6 +1396,7 @@ export const en: Readonly<Record<string, string>> = {
   "profile.seek.dealBreakers.none": "None",
   "profile.seek.dealBreakers.paused": "{field} (paused)",
   "profile.seek.explain": "These work both ways: they decide whom you see and who sees you. Conversations you already have stay as they are.",
+  "profile.seek.failed": "It could not be saved. Try again.",
   "profile.seek.intent.explain": "This also decides who sees you: people who want the same thing. Open to either covers long-term and casual.",
   "profile.seek.summary": "Whom, what ages, what you are here for and your deal-breakers",
   "profile.seek.title": "What you seek",

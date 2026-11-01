@@ -26,7 +26,7 @@ import { Chip, SEARCHABLE_FROM, visibleOptions } from "./FieldEditor";
 import { FieldLabel } from "./fieldIcons";
 import { fieldLabelKey, optionKey } from "./keys";
 import { laterAnswerPath } from "./later/LaterFieldScreen";
-import { sectionOf, sectionPath } from "./sections";
+import { sectionAnswerPath, sectionOf } from "./sections";
 import { useProfile } from "./useProfile";
 
 export const DEAL_BREAKERS_PATH = "/profile/deal-breakers" as const;
@@ -223,7 +223,7 @@ export function DealBreakersScreen() {
         router.push(
           (LATER_FIELD_ORDER as readonly string[]).includes(field)
             ? laterAnswerPath(field)
-            : sectionPath(sectionOf(field)),
+            : sectionAnswerPath(sectionOf(field)),
         );
       }}
     >

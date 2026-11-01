@@ -629,7 +629,7 @@ profile.dealBreakers.title:
 
 profile.dealBreakers.back:
   en: "Back"
-  description: "Screen-reader label of the back arrow of the deal-breakers screen: back to where it was opened, the profile or the e-mail screen; with changes not saved it asks first."
+  description: "Screen-reader label of the back arrow of the deal-breakers screen: back to where it was opened, What you seek or the e-mail screen; with changes not saved it asks first."
   fi: "Takaisin"
   sv: "Tillbaka"
   machine: { fi: true, sv: true }
@@ -795,6 +795,13 @@ profile.seek.ages.summary:
   sv: "Yngsta {min, number}, äldsta {max, number}"
   machine: { fi: true, sv: true }
 
+profile.seek.failed:
+  en: "It could not be saved. Try again."
+  description: "Said when a change on the screens of whom one seeks and the ages could not be saved (#542). Neither screen can hold a wrong answer, so only the server or the network can be at fault: nothing here asks the person to check anything."
+  fi: "Tallentaminen ei onnistunut. Yritä uudelleen."
+  sv: "Det gick inte att spara. Försök igen."
+  machine: { fi: true, sv: true }
+
 profile.seek.intent.explain:
   en: "This also decides who sees you: people who want the same thing. Open to either covers long-term and casual."
   description: "Lead text of the screen that changes what one is here for (#542). Not the intent step's text, which says it can be changed later; the second sentence names the option Open to either."
@@ -916,7 +923,7 @@ profile.later.back:
 
 profile.later.backOnce:
   en: "Back to your deal-breakers"
-  description: "Screen-reader label of the back arrow of a later question opened from the deal-breakers' Answer it, which goes back there (#542)."
+  description: "Screen-reader label of the back arrow of a later question or a section opened from the deal-breakers' Answer it, which goes back there (#542)."
   fi: "Takaisin ehdottomiin rajoihisi"
   sv: "Tillbaka till dina absoluta gränser"
   machine: { fi: true, sv: true }

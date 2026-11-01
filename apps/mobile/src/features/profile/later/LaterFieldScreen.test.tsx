@@ -1,9 +1,10 @@
-import { act, fireEvent, screen, waitFor } from "@testing-library/react-native";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react-native";
 import type * as React from "react";
+import { StrictMode } from "react";
 import { saveSession } from "@/lib/session";
 import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
 import { expectPinnedHeader } from "@/test/layout";
-import { renderWithTheme } from "@/test/render";
+import { renderWithTheme, underProviders } from "@/test/render";
 import { LaterFieldScreen, laterProgress, screenOpen } from "./LaterFieldScreen";
 
 const { __router: router, __navigation: navigation } = jest.requireMock("expo-router") as {
@@ -455,6 +456,62 @@ describe("LaterFieldScreen", () => {
     expect(router.push).toHaveBeenCalledWith("/profile/later/languages");
   });
 
+  /**
+   * Save and continue, then away by the arrow with the save on its way (#542):
+   * the stack takes the screen at once, and the save lands after it.
+   */
+  async function leftWhileSaving(ui: React.ReactElement, arrow: string) {
+    const server = refusingSaves(null);
+    const { unmount } = await act(async () => {
+      const rendered = renderWithTheme(ui);
+      await settle();
+      return rendered;
+    });
+    await waitFor(() => expect(screen.getByText("While you wait")).toBeTruthy());
+    await press(screen.getByRole("button", { name: "Save and continue" }));
+    await press(screen.getByRole("button", { name: arrow }));
+    await act(async () => {
+      unmount();
+      await settle();
+    });
+    await act(async () => {
+      server.answer(
+        json({
+          profile: {
+            ...named({}),
+            specialCategoryConsent: null,
+            updatedAt: "2026-10-08T10:00:00.000Z",
+          },
+          completeness: { complete: false, missing: ["photos"] },
+          home: null,
+        }),
+      );
+      await settle();
+    });
+  }
+
+  it("moves on to no next question when it was left while its save was on the way", async () => {
+    router.dismissTo.mockClear();
+    await leftWhileSaving(<LaterFieldScreen field="smoking" />, "Back to your profile");
+    expect(router.dismissTo).toHaveBeenCalledTimes(1);
+    expect(router.push).not.toHaveBeenCalled();
+  });
+
+  // The second run of the effects comes after their cleanup, which marked the screen left.
+  it("still moves on after a save once StrictMode has run the effects twice", async () => {
+    const { puts } = fakeApi(named({}));
+    // Around the root: below the providers, the effects run once.
+    await act(async () => {
+      render(underProviders(<LaterFieldScreen field="hasKids" />), { wrapper: StrictMode });
+      await settle();
+    });
+    await waitFor(() => expect(screen.getByText("While you wait")).toBeTruthy());
+    await press(screen.getByRole("button", { name: "No kids" }));
+    await press(screen.getByRole("button", { name: "Save and continue" }));
+    await waitFor(() => expect(puts).toHaveLength(1));
+    await waitFor(() => expect(router.push).toHaveBeenCalledWith("/profile/later/wantsKids"));
+  });
+
   describe("opened for its one answer (#542)", () => {
     const SAVE = "Save and continue";
     const SKIP = "Ask me later";
@@ -538,6 +595,14 @@ describe("LaterFieldScreen", () => {
         expect(router.dismissTo).not.toHaveBeenCalled();
       },
     );
+
+    it("pops once when it was left while its save was on the way: a second pop would take what opened it", async () => {
+      const popped = popping();
+      await leftWhileSaving(<LaterFieldScreen field="smoking" once />, ARROW);
+      expect(popped).toHaveLength(1);
+      expect(popped[0]?.preventDefault).not.toHaveBeenCalled();
+      expect(router.push).not.toHaveBeenCalled();
+    });
 
     it("stays on a refused save, with the reason and the answer, and still asks before it is left", async () => {
       refusingSaves("validation_failed");

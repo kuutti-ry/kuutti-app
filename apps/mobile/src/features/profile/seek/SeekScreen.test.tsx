@@ -99,7 +99,7 @@ function fakeApi(start: Partial<Server> = {}) {
 }
 
 const { __router: router, __focus: focus } = jest.requireMock("expo-router") as {
-  __router: { push: jest.Mock; replace: jest.Mock; back: jest.Mock };
+  __router: { push: jest.Mock; replace: jest.Mock; back: jest.Mock; dismissTo: jest.Mock };
   __focus: () => void;
 };
 
@@ -145,6 +145,7 @@ beforeEach(async () => {
   router.push.mockClear();
   router.replace.mockClear();
   router.back.mockClear();
+  router.dismissTo.mockClear();
   await saveSession({
     sessionId: "6f1c1c4e-9a8e-4a0b-9c3a-0c8d1e2f3a4b",
     accessToken: token("access"),
@@ -315,12 +316,13 @@ describe("SeekScreen", () => {
     expect(screen.queryByText("Smoking")).toBeNull();
   });
 
-  it("goes to onboarding when a screen hands back and the consent is gone", async () => {
+  it("goes back to Home when a screen hands back and the consent is gone", async () => {
     const { server } = await opened();
-    expect(router.replace).not.toHaveBeenCalled();
+    expect(router.dismissTo).not.toHaveBeenCalled();
     server.consent = null;
     await handBack();
-    expect(router.replace).toHaveBeenCalledWith("/onboarding");
+    expect(router.dismissTo).toHaveBeenCalledWith("/");
+    expect(router.replace).not.toHaveBeenCalled();
   });
 
   it("says it is loading until the answers are read, in a live region, with no row", async () => {
@@ -373,10 +375,30 @@ describe("SeekScreen", () => {
     expect(screen.queryByText("Your profile could not be loaded.")).toBeNull();
   });
 
-  it("sends whoever lacks the consent to onboarding, and shows no row of it", async () => {
+  it("says it is loading again while Try again reads", async () => {
+    const { server } = fakeApi({ failing: true });
+    await show(<SeekScreen />);
+    await waitFor(() => expect(screen.getByText("Your profile could not be loaded.")).toBeTruthy());
+    let answer: (() => void) | undefined;
+    server.wait = new Promise((resolve) => {
+      answer = resolve;
+    });
+    server.failing = false;
+    await press(screen.getByRole("button", { name: "Try again" }));
+    expect(screen.getByText("Loading your profile…").props.accessibilityLiveRegion).toBe("polite");
+    expect(screen.queryByText("Your profile could not be loaded.")).toBeNull();
+    await act(async () => {
+      answer?.();
+      await settle();
+    });
+    await waitFor(() => expect(row(WHOM)).toBeTruthy());
+  });
+
+  it("sends whoever lacks the consent back to Home, and shows no row of it", async () => {
     fakeApi({ consent: null });
     await show(<SeekScreen />);
-    await waitFor(() => expect(router.replace).toHaveBeenCalledWith("/onboarding"));
+    await waitFor(() => expect(router.dismissTo).toHaveBeenCalledWith("/"));
+    expect(router.replace).not.toHaveBeenCalled();
     expect(screen.queryByRole("button", { name: WHOM })).toBeNull();
     expect(screen.queryByText("Your profile could not be loaded.")).toBeNull();
   });

@@ -36,6 +36,12 @@ describe("Stepper", () => {
     expect(pressables(screen.toJSON() as HostNode).flatMap((n) => a11yProblems(n))).toEqual([]);
   });
 
+  it("is no heading, drawn as large as one, and keeps its live region (#542)", async () => {
+    await show();
+    expect(screen.queryByRole("heading")).toBeNull();
+    expect(screen.getByText("170 cm").props.accessibilityLiveRegion).toBe("polite");
+  });
+
   it("does not step below the lower end", async () => {
     const onChange = await show({ canDown: false });
     const down = screen.getByRole("button", { name: "One centimetre less" });

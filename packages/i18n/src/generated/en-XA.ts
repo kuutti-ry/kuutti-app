@@ -1396,6 +1396,7 @@ export const enXA: Readonly<Record<string, string>> = {
   "profile.seek.dealBreakers.none": "［Ñóóñéé］",
   "profile.seek.dealBreakers.paused": "［{field} (pááúúšééd)］",
   "profile.seek.explain": "［Thééšéé wóórk bóóth wááýýš: thééýý dééçíídéé whóóm ýýóóúú šéééé ááñd whóó šééééš ýýóóúú. Çóóñvééršáátííóóñš ýýóóúú áálrééáádýý háávéé štááýý ááš thééýý ááréé.］",
+  "profile.seek.failed": "［ÍÍt çóóúúld ñóót béé šáávééd. Trýý áágááííñ.］",
   "profile.seek.intent.explain": "［Thííš áálšóó dééçíídééš whóó šééééš ýýóóúú: pééóópléé whóó wááñt théé šááméé thííñg. ÓÓpééñ tóó ééííthéér çóóvéérš lóóñg-téérm ááñd çáášúúáál.］",
   "profile.seek.summary": "［Whóóm, wháát áágééš, wháát ýýóóúú ááréé hééréé fóór ááñd ýýóóúúr dééáál-brééáákéérš］",
   "profile.seek.title": "［Wháát ýýóóúú šéééék］",

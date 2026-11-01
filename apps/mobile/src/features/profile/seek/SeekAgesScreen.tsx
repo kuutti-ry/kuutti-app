@@ -9,9 +9,8 @@ import { Stepper } from "@/components/ui/stepper";
 import { Text } from "@/components/ui/text";
 import { useT } from "@/lib/locale";
 import { ConfirmLeaveDialog } from "../ConfirmLeave";
-import { profileErrorText } from "../errorText";
 import { useRefusedDraft, useSaveOnLeave } from "../useSaveOnLeave";
-import { type HeldChange, savedOrHeld, useSeeking } from "./useSeeking";
+import { savedOrHeld, useSeeking } from "./useSeeking";
 
 export const SEEK_AGES_PATH = "/profile/seek/ages" as const;
 
@@ -24,22 +23,24 @@ export const SEEK_AGES_PATH = "/profile/seek/ages" as const;
 export function SeekAgesScreen() {
   const { t } = useT();
   const router = useRouter();
-  const held = useRefusedDraft<HeldChange<AgeWindow>>(SEEK_AGES_PATH);
+  const held = useRefusedDraft<AgeWindow>(SEEK_AGES_PATH);
   const seeking = useSeeking();
   const stored = seeking.status === "ready" ? seeking.seeking.ageWindow : null;
-  const [draft, setDraft] = useState<AgeWindow | null>(held?.draft ?? null);
+  const [draft, setDraft] = useState<AgeWindow | null>(held ?? null);
   const ages = draft ?? stored;
-  const leaving = useSaveOnLeave<HeldChange<AgeWindow>>({
+  const leaving = useSaveOnLeave<AgeWindow>({
     screen: SEEK_AGES_PATH,
     path: SEEK_AGES_PATH,
     held: held !== undefined,
+    // With no stored answer to compare with (the read failed too), a draft is tried again.
     save: () =>
-      !draft || !stored || (draft.min === stored.min && draft.max === stored.max)
+      !draft || (stored && draft.min === stored.min && draft.max === stored.max)
         ? null
         : savedOrHeld({ ageWindow: draft }, draft),
   });
 
-  if (seeking.status === "error") {
+  // A change brought back outlives a read that failed: see SeekWhomScreen.
+  if (seeking.status === "error" && !draft) {
     return (
       <SafeAreaView className="flex-1 bg-background">
         <View className="flex-1 items-center justify-center gap-4 p-6">
@@ -92,10 +93,7 @@ export function SeekAgesScreen() {
           onChange={(max) => setDraft({ ...ages, max })}
         />
       </ScrollView>
-      <ConfirmLeaveDialog
-        {...leaving}
-        reason={profileErrorText({ kind: "error", code: held?.code }, t)}
-      />
+      <ConfirmLeaveDialog {...leaving} reason={t("profile.seek.failed")} />
     </SafeAreaView>
   );
 }

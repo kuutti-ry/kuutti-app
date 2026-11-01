@@ -42,6 +42,8 @@ type Server = {
   refusal: (() => Response) | null;
   /** Every read fails. */
   failing: boolean;
+  /** The network is gone: every request is lost, a save counted as it went. */
+  offline: boolean;
   /** Every read waits for this. */
   wait: Promise<void>;
 };
@@ -53,6 +55,7 @@ function fakeApi(start: Partial<Server> = {}) {
     consent: CONSENT,
     refusal: null,
     failing: false,
+    offline: false,
     wait: Promise.resolve(),
     ...start,
   };
@@ -63,11 +66,13 @@ function fakeApi(start: Partial<Server> = {}) {
     if (request.method !== "GET") {
       const body = (await request.json()) as { seeks?: string[] };
       writes.push({ method: request.method, path, body });
+      if (server.offline) throw new TypeError("Network request failed");
       if (server.refusal) return server.refusal();
       server.seeks = body.seeks ?? server.seeks;
       return json({ seeks: server.seeks, ageWindow: server.ageWindow });
     }
     await server.wait;
+    if (server.offline) throw new TypeError("Network request failed");
     if (server.failing) return envelope("internal_error", 500);
     if (path === "/preferences") return json({ seeks: server.seeks, ageWindow: server.ageWindow });
     if (path === "/profile") {
@@ -92,7 +97,7 @@ function fakeApi(start: Partial<Server> = {}) {
 
 const { __navigation: navigation, __router: router } = jest.requireMock("expo-router") as {
   __navigation: { emit: (name: string, event: unknown) => void };
-  __router: { push: jest.Mock; replace: jest.Mock; back: jest.Mock };
+  __router: { push: jest.Mock; replace: jest.Mock; back: jest.Mock; dismissTo: jest.Mock };
 };
 
 /** The back gesture, the back button or Android's back key, as the stack reports it. */
@@ -115,9 +120,8 @@ const leaveAndGo = async (view: Awaited<ReturnType<typeof show>>) => {
 
 const CHIPS = ["Women", "Men", "Non-binary people", "Anyone"];
 const KEEP_ONE = "Keep at least one.";
-const GENERIC = "Saving did not work. Check the fields and try again.";
-const CONTACT_DETAILS =
-  "Your text has an e-mail address, a link, a phone number or a social media handle. Those come after a match.";
+const FAILED = "It could not be saved. Try again.";
+const LOAD_FAILED = "Your profile could not be loaded.";
 const THE_QUESTION = "Leave without saving?";
 const BACK = "Back to what you seek";
 
@@ -137,6 +141,7 @@ beforeEach(async () => {
   router.push.mockClear();
   router.replace.mockClear();
   router.back.mockClear();
+  router.dismissTo.mockClear();
   await saveSession({
     sessionId: "6f1c1c4e-9a8e-4a0b-9c3a-0c8d1e2f3a4b",
     accessToken: token("access"),
@@ -289,59 +294,118 @@ describe("SeekWhomScreen", () => {
     expect(router.push).not.toHaveBeenCalled();
   });
 
+  it("brings a refused change back with the draft and says it could not be saved, and goes on the word", async () => {
+    const { writes, view } = await opened({ refusal: () => envelope("internal_error", 500) });
+    await press(chip("Men"));
+    await leaveAndGo(view);
+    expect(writes).toEqual([saved(["woman", "man"])]);
+    expect(router.push).toHaveBeenCalledWith("/profile/seek/whom");
+
+    // The stack opens the screen again: what was chosen is there, and why it was not saved.
+    await show(<SeekWhomScreen />);
+    await waitFor(() => expect(screen.getByText(THE_QUESTION)).toBeTruthy());
+    expect(chosen()).toEqual(["Women", "Men"]);
+    expect(screen.getByText(FAILED)).toBeTruthy();
+
+    await press(chip("Leave without saving"));
+    expect(screen.queryByText(THE_QUESTION)).toBeNull();
+    expect(router.back).toHaveBeenCalledTimes(1);
+    await leave();
+    expect(writes).toHaveLength(1);
+  });
+
   it.each([
-    ["the generic line", "internal_error", 500, GENERIC],
-    ["the words the app has for the code", "text_contact_details", 400, CONTACT_DETAILS],
-  ])(
-    "brings a refused change back with the draft and %s, and goes on the word",
-    async (_what, code, status, reason) => {
-      const { writes, view } = await opened({ refusal: () => envelope(code, status) });
-      await press(chip("Men"));
+    ["fi-FI", "Kenet tahansa", "Tallentaminen ei onnistunut. Yritä uudelleen."],
+    ["sv-FI", "Vem som helst", "Det gick inte att spara. Försök igen."],
+  ])("says in %s that a refused change could not be saved", async (tag, anyone, failed) => {
+    (useLocales as jest.Mock).mockReturnValue([{ languageTag: tag }]);
+    try {
+      fakeApi({ refusal: () => envelope("internal_error", 500) });
+      const view = await show(<SeekWhomScreen />);
+      await waitFor(() => expect(chip(anyone)).toBeTruthy());
+      await press(chip(anyone));
       await leaveAndGo(view);
-      expect(writes).toEqual([saved(["woman", "man"])]);
-      expect(router.push).toHaveBeenCalledWith("/profile/seek/whom");
-
-      // The stack opens the screen again: what was chosen is there, and why it was not saved.
       await show(<SeekWhomScreen />);
-      await waitFor(() => expect(screen.getByText(THE_QUESTION)).toBeTruthy());
-      expect(chosen()).toEqual(["Women", "Men"]);
-      expect(screen.getByText(reason)).toBeTruthy();
+      await waitFor(() => expect(screen.getByText(failed)).toBeTruthy());
+    } finally {
+      (useLocales as jest.Mock).mockReturnValue([{ languageTag: "en-US" }]);
+    }
+  });
 
-      await press(chip("Leave without saving"));
-      expect(screen.queryByText(THE_QUESTION)).toBeNull();
-      expect(router.back).toHaveBeenCalledTimes(1);
-      await leave();
-      expect(writes).toHaveLength(1);
-    },
-  );
-
-  // Nothing to compare the draft with yet, so nothing goes: it is the question's to let go.
-  it("sends nothing for a refused draft left before the stored answer is read", async () => {
+  // Nothing to compare the draft with yet, so it goes as it is: a draft is never dropped unasked.
+  it("tries a refused draft again when it is left before the stored answer is read", async () => {
     const { server, writes, view } = await opened({
       refusal: () => envelope("internal_error", 500),
     });
     await press(chip("Men"));
     await leaveAndGo(view);
+    server.refusal = null;
     server.wait = new Promise(() => {});
     await show(<SeekWhomScreen />);
     expect(chosen()).toEqual(["Women", "Men"]);
     await leave();
-    expect(writes).toHaveLength(1);
+    expect(writes).toEqual([saved(["woman", "man"]), saved(["woman", "man"])]);
+    expect(server.seeks).toEqual(["woman", "man"]);
   });
 
   it("holds a change the network lost, as any refusal", async () => {
-    const { server, view } = await opened({
-      refusal: () => {
-        throw new TypeError("Network request failed");
-      },
-    });
+    const { server, view } = await opened();
     await press(chip("Men"));
+    server.offline = true;
     await leaveAndGo(view);
     expect(router.push).toHaveBeenCalledWith("/profile/seek/whom");
-    server.refusal = null;
+    // The network that lost the save has lost the read too.
     await show(<SeekWhomScreen />);
-    await waitFor(() => expect(screen.getByText(GENERIC)).toBeTruthy());
+    await waitFor(() => expect(screen.getByText(FAILED)).toBeTruthy());
     expect(chosen()).toEqual(["Women", "Men"]);
+    expect(screen.queryByText(LOAD_FAILED)).toBeNull();
+  });
+
+  describe("a change brought back with its read lost too", () => {
+    const broughtBack = async () => {
+      const { server, writes, view } = await opened();
+      await press(chip("Men"));
+      server.offline = true;
+      await leaveAndGo(view);
+      const again = await show(<SeekWhomScreen />);
+      await waitFor(() => expect(screen.getByText(THE_QUESTION)).toBeTruthy());
+      return { server, writes, again };
+    };
+
+    it("tries the save again on the leaving after Keep editing", async () => {
+      const { server, writes, again } = await broughtBack();
+      await press(chip("Keep editing"));
+      expect(screen.queryByText(THE_QUESTION)).toBeNull();
+      expect(screen.queryByText(LOAD_FAILED)).toBeNull();
+      expect(router.back).not.toHaveBeenCalled();
+      expect(chosen()).toEqual(["Women", "Men"]);
+      server.offline = false;
+      await leaveAndGo(again);
+      expect(writes).toEqual([saved(["woman", "man"]), saved(["woman", "man"])]);
+      expect(server.seeks).toEqual(["woman", "man"]);
+      expect(router.push).toHaveBeenCalledTimes(1);
+    });
+
+    it("comes back again when that save is lost too", async () => {
+      const { writes, again } = await broughtBack();
+      await press(chip("Keep editing"));
+      await leaveAndGo(again);
+      expect(writes).toHaveLength(2);
+      expect(router.push).toHaveBeenCalledTimes(2);
+      await show(<SeekWhomScreen />);
+      await waitFor(() => expect(screen.getByText(THE_QUESTION)).toBeTruthy());
+      expect(chosen()).toEqual(["Women", "Men"]);
+    });
+
+    it("goes back on Leave without saving, and sends nothing", async () => {
+      const { server, writes } = await broughtBack();
+      server.offline = false;
+      await press(chip("Leave without saving"));
+      expect(screen.queryByText(THE_QUESTION)).toBeNull();
+      expect(router.back).toHaveBeenCalledTimes(1);
+      await leave();
+      expect(writes).toHaveLength(1);
+    });
   });
 
   it("keeps a refused draft on Keep editing, and saves it on the next leaving", async () => {
@@ -399,10 +463,30 @@ describe("SeekWhomScreen", () => {
     expect(screen.queryByText("Your profile could not be loaded.")).toBeNull();
   });
 
-  it("sends whoever has no consent to onboarding, and shows no chip", async () => {
+  it("says it is loading again while Try again reads", async () => {
+    const { server } = fakeApi({ failing: true });
+    await show(<SeekWhomScreen />);
+    await waitFor(() => expect(screen.getByText(LOAD_FAILED)).toBeTruthy());
+    let answer: (() => void) | undefined;
+    server.wait = new Promise((resolve) => {
+      answer = resolve;
+    });
+    server.failing = false;
+    await press(chip("Try again"));
+    expect(screen.getByText("Loading your profile…").props.accessibilityLiveRegion).toBe("polite");
+    expect(screen.queryByText(LOAD_FAILED)).toBeNull();
+    await act(async () => {
+      answer?.();
+      await settle();
+    });
+    await waitFor(() => expect(chosen()).toEqual(["Women"]));
+  });
+
+  it("sends whoever has no consent back to Home, and shows no chip", async () => {
     fakeApi({ consent: null });
     await show(<SeekWhomScreen />);
-    await waitFor(() => expect(router.replace).toHaveBeenCalledWith("/onboarding"));
+    await waitFor(() => expect(router.dismissTo).toHaveBeenCalledWith("/"));
+    expect(router.replace).not.toHaveBeenCalled();
     expect(screen.queryByRole("button", { name: "Women" })).toBeNull();
     expect(screen.queryByText("Your profile could not be loaded.")).toBeNull();
   });

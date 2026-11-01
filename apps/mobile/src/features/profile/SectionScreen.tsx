@@ -18,6 +18,7 @@ import {
   INTENT_SECTION,
   type SectionId,
   type SectionItem,
+  sectionAnswerPath,
   sectionPath,
   sectionTitleKey,
 } from "./sections";
@@ -69,9 +70,10 @@ function ItemEditor({
  * research event (ADR-011), and a refused bio is best said on the screen that
  * holds it. Each section saves only its own changes onto the document as
  * stored (useProfile). What one is here for says beside its answer what the
- * answer does, and goes back to What you seek (#542).
+ * answer does, and goes back to What you seek (#542). Opened for one answer
+ * (`once`, the deal-breakers' "Answer it"), the arrow says it goes back there.
  */
-export function SectionScreen({ section: id }: { section: string }) {
+export function SectionScreen({ section: id, once = false }: { section: string; once?: boolean }) {
   const { t } = useT();
   const router = useRouter();
   const held = useRefusedDraft<HeldDraft>(id);
@@ -84,7 +86,7 @@ export function SectionScreen({ section: id }: { section: string }) {
   }, [section, router]);
   const leaving = useSaveOnLeave<HeldDraft>({
     screen: id,
-    path: sectionPath(id as SectionId),
+    path: once ? sectionAnswerPath(id as SectionId) : sectionPath(id as SectionId),
     held: held !== undefined,
     save: () => {
       if (!profile.dirty) return null;
@@ -122,7 +124,13 @@ export function SectionScreen({ section: id }: { section: string }) {
     <SafeAreaView className="flex-1 bg-background">
       <ScreenHeader
         title={t(sectionTitleKey(section.id))}
-        backLabel={t(section.id === INTENT_SECTION ? "profile.seek.back" : "profile.section.back")}
+        backLabel={t(
+          once
+            ? "profile.later.backOnce"
+            : section.id === INTENT_SECTION
+              ? "profile.seek.back"
+              : "profile.section.back",
+        )}
         onBack={() => router.back()}
       />
       <ScrollView

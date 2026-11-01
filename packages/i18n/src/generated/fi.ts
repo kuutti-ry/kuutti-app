@@ -1013,6 +1013,7 @@ export const fi: Readonly<Record<string, string>> = {
   "profile.seek.dealBreakers.none": "Ei yhtään",
   "profile.seek.dealBreakers.paused": "{field} (tauolla)",
   "profile.seek.explain": "Nämä toimivat molempiin suuntiin: ne ratkaisevat, keitä näet ja ketkä näkevät sinut. Keskustelusi pysyvät ennallaan.",
+  "profile.seek.failed": "Tallentaminen ei onnistunut. Yritä uudelleen.",
   "profile.seek.intent.explain": "Tämä ratkaisee myös, ketkä näkevät sinut: ne, jotka haluavat samaa. Avoin kummallekin kattaa pitkäaikaisen ja rennon.",
   "profile.seek.summary": "Ketä, minkä ikäisiä, mitä etsit täältä ja ehdottomat rajasi",
   "profile.seek.title": "Mitä etsit",

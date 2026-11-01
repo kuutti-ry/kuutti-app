@@ -41,6 +41,10 @@ export const LISTED_SECTIONS: readonly ProfileSection[] = PROFILE_SECTIONS.filte
 
 export const sectionPath = (id: SectionId) => `/profile/section/${id}` as const;
 
+/** A section opened for one answer: its arrow goes back to the deal-breakers, and says so (#542). */
+export const sectionAnswerPath = (id: SectionId) =>
+  ({ pathname: "/profile/section/[id]", params: { id, once: "1" } }) as const;
+
 export function findSection(id: string): ProfileSection | undefined {
   return PROFILE_SECTIONS.find((section) => section.id === id);
 }

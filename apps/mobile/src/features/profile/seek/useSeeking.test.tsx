@@ -5,7 +5,7 @@ import { saveSession } from "@/lib/session";
 import { savedOrHeld, useSeeking } from "./useSeeking";
 
 // What the list of What you seek and its two screens read (#542): the answers
-// with the consent, a way to onboarding for whoever lacks one of them, and what
+// with the consent, a way back to Home for whoever lacks one of them, and what
 // is held when a change is refused on the way out.
 
 const settle = () => new Promise<void>((resolve) => setTimeout(resolve, 10));
@@ -65,6 +65,16 @@ function serve(answers: Partial<Routes> = {}) {
   return { routes, saved };
 }
 
+/** Holds the next read of the answers until the test lets it through. */
+function waiting(routes: Routes) {
+  let answer: ((response: Response) => void) | undefined;
+  routes.preferences = () =>
+    new Promise<Response>((resolve) => {
+      answer = resolve;
+    });
+  return (response: Response) => answer?.(response);
+}
+
 async function ready() {
   const view = await renderHook(() => useSeeking());
   await waitFor(() => expect(view.result.current.status).not.toBe("loading"));
@@ -75,11 +85,12 @@ const failure = (state: ReturnType<typeof useSeeking>) =>
   state.status === "error" ? state.error : undefined;
 
 const { __router: router } = jest.requireMock("expo-router") as {
-  __router: { replace: jest.Mock };
+  __router: { replace: jest.Mock; dismissTo: jest.Mock };
 };
 
 beforeEach(async () => {
   router.replace.mockClear();
+  router.dismissTo.mockClear();
   await saveSession({
     sessionId: "6f1c1c4e-9a8e-4a0b-9c3a-0c8d1e2f3a4b",
     accessToken: token("access"),
@@ -97,7 +108,7 @@ describe("useSeeking", () => {
       status: "ready",
       seeking: { seeks: ["woman"], ageWindow: AGES, intent: "long_term" },
     });
-    expect(router.replace).not.toHaveBeenCalled();
+    expect(router.dismissTo).not.toHaveBeenCalled();
   });
 
   it("asks nothing of what one is here for: unanswered, it is ready without it", async () => {
@@ -105,7 +116,7 @@ describe("useSeeking", () => {
     const { result } = await ready();
     expect(result.current.status).toBe("ready");
     expect(result.current).toMatchObject({ seeking: { intent: undefined } });
-    expect(router.replace).not.toHaveBeenCalled();
+    expect(router.dismissTo).not.toHaveBeenCalled();
   });
 
   it.each([
@@ -113,12 +124,13 @@ describe("useSeeking", () => {
     ["an age window", { preferences: () => json({ ...PREFERENCES, ageWindow: null }) }],
     ["a stored profile", { profile: () => json(profile(null)) }],
     ["the consent", { profile: () => json(profile(stored({ specialCategoryConsent: null }))) }],
-  ])("sends a person without %s to onboarding, with no error shown", async (_what, answers) => {
+  ])("sends a person without %s back to Home, with no error shown", async (_what, answers) => {
     serve(answers);
     const { result } = await renderHook(() => useSeeking());
-    await waitFor(() => expect(router.replace).toHaveBeenCalledWith("/onboarding"));
+    await waitFor(() => expect(router.dismissTo).toHaveBeenCalledWith("/"));
     await act(settle);
     expect(result.current.status).toBe("loading");
+    expect(router.replace).not.toHaveBeenCalled();
   });
 
   it("does nothing once its host has gone, whatever the read brings", async () => {
@@ -136,7 +148,7 @@ describe("useSeeking", () => {
       answer?.(json({ ...PREFERENCES, seeks: null }));
       await settle();
     });
-    expect(router.replace).not.toHaveBeenCalled();
+    expect(router.dismissTo).not.toHaveBeenCalled();
   });
 
   it.each([
@@ -157,7 +169,7 @@ describe("useSeeking", () => {
     const { result } = await ready();
     expect(result.current.status).toBe("error");
     expect(failure(result.current)).toMatchObject({ name });
-    expect(router.replace).not.toHaveBeenCalled();
+    expect(router.dismissTo).not.toHaveBeenCalled();
   });
 
   it("keeps what it showed when a read again fails", async () => {
@@ -166,7 +178,23 @@ describe("useSeeking", () => {
     routes.preferences = () => refusal("internal_error", 500);
     await act(() => result.current.reload());
     expect(result.current).toMatchObject({ status: "ready", seeking: { seeks: ["woman"] } });
-    expect(router.replace).not.toHaveBeenCalled();
+    expect(router.dismissTo).not.toHaveBeenCalled();
+  });
+
+  it("stays quiet through a read again over a ready screen: no loading, and what it shows stays", async () => {
+    const { routes } = serve();
+    const { result } = await ready();
+    const answer = waiting(routes);
+    await act(async () => {
+      void result.current.reload();
+      await settle();
+    });
+    expect(result.current).toMatchObject({ status: "ready", seeking: { seeks: ["woman"] } });
+    await act(async () => {
+      answer(json({ ...PREFERENCES, seeks: ["man"] }));
+      await settle();
+    });
+    expect(result.current).toMatchObject({ status: "ready", seeking: { seeks: ["man"] } });
   });
 
   it("reads again on reload, and takes the new answers", async () => {
@@ -181,12 +209,13 @@ describe("useSeeking", () => {
     });
   });
 
-  it("goes to onboarding when a read again finds the consent gone", async () => {
+  it("goes back to Home when a read again finds the consent gone", async () => {
     const { routes } = serve();
     const { result } = await ready();
     routes.profile = () => json(profile(stored({ specialCategoryConsent: null })));
     await act(() => result.current.reload());
-    expect(router.replace).toHaveBeenCalledWith("/onboarding");
+    expect(router.dismissTo).toHaveBeenCalledWith("/");
+    expect(router.replace).not.toHaveBeenCalled();
   });
 
   it("comes out of the error state on a read again that works", async () => {
@@ -194,6 +223,23 @@ describe("useSeeking", () => {
     const { result } = await ready();
     routes.preferences = () => json(PREFERENCES);
     await act(() => result.current.reload());
+    expect(result.current).toMatchObject({ status: "ready", seeking: { seeks: ["woman"] } });
+  });
+
+  it("goes through loading on a read again after a failure, for the screen to say so", async () => {
+    const { routes } = serve({ preferences: () => refusal("internal_error", 500) });
+    const { result } = await ready();
+    expect(result.current.status).toBe("error");
+    const answer = waiting(routes);
+    await act(async () => {
+      void result.current.reload();
+      await settle();
+    });
+    expect(result.current.status).toBe("loading");
+    await act(async () => {
+      answer(json(PREFERENCES));
+      await settle();
+    });
     expect(result.current).toMatchObject({ status: "ready", seeking: { seeks: ["woman"] } });
   });
 
@@ -249,27 +295,16 @@ describe("savedOrHeld", () => {
     expect(saved).toEqual([{ seeks: ["man"] }]);
   });
 
-  it("holds the draft with the code of a refusal", async () => {
-    serve({ save: () => refusal("validation_failed", 422) });
-    await expect(savedOrHeld({ seeks: draft }, draft)).resolves.toEqual({
-      draft,
-      code: "validation_failed",
-    });
-  });
-
   it.each([
+    ["the API refused it", () => refusal("validation_failed", 422)],
     ["the network failed", offline],
-    ["the answer has no envelope", () => new Response("Bad gateway", { status: 502 })],
     ["this build cannot read the answer", () => json({ seeks: "everybody", ageWindow: null })],
-  ])("holds the draft with no code when %s", async (_what, save) => {
+  ])("holds the draft itself when %s", async (_what, save) => {
     serve({ save });
-    await expect(savedOrHeld({ seeks: draft }, draft)).resolves.toEqual({
-      draft,
-      code: undefined,
-    });
+    await expect(savedOrHeld({ seeks: draft }, draft)).resolves.toBe(draft);
   });
 
-  // An answer with no consent has nowhere to go: the list's read sends the person to onboarding.
+  // An answer with no consent has nowhere to go: the list's read sends the person on to onboarding.
   it("holds nothing when what is gone is the consent", async () => {
     const { saved } = serve({ save: () => refusal("consent_required", 403) });
     await expect(savedOrHeld({ seeks: draft }, draft)).resolves.toBeNull();

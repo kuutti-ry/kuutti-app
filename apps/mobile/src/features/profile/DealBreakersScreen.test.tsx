@@ -199,12 +199,15 @@ describe("DealBreakersScreen", () => {
     expect(screen.queryByText("Leave without saving?")).toBeNull();
   });
 
-  it("leads a field without a later screen to the section that holds it (#239)", async () => {
+  it("leads a field without a later screen to the section that holds it, for its one answer (#239, #542)", async () => {
     fakeApi({ ...answeredAll, monogamy: undefined });
     await show(<DealBreakersScreen />);
     await waitFor(() => expect(screen.getByText("Deal-breakers")).toBeTruthy());
     await press(screen.getByRole("button", { name: "Answer it" }));
-    expect(router.push).toHaveBeenCalledWith("/profile/section/relationship");
+    expect(router.push).toHaveBeenCalledWith({
+      pathname: "/profile/section/[id]",
+      params: { id: "relationship", once: "1" },
+    });
   });
 
   it("switches deal-breakers on, takes what is fine, holds the limit, and saves the set", async () => {

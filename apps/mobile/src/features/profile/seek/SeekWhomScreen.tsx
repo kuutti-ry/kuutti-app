@@ -9,10 +9,9 @@ import { ScreenHeader } from "@/components/ScreenHeader";
 import { Text } from "@/components/ui/text";
 import { useT } from "@/lib/locale";
 import { ConfirmLeaveDialog } from "../ConfirmLeave";
-import { profileErrorText } from "../errorText";
 import { useRefusedDraft, useSaveOnLeave } from "../useSaveOnLeave";
 import { SeeksChips } from "./SeeksChips";
-import { type HeldChange, savedOrHeld, useSeeking } from "./useSeeking";
+import { savedOrHeld, useSeeking } from "./useSeeking";
 
 export const SEEK_WHOM_PATH = "/profile/seek/whom" as const;
 
@@ -28,22 +27,25 @@ const sameSet = (a: readonly Gender[], b: readonly Gender[]) =>
 export function SeekWhomScreen() {
   const { t } = useT();
   const router = useRouter();
-  const held = useRefusedDraft<HeldChange<Gender[]>>(SEEK_WHOM_PATH);
+  const held = useRefusedDraft<Gender[]>(SEEK_WHOM_PATH);
   const seeking = useSeeking();
   const stored = seeking.status === "ready" ? seeking.seeking.seeks : null;
-  const [draft, setDraft] = useState<Gender[] | null>(held?.draft ?? null);
+  const [draft, setDraft] = useState<Gender[] | null>(held ?? null);
   // How many times the only chip was pressed: each is said, and a new choice ends them.
   const [refused, setRefused] = useState(0);
   const chosen = draft ?? stored;
-  const leaving = useSaveOnLeave<HeldChange<Gender[]>>({
+  const leaving = useSaveOnLeave<Gender[]>({
     screen: SEEK_WHOM_PATH,
     path: SEEK_WHOM_PATH,
     held: held !== undefined,
+    // With no stored answer to compare with (the read failed too), a draft is tried again.
     save: () =>
-      !draft || !stored || sameSet(draft, stored) ? null : savedOrHeld({ seeks: draft }, draft),
+      !draft || (stored && sameSet(draft, stored)) ? null : savedOrHeld({ seeks: draft }, draft),
   });
 
-  if (seeking.status === "error") {
+  // A change brought back outlives a read that failed: the network that lost
+  // the save usually loses the read too, and it must not vanish behind this.
+  if (seeking.status === "error" && !draft) {
     return (
       <SafeAreaView className="flex-1 bg-background">
         <View className="flex-1 items-center justify-center gap-4 p-6">
@@ -88,10 +90,7 @@ export function SeekWhomScreen() {
         />
         {refused > 0 && <Notice words={t("profile.seek.whom.keepOne")} answer={refused} refused />}
       </ScrollView>
-      <ConfirmLeaveDialog
-        {...leaving}
-        reason={profileErrorText({ kind: "error", code: held?.code }, t)}
-      />
+      <ConfirmLeaveDialog {...leaving} reason={t("profile.seek.failed")} />
     </SafeAreaView>
   );
 }

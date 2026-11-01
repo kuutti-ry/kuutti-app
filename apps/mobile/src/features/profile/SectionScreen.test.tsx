@@ -571,4 +571,57 @@ describe("SectionScreen", () => {
       expect(option("Something long-term").props.accessibilityState?.selected).toBe(true);
     });
   });
+
+  describe("opened for one answer, from the deal-breakers' Answer it (#542)", () => {
+    const TITLE = "Relationship and kids";
+    const ARROW = "Back to your deal-breakers";
+    const ready = () =>
+      waitFor(() => expect(screen.getByText("Relationship structure")).toBeTruthy());
+
+    it("says its arrow goes back to the deal-breakers, and goes back", async () => {
+      fakeApi();
+      await show(<SectionScreen section="relationship" once />);
+      await ready();
+      expectPinnedHeader(TITLE, ARROW);
+      expect(screen.queryByRole("button", { name: "Back to your profile" })).toBeNull();
+      await press(screen.getByRole("button", { name: ARROW }));
+      expect(router.back).toHaveBeenCalledTimes(1);
+    });
+
+    it.each([
+      ["fi-FI", "Takaisin ehdottomiin rajoihisi"],
+      ["sv-FI", "Tillbaka till dina absoluta gränser"],
+    ])("says so in %s", async (tag, arrow) => {
+      (useLocales as jest.Mock).mockReturnValue([{ languageTag: tag }]);
+      try {
+        fakeApi();
+        await show(<SectionScreen section="relationship" once />);
+        await waitFor(() => expect(screen.getByRole("button", { name: arrow })).toBeTruthy());
+      } finally {
+        (useLocales as jest.Mock).mockReturnValue([{ languageTag: "en-US" }]);
+      }
+    });
+
+    it("comes back at the path that says once when a change is refused, so the arrow still says it", async () => {
+      fakeApi({ saveStatus: 422 });
+      const view = await show(<SectionScreen section="relationship" once />);
+      await ready();
+      await press(screen.getByRole("button", { name: "Monogamous" }));
+      await leaveAndGo(view);
+      expect(router.push).toHaveBeenCalledTimes(1);
+      expect(router.push).toHaveBeenCalledWith({
+        pathname: "/profile/section/[id]",
+        params: { id: "relationship", once: "1" },
+      });
+
+      // The stack opens that path, and the route hands `once` on (routes.test.tsx).
+      await show(<SectionScreen section="relationship" once />);
+      await waitFor(() => expect(screen.getByText("Leave without saving?")).toBeTruthy());
+      await press(screen.getByRole("button", { name: "Keep editing" }));
+      expectPinnedHeader(TITLE, ARROW);
+      expect(
+        screen.getByRole("button", { name: "Monogamous" }).props.accessibilityState?.selected,
+      ).toBe(true);
+    });
+  });
 });

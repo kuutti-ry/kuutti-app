@@ -427,11 +427,17 @@ describe("the profile's routes with a param", () => {
   it("hands a section's id to its screen, and an empty one when the link has none", async () => {
     params({ id: "basics" });
     const view = await render(<ProfileSectionRoute />);
-    expect(propsOf("SectionScreen")).toEqual({ section: "basics" });
+    expect(propsOf("SectionScreen")).toEqual({ section: "basics", once: false });
     await view.unmount();
     params({});
     await render(<ProfileSectionRoute />);
-    expect(propsOf("SectionScreen")).toEqual({ section: "" });
+    expect(propsOf("SectionScreen")).toEqual({ section: "", once: false });
+  });
+
+  it("says a section was opened for its one answer when the link says once (#542)", async () => {
+    params({ id: "relationship", once: "1" });
+    await render(<ProfileSectionRoute />);
+    expect(propsOf("SectionScreen")).toEqual({ section: "relationship", once: true });
   });
 });
 

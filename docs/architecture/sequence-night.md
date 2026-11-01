@@ -182,7 +182,7 @@ sequenceDiagram
 
 ## Open
 
-- **Two jobs held back in production, the maintainer's to lift.** `round-builder` waits for how long rounds are kept (ADR-034 Open 2, ADR-035 Open 1), and `research-export` for ADR-029's ninety days. Both are `shortcut:` lines in `boot.ts`.
+- **Two jobs held back in production, the maintainer's to lift.** `round-builder` waits for how long rounds are kept (ADR-034 Open 2, ADR-035 Open 1) and for the filters to be asked on read and on `decide` (#502, #542), and `research-export` for ADR-029's ninety days. Both are `shortcut:` lines in `boot.ts`.
 - **"As cron".** `.claude/rules/api.md` says the nightly jobs run "as cron inside the same container". There is no cron: one timer in the API's process (`jobs/nightly.ts`). Drawn as the code.
 - **What `jobs/` holds.** `.claude/rules/layout.md` says `jobs/` holds the nightly runner and its jobs, "the slices' sweeps" among them. The sweeps live in their slices, `jobs/` also holds the round builder and the invitation count, and the order is `boot.ts`'s list. Drawn as `boot.ts`.
 - **"Every 24 hours".** The comment at the top of `jobs/nightly.ts` says one timer to the next 04:00, then every 24 hours. The code arms the timer again for the next 04:00 after each run, so on the nights summer time begins or ends the wait is 23 or 25 hours. Drawn as the code: 04:00 in Helsinki, every night.

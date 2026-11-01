@@ -29,7 +29,7 @@ ADR-034 built the round record and nothing that writes it: a person whose matchi
 4. **The night.** The job `round-builder` builds the Finnish day that is (at 04:00 it has begun). A pond is read once; each person's history is one query, their round one transaction through `saveRound` (ADR-034 §8). Somebody whose round for the day exists already is left as they are. One person's round that fails to build is a log line naming the account and a count; everybody else's is built, and the day's first read tries again (§5). The job's line carries counts only: ponds, rounds built, cards, failures.
 5. **The day's first read builds a missing round.** `GET /rounds/today` that finds no round for the day asks the builder for the caller's alone (`buildRoundOf`, handed in by `app.ts`, as the card builder is), and reads again if a round for the day stands now, whoever wrote it. This amends ADR-034 §3: entries are null while the caller has no round for the day, which is when their matching has not opened, and an empty list is a round with nobody to show. It covers a gate that opened at a first ask during the day, a profile completed after the night, the hours between midnight and the night's jobs, and a build that failed at night. Two reads at once both build; `saveRound` keeps the first, and the read that lost answers with the round the other wrote (`buildRoundOf` says whether a round stands, not whether it wrote one). The person is asked alone first, so one whose profile no longer counts as complete, though their gate is open, costs no read of the pond on each visit. It reads the person's whole pond for one round: a few hundred milliseconds at five thousand people, at most once a person a day, and only when the night built none.
 6. **Research.** `round_built` names its ordering (`ordering: "count"`, `"band_count"` since #514), so the rounds of a later ordering are told apart from the first cut's (a closed list, as `reason` is: ADR-011 §4's no string field holds). The first cut's rounds have no random places, so they are no uniform sample of anybody's pool; the name says which rounds those are.
-7. **Not in production yet.** Neither the night's job nor the first read builds anything where `APP_ENV` is `production`, until the maintainer has set how long rounds are kept (ADR-034 Open 2): a `shortcut:` in `boot.ts` and `app.ts`, which his answer lifts.
+7. **Not in production yet.** Neither the night's job nor the first read builds anything where `APP_ENV` is `production`, until the maintainer has set how long rounds are kept (ADR-034 Open 2) and the filters are asked on read and on `decide` (#502): a `shortcut:` in `boot.ts` and `app.ts`, which both together lift.
 
 ## Consequences
 
@@ -52,7 +52,7 @@ Liked-you's forced places, its queue and its expiry (#97, next) and the fish ahe
 
 ## Open, the maintainer's
 
-1. How long rounds are kept (ADR-034 Open 2); until then nothing is built in production (§7).
+1. How long rounds are kept (ADR-034 Open 2); until then, and until the filters are asked on read and on `decide`, nothing is built in production (§7).
 2. The cooldown's edge: a day exactly `shown_cooldown_days` back is outside it (§2).
 3. A like given and never answered: past the cooldown the person comes back as seen before, and the like can be given again (#99's order of coming back later).
 4. A conversation of any state keeps two people apart for good, an ended one included (§2).
@@ -60,6 +60,7 @@ Liked-you's forced places, its queue and its expiry (#97, next) and the fish ahe
 
 ## History
 
+- 2026-11-01 (#542, the maintainer's word of 31/10/2026): §7's hold waits for two things. Today's cards stand until midnight after a change of what one seeks, which he accepted only while production builds no rounds before the filters are asked on read and on `decide`, so the answer on how long rounds are kept cannot lift the hold alone.
 - 2026-10-20: written with #95's first cut, on the maintainer's decisions of that day.
 - 2026-10-20 (#97, ADR-037): the round's first places are the people whose like waits on the person; the shown cooldown spaces ordinary cards only, a recent pass and a conversation keep a like away too.
 - 2026-10-20, after the audit of the first cut: §5's lost race answers the other read's round, and the person is asked alone before the pond is read; the builder caps a round at `ROUND_ENTRIES_MAX`, the liked-you places first; the Consequences count the liked-you places of #97.

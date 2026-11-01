@@ -1,11 +1,11 @@
 # What you seek (#542): a list of its own, opened from the profile, with whom,
-# the ages, what one is here for and the deal-breakers, each row opening a
-# screen with no Save button. A change is kept by going back and read again on
-# the way in, as often as one wishes. The only gender chosen stays chosen and
-# says why, and what one is here for changes and never clears. Elina seeks men
-# aged 35 to 48 for something long-term, and no other flow reads that; the flow
-# ends as it began. A run that stops half-way leaves a change: `pnpm demo:reset`
-# puts her back.
+# the ages, what one is here for and the deal-breakers. The first three open a
+# screen with no Save button, and the deal-breakers keep theirs. A change is
+# kept by going back and read again on the way in, as often as one wishes. The
+# only gender chosen stays chosen and says why, and what one is here for changes
+# and never clears. Elina seeks men aged 35 to 48 for something long-term, and
+# no other flow reads that; the flow ends as it began. A run that stops half-way
+# leaves a change: `pnpm demo:reset` puts her back.
 appId: fi.kuutti.app
 name: What you seek lists whom, the ages, why and the deal-breakers, and each change is kept by going back
 ---
