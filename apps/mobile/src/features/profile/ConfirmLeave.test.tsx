@@ -44,15 +44,49 @@ const press = (name: string) =>
     fireEvent.press(screen.getByRole("button", { name }));
     await settle();
   });
+const leaveEvent = () => ({ preventDefault: jest.fn(), data: { action: { type: "GO_BACK" } } });
 /** The arrow, Android's back key or a pop of several screens, as the stack reports it. */
 const back = async () => {
-  const event = { preventDefault: jest.fn(), data: { action: { type: "GO_BACK" } } };
+  const event = leaveEvent();
   await act(async () => {
     navigation.emit("beforeRemove", event);
     await settle();
   });
   return event;
 };
+
+/**
+ * A screen with an answer not saved, whose button pops it in the same tick, as
+ * a once-only question does on its way back: no render comes between, so the
+ * state still says unsaved when the stack asks. `Pop after letting go` says
+ * first that nothing is unsaved; `popped` is what the stack was told.
+ */
+let popped: ReturnType<typeof leaveEvent>[] = [];
+function Popping() {
+  const leaving = useConfirmLeave(true, () => undefined);
+  const pop = () => {
+    const event = leaveEvent();
+    popped.push(event);
+    navigation.emit("beforeRemove", event);
+  };
+  return (
+    <>
+      <Pressable accessibilityRole="button" onPress={pop}>
+        <Text>Pop</Text>
+      </Pressable>
+      <Pressable
+        accessibilityRole="button"
+        onPress={() => {
+          leaving.letGo();
+          pop();
+        }}
+      >
+        <Text>Pop after letting go</Text>
+      </Pressable>
+      <ConfirmLeaveDialog {...leaving} />
+    </>
+  );
+}
 /**
  * A link from outside the app, as Expo Router hands it to +native-intent. The
  * outcome comes back in a box: a held link is a promise that only the word
@@ -69,6 +103,7 @@ const link = async (path: string, initial = false) => {
 
 beforeEach(() => {
   navigation.dispatch.mockClear();
+  popped = [];
 });
 // Each test's screens are taken down: a holder left mounted would keep listening.
 afterEach(() => {
@@ -172,5 +207,58 @@ describe("useConfirmLeave", () => {
     await renderWithTheme(<Holder name="A" unsaved={false} />);
     expect((await back()).preventDefault).not.toHaveBeenCalled();
     expect(navigation.setOptions).toHaveBeenLastCalledWith({ gestureEnabled: true });
+  });
+
+  describe("letGo (#542)", () => {
+    it("lets a pop through in the same tick, with nothing asked", async () => {
+      await renderWithTheme(<Popping />);
+      await press("Pop after letting go");
+      expect(popped).toHaveLength(1);
+      expect(popped[0]?.preventDefault).not.toHaveBeenCalled();
+      expect(screen.queryByText("Leave without saving?")).toBeNull();
+      expect(navigation.dispatch).not.toHaveBeenCalled();
+    });
+
+    it("is what lets it through: the same pop without it is held and asked about", async () => {
+      await renderWithTheme(<Popping />);
+      await press("Pop");
+      expect(popped[0]?.preventDefault).toHaveBeenCalled();
+      expect(screen.getByText("Leave without saving?")).toBeTruthy();
+    });
+
+    it("lets a link through too: nothing is held for it to wait on", async () => {
+      await renderWithTheme(<Popping />);
+      await press("Pop after letting go");
+      expect((await link("kuutti://settings")).outcome).toBe("kuutti://settings");
+      expect(screen.queryByText("Leave without saving?")).toBeNull();
+    });
+  });
+});
+
+describe("ConfirmLeaveDialog", () => {
+  const dialog = (reason?: string) => (
+    <ConfirmLeaveDialog asking keep={jest.fn()} leave={jest.fn()} reason={reason} />
+  );
+
+  it("says why nothing was saved in place of the unsaved line, where it is given one", async () => {
+    await renderWithTheme(dialog("That has an e-mail address in it."));
+    expect(screen.getByText("Leave without saving?")).toBeTruthy();
+    expect(screen.getByText("That has an e-mail address in it.")).toBeTruthy();
+    expect(screen.queryByText("Your changes are not saved yet.")).toBeNull();
+    expect(screen.getByRole("button", { name: "Keep editing" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Leave without saving" })).toBeTruthy();
+  });
+
+  it("says that something is unsaved where it is given no reason", async () => {
+    await renderWithTheme(dialog());
+    expect(screen.getByText("Your changes are not saved yet.")).toBeTruthy();
+  });
+
+  it("shows nothing while it is not asking", async () => {
+    await renderWithTheme(
+      <ConfirmLeaveDialog asking={false} keep={jest.fn()} leave={jest.fn()} reason="Refused." />,
+    );
+    expect(screen.queryByText("Leave without saving?")).toBeNull();
+    expect(screen.queryByText("Refused.")).toBeNull();
   });
 });

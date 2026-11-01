@@ -914,6 +914,13 @@ profile.later.back:
   sv: "Tillbaka till din profil"
   machine: { fi: true, sv: true }
 
+profile.later.backOnce:
+  en: "Back to your deal-breakers"
+  description: "Screen-reader label of the back arrow of a later question opened from the deal-breakers' Answer it, which goes back there (#542)."
+  fi: "Takaisin ehdottomiin rajoihisi"
+  sv: "Tillbaka till dina absoluta gränser"
+  machine: { fi: true, sv: true }
+
 profile.later.progress:
   en: "{answered, number} of {total, number} answered"
   description: "Progress line of the later screens (#148)."

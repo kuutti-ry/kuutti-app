@@ -7,13 +7,18 @@ import { expectPinnedHeader } from "@/test/layout";
 import { renderWithTheme } from "@/test/render";
 import { DealBreakersScreen } from "./DealBreakersScreen";
 
-const { __router: router, __navigation: navigation } = jest.requireMock("expo-router") as {
+const {
+  __router: router,
+  __navigation: navigation,
+  __focus: focus,
+} = jest.requireMock("expo-router") as {
   __router: { push: jest.Mock; replace: jest.Mock; back: jest.Mock };
   __navigation: {
     dispatch: jest.Mock;
     setOptions: jest.Mock;
     emit: (name: string, event: unknown) => void;
   };
+  __focus: () => void;
 };
 const settle = (ms = 30) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 /** The arrow, Android's back key or a pop of several screens, as the stack reports it. */
@@ -42,10 +47,17 @@ const token = (seed: string) => (seed + "x".repeat(43)).slice(0, 43);
 
 type DealBreaker = { field: string; accept: string[]; includeUnknown: boolean };
 
+/** A later field's own screen, opened for its one answer: the answer comes back here (#542). */
+const answerAt = (field: string) => ({
+  pathname: "/profile/later/[field]",
+  params: { field, once: "1" },
+});
+
 /** A tiny server: the profile for the own answers, the deal-breakers read and replaced whole, paused read off the profile. */
 function fakeApi(fields: Record<string, unknown>, dealBreakers: DealBreaker[] = [], max = 2) {
   const server = { fields, dealBreakers };
   const puts: DealBreaker[][] = [];
+  const reads: string[] = [];
   const stored = () => ({
     dealBreakers: server.dealBreakers.map((d) => ({
       ...d,
@@ -56,6 +68,7 @@ function fakeApi(fields: Record<string, unknown>, dealBreakers: DealBreaker[] = 
   globalThis.fetch = jest.fn(async (input: Request | string, init?: RequestInit) => {
     const request = input instanceof Request ? input : new Request(input, init);
     const path = new URL(request.url).pathname;
+    if (request.method === "GET") reads.push(path);
     if (path === "/profile" && request.method === "GET") {
       return json({
         profile: {
@@ -80,7 +93,7 @@ function fakeApi(fields: Record<string, unknown>, dealBreakers: DealBreaker[] = 
     }
     return json({ error: { code: "not_found", message: "no", requestId: "r" } }, 404);
   }) as unknown as typeof fetch;
-  return { server, puts };
+  return { server, puts, reads };
 }
 
 const answeredAll = {
@@ -120,7 +133,7 @@ describe("DealBreakersScreen", () => {
     expect(screen.getAllByText("To filter on this, share yours first.")).toHaveLength(1);
     checkA11y();
     await press(screen.getByRole("button", { name: "Answer it" }));
-    expect(router.push).toHaveBeenCalledWith("/profile/later/hasKids");
+    expect(router.push).toHaveBeenCalledWith(answerAt("hasKids"));
   });
 
   it("goes back to where it was opened from an arrow pinned above the list, saving nothing", async () => {
@@ -247,7 +260,111 @@ describe("DealBreakersScreen", () => {
       true,
     );
     await press(screen.getByRole("button", { name: "Answer it" }));
-    expect(router.push).toHaveBeenCalledWith("/profile/later/smoking");
+    expect(router.push).toHaveBeenCalledWith(answerAt("smoking"));
+  });
+
+  describe("the way back from Answer it (#542)", () => {
+    const GATED = "To filter on this, share yours first.";
+    const PAUSED = "Paused until you answer it yourself.";
+    const ready = async () => {
+      await show(<DealBreakersScreen />);
+      await waitFor(() => expect(screen.getByText("Deal-breakers")).toBeTruthy());
+    };
+    const backInFront = () =>
+      act(async () => {
+        focus();
+        await settle();
+      });
+    const checked = (label: string) =>
+      screen.getByLabelText(label).props.accessibilityState?.checked;
+
+    it("reads the person's own answers on the first focus once, no more", async () => {
+      const { reads } = fakeApi(answeredAll);
+      await ready();
+      expect([...reads].sort()).toEqual(["/preferences/deal-breakers", "/profile"]);
+    });
+
+    it("reads them again when it is back in front, which opens the row that was gated", async () => {
+      const { server, reads } = fakeApi({ ...answeredAll, hasKids: undefined });
+      await ready();
+      expect(screen.getByText(GATED)).toBeTruthy();
+      expect(screen.queryByLabelText("Deal-breaker: Kids")).toBeNull();
+
+      server.fields.hasKids = "no";
+      await backInFront();
+      expect(screen.queryByText(GATED)).toBeNull();
+      expect(screen.queryByRole("button", { name: "Answer it" })).toBeNull();
+      expect(checked("Deal-breaker: Kids")).toBe(false);
+      expect(reads.filter((path) => path === "/profile")).toHaveLength(2);
+    });
+
+    it("takes a pause off the same way, the deal-breaker on as it was", async () => {
+      const { server } = fakeApi({ ...answeredAll, smoking: undefined }, [
+        { field: "smoking", accept: ["never"], includeUnknown: false },
+      ]);
+      await ready();
+      expect(screen.getByText(PAUSED)).toBeTruthy();
+      server.fields.smoking = "never";
+      await backInFront();
+      expect(screen.queryByText(PAUSED)).toBeNull();
+      expect(checked("Deal-breaker: Smoking")).toBe(true);
+    });
+
+    it("stays gated when the person came back without an answer", async () => {
+      fakeApi({ ...answeredAll, hasKids: undefined });
+      await ready();
+      await backInFront();
+      expect(screen.getByText(GATED)).toBeTruthy();
+      expect(screen.queryByLabelText("Deal-breaker: Kids")).toBeNull();
+    });
+
+    it("leaves a draft not saved as it is, and asks nothing of the API for it", async () => {
+      const { server, puts, reads } = fakeApi({ ...answeredAll, hasKids: undefined });
+      await ready();
+      await press(screen.getByLabelText("Deal-breaker: Smoking"));
+      await press(screen.getByRole("button", { name: "Never" }));
+
+      server.fields.hasKids = "no";
+      await backInFront();
+      // Still the draft: on, its answer accepted, and still something for the leaving to ask about.
+      expect(checked("Deal-breaker: Smoking")).toBe(true);
+      expect(screen.getByRole("button", { name: "Never" }).props.accessibilityState?.selected).toBe(
+        true,
+      );
+      expect(swipe()).toEqual({ gestureEnabled: false });
+      expect(reads.filter((path) => path === "/preferences/deal-breakers")).toHaveLength(1);
+      expect(puts).toEqual([]);
+
+      // The row that opened joins it, and both go in the one save.
+      await press(screen.getByLabelText("Deal-breaker: Kids"));
+      await press(screen.getByRole("button", { name: "No kids" }));
+      await press(screen.getByRole("button", { name: "Save the deal-breakers" }));
+      await waitFor(() => expect(screen.getByText("Saved.")).toBeTruthy());
+      expect(puts).toEqual([
+        [
+          { field: "hasKids", accept: ["no"], includeUnknown: true },
+          { field: "smoking", accept: ["never"], includeUnknown: true },
+        ],
+      ]);
+    });
+
+    it("takes nothing away when the read on the way back fails", async () => {
+      const { server } = fakeApi({ ...answeredAll });
+      await ready();
+      await press(screen.getByLabelText("Deal-breaker: Smoking"));
+      const reads = globalThis.fetch;
+      globalThis.fetch = jest.fn(async () =>
+        json({ error: { code: "internal_error", message: "x", requestId: "r" } }, 500),
+      ) as unknown as typeof fetch;
+      await backInFront();
+      expect(screen.queryByText("Your profile could not be loaded.")).toBeNull();
+      expect(checked("Deal-breaker: Smoking")).toBe(true);
+      // And the next time the read works, it counts.
+      globalThis.fetch = reads;
+      server.fields.hasKids = undefined;
+      await backInFront();
+      expect(screen.getByText(GATED)).toBeTruthy();
+    });
   });
 
   describe("the height row (#508)", () => {
@@ -340,7 +457,7 @@ describe("DealBreakersScreen", () => {
       expect(screen.queryByRole("button", { name: "Taller than me" })).toBeNull();
       expect(screen.queryByRole("button", { name: "Everyone, Height" })).toBeNull();
       await press(button("Answer it"));
-      expect(router.push).toHaveBeenCalledWith("/profile/later/height");
+      expect(router.push).toHaveBeenCalledWith(answerAt("height"));
     });
 
     it("says in words that it is paused while the own height is missing, and can be taken off", async () => {

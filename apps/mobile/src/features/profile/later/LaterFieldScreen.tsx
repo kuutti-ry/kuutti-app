@@ -138,7 +138,7 @@ export function LaterFieldScreen({ field, once = false }: { field: string; once?
           one is pushed on the last, so a plain back would step back one. */}
       <ScreenHeader
         title={t("profile.later.title")}
-        backLabel={t("profile.later.back")}
+        backLabel={t(once ? "profile.later.backOnce" : "profile.later.back")}
         onBack={() => (once ? router.back() : router.dismissTo("/profile"))}
       />
       <ScrollView

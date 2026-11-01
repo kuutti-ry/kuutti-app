@@ -4,7 +4,7 @@ import {
   PROFILE_FIELDS,
   type ProfileFieldKey,
 } from "@kuutti/schema";
-import { act, fireEvent, screen, waitFor } from "@testing-library/react-native";
+import { act, fireEvent, screen, waitFor, within } from "@testing-library/react-native";
 import { useLocales } from "expo-localization";
 import type * as React from "react";
 import { saveSession } from "@/lib/session";
@@ -238,7 +238,7 @@ describe("ProfileScreen", () => {
     expect(screen.queryByRole("button", { name: "Save" })).toBeNull();
     expect(screen.queryAllByText(/^profile\./)).toEqual([]);
     const found = pressables(screen.toJSON() as HostNode);
-    // The back arrow and the eye, the photos, the home and seven sections, the deal-breakers and the later questions.
+    // The back arrow and the eye, the photos, the home and seven sections, What you seek and the later questions.
     expect(found).toHaveLength(13);
     expect(found.flatMap((node) => a11yProblems(node))).toEqual([]);
   });
@@ -298,9 +298,95 @@ describe("ProfileScreen", () => {
     expect(screen.getByText("1/6", hidden)).toBeTruthy();
     expect(screen.getByText("0/3", hidden)).toBeTruthy();
     expect(screen.queryByText("1/6")).toBeNull();
-    // No mark on the deal-breakers or the later questions: neither is a part one fills.
-    expect(progressValue("Your deal-breakers")).toBeUndefined();
+    // No mark on What you seek or the later questions: neither is a part one fills.
+    expect(progressValue("What you seek")).toBeUndefined();
     expect(progressValue("Fill in the rest while you wait")).toBeUndefined();
+  });
+
+  it("keeps the marks' turns on the rows there are: the section that left the list takes none (#542)", async () => {
+    fakeApi([[]]);
+    await show(<ProfileScreen />);
+    await waitFor(() => expect(progressValue("Photos")).toBe("0 of 2 approved"));
+    const hidden = { includeHiddenElements: true };
+    const markOf = (name: string) => {
+      const row = within(screen.getByRole("button", { name }));
+      if (row.queryByTestId("progress-ring", hidden)) return "ring";
+      return row.queryByText(/^\d+\/\d+$/, hidden) ? "count" : "none";
+    };
+    expect(
+      [
+        "Photos",
+        "The basics",
+        "Prompts",
+        "Relationship and kids",
+        "Work and education",
+        "Lifestyle",
+        "Hobbies",
+        "Beliefs",
+      ].map((name) => [name, markOf(name)]),
+    ).toEqual([
+      ["Photos", "ring"],
+      ["The basics", "count"],
+      ["Prompts", "ring"],
+      ["Relationship and kids", "count"],
+      ["Work and education", "ring"],
+      ["Lifestyle", "count"],
+      ["Hobbies", "ring"],
+      ["Beliefs", "count"],
+    ]);
+  });
+
+  it("counts three in the relationship now what one is here for has left it (#542)", async () => {
+    fakeApi([[]], {
+      document: { fields: { monogamy: "monogamous", hasKids: "no", wantsKids: "want" } },
+    });
+    await show(<ProfileScreen />);
+    await waitFor(() => expect(progressValue("Relationship and kids")).toBe("Done"));
+  });
+
+  describe("What you seek's row (#542)", () => {
+    const SUMMARY = "Whom, what ages, what you are here for and your deal-breakers";
+    const ready = async (document?: Document) => {
+      fakeApi([[]], { document });
+      await show(<ProfileScreen />);
+      await waitFor(() => expect(screen.getByText("The basics")).toBeTruthy());
+    };
+
+    it("opens the list, and says what is on it, heard as the hint", async () => {
+      await ready();
+      const row = screen.getByRole("button", { name: "What you seek" });
+      expect(row.props.accessibilityHint).toBe(SUMMARY);
+      expect(screen.getByText(SUMMARY)).toBeTruthy();
+      await press(row);
+      expect(router.push).toHaveBeenCalledWith("/profile/seek");
+    });
+
+    it("holds no answer, whatever is answered: the list is where those are", async () => {
+      await ready({ fields: { intent: "casual" } });
+      expect(screen.getByRole("button", { name: "What you seek" }).props.accessibilityHint).toBe(
+        SUMMARY,
+      );
+      expect(screen.queryByText("Something casual")).toBeNull();
+    });
+
+    it("takes the deal-breakers' place, and what one is here for has no row: one answer, one door", async () => {
+      await ready();
+      expect(screen.getAllByRole("button").map((node) => node.props.accessibilityLabel)).toEqual([
+        "Back",
+        "See your card",
+        "Photos",
+        "Home",
+        "The basics",
+        "Prompts",
+        "Relationship and kids",
+        "Work and education",
+        "Lifestyle",
+        "Hobbies",
+        "Beliefs",
+        "What you seek",
+        "Fill in the rest while you wait",
+      ]);
+    });
   });
 
   it("marks the photos done at the two a card needs, and leaves the mark out when the list cannot be read", async () => {
@@ -323,7 +409,7 @@ describe("ProfileScreen", () => {
     await show(<ProfileScreen />);
     await waitFor(() => expect(progressValue("Hobbies")).toBe("Done"));
     expect(screen.queryByRole("button", { name: "Fill in the rest while you wait" })).toBeNull();
-    expect(screen.getByRole("button", { name: "Your deal-breakers" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "What you seek" })).toBeTruthy();
   });
 
   it("keeps the invitation while other nicotine alone is unanswered, as the smoking screen asks it (#239)", async () => {
@@ -337,20 +423,20 @@ describe("ProfileScreen", () => {
     expect(screen.getByRole("button", { name: "Fill in the rest while you wait" })).toBeTruthy();
   });
 
-  it("opens the photos, a section, the card from the eye, the deal-breakers and the later questions", async () => {
+  it("opens the photos, a section, the card from the eye, What you seek and the later questions", async () => {
     fakeApi([[]]);
     await show(<ProfileScreen />);
     await waitFor(() => expect(screen.getByText("Lifestyle")).toBeTruthy());
     await press(screen.getByRole("button", { name: "Photos" }));
     await press(screen.getByRole("button", { name: "Lifestyle" }));
     await press(screen.getByRole("button", { name: "See your card" }));
-    await press(screen.getByRole("button", { name: "Your deal-breakers" }));
+    await press(screen.getByRole("button", { name: "What you seek" }));
     await press(screen.getByRole("button", { name: "Fill in the rest while you wait" }));
     expect(router.push.mock.calls.map(([path]) => path)).toEqual([
       "/photos",
       "/profile/section/lifestyle",
       "/profile/card",
-      "/profile/deal-breakers",
+      "/profile/seek",
       expect.stringMatching(/^\/profile\/later\//),
     ]);
   });

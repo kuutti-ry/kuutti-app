@@ -1105,6 +1105,7 @@ export const en: Readonly<Record<string, string>> = {
   "profile.hobbyGroup.wellbeing": "Wellbeing",
   "profile.home.open": "Your profile",
   "profile.later.back": "Back to your profile",
+  "profile.later.backOnce": "Back to your deal-breakers",
   "profile.later.done": "That is everything. Thank you.",
   "profile.later.explain": "One question at a time, each optional. Skip what you like; every answer is on your card only when you give it.",
   "profile.later.next": "Save and continue",

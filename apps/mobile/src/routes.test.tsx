@@ -27,6 +27,12 @@ import LaterFieldRoute from "../app/profile/later/[field]";
 import PlaceRoute from "../app/profile/place";
 // biome-ignore lint/style/noRestrictedImports: a route file, not a slice internal
 import ProfileSectionRoute from "../app/profile/section/[id]";
+// biome-ignore lint/style/noRestrictedImports: a route file, not a slice internal
+import SeekAgesRoute from "../app/profile/seek/ages";
+// biome-ignore lint/style/noRestrictedImports: a route file, not a slice internal
+import SeekRoute from "../app/profile/seek/index";
+// biome-ignore lint/style/noRestrictedImports: a route file, not a slice internal
+import SeekWhomRoute from "../app/profile/seek/whom";
 import RoundRoute from "../app/round";
 import FoundThemRoute from "../app/settings/found-them";
 import SettingsRoute from "../app/settings/index";
@@ -120,6 +126,9 @@ jest.mock("@/features/profile", () => {
     PlaceScreen: probe("PlaceScreen"),
     ProfileScreen: probe("ProfileScreen"),
     SectionScreen: probe("SectionScreen"),
+    SeekAgesScreen: probe("SeekAgesScreen"),
+    SeekScreen: probe("SeekScreen"),
+    SeekWhomScreen: probe("SeekWhomScreen"),
   };
 });
 jest.mock("@/features/settings", () => {
@@ -177,6 +186,9 @@ describe("the screens without params", () => {
     ["/profile/card", CardPreviewRoute, "CardPreviewScreen"],
     ["/profile/deal-breakers", DealBreakersRoute, "DealBreakersScreen"],
     ["/profile/place", PlaceRoute, "PlaceScreen"],
+    ["/profile/seek", SeekRoute, "SeekScreen"],
+    ["/profile/seek/ages", SeekAgesRoute, "SeekAgesScreen"],
+    ["/profile/seek/whom", SeekWhomRoute, "SeekWhomScreen"],
     ["/round", RoundRoute, "RoundScreen"],
     ["/settings", SettingsRoute, "SettingsScreen"],
     ["/settings/found-them", FoundThemRoute, "FoundThemScreen"],
@@ -399,11 +411,17 @@ describe("the profile's routes with a param", () => {
   it("hands a later field's key to its screen, and an empty one when the link has none", async () => {
     params({ field: "smoking" });
     const view = await render(<LaterFieldRoute />);
-    expect(propsOf("LaterFieldScreen")).toEqual({ field: "smoking" });
+    expect(propsOf("LaterFieldScreen")).toEqual({ field: "smoking", once: false });
     await view.unmount();
     params({});
     await render(<LaterFieldRoute />);
-    expect(propsOf("LaterFieldScreen")).toEqual({ field: "" });
+    expect(propsOf("LaterFieldScreen")).toEqual({ field: "", once: false });
+  });
+
+  it("says a later field was opened for its one answer when the link says once (#542)", async () => {
+    params({ field: "smoking", once: "1" });
+    await render(<LaterFieldRoute />);
+    expect(propsOf("LaterFieldScreen")).toEqual({ field: "smoking", once: true });
   });
 
   it("hands a section's id to its screen, and an empty one when the link has none", async () => {

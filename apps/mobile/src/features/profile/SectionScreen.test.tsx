@@ -1,4 +1,5 @@
 import { act, fireEvent, screen, waitFor } from "@testing-library/react-native";
+import { useLocales } from "expo-localization";
 import type * as React from "react";
 import { clearSession, saveSession } from "@/lib/session";
 import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
@@ -190,7 +191,7 @@ describe("SectionScreen", () => {
   it("leaves without a word or a request when nothing changed", async () => {
     const { puts } = fakeApi();
     await show(<SectionScreen section="relationship" />);
-    await waitFor(() => expect(screen.getByText("Looking for")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("Relationship structure")).toBeTruthy());
     const event = await leave();
     expect(event.preventDefault).not.toHaveBeenCalled();
     expect(puts).toEqual([]);
@@ -286,6 +287,19 @@ describe("SectionScreen", () => {
     expect(router.push).toHaveBeenCalledTimes(1);
   });
 
+  it("says why in the question itself, where the line on something unsaved would say less", async () => {
+    fakeApi({ saveStatus: 400, saveCode: "text_contact_details" });
+    const view = await show(<SectionScreen section="basics" />);
+    await waitFor(() => expect(screen.getByLabelText("Name on your card")).toBeTruthy());
+    await type(screen.getByLabelText("Name on your card"), "aino@example.com");
+    await leaveAndGo(view);
+    await show(<SectionScreen section="basics" />);
+    await waitFor(() => expect(screen.getByText("Leave without saving?")).toBeTruthy());
+    // On the screen and in the dialog: the screen's own line stays once the dialog has gone.
+    expect(screen.getAllByText(/e-mail address, a link/)).toHaveLength(2);
+    expect(screen.queryByText("Your changes are not saved yet.")).toBeNull();
+  });
+
   it("lets a refused draft go on the word, with no save on the way out", async () => {
     const { puts } = fakeApi({ saveStatus: 400, saveCode: "text_contact_details" });
     const view = await show(<SectionScreen section="basics" />);
@@ -323,12 +337,12 @@ describe("SectionScreen", () => {
     expect(router.push).toHaveBeenCalledWith("/profile/section/basics");
 
     // Meanwhile another section is changed and saved.
-    const relationship = await show(<SectionScreen section="relationship" />);
+    const intent = await show(<SectionScreen section="intent" />);
     await waitFor(() =>
       expect(screen.getByRole("button", { name: "Something casual" })).toBeTruthy(),
     );
     await press(screen.getByRole("button", { name: "Something casual" }));
-    await leaveAndGo(relationship);
+    await leaveAndGo(intent);
     expect(document.fields).toEqual({ smoking: "never", intent: "casual" });
 
     // The refused section, back, fixed and left last, saves its own change and undoes none.
@@ -448,5 +462,113 @@ describe("SectionScreen", () => {
     await waitFor(() => expect(screen.getByRole("heading", { name: "Hobbies" })).toBeTruthy());
     await press(screen.getByRole("button", { name: "Back to your profile" }));
     expect(router.back).toHaveBeenCalledTimes(1);
+  });
+
+  describe("what one is here for, a section of its own (#542)", () => {
+    const LEAD =
+      "This also decides who sees you: people who want the same thing. Open to either covers long-term and casual.";
+    const QUESTION = "What are you here for?";
+    const BACK = "Back to what you seek";
+    const option = (name: string) => screen.getByRole("button", { name });
+    const ready = () =>
+      waitFor(() => expect(screen.getByRole("button", { name: "Something casual" })).toBeTruthy());
+
+    it("is titled by onboarding's question, says what the answer does, and goes back to What you seek", async () => {
+      fakeApi({ profile: stored({ intent: "casual" }) });
+      await show(<SectionScreen section="intent" />);
+      await ready();
+      expectPinnedHeader(QUESTION, BACK);
+      expect(screen.getByText(LEAD)).toBeTruthy();
+      expect(screen.queryByRole("button", { name: "Back to your profile" })).toBeNull();
+      await press(option(BACK));
+      expect(router.back).toHaveBeenCalledTimes(1);
+    });
+
+    it.each([
+      [
+        "fi-FI",
+        "Mitä etsit täältä?",
+        "Takaisin siihen, mitä etsit",
+        "Tämä ratkaisee myös, ketkä näkevät sinut: ne, jotka haluavat samaa. Avoin kummallekin kattaa pitkäaikaisen ja rennon.",
+      ],
+      [
+        "sv-FI",
+        "Vad är du här för?",
+        "Tillbaka till vad du söker",
+        "Det här avgör också vilka som ser dig: de som vill samma sak. Öppen för båda omfattar långvarigt och avslappnat.",
+      ],
+    ])("speaks %s", async (tag, title, back, lead) => {
+      (useLocales as jest.Mock).mockReturnValue([{ languageTag: tag }]);
+      try {
+        fakeApi();
+        await show(<SectionScreen section="intent" />);
+        await waitFor(() => expect(screen.getByText(lead)).toBeTruthy());
+        expectPinnedHeader(title, back);
+      } finally {
+        (useLocales as jest.Mock).mockReturnValue([{ languageTag: "en-US" }]);
+      }
+    });
+
+    it("leaves the lead to itself: the section it left keeps its own way back and has none", async () => {
+      fakeApi();
+      await show(<SectionScreen section="relationship" />);
+      await waitFor(() => expect(screen.getByText("Relationship structure")).toBeTruthy());
+      expectPinnedHeader("Relationship and kids", "Back to your profile");
+      expect(screen.queryByText(LEAD)).toBeNull();
+      expect(screen.queryByRole("button", { name: BACK })).toBeNull();
+      // Nor is the answer asked here any more: one answer, one door.
+      expect(screen.queryByText("Looking for")).toBeNull();
+      expect(screen.queryByRole("button", { name: "Something casual" })).toBeNull();
+    });
+
+    it("saves nothing when the chosen answer is pressed again", async () => {
+      const { puts } = fakeApi({ profile: stored({ intent: "casual" }) });
+      const view = await show(<SectionScreen section="intent" />);
+      await ready();
+      await press(option("Something casual"));
+      expect(option("Something casual").props.accessibilityState?.selected).toBe(true);
+      await leaveAndGo(view);
+      expect(puts).toEqual([]);
+    });
+
+    it("saves a changed answer on leaving, the rest of the document with it", async () => {
+      const { puts } = fakeApi({ profile: stored({ intent: "casual", smoking: "never" }) });
+      const view = await show(<SectionScreen section="intent" />);
+      await ready();
+      await press(option("Something long-term"));
+      expect(puts).toEqual([]);
+      const event = await leaveAndGo(view);
+      expect(event.preventDefault).not.toHaveBeenCalled();
+      expect(puts).toEqual([
+        expect.objectContaining({ fields: { intent: "long_term", smoking: "never" } }),
+      ]);
+    });
+
+    it("saves a Hide on leaving, the answer kept: Hide moved here with it", async () => {
+      const { puts } = fakeApi({ profile: stored({ intent: "casual" }) });
+      const view = await show(<SectionScreen section="intent" />);
+      await ready();
+      await press(option("Hide from your card: Looking for"));
+      await leaveAndGo(view);
+      expect(puts).toEqual([
+        expect.objectContaining({ fields: { intent: "casual" }, hiddenFields: ["intent"] }),
+      ]);
+    });
+
+    it("comes back to itself when a change is refused, with the draft and the reason", async () => {
+      fakeApi({ profile: stored({ intent: "casual" }), saveStatus: 422 });
+      const view = await show(<SectionScreen section="intent" />);
+      await ready();
+      await press(option("Something long-term"));
+      await leaveAndGo(view);
+      expect(router.push).toHaveBeenCalledWith("/profile/section/intent");
+
+      await show(<SectionScreen section="intent" />);
+      await waitFor(() => expect(screen.getByText("Leave without saving?")).toBeTruthy());
+      expect(
+        screen.getAllByText("Saving did not work. Check the fields and try again."),
+      ).toHaveLength(2);
+      expect(option("Something long-term").props.accessibilityState?.selected).toBe(true);
+    });
   });
 });

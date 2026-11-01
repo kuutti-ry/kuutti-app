@@ -16,6 +16,7 @@ import { PromptsEditor } from "./PromptsEditor";
 import {
   findSection,
   INTENT_SECTION,
+  type SectionId,
   type SectionItem,
   sectionPath,
   sectionTitleKey,
@@ -83,10 +84,10 @@ export function SectionScreen({ section: id }: { section: string }) {
   }, [section, router]);
   const leaving = useSaveOnLeave<HeldDraft>({
     screen: id,
-    path: sectionPath(section?.id ?? "basics"),
+    path: sectionPath(id as SectionId),
     held: held !== undefined,
     save: () => {
-      if (!section || !profile.dirty) return null;
+      if (!profile.dirty) return null;
       const { changes } = profile;
       return profile.save().then((notice) => notice && { changes, notice });
     },

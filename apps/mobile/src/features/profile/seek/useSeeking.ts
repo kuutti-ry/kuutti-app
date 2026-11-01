@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { ApiError } from "@/lib/api";
 import { fetchPreferences, fetchProfile, savePreferences } from "../client";
 
-export type Seeking = {
+type Seeking = {
   seeks: Gender[];
   ageWindow: AgeWindow;
   intent: ProfileFields["intent"];
@@ -51,7 +51,6 @@ export function useSeeking() {
       if (seeking) setState({ status: "ready", seeking });
       else router.replace("/onboarding");
     } catch (error) {
-      if (!mounted.current) return;
       setState((was) => (was.status === "ready" ? was : { status: "error", error }));
     }
   }, [router]);

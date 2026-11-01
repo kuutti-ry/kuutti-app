@@ -714,6 +714,7 @@ export const sv: Readonly<Record<string, string>> = {
   "profile.hobbyGroup.wellbeing": "Välmående",
   "profile.home.open": "Din profil",
   "profile.later.back": "Tillbaka till din profil",
+  "profile.later.backOnce": "Tillbaka till dina absoluta gränser",
   "profile.later.done": "Det var allt. Tack.",
   "profile.later.explain": "En fråga i taget, var och en frivillig. Hoppa över vad du vill; ett svar syns på ditt kort bara om du ger det.",
   "profile.later.next": "Spara och fortsätt",

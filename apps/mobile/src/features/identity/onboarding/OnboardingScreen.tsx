@@ -91,6 +91,12 @@ type LocalAnswers = {
   labelPending: boolean;
   /** The home the API just took: what the card will say is shown once, with the choice if there is one. */
   homeShown: HomeSummary | null;
+  /**
+   * The seeks step started from a stored answer, and only Continue ends it:
+   * to the API the consent alone answers the step, which would go with a
+   * change on the chips unsaved.
+   */
+  seeksHeld: boolean;
 };
 
 /**
@@ -113,7 +119,7 @@ function nextStep(status: OnboardingStatus, local: LocalAnswers): Step {
   if (missing.has("name")) return "name";
   if (missing.has("gender")) return "gender";
   if (local.labelPending) return "identityLabel";
-  if (missing.has("seeks")) return "seeks";
+  if (missing.has("seeks") || local.seeksHeld) return "seeks";
   if (missing.has("intent")) return "intent";
   if (missing.has("age_window")) return "age";
   if (missing.has("home")) return "home";
@@ -185,13 +191,14 @@ export function OnboardingScreen() {
   const profile = useProfile();
   const [invitation, setInvitation] = useState<InvitationOffer>("unasked");
   const [seeks, setSeeks] = useState<Gender[] | null>(null);
+  const [seeksHeld, setSeeksHeld] = useState(false);
   const [labelPending, setLabelPending] = useState(false);
   const [homeShown, setHomeShown] = useState<HomeSummary | null>(null);
   const [gender, setGender] = useState<Gender | null>(null);
   const [ages, setAges] = useState<{ min: number; max: number } | null>(null);
   const current: Step | null =
     state.status === "ready"
-      ? nextStep(state.onboarding, { invitation, labelPending, homeShown })
+      ? nextStep(state.onboarding, { invitation, labelPending, homeShown, seeksHeld })
       : null;
   // Whether a code may still be typed, asked once the consents are given,
   // which the API's answer needs (ADR-044 §6): offered if so, and otherwise,
@@ -219,7 +226,9 @@ export function OnboardingScreen() {
   // one here (a withdrawal takes it), and a new wording asks everybody at once.
   const storedSeeks = state.status === "ready" ? state.onboarding.preferences.seeks : null;
   useEffect(() => {
-    if (current === "seeks" && seeks === null) setSeeks(storedSeeks ?? []);
+    if (current !== "seeks" || seeks !== null) return;
+    setSeeks(storedSeeks ?? []);
+    setSeeksHeld(storedSeeks !== null);
   }, [current, seeks, storedSeeks]);
   const age = state.status === "ready" ? state.onboarding.age : null;
   // From when a refused change of gender is possible (#147).
@@ -302,6 +311,7 @@ export function OnboardingScreen() {
   const { onboarding } = state;
   const { draft, update } = profile;
   const position = STEPS.indexOf(NUMBERED_AS[current] ?? current) + 1;
+  const chosenSeeks = seeks ?? [];
   const specialConsented =
     onboarding.consents.specialCategory === bundledVersion("special_category");
   const specialOutdated =
@@ -463,7 +473,7 @@ export function OnboardingScreen() {
           <View className="gap-4">
             <Text variant="h2">{t("onboarding.seeks.title")}</Text>
             <Text>{t("onboarding.seeks.explain")}</Text>
-            <SeeksChips chosen={seeks ?? []} onChange={setSeeks} />
+            <SeeksChips chosen={chosenSeeks} onChange={setSeeks} />
             {/* Article 9: the consent on the screen that collects the answer (ADR-019 §4). */}
             <Card>
               <CardHeader>
@@ -508,10 +518,13 @@ export function OnboardingScreen() {
             </Card>
             {/* Saved on leaving the screen (ADR-010 §13): an app closed before the ages keeps it. */}
             <Button
-              disabled={busy || !seeks?.length || !specialConsented}
+              disabled={busy || chosenSeeks.length === 0 || !specialConsented}
               onPress={() => {
                 tap();
-                if (seeks) void step(() => savePreferences({ seeks }));
+                void step(async () => {
+                  await savePreferences({ seeks: chosenSeeks });
+                  setSeeksHeld(false);
+                });
               }}
             >
               {t("onboarding.continue")}

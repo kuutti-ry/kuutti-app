@@ -1105,6 +1105,7 @@ export const enXA: Readonly<Record<string, string>> = {
   "profile.hobbyGroup.wellbeing": "［Wééllbééííñg］",
   "profile.home.open": "［ÝÝóóúúr próófííléé］",
   "profile.later.back": "［Bááçk tóó ýýóóúúr próófííléé］",
+  "profile.later.backOnce": "［Bááçk tóó ýýóóúúr dééáál-brééáákéérš］",
   "profile.later.done": "［Tháát ííš éévéérýýthííñg. Thááñk ýýóóúú.］",
   "profile.later.explain": "［ÓÓñéé qúúééštííóóñ áát áá tííméé, ééááçh óóptííóóñáál. Škííp wháát ýýóóúú lííkéé; éévéérýý ááñšwéér ííš óóñ ýýóóúúr çáárd óóñlýý whééñ ýýóóúú gíívéé íít.］",
   "profile.later.next": "［Šáávéé ááñd çóóñtííñúúéé］",

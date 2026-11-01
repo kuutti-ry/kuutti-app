@@ -836,6 +836,167 @@ describe("OnboardingScreen", () => {
     expect(server.seeks).toEqual(["man"]);
   });
 
+  describe("the seeks step and a stored answer (#542)", () => {
+    const TITLE = "Whom are you looking for?";
+    const CONSENT = "I consent to Kuutti storing whom I seek";
+    const selected = (name: string) =>
+      screen.getByRole("button", { name }).props.accessibilityState?.selected;
+    const continueDisabled = () =>
+      screen.getByRole("button", { name: "Continue" }).props.accessibilityState?.disabled;
+    const putsOfPreferences = (calls: ReturnType<typeof fakeApi>["calls"]) =>
+      calls.filter((c) => c.path === "/preferences" && c.method === "PUT");
+    /** A new wording: the API reads the old consent as none, and only that leaves an answer here. */
+    const outdated = (server: ReturnType<typeof fakeApi>["server"], seeks: string[]) => {
+      allAnswered(server);
+      server.seeks = seeks;
+      server.consents = server.consents.map((c) =>
+        c.kind === "special_category" ? { ...c, version: "2026-01-older" } : c,
+      );
+    };
+    const atTheStep = async () => {
+      await show(<OnboardingScreen />);
+      await waitFor(() => expect(screen.getByText(TITLE)).toBeTruthy());
+    };
+
+    it("starts from the stored answer when a new wording has outdated the consent", async () => {
+      const { server } = fakeApi();
+      outdated(server, ["woman", "non_binary"]);
+      await atTheStep();
+      expect(selected("Women")).toBe(true);
+      expect(selected("Non-binary people")).toBe(true);
+      expect(selected("Men")).toBe(false);
+      expect(selected("Anyone")).toBe(false);
+      // The consent is what is asked: its switch is off, and Continue waits for it.
+      expect(screen.getByLabelText(CONSENT).props.accessibilityState?.checked).toBe(false);
+      expect(continueDisabled()).toBe(true);
+      checkA11y();
+    });
+
+    it("shows a stored answer of all three as Anyone", async () => {
+      const { server } = fakeApi();
+      outdated(server, ["woman", "man", "non_binary"]);
+      await atTheStep();
+      expect(selected("Anyone")).toBe(true);
+    });
+
+    it("starts empty with no answer stored, and Continue waits for one though the consent is there", async () => {
+      const { server } = fakeApi();
+      allAnswered(server);
+      server.seeks = null;
+      await atTheStep();
+      for (const name of ["Women", "Men", "Non-binary people", "Anyone"]) {
+        expect(selected(name)).toBe(false);
+      }
+      expect(continueDisabled()).toBe(true);
+    });
+
+    it("leaves it empty when the last chip is taken away: the stored answer never fills it again", async () => {
+      const { server, calls } = fakeApi();
+      outdated(server, ["man"]);
+      await atTheStep();
+      await press(screen.getByRole("button", { name: "Men" }));
+      expect(selected("Men")).toBe(false);
+      expect(continueDisabled()).toBe(true);
+      // Not when the status is read again either: the answer is still stored there.
+      await act(async () => {
+        focus();
+        await settle();
+      });
+      expect(screen.getByText(TITLE)).toBeTruthy();
+      expect(selected("Men")).toBe(false);
+      expect(putsOfPreferences(calls)).toEqual([]);
+    });
+
+    it("disables Continue again when the last chip goes, whatever the consent says", async () => {
+      const { server } = fakeApi();
+      allAnswered(server);
+      server.seeks = null;
+      await atTheStep();
+      await press(screen.getByRole("button", { name: "Men" }));
+      expect(continueDisabled()).toBe(false);
+      await press(screen.getByRole("button", { name: "Men" }));
+      expect(continueDisabled()).toBe(true);
+    });
+
+    it("stays until Continue once the consent is given, and goes on with the stored answer", async () => {
+      const { server, calls } = fakeApi();
+      outdated(server, ["man"]);
+      await atTheStep();
+      await press(screen.getByLabelText(CONSENT));
+      await flush();
+      // To the API the consent alone answers the step: nothing but Continue may end it here.
+      expect(screen.getByText(TITLE)).toBeTruthy();
+      expect(router.replace).not.toHaveBeenCalledWith("/");
+      expect(putsOfPreferences(calls)).toEqual([]);
+      await press(screen.getByRole("button", { name: "Continue" }));
+      await flush();
+      await waitFor(() => expect(router.replace).toHaveBeenCalledWith("/"));
+      expect(server.seeks).toEqual(["man"]);
+    });
+
+    it.each([
+      ["the change, then the consent", ["chips", "consent"]],
+      ["the consent, then the change", ["consent", "chips"]],
+    ])("saves a change of a stored answer: %s", async (_what, order) => {
+      const { server, calls } = fakeApi();
+      outdated(server, ["man"]);
+      await atTheStep();
+      for (const step of order) {
+        if (step === "consent") {
+          await press(screen.getByLabelText(CONSENT));
+          await flush();
+        } else {
+          await press(screen.getByRole("button", { name: "Women" }));
+          await press(screen.getByRole("button", { name: "Men" }));
+        }
+      }
+      await press(screen.getByRole("button", { name: "Continue" }));
+      await flush();
+      expect(putsOfPreferences(calls)).toEqual([
+        { method: "PUT", path: "/preferences", body: { seeks: ["woman"] } },
+      ]);
+      expect(server.seeks).toEqual(["woman"]);
+      await waitFor(() => expect(router.replace).toHaveBeenCalledWith("/"));
+    });
+
+    it("keeps the step when that save is refused, and goes on once it lands", async () => {
+      const { server } = fakeApi();
+      outdated(server, ["man"]);
+      await atTheStep();
+      await press(screen.getByLabelText(CONSENT));
+      await flush();
+      server.seeksRefused = true;
+      await press(screen.getByRole("button", { name: "Continue" }));
+      await flush();
+      expect(screen.getByText(TITLE)).toBeTruthy();
+      expect(router.replace).not.toHaveBeenCalledWith("/");
+      server.seeksRefused = false;
+      await press(screen.getByRole("button", { name: "Continue" }));
+      await flush();
+      await waitFor(() => expect(router.replace).toHaveBeenCalledWith("/"));
+    });
+
+    it("saves what the chips say, not what was stored, when the step is still open at Continue", async () => {
+      const { server, calls } = fakeApi();
+      outdated(server, ["man"]);
+      await atTheStep();
+      await press(screen.getByRole("button", { name: "Women" }));
+      await press(screen.getByRole("button", { name: "Men" }));
+      // Taken back on another device meanwhile: the answer went, so the consent closes nothing.
+      server.seeks = null;
+      await press(screen.getByLabelText(CONSENT));
+      await flush();
+      expect(selected("Women")).toBe(true);
+      expect(selected("Men")).toBe(false);
+      await press(screen.getByRole("button", { name: "Continue" }));
+      await flush();
+      expect(putsOfPreferences(calls)).toEqual([
+        { method: "PUT", path: "/preferences", body: { seeks: ["woman"] } },
+      ]);
+      expect(server.seeks).toEqual(["woman"]);
+    });
+  });
+
   it("Onboarding leaves after the last profile step without asking about research", async () => {
     // A first walk with no research answer at all: the status says none was given.
     const { server, calls } = fakeApi();

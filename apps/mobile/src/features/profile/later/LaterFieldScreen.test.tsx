@@ -454,4 +454,142 @@ describe("LaterFieldScreen", () => {
     });
     expect(router.push).toHaveBeenCalledWith("/profile/later/languages");
   });
+
+  describe("opened for its one answer (#542)", () => {
+    const SAVE = "Save and continue";
+    const SKIP = "Ask me later";
+    const ARROW = "Back to your deal-breakers";
+    const ASKED = "Leave without saving?";
+    const button = (name: string) => screen.getByRole("button", { name });
+    const chosen = (name: string) => button(name).props.accessibilityState?.selected;
+
+    /**
+     * The stack as `router.back` drives it: `beforeRemove` in the same tick, ahead
+     * of any render, so a screen that still thinks itself unsaved is caught at it.
+     * `popped` is each leaving, with how many saves had landed by then.
+     */
+    function popping(puts: Profile[] = []) {
+      const popped: { saved: number; preventDefault: jest.Mock }[] = [];
+      router.back.mockImplementation(() => {
+        const event = {
+          saved: puts.length,
+          preventDefault: jest.fn(),
+          data: { action: { type: "GO_BACK" } },
+        };
+        popped.push(event);
+        navigation.emit("beforeRemove", event);
+      });
+      return popped;
+    }
+
+    beforeEach(() => {
+      router.dismissTo.mockClear();
+    });
+    afterEach(() => {
+      router.back.mockReset();
+    });
+
+    it("goes back to what opened it from the arrow, never out to the profile, saving nothing", async () => {
+      const { puts } = fakeApi(named({}));
+      const popped = popping(puts);
+      await show(<LaterFieldScreen field="hasKids" once />);
+      await waitFor(() => expect(screen.getByText("While you wait")).toBeTruthy());
+      await press(button(ARROW));
+      expect(popped).toHaveLength(1);
+      expect(popped[0]?.preventDefault).not.toHaveBeenCalled();
+      expect(router.dismissTo).not.toHaveBeenCalled();
+      expect(router.push).not.toHaveBeenCalled();
+      expect(puts).toEqual([]);
+    });
+
+    it("still asks before the arrow leaves an answer not saved", async () => {
+      const { puts } = fakeApi(named({}));
+      const popped = popping(puts);
+      await show(<LaterFieldScreen field="hasKids" once />);
+      await waitFor(() => expect(screen.getByText("While you wait")).toBeTruthy());
+      await press(button("Yes, living with me"));
+      await press(button(ARROW));
+      expect(popped[0]?.preventDefault).toHaveBeenCalled();
+      expect(screen.getByText(ASKED)).toBeTruthy();
+      expect(puts).toEqual([]);
+    });
+
+    it.each([
+      ["the first question", "hasKids", "No kids", { hasKids: "no" }],
+      ["a question with a companion", "smoking", "Vaping", { smoking: "vaping" }],
+      ["the last question", "zodiac", "Corgi", { zodiac: "corgi" }],
+    ])(
+      "saves %s, then goes back with nothing asked, on to no other screen",
+      async (_what, field, answer, fields) => {
+        const { puts } = fakeApi(named({}));
+        const popped = popping(puts);
+        await show(<LaterFieldScreen field={field} once />);
+        await waitFor(() => expect(screen.getByRole("button", { name: answer })).toBeTruthy());
+        await press(button(answer));
+        await press(button(SAVE));
+        await waitFor(() => expect(popped).toHaveLength(1));
+        expect(puts).toEqual([expect.objectContaining({ fields })]);
+        // The save first: back on the deal-breakers, the row reads what was stored.
+        expect(popped[0]?.saved).toBe(1);
+        expect(popped[0]?.preventDefault).not.toHaveBeenCalled();
+        expect(screen.queryByText(ASKED)).toBeNull();
+        expect(router.push).not.toHaveBeenCalled();
+        expect(router.replace).not.toHaveBeenCalled();
+        expect(router.dismissTo).not.toHaveBeenCalled();
+      },
+    );
+
+    it("stays on a refused save, with the reason and the answer, and still asks before it is left", async () => {
+      refusingSaves("validation_failed");
+      const popped = popping();
+      await show(<LaterFieldScreen field="smoking" once />);
+      await waitFor(() => expect(screen.getByText("While you wait")).toBeTruthy());
+      await press(button("Never"));
+      await press(button(SAVE));
+      expect(screen.getByText("Saving did not work. Check the fields and try again.")).toBeTruthy();
+      expect(popped).toEqual([]);
+      expect(router.push).not.toHaveBeenCalled();
+      expect(chosen("Never")).toBe(true);
+      expect((await leave()).preventDefault).toHaveBeenCalled();
+      expect(screen.getByText(ASKED)).toBeTruthy();
+    });
+
+    it.each([
+      ["with nothing changed", []],
+      ["even after a change", ["Yes, living with me"]],
+    ])(
+      "writes nothing on Ask me later and goes back with nothing asked, %s",
+      async (_what, taps) => {
+        const { puts } = fakeApi(named({}));
+        const popped = popping(puts);
+        await show(<LaterFieldScreen field="hasKids" once />);
+        await waitFor(() => expect(screen.getByText("While you wait")).toBeTruthy());
+        for (const name of taps) await press(button(name));
+        await press(button(SKIP));
+        expect(popped).toHaveLength(1);
+        expect(popped[0]?.preventDefault).not.toHaveBeenCalled();
+        expect(screen.queryByText(ASKED)).toBeNull();
+        expect(puts).toEqual([]);
+        expect(router.push).not.toHaveBeenCalled();
+      },
+    );
+
+    it("stays on the first field when it is answered already: the person came for this one", async () => {
+      fakeApi(named({ hasKids: "no" }));
+      await show(<LaterFieldScreen field="hasKids" once />);
+      await waitFor(() => expect(screen.getByText("While you wait")).toBeTruthy());
+      await waitFor(() => expect(chosen("No kids")).toBe(true));
+      expect(router.replace).not.toHaveBeenCalled();
+    });
+
+    it("goes back from the last field with every other answered too, never to the e-mail", async () => {
+      const { puts } = fakeApi(named(ALL_ANSWERED));
+      const popped = popping(puts);
+      await show(<LaterFieldScreen field="zodiac" once />);
+      await waitFor(() => expect(screen.getByText("16 of 16 answered")).toBeTruthy());
+      await press(button(SKIP));
+      expect(popped).toHaveLength(1);
+      expect(router.push).not.toHaveBeenCalled();
+    });
+  });
 });

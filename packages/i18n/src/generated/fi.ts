@@ -722,6 +722,7 @@ export const fi: Readonly<Record<string, string>> = {
   "profile.hobbyGroup.wellbeing": "Hyvinvointi",
   "profile.home.open": "Profiilisi",
   "profile.later.back": "Takaisin profiiliisi",
+  "profile.later.backOnce": "Takaisin ehdottomiin rajoihisi",
   "profile.later.done": "Siinä kaikki. Kiitos.",
   "profile.later.explain": "Yksi kysymys kerrallaan, jokainen vapaaehtoinen. Ohita mitä haluat; vastaus näkyy kortillasi vain, jos annat sen.",
   "profile.later.next": "Tallenna ja jatka",

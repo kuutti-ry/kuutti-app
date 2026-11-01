@@ -10,9 +10,10 @@ import { FieldEditor, optionTextKey, toggled, visibleOptions } from "./FieldEdit
 // a setting as a switch, choices as chips that say whether they are chosen,
 // a short text, a number as a stepper, and a search over a long list.
 
-/** The draft the editor works on, as the screens hold it; `fields` is what it holds now. */
+/** The draft the editor works on, as the screens hold it; `fields` is what it holds now, `patches` every update it asked for. */
 let fields: ProfileFields = {};
 let hiddenFields: readonly HiddenField[] | undefined;
+let patches: unknown[] = [];
 function Harness({
   field,
   initial,
@@ -32,7 +33,10 @@ function Harness({
     <FieldEditor
       field={field}
       draft={draft}
-      update={(patch) => setDraft((previous) => ({ ...previous, ...patch }))}
+      update={(patch) => {
+        patches.push(patch);
+        setDraft((previous) => ({ ...previous, ...patch }));
+      }}
     />
   );
 }
@@ -44,6 +48,7 @@ const chosen = (name: string) =>
 beforeEach(() => {
   fields = {};
   hiddenFields = undefined;
+  patches = [];
 });
 
 describe("FieldEditor: a setting", () => {
@@ -197,6 +202,63 @@ describe("FieldEditor: one choice", () => {
     await fireEvent.press(screen.getByRole("button", { name: "Sometimes" }));
     expect(fields).toEqual({});
     expect(pressables(screen.toJSON() as HostNode).flatMap((n) => a11yProblems(n))).toEqual([]);
+  });
+
+  it.each([
+    ["an info answer", "monogamy", { monogamy: "monogamous" }, "Monogamous"],
+    ["a soft answer", "drinking", { drinking: "rarely" }, "Rarely"],
+  ] satisfies [string, ProfileFieldKey, ProfileFields, string][])(
+    "still clears %s when the chosen one is pressed again",
+    async (_what, field, initial, name) => {
+      await show(field, initial);
+      expect(chosen(name)).toBe(true);
+      await fireEvent.press(screen.getByRole("button", { name }));
+      expect(fields).toEqual({});
+      expect(chosen(name)).toBe(false);
+    },
+  );
+});
+
+describe("FieldEditor: one hard choice (#542)", () => {
+  const CASUAL = "Something casual";
+  const LONG_TERM = "Something long-term";
+
+  it("stays chosen when pressed again, asking for no update: without it the person is back in onboarding", async () => {
+    await show("intent", { intent: "casual" });
+    await fireEvent.press(screen.getByRole("button", { name: CASUAL }));
+    expect(chosen(CASUAL)).toBe(true);
+    expect(fields).toEqual({ intent: "casual" });
+    expect(patches).toEqual([]);
+  });
+
+  it("changes to another option, and that one stays in its turn", async () => {
+    await show("intent", { intent: "casual" });
+    await fireEvent.press(screen.getByRole("button", { name: LONG_TERM }));
+    expect(fields).toEqual({ intent: "long_term" });
+    expect(chosen(LONG_TERM)).toBe(true);
+    expect(chosen(CASUAL)).toBe(false);
+    await fireEvent.press(screen.getByRole("button", { name: LONG_TERM }));
+    expect(fields).toEqual({ intent: "long_term" });
+    expect(patches).toEqual([{ fields: { intent: "long_term" } }]);
+  });
+
+  it("takes a first answer as any choice does", async () => {
+    await show("intent");
+    await fireEvent.press(screen.getByRole("button", { name: CASUAL }));
+    expect(fields).toEqual({ intent: "casual" });
+    expect(chosen(CASUAL)).toBe(true);
+  });
+
+  it("still hides and shows, and a hidden answer stays chosen when pressed again", async () => {
+    await show("intent", { intent: "casual" });
+    await fireEvent.press(screen.getByRole("button", { name: "Hide from your card: Looking for" }));
+    expect(hiddenFields).toEqual(["intent"]);
+    await fireEvent.press(screen.getByRole("button", { name: CASUAL }));
+    expect(fields).toEqual({ intent: "casual" });
+    expect(hiddenFields).toEqual(["intent"]);
+    await fireEvent.press(screen.getByRole("button", { name: "Show on your card: Looking for" }));
+    expect(hiddenFields).toEqual([]);
+    expect(fields).toEqual({ intent: "casual" });
   });
 });
 
