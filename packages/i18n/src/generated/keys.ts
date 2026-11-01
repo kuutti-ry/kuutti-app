@@ -1390,6 +1390,17 @@ export type MessageParams = {
   "profile.section.relationship.title": Record<never, never>;
   "profile.section.work.summary": Record<never, never>;
   "profile.section.work.title": Record<never, never>;
+  "profile.seek.ages.explain": { "min": number; "max": number };
+  "profile.seek.ages.summary": { "min": number; "max": number };
+  "profile.seek.back": Record<never, never>;
+  "profile.seek.dealBreakers.none": Record<never, never>;
+  "profile.seek.dealBreakers.paused": { "field": string };
+  "profile.seek.explain": Record<never, never>;
+  "profile.seek.intent.explain": Record<never, never>;
+  "profile.seek.summary": Record<never, never>;
+  "profile.seek.title": Record<never, never>;
+  "profile.seek.whom.explain": Record<never, never>;
+  "profile.seek.whom.keepOne": Record<never, never>;
   "profile.text.hint": { "max": number };
   "profile.tip.blurry": Record<never, never>;
   "profile.tip.dismiss": Record<never, never>;

@@ -6,6 +6,8 @@ import {
   ErrorResponse,
   HomeSummary,
   type HomeUpdate,
+  PreferencesResponse,
+  type PreferencesUpdate,
   type ProfileDocument,
   ProfileResponse,
   type ProfileUpdate,
@@ -90,6 +92,29 @@ export function saveHome(update: HomeUpdate): Promise<HomeSummary> {
     });
     if (!data) throw failed(response, error, "home");
     return HomeSummary.parse(data);
+  });
+  lastSave = sent.catch(() => undefined);
+  return sent;
+}
+
+// What one seeks lives with the profile here (#542): onboarding asks it once,
+// What you seek keeps it. In the line of saves, as a section is: the list reads
+// what a screen stored on leaving.
+export async function fetchPreferences(): Promise<PreferencesResponse> {
+  await lastSave;
+  const { data, error, response } = await api.GET("/preferences");
+  if (!data) throw failed(response, error, "preferences");
+  return PreferencesResponse.parse(data);
+}
+
+export function savePreferences(update: PreferencesUpdate): Promise<PreferencesResponse> {
+  const sent = lastSave.then(async () => {
+    // The generated body type spells the strict object with an index signature the zod type has no room for (ADR-003).
+    const { data, error, response } = await api.PUT("/preferences", {
+      body: update as unknown as ApiComponents["schemas"]["PreferencesUpdate"],
+    });
+    if (!data) throw failed(response, error, "preferences");
+    return PreferencesResponse.parse(data);
   });
   lastSave = sent.catch(() => undefined);
   return sent;

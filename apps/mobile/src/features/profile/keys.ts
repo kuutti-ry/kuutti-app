@@ -23,6 +23,10 @@ import type { useT } from "@/lib/locale";
 export const genderKey = (gender: Gender): PlainMessageKey =>
   `onboarding.gender.${gender}` as PlainMessageKey;
 
+/** Whom one seeks, in the words of the seeks step (#146): one gender as the person wants to see it. */
+export const seeksKey = (gender: Gender): PlainMessageKey =>
+  `onboarding.seeks.${gender}` as PlainMessageKey;
+
 export const fieldLabelKey = (field: DealBreakerField): PlainMessageKey =>
   `profile.field.${field}` as PlainMessageKey;
 

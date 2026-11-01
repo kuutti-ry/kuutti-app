@@ -3,7 +3,7 @@
 export { BioEditor } from "./BioEditor";
 export { CardPreviewScreen } from "./CardPreviewScreen";
 export { ConfirmLeaveDialog, holdLinkWhileUnsaved, useConfirmLeave } from "./ConfirmLeave";
-export { saveHome } from "./client";
+export { saveHome, savePreferences } from "./client";
 export { DEAL_BREAKERS_PATH, DealBreakersScreen } from "./DealBreakersScreen";
 export { profileErrorText } from "./errorText";
 export { fieldLabelKey, optionKey } from "./keys";
@@ -14,4 +14,8 @@ export { ProfileCardView } from "./ProfileCardView";
 export { ProfileScreen } from "./ProfileScreen";
 export { PromptsEditor } from "./PromptsEditor";
 export { SectionScreen } from "./SectionScreen";
+export { SeekAgesScreen } from "./seek/SeekAgesScreen";
+export { SeekScreen } from "./seek/SeekScreen";
+export { SeeksChips } from "./seek/SeeksChips";
+export { SeekWhomScreen } from "./seek/SeekWhomScreen";
 export { useProfile } from "./useProfile";

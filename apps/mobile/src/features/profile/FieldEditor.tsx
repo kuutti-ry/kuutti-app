@@ -285,7 +285,9 @@ export function FieldEditor({
             const next = toggled(chosen, option, spec);
             if (!seen.includes(option)) setSeen([...seen, option]);
             setField(next.length > 0 ? next : undefined);
-          } else {
+          } else if (!selected || spec.role !== "hard") {
+            // A hard answer changes and never clears: without what one is here
+            // for, the person is back in onboarding (#542).
             setField(selected ? undefined : option);
           }
         }}

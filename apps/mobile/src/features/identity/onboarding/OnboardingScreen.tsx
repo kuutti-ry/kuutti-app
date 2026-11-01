@@ -33,7 +33,9 @@ import {
   PlacePicker,
   PromptsEditor,
   profileErrorText,
+  SeeksChips,
   saveHome,
+  savePreferences,
   useProfile,
   useSpokenOnIos,
 } from "@/features/profile";
@@ -43,7 +45,7 @@ import { useHapticTap } from "@/theme/haptics";
 import { rememberAgreed } from "../agreements";
 import { NormsAndConsents } from "../BeforeSignIn";
 import { LegalTextLink } from "../LegalTextLink";
-import { consentLocale, declareGender, giveConsent, savePreferences } from "./client";
+import { consentLocale, declareGender, giveConsent } from "./client";
 import { useOnboarding } from "./useOnboarding";
 
 type Step =
@@ -145,11 +147,6 @@ const GENDER_TEXT: Record<Gender, PlainMessageKey> = {
   man: "onboarding.gender.man",
   non_binary: "onboarding.gender.non_binary",
 };
-const SEEKS_TEXT: Record<Gender, PlainMessageKey> = {
-  woman: "onboarding.seeks.woman",
-  man: "onboarding.seeks.man",
-  non_binary: "onboarding.seeks.non_binary",
-};
 
 function Chip({
   label,
@@ -187,7 +184,7 @@ export function OnboardingScreen() {
   const { state, busy, failed, failedCode, reload, step } = useOnboarding();
   const profile = useProfile();
   const [invitation, setInvitation] = useState<InvitationOffer>("unasked");
-  const [seeks, setSeeks] = useState<Gender[]>([]);
+  const [seeks, setSeeks] = useState<Gender[] | null>(null);
   const [labelPending, setLabelPending] = useState(false);
   const [homeShown, setHomeShown] = useState<HomeSummary | null>(null);
   const [gender, setGender] = useState<Gender | null>(null);
@@ -218,6 +215,12 @@ export function OnboardingScreen() {
   useEffect(() => {
     if (current) scroll.current?.scrollTo({ y: 0, animated: false });
   }, [current]);
+  // A stored answer is where the step starts: only an outdated consent leaves
+  // one here (a withdrawal takes it), and a new wording asks everybody at once.
+  const storedSeeks = state.status === "ready" ? state.onboarding.preferences.seeks : null;
+  useEffect(() => {
+    if (current === "seeks" && seeks === null) setSeeks(storedSeeks ?? []);
+  }, [current, seeks, storedSeeks]);
   const age = state.status === "ready" ? state.onboarding.age : null;
   // From when a refused change of gender is possible (#147).
   const changeFrom = state.status === "ready" ? state.onboarding.nextChange.gender : null;
@@ -460,29 +463,7 @@ export function OnboardingScreen() {
           <View className="gap-4">
             <Text variant="h2">{t("onboarding.seeks.title")}</Text>
             <Text>{t("onboarding.seeks.explain")}</Text>
-            <View className="flex-row flex-wrap gap-2">
-              {GENDERS.map((option) => (
-                <Chip
-                  key={option}
-                  label={t(SEEKS_TEXT[option])}
-                  selected={seeks.includes(option)}
-                  onPress={() => {
-                    tap();
-                    setSeeks((s) =>
-                      s.includes(option) ? s.filter((g) => g !== option) : [...s, option],
-                    );
-                  }}
-                />
-              ))}
-              <Chip
-                label={t("onboarding.seeks.anyone")}
-                selected={seeks.length === GENDERS.length}
-                onPress={() => {
-                  tap();
-                  setSeeks([...GENDERS]);
-                }}
-              />
-            </View>
+            <SeeksChips chosen={seeks ?? []} onChange={setSeeks} />
             {/* Article 9: the consent on the screen that collects the answer (ADR-019 §4). */}
             <Card>
               <CardHeader>
@@ -527,10 +508,10 @@ export function OnboardingScreen() {
             </Card>
             {/* Saved on leaving the screen (ADR-010 §13): an app closed before the ages keeps it. */}
             <Button
-              disabled={busy || seeks.length === 0 || !specialConsented}
+              disabled={busy || !seeks?.length || !specialConsented}
               onPress={() => {
                 tap();
-                void step(() => savePreferences({ seeks }));
+                if (seeks) void step(() => savePreferences({ seeks }));
               }}
             >
               {t("onboarding.continue")}

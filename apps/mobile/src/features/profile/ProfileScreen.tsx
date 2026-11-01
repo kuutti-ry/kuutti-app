@@ -13,12 +13,12 @@ import { Text } from "@/components/ui/text";
 import { listPhotos } from "@/features/media";
 import { useT } from "@/lib/locale";
 import { useHapticTap } from "@/theme/haptics";
-import { DEAL_BREAKERS_PATH } from "./DealBreakersScreen";
 import { completenessText, shownPlaceName } from "./keys";
 import { FIRST_LATER_FIELD, laterPath, laterProgress } from "./later/LaterFieldScreen";
 import { type MarkStyle, ProgressMark, progressWords } from "./ProgressMark";
 import { isDone, type Progress, photoProgress, sectionProgress } from "./progress";
-import { PROFILE_SECTIONS, sectionPath, sectionSummaryKey, sectionTitleKey } from "./sections";
+import { LISTED_SECTIONS, sectionPath, sectionSummaryKey, sectionTitleKey } from "./sections";
+import { SEEK_PATH } from "./seek/SeekScreen";
 import { useProfile } from "./useProfile";
 
 /**
@@ -66,8 +66,8 @@ function useApprovedPhotos(): [number | null, () => void] {
  * while something is missing, #239), then the
  * profile's parts, each with how far it is filled: the photos, the home
  * (ADR-061), which is never unfilled and carries what the card says instead,
- * the sections (each its own screen that saves on leaving), the deal-breakers
- * (#149) and, while a later question is unanswered, the later screens (#148). Nothing is
+ * the sections (each its own screen that saves on leaving), What you seek
+ * (#542) and, while a later question is unanswered, the later screens (#148). Nothing is
  * edited here, so there is nothing to save; the list reads the profile and
  * the photos again when a screen hands back, and the marks follow.
  */
@@ -173,7 +173,7 @@ export function ProfileScreen() {
               summary: profile.home ? shownPlaceName(profile.home, locale) : undefined,
               onPress: open("/profile/place"),
             },
-            ...PROFILE_SECTIONS.map((section, index) =>
+            ...LISTED_SECTIONS.map((section, index) =>
               filled(
                 t,
                 {
@@ -191,9 +191,10 @@ export function ProfileScreen() {
         <RowGroup
           rows={[
             {
-              key: "dealBreakers",
-              title: t("profile.dealBreakers.open"),
-              onPress: open(DEAL_BREAKERS_PATH),
+              key: "seek",
+              title: t("profile.seek.title"),
+              summary: t("profile.seek.summary"),
+              onPress: open(SEEK_PATH),
             },
             // An invitation only while something is left to ask (#239).
             ...(later.answered < later.total

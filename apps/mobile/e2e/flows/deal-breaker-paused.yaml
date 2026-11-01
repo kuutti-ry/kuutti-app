@@ -60,10 +60,7 @@ name: Taking one's own answer back pauses the deal-breaker on it, and answering 
     centerElement: true
     timeout: 60000
 - tapOn: "Save and continue|Tallenna ja jatka|Spara och fortsätt"
-- extendedWaitUntil:
-    notVisible: "Smoking|Tupakointi|Rökning"
-    timeout: 15000
-- openLink: kuutti://profile/deal-breakers
+# Back where Answer it was pressed (#542), not on through the later questions.
 - extendedWaitUntil:
     visible: "Deal-breakers|Ehdottomat rajat|Absoluta gränser"
     timeout: 15000

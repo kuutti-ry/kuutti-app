@@ -19,6 +19,10 @@ import { useProfile } from "../useProfile";
 export const laterPath = (field: ProfileFieldKey) => `/profile/later/${field}` as const;
 export const FIRST_LATER_FIELD = LATER_FIELD_ORDER[0] as ProfileFieldKey;
 
+/** A later screen opened for its one answer: back to where it was opened, not on through the questions (#542). */
+export const laterAnswerPath = (field: ProfileFieldKey) =>
+  ({ pathname: "/profile/later/[field]", params: { field, once: "1" } }) as const;
+
 /**
  * Whether a later screen still asks something: its field is unanswered, or a
  * companion whose answer counts is (other nicotine on the smoking screen; not
@@ -59,9 +63,11 @@ export function laterProgress(fields: Record<string, unknown>): {
  * later", which writes nothing, and "Save and continue", which saves the
  * whole document and moves on. The article 9 fields carry no note on their
  * consent: Settings is the one place for it (#239). The last screen leads to
- * the optional e-mail, which is the account's.
+ * the optional e-mail, which is the account's. Opened for one answer (`once`,
+ * the deal-breakers' "Answer it"), either button and the arrow go back to the
+ * screen that opened it (#542).
  */
-export function LaterFieldScreen({ field }: { field: string }) {
+export function LaterFieldScreen({ field, once = false }: { field: string; once?: boolean }) {
   const { t } = useT();
   const router = useRouter();
   const tap = useHapticTap();
@@ -79,12 +85,12 @@ export function LaterFieldScreen({ field }: { field: string }) {
   const loadedFields = profile.status === "ready" ? profile.draft.fields : null;
   const key = index < 0 ? null : (LATER_FIELD_ORDER[index] as ProfileFieldKey);
   useEffect(() => {
-    if (index !== 0 || !key || !loadedFields || entered.current) return;
+    if (once || index !== 0 || !key || !loadedFields || entered.current) return;
     entered.current = true;
     if (screenOpen(loadedFields, key)) return;
     const next = nextUnanswered(loadedFields, 0);
     if (next) router.replace(laterPath(next));
-  }, [index, key, loadedFields, router]);
+  }, [once, index, key, loadedFields, router]);
   const leaving = useConfirmLeave(profile.status === "ready" && profile.dirty, () => update(saved));
   if (index < 0 || !key) return null;
   const companion = LATER_COMPANIONS[key];
@@ -115,6 +121,12 @@ export function LaterFieldScreen({ field }: { field: string }) {
   const progress = laterProgress(draft.fields);
   // Onward to the next field without an answer; answered ones are the profile screen's to change.
   const moveOn = () => {
+    if (once) {
+      // Saved or passed over a breath ago, which the leaving must not ask about.
+      leaving.letGo();
+      router.back();
+      return;
+    }
     const next = nextUnanswered(draft.fields, index);
     if (next) router.push(laterPath(next));
     else router.push("/account/email");
@@ -127,7 +139,7 @@ export function LaterFieldScreen({ field }: { field: string }) {
       <ScreenHeader
         title={t("profile.later.title")}
         backLabel={t("profile.later.back")}
-        onBack={() => router.dismissTo("/profile")}
+        onBack={() => (once ? router.back() : router.dismissTo("/profile"))}
       />
       <ScrollView
         contentContainerClassName="flex-grow gap-6 p-6"
