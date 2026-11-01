@@ -13,9 +13,9 @@ import {
 } from "./identity/index.ts";
 import { invitationCountJob } from "./jobs/invitation-count.ts";
 import type { NightlyJob } from "./jobs/nightly.ts";
+import { countsBands, ensureFirstSnapshot, pondCounterJob } from "./jobs/pond-counter.ts";
 import { roundsJob } from "./jobs/round-builder.ts";
 import type { RoundPushDeps } from "./jobs/round-push.ts";
-import { countsBands, ensureFirstSnapshot, waitlistJob } from "./jobs/waitlist-snapshot.ts";
 import type { Config } from "./lib/config.ts";
 import type { Logger } from "./lib/logger.ts";
 import { mailerFor } from "./lib/mail.ts";
@@ -257,7 +257,7 @@ export async function boot({
     media.setup.mode === "off" || config.APP_ENV === "production"
       ? undefined
       : { db: pool, now, store: s3CopyStore(createS3Client(config), config.S3_BUCKET) };
-  const waitlist = { db: pool, logger, now, bands: countsBands(config.APP_ENV) };
+  const counter = { db: pool, logger, now, bands: countsBands(config.APP_ENV) };
   const jobs: NightlyJob[] = [
     { name: "sweep-sessions", run: () => sweepSessions({ db: pool, now }) },
     { name: "sweep-admin-sessions", run: () => sweepAdminSessions({ db: pool, now }) },
@@ -275,8 +275,8 @@ export async function boot({
     // Suspensions past their day end (#307, ADR-024 §5), before the counter
     // and the rounds, so a person let back in is counted the same night.
     { name: "end-suspensions", run: async () => ({ ended: await endSuspensions(pool, now()) }) },
-    // The day's waitlist figures (#54): taken once a day, served all day.
-    waitlistJob(waitlist),
+    // The day's figures (#54): taken once a day, served all day.
+    pondCounterJob(counter),
     // The invitations whose redeemer's profile is complete tonight (#107, ADR-044 §7).
     invitationCountJob({ db: pool, logger, now }),
     // The day's round for everybody complete in an open pond (#95, #500, ADR-035).
@@ -315,8 +315,8 @@ export async function boot({
   }
   // A database with no figures yet gets its first ones now, so the public route has a day to serve.
   // Logged, never thrown, like a nightly job: the counter is not worth a boot, and the night tries again.
-  await ensureFirstSnapshot(waitlist).catch((err: unknown) =>
-    logger.error({ job: "waitlist-snapshot", err }, "first waitlist snapshot failed"),
+  await ensureFirstSnapshot(counter).catch((err: unknown) =>
+    logger.error({ job: "pond-counter", err }, "first pond counter failed"),
   );
 
   const roundPush: RoundPushDeps = { db: pool, logger, now, push };

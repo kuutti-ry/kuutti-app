@@ -38,7 +38,7 @@ const VERSIONS = {
   privacy: "test-privacy-1",
   special_category: "test-special-1",
 };
-const THRESHOLDS = { counterK: MATCHING_CONFIG_V1.waitlist_k };
+const THRESHOLDS = { counterK: MATCHING_CONFIG_V1.pond_counter_k };
 /** From this many people up, the population shows everything it is there for. */
 const SHOWS_EVERYTHING_FROM = 174;
 /** A few places by the people behind them, as the API hands them in; the real list and what it keeps are tested beside it (apps/api/scripts/demo/demo-homes.test.ts). */
@@ -227,7 +227,7 @@ describe("the synthetic population", () => {
   });
 
   it("fills every band of the bar, and more than k of each, from 250 people up", () => {
-    const k = MATCHING_CONFIG_V1.waitlist_k;
+    const k = MATCHING_CONFIG_V1.pond_counter_k;
     for (const band of Object.values(BAR_PEOPLE)) expect(band).toBeGreaterThan(k);
     for (const size of [250, 300, 1234, DEMO_SIZE_MAX]) {
       for (let seed = 0; seed < 10; seed += 1) {

@@ -1,13 +1,13 @@
 import type { Queryable } from "@kuutti/db";
 import {
   type DistanceBand,
+  pondCounterK,
   type Relaxation,
   type RelaxationKind,
   type RelaxationOffer,
   ROUND_ENTRIES_MAX,
   type RoundReason,
   saidInStep,
-  waitlistK,
 } from "@kuutti/schema";
 import { finnishDay } from "../lib/finnish-day.ts";
 import type { Logger } from "../lib/logger.ts";
@@ -74,7 +74,7 @@ const KEYS = [
 ] as const;
 type BuilderConfig = Record<(typeof KEYS)[number], number>;
 /** The short pool reads the counter's step too (ADR-042 §4). */
-const SHORT_POOL_KEYS = [...KEYS, "waitlist_k"] as const;
+const SHORT_POOL_KEYS = [...KEYS, "pond_counter_k"] as const;
 
 export type BuildCount = { ponds: number; built: number; cards: number; failed: number };
 
@@ -443,7 +443,7 @@ export async function relaxationOffers(
         field: dealBreaker.field,
         kind,
         // The counter's step, floored at its minimum, as every figure about people is said (ADR-042 §4).
-        more: saidInStep(t.shown.filter(admits).length, waitlistK(t.config.waitlist_k)),
+        more: saidInStep(t.shown.filter(admits).length, pondCounterK(t.config.pond_counter_k)),
       });
     }
   }

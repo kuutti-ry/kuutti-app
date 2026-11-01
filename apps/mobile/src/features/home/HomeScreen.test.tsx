@@ -1,5 +1,5 @@
 import { CONSENT_VERSIONS } from "@kuutti/i18n";
-import type { GateResponse, PondSummary, WaitlistResponse } from "@kuutti/schema";
+import type { GateResponse, PondCounterResponse, PondSummary } from "@kuutti/schema";
 import { fireEvent, screen, userEvent, within } from "@testing-library/react-native";
 import * as SecureStore from "expo-secure-store";
 import * as React from "react";
@@ -54,9 +54,11 @@ const POND: PondSummary = {
   nameInessive: "Otaniemessä",
   parentId: null,
 };
-const waitlist: WaitlistResponse = {
+const counter: PondCounterResponse = {
   k: 10,
-  ponds: [{ pond: POND, day: "2026-10-05", verified: 150, split: null, finishing: null }],
+  ponds: [
+    { pond: POND, day: "2026-10-05", verified: 150, split: null, finishing: null, seeks: null },
+  ],
 };
 const gate: GateResponse = { state: "closed" };
 const json = (body: unknown, status = 200) =>
@@ -77,7 +79,7 @@ beforeEach(async () => {
   mockGate = { status: "complete", pond: POND };
   globalThis.fetch = jest.fn(async (input: Request | string) => {
     const url = new URL(input instanceof Request ? input.url : input);
-    if (url.pathname === "/waitlist") return json(waitlist);
+    if (url.pathname === "/ponds/counter") return json(counter);
     if (url.pathname === "/gate") return json(gate);
     return json({ error: { code: "not_found" } }, 404);
   }) as unknown as typeof fetch;
@@ -164,7 +166,7 @@ describe("HomeScreen", () => {
 
     (globalThis.fetch as jest.Mock).mockImplementation(async (input: Request | string) => {
       const url = new URL(input instanceof Request ? input.url : input);
-      if (url.pathname === "/waitlist") return json(waitlist);
+      if (url.pathname === "/ponds/counter") return json(counter);
       if (url.pathname === "/gate") return json({ state: "open" });
       return json({ error: { code: "not_found" } }, 404);
     });
@@ -191,7 +193,7 @@ describe("HomeScreen", () => {
 
     (globalThis.fetch as jest.Mock).mockImplementation(async (input: Request | string) => {
       const url = new URL(input instanceof Request ? input.url : input);
-      if (url.pathname === "/waitlist") return json(waitlist);
+      if (url.pathname === "/ponds/counter") return json(counter);
       if (url.pathname === "/gate") return json({ state: "open" });
       return json({ error: { code: "not_found" } }, 404);
     });
@@ -249,7 +251,7 @@ describe("HomeRoute", () => {
     (globalThis.fetch as jest.Mock).mockImplementation(async (input: Request | string) => {
       const url = new URL(input instanceof Request ? input.url : input);
       if (url.pathname === "/auth/exchange") return json({ ...tokens, outcome });
-      if (url.pathname === "/waitlist") return json(waitlist);
+      if (url.pathname === "/ponds/counter") return json(counter);
       if (url.pathname === "/gate") return json(gate);
       return json({ error: { code: "not_found" } }, 404);
     });

@@ -35,7 +35,7 @@ import {
   openPonds,
 } from "@kuutti/db/demo";
 import { hmacKeyFromHex } from "../src/identity/index.ts";
-import { takeSnapshot } from "../src/jobs/waitlist-snapshot.ts";
+import { takeSnapshot } from "../src/jobs/pond-counter.ts";
 import { loadConfig } from "../src/lib/config.ts";
 import { createLogger } from "../src/lib/logger.ts";
 import { createMediaDeps } from "../src/media/index.ts";
@@ -118,7 +118,7 @@ try {
   console.log(JSON.stringify({ msg: "demo stories: photos in conversations", ...photos }));
   // The pond has other people in it now (ADR-018: nobody on staging is
   // anybody, so the counter of #54 is counted anew, as the population does).
-  await pool.query("DELETE FROM waitlist_snapshot");
+  await pool.query("DELETE FROM pond_counter");
   const counted = await takeSnapshot({ db: pool, logger, now });
   console.log(JSON.stringify({ msg: "demo stories: counter recounted", ...counted }));
   const opened = await openPonds(pool);

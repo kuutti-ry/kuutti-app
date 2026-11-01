@@ -13,7 +13,7 @@
  * status, then the home's gate) and looking at their profile (the profile and the photo list); on
  * one visit in N they also open the photos screen, which reads the list again and asks a signed
  * URL for each thumbnail (ADR-008), N spread so an account's URLs last the run. The public part
- * goes out at the visit's start: every second visit asks for the waitlist counter (cacheable for an
+ * goes out at the visit's start: every second visit asks for the pond counter (cacheable for an
  * hour), and every fourth sends the sign-in's last step, the exchange, with a code nobody holds:
  * its shape without the bank. Without sessions a visit is that public part alone. A stage offers
  * visits at a fixed rate, an open model: a visit that finds every request slot busy is counted as
@@ -128,11 +128,10 @@ const URLS_PER_ACCOUNT = 60;
 const SERVER_ERRORS_MAX = 3;
 /** The share of errors, dropped visits or held-back parts past which a stage is not one that held. */
 const BEND_SHARE = 0.01;
-const WAITLIST_EVERY = 2;
 // A launch evening's share of first sign-ins: an assumption, and the visit's cheapest request.
 const EXCHANGE_EVERY = 4;
-/** The signed-in requests of every visit: onboarding, gate, profile, photo list. */
-const SIGNED_IN_PER_VISIT = 4;
+/** The signed-in requests of every visit: onboarding, gate, counter, profile, photo list. */
+const SIGNED_IN_PER_VISIT = 5;
 /**
  * The chat's sockets an account may hold in a run: one under the API's WS_SOCKETS_PER_ACCOUNT (5),
  * which closes an account's oldest for a sixth, so a persona's own phone is never the one closed.
@@ -175,7 +174,7 @@ const ROUTES = {
     expect: 401,
     code: "auth_code_used",
   },
-  waitlist: { name: "GET /waitlist", method: "GET", signedIn: false, expect: 200 },
+  counter: { name: "GET /ponds/counter", method: "GET", signedIn: true, expect: 200 },
   onboarding: { name: "GET /onboarding", method: "GET", signedIn: true, expect: 200 },
   gate: { name: "GET /gate", method: "GET", signedIn: true, expect: 200 },
   profile: { name: "GET /profile", method: "GET", signedIn: true, expect: 200 },
@@ -413,7 +412,7 @@ function planOf(
     accounts === 0 || photosMax === 0
       ? 1
       : Math.max(1, Math.ceil(((visits / accounts) * photosMax) / URLS_PER_ACCOUNT));
-  const publicPerVisit = 1 / WAITLIST_EVERY + 1 / EXCHANGE_EVERY;
+  const publicPerVisit = 1 / EXCHANGE_EVERY;
   // The photos screen reads the list again, then a URL a photo.
   const personPerVisit = SIGNED_IN_PER_VISIT + (1 + photosMax) / thumbEvery;
   // What the address's window holds besides the public requests: the signed-in requests in
@@ -651,8 +650,8 @@ function countServerError(run: Run): void {
 
 /**
  * A person opening the app and looking at their profile (useOnboardingGate and HomeScreen, then
- * ProfileScreen); the photos screen on one visit in thumbEvery. The public part goes out at the
- * start, where the app asks the waitlist alongside the gate: one request's place in a visit.
+ * ProfileScreen); the photos screen on one visit in thumbEvery. The public part, a sign-in's last
+ * step, goes out at the start: one request's place in a visit.
  */
 async function visit(run: Run, n: number): Promise<void> {
   const jobs: Promise<unknown>[] = [];
@@ -664,7 +663,6 @@ async function visit(run: Run, n: number): Promise<void> {
   const publicly = (route: Route, path: string, body?: unknown) =>
     offer(performance.now() < run.anonymousRestUntil, () => call(run, route, path, { body }));
   if (n % EXCHANGE_EVERY === 0) publicly(ROUTES.exchange, "/auth/exchange", nobodysCode());
-  if (n % WAITLIST_EVERY === 0) publicly(ROUTES.waitlist, "/waitlist");
   const account = run.accounts[n % run.accounts.length];
   if (account) offer(performance.now() < account.restUntil, () => signedIn(run, account));
   await Promise.all(jobs);
@@ -676,7 +674,8 @@ async function signedIn(run: Run, account: Account): Promise<void> {
   account.visits += 1;
   const get = (route: Route, path: string) => call(run, route, path, { token, account });
   await get(ROUTES.onboarding, "/onboarding");
-  await get(ROUTES.gate, "/gate");
+  // The home's two reads, the counter asked with the session for the pond's bar (ADR-013 §18).
+  await Promise.all([get(ROUTES.gate, "/gate"), get(ROUTES.counter, "/ponds/counter")]);
   await Promise.all([get(ROUTES.profile, "/profile"), get(ROUTES.photos, "/photos")]);
   if (!thumbs) return;
   // The photos screen reads the list itself (usePhotos), then a URL for each thumbnail.
@@ -1076,13 +1075,14 @@ async function execute(options: Options, io: Io, now: Date = new Date()): Promis
     );
   }
 
-  const waitlist = await ask(base, "/waitlist");
-  if (typeof waitlist === "string") return refuse(`/waitlist: ${waitlist}`);
-  const address = budgetOf(waitlist.headers);
-  if (waitlist.status !== 200) {
-    return refuse(`/waitlist answered ${waitlist.status} ${codeOf(waitlist.json)}`);
+  const counter = await ask(base, "/ponds/counter");
+  if (typeof counter === "string") return refuse(`/ponds/counter: ${counter}`);
+  const address = budgetOf(counter.headers);
+  if (counter.status !== 200) {
+    return refuse(`/ponds/counter answered ${counter.status} ${codeOf(counter.json)}`);
   }
-  if (!address) return refuse("/waitlist sent no RateLimit-Limit: a budget unseen cannot be kept");
+  if (!address)
+    return refuse("/ponds/counter sent no RateLimit-Limit: a budget unseen cannot be kept");
   const accounts = people.accounts.length;
   const plan = planOf(options, {
     addressLimit: address.limit,
@@ -1386,7 +1386,7 @@ async function selfTest(): Promise<never> {
     plan.ceiling.toFixed(3),
     plan.neededLimit,
   ];
-  // Public only: 0.75 public requests a visit, 40 % of 120 a minute: 48 / 45.
+  // Public only: 0.25 public requests a visit, 40 % of 120 a minute: 48 / 15.
   expect(
     "plan without sessions",
     shape(
@@ -1395,11 +1395,12 @@ async function selfTest(): Promise<never> {
         { addressLimit: 120, personLimit: 0, accounts: 0, photosMax: 0 },
       ),
     ),
-    [1, "1.067", 57],
+    [1, "3.200", 19],
   );
-  // Seven accounts of six photos over 90 visits: the photos screen every second visit, 7.5
-  // signed-in requests a visit; the address holds sixteen in flight and binds, (48 - 16) / 45
-  // against 7 * 48 / 450; one visit a second needs 64.3 a minute of each person, / 0.4.
+  // Seven accounts of six photos over 90 visits: the photos screen every second visit, 8.5
+  // signed-in requests a visit; the accounts bind, 7 * 48 / 510 against (48 - 16) / 15 with the
+  // sixteen in flight the address holds; one visit a second needs 72.9 a minute of each person,
+  // / 0.4.
   expect(
     "plan with seven accounts",
     shape(
@@ -1408,10 +1409,11 @@ async function selfTest(): Promise<never> {
         { addressLimit: 120, personLimit: 120, accounts: 7, photosMax: 6 },
       ),
     ),
-    [2, "0.711", 161],
+    [2, "0.659", 183],
   );
-  // The limit raised to 1000 for the run: 720 visits, the photos screen on every eleventh; the
-  // address binds, (400 - 32) / 45, and six visits a second need (270 + 32) / 0.4.
+  // The limit raised to 1000 for the run: 720 visits, the photos screen on every eleventh, 5.64
+  // signed-in requests a visit; the accounts bind, 7 * 400 / 338.2, and six visits a second need
+  // 289.9 a minute of each person, / 0.4.
   expect(
     "plan with a raised limit",
     shape(
@@ -1420,10 +1422,10 @@ async function selfTest(): Promise<never> {
         { addressLimit: 1000, personLimit: 1000, accounts: 7, photosMax: 6 },
       ),
     ),
-    [11, "8.178", 755],
+    [11, "8.280", 725],
   );
   // The same with four sockets for each of the seven accounts: their 28 upgrades stay on the
-  // address, (400 - 32 - 28) / 45, and six visits a second need (270 + 60) / 0.4.
+  // address, (400 - 32 - 28) / 15, which still does not bind.
   expect(
     "plan with a raised limit and sockets",
     shape(
@@ -1432,10 +1434,10 @@ async function selfTest(): Promise<never> {
         { addressLimit: 1000, personLimit: 1000, accounts: 7, photosMax: 6 },
       ),
     ),
-    [11, "7.556", 825],
+    [11, "8.280", 725],
   );
   // Under the default limit the 28 upgrades take nearly all the address's share, (48 - 16 - 28) /
-  // 45; one visit a second needs (45 + 44) / 0.4.
+  // 15; one visit a second needs 72.9 a minute of each person, / 0.4.
   expect(
     "plan with sockets under the default limit",
     shape(
@@ -1444,10 +1446,10 @@ async function selfTest(): Promise<never> {
         { addressLimit: 120, personLimit: 120, accounts: 7, photosMax: 6 },
       ),
     ),
-    [2, "0.089", 223],
+    [2, "0.267", 183],
   );
   // Forty take more than all of it: nothing is allowed, and half a visit a second needs
-  // (22.5 + 56) / 0.4.
+  // (7.5 + 56) / 0.4.
   expect(
     "plan with more sockets than the address's share",
     shape(
@@ -1456,10 +1458,10 @@ async function selfTest(): Promise<never> {
         { addressLimit: 120, personLimit: 120, accounts: 10, photosMax: 6 },
       ),
     ),
-    [1, "0.000", 197],
+    [1, "0.000", 159],
   );
-  // One account without photos: five requests a visit (the photos screen's list on each) against
-  // its 40 % of 120, 48 / 300.
+  // One account without photos: six requests a visit (the photos screen's list on each) against
+  // its 40 % of 120, 48 / 360.
   expect(
     "plan of an account without photos",
     shape(
@@ -1468,7 +1470,7 @@ async function selfTest(): Promise<never> {
         { addressLimit: 120, personLimit: 120, accounts: 1, photosMax: 0 },
       ),
     ),
-    [1, "0.160", 750],
+    [1, "0.133", 900],
   );
 
   const outcomes: Array<[Route, number, string, Outcome]> = [
@@ -1477,8 +1479,8 @@ async function selfTest(): Promise<never> {
     [ROUTES.exchange, 200, "", "unexpected"],
     [ROUTES.gate, 200, "", "ok"],
     [ROUTES.gate, 401, "session_expired", "signed-out"],
-    [ROUTES.waitlist, 401, "unauthenticated", "unexpected"],
-    [ROUTES.waitlist, 429, "rate_limited", "limited"],
+    [ROUTES.counter, 401, "unauthenticated", "signed-out"],
+    [ROUTES.counter, 429, "rate_limited", "limited"],
     [ROUTES.thumb, 429, "photo_budget_exceeded", "limited"],
     [ROUTES.gate, 503, "unreadable", "server"],
     [ROUTES.thumb, 404, "not_found", "unexpected"],
@@ -1690,8 +1692,8 @@ async function standInRuns(
       "GET /openapi.json",
       "GET /photos",
       "GET /photos/{id}/thumb",
+      "GET /ponds/counter",
       "GET /profile",
-      "GET /waitlist",
       "POST /auth/exchange",
       "POST /auth/refresh",
     ]);
@@ -1746,7 +1748,7 @@ async function standInRuns(
       "POST /auth/refresh",
       "GET /auth/session",
       "GET /photos",
-      "GET /waitlist",
+      "GET /ponds/counter",
     ]);
     expect(
       "an over-budget run's refusal",
@@ -1823,8 +1825,7 @@ async function standInRuns(
     // The address's budget under half on a public answer rests the public parts for a window:
     // the stage sent less than its rate, and is no measurement.
     const h = await standIn([], {
-      twist: (route, nth) =>
-        route === "GET /waitlist" && nth >= 1 ? { remaining: 10 } : undefined,
+      twist: (route) => (route === "POST /auth/exchange" ? { remaining: 10 } : undefined),
     });
     const runH = await drive(h.url, undefined, { rates: [8] });
     await h.close();
@@ -1832,7 +1833,7 @@ async function standInRuns(
       "a run whose address rests",
       [
         runH.status,
-        times(h.seen, "GET /waitlist"),
+        times(h.seen, "GET /ponds/counter"),
         times(h.seen, "POST /auth/exchange"),
         runH.out.some((line) =>
           /^load-smoke: held at no stage; the stage at 8 is no measurement: \d+ of \d+ parts of its visits were held back/.test(
@@ -1840,7 +1841,7 @@ async function standInRuns(
           ),
         ),
       ],
-      [0, 2, 1, true],
+      [0, 1, 1, true],
     );
 
     // A person's budget under half rests that account: the same, and the row says so.
@@ -2164,7 +2165,7 @@ async function standIn(
     if (route === "GET /openapi.json") {
       return behaviour.production ? refused(404, "not_found") : answer(200, { openapi: "3.1.0" });
     }
-    if (route === "GET /waitlist") return answer(200, {});
+    if (route === "GET /ponds/counter") return answer(200, {});
     if (route === "POST /auth/exchange") return refused(401, "auth_code_used");
     if (route === "POST /auth/refresh") {
       const presented = (JSON.parse(body) as { refreshToken?: string }).refreshToken ?? "";

@@ -1,9 +1,9 @@
-import type { PondSummary, WaitlistResponse } from "@kuutti/schema";
+import type { PondCounterResponse, PondSummary } from "@kuutti/schema";
 import { act, fireEvent } from "@testing-library/react-native";
 import { renderWithTheme } from "@/test/render";
-import { WaitlistCard } from "./WaitlistCard";
+import { PondCard } from "./PondCard";
 
-// The waitlist card (#54, ADR-013): figures in words, nothing below the
+// The pond card (#54, ADR-013): figures in words, nothing below the
 // threshold, and the bar of whom the people there seek (#507).
 
 const POND: PondSummary = {
@@ -14,7 +14,7 @@ const POND: PondSummary = {
   parentId: null,
 };
 
-const waitlist = (figures: Partial<WaitlistResponse["ponds"][number]>): WaitlistResponse => ({
+const counter = (figures: Partial<PondCounterResponse["ponds"][number]>): PondCounterResponse => ({
   k: 10,
   ponds: [
     {
@@ -23,6 +23,7 @@ const waitlist = (figures: Partial<WaitlistResponse["ponds"][number]>): Waitlist
       verified: null,
       split: null,
       finishing: null,
+      seeks: null,
       ...figures,
     },
   ],
@@ -31,15 +32,13 @@ const waitlist = (figures: Partial<WaitlistResponse["ponds"][number]>): Waitlist
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
 
-const NO_BAR = () => json({ seeks: null });
-const BAR = () => json({ seeks: { men: 30, everyone: 20, women: 50 } });
+const BAR = { men: 30, everyone: 20, women: 50 };
 
-function answering(answers: Array<() => Response>, seeks: () => Response = NO_BAR) {
+function answering(answers: Array<() => Response>) {
   const calls: Request[] = [];
   let n = 0;
   globalThis.fetch = jest.fn(async (input: Request | string) => {
     const request = input instanceof Request ? input : new Request(input);
-    if (new URL(request.url).pathname === "/ponds/seeks") return seeks();
     calls.push(request);
     const answer = answers[Math.min(n, answers.length - 1)];
     n += 1;
@@ -51,10 +50,10 @@ function answering(answers: Array<() => Response>, seeks: () => Response = NO_BA
 
 const settle = () => act(() => new Promise<void>((resolve) => setTimeout(resolve, 20)));
 
-describe("WaitlistCard", () => {
+describe("PondCard", () => {
   it("says the figures in words, with the pond's name on its own", async () => {
-    const calls = answering([() => json(waitlist({ verified: 42, finishing: 17 }))], BAR);
-    const screen = await renderWithTheme(<WaitlistCard pond={POND} />);
+    const calls = answering([() => json(counter({ verified: 42, finishing: 17, seeks: BAR }))]);
+    const screen = await renderWithTheme(<PondCard pond={POND} />);
     await settle();
     expect(screen.getByLabelText("People in your area")).toBeTruthy();
     expect(screen.getByText("Otaniemi")).toBeTruthy();
@@ -68,54 +67,39 @@ describe("WaitlistCard", () => {
         "The numbers change only in steps of at least 10 people, so that one person does not show.",
       ),
     ).toBeTruthy();
-    // The public route: asked without the session's token.
-    expect(new URL(calls[0]?.url ?? "").pathname).toBe("/waitlist");
-    expect(calls[0]?.headers.get("authorization")).toBeNull();
+    expect(new URL(calls[0]?.url ?? "").pathname).toBe("/ponds/counter");
   });
 
   it("no longer says the gender split, even when the counter does", async () => {
     answering([
       () =>
         json(
-          waitlist({ verified: 42, split: { woman: 20, man: 12, nonBinary: 10 }, finishing: 17 }),
+          counter({ verified: 42, split: { woman: 20, man: 12, nonBinary: 10 }, finishing: 17 }),
         ),
     ]);
-    const screen = await renderWithTheme(<WaitlistCard pond={POND} />);
+    const screen = await renderWithTheme(<PondCard pond={POND} />);
     await settle();
     expect(screen.getByText("42 people have identified with their bank")).toBeTruthy();
     expect(screen.queryByText(/non-binary/)).toBeNull();
   });
 
   it("draws no bar while the pond may not say it", async () => {
-    answering([() => json(waitlist({ verified: 30, finishing: 0 }))]);
-    const screen = await renderWithTheme(<WaitlistCard pond={POND} />);
+    answering([() => json(counter({ verified: 30, finishing: 0 }))]);
+    const screen = await renderWithTheme(<PondCard pond={POND} />);
     await settle();
     expect(screen.getByText("30 people have identified with their bank")).toBeTruthy();
     expect(screen.queryByRole("image")).toBeNull();
-  });
-
-  it("leaves the bar out when its read fails, and the rest of the card as it is", async () => {
-    answering([() => json(waitlist({ verified: 30, finishing: 0 }))], () =>
-      json({ error: { code: "internal_error", message: "x", requestId: "r" } }, 500),
-    );
-    const screen = await renderWithTheme(<WaitlistCard pond={POND} />);
-    await settle();
-    expect(screen.getByText("30 people have identified with their bank")).toBeTruthy();
-    expect(screen.queryByRole("image")).toBeNull();
-    expect(screen.queryByText("The numbers could not be read.")).toBeNull();
   });
 
   it("brings the bar back with the figures on Try again", async () => {
-    let online = false;
-    const down = () =>
-      json({ error: { code: "internal_error", message: "x", requestId: "r" } }, 500);
-    answering([() => (online ? json(waitlist({ verified: 30, finishing: 0 })) : down())], () =>
-      online ? BAR() : down(),
-    );
-    const screen = await renderWithTheme(<WaitlistCard pond={POND} />);
+    answering([
+      () => json({ error: { code: "internal_error", message: "x", requestId: "r" } }, 500),
+      () => json(counter({ verified: 30, finishing: 0, seeks: BAR })),
+    ]);
+    const screen = await renderWithTheme(<PondCard pond={POND} />);
     await settle();
     expect(screen.getByText("The numbers could not be read.")).toBeTruthy();
-    online = true;
+    expect(screen.queryByRole("image")).toBeNull();
     await act(async () => {
       fireEvent.press(screen.getByRole("button", { name: "Try again" }));
       await new Promise<void>((resolve) => setTimeout(resolve, 20));
@@ -125,16 +109,16 @@ describe("WaitlistCard", () => {
     expect(screen.getByText("30 % men")).toBeTruthy();
   });
 
-  it("draws no bar below the threshold, whatever the bar's route says", async () => {
-    answering([() => json(waitlist({}))], BAR);
-    const screen = await renderWithTheme(<WaitlistCard pond={POND} />);
+  it("draws no bar below the threshold, whatever the answer says", async () => {
+    answering([() => json(counter({ seeks: BAR }))]);
+    const screen = await renderWithTheme(<PondCard pond={POND} />);
     await settle();
     expect(screen.queryByRole("image")).toBeNull();
   });
 
   it("says no number about a pond below the threshold", async () => {
-    answering([() => json(waitlist({}))]);
-    const screen = await renderWithTheme(<WaitlistCard pond={POND} />);
+    answering([() => json(counter({}))]);
+    const screen = await renderWithTheme(<PondCard pond={POND} />);
     await settle();
     expect(
       screen.getByText(
@@ -147,16 +131,16 @@ describe("WaitlistCard", () => {
   });
 
   it("has words for nobody finishing", async () => {
-    answering([() => json(waitlist({ verified: 30, split: null, finishing: 0 }))]);
-    const screen = await renderWithTheme(<WaitlistCard pond={POND} />);
+    answering([() => json(counter({ verified: 30, split: null, finishing: 0 }))]);
+    const screen = await renderWithTheme(<PondCard pond={POND} />);
     await settle();
     expect(screen.getByText("30 people have identified with their bank")).toBeTruthy();
     expect(screen.getByText("Everyone has finished their profile.")).toBeTruthy();
   });
 
   it("says nothing of people finishing when the counter hides their number", async () => {
-    answering([() => json(waitlist({ verified: 12, split: null, finishing: null }))]);
-    const screen = await renderWithTheme(<WaitlistCard pond={POND} />);
+    answering([() => json(counter({ verified: 12, split: null, finishing: null }))]);
+    const screen = await renderWithTheme(<PondCard pond={POND} />);
     await settle();
     expect(screen.getByText("12 people have identified with their bank")).toBeTruthy();
     expect(screen.queryByText(/finish/)).toBeNull();
@@ -165,9 +149,9 @@ describe("WaitlistCard", () => {
   it("offers another try when the figures cannot be read", async () => {
     answering([
       () => json({ error: { code: "internal_error", message: "x", requestId: "r" } }, 500),
-      () => json(waitlist({ verified: 11, split: null, finishing: 11 })),
+      () => json(counter({ verified: 11, split: null, finishing: 11 })),
     ]);
-    const screen = await renderWithTheme(<WaitlistCard pond={POND} />);
+    const screen = await renderWithTheme(<PondCard pond={POND} />);
     await settle();
     expect(screen.getByText("The numbers could not be read.")).toBeTruthy();
     const retry = screen.getByRole("button", { name: "Try again" });

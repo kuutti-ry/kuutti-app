@@ -23,7 +23,7 @@ In these diagrams every arrow is built. Mermaid's sequence diagrams take a messa
 | 4 | `research-events-partitions` | research | the events table's partitions; the copy, where there is one | this month's and next month's partitions; drops each month whose first day is 90 days old or more | everywhere |
 | 5 | `research-anonymity` | research | the events table | nothing; a warning when a cell is under k | everywhere |
 | 6 | `end-suspensions` | safety | sanctions | lifts each suspension past its day, settles the account | everywhere |
-| 7 | `waitlist-snapshot` | jobs | accounts, profiles, photos, preferences, ponds | the day's waitlist figures per pond | everywhere |
+| 7 | `pond-counter` | jobs | accounts, profiles, photos, preferences, ponds | the day's figures per pond | everywhere |
 | 8 | `invitation-count` | rewards | invitations, accounts, consents, profiles, photos, preferences | invitations counted, the inviter's reward units, a notice | everywhere |
 | 9 | `round-builder` | jobs, written through matching | the ponds' switches, accounts, profiles, photos, preferences, consents, blocks, rounds, likes, conversations | the day's round and its cards | everywhere but production |
 | 10 | `reject-unreviewed-photos` | media | profile photos in the human queue | rejects those waiting past `photo_queue_reject_days` as not reviewed | everywhere |
@@ -112,12 +112,12 @@ sequenceDiagram
 ```mermaid
 sequenceDiagram
   accTitle: The night's jobs, part 3: the pond and the round
-  accDescr: Suspensions past their day end first, so a person let back in is counted the same night. Then the waitlist's figures, the invitations whose redeemer is complete, and, outside production, the Finnish day's round for each complete person of an open pond.
+  accDescr: Suspensions past their day end first, so a person let back in is counted the same night. Then the counter's figures, the invitations whose redeemer is complete, and, outside production, the Finnish day's round for each complete person of an open pond.
   autonumber 19
   participant api as The API's nightly run
   participant db as PostgreSQL
   api->>db: end-suspensions. Lift each suspension past its day and settle its account, one account per transaction
-  api->>db: waitlist-snapshot. Under its lock, count each pond, and move its figures when k people came or went
+  api->>db: pond-counter. Under its lock, count each pond, and move its figures when k people came or went
   api->>db: invitation-count. Count each invitation whose redeemer is complete now, give the inviter its units, write a notice
   opt not in production
     api->>db: round-builder. In each pond an admin has opened, write the Finnish day's round for each complete person
@@ -127,7 +127,7 @@ sequenceDiagram
 ### Steps
 
 19. `end-suspensions` (safety, #307, ADR-024 §5): every suspension still open past its day is lifted by nobody, and its account's state settled from the sanctions still open, one account per transaction. It runs before the counts so that a person let back in is counted the same night. A login on the end day before 04:00 is still refused: a `shortcut:` in `safety/sanctions.ts`.
-20. `waitlist-snapshot` (`jobs/`, #54, ADR-013): under its own advisory lock, counts the waitlist of each pond: live, bank-verified accounts with a pond. A pond's figures move only when at least k people have come or gone since they were taken, and the bands of whom its finished profiles seek on their own, in every environment but production (#507). The public waitlist route serves the figures all day, and a signed-in route the bands of the caller's own pond, as shares. A database with no figures gets its first ones at boot.
+20. `pond-counter` (`jobs/`, #54, ADR-013): under its own advisory lock, counts each pond: live, bank-verified accounts with a pond. A pond's figures move only when at least k people have come or gone since they were taken, and the bands of whom its finished profiles seek on their own, in every environment but production (#507). The counter's route serves the figures all day, and to a session the bands of the caller's own pond, as shares. A database with no figures gets its first ones at boot.
 21. `invitation-count` (rewards, #107, ADR-044 §7, ADR-060 §7): in one transaction, each invitation not counted yet whose redeemer's profile and onboarding are complete now is counted once; its inviter gets the units `matching_config invitation_reward` says tonight, and one notice in the app (ADR-032). Its line says how many and of what, never who.
 22. `round-builder` (`jobs/`, #95, ADR-035, ADR-060 §5): in each pond an admin has opened, each complete person gets a round for the Finnish day, written through the matching slice's one writer. The people whose like waits on the person come first (ADR-037, ADR-039). Somebody the night did not build for gets theirs at the day's first read. Not in production, by night or by read, until the maintainer has set how long rounds are kept (ADR-034 Open 2, ADR-035 Open 1): a `shortcut:` in `boot.ts` and `app.ts`. The day's round is told later, at `matching_config round_push_hour` (9 in Helsinki), by a timer of its own in the same process and not by a nightly job: one push to each person whose round was built and who has not opened it, and who opened a round within `matching_config round_push_idle_days` (7), through Expo; a failed run is tried again three times five minutes apart, the same day (#102, ADR-055 §6; [Components](components.md), step 21).
 
@@ -174,9 +174,9 @@ sequenceDiagram
 ## Where it lives
 
 - The timer and the list: `apps/api/src/jobs/nightly.ts` (`msUntilNightly` over `msUntilFinnishHour`, which the round's push uses too, `runNightly`, `scheduleNightly`), `apps/api/src/boot.ts` (the jobs, in order, and the two held back in production), `apps/api/src/index.ts` (`scheduleNightly` at start)
-- The jobs: `apps/api/src/identity/sessions.ts` and `admin-session.ts`; `apps/api/src/research/copy.ts`, `copy-store.ts`, `partitions.ts`, `anonymity.ts`; `apps/api/src/safety/sanctions.ts` (`endSuspensions`), `photo-check.ts`, `reports.ts` (`pruneReports`); `apps/api/src/jobs/waitlist-snapshot.ts`, `pool.ts`, `invitation-count.ts` with `apps/api/src/rewards/invitations.ts`, `round-builder.ts` with `apps/api/src/matching/rounds.ts` (`saveRound`); `apps/api/src/media/moderation.ts` (`rejectUnreviewedPhotos`, `sweepPendingPhotos`); `apps/api/src/chat/archive.ts`
+- The jobs: `apps/api/src/identity/sessions.ts` and `admin-session.ts`; `apps/api/src/research/copy.ts`, `copy-store.ts`, `partitions.ts`, `anonymity.ts`; `apps/api/src/safety/sanctions.ts` (`endSuspensions`), `photo-check.ts`, `reports.ts` (`pruneReports`); `apps/api/src/jobs/pond-counter.ts`, `pool.ts`, `invitation-count.ts` with `apps/api/src/rewards/invitations.ts`, `round-builder.ts` with `apps/api/src/matching/rounds.ts` (`saveRound`); `apps/api/src/media/moderation.ts` (`rejectUnreviewedPhotos`, `sweepPendingPhotos`); `apps/api/src/chat/archive.ts`
 - The alarm: `infra/modules/observability/main.tf` (the topic, the e-mail subscription, the metric filter `nightly-failures`, the alarm `nightly-job-failed`), `infra/modules/compute/main.tf` and `templates/user_data.sh.tpl` (the log group and the `awslogs` driver), `infra/envs/staging/main.tf` and `infra/envs/prod/main.tf` (each composes it), `docs/runbooks/alerts.md`
-- Specs: `features/safety/sanctions.feature` (the night lifts a suspension), `features/pond/opening.feature`, `features/pond/waitlist.feature`, `features/matching/rounds.feature`, `features/media/moderation.feature`, `features/chat/conversations.feature`
+- Specs: `features/safety/sanctions.feature` (the night lifts a suspension), `features/pond/opening.feature`, `features/pond/counter.feature`, `features/matching/rounds.feature`, `features/media/moderation.feature`, `features/chat/conversations.feature`
 - ADRs: [ADR-006](../adr/006-photo-moderation.md) §2 and §4, [ADR-011](../adr/011-research-events.md) §6 and §9, [ADR-013](../adr/013-waitlist-counter.md), [ADR-060](../adr/060-no-waiting-at-the-pond.md), [ADR-022](../adr/022-taking-a-break.md) §4, [ADR-024](../adr/024-sanctions.md) §5, [ADR-029](../adr/029-the-research-copy.md) §1 to §6 and §12, [ADR-030](../adr/030-reports-and-blocks.md) §8 and §12, [ADR-031](../adr/031-chat.md) §8, [ADR-032](../adr/032-notification-choices-and-notices.md), [ADR-034](../adr/034-the-round-record.md), [ADR-035](../adr/035-the-round-builder-first-cut.md), [ADR-037](../adr/037-liked-you-in-the-round.md), [ADR-039](../adr/039-the-fish.md), [ADR-044](../adr/044-invitations.md) §7
 - Issues: #35, #49, #50, #54, #84, #95, #107, #194, #253, #307, #348, #351, #376, #500; the alarm #11 and #194
 

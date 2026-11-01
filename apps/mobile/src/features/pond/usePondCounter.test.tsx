@@ -1,7 +1,7 @@
 import { act, renderHook, waitFor } from "@testing-library/react-native";
-import { useWaitlist } from "./useWaitlist";
+import { usePondCounter } from "./usePondCounter";
 
-// What the public counter says of one pond (#54): its figures, none when the
+// What the counter says of one pond (#54): its figures, none when the
 // list does not name it, a failure with a retry, and an answer for a pond
 // that is no longer asked about is dropped.
 
@@ -20,8 +20,9 @@ const entry = (n: number, verified: number) => ({
   verified,
   split: null,
   finishing: null,
+  seeks: null,
 });
-const WAITLIST = { k: 10, ponds: [entry(1, 150), entry(2, 40)] };
+const COUNTER = { k: 10, ponds: [entry(1, 150), entry(2, 40)] };
 
 function pendingReads() {
   const waiting: Array<(response: Response) => void> = [];
@@ -34,49 +35,49 @@ function pendingReads() {
   return waiting;
 }
 
-describe("useWaitlist", () => {
+describe("usePondCounter", () => {
   it("gives the figures of the asked pond and the step they are said in", async () => {
-    globalThis.fetch = jest.fn(async () => json(WAITLIST)) as unknown as typeof fetch;
-    const { result } = await renderHook(() => useWaitlist(pond(2).id));
+    globalThis.fetch = jest.fn(async () => json(COUNTER)) as unknown as typeof fetch;
+    const { result } = await renderHook(() => usePondCounter(pond(2).id));
     await waitFor(() => expect(result.current.status).toBe("ready"));
     expect(result.current).toMatchObject({ status: "ready", k: 10, figures: entry(2, 40) });
   });
 
   it("has no figures for a pond the list does not name", async () => {
-    globalThis.fetch = jest.fn(async () => json(WAITLIST)) as unknown as typeof fetch;
-    const { result } = await renderHook(() => useWaitlist(pond(9).id));
+    globalThis.fetch = jest.fn(async () => json(COUNTER)) as unknown as typeof fetch;
+    const { result } = await renderHook(() => usePondCounter(pond(9).id));
     await waitFor(() => expect(result.current.status).toBe("ready"));
     expect(result.current).toMatchObject({ k: 10, figures: null });
   });
 
   it("fails, and loads again on a retry", async () => {
     const waiting = pendingReads();
-    const { result } = await renderHook(() => useWaitlist(pond(1).id));
+    const { result } = await renderHook(() => usePondCounter(pond(1).id));
     await act(async () => waiting.shift()?.(json({ error: { code: "internal_error" } }, 503)));
     expect(result.current.status).toBe("failed");
     await act(async () => result.current.retry());
     expect(result.current.status).toBe("loading");
-    await act(async () => waiting.shift()?.(json(WAITLIST)));
+    await act(async () => waiting.shift()?.(json(COUNTER)));
     expect(result.current).toMatchObject({ status: "ready", figures: entry(1, 150) });
   });
 
   it("drops the answer, or the failure, for a pond no longer asked about", async () => {
     const waiting = pendingReads();
-    const { result, rerender } = await renderHook(({ id }: { id: string }) => useWaitlist(id), {
+    const { result, rerender } = await renderHook(({ id }: { id: string }) => usePondCounter(id), {
       initialProps: { id: pond(1).id },
     });
     await rerender({ id: pond(2).id });
     const [first, second] = waiting;
-    await act(async () => first?.(json(WAITLIST)));
+    await act(async () => first?.(json(COUNTER)));
     expect(result.current.status).toBe("loading");
-    await act(async () => second?.(json(WAITLIST)));
+    await act(async () => second?.(json(COUNTER)));
     expect(result.current).toMatchObject({ figures: entry(2, 40) });
     await rerender({ id: pond(1).id });
     await rerender({ id: pond(2).id });
     const [, , third, fourth] = waiting;
     await act(async () => third?.(json({ error: { code: "internal_error" } }, 503)));
     expect(result.current.status).toBe("loading");
-    await act(async () => fourth?.(json(WAITLIST)));
+    await act(async () => fourth?.(json(COUNTER)));
     expect(result.current).toMatchObject({ status: "ready", figures: entry(2, 40) });
   });
 });

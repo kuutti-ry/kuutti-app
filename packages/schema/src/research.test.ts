@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
+import { POND_COUNTER_K_MIN } from "./pond-counter.ts";
 import { PROFILE_FIELD_KEYS, PROFILE_FIELDS, SPECIAL_CATEGORY_FIELDS } from "./profile-fields.ts";
 import {
   AGE_BANDS,
@@ -11,7 +12,6 @@ import {
   ResearchSnapshot,
   researchFieldsOf,
 } from "./research.ts";
-import { WAITLIST_K_MIN } from "./waitlist.ts";
 
 // The event registry and the coarse snapshot (#50, ADR-011, rules/schema.md).
 
@@ -157,9 +157,9 @@ describe("the coarse snapshot", () => {
     expect(RESEARCH_FIELD_KEYS).toEqual(["intent"]);
   });
 
-  it("holds k to the waitlist's floor of ten", () => {
+  it("holds k to the counter's floor of ten", () => {
     expect(RESEARCH_K_MIN).toBe(10);
-    expect(RESEARCH_K_MIN).toBe(WAITLIST_K_MIN);
+    expect(RESEARCH_K_MIN).toBe(POND_COUNTER_K_MIN);
   });
 
   it("keeps a stored value only while the registry still knows it, and drops the rest", () => {

@@ -80,7 +80,7 @@ export type Relaxation = z.infer<typeof Relaxation>;
 
 /**
  * A relaxation a short round offers (ADR-042 §4), with `more`: how much it
- * widens the person's pool, rounded down to a step of `waitlist_k` (ADR-015
+ * widens the person's pool, rounded down to a step of `pond_counter_k` (ADR-015
  * §6), so zero says fewer than a step. Never a count of anything else.
  */
 export const RelaxationOffer = Relaxation.extend({ more: z.int().min(0) })

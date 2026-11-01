@@ -1,20 +1,20 @@
 import { type Queryable, transaction } from "@kuutti/db";
-import { moveFigures, seeksBand, type WaitlistCounts } from "@kuutti/schema";
+import { moveFigures, type PondCounterCounts, seeksBand } from "@kuutti/schema";
 import { CURRENT_CONSENT_VERSIONS } from "../identity/index.ts";
 import { finnishDay } from "../lib/finnish-day.ts";
 import type { Logger } from "../lib/logger.ts";
 import { preferencesFrom } from "../matching/index.ts";
-import { listPonds, readStandingFigures, readWaitlistK } from "../pond/index.ts";
+import { listPonds, readPondCounterK, readStandingFigures } from "../pond/index.ts";
 import { answeredPromptsOf, completeness } from "../profile/index.ts";
 import type { NightlyJob } from "./nightly.ts";
 
 /**
- * The waitlist counter's figures (#54, ADR-013). The waitlist is the people
- * themselves: live, bank-verified accounts with a pond. Once a day they are
- * counted per pond, and a pond's figures move when at least k people have
- * come or gone since they were taken (`moveFigures`): a count that followed
- * every day would say what the one person who came that day declared. The
- * public route of the pond slice serves the figures after suppression. It
+ * The pond counter's figures (#54, ADR-013). It counts the people themselves:
+ * live, bank-verified accounts with a pond. Once a day they are counted per
+ * pond, and a pond's figures move when at least k people have come or gone
+ * since they were taken (`moveFigures`): a count that followed every day would
+ * say what the one person who came that day declared. The pond slice's route
+ * serves the figures after suppression. It
  * lives here and not in a slice because it reads across several (accounts,
  * profiles, photos, preferences, ponds) and none of them should depend on the
  * others for it (rules/layout.md).
@@ -23,7 +23,7 @@ import type { NightlyJob } from "./nightly.ts";
  * Queryable seam the test harness hands a rolled-back transaction through.
  * No statement here takes input from a request.
  */
-export type WaitlistDeps = {
+export type PondCounterDeps = {
   db: Queryable;
   logger: Logger;
   now: () => Date;
@@ -46,7 +46,7 @@ export const countsBands = (appEnv: string) => appEnv !== "production";
  * by k, and the second overwrites the first with a total one person apart:
  * the very difference the step rule is there to keep from being said.
  */
-export const WAITLIST_LOCK_KEY = 725_121_154;
+export const POND_COUNTER_LOCK_KEY = 725_121_154;
 
 type FactsRow = {
   pond_id: string;
@@ -62,7 +62,7 @@ type FactsRow = {
   seeks_consented: boolean;
 };
 
-const empty = (): WaitlistCounts => ({
+const empty = (): PondCounterCounts => ({
   verified: 0,
   woman: 0,
   man: 0,
@@ -93,7 +93,7 @@ const STANDS_AS_ACTIVE = new Set(["active", "shadow_banned"]);
 export async function countPonds(
   db: Queryable,
   bands = true,
-): Promise<Map<string, WaitlistCounts>> {
+): Promise<Map<string, PondCounterCounts>> {
   const { rows } = await db.query<FactsRow>(
     `SELECT a.pond_id, a.gender, a.state, p.display_name, p.bio, p.bio_preset, p.prompts,
             (SELECT count(*) FROM photo ph
@@ -113,7 +113,7 @@ export async function countPonds(
        AND i.standing = 'ok'`,
     [CURRENT_CONSENT_VERSIONS.special_category],
   );
-  const ponds = new Map<string, WaitlistCounts>();
+  const ponds = new Map<string, PondCounterCounts>();
   for (const row of rows) {
     const counts = ponds.get(row.pond_id) ?? empty();
     counts.verified += 1;
@@ -157,20 +157,20 @@ export type SnapshotResult = { day: string; ponds: number; moved: number; counte
  * lock one after the other. Every row's `taken_at` is the last count, so the
  * newest of them says which day was counted last.
  */
-export async function takeSnapshot(deps: WaitlistDeps): Promise<SnapshotResult> {
+export async function takeSnapshot(deps: PondCounterDeps): Promise<SnapshotResult> {
   const at = deps.now();
   const day = finnishDay(at);
   const result = await transaction(deps.db, async (tx) => {
     // Before anything is read: what this count compares with must be what the last one left.
-    await tx.query("SELECT pg_advisory_xact_lock($1)", [WAITLIST_LOCK_KEY]);
+    await tx.query("SELECT pg_advisory_xact_lock($1)", [POND_COUNTER_LOCK_KEY]);
     const last = await tx.query<{ at: Date | null }>(
-      "SELECT max(taken_at) AS at FROM waitlist_snapshot",
+      "SELECT max(taken_at) AS at FROM pond_counter",
     );
     const lastAt = last.rows[0]?.at ?? null;
     if (lastAt !== null && finnishDay(lastAt) === day) {
       return { day, ponds: 0, moved: 0, counted: false };
     }
-    const k = await readWaitlistK(tx);
+    const k = await readPondCounterK(tx);
     const counts = await countPonds(tx, deps.bands);
     const standing = await readStandingFigures(tx);
     const ponds = await listPonds(tx);
@@ -185,7 +185,7 @@ export async function takeSnapshot(deps: WaitlistDeps): Promise<SnapshotResult> 
       // leaves it, or it would say in public that whom people seek has changed.
       const movedOn = had && next.verified === had.counts.verified ? had.day : day;
       await tx.query(
-        `INSERT INTO waitlist_snapshot (pond_id, day, verified, woman, man, non_binary, finishing,
+        `INSERT INTO pond_counter (pond_id, day, verified, woman, man, non_binary, finishing,
                                         seeks_men, seeks_everyone, seeks_women, taken_at)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
          ON CONFLICT (pond_id) DO UPDATE
@@ -210,27 +210,24 @@ export async function takeSnapshot(deps: WaitlistDeps): Promise<SnapshotResult> 
       );
     }
     // The ponds that did not move were counted too: the mark of the day's count is on every row.
-    await tx.query("UPDATE waitlist_snapshot SET taken_at = $1", [at]);
+    await tx.query("UPDATE pond_counter SET taken_at = $1", [at]);
     return { day, ponds: ponds.length, moved, counted: true };
   });
   // How many ponds there are and how many moved, never who, where or how many people.
-  deps.logger.info(
-    result,
-    result.counted ? "waitlist snapshot" : "waitlist snapshot: counted today already",
-  );
+  deps.logger.info(result, result.counted ? "pond counter" : "pond counter: counted today already");
   return result;
 }
 
 /** The first figures for a database that has none, so the route has something to say after a first deploy. */
-export async function ensureFirstSnapshot(deps: WaitlistDeps): Promise<SnapshotResult | null> {
-  const { rows } = await deps.db.query("SELECT 1 FROM waitlist_snapshot LIMIT 1");
+export async function ensureFirstSnapshot(deps: PondCounterDeps): Promise<SnapshotResult | null> {
+  const { rows } = await deps.db.query("SELECT 1 FROM pond_counter LIMIT 1");
   return rows.length === 0 ? takeSnapshot(deps) : null;
 }
 
 /** The nightly job: the day's count. */
-export function waitlistJob(deps: WaitlistDeps): NightlyJob {
+export function pondCounterJob(deps: PondCounterDeps): NightlyJob {
   return {
-    name: "waitlist-snapshot",
+    name: "pond-counter",
     run: async () => {
       const result = await takeSnapshot(deps);
       return { ponds: result.ponds, moved: result.moved };

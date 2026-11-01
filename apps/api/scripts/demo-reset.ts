@@ -41,7 +41,7 @@ import {
   PERSONA_HISTORIES,
 } from "@kuutti/db/demo";
 import { hmacKeyFromHex } from "../src/identity/index.ts";
-import { takeSnapshot } from "../src/jobs/waitlist-snapshot.ts";
+import { takeSnapshot } from "../src/jobs/pond-counter.ts";
 import { loadConfig, parseConfig } from "../src/lib/config.ts";
 import { createLogger, type Logger } from "../src/lib/logger.ts";
 import { createMediaDeps } from "../src/media/index.ts";
@@ -111,7 +111,7 @@ async function recount(
 ) {
   // The ponds have other people in them now: the counter of #54 is counted
   // anew, as after a write of the population (demo-population.ts says why).
-  await pool.query("DELETE FROM waitlist_snapshot");
+  await pool.query("DELETE FROM pond_counter");
   const counted = await takeSnapshot({ db: pool, logger, now });
   console.log(JSON.stringify({ msg: "demo reset: counter recounted", ...counted }));
   // And the ponds open, so that the personas have rounds (ADR-060 Open 1).

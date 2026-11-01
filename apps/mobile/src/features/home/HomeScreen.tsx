@@ -12,7 +12,7 @@ import { ChatsButton } from "@/features/chat";
 import { useOnboardingGate, useSession } from "@/features/identity";
 import { RoundButton } from "@/features/matching";
 import { Notices, PushOffer } from "@/features/notifications";
-import { GateCard, WaitlistCard } from "@/features/pond";
+import { GateCard, PondCard } from "@/features/pond";
 import { isProduction } from "@/lib/environment";
 import { useT } from "@/lib/locale";
 import { useHapticTap } from "@/theme/haptics";
@@ -97,7 +97,7 @@ export function HomeScreen() {
             {/* How the person's own pond is filling up (#54), and whether matching is open for them
                 (#500); once it is, the way to today's round (#379) and the one offer of
                 notifications, since now there is something to tell (#102, ADR-055 §9). */}
-            {gate.pond && <WaitlistCard pond={gate.pond} />}
+            {gate.pond && <PondCard pond={gate.pond} />}
             {gate.pond && (
               <GateCard
                 whenOpen={

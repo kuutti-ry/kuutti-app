@@ -1,20 +1,19 @@
-# features/pond/waitlist.feature
-Feature: The waitlist counter
-  The waitlist is the people themselves: bank-verified accounts with a pond,
-  waiting for matching to open there (TD-10). Its counter is public, so it is
-  coarse on purpose: a number is said only where at least k people stand
-  behind it, and the numbers of a pond move only once at least k people have
-  come or gone, so one person coming or going changes nothing that is said
-  (#54, ADR-013).
+# features/pond/counter.feature
+Feature: The pond counter
+  The figure of a pond: the people themselves, bank-verified accounts with that
+  pond as theirs (TD-10). It is public, so it is coarse on purpose: a number is
+  said only where at least k people stand behind it, and the numbers of a pond
+  move only once at least k people have come or gone, so one person coming or
+  going changes nothing that is said (#54, ADR-013).
 
   Scenario: A pond below k publishes no number
     Given a pond with nine verified people and k is ten
-    When the figures are taken and the waitlist is read
+    When the figures are taken and the counter is read
     Then the pond is listed with no total, no split, no count of people finishing and no day
 
   Scenario Outline: The gender split is published only when every cell is at least k
     Given a pond with <women> women, <men> men, <non_binary> non-binary people and <undeclared> who have declared no gender, and k is ten
-    When the figures are taken and the waitlist is read
+    When the figures are taken and the counter is read
     Then the total is published and the split is <split>
 
     Examples:
@@ -33,35 +32,35 @@ Feature: The waitlist counter
 
   Scenario: A profile that is not complete counts as finishing
     Given a pond with twenty-five verified people of whom ten have a complete profile
-    When the figures are taken and the waitlist is read
+    When the figures are taken and the counter is read
     Then twenty-five are verified and fifteen are finishing their profile
 
   Scenario: The people finishing are counted in public only when they and the rest are none or at least k
     Given a pond with twelve verified people of whom three have a complete profile
-    When the figures are taken and the waitlist is read
+    When the figures are taken and the counter is read
     Then twelve are verified and the number finishing is not said
 
   Scenario: The figures of a pond move only once at least k people have come or gone
     Given a pond whose published total is twenty-five
     When nine more people join and the figures are taken on the next day
-    Then the waitlist says what it said, day and all
+    Then the counter says what it said, day and all
     When one more joins and the figures are taken on the day after
     Then the total is thirty-five and the day is that day
 
   Scenario: The accounts are counted at most once a day
     Given a pond whose published total is twenty-five, counted today
     When ten more people join and another process counts on the same day
-    Then nothing is counted and the waitlist says what it said
+    Then nothing is counted and the counter says what it said
     When the figures are taken on the next day
     Then the total is thirty-five
 
   Scenario: The figures do not move between two counts
     Given the figures of one day
     When fifteen more people join the pond that day
-    Then the waitlist says what it said, until the figures are taken again
+    Then the counter says what it said, until the figures are taken again
 
-  Scenario: The waitlist answers without a session and names nobody
-    When anybody asks for the waitlist
+  Scenario: The counter answers without a session and names nobody
+    When anybody asks for the counter
     Then the answer carries k and every pond, may be cached, and holds no account, no time of day and nothing from a profile
 
   Scenario Outline: Whom a finished profile seeks decides its band
@@ -130,15 +129,19 @@ Feature: The waitlist counter
   Scenario: The bar says shares of the caller's own pond and nothing else
     Given a pond whose bar is said
     When a person of the pond asks
-    Then they hear its shares, never cached, with no count, no pond and no day
+    Then they hear its shares, never cached, with no count of any band
 
   Scenario: Nobody hears a bar without a pond or without a session
     When somebody with no pond asks
     Then the bar is not said
     When somebody asks without a session
+    Then the bar is not said
+
+  Scenario: A session that does not stand is refused, not answered as the public
+    When somebody asks with a session that does not stand
     Then the answer is refused
 
-  Scenario: The public waitlist says nothing of whom anybody seeks
+  Scenario: The public counter says nothing of whom anybody seeks
     Given a pond whose bar is said
-    When anybody asks for the waitlist
+    When anybody asks for the counter
     Then the answer carries no band and no share

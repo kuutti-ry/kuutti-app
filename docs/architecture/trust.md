@@ -189,7 +189,7 @@ flowchart TB
 - **#198** is the issue #397 names for CloudFront-only ingress. The repository names the switch (`cloudfront_only_ingress`, ADR-005 §7) but no issue number.
 - **Rule 6.** The checklist's line for rule 6 (every user-data query scoped by the session's `account_id`) is still unticked; steps 5 and 23 draw what the code does.
 - **Session tokens.** The checklist's line "stored hashed, compared in constant time" is unticked. The code stores SHA-256 hashes and finds a token by its hash in the database (step 5), not by a constant-time compare in the API.
-- **Rule 8's words** say no CORS. The code answers the panel's origin on staging and a preview's own web origin on a preview; the checklist also allows the waitlist site, which staging's list does not name.
+- **Rule 8's words** say no CORS. The code answers the panel's origin on staging and a preview's own web origin on a preview; the checklist also allows the public site, which staging's list does not name.
 - **Rekognition and AWS's use of content.** AWS may use what its AI services are sent to improve them unless the account opts out; the opt-out waits for the association's organisation (ADR-006 §1).
 - **The hop from CloudFront to the box** crosses the public internet over HTTPS until the ingress switch (the checklist's TLS line, unticked).
 - **Production** has run since 2026-10-24 without bank identification (ADR-049), so it holds nobody's data yet. It has no research module and no copy until ADR-029's ninety days are answered.

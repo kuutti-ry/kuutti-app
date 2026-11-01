@@ -75,6 +75,7 @@ describe("the tables", () => {
       "photo_access",
       "photo_check_note",
       "photo_review",
+      "pond_counter",
       "ponds",
       "preferences",
       "profile",
@@ -90,7 +91,6 @@ describe("the tables", () => {
       "rounds",
       "sanction",
       "session",
-      "waitlist_snapshot",
     ]);
   });
 

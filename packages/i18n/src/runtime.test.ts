@@ -38,7 +38,7 @@ describe("plurals in every language", () => {
     ["sv", 1, "1 person håller fortfarande på med sin profil."],
     ["sv", 11, "11 personer håller fortfarande på med sin profil."],
   ] as const)("say %s for %i: %s", (locale, people, text) => {
-    expect(tIn(locale)("pond.waitlist.finishing", { people })).toBe(text);
+    expect(tIn(locale)("pond.counter.finishing", { people })).toBe(text);
   });
 
   it.each([
@@ -66,12 +66,12 @@ describe("plurals in every language", () => {
     ],
   ] as const)("say the bar of a pond in three sentences in %s", (locale, text) => {
     const shares = { men: 30, everyone: 20, women: 50 };
-    expect(tIn(locale)("pond.waitlist.seeks.label", shares)).toBe(text);
+    expect(tIn(locale)("pond.counter.seeks.label", shares)).toBe(text);
   });
 
   it("format the numbers of a message with the language's grouping and a decimal comma", () => {
-    expect(tIn("en")("pond.waitlist.small", { k: 1200 })).toContain(`1${nbsp}200 people`);
-    expect(tIn("en")("pond.waitlist.seeks.men", { share: 10.5 })).toBe("10,5 % men");
+    expect(tIn("en")("pond.counter.small", { k: 1200 })).toContain(`1${nbsp}200 people`);
+    expect(tIn("en")("pond.counter.seeks.men", { share: 10.5 })).toBe("10,5 % men");
     expect(tIn("sv")("photos.count", { photos: 1, max: 6 })).toBe("1 foto, högst 6");
   });
 });
