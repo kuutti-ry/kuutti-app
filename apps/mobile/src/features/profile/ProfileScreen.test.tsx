@@ -121,7 +121,6 @@ function fakeApi(
         state: "active",
         age: 36,
         gender: answer,
-        pond: null,
         home: null,
         preferences: { seeks: ["man"], ageWindow: { min: 25, max: 40 } },
         consents: { terms: "t", privacy: "p", specialCategory: "s", research: null },

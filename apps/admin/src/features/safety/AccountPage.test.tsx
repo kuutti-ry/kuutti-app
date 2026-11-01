@@ -439,7 +439,7 @@ describe("a person's page", () => {
     expect(screen.queryByRole("alert")).toBeNull();
   });
 
-  it("shows a dash for what a profile leaves empty: no age, gender, pond or bio", async () => {
+  it("shows a dash for what a profile leaves empty: no age, gender or bio", async () => {
     fetchMock([
       pageOf(
         page({

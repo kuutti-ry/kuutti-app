@@ -34,8 +34,12 @@ export async function signedInAccount(
   );
   const identityId = identity.rows[0]?.id;
   if (!identityId) throw new Error("test identity not written");
+  // A minute back, since `blockStandsBetween` compares this, the database's clock, with a block's
+  // time, the API's: a database ahead of this machine by more than a test's few milliseconds read
+  // a block as older than both accounts, and a report's proof failed (reports.test.ts, 01/11/2026).
   const account = await db.query<{ id: string }>(
-    "INSERT INTO account (identity_id, state, birth_year, birth_month) VALUES ($1, $2, 1990, 6) RETURNING id",
+    `INSERT INTO account (identity_id, state, birth_year, birth_month, registered_at)
+     VALUES ($1, $2, 1990, 6, now() - interval '1 minute') RETURNING id`,
     [identityId, options.state ?? "active"],
   );
   const accountId = account.rows[0]?.id;

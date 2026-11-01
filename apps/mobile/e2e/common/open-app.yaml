@@ -1,6 +1,6 @@
 # Open the local bundle and wait for one of the app's first screens (ADR-020 §3).
 # The dev client opens the bundle by its launcher link, never through the launcher
-# screen. Signed in, the app shows the home screen's area card or an onboarding
+# screen. Signed in, the app shows the card People on Kuutti or an onboarding
 # step under its welcome title; signed out, the sign-in screen, with its button or,
 # after a refusal that may pass, the button to try again (#466), or on a phone that
 # has not recorded the current wordings the screens before the bank (#418), which

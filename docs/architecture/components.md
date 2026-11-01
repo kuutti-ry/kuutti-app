@@ -137,7 +137,7 @@ Code inside each app is organised by slice, never by layer (`.claude/rules/layou
 | identity | yes | yes | yes: staff sign-in | yes | heavy, thin, auth only |
 | profile | yes | yes | no directory | no | medium, heavy, read |
 | media | yes | yes | yes: the photo queue | yes | heavy, medium, queue |
-| pond | yes | yes | yes: the ponds' switches | yes | medium, thin, switch |
+| pond | yes | yes | yes: the switch that opens matching | yes | medium, thin, switch |
 | matching | yes | yes | no directory | yes | heavy, heavy, none |
 | chat | yes | yes | no directory | yes | heavy, heavy, snapshots |
 | safety | yes | yes | yes: the overview, reports, accounts, sanctions, automatic bans, feedback, staff, the audit log, matching_config | yes | medium, thin, heavy |
@@ -153,7 +153,7 @@ Besides the slices, the API has `health/`, `jobs/` (the nightly timer and the jo
 4. **pond**: the one pond, a person's home (ADR-061), the pond counter, and the switch that opens matching. In all three apps (the admin panel's Matching screen); specs in `features/pond`.
 5. **matching**: rounds, deal-breakers, likes, the fish, the match. API and phone app; specs in `features/matching`.
 6. **chat**: conversations, messages, the socket, contacts shared, the archive. API and phone app; specs in `features/chat`.
-7. **safety**: reports, blocks, sanctions, the audit log, the automatic shadow bans, velocity. In all three apps; the admin panel's screens are in this slice, but for the photo queue and the ponds. Specs in `features/safety`.
+7. **safety**: reports, blocks, sanctions, the audit log, the automatic shadow bans, velocity. In all three apps; the admin panel's screens are in this slice, but for the photo queue and the Matching switch. Specs in `features/safety`.
 8. **research**: the event registry's one door (`track`), the `research_id` mapping, the partitions and the research copy. The API alone has code; the phone app's directory holds a README only.
 9. **rewards**: invitations and the reward ledger. API and phone app.
 10. **notifications**: the notification choices, the notices in the app and the push (#102, ADR-055): whom to tell of a message, a match or the day's round, and the devices' tokens. API and phone app.
@@ -209,7 +209,7 @@ flowchart LR
 
 ## Open
 
-- **The admin panel's slices.** The layout rules' matrix gives the admin panel profile "read", pond "switch", chat "snapshots" and research "read", but `apps/admin/src/features` holds identity, media, pond and safety only. What exists of the others is in safety's screens (the report page shows a conversation's frozen copy), and a researcher has no screen (`apps/admin/src/app.tsx`, "until #194"). Part 3 draws the directories; whether the matrix or the panel's layout changes is the maintainer's.
+- **The admin panel's slices.** The layout rules' matrix gives the admin panel profile "read", chat "snapshots" and research "read", and `apps/admin/src/features` has none of the three. What exists of them is in safety's screens (the report page shows a conversation's frozen copy), and a researcher has no screen (`apps/admin/src/app.tsx`, "until #194"). Part 3 draws the directories; whether the matrix or the panel's layout changes is the maintainer's.
 - **The RPC style.** `.claude/rules/api.md` still calls the style across the boundary an open decision; ADR-003 is accepted and CLAUDE.md lists it as settled. Drawn as ADR-003.
 - **The web preview's bank.** `.claude/rules/mobile.md` says the web preview runs against the mock IdP and seed data; `apps/api/src/lib/config.ts` says no mock bank is deployed beside a preview and its login answers `auth_unavailable`. Drawn neither way: the web target's box says previews only.
 - **An eleventh name in the boundary.** `biome.json`'s patterns also guard a slice named `smoke`, and no directory of that name exists. Not drawn.

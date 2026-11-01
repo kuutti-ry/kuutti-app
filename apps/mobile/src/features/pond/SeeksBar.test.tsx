@@ -2,7 +2,7 @@ import { StyleSheet } from "react-native";
 import { renderWithTheme } from "@/test/render";
 import { SeeksBar } from "./SeeksBar";
 
-// The bar of whom the people of an area seek (#507): each band named with its
+// The bar of whom people on Kuutti seek (#507): each band named with its
 // figure, told apart by its pattern, one element for a screen reader.
 
 const SEEKS = { men: 30, everyone: 20, women: 50 };

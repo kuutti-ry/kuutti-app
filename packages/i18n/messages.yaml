@@ -22,8 +22,8 @@
 # docs/i18n/translation-review-guide.md is the review.
 #
 # Never inflect a dynamic value: proper nouns and user values stand in nominative
-# positions only ("in {pond}" is banned; ponds carry their case forms in the
-# database). legal.* keys take a consent_version and never a machine flag.
+# positions only ("in {pond}" is banned). legal.* keys take a consent_version and
+# never a machine flag.
 # After editing: `pnpm i18n:build`, and commit src/generated with it.
 
 

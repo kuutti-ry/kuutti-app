@@ -69,7 +69,7 @@ function Hatched({
 }
 
 /**
- * Whom the people of the area seek (#507, ADR-013 §12, §13): one bar, those who
+ * Whom people on Kuutti seek (#507, ADR-013 §12, §13): one bar, those who
  * seek men at one end, those who seek women at the other, everyone in the
  * middle. No animation, and the bar holds no text: the labels below it wrap at
  * any text size. One element for a screen reader, which says the three figures

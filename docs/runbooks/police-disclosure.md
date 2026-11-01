@@ -159,7 +159,7 @@ SELECT account_id FROM photo WHERE key = '<key>';
 ROLLBACK;
 ```
 
-Then put the look on record in the panel (`admin.kuutti.app` comes with #25). As an admin, open the audit viewer (`/audit`) and narrow it to subject type `account` and the account id. That writes an `audit.read` row about the account (`.claude/rules/admin.md`) and shows only what staff did or saw about it. Do not open the person's page (`/accounts/<account id>`) for a tier A answer: it shows the age, the gender, the pond, the profile as the card shows it, the photo list, the feedback texts, the latest 50 audit rows and the sanctions with staff's notes (`apps/api/src/safety/accounts.ts`). Open it only when a tier B answer needs it; that writes `account.view`, and a photo is fetched only on a click (`photo.view`).
+Then put the look on record in the panel (`admin.kuutti.app` comes with #25). As an admin, open the audit viewer (`/audit`) and narrow it to subject type `account` and the account id. That writes an `audit.read` row about the account (`.claude/rules/admin.md`) and shows only what staff did or saw about it. Do not open the person's page (`/accounts/<account id>`) for a tier A answer: it shows the age, the gender, the profile as the card shows it, the photo list, the feedback texts, the latest 50 audit rows and the sanctions with staff's notes (`apps/api/src/safety/accounts.ts`). Open it only when a tier B answer needs it; that writes `account.view`, and a photo is fetched only on a click (`photo.view`).
 
 Write each lookup in the record: the identifier, the query, the time, the result.
 
