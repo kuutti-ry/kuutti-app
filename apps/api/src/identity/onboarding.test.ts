@@ -96,6 +96,20 @@ const putProfile = (app: App, headers: Headers, body: unknown) =>
     headers: jsonHeaders(headers),
     body: JSON.stringify(body),
   });
+const profileOf = async (app: App, headers: Headers) =>
+  ProfileResponse.parse(await (await app.request("/profile", { headers })).json());
+const declare = (app: App, headers: Headers, gender: string) =>
+  app.request("/account/gender", {
+    method: "PUT",
+    headers: jsonHeaders(headers),
+    body: JSON.stringify({ gender }),
+  });
+/** A profile with an identity label, and a hide on it (#515). */
+const LABELLED = {
+  ...PROFILE,
+  fields: { intent: "casual", identityLabel: "genderfluid" },
+  hiddenFields: ["identityLabel"],
+};
 async function uploadPhotos(app: App, headers: Headers, n: number) {
   for (let i = 0; i < n; i += 1) {
     const form = new FormData();
@@ -319,6 +333,84 @@ describe("onboarding and consents", () => {
     expect((await status(app, a.headers)).nextChange.gender).toBe(from);
     // The values stay out of the log, the refusal included.
     expect(JSON.stringify(logs())).not.toContain("non_binary");
+  });
+
+  test("A change away from non-binary clears the identity label", async ({ ctx }) => {
+    const { app, logs } = await appWith(ctx);
+    const a = await signedInAccount(ctx.client, "a");
+    const b = await signedInAccount(ctx.client, "b");
+    for (const who of [a, b]) {
+      expect((await declare(app, who.headers, "non_binary")).status).toBe(204);
+      expect((await putProfile(app, who.headers, LABELLED)).status).toBe(200);
+    }
+    expect((await declare(app, a.headers, "woman")).status).toBe(204);
+    const { profile } = await profileOf(app, a.headers);
+    expect(profile?.fields).toEqual({ intent: "casual" });
+    expect(profile?.hiddenFields).toEqual(["identityLabel"]);
+    expect(profile?.displayName).toBe(PROFILE.displayName);
+    expect(profile?.bio).toBe(PROFILE.bio);
+    expect((await status(app, a.headers)).gender).toBe("woman");
+    // The caller's alone (rule 6).
+    expect((await profileOf(app, b.headers)).profile?.fields.identityLabel).toBe("genderfluid");
+    // What was left stays out of the log: a line of its own would say it.
+    expect(JSON.stringify(logs())).not.toContain("genderfluid");
+    expect(logs().filter((l) => l.msg === "gender declared")).toHaveLength(3);
+    expect(logs().filter((l) => /label/i.test(l.msg ?? ""))).toEqual([]);
+  });
+
+  test("the label stays through the same answer again, a change between other genders and a refused change", async ({
+    ctx,
+  }) => {
+    const { app } = await appWith(ctx);
+    const same = await signedInAccount(ctx.client, "same");
+    await declare(app, same.headers, "non_binary");
+    await putProfile(app, same.headers, LABELLED);
+    const stored = await profileOf(app, same.headers);
+    expect((await declare(app, same.headers, "non_binary")).status).toBe(204);
+    expect(await profileOf(app, same.headers)).toEqual(stored);
+
+    // The screens never offer it here, the API lets it through, and the rule is only about leaving non-binary.
+    const other = await signedInAccount(ctx.client, "other");
+    await declare(app, other.headers, "woman");
+    await putProfile(app, other.headers, LABELLED);
+    expect((await declare(app, other.headers, "man")).status).toBe(204);
+    expect((await profileOf(app, other.headers)).profile?.fields.identityLabel).toBe("genderfluid");
+
+    // The first change starts the limit, and a refusal changes nothing.
+    const refused = await signedInAccount(ctx.client, "refused");
+    await declare(app, refused.headers, "woman");
+    await declare(app, refused.headers, "non_binary");
+    await putProfile(app, refused.headers, LABELLED);
+    expect((await declare(app, refused.headers, "man")).status).toBe(429);
+    expect((await profileOf(app, refused.headers)).profile?.fields.identityLabel).toBe(
+      "genderfluid",
+    );
+    expect((await status(app, refused.headers)).gender).toBe("non_binary");
+  });
+
+  test("a change away from non-binary writes nothing to a profile with no label, or none at all", async ({
+    ctx,
+  }) => {
+    const { app } = await appWith(ctx);
+    const updatedAt = async (accountId: string) => {
+      const { rows } = await ctx.client.query<{ updated_at: Date }>(
+        "SELECT updated_at FROM profile WHERE account_id = $1",
+        [accountId],
+      );
+      return rows[0]?.updated_at;
+    };
+    const none = await signedInAccount(ctx.client, "no profile");
+    await declare(app, none.headers, "non_binary");
+    expect((await declare(app, none.headers, "man")).status).toBe(204);
+    expect((await status(app, none.headers)).gender).toBe("man");
+    expect(await updatedAt(none.accountId)).toBeUndefined();
+
+    const bare = await signedInAccount(ctx.client, "no label");
+    await declare(app, bare.headers, "non_binary");
+    await putProfile(app, bare.headers, PROFILE);
+    const before = await updatedAt(bare.accountId);
+    expect((await declare(app, bare.headers, "man")).status).toBe(204);
+    expect(await updatedAt(bare.accountId)).toEqual(before);
   });
 
   test("unauthenticated: 401 on every onboarding, consent, home and preference route", async ({

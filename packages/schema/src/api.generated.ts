@@ -2252,7 +2252,7 @@ export interface paths {
         get?: never;
         /**
          * Declare the caller's gender
-         * @description Self-declared, one of a closed list (rule 3); nothing from the bank informs it.
+         * @description Self-declared, one of a closed list (rule 3); nothing from the bank informs it. The first answer and the same answer again are free; a change is possible once in `change_cadence_days`. A change away from non-binary clears the identity label.
          */
         put: {
             parameters: {
@@ -2294,6 +2294,15 @@ export interface paths {
                 };
                 /** @description No live account (erased meanwhile). */
                 404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description change_too_soon: the gender was changed within the cadence, and GET /onboarding's nextChange says from when. */
+                429: {
                     headers: {
                         [name: string]: unknown;
                     };

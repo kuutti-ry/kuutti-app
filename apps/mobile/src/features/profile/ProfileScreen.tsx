@@ -1,3 +1,4 @@
+import type { Gender } from "@kuutti/schema";
 import { useFocusEffect, useRouter } from "expo-router";
 import Eye from "lucide-react-native/icons/eye";
 import { useCallback, useRef, useState } from "react";
@@ -13,7 +14,9 @@ import { Text } from "@/components/ui/text";
 import { listPhotos } from "@/features/media";
 import { useT } from "@/lib/locale";
 import { useHapticTap } from "@/theme/haptics";
-import { completenessText, shownPlaceName } from "./keys";
+import { fetchOwnGender } from "./client";
+import { GENDER_PATH } from "./gender/GenderScreen";
+import { completenessText, genderKey, shownPlaceName } from "./keys";
 import { FIRST_LATER_FIELD, laterPath, laterProgress } from "./later/LaterFieldScreen";
 import { type MarkStyle, ProgressMark, progressWords } from "./ProgressMark";
 import { isDone, type Progress, photoProgress, sectionProgress } from "./progress";
@@ -61,12 +64,28 @@ function useApprovedPhotos(): [number | null, () => void] {
 }
 
 /**
+ * The gender, for its row; null until known, and when it could not be read:
+ * the row then shows its title alone, and its screen says what failed. Read
+ * again whenever the list is back in front.
+ */
+function useOwnGenderRow(): [Gender | null, () => void] {
+  const [gender, setGender] = useState<Gender | null>(null);
+  const read = useCallback(() => {
+    fetchOwnGender().then(
+      (own) => setGender(own.gender),
+      () => setGender(null),
+    );
+  }, []);
+  return [gender, read];
+}
+
+/**
  * The profile as a list (#227, ADR-009, ADR-019): the eye at the top that
  * opens the card as others see it, what the card still needs (said only
  * while something is missing, #239), then the
  * profile's parts, each with how far it is filled: the photos, the home
- * (ADR-061), which is never unfilled and carries what the card says instead,
- * the sections (each its own screen that saves on leaving), What you seek
+ * (ADR-061) and the gender (#552), which are never unfilled and carry their
+ * answer instead, the sections (each its own screen that saves on leaving), What you seek
  * (#542) and, while a later question is unanswered, the later screens (#148). Nothing is
  * edited here, so there is nothing to save; the list reads the profile and
  * the photos again when a screen hands back, and the marks follow.
@@ -78,6 +97,7 @@ export function ProfileScreen() {
   const profile = useProfile();
   const { reload } = profile;
   const [approvedPhotos, readPhotos] = useApprovedPhotos();
+  const [gender, readGender] = useOwnGenderRow();
   // The first focus is the mount, which the hook reads already.
   const shown = useRef(false);
   useFocusEffect(
@@ -85,7 +105,8 @@ export function ProfileScreen() {
       if (shown.current) void reload();
       shown.current = true;
       readPhotos();
-    }, [reload, readPhotos]),
+      readGender();
+    }, [reload, readPhotos, readGender]),
   );
   const open = (path: Parameters<typeof router.push>[0]) => () => {
     tap();
@@ -109,6 +130,7 @@ export function ProfileScreen() {
             error={profile.error}
             onRetry={() => {
               readPhotos();
+              readGender();
               void profile.reload();
             }}
           />
@@ -120,6 +142,7 @@ export function ProfileScreen() {
   const later = laterProgress(profile.saved.fields);
   const photos = approvedPhotos === null ? undefined : photoProgress(approvedPhotos);
   const missing = profile.completeness?.complete === false ? profile.completeness.missing : [];
+  const genderWord = gender ? t(genderKey(gender)) : undefined;
 
   return (
     <SafeAreaView className="flex-1 bg-background">
@@ -172,6 +195,13 @@ export function ProfileScreen() {
               title: t("profile.place.title"),
               summary: profile.home ? shownPlaceName(profile.home, locale) : undefined,
               onPress: open("/profile/place"),
+            },
+            {
+              key: "gender",
+              title: t("profile.gender.title"),
+              summary: genderWord,
+              value: genderWord,
+              onPress: open(GENDER_PATH),
             },
             ...LISTED_SECTIONS.map((section, index) =>
               filled(

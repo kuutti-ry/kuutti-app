@@ -28,7 +28,12 @@ import {
 } from "../matching/index.ts";
 import { listPhotos } from "../media/index.ts";
 import { findPondOfAccount } from "../pond/index.ts";
-import { ageInYears, readProfile, withdrawSpecialCategoryAnswers } from "../profile/index.ts";
+import {
+  ageInYears,
+  clearIdentityLabel,
+  readProfile,
+  withdrawSpecialCategoryAnswers,
+} from "../profile/index.ts";
 import { enrolResearchSubject, removeResearchSubject, track } from "../research/index.ts";
 import * as repo from "./repo.ts";
 import { visibleState } from "./standing.ts";
@@ -335,6 +340,12 @@ export async function declareGender(
         });
       }
     }
+    // In this transaction, so that no card says the new gender with the old
+    // word (#552). No log line of its own: it would say what was left.
+    // shortcut: a save from a second phone that read the profile before this
+    // commit and lands after it brings the word back, since saveProfile does
+    // not ask the gender; asking it there, under the same lock, would lift it.
+    if (change && before.gender === "non_binary") await clearIdentityLabel(tx, accountId, at);
     return repo.setGender(tx, accountId, gender, change ? at : null);
   });
   if (!declared) throw new AppError(404, "not_found", "No live account");

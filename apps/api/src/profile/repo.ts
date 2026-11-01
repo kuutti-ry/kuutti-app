@@ -201,6 +201,24 @@ export async function findCardSubject(
 }
 
 /**
+ * The identity label is a word for a non-binary gender (ADR-019 §1): a change
+ * away from it takes the label along (#552). The caller holds the account
+ * row's lock. No profile yet, or no label, writes nothing; a hide stays, as
+ * it does for every answer that goes.
+ */
+export async function clearIdentityLabel(
+  db: Queryable,
+  accountId: string,
+  at: Date,
+): Promise<void> {
+  await db.query(
+    `UPDATE profile SET fields = fields - 'identityLabel', updated_at = $2
+     WHERE account_id = $1 AND fields ? 'identityLabel'`,
+    [accountId, at],
+  );
+}
+
+/**
  * Withdrawing the special-category consent takes the article 9 answers with
  * it (ADR-019 §4, #146): politics and religion leave the document;
  * everything else stays. The consent itself is the withdrawn consent row. Under the account row's

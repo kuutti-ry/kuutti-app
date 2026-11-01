@@ -63,7 +63,8 @@ const approved = (n: number) => ({
  * GET /profile answering each read with the next list of what is missing, the
  * last one again after that; `document` the stored profile (none by
  * default); `photos` the photo list's photos (none by default), or "failing"
- * for a list that cannot be read; `home` the person's home (none by default).
+ * for a list that cannot be read; `home` the person's home (none by default);
+ * `gender` the status's gender, or "failing" for a status that cannot be read.
  */
 function fakeApi(
   missingByRead: string[][],
@@ -71,10 +72,12 @@ function fakeApi(
     document,
     photos = [],
     home = null,
+    gender = "woman",
   }: {
     document?: Document;
     photos?: ReturnType<typeof approved>[] | "failing";
     home?: HomeSummary | null;
+    gender?: string | (() => string) | "failing";
   } = {},
 ) {
   let reads = 0;
@@ -108,6 +111,25 @@ function fakeApi(
         return json({ error: { code: "internal_error", message: "x", requestId: "r" } }, 500);
       }
       return json({ photos, maxPhotos: 6, tips: [] });
+    }
+    if (path === "/onboarding" && request.method === "GET") {
+      const answer = typeof gender === "function" ? gender() : gender;
+      if (answer === "failing") {
+        return json({ error: { code: "internal_error", message: "x", requestId: "r" } }, 500);
+      }
+      return json({
+        state: "active",
+        age: 36,
+        gender: answer,
+        pond: null,
+        home: null,
+        preferences: { seeks: ["man"], ageWindow: { min: 25, max: 40 } },
+        consents: { terms: "t", privacy: "p", specialCategory: "s", research: null },
+        currentVersions: { terms: "t", privacy: "p", research: "r", special_category: "s" },
+        nextChange: { gender: null },
+        missing: [],
+        complete: true,
+      });
     }
     return json({ error: { code: "not_found", message: "no", requestId: "r" } }, 404);
   }) as unknown as typeof fetch;
@@ -221,6 +243,7 @@ describe("ProfileScreen", () => {
     for (const title of [
       "Photos",
       "Home",
+      "Gender",
       "Prompts",
       "Relationship and kids",
       "Work and education",
@@ -238,8 +261,8 @@ describe("ProfileScreen", () => {
     expect(screen.queryByRole("button", { name: "Save" })).toBeNull();
     expect(screen.queryAllByText(/^profile\./)).toEqual([]);
     const found = pressables(screen.toJSON() as HostNode);
-    // The back arrow and the eye, the photos, the home and seven sections, What you seek and the later questions.
-    expect(found).toHaveLength(13);
+    // The back arrow and the eye, the photos, the home, the gender and seven sections, What you seek and the later questions.
+    expect(found).toHaveLength(14);
     expect(found.flatMap((node) => a11yProblems(node))).toEqual([]);
   });
 
@@ -376,6 +399,7 @@ describe("ProfileScreen", () => {
         "See your card",
         "Photos",
         "Home",
+        "Gender",
         "The basics",
         "Prompts",
         "Relationship and kids",
@@ -386,6 +410,61 @@ describe("ProfileScreen", () => {
         "What you seek",
         "Fill in the rest while you wait",
       ]);
+    });
+  });
+
+  describe("the gender's row (#552)", () => {
+    const row = () => screen.getByRole("button", { name: "Gender" });
+    const ready = async (gender?: string | (() => string) | "failing") => {
+      fakeApi([[]], gender === undefined ? {} : { gender });
+      await show(<ProfileScreen />);
+      await waitFor(() => expect(screen.getByText("The basics")).toBeTruthy());
+    };
+
+    it("stands beside the home, and opens the gender's screen", async () => {
+      await ready();
+      const rows = screen.getAllByRole("button").map((node) => node.props.accessibilityLabel);
+      expect(rows.indexOf("Gender")).toBe(rows.indexOf("Home") + 1);
+      await press(row());
+      expect(router.push).toHaveBeenCalledWith("/profile/gender");
+    });
+
+    it("says the answer under its title, heard once as its value, with no mark", async () => {
+      await ready("non_binary");
+      await waitFor(() => expect(screen.getByText("Non-binary")).toBeTruthy());
+      expect(row().props.accessibilityValue?.text).toBe("Non-binary");
+      expect(row().props.accessibilityHint).toBeUndefined();
+    });
+
+    it("reads the answer again when the list is back in front, after a change on its screen", async () => {
+      let stored = "woman";
+      await ready(() => stored);
+      await waitFor(() => expect(screen.getByText("Woman")).toBeTruthy());
+      stored = "man";
+      await act(async () => {
+        focus();
+        await settle();
+      });
+      expect(screen.getByText("Man")).toBeTruthy();
+      expect(screen.queryByText("Woman")).toBeNull();
+    });
+
+    it("shows its title alone when the status cannot be read: its screen says what failed", async () => {
+      await ready("failing");
+      expect(row().props.accessibilityValue?.text).toBeUndefined();
+      expect(screen.queryByText("Woman")).toBeNull();
+    });
+
+    it("takes back an answer it can no longer vouch for when a read again fails", async () => {
+      let stored = "woman";
+      await ready(() => stored);
+      await waitFor(() => expect(screen.getByText("Woman")).toBeTruthy());
+      stored = "failing";
+      await act(async () => {
+        focus();
+        await settle();
+      });
+      expect(screen.queryByText("Woman")).toBeNull();
     });
   });
 

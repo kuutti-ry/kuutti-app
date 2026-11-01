@@ -1,0 +1,73 @@
+# The person's own gender after sign-up (#552): a row of its own beside the
+# home, the stored answer chosen, a change kept by going back. Non-binary offers
+# a word for it, which Basics then holds. A change cannot be undone for 30 days,
+# so the flow ends inside the limit, with the date said on arrival and another
+# gender staying unchosen: one run per `pnpm demo:reset`. Jussi is a man, and no
+# other flow reads that. What a change away from non-binary takes is the API's
+# and jest's to hold, since the limit keeps one run from going both ways.
+appId: fi.kuutti.app
+name: The gender changes on its own screen, offers a word after non-binary, and the limit then says its date
+---
+- runFlow:
+    file: ../common/sign-in.yaml
+    env:
+      PERSONA: Jussi Lehtonen
+- openLink: kuutti://profile
+- extendedWaitUntil:
+    visible: "(The basics|Perustiedot|Grunderna)(, .*)?"
+    timeout: 15000
+- waitForAnimationToEnd
+- tapOn: "(Gender|Sukupuoli|Kön)(, .*)?"
+- extendedWaitUntil:
+    visible: "This is on your card.*|Tämä näkyy kortillasi.*|Det här visas på ditt kort.*"
+    timeout: 15000
+- waitForAnimationToEnd
+- assertVisible:
+    text: "Man|Mies"
+    selected: true
+- assertNotVisible: "A word for it, if you like|Sana sille, jos haluat|Ett ord för det, om du vill"
+
+# Non-binary offers a word for it, and going back keeps both.
+- tapOn: "Non-binary|Muunsukupuolinen|Icke-binär"
+- extendedWaitUntil:
+    visible: "A word for it, if you like|Sana sille, jos haluat|Ett ord för det, om du vill"
+    timeout: 15000
+- tapOn: "Genderqueer"
+- assertVisible:
+    text: "Genderqueer"
+    selected: true
+- tapOn: "Back to your profile|Takaisin profiiliisi|Tillbaka till din profil"
+- extendedWaitUntil:
+    visible: "(The basics|Perustiedot|Grunderna)(, .*)?"
+    timeout: 15000
+- waitForAnimationToEnd
+
+# The word is the profile's now: Basics holds it, where it can be changed.
+- tapOn: "(The basics|Perustiedot|Grunderna)(, .*)?"
+- extendedWaitUntil:
+    visible:
+      text: "Genderqueer"
+      selected: true
+    timeout: 15000
+- tapOn: "Back to your profile|Takaisin profiiliisi|Tillbaka till din profil"
+- extendedWaitUntil:
+    visible: "(The basics|Perustiedot|Grunderna)(, .*)?"
+    timeout: 15000
+- waitForAnimationToEnd
+
+# The limit runs now: the date on arrival, the stored answer chosen, and another
+# gender stays unchosen and says so again.
+- tapOn: "(Gender|Sukupuoli|Kön)(, .*)?"
+- extendedWaitUntil:
+    visible: "You changed this recently\\. .*|Muutit tätä äskettäin\\. .*|Du ändrade det här nyligen\\. .*"
+    timeout: 15000
+- waitForAnimationToEnd
+- assertVisible:
+    text: "Non-binary|Muunsukupuolinen|Icke-binär"
+    selected: true
+- assertNotVisible: "A word for it, if you like|Sana sille, jos haluat|Ett ord för det, om du vill"
+- tapOn: "Woman|Nainen|Kvinna"
+- assertVisible:
+    text: "Non-binary|Muunsukupuolinen|Icke-binär"
+    selected: true
+- assertVisible: "You changed this recently\\. .*|Muutit tätä äskettäin\\. .*|Du ändrade det här nyligen\\. .*"
