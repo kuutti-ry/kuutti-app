@@ -76,6 +76,8 @@ type Server = {
   statusFails: boolean;
   /** The next read of the profile fails. */
   profileFails: boolean;
+  /** Every read of the status or the profile waits for this. */
+  reads: Promise<void>;
 };
 
 function fakeApi(start: Partial<Server> = {}) {
@@ -88,6 +90,7 @@ function fakeApi(start: Partial<Server> = {}) {
     profileRefusal: null,
     statusFails: false,
     profileFails: false,
+    reads: Promise.resolve(),
     ...start,
   };
   const writes: { path: string; body: { gender?: string; fields?: unknown } }[] = [];
@@ -109,6 +112,7 @@ function fakeApi(start: Partial<Server> = {}) {
     const request = input instanceof Request ? input : new Request(input, init);
     const path = new URL(request.url).pathname;
     if (path === "/onboarding") {
+      await server.reads;
       if (server.statusFails) {
         server.statusFails = false;
         return envelope("server_error", 500);
@@ -128,6 +132,7 @@ function fakeApi(start: Partial<Server> = {}) {
       });
     }
     if (path === "/profile" && request.method === "GET") {
+      await server.reads;
       if (server.profileFails) {
         server.profileFails = false;
         return envelope("server_error", 500);
@@ -371,6 +376,83 @@ describe("GenderScreen", () => {
       await show();
       expect(selected("Non-binary")).toBe(true);
       expect(selected("Genderfluid")).toBe(true);
+    });
+
+    it("sends a held word once it can, with the profile unread on the way back", async () => {
+      const api = fakeApi({ gender: "non_binary" });
+      const view = await show();
+      await choose("Agender");
+      api.server.profileRefusal = () => {
+        throw new TypeError("Network request failed");
+      };
+      await leaveAndGo(view);
+      api.server.profileFails = true;
+      const again = await show();
+      expect(selected("Agender")).toBe(true);
+      await press(screen.getByRole("button", { name: "Keep editing" }));
+      api.server.profileRefusal = null;
+      await leaveAndGo(again);
+      expect(api.server.label).toBe("agender");
+    });
+
+    it("sends a held word after its gender, with the profile unread on the way back", async () => {
+      const api = fakeApi();
+      const view = await show();
+      await choose("Non-binary");
+      await choose("Genderfluid");
+      api.server.genderRefusal = () => envelope("server_error", 500);
+      await leaveAndGo(view);
+      api.server.profileFails = true;
+      const again = await show();
+      await press(screen.getByRole("button", { name: "Keep editing" }));
+      api.server.genderRefusal = null;
+      await leaveAndGo(again);
+      expect(api.server.gender).toBe("non_binary");
+      expect(api.server.label).toBe("genderfluid");
+    });
+
+    it("holds the last word pressed, never an older one", async () => {
+      const api = fakeApi();
+      const view = await show();
+      await choose("Non-binary");
+      await choose("Genderfluid");
+      api.server.genderRefusal = () => envelope("server_error", 500);
+      await leaveAndGo(view);
+      api.server.profileFails = true;
+      const again = await show();
+      await press(screen.getByRole("button", { name: "Keep editing" }));
+      await choose("Agender");
+      await leaveAndGo(again);
+      const last = await show();
+      expect(selected("Agender")).toBe(true);
+      expect(selected("Genderfluid")).toBe(false);
+      await press(screen.getByRole("button", { name: "Keep editing" }));
+      api.server.genderRefusal = null;
+      await leaveAndGo(last);
+      expect(api.server.label).toBe("agender");
+    });
+
+    it("keeps a held word when somebody leaves while the reads are on their way", async () => {
+      const api = fakeApi();
+      const view = await show();
+      await choose("Non-binary");
+      await choose("Genderfluid");
+      api.server.genderRefusal = () => envelope("server_error", 500);
+      await leaveAndGo(view);
+      let answer = () => {};
+      api.server.reads = new Promise<void>((resolve) => {
+        answer = resolve;
+      });
+      const again = await show();
+      expect(screen.getByText("Loading your profile…")).toBeTruthy();
+      api.server.genderRefusal = null;
+      await leaveAndGo(again);
+      await act(async () => {
+        answer();
+        await settle();
+      });
+      expect(api.server.gender).toBe("non_binary");
+      expect(api.server.label).toBe("genderfluid");
     });
 
     it("brings the word back with a refused gender, and neither went through", async () => {

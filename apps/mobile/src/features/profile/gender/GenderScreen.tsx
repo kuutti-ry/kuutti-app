@@ -12,15 +12,17 @@ import { ApiError } from "@/lib/api";
 import { useT } from "@/lib/locale";
 import { ConfirmLeaveDialog } from "../ConfirmLeave";
 import { saveGender } from "../client";
-import { type ProfileChanges, useProfile } from "../useProfile";
+import { saveChanges, useProfile } from "../useProfile";
 import { useRefusedDraft, useSaveOnLeave } from "../useSaveOnLeave";
 import { GenderChips, IdentityLabelChips } from "./GenderChips";
 import { useOwnGender } from "./useOwnGender";
 
 export const GENDER_PATH = "/profile/gender" as const;
 
+type Word = ProfileFields["identityLabel"];
+
 /** A refused change, held to bring its screen back: the gender, the word offered with it, and why. */
-type HeldGender = { gender: Gender | null; changes: ProfileChanges; code: string | undefined };
+type HeldGender = { gender: Gender | null; word: Word; code: string | undefined };
 
 /**
  * The person's own gender after sign-up (#552): the three genders from the
@@ -40,10 +42,10 @@ export function GenderScreen() {
   const router = useRouter();
   const held = useRefusedDraft<HeldGender>(GENDER_PATH);
   const own = useOwnGender();
-  const profile = useProfile(
-    held && { changes: held.changes, notice: { kind: "error", code: held.code } },
-  );
+  const profile = useProfile();
   const [draft, setDraft] = useState<Gender | null>(held?.gender ?? null);
+  // Here and not in the profile's draft: a held word must not need a read to come back.
+  const [word, setWord] = useState<Word>(held?.word);
   // How many times another gender was pressed while the limit runs: each is said.
   const [refused, setRefused] = useState(0);
   const stored = own.status === "ready" ? own.gender : null;
@@ -54,25 +56,22 @@ export function GenderScreen() {
   const labelGoes = stored === "non_binary" && chosen !== stored && label !== undefined;
   // With no stored answer to compare with (the read failed too), a held change is tried again.
   const genderChanged = draft !== null && draft !== stored;
-  // A word chosen and then left behind for another gender is not sent.
-  const labelChanged = labelOffered && profile.dirty;
 
   const leaving = useSaveOnLeave<HeldGender>({
     screen: GENDER_PATH,
     path: GENDER_PATH,
     held: held !== undefined,
     save: async () => {
-      // Until a read has put a held word back, the profile's own changes are empty.
-      const changes = profile.status === "ready" ? profile.changes : (held?.changes ?? {});
       try {
-        // First and on its own: a word goes only with a gender that was accepted.
+        // First and on its own: a word goes only with a gender that was accepted,
+        // and one left behind for another gender is not sent.
         if (genderChanged) await saveGender(draft);
+        if (labelOffered && word) await saveChanges({ fields: { identityLabel: word } });
+        return null;
       } catch (error) {
         const code = error instanceof ApiError ? error.code : undefined;
-        return { gender: chosen, changes, code };
+        return { gender: chosen, word, code };
       }
-      const notice = labelChanged ? await profile.save() : null;
-      return notice && { gender: chosen, changes, code: notice.code };
     },
   });
 
@@ -116,8 +115,6 @@ export function GenderScreen() {
     setRefused(0);
     setDraft(gender);
   };
-  const chooseLabel = (identityLabel: ProfileFields["identityLabel"]) =>
-    profile.update({ fields: { ...profile.draft.fields, identityLabel } });
 
   return (
     <SafeAreaView className="flex-1 bg-background">
@@ -142,10 +139,7 @@ export function GenderScreen() {
                   : "profile.gender.label.explain",
               )}
             />
-            <IdentityLabelChips
-              chosen={profile.draft.fields.identityLabel}
-              onChange={chooseLabel}
-            />
+            <IdentityLabelChips chosen={word} onChange={setWord} />
           </View>
         )}
       </ScrollView>
