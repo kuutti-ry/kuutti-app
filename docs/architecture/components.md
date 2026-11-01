@@ -150,7 +150,7 @@ Besides the slices, the API has `health/`, `jobs/` (the nightly timer and the jo
 1. **identity**: the bank login, accounts, sessions, re-registration, taking a break, staff sessions. In all three apps; specs in `features/identity`.
 2. **profile**: onboarding, profile fields and prompts, completeness. API and phone app.
 3. **media**: the photo pipeline, signed URLs, the automatic check and the human queue. In all three apps (the admin panel's photo queue); spec in `features/media`.
-4. **pond**: ponds, a person's home (ADR-061), the pond counter, and the switch that opens matching in a pond. In all three apps (the admin panel's Ponds screen); specs in `features/pond`.
+4. **pond**: the one pond, a person's home (ADR-061), the pond counter, and the switch that opens matching. In all three apps (the admin panel's Matching screen); specs in `features/pond`.
 5. **matching**: rounds, deal-breakers, likes, the fish, the match. API and phone app; specs in `features/matching`.
 6. **chat**: conversations, messages, the socket, contacts shared, the archive. API and phone app; specs in `features/chat`.
 7. **safety**: reports, blocks, sanctions, the audit log, the automatic shadow bans, velocity. In all three apps; the admin panel's screens are in this slice, but for the photo queue and the ponds. Specs in `features/safety`.
@@ -209,7 +209,7 @@ flowchart LR
 
 ## Open
 
-- **The admin panel's slices.** The layout rules' matrix gives the admin panel profile "read", pond "read", chat "snapshots" and research "read", but `apps/admin/src/features` holds identity, media and safety only. What exists of the others is in safety's screens (the account page shows the pond, the report page shows a conversation's frozen copy), and a researcher has no screen (`apps/admin/src/app.tsx`, "until #194"). Part 3 draws the directories; whether the matrix or the panel's layout changes is the maintainer's.
+- **The admin panel's slices.** The layout rules' matrix gives the admin panel profile "read", pond "switch", chat "snapshots" and research "read", but `apps/admin/src/features` holds identity, media, pond and safety only. What exists of the others is in safety's screens (the report page shows a conversation's frozen copy), and a researcher has no screen (`apps/admin/src/app.tsx`, "until #194"). Part 3 draws the directories; whether the matrix or the panel's layout changes is the maintainer's.
 - **The RPC style.** `.claude/rules/api.md` still calls the style across the boundary an open decision; ADR-003 is accepted and CLAUDE.md lists it as settled. Drawn as ADR-003.
 - **The web preview's bank.** `.claude/rules/mobile.md` says the web preview runs against the mock IdP and seed data; `apps/api/src/lib/config.ts` says no mock bank is deployed beside a preview and its login answers `auth_unavailable`. Drawn neither way: the web target's box says previews only.
 - **An eleventh name in the boundary.** `biome.json`'s patterns also guard a slice named `smoke`, and no directory of that name exists. Not drawn.

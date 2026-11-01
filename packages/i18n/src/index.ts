@@ -10,10 +10,7 @@ export {
   formatDateTime,
   formatHeight,
   formatNumber,
-  formatPond,
   formatTime,
-  type PondCase,
-  type PondName,
 } from "./format.ts";
 export {
   CONSENT_TEXT_HASHES,

@@ -70,7 +70,6 @@ const account = {
   suspensionEndsAt: null,
   age: null,
   gender: null,
-  pond: null,
   profile: null,
   photos: [],
   feedback: [],
@@ -423,7 +422,7 @@ describe("App", () => {
       "Photos",
       "Feedback",
       "A person",
-      "Ponds",
+      "Matching",
       "Tunables",
       "Audit log",
       "Staff",
@@ -536,9 +535,9 @@ describe("App", () => {
   it.each([
     ["/audit", "Audit log"],
     ["/staff", "Staff"],
-    ["/ponds", "Ponds"],
+    ["/matching", "Matching"],
   ])(
-    "shows a moderator no audit log, staff or ponds in the menu, and at %s says the role does not allow it, asking nothing (#309, #310, #500)",
+    "shows a moderator no audit log, staff or matching switch in the menu, and at %s says the role does not allow it, asking nothing (#309, #310, #500)",
     async (address, title) => {
       window.sessionStorage.setItem("kuutti.admin.session", JSON.stringify(staff));
       window.history.replaceState(null, "", address);
@@ -557,7 +556,7 @@ describe("App", () => {
       ).toEqual(["Overview", "Reports", "Automatic bans", "Photos", "Feedback", "A person"]);
       expect(within(menu).queryByRole("link", { name: "Audit log" })).toBeNull();
       expect(within(menu).queryByRole("link", { name: "Staff" })).toBeNull();
-      expect(within(menu).queryByRole("link", { name: "Ponds" })).toBeNull();
+      expect(within(menu).queryByRole("link", { name: "Matching" })).toBeNull();
       expect(screen.queryByRole("form", { name: "Filters" })).toBeNull();
       expect(screen.queryByRole("button", { name: "Refresh" })).toBeNull();
       expect(document.title).toBe(`${title} · Kuutti admin`);

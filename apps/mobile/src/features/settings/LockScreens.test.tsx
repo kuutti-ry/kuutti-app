@@ -758,7 +758,7 @@ describe("the lock's one offer, after the e-mail", () => {
     expect(store.has("kuutti.preference.lockOffered")).toBe(false);
     await show(<LockOfferScreen />);
     expect(store.get("kuutti.preference.lockOffered")).toBe("true");
-    expect(screen.getByRole("heading", { name: "While you wait" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "When you have a moment" })).toBeTruthy();
     expect(screen.getByText("Lock Kuutti on this phone?")).toBeTruthy();
     expect(screen.getByText(TEXT.explain)).toBeTruthy();
     expect(button(TEXT.setPasscode)).toBeTruthy();

@@ -6,7 +6,6 @@ import {
   formatDateTime,
   formatHeight,
   formatNumber,
-  formatPond,
   formatTime,
   LOCALE_NAMES,
   LOCALES,
@@ -171,22 +170,6 @@ describe("numbers", () => {
       "en-FI",
       "de-DE",
     ]);
-  });
-});
-
-describe("a pond's name", () => {
-  it.each([
-    ["fi", "inessive", "Helsingissä"],
-    ["fi", "nominative", "Helsinki"],
-    ["fi-x-stadi", "inessive", "Helsingissä"],
-    ["fi-x-stadi", "nominative", "Helsinki"],
-    ["sv", "inessive", "Helsinki"],
-    ["en", "nominative", "Helsinki"],
-    ["en-XA", "inessive", "Helsinki"],
-  ] as const)("in %s, %s, is %s", (locale, grammaticalCase, name) => {
-    expect(
-      formatPond({ name: "Helsinki", nameInessive: "Helsingissä" }, grammaticalCase, locale),
-    ).toBe(name);
   });
 });
 

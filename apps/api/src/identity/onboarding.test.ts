@@ -214,7 +214,6 @@ describe("onboarding and consents", () => {
       complete: false,
       missing: ["name", "intent", "photos", "prompts_or_bio"],
       gender: "woman",
-      pond: { slug: "suomi", name: "Suomi", nameInessive: "Suomessa" },
       home: { town: { fi: "Helsinki", sv: "Helsingfors" }, area: { fi: "Kallio", sv: "Berghäll" } },
       preferences: { seeks: ["man", "non_binary"], ageWindow: { min: 25, max: 35 } },
       consents: { specialCategory: CURRENT_CONSENT_VERSIONS.special_category },
@@ -291,10 +290,10 @@ describe("onboarding and consents", () => {
     await app.request("/consents/research", { method: "DELETE", headers: a.headers });
     const exported = await exportOf(app, a.headers);
     expect(exported.account.gender).toBe("woman");
-    expect(exported.account.pond).toMatchObject({
+    expect(exported.account.pond).toEqual({
+      id: expect.any(String),
       slug: "suomi",
       name: "Suomi",
-      nameInessive: "Suomessa",
     });
     expect(exported.preferences).toEqual({
       seeks: ["man", "non_binary"],

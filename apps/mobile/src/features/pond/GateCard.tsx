@@ -9,8 +9,8 @@ import { useGate } from "./useGate";
 
 /**
  * Whether matching is open for the person (#500, ADR-060 §4), one sentence for
- * each of three things: the profile lacks something, it is finished and their
- * area has not opened, or open. No number and nothing that can be tapped to
+ * each of three things: the profile lacks something, it is finished and
+ * matching has not opened, or open. No number and nothing that can be tapped to
  * move ahead. Once matching is open, the card carries what the home screen
  * hands it for that: the way to today's round (#379).
  */
@@ -22,7 +22,7 @@ export function GateCard({ whenOpen }: { whenOpen?: ReactNode }) {
 
   return (
     <Card className="w-full max-w-md">
-      <View accessibilityLabel={t("pond.gate.label")} className="gap-6">
+      <View accessibilityLabel={t("pond.gate.title")} className="gap-6">
         <CardHeader>
           <CardDescription>{t("pond.gate.title")}</CardDescription>
         </CardHeader>

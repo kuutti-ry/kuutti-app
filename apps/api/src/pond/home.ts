@@ -3,7 +3,6 @@ import type { Locale } from "@kuutti/i18n";
 import type { AccountExport, HomeSummary, HomeUpdate, PlaceName } from "@kuutti/schema";
 import { AppError } from "../lib/errors.ts";
 import type { Logger } from "../lib/logger.ts";
-import { readMatchingConfig } from "../lib/matching-config.ts";
 import { areaOf, homeRules, homeSummary, keptPlace, nameOf, shownPlace, townOf } from "./places.ts";
 import * as repo from "./repo.ts";
 
@@ -15,9 +14,6 @@ import * as repo from "./repo.ts";
  * home is in no log line, error, event, frame or push.
  */
 export type HomeDeps = { db: Queryable; logger: Logger; now?: () => Date };
-
-/** The matching_config key naming the one pond (ADR-061 §8). */
-const DEFAULT_POND_KEY = "default_pond";
 
 /**
  * A new home, what the card shows, or both. A new postal code starts from the
@@ -37,7 +33,6 @@ export async function saveHome(
   if (postalCode !== undefined && moved === null) {
     throw new AppError(400, "postal_code_unknown", "That postal code is not on the list");
   }
-  const slug = await readMatchingConfig(deps.db, DEFAULT_POND_KEY);
   const home = await transaction(deps.db, async (tx) => {
     const stored = await repo.lockHomeOfAccount(tx, accountId);
     if (!stored) throw new AppError(404, "not_found", "No live account");
@@ -46,17 +41,12 @@ export async function saveHome(
     if (place === null) throw new AppError(400, "validation_failed", "A postal code first");
     const area = areaOf(place);
     const showArea = update.showArea === true && area !== null;
-    const pond = await repo.writeHomeOfAccount(
+    await repo.writeHomeOfAccount(
       tx,
       accountId,
       { place: moved, showsArea: showArea },
-      typeof slug === "string" ? slug : null,
       deps.now?.() ?? new Date(),
     );
-    // Thrown as a fault, not refused: nobody is left with a home and no pond,
-    // which would read as `incomplete` for ever with nothing to say why, and
-    // this goes to Sentry. The transaction takes the home back with it.
-    if (pond === null) throw new Error("saveHome: matching_config default_pond names no pond");
     return { town: townOf(place, rules.townMin), area, showArea };
   });
   deps.logger.info({ accountId }, "home set");

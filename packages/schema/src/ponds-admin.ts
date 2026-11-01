@@ -2,8 +2,9 @@ import { z } from "zod";
 import { PondSummary } from "./onboarding.ts";
 
 /**
- * The ponds in the panel (#500, ADR-060 §2): each with its switch. An admin
- * turns it; nothing else does, so the answer carries no count and no figure.
+ * The switch in the panel (#500, ADR-060 §2): the one pond's, for the whole
+ * country. An admin turns it; nothing else does, so the answer carries no count
+ * and no figure.
  */
 export const AdminPond = PondSummary.extend({ matchingOpen: z.boolean() }).meta({
   id: "AdminPond",

@@ -413,10 +413,8 @@ describe("the status read racing another request", () => {
     const me = await signedInAccount(ctx.client, undefined, { state: "registered" });
     // Its last read before the transaction: here on one connection the transaction's
     // rollback would take the other request's erasure with it, which a commit never would.
-    const db = interleaved(
-      ctx.client,
-      { before: /SELECT value FROM matching_config WHERE key = \$1/ },
-      () => eraseOnOtherDevice(ctx, me.accountId),
+    const db = interleaved(ctx.client, { before: /FROM matching_config WHERE key = ANY/ }, () =>
+      eraseOnOtherDevice(ctx, me.accountId),
     );
     const { app, logs } = await appOn(db);
     const res = await app.request("/account/home", {

@@ -37,8 +37,7 @@ describe("the demo commands' ponds", () => {
       try {
         await migrate(pool, MIGRATIONS);
         await pool.query(
-          `INSERT INTO ponds (slug, name_nominative, name_inessive)
-           VALUES ('paakaupunkiseutu', 'Pääkaupunkiseutu', 'Pääkaupunkiseudulla')`,
+          "INSERT INTO ponds (slug, name_nominative) VALUES ('paakaupunkiseutu', 'Pääkaupunkiseutu')",
         );
         expect(await openPonds(pool)).toBe(2);
         const ponds = await pool.query("SELECT DISTINCT matching_open FROM ponds");

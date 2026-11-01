@@ -8,8 +8,6 @@ const pond = {
   id: "00000000-0000-4000-8000-000000000001",
   slug: "suomi",
   name: "Suomi",
-  nameInessive: "Suomessa",
-  parentId: null,
   matchingOpen: false,
 };
 

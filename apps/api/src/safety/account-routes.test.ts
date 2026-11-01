@@ -308,7 +308,6 @@ async function seededPerson(ctx: TestContext, api: Api, moderator: Staff) {
   return {
     person,
     bug,
-    pondName: `Pond ${pondSlug}`,
     hetuHmac,
     researchId,
     approved,
@@ -339,7 +338,6 @@ describe("GET /admin/accounts/{id}", () => {
       suspensionEndsAt: SUSPENSION_ENDS,
       age: 36,
       gender: "woman",
-      pond: s.pondName,
       profile: {
         displayName: DISPLAY_NAME,
         bio: BIO,
@@ -631,7 +629,6 @@ describe("GET /admin/accounts/{id}", () => {
       // June 1990 at October 2026.
       age: 36,
       gender: null,
-      pond: null,
       profile: null,
       photos: [],
       feedback: [],
@@ -790,7 +787,6 @@ describe("GET /admin/accounts/{id}", () => {
       suspensionEndsAt: null,
       age: null,
       gender: null,
-      pond: null,
       profile: null,
       photos: [],
       feedback: [],
@@ -881,7 +877,6 @@ describe("the account.view row", () => {
     ["the identity's standing", /SELECT standing, standing_changed_at/],
     ["the profile", /FROM profile WHERE account_id/],
     ["the photos", /FROM photo WHERE account_id/],
-    ["the pond", /JOIN ponds/],
     ["the feedback", /FROM feedback WHERE account_id/],
     ["the audit rows", /FROM audit_log\s+WHERE/],
   ] as const;

@@ -2,10 +2,10 @@
 # opens in place (#511) and chooses the hand the round's Like and Pass are
 # placed for, one-handed mode and the marks they carry (#520), each kept on
 # the phone. Where the buttons then sit and what they carry on the round is
-# the round screen's jest tests: Sanna's matching has not opened, and a mark
-# is silent. This flow holds the setting on a device: chosen, and kept when
-# the row is opened again. Sanna; the flow leaves the setting as it found it,
-# right hand, two hands and Kuutti's style, and the row closed.
+# the round screen's jest tests: a mark is silent. This flow holds the setting
+# on a device: chosen, and kept when the row is opened again. Sanna; the flow
+# leaves the setting as it found it, right hand, two hands and Kuutti's style,
+# and the row closed.
 appId: fi.kuutti.app
 name: The decision buttons setting places Like and Pass for either hand, and one-handed
 ---

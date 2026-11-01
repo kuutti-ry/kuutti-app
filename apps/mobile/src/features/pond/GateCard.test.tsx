@@ -36,13 +36,13 @@ describe("GateCard", () => {
     const calls = answering([() => json(gate("closed"))]);
     const screen = await renderWithTheme(<GateCard />);
     await settle();
-    expect(screen.getByLabelText("When matching opens for you")).toBeTruthy();
+    expect(screen.getByLabelText("Matching")).toBeTruthy();
     expect(new URL(calls[0]?.url ?? "").pathname).toBe("/gate");
   });
 
   it.each([
     ["open", "Matching is open for you."],
-    ["closed", "Your profile is finished. Matching has not opened in your area yet."],
+    ["closed", "Your profile is finished. Matching has not opened yet."],
     ["incomplete", "Matching opens for finished profiles. Yours still lacks something."],
   ] as const)("says %s in one sentence, with no number and no gender", async (state, text) => {
     answering([() => json(gate(state))]);
@@ -55,7 +55,7 @@ describe("GateCard", () => {
 
   it.each([
     ["open", "Matching is open for you.", true],
-    ["closed", "Your profile is finished. Matching has not opened in your area yet.", false],
+    ["closed", "Your profile is finished. Matching has not opened yet.", false],
     ["incomplete", "Matching opens for finished profiles. Yours still lacks something.", false],
   ] as const)(
     "carries what the home screen hands it for an open gate only: %s (#379)",
@@ -75,7 +75,7 @@ describe("GateCard", () => {
     ]);
     const screen = await renderWithTheme(<GateCard />);
     await settle();
-    expect(screen.getByText("Where you stand could not be read.")).toBeTruthy();
+    expect(screen.getByText("Matching could not be checked.")).toBeTruthy();
     const retry = screen.getByRole("button", { name: "Try again" });
     expect(retry.props.accessibilityRole).toBe("button");
     await act(async () => {
@@ -118,9 +118,7 @@ describe("GateCard", () => {
       arrive();
     });
     await settle();
-    expect(
-      screen.getByText("Your profile is finished. Matching has not opened in your area yet."),
-    ).toBeTruthy();
+    expect(screen.getByText("Your profile is finished. Matching has not opened yet.")).toBeTruthy();
   });
 
   it("reads again when the app comes back to the foreground", async () => {
@@ -130,9 +128,7 @@ describe("GateCard", () => {
     const calls = answering([() => json(gate("closed")), () => json(gate("open"))]);
     const screen = await renderWithTheme(<GateCard />);
     await settle();
-    expect(
-      screen.getByText("Your profile is finished. Matching has not opened in your area yet."),
-    ).toBeTruthy();
+    expect(screen.getByText("Your profile is finished. Matching has not opened yet.")).toBeTruthy();
     const heard = listening.mock.calls.filter(([type]) => type === "change");
     expect(heard).toHaveLength(1);
     const listener = heard[0]?.[1] as (state: string) => void;
@@ -166,17 +162,15 @@ describe("GateCard", () => {
       focus();
     });
     await settle();
-    expect(
-      screen.getByText("Your profile is finished. Matching has not opened in your area yet."),
-    ).toBeTruthy();
-    expect(screen.queryByText("Where you stand could not be read.")).toBeNull();
+    expect(screen.getByText("Your profile is finished. Matching has not opened yet.")).toBeTruthy();
+    expect(screen.queryByText("Matching could not be checked.")).toBeNull();
   });
 
   it("refuses an answer that carries a number", async () => {
     answering([() => json({ state: "closed", needed: 10 })]);
     const screen = await renderWithTheme(<GateCard />);
     await settle();
-    expect(screen.getByText("Where you stand could not be read.")).toBeTruthy();
+    expect(screen.getByText("Matching could not be checked.")).toBeTruthy();
   });
 
   it("has a label and a role on everything that can be pressed", async () => {

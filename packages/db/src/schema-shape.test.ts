@@ -332,8 +332,13 @@ describe("the foreign keys", () => {
     ]);
   });
 
-  it("make the ponds a tree", () => {
-    expect(references).toContain("ponds.parent_id -> ponds.id no action");
+  it("name the one pond from the account and the counter, and no pond from a pond", () => {
+    expect(
+      references.filter((reference) => reference.endsWith("-> ponds.id no action")).sort(),
+    ).toEqual([
+      "account.pond_id -> ponds.id no action",
+      "pond_counter.pond_id -> ponds.id no action",
+    ]);
   });
 });
 

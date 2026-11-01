@@ -12,10 +12,7 @@ import { HomeScreen } from "./HomeScreen";
 
 // The onboarding gate (#46) is the identity slice's; here it says what the
 // test needs, so the screen can be seen complete, checking or unknown.
-let mockGate:
-  | { status: "checking" }
-  | { status: "unknown" }
-  | { status: "complete"; pond: PondSummary | null };
+let mockGate: { status: "checking" } | { status: "unknown" } | { status: "complete" };
 jest.mock("@/features/identity", () => ({
   ...jest.requireActual("@/features/identity"),
   useOnboardingGate: () => ({ ...mockGate, retry: mockRetry }),
@@ -49,10 +46,8 @@ function topRow(): HostNode[] {
 
 const POND: PondSummary = {
   id: "0b4f3a0e-7c2f-4e2b-9a9a-1a2b3c4d5e6f",
-  slug: "otaniemi",
-  name: "Otaniemi",
-  nameInessive: "Otaniemessä",
-  parentId: null,
+  slug: "suomi",
+  name: "Suomi",
 };
 const counter: PondCounterResponse = {
   k: 10,
@@ -76,7 +71,7 @@ beforeEach(async () => {
   router.push.mockReset();
   mockRetry.mockReset();
   mockProduction = false;
-  mockGate = { status: "complete", pond: POND };
+  mockGate = { status: "complete" };
   globalThis.fetch = jest.fn(async (input: Request | string) => {
     const url = new URL(input instanceof Request ? input.url : input);
     if (url.pathname === "/ponds/counter") return json(counter);
@@ -91,11 +86,9 @@ describe("HomeScreen", () => {
     await renderWithTheme(<HomeScreen />);
     expect(screen.getByRole("heading", { name: "Kuutti" })).toBeTruthy();
     // Both cards have fetched and painted before anything is pressed.
-    expect(await screen.findByText("Otaniemi")).toBeTruthy();
+    expect(await screen.findByText("People on Kuutti")).toBeTruthy();
     expect(
-      await screen.findByText(
-        "Your profile is finished. Matching has not opened in your area yet.",
-      ),
+      await screen.findByText("Your profile is finished. Matching has not opened yet."),
     ).toBeTruthy();
     const user = userEvent.setup();
     await user.press(screen.getByRole("button", { name: "Your profile" }));
@@ -136,31 +129,25 @@ describe("HomeScreen", () => {
     fireEvent.press(screen.getByRole("button", { name: "Try again" }));
     expect(mockRetry).toHaveBeenCalledTimes(1);
     expect(screen.queryByRole("button", { name: "Your profile" })).toBeNull();
-    expect(screen.queryByText("Otaniemi")).toBeNull();
+    expect(screen.queryByText("People on Kuutti")).toBeNull();
   });
 
   it("leaves the photos, the later questions and the deal-breakers to the profile, which holds them (#239)", async () => {
     await renderWithTheme(<HomeScreen />);
     expect(await screen.findByRole("button", { name: "Your profile" })).toBeTruthy();
-    for (const name of ["Your photos", "Fill in the rest while you wait", "Your deal-breakers"]) {
+    for (const name of [
+      "Your photos",
+      "Fill in the rest when you have a moment",
+      "Your deal-breakers",
+    ]) {
       expect(screen.queryByRole("button", { name })).toBeNull();
     }
-  });
-
-  it("shows the profile but no pond before the account has one", async () => {
-    mockGate = { status: "complete", pond: null };
-    await renderWithTheme(<HomeScreen />);
-    expect(screen.getByRole("button", { name: "Your profile" })).toBeTruthy();
-    expect(screen.queryByText("Otaniemi")).toBeNull();
-    expect(screen.queryByText(/Matching has not opened/)).toBeNull();
   });
 
   it("leads to today's round from the gate card once matching is open, and not before (#379)", async () => {
     await renderWithTheme(<HomeScreen />);
     expect(
-      await screen.findByText(
-        "Your profile is finished. Matching has not opened in your area yet.",
-      ),
+      await screen.findByText("Your profile is finished. Matching has not opened yet."),
     ).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Today's round" })).toBeNull();
 
@@ -185,9 +172,7 @@ describe("HomeScreen", () => {
     const heading = "Shall Kuutti tell you?";
     await renderWithTheme(<HomeScreen />);
     expect(
-      await screen.findByText(
-        "Your profile is finished. Matching has not opened in your area yet.",
-      ),
+      await screen.findByText("Your profile is finished. Matching has not opened yet."),
     ).toBeTruthy();
     expect(screen.queryByText(heading)).toBeNull();
 
@@ -199,7 +184,7 @@ describe("HomeScreen", () => {
     });
     await renderWithTheme(<HomeScreen />);
     expect(await screen.findByText(heading)).toBeTruthy();
-    const card = screen.getByLabelText("When matching opens for you");
+    const card = screen.getByLabelText("Matching");
     expect(within(card).getByRole("button", { name: "Today's round" })).toBeTruthy();
     expect(within(card).getByRole("button", { name: "Allow notifications" })).toBeTruthy();
     expect(within(card).getByRole("button", { name: "No thanks" })).toBeTruthy();

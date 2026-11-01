@@ -42,7 +42,6 @@ const page = (extra: Record<string, unknown> = {}) => ({
   suspensionEndsAt: UNTIL,
   age: 34,
   gender: "woman",
-  pond: "Helsinki",
   profile: {
     displayName: "Aino",
     bio: "Likes long walks.",
@@ -102,7 +101,6 @@ const tombstone = page({
   suspensionEndsAt: null,
   age: null,
   gender: null,
-  pond: null,
   profile: null,
   photos: [],
   feedback: [],
@@ -317,7 +315,6 @@ describe("a person's page", () => {
     expect(termValue("Name")).toBe("Aino");
     expect(termValue("Age")).toBe("34");
     expect(termValue("Gender")).toBe("woman");
-    expect(termValue("Pond")).toBe("Helsinki");
     expect(termValue("Bio")).toBe("Likes long walks.");
     expect(termValue("sunday")).toBe("A sauna and a book.");
     expect(termValue("languages")).toBe("fi, en");
@@ -448,7 +445,6 @@ describe("a person's page", () => {
         page({
           age: null,
           gender: null,
-          pond: null,
           profile: { displayName: "Aino", bio: null, bioPreset: null, prompts: [], fields: {} },
         }),
       ),
@@ -456,7 +452,7 @@ describe("a person's page", () => {
     ]);
     show();
     expect(await screen.findByText("Aino")).toBeInTheDocument();
-    for (const term of ["Age", "Gender", "Pond", "Bio"]) expect(termValue(term)).toBe("–");
+    for (const term of ["Age", "Gender", "Bio"]) expect(termValue(term)).toBe("–");
     expect(screen.queryByText("sunday")).toBeNull();
   });
 

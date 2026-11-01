@@ -163,10 +163,8 @@ function anExport(): Record<string, unknown> {
       gender: "woman",
       pond: {
         id: uuid(2),
-        slug: "helsinki",
-        name: "Helsinki",
-        nameInessive: "Helsingissä",
-        parentId: null,
+        slug: "suomi",
+        name: "Suomi",
       },
       home: { place: "Kallio", shownOnCard: "Helsinki", movedAt: null },
       stateChangedAt: null,

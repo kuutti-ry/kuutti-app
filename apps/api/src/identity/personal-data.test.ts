@@ -169,7 +169,7 @@ const REGISTER: Record<string, Entry> = {
       "appealed_at checked_at decided_at decided_by decision description faces flagged labels model_version photo_id reason",
     exported: ["photos"],
   },
-  ponds: { erasure: "nobody", why: "The areas." },
+  ponds: { erasure: "nobody", why: "The one pond, the country, and its switch." },
   preferences: {
     erasure: "goes",
     by: "deletePreferencesOfAccount",

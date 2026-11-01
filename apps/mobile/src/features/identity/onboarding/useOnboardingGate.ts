@@ -1,4 +1,3 @@
-import type { PondSummary } from "@kuutti/schema";
 import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useState } from "react";
 import { useSession } from "../session";
@@ -7,8 +6,8 @@ import { fetchOnboarding } from "./client";
 export type OnboardingGate =
   | { status: "signed-out" }
   | { status: "checking" }
-  /** Nothing required is missing: the home screen may show what needs a finished account, and knows the person's pond (#54). */
-  | { status: "complete"; pond: PondSummary | null }
+  /** Nothing required is missing: the home screen may show what needs a finished account. */
+  | { status: "complete" }
   /** Sent to onboarding; the home screen shows nothing meanwhile. */
   | { status: "incomplete" }
   /** The status could not be read: the gate stays closed and offers a retry (#65 review); `error` says why (LoadFailed). */
@@ -44,7 +43,7 @@ export function useOnboardingGate(): OnboardingGate & { retry: () => void } {
           setGate({ status: "incomplete" });
           router.replace("/onboarding");
         } else {
-          setGate({ status: "complete", pond: status.pond });
+          setGate({ status: "complete" });
         }
       })
       .catch((error: unknown) => {

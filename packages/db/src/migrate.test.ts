@@ -533,12 +533,13 @@ describe("migrate", () => {
             "auto_shadow_ban_photo_fetches",
             "deal_breakers_max",
           ]);
-          // The gate's two keys stand here still: the seed has none of them, and 0094 deletes them (#500).
-          const gateKeys = ["gate_k", "majority_share_max"];
+          // The gate's two keys and default_pond's two versions stand here still: the seed has none
+          // of them, and 0094 and 0101 delete them (#500).
+          const goneSince = ["gate_k", "majority_share_max", "default_pond", "default_pond"];
           expect(rows).toHaveLength(
             Object.keys(MATCHING_CONFIG_V1).filter((key) => !later.has(key)).length +
               Object.keys(MATCHING_CONFIG_V2).filter((key) => !laterVersions.has(key)).length +
-              gateKeys.length,
+              goneSince.length,
           );
 
           expect(await migrate(pool, through0047)).toEqual({ state: "applied", applied: 1 });
@@ -952,6 +953,7 @@ describe("migrate", () => {
 
   it("migrations 0095 and 0097 follow a value set in the panel with the next version, and leave its row and reason alone (#514, #305)", async () => {
     const before = migrationsBefore("0095_one_pond");
+    const through = migrationsBefore("0101_default_pond_goes");
     try {
       await withTemporaryDatabase(async (url) => {
         const pool = createPool({ connectionString: url, max: 2 });
@@ -964,7 +966,7 @@ describe("migrate", () => {
                (4, 'deal_breakers_max', '5'::jsonb, 'admin', 'A few more')`,
           );
 
-          expect((await migrate(pool, MIGRATIONS)).state).toBe("applied");
+          expect((await migrate(pool, through)).state).toBe("applied");
 
           expect((await versionsOf(pool, "default_pond")).slice(-2)).toEqual([
             {
@@ -980,6 +982,81 @@ describe("migrate", () => {
             { version: 4, value: 5, created_by: "admin", reason: "A few more" },
             { version: 5, value: 7, created_by: "migration:0097", reason: null },
           ]);
+        } finally {
+          await pool.end();
+        }
+      });
+    } finally {
+      rmSync(before, { recursive: true, force: true });
+      rmSync(through, { recursive: true, force: true });
+    }
+  });
+
+  it("migration 0100 takes the tree and the case form off the pond, and keeps its row, its switch and its people (#500)", async () => {
+    const before = migrationsBefore("0100_pond_one_row");
+    try {
+      await withTemporaryDatabase(async (url) => {
+        const pool = createPool({ connectionString: url, max: 2 });
+        try {
+          await migrate(pool, before);
+          const suomi = await suomiId(pool);
+          await pool.query("UPDATE ponds SET matching_open = true WHERE id = $1", [suomi]);
+          await aPerson(pool, "a", suomi);
+
+          expect((await migrate(pool, MIGRATIONS)).state).toBe("applied");
+
+          const columns = await pool.query<{ column_name: string }>(
+            `SELECT column_name FROM information_schema.columns
+             WHERE table_name = 'ponds' ORDER BY column_name`,
+          );
+          expect(columns.rows.map((row) => row.column_name)).toEqual([
+            "created_at",
+            "id",
+            "matching_open",
+            "name_nominative",
+            "slug",
+          ]);
+          const ponds = await pool.query(
+            "SELECT id, slug, name_nominative, matching_open FROM ponds",
+          );
+          expect(ponds.rows).toEqual([
+            { id: suomi, slug: "suomi", name_nominative: "Suomi", matching_open: true },
+          ]);
+          const accounts = await pool.query("SELECT pond_id FROM account");
+          expect(accounts.rows).toEqual([{ pond_id: suomi }]);
+        } finally {
+          await pool.end();
+        }
+      });
+    } finally {
+      rmSync(before, { recursive: true, force: true });
+    }
+  });
+
+  it("migration 0101 takes default_pond away, every version whoever wrote it, and no other key (#500)", async () => {
+    const before = migrationsBefore("0101_default_pond_goes");
+    try {
+      await withTemporaryDatabase(async (url) => {
+        const pool = createPool({ connectionString: url, max: 2 });
+        try {
+          await migrate(pool, before);
+          await pool.query(
+            `INSERT INTO matching_config (version, key, value, created_by, reason)
+             VALUES (4, 'default_pond', '"nowhere"'::jsonb, 'admin', 'A slug no row has')`,
+          );
+          const others = async () =>
+            (
+              await pool.query(
+                "SELECT key, version, value FROM matching_config WHERE key <> 'default_pond' ORDER BY key, version",
+              )
+            ).rows;
+          const kept = await others();
+          expect((await versionsOf(pool, "default_pond")).length).toBe(4);
+
+          expect((await migrate(pool, MIGRATIONS)).state).toBe("applied");
+
+          expect(await versionsOf(pool, "default_pond")).toEqual([]);
+          expect(await others()).toEqual(kept);
         } finally {
           await pool.end();
         }

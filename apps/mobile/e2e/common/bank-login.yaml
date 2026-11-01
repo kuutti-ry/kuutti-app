@@ -86,7 +86,7 @@ appId: fi.kuutti.app
           commands:
             - tapOn: ".*${PERSONA}.*"
       - extendedWaitUntil:
-          visible: "Open|Avaa|Öppna|Sign-in did not complete|Kirjautuminen ei onnistunut|Inloggningen slutfördes inte|Your area|Alueesi|Ditt område|Welcome to Kuutti|Tervetuloa Kuuttiin|Välkommen till Kuutti"
+          visible: "Open|Avaa|Öppna|Sign-in did not complete|Kirjautuminen ei onnistunut|Inloggningen slutfördes inte|People on Kuutti|Ihmiset Kuutissa|Människor på Kuutti|Welcome to Kuutti|Tervetuloa Kuuttiin|Välkommen till Kuutti"
           timeout: 20000
 # Only iOS asks: on Android the question would cost its 7 s on every sign-in.
 - runFlow:

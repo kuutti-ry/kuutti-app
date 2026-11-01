@@ -41,7 +41,6 @@ const page = {
   suspensionEndsAt: null,
   age: null,
   gender: null,
-  pond: null,
   profile: null,
   photos: [],
   feedback: [],

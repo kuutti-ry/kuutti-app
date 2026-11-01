@@ -17,19 +17,11 @@ const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
 const token = (seed: string) => (seed + "x".repeat(43)).slice(0, 43);
 
-const POND = {
-  id: "0b4f3a0e-7c2f-4e2b-9a9a-1a2b3c4d5e6f",
-  slug: "suomi",
-  name: "Suomi",
-  nameInessive: "Suomessa",
-  parentId: null,
-};
 const VERSION = "2026-09-draft-1";
 const status = (missing: string[]) => ({
   state: "active",
   age: 56,
   gender: "man",
-  pond: POND,
   home: null,
   preferences: {
     seeks: missing.includes("seeks") ? null : ["woman"],

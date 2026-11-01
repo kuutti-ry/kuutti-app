@@ -1170,9 +1170,9 @@ describe("over the synthetic population", () => {
     // The population lives in the seed's ponds, which this database has not been given.
     for (const pond of SEED_PONDS) {
       await ctx.client.query(
-        `INSERT INTO ponds (slug, name_nominative, name_inessive) VALUES ($1, $2, $3)
+        `INSERT INTO ponds (slug, name_nominative) VALUES ($1, $2)
          ON CONFLICT (slug) DO NOTHING`,
-        [pond.slug, pond.nameNominative, pond.nameInessive],
+        [pond.slug, pond.nameNominative],
       );
     }
     await writePopulation(

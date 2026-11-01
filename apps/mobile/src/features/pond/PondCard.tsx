@@ -1,35 +1,31 @@
-import type { PondSummary } from "@kuutti/schema";
 import { View } from "react-native";
 import { LoadFailed } from "@/components/LoadFailed";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Text } from "@/components/ui/text";
 import { useT } from "@/lib/locale";
 import { useHapticTap } from "@/theme/haptics";
-import { pondName } from "./names";
 import { SeeksBar } from "./SeeksBar";
 import { usePondCounter } from "./usePondCounter";
 
 /**
- * How the person's own pond is filling up (#54, ADR-013): the counter's
- * figures, in words. Below the threshold no number is said, here as
- * everywhere, and the card says why the numbers stand still for a while: they
- * move in steps of at least k people. The pond's name stands on a line of its
- * own, in the nominative and in the person's language (#174): no sentence is
- * built around it (TD-17). The bar of whom the people there seek stands under
- * the total, once the pond may say it (#507).
+ * How many people are on Kuutti (#54, ADR-013): the counter's figures, in
+ * words. Below the threshold no number is said, here as everywhere, and the
+ * card says why the numbers stand still for a while: they move in steps of at
+ * least k people. There is one pond, the country (ADR-061 §8), so the card
+ * names no area (#500). The bar of whom those people seek stands under the
+ * total, once it may be said (#507).
  */
-export function PondCard({ pond }: { pond: PondSummary }) {
+export function PondCard() {
   const { t } = useT();
   const tap = useHapticTap();
-  const counter = usePondCounter(pond.id);
+  const counter = usePondCounter();
   const figures = counter.status === "ready" ? counter.figures : null;
 
   return (
     <Card className="w-full max-w-md">
-      <View accessibilityLabel={t("pond.counter.label")} className="gap-6">
+      <View accessibilityLabel={t("pond.counter.title")} className="gap-6">
         <CardHeader>
-          <CardDescription>{t("pond.counter.title")}</CardDescription>
-          <CardTitle>{pondName(t, pond)}</CardTitle>
+          <CardTitle>{t("pond.counter.title")}</CardTitle>
         </CardHeader>
         <CardContent className="gap-2">
           {counter.status === "loading" && (

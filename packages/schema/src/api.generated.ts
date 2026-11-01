@@ -7087,9 +7087,6 @@ export interface components {
             id: string;
             slug: string;
             name: string;
-            nameInessive: string;
-            /** Format: uuid */
-            parentId: string | null;
         } | null;
         PreferencesResponse: {
             seeks: components["schemas"]["Gender"][] | null;
@@ -7871,7 +7868,6 @@ export interface components {
             state: "registered" | "active" | "paused" | "shadow_banned" | "suspended" | "banned" | "deleted";
             age: number;
             gender: components["schemas"]["Gender"];
-            pond: components["schemas"]["PondSummary"];
             home: components["schemas"]["HomeSummary"];
             preferences: components["schemas"]["PreferencesResponse"];
             consents: {
@@ -8479,7 +8475,6 @@ export interface components {
             suspensionEndsAt: string | null;
             age: number | null;
             gender: string | null;
-            pond: string | null;
             profile: {
                 displayName: string;
                 bio: string | null;
@@ -8562,9 +8557,6 @@ export interface components {
             id: string;
             slug: string;
             name: string;
-            nameInessive: string;
-            /** Format: uuid */
-            parentId: string | null;
             matchingOpen: boolean;
         };
         PondMatchingChange: {

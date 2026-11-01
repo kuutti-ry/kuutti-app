@@ -214,7 +214,6 @@ export const AdminAccount = z
     suspensionEndsAt: z.iso.datetime().nullable(),
     age: z.int().min(0).max(130).nullable(),
     gender: z.string().max(40).nullable(),
-    pond: z.string().max(80).nullable(),
     profile: z
       .object({
         displayName: z.string(),

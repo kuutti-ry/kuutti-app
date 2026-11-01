@@ -200,7 +200,6 @@ name: A registered person is taken through onboarding one question per screen, a
 # Home straight after the bio: research was asked before the bank. The one
 # pond's counter; the photos wait in the local queue, so matching waits for them.
 - extendedWaitUntil:
-    visible: "Your area|Alueesi|Ditt område"
+    visible: "People on Kuutti|Ihmiset Kuutissa|Människor på Kuutti"
     timeout: 15000
-- assertVisible: "Finland|Suomi"
 - assertVisible: "Matching opens for finished profiles\\. Yours still lacks something\\.|Seuranhaku avautuu valmiille profiileille\\. Sinun profiilistasi puuttuu vielä jotakin\\.|Matchningen öppnar för färdiga profiler\\. I din saknas ännu något\\."

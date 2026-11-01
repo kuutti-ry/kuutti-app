@@ -13,22 +13,13 @@ const pondFrom = (r: Row): PondSummary => ({
   id: r.id as string,
   slug: r.slug as string,
   name: r.name_nominative as string,
-  nameInessive: r.name_inessive as string,
-  parentId: (r.parent_id as string | null) ?? null,
 });
 
-const COLUMNS = "id, slug, name_nominative, name_inessive, parent_id";
+const COLUMNS = "id, slug, name_nominative";
 
-/** Every pond in tree order: each parent right before its descendants, siblings by name. */
+/** Every pond by name; there is one, the country (ADR-061 §8). */
 export async function listPonds(db: Queryable): Promise<PondSummary[]> {
-  const { rows } = await db.query<Row>(
-    `WITH RECURSIVE tree AS (
-       SELECT ${COLUMNS}, ARRAY[name_nominative] AS path FROM ponds WHERE parent_id IS NULL
-       UNION ALL
-       SELECT p.id, p.slug, p.name_nominative, p.name_inessive, p.parent_id, t.path || p.name_nominative
-       FROM ponds p JOIN tree t ON p.parent_id = t.id)
-     SELECT ${COLUMNS} FROM tree ORDER BY path`,
-  );
+  const { rows } = await db.query<Row>(`SELECT ${COLUMNS} FROM ponds ORDER BY name_nominative`);
   return rows.map(pondFrom);
 }
 
@@ -37,7 +28,7 @@ export async function findPondOfAccount(
   accountId: string,
 ): Promise<PondSummary | null> {
   const { rows } = await db.query<Row>(
-    `SELECT p.id, p.slug, p.name_nominative, p.name_inessive, p.parent_id
+    `SELECT p.id, p.slug, p.name_nominative
      FROM account a JOIN ponds p ON p.id = a.pond_id WHERE a.id = $1`,
     [accountId],
   );
@@ -91,28 +82,25 @@ export async function lockHomeOfAccount(
 /**
  * The write of a home, and the one write of a pond (ADR-061 §8): in one
  * statement, so that nobody has a home without one and the counter's
- * `verified` still starts after a gender is declared. A pond already held
- * stays. `place` null leaves the kept place as it is, and another place than
- * the one held is a move, at `at` (§5). The pond the account has after it, null
- * for none.
+ * `verified` still starts after a gender is declared. The slug is the row every
+ * database has (migration 0027, kept by 0095); a pond already held stays.
+ * `place` null leaves the kept place as it is, and another place than the one
+ * held is a move, at `at` (§5).
  */
 export async function writeHomeOfAccount(
   tx: Queryable,
   accountId: string,
   home: Pick<StoredHome, "place" | "showsArea">,
-  defaultPond: string | null,
   at: Date,
-): Promise<string | null> {
-  const { rows } = await tx.query<{ pond_id: string | null }>(
+): Promise<void> {
+  await tx.query(
     `UPDATE account
-        SET home_moved_at = CASE WHEN $2::text <> home_place THEN $5 ELSE home_moved_at END,
+        SET home_moved_at = CASE WHEN $2::text <> home_place THEN $4 ELSE home_moved_at END,
             home_place = COALESCE($2, home_place), home_shows_area = $3,
-            pond_id = COALESCE(pond_id, (SELECT id FROM ponds WHERE slug = $4))
-      WHERE id = $1
-      RETURNING pond_id`,
-    [accountId, home.place, home.showsArea, defaultPond, at],
+            pond_id = COALESCE(pond_id, (SELECT id FROM ponds WHERE slug = 'suomi'))
+      WHERE id = $1`,
+    [accountId, home.place, home.showsArea, at],
   );
-  return rows[0]?.pond_id ?? null;
 }
 
 const adminPondFrom = (r: Row): AdminPond => ({

@@ -451,62 +451,27 @@ describe("the features of the home", () => {
   test("The home write sets the one pond, and reading the status sets nothing", async ({ ctx }) => {
     const { app, logs } = await appWith(ctx);
     const a = await signedInAccount(ctx.client, undefined, { state: "registered" });
-    const first = OnboardingStatus.parse(
-      await (await app.request("/onboarding", { headers: a.headers })).json(),
-    );
-    expect(first.pond).toBeNull();
+    const read = async () => (await app.request("/onboarding", { headers: a.headers })).json();
+    const first = OnboardingStatus.parse(await read());
     expect(first.missing).toContain("home");
     expect(first.missing).not.toContain("pond");
     expect((await homeRow(ctx, a.accountId))?.pond_id).toBeNull();
 
     expect((await putHome(app, a.headers, { postalCode: "00530" })).status).toBe(200);
-    const then = OnboardingStatus.parse(
-      await (await app.request("/onboarding", { headers: a.headers })).json(),
+    const { rows } = await ctx.client.query<{ id: string }>(
+      "SELECT id FROM ponds WHERE slug = 'suomi'",
     );
-    // The row matching_config's default_pond names, version 3 of it (ADR-061 §8).
-    expect(then.pond).toMatchObject({ slug: "suomi" });
+    expect((await homeRow(ctx, a.accountId))?.pond_id).toBe(rows[0]?.id);
+    // The status names no pond, before or after: the home card reads the counter's (#500).
+    expect(await read()).not.toHaveProperty("pond");
     expect(logs().some((l) => l.msg === "pond assigned")).toBe(false);
   });
 
-  test("A home write that would leave the account with no pond fails loudly and keeps nothing", async ({
-    ctx,
-  }) => {
-    const reports: unknown[] = [];
-    const { logger, lines } = await captureLogger();
-    const app = createApp({
-      config: testConfig(),
-      logger,
-      db: ctx.client,
-      report: (error) => reports.push(error),
-    });
-    const a = await signedInAccount(ctx.client, undefined, { state: "registered" });
-    for (const value of ["nowhere", "", 7]) {
-      await withMatchingConfig(ctx.client, { default_pond: value });
-      const res = await putHome(app, a.headers, { postalCode: "00530" });
-      expect(res.status, String(value)).toBe(500);
-      expect(await errorCode(res)).toBe("internal_error");
-      expect(await homeRow(ctx, a.accountId), String(value)).toEqual({
-        home_place: null,
-        home_shows_area: false,
-        pond_id: null,
-      });
-      const status = OnboardingStatus.parse(
-        await (await app.request("/onboarding", { headers: a.headers })).json(),
-      );
-      expect(status.missing).toContain("home");
-    }
-    expect(reports).toHaveLength(3);
-    expect(lines().filter((l) => l.msg === "unhandled error")).toHaveLength(3);
-    expect(lines().some((l) => l.msg === "home set")).toBe(false);
-    expect(JSON.stringify(lines())).not.toContain("00530");
-  });
-
-  test("a pond held stays, whatever the config names", async ({ ctx }) => {
+  test("a pond held stays", async ({ ctx }) => {
     const { app } = await appWith(ctx);
     const pondId = await pondNamed(ctx.client, "test-home-pond-held");
     const a = await signedInAccount(ctx.client);
     await ctx.client.query("UPDATE account SET pond_id = $2 WHERE id = $1", [a.accountId, pondId]);
-    await withMatchingConfig(ctx.client, { default_pond: "nowhere" });
     expect((await putHome(app, a.headers, { postalCode: "00530" })).status).toBe(200);
     expect((await homeRow(ctx, a.accountId))?.pond_id).toBe(pondId);
   });

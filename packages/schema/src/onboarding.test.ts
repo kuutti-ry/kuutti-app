@@ -144,23 +144,18 @@ describe("the gender", () => {
 describe("the pond", () => {
   const pond = {
     id: uuid(1),
-    slug: "helsinki",
-    name: "Helsinki",
-    nameInessive: "Helsingissä",
-    parentId: null,
+    slug: "suomi",
+    name: "Suomi",
   };
 
-  it("carries both case forms and the parent", () => {
+  it("carries its id, its slug and its name", () => {
     expect(PondSummary.parse(pond)).toEqual(pond);
-    expect(PondSummary.parse({ ...pond, parentId: uuid(2) }).parentId).toBe(uuid(2));
   });
 
   it.each([
     ["an empty slug", { slug: "" }, "too_small"],
     ["a slug of 61 characters", { slug: "s".repeat(61) }, "too_big"],
     ["a name of 81 characters", { name: "n".repeat(81) }, "too_big"],
-    ["no inessive", { nameInessive: "" }, "too_small"],
-    ["a parent that is not a uuid", { parentId: "uusimaa" }, "invalid_format"],
   ])("refuses %s", (_, change, code) => {
     expect(codes(PondSummary, { ...pond, ...change })).toEqual([code]);
   });
@@ -355,7 +350,6 @@ describe("the onboarding steps", () => {
     state: "registered",
     age: 18,
     gender: null,
-    pond: null,
     home: null,
     preferences: { seeks: null, ageWindow: null },
     consents: { terms: null, privacy: null, specialCategory: null, research: null },

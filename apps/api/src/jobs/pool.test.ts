@@ -150,15 +150,14 @@ describe("what a person is told", () => {
   });
 
   test("Another person's state is never served", async ({ ctx }) => {
-    const open = await pondNamed(ctx.client, "test-own-open");
-    await openPond(ctx.client, open);
-    const shut = await pondNamed(ctx.client, "test-own-closed");
-    const [mine] = await people(ctx.client, shut, 1, ALIKE);
-    const [theirs] = await people(ctx.client, open, 1, ALIKE);
+    const pond = await pondNamed(ctx.client, "test-own-state");
+    await openPond(ctx.client, pond);
+    const [mine] = await people(ctx.client, pond, 1, { gender: "woman" });
+    const [theirs] = await people(ctx.client, pond, 1, ALIKE);
     expect(await statusOf(ctx, theirs)).toBe("open");
-    expect(await statusOf(ctx, mine)).toBe("closed");
+    expect(await statusOf(ctx, mine)).toBe("incomplete");
     // The route takes no id: there is nobody else's to ask for.
-    expect(await statusOf(ctx, mine, `?accountId=${theirs}`)).toBe("closed");
+    expect(await statusOf(ctx, mine, `?accountId=${theirs}`)).toBe("incomplete");
   });
 
   test("the gate is not served without a session", async ({ ctx }) => {

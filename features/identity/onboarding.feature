@@ -69,7 +69,7 @@ Feature: Onboarding and consents
   Scenario: The export lists gender, pond, preferences and every consent
     Given an onboarded account with a withdrawn research consent
     When it downloads its export
-    Then the export carries the gender, the pond with both case forms, the two hard preferences and every consent row
+    Then the export carries the gender, the pond, the two hard preferences and every consent row
 
   Scenario: The research opt-in creates the research_id mapping and withdrawal removes it
     Given the account gave the research consent

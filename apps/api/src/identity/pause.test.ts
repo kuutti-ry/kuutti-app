@@ -82,7 +82,7 @@ describe("taking a break", () => {
     ]);
     await ctx.client.query("DELETE FROM account WHERE id = $1", [second.accountId]);
     const pond = await ctx.client.query<{ id: string }>(
-      "INSERT INTO ponds (slug, name_nominative, name_inessive) VALUES ('break-pond', 'Pond', 'Pondissa') RETURNING id",
+      "INSERT INTO ponds (slug, name_nominative) VALUES ('break-pond', 'Pond') RETURNING id",
     );
     const pondId = pond.rows[0]?.id;
     await ctx.client.query("UPDATE account SET gender = 'woman', pond_id = $2 WHERE id = $1", [

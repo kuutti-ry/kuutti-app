@@ -19,7 +19,7 @@ import { type AgeBand, RESEARCH_FIELD_KEYS } from "@kuutti/schema";
  * Under k, the cascade of ADR-011 §9: the research fields are withheld, then
  * the age band goes to its fixed neighbour pair, then the pond is withheld;
  * a row still under k is dropped and counted. Withheld is `*`, never null:
- * null already says "not chosen" or "not answered".
+ * null already says "no home yet" or "not answered".
  */
 export const WITHHELD = "*";
 

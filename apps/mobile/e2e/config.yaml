@@ -34,7 +34,7 @@ executionOrder:
     - Height takes one relation of its four buttons, kept when saved, and Everyone takes it off
     - Distance takes a band of its four buttons, kept when saved, and Everyone takes it off
     - The home changes by a new postal code, the card says the name chosen, and digits are never shown back
-    - Home names the area with its numbers and the gate in words, and the wrench names the API
+    - Home says how many people are on Kuutti and the gate in words, and the wrench names the API
     - A malformed e-mail is refused in words, a valid one is saved, and it can be removed
     - The research switch in Settings records the opt-in and withdraws it again
     - The messages switch in Settings, Notifications, goes off, is kept on the server, and goes on again

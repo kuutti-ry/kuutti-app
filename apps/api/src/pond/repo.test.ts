@@ -20,26 +20,22 @@ import {
 const AT = new Date("2026-10-20T09:00:00.000Z");
 
 describe("the pond and the home of an account", () => {
-  test("the ponds are listed parents first, whatever their names", async ({ ctx }) => {
+  test("the ponds are listed by name", async ({ ctx }) => {
     const zeta = await pondNamed(ctx.client, "test-repo-zeta");
-    const { rows } = await ctx.client.query<{ id: string }>(
-      `INSERT INTO ponds (slug, name_nominative, name_inessive, parent_id)
-       VALUES ('test-repo-child', 'Aalto', 'Aallossa', $1) RETURNING id`,
-      [zeta],
-    );
+    const alpha = await pondNamed(ctx.client, "test-repo-alpha");
     const ponds = (await listPonds(ctx.client)).map((pond) => pond.id);
-    expect(ponds.indexOf(zeta)).toBeLessThan(ponds.indexOf(rows[0]?.id ?? ""));
+    expect(ponds.indexOf(alpha)).toBeLessThan(ponds.indexOf(zeta));
   });
 
   test("an account's pond is its own, and nothing before the home set it", async ({ ctx }) => {
     const a = await signedInAccount(ctx.client, "a");
     const b = await signedInAccount(ctx.client, "b");
     expect(await findPondOfAccount(ctx.client, a.accountId)).toBeNull();
-    const home = { place: "00530", showsArea: false };
-    const pondId = await writeHomeOfAccount(ctx.client, a.accountId, home, "suomi", AT);
-    expect(await findPondOfAccount(ctx.client, a.accountId)).toMatchObject({
-      id: pondId,
+    await writeHomeOfAccount(ctx.client, a.accountId, { place: "00530", showsArea: false }, AT);
+    expect(await findPondOfAccount(ctx.client, a.accountId)).toEqual({
+      id: expect.any(String),
       slug: "suomi",
+      name: "Suomi",
     });
     expect(await findPondOfAccount(ctx.client, b.accountId)).toBeNull();
     expect(await findHomeOfAccount(ctx.client, b.accountId)).toEqual({
@@ -49,36 +45,20 @@ describe("the pond and the home of an account", () => {
     });
   });
 
-  test("the write says what pond the account ends with, none where the slug names no pond", async ({
-    ctx,
-  }) => {
+  test("the write leaves a pond already held", async ({ ctx }) => {
     const a = await signedInAccount(ctx.client);
-    const home = { place: "00530", showsArea: true };
-    expect(await writeHomeOfAccount(ctx.client, a.accountId, home, "nowhere", AT)).toBeNull();
-    expect(await writeHomeOfAccount(ctx.client, a.accountId, home, null, AT)).toBeNull();
     const pondId = await pondNamed(ctx.client, "test-repo-held");
     await ctx.client.query("UPDATE account SET pond_id = $2 WHERE id = $1", [a.accountId, pondId]);
-    expect(await writeHomeOfAccount(ctx.client, a.accountId, home, "suomi", AT)).toBe(pondId);
+    await writeHomeOfAccount(ctx.client, a.accountId, { place: "00530", showsArea: true }, AT);
+    expect(await findPondOfAccount(ctx.client, a.accountId)).toMatchObject({ id: pondId });
   });
 
   test("a write with no place leaves the kept place, and sets what the card shows", async ({
     ctx,
   }) => {
     const a = await signedInAccount(ctx.client);
-    await writeHomeOfAccount(
-      ctx.client,
-      a.accountId,
-      { place: "00530", showsArea: false },
-      "suomi",
-      AT,
-    );
-    await writeHomeOfAccount(
-      ctx.client,
-      a.accountId,
-      { place: null, showsArea: true },
-      "suomi",
-      AT,
-    );
+    await writeHomeOfAccount(ctx.client, a.accountId, { place: "00530", showsArea: false }, AT);
+    await writeHomeOfAccount(ctx.client, a.accountId, { place: null, showsArea: true }, AT);
     expect(await findHomeOfAccount(ctx.client, a.accountId)).toEqual({
       place: "00530",
       showsArea: true,
@@ -91,7 +71,7 @@ describe("the pond and the home of an account", () => {
   }) => {
     const a = await signedInAccount(ctx.client);
     const write = (place: string | null, at: Date) =>
-      writeHomeOfAccount(ctx.client, a.accountId, { place, showsArea: false }, "suomi", at);
+      writeHomeOfAccount(ctx.client, a.accountId, { place, showsArea: false }, at);
     const movedAt = async () => (await findHomeOfAccount(ctx.client, a.accountId))?.movedAt;
     const LATER = new Date(AT.getTime() + 60_000);
 

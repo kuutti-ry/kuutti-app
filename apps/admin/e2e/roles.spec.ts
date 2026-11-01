@@ -5,7 +5,7 @@ import { expect, signInAsModerator, test } from "./fixtures.ts";
 // (its route tests, per role); the panel never sends the request.
 
 for (const [path, heading] of [
-  ["/ponds", "Ponds"],
+  ["/matching", "Matching"],
   ["/config", "Tunables"],
   ["/audit", "Audit log"],
   ["/staff", "Staff"],

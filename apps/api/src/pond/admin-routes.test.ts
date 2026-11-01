@@ -76,7 +76,8 @@ describe("the ponds in the panel", () => {
     const response = await ctx.app.request("/admin/ponds", { headers: admin.headers });
     expect(response.status).toBe(200);
     const { items } = AdminPondList.parse(await response.json());
-    expect(items.find((pond) => pond.id === pondId)).toMatchObject({
+    expect(items.find((pond) => pond.id === pondId)).toEqual({
+      id: pondId,
       slug: "test-admin-list",
       name: "Pond test-admin-list",
       matchingOpen: false,

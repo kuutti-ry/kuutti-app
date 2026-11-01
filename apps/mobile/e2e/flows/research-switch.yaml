@@ -30,7 +30,7 @@ name: The research switch in Settings records the opt-in and withdraws it again
 # comes back open, as it was left.
 - openLink: kuutti://
 - extendedWaitUntil:
-    visible: "Your area|Alueesi|Ditt område"
+    visible: "People on Kuutti|Ihmiset Kuutissa|Människor på Kuutti"
     timeout: 15000
 - openLink: kuutti://settings
 - runFlow:
