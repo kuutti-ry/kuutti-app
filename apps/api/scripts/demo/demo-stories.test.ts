@@ -270,6 +270,7 @@ describe("the stories through the services", () => {
       ["katja", "resumed"],
       ["minna", "resumed"],
       ["riikka", "resumed"],
+      ["ritva", "resumed"],
     ]);
     const after = await ctx.client.query<{ n: string }>("SELECT count(*) AS n FROM account");
     expect(after.rows[0]?.n).toBe(before.rows[0]?.n);

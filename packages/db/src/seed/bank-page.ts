@@ -26,7 +26,7 @@ const GROUPS: ReadonlyArray<{ group: DemoPersona["group"]; title: string; lead: 
   {
     group: "history",
     title: "People with a history",
-    lead: "The same identity on every day, and, but for the three pairs of the conversations and Iida, the same person as a test user of Telia's bed on staging. What Kuutti holds about them is given by pnpm demo:reset; before it has run they are newcomers too.",
+    lead: "The same identity on every day, and, but for the three pairs of the conversations, Iida and Ritva, the same person as a test user of Telia's bed on staging. What Kuutti holds about them is given by pnpm demo:reset; before it has run they are newcomers too.",
   },
   {
     group: "ages",
@@ -70,13 +70,12 @@ export function renderBankPage(personas: readonly DemoPersona[]): string {
   // without scrolling, so an end-to-end flow taps one where it is (#226). Scrolled to a card, a
   // flow could stop with the card's edge at the screen's edge, a sliver Maestro counts as wholly
   // visible, and its tap there missed.
-  // shortcut: two columns on a phone hold twenty names. Measured with nineteen (#351), the last
-  // button ends 711 CSS px down the page at 375 to 411 px wide; an iPhone 17's Safari shows about
-  // 728 above its floating bar, a Pixel 7's Chrome about 780. (The report's pair had other names
-  // then, none longer than Mikael Lindqvist's, so every row is as high.) Iida is the twentieth
-  // (#379), in the tenth row as the nineteenth was; the people of her round are cards nobody signs
-  // in as, so they are not listed. A twenty-first name needs a third column or a shorter head of
-  // the page.
+  // shortcut: two columns on a phone hold twenty-one names. Measured with twenty-one (#542), the
+  // last button ends 699 CSS px down the page at 375 to 411 px wide; an iPhone 17's Safari shows
+  // about 728 above its floating bar, a Pixel 7's Chrome about 780. The eleventh row took a shorter
+  // warning, less room above the list and a narrower gap between its rows. The people of Iida's
+  // round are cards nobody signs in as, so they are not listed. A twenty-second name needs a third
+  // column, and every name must stay on one line, as Mikael Lindqvist's does.
   const names = personas
     .filter((p) => p.group !== "cards")
     .map(
@@ -136,7 +135,8 @@ ${buttons}
       ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
       button { font: inherit; color: inherit; cursor: pointer; border: 1px solid var(--line); border-radius: 8px; background: var(--card); }
       button[data-persona] { display: block; width: 100%; min-height: 56px; padding: 10px 14px; text-align: left; }
-      .names { grid-template-columns: repeat(auto-fill, minmax(9.5rem, 1fr)); }
+      #group-names { margin-top: 12px; }
+      .names { gap: 6px; grid-template-columns: repeat(auto-fill, minmax(9.5rem, 1fr)); }
       .names button[data-persona] { min-height: 44px; padding: 8px 12px; font-weight: 600; }
       button:focus-visible, textarea:focus-visible, input:focus-visible { outline: 3px solid var(--mark); outline-offset: 2px; }
       .name { display: block; font-weight: 600; }
@@ -152,8 +152,7 @@ ${buttons}
     <main>
       <h1>Mock bank</h1>
       <p class="warning">
-        This stands in for bank identification on a developer's machine. Nobody here is a person:
-        every code on this page is artificial.
+        Not a bank, and nobody here is a person: every code on this page is artificial.
       </p>
       <section aria-labelledby="group-names">
         <h2 id="group-names">Sign in as</h2>

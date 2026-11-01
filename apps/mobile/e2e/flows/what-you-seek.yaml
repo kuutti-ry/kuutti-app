@@ -3,16 +3,16 @@
 # screen with no Save button, and the deal-breakers keep theirs. A change is
 # kept by going back and read again on the way in, as often as one wishes. The
 # only gender chosen stays chosen and says why, and what one is here for changes
-# and never clears. Elina seeks men aged 35 to 48 for something long-term, and
-# no other flow reads that; the flow ends as it began. A run that stops half-way
-# leaves a change: `pnpm demo:reset` puts her back.
+# and never clears. Ritva seeks men aged 60 to 72 for something long-term, and
+# she is this flow's alone; it ends as it began. A run that stops half-way leaves
+# a change: `pnpm demo:reset` puts her back.
 appId: fi.kuutti.app
 name: What you seek lists whom, the ages, why and the deal-breakers, and each change is kept by going back
 ---
 - runFlow:
     file: ../common/sign-in.yaml
     env:
-      PERSONA: Elina Järvinen
+      PERSONA: Ritva Lahtinen
 - openLink: kuutti://profile
 - extendedWaitUntil:
     visible: "(The basics|Perustiedot|Grunderna)(, .*)?"
@@ -75,12 +75,12 @@ name: What you seek lists whom, the ages, why and the deal-breakers, and each ch
 # The ages: a year at a time, kept by going back.
 - tapOn: "(What ages\\?|Minkä ikäisiä\\?|Vilka åldrar\\?)(, .*)?"
 - extendedWaitUntil:
-    visible: "35"
+    visible: "60"
     timeout: 15000
-- assertVisible: "48"
+- assertVisible: "72"
 - waitForAnimationToEnd
 - tapOn: "Youngest, one year older|Nuorin, vuotta vanhempi|Yngsta, ett år äldre"
-- assertVisible: "36"
+- assertVisible: "61"
 - tapOn: "Back to what you seek|Takaisin siihen, mitä etsit|Tillbaka till vad du söker"
 - extendedWaitUntil:
     visible: "These work both ways.*|Nämä toimivat molempiin suuntiin.*|De här gäller åt båda håll.*"
@@ -88,11 +88,11 @@ name: What you seek lists whom, the ages, why and the deal-breakers, and each ch
 - waitForAnimationToEnd
 - tapOn: "(What ages\\?|Minkä ikäisiä\\?|Vilka åldrar\\?)(, .*)?"
 - extendedWaitUntil:
-    visible: "36"
+    visible: "61"
     timeout: 15000
 - waitForAnimationToEnd
 - tapOn: "Youngest, one year younger|Nuorin, vuotta nuorempi|Yngsta, ett år yngre"
-- assertVisible: "35"
+- assertVisible: "60"
 - tapOn: "Back to what you seek|Takaisin siihen, mitä etsit|Tillbaka till vad du söker"
 - extendedWaitUntil:
     visible: "These work both ways.*|Nämä toimivat molempiin suuntiin.*|De här gäller åt båda håll.*"

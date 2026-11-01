@@ -1,7 +1,7 @@
 import { checkCharacter } from "@kuutti-ry/tunnistus-oidc/hetu";
 
 /**
- * The people of the mock bank (#73, #140, ADR-014): twenty-four named persons the
+ * The people of the mock bank (#73, #140, ADR-014): twenty-five named persons the
  * local identity provider can log in as with one tap, so that a demo or a
  * test of the first ten minutes does not start with typing claims into a
  * form. The whole product path runs for them as for anybody: the OIDC
@@ -16,14 +16,15 @@ import { checkCharacter } from "@kuutti-ry/tunnistus-oidc/hetu";
  * broker sends it, and is stored nowhere; what the app calls the persona is
  * the display name the story gives.
  *
- * Eleven more are born on a fixed day and exist at the mock bank only: Antti
+ * Twelve more are born on a fixed day and exist at the mock bank only: Antti
  * and Ville, the pair of the chat's flows (#348, #101), Elina and Jussi, the
  * pair of the contact share's flow (#103), and Laura and Emmi, the pair of
  * the report's flow (#351), each pair with a conversation of its own so that
  * no flow changes what another reads; and the round's cast (#379): Iida, as
  * whom the round's flow signs in, and the four people of her round, Henna,
  * Katja, Minna and Riikka, who are cards and nothing more: no flow and no
- * demo signs in as them. Every test user of the bed whose code the
+ * demo signs in as them; and Ritva, What you seek's (#542), whose answers that
+ * flow changes and puts back, which no other flow reads. Every test user of the bed whose code the
  * product's parser accepts is a persona already (docs/vendors/telia.md 1.4),
  * so nobody signs in as them on staging (the maintainer's choices of
  * 17/10/2026 and 18/10/2026, ADR-014 §4); their stories are given there as
@@ -281,6 +282,16 @@ export const DEMO_PERSONAS: readonly DemoPersona[] = [
     individual: 972,
     group: "cards",
     note: "A card in Iida's round.",
+  },
+  // What you seek's (#542): in nobody's pool, so its flow changes what nothing else reads.
+  {
+    key: "ritva",
+    given: "Ritva",
+    family: "Lahtinen",
+    born: { year: 1964, month: 5, day: 14 },
+    individual: 974,
+    group: "history",
+    note: "Onboarded without photos, in nobody's pool: the flow of What you seek changes what she seeks and puts it back (#542).",
   },
   {
     key: "eetu",

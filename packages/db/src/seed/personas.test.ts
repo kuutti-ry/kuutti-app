@@ -34,14 +34,14 @@ const persona = (key: string) => {
 };
 
 describe("the personas of the mock bank", () => {
-  it("are twenty-four, each with a name of its own and an artificial code", () => {
-    expect(DEMO_PERSONAS).toHaveLength(24);
-    expect(new Set(DEMO_PERSONAS.map((p) => p.key)).size).toBe(24);
-    expect(new Set(DEMO_PERSONAS.map((p) => p.individual)).size).toBe(24);
+  it("are twenty-five, each with a name of its own and an artificial code", () => {
+    expect(DEMO_PERSONAS).toHaveLength(25);
+    expect(new Set(DEMO_PERSONAS.map((p) => p.key)).size).toBe(25);
+    expect(new Set(DEMO_PERSONAS.map((p) => p.individual)).size).toBe(25);
     // A name of its own: a flow finds the persona's button by the name, and
     // the chat's and the round's flows find the other person by the given name.
-    expect(new Set(DEMO_PERSONAS.map((p) => p.given)).size).toBe(24);
-    expect(new Set(DEMO_PERSONAS.map((p) => `${p.given} ${p.family}`)).size).toBe(24);
+    expect(new Set(DEMO_PERSONAS.map((p) => p.given)).size).toBe(25);
+    expect(new Set(DEMO_PERSONAS.map((p) => `${p.given} ${p.family}`)).size).toBe(25);
     for (const p of DEMO_PERSONAS) {
       expect(p.key).toMatch(/^[a-z]+$/);
       // 900 to 999: never given to a person.
@@ -88,8 +88,8 @@ describe("the personas of the mock bank", () => {
     }
     // The rest are the mock bank's alone: the ages, the three pairs of the
     // conversations, the chat's (#348), the contact share's (#103) and the
-    // report's (#351), and the round's cast (#379), for whom the bed has no
-    // test user left.
+    // report's (#351), the round's cast (#379), and What you seek's (#542), for
+    // whom the bed has no test user left.
     const mockOnly = DEMO_PERSONAS.filter((p) => p.bank === undefined).map((p) => p.key);
     expect(mockOnly).toEqual([
       "antti",
@@ -103,6 +103,7 @@ describe("the personas of the mock bank", () => {
       "katja",
       "minna",
       "riikka",
+      "ritva",
       "eetu",
       "venla",
       "lauri",
@@ -120,6 +121,7 @@ describe("the personas of the mock bank", () => {
       "katja",
       "minna",
       "riikka",
+      "ritva",
     ]) {
       expect(hasFixedIdentity(persona(key)), key).toBe(true);
       expect(Object.values(bed), key).not.toContain(personaHetu(persona(key), DAYS[0] as Date));
@@ -204,8 +206,8 @@ describe("the login page of the mock bank", () => {
     expect(names).toBeGreaterThan(-1);
     expect(names).toBeLessThan(cards);
     const listed = DEMO_PERSONAS.filter((p) => p.group !== "cards");
-    // Two columns on a phone hold twenty names (bank-page.ts).
-    expect(listed.length).toBeLessThanOrEqual(20);
+    // Two columns on a phone hold twenty-one names (bank-page.ts).
+    expect(listed.length).toBeLessThanOrEqual(21);
     for (const p of listed) {
       const short = `<button type="button" data-persona="${p.key}">${p.given} ${p.family}</button>`;
       // The first button a selector by the name finds is the short one.

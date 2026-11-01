@@ -1,12 +1,12 @@
 /**
- * Returns the twenty-four personas to where they begin (#73, ADR-014 §12; on
+ * Returns the twenty-five personas to where they begin (#73, ADR-014 §12; on
  * staging #141, ADR-018): everybody erased through the erasure path and
- * forgotten, then the eighteen with a history given it anew, with their
+ * forgotten, then the nineteen with a history given it anew, with their
  * conversations (#348) and, once the ponds are open, Iida's round for the day
  * (#379).
  *
  *   pnpm demo:reset                  reset, then the histories
- *   pnpm demo:reset -- --bare        reset only: all twenty-four are newcomers
+ *   pnpm demo:reset -- --bare        reset only: all twenty-five are newcomers
  *   pnpm demo:reset -- --api http://localhost:3000
  *   pnpm demo:reset -- --objects-lost   although the store does not hold the photos
  *   node dist/demo-reset.js --env staging   inside the API's container on staging
