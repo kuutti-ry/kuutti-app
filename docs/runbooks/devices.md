@@ -13,7 +13,7 @@ Build links are on the project's builds page on expo.dev (`apps/mobile/README.md
 gh workflow run eas-build.yml -f profile=preview -f platform=android
 ```
 
-Each build counts against Expo's free tier (30 a month, at most 15 iOS). Every profile uploads its source maps to Sentry during the build (`docs/runbooks/sentry-setup.md`): a build without readable stack traces fails, it does not ship.
+Each build counts against Expo's free tier (30 a month, at most 15 iOS). Every profile uploads its source maps to Sentry during the build (`docs/runbooks/sentry-setup.md`). A build of the `production` environment without them fails and does not ship. A build of the `preview` environment (development, preview, staging) goes on without them since 2026-11-02, when Sentry's gateway answered the upload with a 504 and failed two iOS staging builds in a row: EAS's `preview` environment holds `SENTRY_ALLOW_FAILURE=true`, the maintainer's choice. Such a build says `warning: sentry-cli` in its Xcode or Gradle log, and its stack traces are unreadable in Sentry.
 
 ## Android (any phone, no cable needed)
 
