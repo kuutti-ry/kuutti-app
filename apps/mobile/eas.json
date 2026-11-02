@@ -34,12 +34,7 @@
   "submit": {
     "staging": {
       "android": { "track": "internal", "releaseStatus": "completed" },
-      "ios": {
-        "appleTeamId": "2NC5W5B372",
-        "appName": "Kuutti",
-        "companyName": "Kuutti ry",
-        "language": "fin"
-      }
+      "ios": { "appleTeamId": "2NC5W5B372", "ascAppId": "6829809045" }
     },
     "production": {}
   }
