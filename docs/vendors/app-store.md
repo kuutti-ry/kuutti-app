@@ -63,6 +63,7 @@ The answers given to Google Play on 2026-11-01 (the listing, the content rating 
 
 ## When something goes wrong
 
+- **"You must specify a supported language", after the build has started:** EAS names languages its own way, Finnish as `fin`, not `fi` (2026-11-02, the first run). Correct `language` in the submit profile, then submit the build that is already running once it has finished, with no new build: `eas submit --platform ios --profile staging --id <build id>`.
 - **"The bundle identifier … is not available":** `fi.kuutti.app` is still on the individual team (step 2), or another team registered it between steps 2 and 3. In the second case only Apple's support can help, and ADR-063 is reopened.
 - **CI's staging build fails at its submission with "Set ascAppId in the submit profile":** `eas.json` has no `ascAppId` yet (step 3). Until it has, start the staging profile with `-f platform=android`.
 - **"App Store Connect API Keys cannot be set up in --non-interactive mode":** no key is assigned to the app on EAS, so step 3 did not finish. The build ran anyway: `eas submit --platform ios --profile staging --id <build id>` in `apps/mobile`, interactive, sets the key up and submits it.
