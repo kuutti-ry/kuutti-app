@@ -53,6 +53,7 @@ Apple's and Expo's side, as read on 2026-11-02 in Apple's and Expo's documents, 
 2. When people outside the team may test, through external testing (ADR-004 §4, #560).
 3. The App Store Connect credential for production (point 6).
 4. Whether the push key becomes one held to `fi.kuutti.app` and its environment, once Expo says its push service takes it.
+5. The app's name on the App Store. "Kuutti" is held by another developer's record that is on sale nowhere, and it is no registered trademark (`TRADEMARKS.md`), so Apple's route for a name dispute is closed. The record carries EAS's placeholder, "Kuutti" with a random suffix, until the name is decided with the listing (#193; the maintainer, 2026-11-02).
 
 ## History
 
