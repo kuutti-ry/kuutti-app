@@ -34,7 +34,12 @@
   "submit": {
     "staging": {
       "android": { "track": "internal", "releaseStatus": "completed" },
-      "ios": { "appleTeamId": "2NC5W5B372", "appName": "Kuutti", "language": "fin" }
+      "ios": {
+        "appleTeamId": "2NC5W5B372",
+        "appName": "Kuutti",
+        "companyName": "Kuutti ry",
+        "language": "fin"
+      }
     },
     "production": {}
   }
