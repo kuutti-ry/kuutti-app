@@ -54,8 +54,9 @@ None of this is needed for internal testing. External testing (ADR-063, Open 2) 
 
 The App Store needs, besides:
 
-- the listing, in English (U.K.) alone for now (ADR-063, Open 5): the name (at most 30 characters), subtitle (30), description, keywords (100) and screenshots, of which the texts are in place since 2026-11-02; the support, marketing and privacy policy addresses; a category, since Apple has no Dating category;
-- the age rating questionnaire, for 18+, and the App Privacy answers;
+- in place since 2026-11-02, written through the App Store Connect API: the listing's texts in English (U.K.) alone (ADR-063, Open 5); the categories Lifestyle and Social Networking (Apple has no Dating category); the age rating questionnaire, with Apple's override at 18+; content rights, third-party content the association may show (people's own photos and texts, the terms' section 5); free; available in every country but China mainland, whose App Store asks for an ICP filing number, the maintainer's choice that the bank login, not the country list, keeps Kuutti to Finland; the copyright line, 2026 Kuutti ry. Whether the app becomes available in countries Apple adds later is set on the website alone (Pricing and Availability), off for now;
+- screenshots;
+- the App Privacy answers, which Apple's API does not take: on the website, or through an Apple web sign-in;
 - the review contact and notes (#560);
 - under the EU's Digital Services Act, the association's answer whether it is a trader, whose address, phone number and e-mail Apple then shows on the product page;
 - the production build itself (ADR-063 §6).
