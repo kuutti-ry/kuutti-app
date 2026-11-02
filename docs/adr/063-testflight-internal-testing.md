@@ -33,7 +33,7 @@ Apple's and Expo's side, as read on 2026-11-02 in Apple's and Expo's documents, 
 - New long-lived credentials at Expo: the App Store Connect key and the new team's APNs key (`custody.md`, `rotation.md` section 15, `incident.md`). A leak of `EXPO_TOKEN` reaches the key's use too (section 10).
 - The move costs the phones on the old team's ad hoc builds their app until they reinstall, and pushes to those builds stop with the old team's key.
 - EAS's group invites every Admin of the team, so a second Admin made for custody (`custody.md`) is a tester too.
-- TestFlight shows the store version of `app.json`, `0.0.0`, until #184's native batch. Apple's rule asks for three integers and names no lower bound; whether it takes `0.0.0` is known at the first upload.
+- TestFlight shows the store version of `app.json`, `0.0.0`, until #184's native batch; Apple took it with the first upload.
 - Verified links (#184): the AASA names `2NC5W5B372` from the move on.
 
 ## Alternatives considered
@@ -59,3 +59,4 @@ Apple's and Expo's side, as read on 2026-11-02 in Apple's and Expo's documents, 
 
 - 2026-11-02: written with #193's Apple half. The same day the maintainer removed everything from the individual team but its one registered device: the App ID `fi.kuutti.app`, the certificates, the profiles and the keys (§4's deletion and §5's revocations, ahead of the first run on the new team). EAS's interactive run then registered `fi.kuutti.app` on the association's team and made its certificate and App Store profile, but failed twice to make the App Store Connect record: first on its own language code for Finnish (`fin`), then on the company name a team's first app needs and a name it reported as taken. The maintainer made the record in App Store Connect the same day: Kuutti, Apple ID 6829809045, SKU `kuutti-ios`, company name Kuutti ry, primary language English (U.S.), and its Apple ID became the submit profile's `ascAppId`. Two builds failed in Xcode the same day when Sentry answered an upload with a gateway timeout (504), the first at the source maps, the second at the native debug symbols.
 - 2026-11-02: the listing's texts went to App Store Connect through the App Store Connect API (the `asc` command-line tool, with a key of the maintainer's kept in his Keychain): English (U.K.) alone, as the primary language (Open 5).
+- 2026-11-02: build 4 (0.0.0), started from the branch with `--auto-submit`, passed Sentry's uploads, and EAS made the App Store Connect key with the App Manager role, submitted the build, and created the internal group "Team (Expo)" with automatic distribution. Apple took version 0.0.0. The maintainer installed it from TestFlight the same evening, through his personal Apple Account invited as a Marketing user of the team.

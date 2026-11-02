@@ -43,7 +43,7 @@ The App ID and every iOS build until 2026-11-02 are on the maintainer's individu
 6. **The team id of the verified links.** `/kuutti/<env>/ios-team-id` becomes `2NC5W5B372` in each environment where it is set (`devices.md`, Verified links), and the API is restarted. It matters once #184's native batch is installed.
 7. **The old team.** Once a tester has installed from TestFlight and a push has reached that phone: on the individual team, revoke the APNs key and the distribution certificate (Certificates, Identifiers & Profiles, Keys and Certificates) (ADR-063 §5).
 
-From then on every start of the `staging` profile reaches the internal group without a click: `gh workflow run eas-build.yml --ref main -f profile=staging`, or `-f platform=ios` for iOS alone. Start it at least every 90 days: a TestFlight build stops opening 90 days after its upload.
+On 2026-11-02 build 4 went this way, and the maintainer installed it from TestFlight that evening, with his personal Apple Account invited as a Marketing user of the team; Apple took the version 0.0.0. From then on every start of the `staging` profile reaches the internal group without a click: `gh workflow run eas-build.yml --ref main -f profile=staging`, or `-f platform=ios` for iOS alone. Start it at least every 90 days: a TestFlight build stops opening 90 days after its upload.
 
 ## Before external testing or the App Store (#193, #188)
 
@@ -71,7 +71,6 @@ The answers given to Google Play on 2026-11-01 (the listing, the content rating 
 - **"App Store Connect API Keys cannot be set up in --non-interactive mode":** no key is assigned to the app on EAS, so step 3 did not finish. The build ran anyway: `eas submit --platform ios --profile staging --id <build id>` in `apps/mobile`, interactive, sets the key up and submits it.
 - **A development or preview build fails at its profile** after the move: no device is registered on the new team, or the ad hoc profile was not made there (step 4).
 - **A build waits with "Missing Compliance":** `app.json` answers the encryption question (`ITSAppUsesNonExemptEncryption`, false), so this means a build made without it.
-- **Apple refuses the upload over its version:** the store version of `app.json` is `0.0.0` until #184's native batch (ADR-063, Consequences), and that batch comes sooner if Apple insists.
 - **A tester sees no build:** the invitation as a user is not accepted (it lapses after three days), the tester is not in the group, Apple is still processing the build, or the build is older than 90 days.
 - **No push reaches an iPhone after the move:** EAS has no APNs key of the new team (`eas credentials -p ios`, Push Notifications).
 - **A bad build:** App Store Connect, TestFlight, the build, Expire Build; the next staging build replaces it. A bad JavaScript update is stopped at EAS, not here (ADR-004, `docs/runbooks/incident.md`).
