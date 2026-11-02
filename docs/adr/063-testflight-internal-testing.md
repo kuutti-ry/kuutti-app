@@ -1,0 +1,59 @@
+# ADR-063: TestFlight: the staging app on internal testing, for the team
+
+- Status: proposed (#193, written on 2026-11-02, the day Apple approved the association's membership, and on the maintainer's answer of that day: internal testing, for the team alone; the profile, the submission and the runbooks built as written here; the move of `fi.kuutti.app`, the first interactive run and the testers are the maintainer's, and so is accepting it)
+- Date: 2026-11-02
+- Follows: TD-2 (Expo and EAS as the native shell and the update channel), TD-4 (the accounts belong to the association), ADR-004 §3 and §4 (write access is the trust of the staging channel; signing returns before a production build reaches people outside the team), ADR-018 (staging holds test persons only), ADR-049 (production has no bank identification yet), ADR-055 (push through Expo), ADR-057 (the same for Google Play), CLAUDE.md (GitHub Actions reach clouds by OIDC only); issues #193, #184, #188, #299, #560
+
+## Context
+
+On 2026-11-02 Apple approved the association's membership of the Apple Developer Program: an organisation, Kuutti ry, team `2NC5W5B372`, its annual fee waived, the maintainer's Apple Account at the association's address its Account Holder. Until then every iOS build was signed on the maintainer's individual membership of 2026-09-20, team `HM4J7X495K`, where EAS registered the explicit App ID `fi.kuutti.app` and made the ad hoc profiles of the development and preview builds; nothing was ever uploaded to App Store Connect there. ADR-057 took the staging app to Google Play's internal testing track and left iOS until the association's Apple account could take it to TestFlight. The production app waits for the reasons it waits on Play (ADR-057, Context): the release gate, no bank identification in production, unsigned updates.
+
+Apple's and Expo's side, as read on 2026-11-02 in Apple's and Expo's documents, eas-cli's source and Apple's forums (sources in `docs/vendors/app-store.md`):
+
+- **Moving an app.** Apple transfers an app between teams only once a version of it has been released on the App Store, which `fi.kuutti.app` never was. An App ID can be deleted by its team's Account Holder or an Admin unless a build was uploaded to App Store Connect with it, and every provisioning profile that contains it becomes invalid. Apple's engineers say on its forums that another team can then register the identifier, so whoever registers first has it; Apple documents no wait.
+- **Internal testing.** Up to 100 testers, each a user of the team in App Store Connect with the Account Holder, Admin, App Manager, Developer or Marketing role; the last three can be limited to chosen apps. An internal group can take every new build automatically, Apple reviews nothing, and a build can be tested for 90 days. A tester needs the TestFlight app and accepts an e-mail invitation. External testing, by e-mail or by a public link, goes through Apple's review and needs the app's test information.
+- **What TestFlight collects.** From every tester's phone, crash logs and usage data, with no way to opt out; Apple shows the developer each tester's name and address, installs, sessions, device model, system version and symbolicated crash logs. Screenshots and comments only when a tester sends feedback, which a group can switch off.
+- **The upload.** EAS Submit uploads with an App Store Connect API key that EAS holds per Apple team and assigns to the app. Only the Account Holder or an Admin can make one, after the Account Holder has requested access to the API, which Apple grants case by case. A team key reaches every app of the team with its role, and neither can be changed afterwards; only a user's own key is held to that user's apps. EAS makes the key in an interactive run, with the Admin role or, as its least privilege, App Manager. App Manager may create app records and versions, submit apps for review, edit the App Store details and the price, and manage TestFlight's groups and testers; Developer may upload builds and manage internal groups, not submit apps. A revoked key cannot be reinstated, and Apple names no expiry.
+- **CI.** Without `ascAppId` in the submit profile a non-interactive submission fails. EAS creates the app record only in an interactive run with an Apple Account, since Apple's API cannot create apps; if the name is taken it appends a random suffix without asking. Whenever the app has no TestFlight group, EAS creates the internal group "Team (Expo)", which takes every build, and invites the team's Admins to it.
+- **Push.** An APNs key belongs to one team. Since February 2025 Apple also makes keys held to one environment or to chosen apps; EAS makes the older kind, which serves both environments, and Expo does not say whether its push service takes the new kinds.
+
+## Decision
+
+1. **The staging app goes to TestFlight beside Play.** The `staging` profile builds both platforms when the maintainer starts it; `--auto-submit` gives the iOS build to the submit profile `staging`, whose `ios` entry names the team, the app (`ascAppId`) and, for the record's creation, its name and Finnish as its primary language (TD-17), and EAS uploads the build once it is built. EAS counts the build number (`autoIncrement`, remote). The release gate does not run. ADR-057 §1's "for Android alone" ends here.
+2. **Internal testing, for the team alone** (the maintainer, 2026-11-02). One internal group with automatic distribution, the "Team (Expo)" group EAS makes at the first submission, holds the people who may run the staging channel's unsigned updates today (ADR-004 §3), the people of Play's list. Each is a user of the association's team with the Developer or Marketing role, limited to Kuutti. No external group and no public link while ADR-004 §4 is open, and not before Apple's reviewers have a way in (#560): a public link reaches whoever it is passed to.
+3. **EAS submits, with an App Store Connect API key that only EAS holds.** EAS makes it in the maintainer's first interactive run, with the App Manager role, and it lives in EAS's credentials of the association's team, with no copy. As with Play's key, EAS uses it for any holder of `EXPO_TOKEN`, so its trust is write access (ADR-004 §3): through EAS it uploads a build signed with the team's distribution certificate, which every cloud build is handed, and the internal group's automatic distribution takes that build to the team's phones, as the update path already can. Unlike Play's account the key cannot be held to one app or to testing. On its own it could create versions, submit them for Apple's review, change the listing and the price, and manage testers, for every app of the team. Two things bound that: the team holds Kuutti's app alone, and nothing reaches the App Store without a version that Apple has reviewed and approved, while EAS Submit itself only uploads builds and sets up TestFlight. The credential is decided again before production is submitted (point 6).
+4. **`fi.kuutti.app` moves to the association's team, not by transfer.** The maintainer deletes the App ID on `HM4J7X495K` and registers it at once on `2NC5W5B372` through the first interactive run of point 3, with no native merge between the two, since CI builds iOS on every native change and would fail without credentials on the new team; or with `EAS_PLATFORMS` set to `android` for the switch. EAS then makes on the new team the distribution certificate, the App Store and ad hoc profiles and an APNs key; the devices of the ad hoc builds are registered again; and `IOS_TEAM_ID` becomes `2NC5W5B372` in each environment. The bundle identifier, the EAS project and the native fingerprint do not change, since the team is not in `app.json`. The old team's development and preview builds are expected to stop opening once their profiles are invalid, and their phones take the app from TestFlight or a new development build.
+5. **The individual team keeps nothing of Kuutti.** Its APNs key and distribution certificate are revoked once the new team's are in use. Whether the membership is renewed on 2027-09-20 is the maintainer's (Open 1).
+6. **Production builds are not submitted yet.** As ADR-057 §7: not before ADR-004 §4 is settled, the release gate passes, production has bank identification, and #188's App Store side and #560's way in for Apple's reviewers exist. The App Store Connect credential is decided again then.
+
+## Consequences
+
+- Apple receives each build EAS uploads, the testers' names and Apple Accounts, from their phones crash logs and usage data that nobody can switch off, and feedback with screenshots when a tester sends it (`docs/vendors/app-store.md`). The app adds no Apple library of its own for it.
+- Each staging build is one of the free tier's 15 iOS builds a month, and a build stops opening for the testers 90 days after its upload: the staging profile is started again before then, or the team's iPhones are without the app.
+- New long-lived credentials at Expo: the App Store Connect key and the new team's APNs key (`custody.md`, `rotation.md` section 15, `incident.md`). A leak of `EXPO_TOKEN` reaches the key's use too (section 10).
+- The move costs the phones on the old team's ad hoc builds their app until they reinstall, and pushes to those builds stop with the old team's key.
+- EAS's group invites every Admin of the team, so a second Admin made for custody (`custody.md`) is a tester too.
+- TestFlight shows the store version of `app.json`, `0.0.0`, until #184's native batch. Apple's rule asks for three integers and names no lower bound; whether it takes `0.0.0` is known at the first upload.
+- Verified links (#184): the AASA names `2NC5W5B372` from the move on.
+
+## Alternatives considered
+
+- **Transferring the app**: Apple's criteria need a release first.
+- **TestFlight on the individual team**: the accounts belong to the association (TD-4), the maintainer's own name would be the seller, and the app would still have to move by transfer after its first release.
+- **A second bundle identifier on the new team**: no deletion and no window in which another team could take the identifier, but Apple would see two apps, the bank's return, verified links (#184) and push would serve two identifiers, and `fi.kuutti.app` would stay on the individual team.
+- **External testing with a public link**, which the maintainer asked about first: whoever gets the link installs an app that runs the staging channel's unsigned updates (ADR-004 §4), and Apple's review of each version needs a way in that does not exist yet (#560).
+- **Ad hoc builds only, as before**: 100 devices a year per team, a registration and a new build for each phone.
+- **An upload from GitHub Actions**: App Store Connect takes no OIDC token, so a key would sit in a GitHub secret, against CLAUDE.md's rule that CI reaches clouds by OIDC alone, while EAS already holds the build.
+- **The Developer role**: the least that uploads, but EAS does not offer it, and Apple's documents leave open whether it covers EAS's TestFlight steps after the upload.
+- **Admin, EAS's default**: adds the team's users, its keys and the removal of apps to what a leaked key gives.
+
+## Open, the maintainer's
+
+1. Whether the individual membership is renewed on 2027-09-20, once nothing of Kuutti is on it.
+2. When people outside the team may test, through external testing (ADR-004 §4, #560).
+3. The App Store Connect credential for production (point 6).
+4. Whether the push key becomes one held to `fi.kuutti.app` and its environment, once Expo says its push service takes it.
+
+## History
+
+- 2026-11-02: written with #193's Apple half. The same day the maintainer removed everything from the individual team but its one registered device: the App ID `fi.kuutti.app`, the certificates, the profiles and the keys (§4's deletion and §5's revocations, ahead of the first run on the new team).

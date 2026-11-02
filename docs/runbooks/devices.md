@@ -25,14 +25,14 @@ With a cable instead (useful for logs): Settings, About phone, tap the MIUI or O
 
 ## iPhone
 
-Needs the paid Apple Developer membership (done 2026-09-20). Apple allows ad hoc installs only on registered devices, 100 a year.
+For the development and preview builds, which install ad hoc. The staging app needs none of this: it comes from TestFlight to the team's Apple Accounts (`docs/vendors/app-store.md`). Builds are signed on the association's Apple team, Kuutti ry (`2NC5W5B372`, since 2026-11-02; until `fi.kuutti.app` moves there, the maintainer's individual team `HM4J7X495K`, ADR-063 §4). Apple allows ad hoc installs only on registered devices, 100 a year per team, so a phone registered on the old team is registered again on the new one.
 
 1. **On the iPhone:** Settings, Privacy & Security, **Developer Mode**, on; the phone restarts. Without it an internal build installs but will not open.
 2. **Register the phone**, on the Mac, as the Expo admin member (never the owner login):
    ```sh
    cd apps/mobile && pnpm exec eas device:create
    ```
-   Choose the Apple team, then "Website": it prints a URL and a QR code. Open it on the iPhone, install the profile it offers (Settings, Profile Downloaded, Install). The device now shows under `eas device:list`.
+   Choose the Apple team Kuutti ry, then "Website": it prints a URL and a QR code. Open it on the iPhone, install the profile it offers (Settings, Profile Downloaded, Install). The device now shows under `eas device:list`.
 3. **First build, interactive, once.** EAS creates and keeps the distribution certificate and the ad hoc provisioning profile; nothing lands in the repository:
    ```sh
    pnpm exec eas build --profile preview --platform ios
@@ -45,7 +45,7 @@ Needs the paid Apple Developer membership (done 2026-09-20). Apple allows ad hoc
    ```
    A new device later means `eas device:create` again and one more build: the profile lists devices at build time.
 
-Push notification credentials (`eas credentials`: FCM service account, APNs key) can wait for push (#102); uploading them now saves a native rebuild then.
+Push notification credentials (`eas credentials`: FCM service account, APNs key) are needed since push (#102); an APNs key belongs to one Apple team, so the move to the association's team makes a new one (`docs/vendors/app-store.md`, step 3).
 
 ## The dev client against your Mac
 
@@ -60,7 +60,7 @@ Phone and Mac on the same network. `pnpm env:up` on the Mac; open the `developme
 The bank login returns to the app by deep link. Today that link is the custom scheme `kuutti://auth?code=…`, which both platforms open in the app without a dialog (iOS through the scheme, Android through the intent filter Expo derives from `scheme`). The https form `https://api.<env>.kuutti.app/auth/return?code=…` needs verified links, which are a native change (`ios.associatedDomains` and `android.intentFilters` with `autoVerify` in `app.json`): batch it with the next fingerprint move (#184). The API already serves the two files from configuration:
 
 - `https://api.<env>.kuutti.app/.well-known/assetlinks.json` from `ANDROID_CERT_FINGERPRINTS`. The fingerprint is the release keystore's SHA-256: `eas credentials --platform android` prints it under the keystore. List the `development` and the `preview` build's fingerprints while they differ, and for the copy installed from Google Play its three app signing fingerprints (`docs/vendors/google-play.md`, step 8), comma separated.
-- `https://api.<env>.kuutti.app/.well-known/apple-app-site-association` from `IOS_TEAM_ID` (`HM4J7X495K`).
+- `https://api.<env>.kuutti.app/.well-known/apple-app-site-association` from `IOS_TEAM_ID`: the association's team `2NC5W5B372` once `fi.kuutti.app` has moved there (ADR-063 §4), the individual team `HM4J7X495K` before.
 
 Both are SSM parameters of those names under `/kuutti/<env>/` (plain String; the values are public). Until they are set the files answer 404 and nothing else changes.
 

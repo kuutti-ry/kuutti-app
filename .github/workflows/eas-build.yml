@@ -10,9 +10,11 @@ name: EAS build
 # (https://expo.dev/accounts/kuutti/projects/kuutti/builds); a repository
 # variable EAS_BUILDS_ISSUE, if set, mirrors them onto that issue as well.
 # EAS_ENABLED switches this on. By hand only, the staging profile: the staging
-# app as an Android app bundle, which EAS submits to Google Play's internal
-# testing track once it is built (ADR-057, #193); EAS holds the Play service
-# account's key, so no GitHub environment holds a Google credential.
+# app as an Android app bundle and an iOS archive, which EAS submits to Google
+# Play's internal testing track and to TestFlight's internal testing once they
+# are built (ADR-057, ADR-063, #193); EAS holds the Play service account's key
+# and the App Store Connect API key, so no GitHub environment holds a Google or
+# an Apple credential.
 
 on:
   push:
@@ -97,9 +99,6 @@ jobs:
           platform=all
           if [ "$EVENT" = workflow_dispatch ]; then
             profiles="$INPUT_PROFILE"; platform="$INPUT_PLATFORM"
-            # Android's alone until the association's Apple account can take
-            # the staging app to TestFlight (#193).
-            if [ "$profiles" = staging ]; then platform=android; fi
           elif [ "$IS_TAG" = true ]; then
             profiles="production"
           else
@@ -200,7 +199,7 @@ jobs:
               jq -r --arg profile "$profile" --arg project "$project" \
                 'select(.profile == $profile) | "| \(.platform | ascii_downcase) | https://expo.dev/projects/\($project)/builds/\(.id) |"' "$RUNNER_TEMP/builds.json"
               echo
-              echo "<sub>Android: install the APK from the build page. iOS: registered devices only (apps/mobile/README.md). Started by [this run]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID).</sub>"
+              echo "<sub>Android: install the APK from the build page. iOS: registered devices only (apps/mobile/README.md). The staging builds go to Play and TestFlight instead. Started by [this run]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID).</sub>"
             } > "$body"
             MARKER="eas-builds-$profile" BODY_FILE="$body" .github/scripts/sticky-comment.sh
           done
