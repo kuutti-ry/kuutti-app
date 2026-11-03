@@ -64,7 +64,7 @@ describe("the tables", () => {
       // "Löysin hänet": a count by day and reason, naming nobody (#83, ADR-040).
       "found_them_count",
       "identity",
-      // An invitation, and the units it earned its inviter (#107, ADR-044).
+      // An invitation, and the units it earned its two (#107, #503, ADR-044).
       "invitation",
       "matching_config",
       "message",
@@ -183,7 +183,7 @@ describe("the foreign keys", () => {
       "contact_share.conversation_id -> conversation.id cascade",
       "conversation_participant.conversation_id -> conversation.id cascade",
       "message.conversation_id -> conversation.id cascade",
-      // A counted invitation's notice goes with its invitation (#107).
+      // A counted invitation's notice, either side's, goes with its invitation (#107, #503).
       "notice.invitation_id -> invitation.id cascade",
       // A warning's notice goes with its warning (#176).
       "notice.sanction_id -> sanction.id cascade",

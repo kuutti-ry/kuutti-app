@@ -736,6 +736,20 @@
       "when": 1793553497041,
       "tag": "0104_queue_config",
       "breakpoints": true
+    },
+    {
+      "idx": 105,
+      "version": "7",
+      "when": 1793709851167,
+      "tag": "0105_like_economy",
+      "breakpoints": true
+    },
+    {
+      "idx": 106,
+      "version": "7",
+      "when": 1793709851969,
+      "tag": "0106_reward_fish_alone",
+      "breakpoints": true
     }
   ]
 }

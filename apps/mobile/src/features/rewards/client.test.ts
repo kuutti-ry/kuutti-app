@@ -15,10 +15,10 @@ const ID = "7a1c1c4e-9a8e-4a0b-9c3a-0c8d1e2f3a01";
 const INVITATIONS = {
   canInvite: true,
   redeemable: false,
-  reward: { fish: 1, likes: 0 },
+  reward: { inviterFish: 1, friendFish: 1 },
   open: [{ id: ID, createdAt: "2026-10-22T09:00:00.000Z" }],
   counted: 2,
-  earned: { fish: 1, likes: 0 },
+  earned: { fish: 1 },
 };
 
 function answering(...answers: Response[]) {
@@ -58,6 +58,11 @@ describe("the invitations client", () => {
 
   it("refuses an answer its contract does not hold, such as a code in the list", async () => {
     answering(json({ ...INVITATIONS, open: "ABCDE-FGHJK" }));
+    await expect(fetchInvitations()).rejects.toThrow();
+  });
+
+  it("refuses a reward in the shape it had before #503", async () => {
+    answering(json({ ...INVITATIONS, reward: { fish: 1, likes: 0 } }));
     await expect(fetchInvitations()).rejects.toThrow();
   });
 

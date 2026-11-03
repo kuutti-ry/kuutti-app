@@ -9,6 +9,7 @@ import {
   type Gender,
   type HomeSummary,
   type HomeUpdate,
+  type InvitationReward,
   type OnboardingStatus,
   PROFILE_FIELDS,
   type ProfileFields,
@@ -186,6 +187,7 @@ export function OnboardingScreen() {
   const { state, busy, failed, failedCode, reload, step } = useOnboarding();
   const profile = useProfile();
   const [invitation, setInvitation] = useState<InvitationOffer>("unasked");
+  const [invitationReward, setInvitationReward] = useState<InvitationReward | null>(null);
   const [seeks, setSeeks] = useState<Gender[] | null>(null);
   const [seeksHeld, setSeeksHeld] = useState(false);
   const [labelPending, setLabelPending] = useState(false);
@@ -203,7 +205,11 @@ export function OnboardingScreen() {
     if (current !== "invitation" || invitation !== "unasked") return;
     let live = true;
     fetchInvitations()
-      .then((answer) => live && setInvitation(answer.redeemable ? "offered" : "done"))
+      .then((answer) => {
+        if (!live) return;
+        setInvitationReward(answer.reward);
+        setInvitation(answer.redeemable ? "offered" : "done");
+      })
       .catch(() => live && setInvitation("done"));
     return () => {
       live = false;
@@ -360,8 +366,8 @@ export function OnboardingScreen() {
         )}
 
         {current === "invitation" &&
-          (invitation === "offered" ? (
-            <InvitationStep onDone={() => setInvitation("done")} />
+          (invitation === "offered" && invitationReward ? (
+            <InvitationStep reward={invitationReward} onDone={() => setInvitation("done")} />
           ) : (
             <Text accessibilityLiveRegion="polite">{t("onboarding.loading")}</Text>
           ))}

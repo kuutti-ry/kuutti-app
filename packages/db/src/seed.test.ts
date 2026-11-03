@@ -41,8 +41,6 @@ describe("seed", () => {
         // The decisions log numbers, read back from the database.
         expect(byKey).toEqual({
           like_budget_balanced: 12,
-          like_budget_contested: 5,
-          contest_ratio_threshold: 1.5,
           like_expiry_days: 14,
           pass_cooldown_days: 90,
           silent_match_archive_days: 7,
@@ -132,7 +130,8 @@ describe("seed", () => {
           inbox_stop: 30,
         });
         expect(byKey).toEqual(MATCHING_CONFIG_V1);
-        // Version 2 wins over version 1: ten likes a day (#98, ADR-036), a pass of thirty days, and no ceiling on cards with the cards alarm on (ADR-062 §6, §9).
+        // Version 2 wins over version 1: ten likes a day (#98, ADR-036), a pass of thirty days, no ceiling on cards
+        // with the cards alarm on (ADR-062 §6, §9), and the invited friend's fish, in the reward's new shape (#503, ADR-044 §4).
         const later = Object.fromEntries(
           config.rows.filter((r) => r.version === 2).map((r) => [r.key, r.value]),
         );
@@ -145,6 +144,7 @@ describe("seed", () => {
           photo_fetches_per_day: { thumb: 600, card: 0, full: 60 },
           auto_shadow_ban_cards_served: 300,
           auto_shadow_ban_cards_served_minutes: 10,
+          invitation_reward: { inviterFish: 1, friendFish: 1 },
         });
         expect(later).toEqual(MATCHING_CONFIG_V2);
         // Version 3: the distance is a seventh deal-breaker (ADR-061 §7), and the photo alarm clears an honest reader (ADR-062 §9).

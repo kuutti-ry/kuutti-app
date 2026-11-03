@@ -1,6 +1,7 @@
 import { formatDateTime, type PlainMessageKey } from "@kuutti/i18n";
 import type {
   InvitationCreated,
+  InvitationReward,
   Invitations as InvitationsAnswer,
   OpenInvitation,
 } from "@kuutti/schema";
@@ -162,10 +163,10 @@ export function Invitations({
     }
   }, [listed, made]);
 
-  const shareCode = async (code: string) => {
+  const shareCode = async (code: string, reward: InvitationReward) => {
     tap();
     try {
-      await share({ message: t("invite.share.message", { code }) });
+      await share({ message: t("invite.share.message", { code, ...rewardParams(reward) }) });
     } catch {
       say("shareFailed");
     }
@@ -229,7 +230,7 @@ export function Invitations({
                 {made.code}
               </Text>
               <Text variant="muted">{t("settings.invite.code.once")}</Text>
-              <Button onPress={() => void shareCode(made.code)}>
+              <Button onPress={() => void shareCode(made.code, reward)}>
                 {t("settings.invite.share")}
               </Button>
             </View>
@@ -266,9 +267,6 @@ export function Invitations({
             {earned.fish > 0 && (
               <Text>{t("settings.invite.earned.fish", { fish: earned.fish })}</Text>
             )}
-            {earned.likes > 0 && (
-              <Text>{t("settings.invite.earned.likes", { likes: earned.likes })}</Text>
-            )}
           </View>
         </>
       ) : (
@@ -283,6 +281,9 @@ export function Invitations({
           ) : (
             <>
               <Text>{t("invite.redeem.explain")}</Text>
+              {reward.friendFish > 0 && (
+                <Text>{t("invite.redeem.earns", rewardParams(reward))}</Text>
+              )}
               <RedeemInvitation
                 onRedeemed={() => {
                   setRedeemed(true);

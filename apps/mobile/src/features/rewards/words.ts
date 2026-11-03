@@ -1,18 +1,20 @@
-/** Which kinds a reward holds, for the messages that word it (an ICU select): "none" falls to their other branch. */
-type RewardShape = "fish" | "likes" | "both" | "none";
+import type { InvitationReward } from "@kuutti/schema";
+
+/** Which of the two an invitation earns for, for the messages that word it (an ICU select): "none" falls to their other branch. */
+type RewardShape = "both" | "inviter" | "friend" | "none";
 
 /**
- * A reward's units as the arguments of the messages that say it
- * (`settings.invite.earns`, `notices.invitationCounted.body`): each says the
- * whole sentence for the kinds there are, so nothing is inflected around a
- * number (#107, ADR-044 §9). What an invitation earns today and what one
- * earned have the same shape.
+ * What an invitation earns as the arguments of the messages that say it
+ * (`settings.invite.earns`, `invite.redeem.earns`): each says the whole
+ * sentence for the sides there are, so nothing is inflected around a number
+ * (#107, ADR-044 §9, #503).
  */
-export function rewardParams({ fish, likes }: { fish: number; likes: number }): {
+export function rewardParams({ inviterFish, friendFish }: InvitationReward): {
   reward: RewardShape;
-  fish: number;
-  likes: number;
+  inviterFish: number;
+  friendFish: number;
 } {
-  const reward = fish > 0 ? (likes > 0 ? "both" : "fish") : likes > 0 ? "likes" : "none";
-  return { reward, fish, likes };
+  const reward =
+    inviterFish > 0 ? (friendFish > 0 ? "both" : "inviter") : friendFish > 0 ? "friend" : "none";
+  return { reward, inviterFish, friendFish };
 }

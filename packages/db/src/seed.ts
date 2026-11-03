@@ -22,8 +22,6 @@ export const SEED_PONDS = [
  */
 export const MATCHING_CONFIG_V1 = {
   like_budget_balanced: 12, // TD-14
-  like_budget_contested: 5, // TD-14
-  contest_ratio_threshold: 1.5, // TD-13, TD-14: above this, the contested budget applies
   like_expiry_days: 14, // TD-11
   pass_cooldown_days: 90, // TD-12
   silent_match_archive_days: 7, // TD-13
@@ -205,6 +203,9 @@ export const MATCHING_CONFIG_V2 = {
   photo_fetches_per_day: { thumb: 600, card: 0, full: 60 },
   auto_shadow_ban_cards_served: 300,
   auto_shadow_ban_cards_served_minutes: 10,
+  // #503 (ADR-044 §4, migration 0105): earned likes go and the invited friend
+  // earns a fish too, the maintainer's of 29/10 and 31/10/2026.
+  invitation_reward: { inviterFish: 1, friendFish: 1 },
 } as const;
 
 /**

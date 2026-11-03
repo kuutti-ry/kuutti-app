@@ -68,4 +68,4 @@ Feature: The fish, a like that says a little more
   Scenario: A fish on a card of somebody whose like waits is a like
     Given "B" liked "A" yesterday, and "B" is in "A"'s round today as liked you
     When "A" sends "B" a fish
-    Then it is recorded as a like, no fish is spent, and the two are a match
+    Then it is recorded as a like, no fish is spent, one of the day's likes is, and the two are a match

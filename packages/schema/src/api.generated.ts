@@ -3330,7 +3330,7 @@ export interface paths {
         };
         /**
          * The caller's invitations
-         * @description Whether the caller may invite (their profile is complete) and may still type a code, what an invitation earns today (matching_config invitation_reward), their open invitations newest first, how many of theirs have counted, and what those earned that is not used yet. Never a code, and nothing of anybody invited.
+         * @description Whether the caller may invite (their profile is complete) and may still type a code, what an invitation earns today (matching_config invitation_reward), their open invitations newest first, how many of theirs have counted, and what invitations earned them that is not used yet. Never a code, and nothing of anybody invited.
          */
         get: {
             parameters: {
@@ -3373,7 +3373,7 @@ export interface paths {
         put?: never;
         /**
          * Make an invitation
-         * @description A code for one friend, in two groups of five, shown here once: Kuutti keeps only its hash. For a caller whose profile is complete; at most matching_config invitations_open open at once. The night the friend's profile first passes the same test, the invitation counts and the caller earns matching_config invitation_reward.
+         * @description A code for one friend, in two groups of five, shown here once: Kuutti keeps only its hash. For a caller whose profile is complete; at most matching_config invitations_open open at once. The night the friend's profile first passes the same test, the invitation counts and the two earn matching_config invitation_reward.
          */
         post: {
             parameters: {
@@ -6453,7 +6453,7 @@ export interface paths {
         get?: never;
         /**
          * Like, pass or skip a card
-         * @description Recorded, or replacing the day's earlier decision on the card; the same decision again writes nothing. A day that has ended answers round_expired. A skip moves on, spends nothing and answers no like; the card returns another day. A like counts against the day's matching_config like_budget_balanced, except one on a liked_you or fish card; a pass or a skip never does. A new like or fish answers your_turn_limit with matching_config your_turn_limit conversations waiting on the caller, and not_found where either side's filters no longer let the two meet. A like of somebody whose like of the caller stands is a match: the answer names its conversation, and that like is final. A fish is a like with a mark, matching_config fish_budget of them in each fish_window_days counted from a Monday, the calendar week; on a liked_you or fish card it is a like. Past either budget, a like or a fish the caller's invitations earned is used by itself, left out of the counts after, and given back when the decision changes the same day. The answer's fishToSend, likesLeft and yourTurn are the queue's after this decision.
+         * @description Recorded, or replacing the day's earlier decision on the card; the same decision again writes nothing. A day that has ended answers round_expired. A skip moves on, spends nothing and answers no like; the card returns another day. A like counts against the day's matching_config like_budget_balanced, a like back on a liked_you or fish card too; a pass or a skip never does. A new like or fish answers your_turn_limit with matching_config your_turn_limit conversations waiting on the caller, and not_found where either side's filters no longer let the two meet. A like of somebody whose like of the caller stands is a match: the answer names its conversation, and that like is final. A fish is a like with a mark, matching_config fish_budget of them in each fish_window_days counted from a Monday, the calendar week; on a liked_you or fish card it is a like. Past the fish's budget, a fish invitations earned the caller is used by itself, left out of the count after, and given back when the decision changes the same day. The answer's fishToSend, likesLeft and yourTurn are the queue's after this decision.
          */
         put: {
             parameters: {
@@ -6516,7 +6516,7 @@ export interface paths {
                         "application/json": components["schemas"]["ErrorResponse"];
                     };
                 };
-                /** @description like_budget_exceeded: the day's likes are used up and no earned like is left, Retry-After the wait until the day rolls; fish_budget_exceeded: matching_config fish_budget fish were sent within the period and no earned fish is left, Retry-After the wait until the midnight that begins the next period, a Monday's. Nothing was written. */
+                /** @description like_budget_exceeded: the day's likes are used up, Retry-After the wait until the day rolls; fish_budget_exceeded: matching_config fish_budget fish were sent within the period and no earned fish is left, Retry-After the wait until the midnight that begins the next period, a Monday's. Nothing was written. */
                 429: {
                     headers: {
                         [name: string]: unknown;
@@ -7439,7 +7439,7 @@ export interface components {
         /** @enum {string} */
         NotificationKind: "message" | "match" | "moderation";
         /** @enum {string} */
-        NoticeKind: "warning" | "invitation_counted";
+        NoticeKind: "warning" | "invitation_counted" | "invitation_friend";
         ExportedRounds: {
             /** @description What this part is, in the request's language. */
             about: string;
@@ -7514,7 +7514,7 @@ export interface components {
         /** @enum {string} */
         InvitationState: "open" | "redeemed" | "counted";
         /** @enum {string} */
-        RewardKind: "like" | "fish";
+        RewardKind: "fish";
         HealthResponse: {
             /**
              * @description ok when the database answers and migrations are current; degraded otherwise.
@@ -7979,7 +7979,7 @@ export interface components {
         Notices: {
             notices: components["schemas"]["Notice"][];
         };
-        Notice: components["schemas"]["WarningNotice"] | components["schemas"]["InvitationCountedNotice"];
+        Notice: components["schemas"]["WarningNotice"] | components["schemas"]["InvitationCountedNotice"] | components["schemas"]["InvitationFriendNotice"];
         WarningNotice: {
             /** Format: uuid */
             id: string;
@@ -8010,7 +8010,20 @@ export interface components {
         };
         RewardUnits: {
             fish: number;
-            likes: number;
+        };
+        InvitationFriendNotice: {
+            /** Format: uuid */
+            id: string;
+            /** Format: date-time */
+            at: string;
+            /** Format: date-time */
+            readAt: string | null;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "invitation_friend";
+            reward: components["schemas"]["RewardUnits"];
         };
         PushTokenRequest: {
             token: string;
@@ -8023,15 +8036,14 @@ export interface components {
             redeemable: boolean;
             /** @description What an invitation earns today (matching_config invitation_reward), for the app's words. */
             reward: {
-                fish: number;
-                likes: number;
+                inviterFish: number;
+                friendFish: number;
             };
             open: components["schemas"]["OpenInvitation"][];
             counted: number;
-            /** @description What the person's invitations earned that is not used yet. */
+            /** @description What invitations earned the person that is not used yet, theirs and the one they used. */
             earned: {
                 fish: number;
-                likes: number;
             };
         };
         OpenInvitation: {

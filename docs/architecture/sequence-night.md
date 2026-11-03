@@ -23,7 +23,7 @@ In these diagrams every arrow is built. Mermaid's sequence diagrams take a messa
 | 5 | `research-anonymity` | research | the events table | nothing; a warning when a cell is under k | everywhere |
 | 6 | `end-suspensions` | safety | sanctions | lifts each suspension past its day, settles the account | everywhere |
 | 7 | `pond-counter` | jobs | accounts, profiles, photos, preferences, ponds | the day's figures per pond | everywhere |
-| 8 | `invitation-count` | rewards | invitations, accounts, consents, profiles, photos, preferences | invitations counted, the inviter's reward units, a notice | everywhere |
+| 8 | `invitation-count` | rewards | invitations, accounts, consents, profiles, photos, preferences | invitations counted, both people's reward units, the notices | everywhere |
 | 9 | `prune-rounds` | matching | rounds | deletes the rounds of days over 365 days back, their entries and relaxations with them | everywhere |
 | 10 | `reject-unreviewed-photos` | media | profile photos in the human queue | rejects those waiting past `photo_queue_reject_days` as not reviewed | everywhere |
 | 11 | `prune-photo-check-notes` | safety | the photo check's notes | deletes notes older than 365 days | everywhere |
@@ -117,7 +117,7 @@ sequenceDiagram
   participant db as PostgreSQL
   api->>db: end-suspensions. Lift each suspension past its day and settle its account, one account per transaction
   api->>db: pond-counter. Under its lock, count each pond, and move its figures when k people came or went
-  api->>db: invitation-count. Count each invitation whose redeemer is complete now, give the inviter its units, write a notice
+  api->>db: invitation-count. Count each invitation whose redeemer is complete now, give the inviter and the friend their units, write the notices
   api->>db: prune-rounds. Delete the rounds of days over 365 days back, their entries and relaxations with them
 ```
 
@@ -125,7 +125,7 @@ sequenceDiagram
 
 19. `end-suspensions` (safety, #307, ADR-024 §5): every suspension still open past its day is lifted by nobody, and its account's state settled from the sanctions still open, one account per transaction. It runs before the counts so that a person let back in is counted the same night. A login on the end day before 04:00 is still refused: a `shortcut:` in `safety/sanctions.ts`.
 20. `pond-counter` (`jobs/`, #54, ADR-013): under its own advisory lock, counts each pond: live, bank-verified accounts with a pond. A pond's figures move only when at least k people have come or gone since they were taken, and the bands of whom its finished profiles seek on their own, in every environment but production (#507). The counter's route serves the figures all day, and to a session the bands of the caller's own pond, as shares. A database with no figures gets its first ones at boot.
-21. `invitation-count` (rewards, #107, ADR-044 §7, ADR-060 §7): in one transaction, each invitation not counted yet whose redeemer's profile and onboarding are complete now is counted once; its inviter gets the units `matching_config invitation_reward` says tonight, and one notice in the app (ADR-032). Its line says how many and of what, never who.
+21. `invitation-count` (rewards, #107, ADR-044 §7, ADR-060 §7): in one transaction, each invitation not counted yet whose redeemer's profile and onboarding are complete now is counted once; its inviter and the friend who used it get the units `matching_config invitation_reward` says tonight, with both people locked first. The inviter gets one notice in the app even of nothing, and the friend one only of a fish (ADR-032). Its line says how many and of what, never who.
 22. `prune-rounds` (matching, #502, ADR-062 §13): the rounds of Finnish days more than 365 days back are deleted, and their entries and relaxations go with them by the cascade. The year covers the longest clock of the queue's ladder, a second pass. Nothing else is done for the round at night: `GET /rounds/today` opens a person's log at their first read of the day and adds the next people as they read (ADR-062 §1), and no push tells of it (ADR-062 §12).
 
 ## Part 4: photos, reports and silent conversations

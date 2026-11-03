@@ -674,11 +674,12 @@ export type MessageParams = {
   "home.welcomeBack": Record<never, never>;
   "invite.redeem.button": Record<never, never>;
   "invite.redeem.done": Record<never, never>;
+  "invite.redeem.earns": { "reward": string; "friendFish": number; "inviterFish": number };
   "invite.redeem.explain": Record<never, never>;
   "invite.redeem.failed": Record<never, never>;
   "invite.redeem.label": Record<never, never>;
   "invite.redeem.title": Record<never, never>;
-  "invite.share.message": { "code": string };
+  "invite.share.message": { "reward": string; "friendFish": number; "inviterFish": number; "code": string };
   "invite.step.explain": Record<never, never>;
   "invite.step.skip": Record<never, never>;
   "invite.step.title": Record<never, never>;
@@ -743,8 +744,10 @@ export type MessageParams = {
   "mail.emailCode.subject": Record<never, never>;
   "mail.signature": Record<never, never>;
   "native.ios.NSFaceIDUsageDescription": Record<never, never>;
-  "notices.invitationCounted.body": { "reward": string; "fish": number; "likes": number };
+  "notices.invitationCounted.body": { "fish": number };
   "notices.invitationCounted.title": Record<never, never>;
+  "notices.invitationFriend.body": { "fish": number };
+  "notices.invitationFriend.title": Record<never, never>;
   "notices.read": Record<never, never>;
   "notices.readFailed": Record<never, never>;
   "notices.title": Record<never, never>;
@@ -1547,8 +1550,7 @@ export type MessageParams = {
   "settings.invite.code.spoken": { "characters": string };
   "settings.invite.counted": { "friends": number };
   "settings.invite.earned.fish": { "fish": number };
-  "settings.invite.earned.likes": { "likes": number };
-  "settings.invite.earns": { "reward": string; "fish": number; "likes": number };
+  "settings.invite.earns": { "reward": string; "inviterFish": number; "friendFish": number };
   "settings.invite.intro": Record<never, never>;
   "settings.invite.label": Record<never, never>;
   "settings.invite.loadFailed": Record<never, never>;

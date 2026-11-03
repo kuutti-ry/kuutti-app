@@ -21,12 +21,12 @@ import * as repo from "./repo.ts";
 
 // Invitations (#107, ADR-044): a code a person whose profile is complete gives
 // a friend, single use; the friend types it after the bank login, before their
-// own profile is complete, and the night it is the invitation counts and its
-// inviter earns matching_config invitation_reward. Who invites, who may still
-// redeem and what counts all hang on one fact, completeness (ADR-060 §7), read
-// when asked by the reader the app hands in. The code is shown once and kept
-// as its SHA-256; it is in no log line, error detail, event or export, and
-// neither is anybody's id but the caller's.
+// own profile is complete, and the night it is the invitation counts and the
+// two earn matching_config invitation_reward. Who invites, who may still redeem
+// and what counts all hang on one fact, completeness (ADR-060 §7), read when
+// asked by the reader the app hands in. The code is shown once and kept as its
+// SHA-256; it is in no log line, error detail, event or export, and neither is
+// anybody's id but the caller's.
 
 /** Whether the person's profile and onboarding are complete. Handed in: it reads across slices and lives with the jobs (rules/layout.md). */
 export type CompleteReader = (db: Queryable, accountId: string) => Promise<boolean>;
@@ -77,7 +77,7 @@ async function readInvitationReward(db: Queryable): Promise<InvitationReward> {
     throw new AppError(
       500,
       "internal_error",
-      `matching_config ${INVITATION_REWARD_KEY} is not a reward of fish and likes`,
+      `matching_config ${INVITATION_REWARD_KEY} is not a reward of fish for the two`,
       { key: INVITATION_REWARD_KEY },
     );
   }
@@ -213,14 +213,18 @@ export async function redeemInvitation(
 /**
  * The night's count (ADR-044 §7), one transaction: every invitation redeemed
  * by somebody whose profile is complete now, and not counted yet, is counted;
- * its inviter gets the units `invitation_reward` says tonight and one notice
- * (ADR-032). Counted once: a second run finds nothing. How many, and of what;
- * never who. One redeemer at a time, on the one connection of the transaction;
- * a night has few, since each redeems once ever.
+ * its inviter and the friend who used it get the fish `invitation_reward` says
+ * tonight. The inviter gets one notice even of none, and the friend one only
+ * of a fish, there being no invitation of theirs to thank them for (ADR-032).
+ * An inviter erased before it counted earns nothing, and the friend still gets
+ * theirs, so that nothing shows them their inviter left (ADR-044 §10).
+ * Counted once: a second run finds nothing. How many, and of what; never who.
+ * One redeemer at a time, on the one connection of the transaction; a night
+ * has few, since each redeems once ever.
  */
 export async function countInvitations(
   deps: RewardsDeps,
-): Promise<{ counted: number; fish: number; likes: number }> {
+): Promise<{ counted: number; fish: number }> {
   const at = deps.now();
   return transaction(deps.db, async (tx) => {
     const reward = await readInvitationReward(tx);
@@ -228,18 +232,22 @@ export async function countInvitations(
     for (const redeemer of await repo.uncountedRedeemers(tx)) {
       if (await deps.complete(tx, redeemer)) redeemers.push(redeemer);
     }
-    const inviters = await repo.lockInviters(tx, redeemers);
-    if (inviters.length === 0) return { counted: 0, fish: 0, likes: 0 };
-    const counted = await repo.markCounted(tx, { inviters, redeemers, at });
-    await repo.insertUnits(tx, { counted, reward, at });
-    await recordInvitationNotices(tx, {
-      counted: counted.map((c) => ({ accountId: c.inviterId, invitationId: c.invitationId })),
-      at,
-    });
+    const parties = await repo.lockParties(tx, redeemers);
+    if (parties.length === 0) return { counted: 0, fish: 0 };
+    const counted = await repo.markCounted(tx, { parties, redeemers, at });
+    const inviters = counted.flatMap((c) =>
+      c.inviterId ? [{ accountId: c.inviterId, invitationId: c.invitationId }] : [],
+    );
+    const friends = counted.map((c) => ({ accountId: c.redeemerId, invitationId: c.invitationId }));
+    await repo.insertUnits(tx, { earners: inviters, fish: reward.inviterFish, at });
+    await repo.insertUnits(tx, { earners: friends, fish: reward.friendFish, at });
+    await recordInvitationNotices(tx, { kind: "invitation_counted", counted: inviters, at });
+    if (reward.friendFish > 0) {
+      await recordInvitationNotices(tx, { kind: "invitation_friend", counted: friends, at });
+    }
     return {
       counted: counted.length,
-      fish: counted.length * reward.fish,
-      likes: counted.length * reward.likes,
+      fish: inviters.length * reward.inviterFish + friends.length * reward.friendFish,
     };
   });
 }

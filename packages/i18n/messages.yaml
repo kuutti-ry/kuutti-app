@@ -3419,7 +3419,7 @@ errors.fish_budget_exceeded:
 
 errors.like_budget_exceeded:
   en: "You have used today's likes. New ones come after midnight; you can still pass."
-  description: "Today's round (429 with Retry-After, #98, ADR-036): the day's likes from matching_config like_budget_balanced are used; a like back on a card of somebody who liked the person is free and a pass is never counted. The day rolls at midnight in Finland. Nothing was saved."
+  description: "Today's round (429 with Retry-After, #98, ADR-036): the day's likes from matching_config like_budget_balanced are used, a like back counted like any other; a pass is never counted. The day rolls at midnight in Finland. Nothing was saved."
   fi: "Olet käyttänyt tämän päivän tykkäykset. Uusia tulee keskiyön jälkeen, mutta voit yhä ohittaa."
   sv: "Du har använt dagens gillanden. Nya kommer efter midnatt, men du kan fortfarande hoppa över."
   machine: { fi: true, sv: true }
@@ -8400,7 +8400,7 @@ round.short.failed:
 
 round.fish:
   en: "Send a fish"
-  description: "Decision button on a round card, above like and pass, a filled rounded square with a fish (#378, ADR-039): a like with a mark, first in the other person's round; matching_config fish_budget of them in a calendar week, Monday to Sunday (fish_window_days from a Monday). Not offered on a card that liked the reader or sent a fish, nor once no fish can go (the week's is sent and no earned one waits), except on the card that holds it (#475). Never a number or a period on the button: both are tunables. The word fish is the app's own (ADR-039 Open 1), for the native review."
+  description: "Decision button on a round card, above like and pass, a filled rounded square with a fish (#378, ADR-039): a like with a mark, first in the other person's round; matching_config fish_budget of them in a calendar week, Monday to Sunday (fish_window_days from a Monday). Not offered on a card that liked the reader or sent a fish, nor with no likes left except on a card already liked (#503), nor once no fish can go (the week's is sent and no earned one waits), except on the card that holds it (#475). Never a number or a period on the button: both are tunables. The word fish is the app's own (ADR-039 Open 1), for the native review."
   fi: "Lähetä kala"
   sv: "Skicka en fisk"
   max_length: 24
@@ -8434,7 +8434,7 @@ round.skip:
 
 round.likesLeft:
   en: "{likes, plural, =0 {No likes left today. New ones tomorrow.} one {# like left today} other {# likes left today}}"
-  description: "Line beside the decision buttons on a round card (#524, ADR-036 §6): how many of the day's likes the reader has left, counting down from matching_config like_budget_balanced to zero; a fish counts in them. A plain fact in the same words at ten as at one: never urgent, never 'only one left'. =0: none are left and new ones come tomorrow, and passing stays possible. It wraps at large text sizes. The number is a tunable, so never write it out."
+  description: "Line beside the decision buttons on a round card (#524, ADR-036 §6): how many of the day's likes the reader has left, counting down from matching_config like_budget_balanced to zero; a fish and a like back count in them. A plain fact in the same words at ten as at one: never urgent, never 'only one left'. =0: none are left and new ones come tomorrow, and passing stays possible. It wraps at large text sizes. The number is a tunable, so never write it out."
   fi: "{likes, plural, =0 {Tykkäyksiä ei ole tänään enää jäljellä. Uusia tulee huomenna.} one {# tykkäys jäljellä tänään} other {# tykkäystä jäljellä tänään}}"
   sv: "{likes, plural, =0 {Inga gillanden kvar i dag. Nya kommer i morgon.} one {# gillande kvar i dag} other {# gillanden kvar i dag}}"
   machine: { fi: true, sv: true }
@@ -9803,10 +9803,24 @@ notices.invitationCounted.title:
   machine: { fi: true, sv: true }
 
 notices.invitationCounted.body:
-  en: "Somebody you invited has finished their profile. {reward, select, fish {You earned {fish, plural, one {a fish} other {# fish}}.} likes {You earned {likes, plural, one {an extra like} other {# extra likes}}.} both {You earned {fish, plural, one {a fish} other {# fish}} and {likes, plural, one {an extra like} other {# extra likes}}.} other {Thank you for inviting them.}}"
-  description: "The home screen's notices (#107, ADR-044 §9), under the title: what the counted invitation earned. reward is fish, likes, both, or anything else when it earned nothing (matching_config invitation_reward switched off); fish and likes are the units it earned. Never who was invited, never when they joined. Fish is the app's super-like (ADR-039), an extra like one used by itself on a day the likes run out."
-  fi: "Joku kutsumasi on saanut profiilinsa valmiiksi. {reward, select, fish {Ansaitsit {fish, plural, one {kalan} other {# kalaa}}.} likes {Ansaitsit {likes, plural, one {ylimääräisen tykkäyksen} other {# ylimääräistä tykkäystä}}.} both {Ansaitsit {fish, plural, one {kalan} other {# kalaa}} ja {likes, plural, one {ylimääräisen tykkäyksen} other {# ylimääräistä tykkäystä}}.} other {Kiitos, että kutsuit hänet.}}"
-  sv: "Någon du bjöd in har gjort klart sin profil. {reward, select, fish {Du fick {fish, plural, one {en fisk} other {# fiskar}}.} likes {Du fick {likes, plural, one {ett extra gillande} other {# extra gillanden}}.} both {Du fick {fish, plural, one {en fisk} other {# fiskar}} och {likes, plural, one {ett extra gillande} other {# extra gillanden}}.} other {Tack för att du bjöd in.}}"
+  en: "Somebody you invited has finished their profile. {fish, plural, =0 {Thank you for inviting them.} one {You earned a fish.} other {You earned # fish.}}"
+  description: "The home screen's notices (#107, ADR-044 §9), under the title: what the counted invitation earned its inviter. fish is the units it earned; =0 when it earned nothing (matching_config invitation_reward switched off). Never who was invited, never when they joined. Fish is the app's super-like (ADR-039)."
+  fi: "Joku kutsumasi on saanut profiilinsa valmiiksi. {fish, plural, =0 {Kiitos, että kutsuit hänet.} one {Ansaitsit kalan.} other {Ansaitsit # kalaa.}}"
+  sv: "Någon du bjöd in har gjort klart sin profil. {fish, plural, =0 {Tack för att du bjöd in.} one {Du fick en fisk.} other {Du fick # fiskar.}}"
+  machine: { fi: true, sv: true }
+
+notices.invitationFriend.title:
+  en: "The invitation you used counted"
+  description: "The home screen's notices (#503, ADR-044 §9): the invitation the person joined with counted, the first night their profile was complete. Shown only when it earned them something. Never who invited them. Short."
+  fi: "Käyttämäsi kutsu laskettiin"
+  sv: "Inbjudan du använde räknades"
+  machine: { fi: true, sv: true }
+
+notices.invitationFriend.body:
+  en: "The invitation earned you {fish, plural, one {a fish} other {# fish}}. An earned fish is used by itself once your own fish are used up."
+  description: "The home screen's notices (#503, ADR-044 §9), under the title: what the invitation earned the person who used it. The invitation earned it, never the finished profile: finishing one's own profile earns nothing (the maintainer, 31/10/2026). fish is the units it earned them, at least one. Never who invited them. Fish is the app's super-like (ADR-039); earned fish wait and are used by themselves, never a number of days or a period (tunables)."
+  fi: "Kutsu toi sinulle {fish, plural, one {kalan} other {# kalaa}}. Ansaittu kala käytetään automaattisesti, kun omat kalasi on käytetty."
+  sv: "Inbjudan gav dig {fish, plural, one {en fisk} other {# fiskar}}. En intjänad fisk används automatiskt när dina egna fiskar är slut."
   machine: { fi: true, sv: true }
 
 # --- Invitations (#107, ADR-044): a code for one friend, made and withdrawn in Settings, typed by the friend after the bank login ---
@@ -9848,10 +9862,10 @@ settings.invite.intro:
   machine: { fi: true, sv: true }
 
 settings.invite.earns:
-  en: "{reward, select, fish {When a friend you invite finishes their profile, you get {fish, plural, one {a fish} other {# fish}}. An earned fish is used by itself once your own fish are used up.} likes {When a friend you invite finishes their profile, you get {likes, plural, one {an extra like} other {# extra likes}}. An extra like is used by itself on a day your likes run out.} both {When a friend you invite finishes their profile, you get {fish, plural, one {a fish} other {# fish}} and {likes, plural, one {an extra like} other {# extra likes}}. They are used by themselves once your own fish or likes run out.} other {Invitations earn nothing just now, but every friend you bring is welcome.}}"
-  description: "The Invitations screen, what an invitation earns today (#107, ADR-044 §4, §8), from matching_config invitation_reward: reward is fish, likes, both, or anything else when both are 0; fish and likes are the units. Earned units wait and are used by themselves once the person's own are used up; never a number of days or a period (tunables)."
-  fi: "{reward, select, fish {Kun kutsumasi ystävä saa profiilinsa valmiiksi, saat {fish, plural, one {kalan} other {# kalaa}}. Ansaittu kala käytetään automaattisesti, kun omat kalasi on käytetty.} likes {Kun kutsumasi ystävä saa profiilinsa valmiiksi, saat {likes, plural, one {ylimääräisen tykkäyksen} other {# ylimääräistä tykkäystä}}. Ylimääräinen tykkäys käytetään automaattisesti päivänä, jona tykkäyksesi loppuvat.} both {Kun kutsumasi ystävä saa profiilinsa valmiiksi, saat {fish, plural, one {kalan} other {# kalaa}} ja {likes, plural, one {ylimääräisen tykkäyksen} other {# ylimääräistä tykkäystä}}. Ne käytetään automaattisesti, kun omat kalasi tai tykkäyksesi loppuvat.} other {Kutsut eivät juuri nyt tuo mitään, mutta jokainen tuomasi ystävä on tervetullut.}}"
-  sv: "{reward, select, fish {När en vän du bjuder in gör klart sin profil får du {fish, plural, one {en fisk} other {# fiskar}}. En intjänad fisk används automatiskt när dina egna fiskar är slut.} likes {När en vän du bjuder in gör klart sin profil får du {likes, plural, one {ett extra gillande} other {# extra gillanden}}. Ett extra gillande används automatiskt en dag då dina gillanden tar slut.} both {När en vän du bjuder in gör klart sin profil får du {fish, plural, one {en fisk} other {# fiskar}} och {likes, plural, one {ett extra gillande} other {# extra gillanden}}. De används automatiskt när dina egna fiskar eller gillanden tar slut.} other {Inbjudningar ger ingenting just nu, men varje vän du tar med är välkommen.}}"
+  en: "{reward, select, both {When a friend you invite finishes their profile, you get {inviterFish, plural, one {a fish} other {# fish}} and your friend gets {friendFish, plural, one {a fish} other {# fish}}. An earned fish is used by itself once your own fish are used up.} inviter {When a friend you invite finishes their profile, you get {inviterFish, plural, one {a fish} other {# fish}}. An earned fish is used by itself once your own fish are used up.} friend {When a friend you invite finishes their profile, your friend gets {friendFish, plural, one {a fish} other {# fish}}.} other {Invitations earn nothing just now, but every friend you bring is welcome.}}"
+  description: "The Invitations screen, what an invitation earns today (#107, ADR-044 §4, §8, #503), from matching_config invitation_reward: reward says which of the two earn, both, inviter, friend, or anything else when neither does; inviterFish and friendFish are their fish. Earned fish wait and are used by themselves once the person's own are used up; never a number of days or a period (tunables)."
+  fi: "{reward, select, both {Kun kutsumasi ystävä saa profiilinsa valmiiksi, saat {inviterFish, plural, one {kalan} other {# kalaa}} ja ystäväsi saa {friendFish, plural, one {kalan} other {# kalaa}}. Ansaittu kala käytetään automaattisesti, kun omat kalasi on käytetty.} inviter {Kun kutsumasi ystävä saa profiilinsa valmiiksi, saat {inviterFish, plural, one {kalan} other {# kalaa}}. Ansaittu kala käytetään automaattisesti, kun omat kalasi on käytetty.} friend {Kun kutsumasi ystävä saa profiilinsa valmiiksi, ystäväsi saa {friendFish, plural, one {kalan} other {# kalaa}}.} other {Kutsut eivät juuri nyt tuo mitään, mutta jokainen tuomasi ystävä on tervetullut.}}"
+  sv: "{reward, select, both {När en vän du bjuder in gör klart sin profil får du {inviterFish, plural, one {en fisk} other {# fiskar}} och din vän får {friendFish, plural, one {en fisk} other {# fiskar}}. En intjänad fisk används automatiskt när dina egna fiskar är slut.} inviter {När en vän du bjuder in gör klart sin profil får du {inviterFish, plural, one {en fisk} other {# fiskar}}. En intjänad fisk används automatiskt när dina egna fiskar är slut.} friend {När en vän du bjuder in gör klart sin profil får din vän {friendFish, plural, one {en fisk} other {# fiskar}}.} other {Inbjudningar ger ingenting just nu, men varje vän du tar med är välkommen.}}"
   machine: { fi: true, sv: true }
 
 settings.invite.notYet:
@@ -10008,16 +10022,9 @@ settings.invite.counted:
 
 settings.invite.earned.fish:
   en: "{fish, plural, one {You have an earned fish waiting.} other {You have # earned fish waiting.}}"
-  description: "The Invitations screen (#107, ADR-044 §8): fish is how many fish the person's invitations earned that are not used yet; shown only when there is one."
+  description: "The Invitations screen (#107, ADR-044 §8): fish is how many fish invitations earned the person that are not used yet, those they made and the one they used; shown only when there is one."
   fi: "{fish, plural, one {Sinulla on yksi ansaittu kala odottamassa.} other {Sinulla on # ansaittua kalaa odottamassa.}}"
   sv: "{fish, plural, one {Du har en intjänad fisk som väntar.} other {Du har # intjänade fiskar som väntar.}}"
-  machine: { fi: true, sv: true }
-
-settings.invite.earned.likes:
-  en: "{likes, plural, one {You have an extra like waiting.} other {You have # extra likes waiting.}}"
-  description: "The Invitations screen (#107, ADR-044 §8): likes is how many extra likes the person's invitations earned that are not used yet; shown only when there is one."
-  fi: "{likes, plural, one {Sinulla on yksi ylimääräinen tykkäys odottamassa.} other {Sinulla on # ylimääräistä tykkäystä odottamassa.}}"
-  sv: "{likes, plural, one {Du har ett extra gillande som väntar.} other {Du har # extra gillanden som väntar.}}"
   machine: { fi: true, sv: true }
 
 invite.redeem.title:
@@ -10025,6 +10032,13 @@ invite.redeem.title:
   description: "The Invitations screen, the heading over the field for a code from a friend (#107, ADR-044 §6), for a person who may still use one."
   fi: "Onko sinulla kutsukoodi?"
   sv: "Har du en inbjudningskod?"
+  machine: { fi: true, sv: true }
+
+invite.redeem.earns:
+  en: "{reward, select, both {The code earns you {friendFish, plural, one {a fish} other {# fish}} and your friend {inviterFish, plural, one {a fish} other {# fish}} once your profile is complete.} other {The code earns you {friendFish, plural, one {a fish} other {# fish}} once your profile is complete.}} A fish is a like that says a little more."
+  description: "Under the explanation of the code, on the Invitations screen and in onboarding's invitation step (#503, ADR-044 §12): what the invitation earns the person typing it, shown only while matching_config invitation_reward gives them a fish. reward is both when the inviter earns too; friendFish is the person's fish, inviterFish their friend's. The reader may not know the word yet, hence the last sentence."
+  fi: "{reward, select, both {Koodista saat {friendFish, plural, one {kalan} other {# kalaa}} ja ystäväsi saa {inviterFish, plural, one {kalan} other {# kalaa}}, kun profiilisi on valmis.} other {Koodista saat {friendFish, plural, one {kalan} other {# kalaa}}, kun profiilisi on valmis.}} Kala on tykkäys, joka sanoo vähän enemmän."
+  sv: "{reward, select, both {Koden ger dig {friendFish, plural, one {en fisk} other {# fiskar}} och din vän {inviterFish, plural, one {en fisk} other {# fiskar}} när din profil är klar.} other {Koden ger dig {friendFish, plural, one {en fisk} other {# fiskar}} när din profil är klar.}} En fisk är ett gillande som säger lite mer."
   machine: { fi: true, sv: true }
 
 invite.redeem.explain:
@@ -10086,10 +10100,10 @@ invite.step.skip:
   machine: { fi: true, sv: true }
 
 invite.share.message:
-  en: "You're invited to Kuutti, a free dating app for Finland where everyone signs in with their bank ID. Get the app at https://kuutti.app/ and type this code after signing in: {code}"
-  description: "The message the phone's share sheet sends with an invitation (#107, ADR-044 Context 5), to somebody who may not know Kuutti: free, bank-verified, Finland's; the website's address as it is, and the code (XXXXX-XXXXX) after a colon at the end. Nothing about the sender, no link into the app."
-  fi: "Sinut on kutsuttu: Kuutti on ilmainen suomalainen deittisovellus, jossa jokainen kirjautuu pankkitunnuksillaan. Lataa sovellus osoitteesta https://kuutti.app/ ja kirjoita tämä koodi kirjautumisen jälkeen: {code}"
-  sv: "Du är inbjuden till Kuutti, en gratis dejtingapp för Finland där alla loggar in med sina bankkoder. Hämta appen på https://kuutti.app/ och skriv in den här koden efter inloggningen: {code}"
+  en: "You're invited to Kuutti, a free dating app for Finland where everyone signs in with their bank ID. {reward, select, both {The code earns you {friendFish, plural, one {a fish} other {# fish}} and your friend {inviterFish, plural, one {a fish} other {# fish}} once your profile is complete. A fish is a like that says a little more. } friend {The code earns you {friendFish, plural, one {a fish} other {# fish}} once your profile is complete. A fish is a like that says a little more. } other {}}Get the app at https://kuutti.app/ and type this code after signing in: {code}"
+  description: "The message the phone's share sheet sends with an invitation (#107, ADR-044 Context 5, §12), to somebody who may not know Kuutti: free, bank-verified, Finland's; what the reader gets (#503), from matching_config invitation_reward, left out when it gives them no fish (reward is both, friend, or anything else; friendFish is the reader's, inviterFish their friend's); the website's address as it is, and the code (XXXXX-XXXXX) after a colon at the end. Nothing else about the sender, no link into the app."
+  fi: "Sinut on kutsuttu: Kuutti on ilmainen suomalainen deittisovellus, jossa jokainen kirjautuu pankkitunnuksillaan. {reward, select, both {Koodista saat {friendFish, plural, one {kalan} other {# kalaa}} ja ystäväsi saa {inviterFish, plural, one {kalan} other {# kalaa}}, kun profiilisi on valmis. Kala on tykkäys, joka sanoo vähän enemmän. } friend {Koodista saat {friendFish, plural, one {kalan} other {# kalaa}}, kun profiilisi on valmis. Kala on tykkäys, joka sanoo vähän enemmän. } other {}}Lataa sovellus osoitteesta https://kuutti.app/ ja kirjoita tämä koodi kirjautumisen jälkeen: {code}"
+  sv: "Du är inbjuden till Kuutti, en gratis dejtingapp för Finland där alla loggar in med sina bankkoder. {reward, select, both {Koden ger dig {friendFish, plural, one {en fisk} other {# fiskar}} och din vän {inviterFish, plural, one {en fisk} other {# fiskar}} när din profil är klar. En fisk är ett gillande som säger lite mer. } friend {Koden ger dig {friendFish, plural, one {en fisk} other {# fiskar}} när din profil är klar. En fisk är ett gillande som säger lite mer. } other {}}Hämta appen på https://kuutti.app/ och skriv in den här koden efter inloggningen: {code}"
   machine: { fi: true, sv: true }
 
 settings.contacts.intro:

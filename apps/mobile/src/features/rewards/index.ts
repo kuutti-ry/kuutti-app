@@ -4,5 +4,3 @@
 export { fetchInvitations } from "./client";
 export { InvitationStep } from "./InvitationStep";
 export { Invitations, useInvitationsSummary } from "./Invitations";
-// What a reward holds, for the notice that an invitation counted.
-export { rewardParams } from "./words";

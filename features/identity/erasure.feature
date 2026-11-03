@@ -189,19 +189,29 @@ Feature: Account deletion per the erasure table
     Then A's open invitation, units and notices are gone, and B's and C's invitations stay theirs, naming no inviter
     And neither "B" nor "C" may type another code, and each one's export still says when they typed theirs
 
-  Scenario: An invitation whose inviter was erased never counts
+  Scenario: An invitation whose inviter was erased counts for the friend alone
     Given "C" used a code of "A"'s and has not finished, and "A" deleted the account
     When C's profile passes the test and the night counts
-    Then C's invitation stays uncounted, and nobody gets a unit or a notice for it
+    Then C's invitation counts, "C" gets their fish and their notice, and nobody else gets anything for it
 
   Scenario: An erased redeemer's invitation goes until it counts, and once counted stays for its inviter without them
     Given "B" used a code of "A"'s and has not finished, and "C" used another that has counted
     When "B" and then "C" delete their accounts
     Then B's invitation is gone, C's stays counted naming nobody, and "A" keeps the count and the fish it earned
 
+  Scenario: An erased inviter leaves the friend the fish the invitation earned them
+    Given "B" used a code of "A"'s, it has counted, and each of the two holds a fish and a notice from it
+    When "A" deletes the account
+    Then A's fish and notice are gone, and "B" keeps theirs with the invitation naming no inviter
+
+  Scenario: An erased friend leaves the inviter the fish the invitation earned them
+    Given "B" used a code of "A"'s, it has counted, and each of the two holds a fish and a notice from it
+    When "B" deletes the account
+    Then B's fish and notice are gone, and "A" keeps theirs and the count
+
   Scenario: The export lists the invitations made, the one used and the units, never a code or the other person
     Given "A" made an open invitation and one that "B" used and that has counted, and "A" used the fish it earned
     When "A" and "B" export their accounts
     Then A's export lists both invitations with their state, none used, and the fish with when it was earned and used
-    And B's lists when B typed the code and when it counted
+    And B's lists when B typed the code and when it counted, and the fish it earned them
     And neither carries a code, its hash or the other's account id

@@ -41,7 +41,7 @@ const feedback = tunable(
 const word = tunable("sample_word", version(1, "first"));
 const fetches = tunable("photo_fetches_per_day", version(1, { thumb: 600, card: 300, full: 60 }));
 const tips = tunable("photo_tips_on", version(1, true));
-const share = tunable("contest_ratio_threshold", version(1, 0.6));
+const share = tunable("sample_fraction", version(1, 0.6));
 
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
@@ -225,7 +225,7 @@ describe("the tunables", () => {
     expect(number.getByLabelText("Why the change")).toHaveValue("");
     expect(number.getByLabelText("Why the change")).toHaveAttribute("maxlength", "500");
     expect(number.getByLabelText("Why the change")).toBeRequired();
-    const fraction = await item("contest_ratio_threshold");
+    const fraction = await item("sample_fraction");
     expect(fraction.getByLabelText("New value")).toHaveAttribute("inputmode", "decimal");
     const text = await item("sample_word");
     expect(text.getByLabelText("New value")).toHaveValue("first");
@@ -412,13 +412,11 @@ describe("the tunables", () => {
       value: 1000,
       reason: "Because the pilot said so",
     });
-    const fraction = await item("contest_ratio_threshold");
+    const fraction = await item("sample_fraction");
     review(fraction, "-0.1");
     expect(fraction.getByRole("alert")).toHaveTextContent("This is not a value of the key's type.");
     review(fraction, "0.55");
-    expect(
-      fraction.getByText("Change contest_ratio_threshold? Now: 0.6. New: 0.55"),
-    ).toBeInTheDocument();
+    expect(fraction.getByText("Change sample_fraction? Now: 0.6. New: 0.55")).toBeInTheDocument();
   });
 
   it("holds an object key's other members to their declared type", async () => {
@@ -461,6 +459,29 @@ describe("the tunables", () => {
         "This is not a value of the key's type.",
       );
     }
+    expect(posts(calls)).toEqual([]);
+  });
+
+  it("holds a key to the newest version no admin wrote, so a shape a migration moved is the one it takes (#503)", async () => {
+    const moved = tunable(
+      "invitation_reward",
+      version(
+        3,
+        { inviterFish: 2, friendFish: 1 },
+        { createdBy: ADMIN, reason: "Two for the inviter" },
+      ),
+      version(2, { inviterFish: 1, friendFish: 1 }),
+      version(1, { fish: 1, likes: 0 }),
+    );
+    const calls = fetchMock([listOf(moved)]);
+    show();
+    const at = await item("invitation_reward");
+    // The first version's shape, which the API and the night's count refuse.
+    review(at, '{"fish":2,"likes":0}');
+    expect(at.getByRole("alert")).toHaveTextContent("This is not a value of the key's type.");
+    review(at, '{"inviterFish":3,"friendFish":0}');
+    await at.findByText(/^Change invitation_reward\?/);
+    expect(at.queryByRole("alert")).toBeNull();
     expect(posts(calls)).toEqual([]);
   });
 

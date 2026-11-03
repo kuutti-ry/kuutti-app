@@ -30,9 +30,9 @@ import { useList } from "../../lib/use-list.ts";
 
 // The tunables (#304, #305, admins only): every key of matching_config with
 // its value and history, and a change with a reason, shown old and new before
-// it is sent. The API holds the value to the shape its key declared (the
-// first version); the form reads the input the same way, so a typo is caught
-// here first. A saved change updates its key in place: nothing else on the
+// it is sent. The API holds the value to the shape its key declared (its
+// newest version no admin wrote); the form reads the input the same way, so a
+// typo is caught here first. A saved change updates its key in place: nothing else on the
 // screen moves. English only (TD-17); keyboard first.
 
 /** A value as the panel shows it: an object as JSON, the rest as it is. */
@@ -166,8 +166,8 @@ function Tunable({
   const [reason, setReason] = useState("");
   const [step, setStep] = useState<Step>({ kind: "editing" });
   const object = typeof item.value === "object";
-  // The shape the key declared: its first version, the migration's (the history is newest first).
-  const declared = item.versions.at(-1)?.value ?? item.value;
+  // The shape the key declared: its newest version no admin wrote, a migration's (the history is newest first).
+  const declared = item.versions.find((version) => version.reason === null)?.value ?? item.value;
   const whole = typeof declared === "number" && Number.isInteger(declared);
 
   // The focus follows the step: to the confirm sentence when it appears, back

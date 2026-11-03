@@ -43,7 +43,7 @@ const listRoute = createRoute({
   path: "/invitations",
   summary: "The caller's invitations",
   description:
-    "Whether the caller may invite (their profile is complete) and may still type a code, what an invitation earns today (matching_config invitation_reward), their open invitations newest first, how many of theirs have counted, and what those earned that is not used yet. Never a code, and nothing of anybody invited.",
+    "Whether the caller may invite (their profile is complete) and may still type a code, what an invitation earns today (matching_config invitation_reward), their open invitations newest first, how many of theirs have counted, and what invitations earned them that is not used yet. Never a code, and nothing of anybody invited.",
   ...bearer,
   responses: {
     200: { description: "The caller's invitations.", ...json(Invitations) },
@@ -57,7 +57,7 @@ const createInvitationRoute = createRoute({
   path: "/invitations",
   summary: "Make an invitation",
   description:
-    "A code for one friend, in two groups of five, shown here once: Kuutti keeps only its hash. For a caller whose profile is complete; at most matching_config invitations_open open at once. The night the friend's profile first passes the same test, the invitation counts and the caller earns matching_config invitation_reward.",
+    "A code for one friend, in two groups of five, shown here once: Kuutti keeps only its hash. For a caller whose profile is complete; at most matching_config invitations_open open at once. The night the friend's profile first passes the same test, the invitation counts and the two earn matching_config invitation_reward.",
   ...bearer,
   responses: {
     201: { description: "Made; the code is not shown again.", ...json(InvitationCreated) },
