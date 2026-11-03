@@ -57,9 +57,9 @@ export class FakeXhr {
     (globalThis as { XMLHttpRequest: unknown }).XMLHttpRequest = FakeXhr;
     // React Native's FormData, not Node's: it keeps a file part as { uri, name,
     // type } and exposes getParts(), which is what the runtime streams from.
-    (globalThis as { FormData: unknown }).FormData = (
-      require("react-native/Libraries/Network/FormData") as { default: unknown }
-    ).default;
+    (globalThis as { FormData: unknown }).FormData =
+      // biome-ignore lint/suspicious/noReactNativeDeepImports: the entry point exports no FormData
+      (require("react-native/Libraries/Network/FormData") as { default: unknown }).default;
   }
 }
 

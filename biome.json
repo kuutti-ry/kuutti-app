@@ -1,5 +1,5 @@
 {
-  "$schema": "https://biomejs.dev/schemas/2.5.15/schema.json",
+  "$schema": "https://biomejs.dev/schemas/2.6.3/schema.json",
   "vcs": {
     "enabled": true,
     "clientKind": "git",
@@ -39,6 +39,16 @@
       }
     }
   },
+  "markdown": {
+    "formatter": {
+      "enabled": false
+    }
+  },
+  "yaml": {
+    "formatter": {
+      "enabled": false
+    }
+  },
   "javascript": {
     "formatter": {
       "quoteStyle": "double",
@@ -55,6 +65,38 @@
     }
   },
   "overrides": [
+    {
+      "includes": ["apps/mobile/**"],
+      "linter": {
+        "rules": {
+          "correctness": {
+            "noReactNativeRawText": {
+              "level": "error",
+              "options": {
+                "skip": [
+                  "Button",
+                  "CardTitle",
+                  "CardDescription",
+                  "DialogTitle",
+                  "DialogDescription",
+                  "Label"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": ["apps/admin/src/**"],
+      "linter": {
+        "rules": {
+          "correctness": {
+            "noPlaywrightMissingAwait": "off"
+          }
+        }
+      }
+    },
     {
       "includes": ["apps/admin/src/styles.css"],
       "css": {
