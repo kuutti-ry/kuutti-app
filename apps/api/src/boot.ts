@@ -13,7 +13,7 @@ import {
 } from "./identity/index.ts";
 import { invitationCountJob } from "./jobs/invitation-count.ts";
 import type { NightlyJob } from "./jobs/nightly.ts";
-import { countsBands, ensureFirstSnapshot, pondCounterJob } from "./jobs/pond-counter.ts";
+import { ensureFirstSnapshot, pondCounterJob } from "./jobs/pond-counter.ts";
 import type { Config } from "./lib/config.ts";
 import type { Logger } from "./lib/logger.ts";
 import { mailerFor } from "./lib/mail.ts";
@@ -254,7 +254,7 @@ export async function boot({
     media.setup.mode === "off" || config.APP_ENV === "production"
       ? undefined
       : { db: pool, now, store: s3CopyStore(createS3Client(config), config.S3_BUCKET) };
-  const counter = { db: pool, logger, now, bands: countsBands(config.APP_ENV) };
+  const counter = { db: pool, logger, now };
   const jobs: NightlyJob[] = [
     { name: "sweep-sessions", run: () => sweepSessions({ db: pool, now }) },
     { name: "sweep-admin-sessions", run: () => sweepAdminSessions({ db: pool, now }) },
