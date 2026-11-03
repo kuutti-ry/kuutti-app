@@ -1,8 +1,9 @@
 # features/notifications/push.feature
 Feature: Pushes say that there is something, never what or from whom
-  A phone whose app is closed is told of three things through Expo (#102,
-  ADR-055): a message the person may read, a match made by the other's like,
-  and today's round while it is not opened. A push is one line of the app's
+  A phone whose app is closed is told of two things through Expo (#102,
+  ADR-055): a message the person may read and a match made by the other's
+  like. The round's push went with the daily set (ADR-062 §12): with nothing
+  built at night nothing is ready to tell of. A push is one line of the app's
   own words in the phone's language and its kind: never a message's text, a
   name, an account or the conversation (§1). Who may be told of a message is
   the chat's rule (ADR-031 §5): nothing crosses a block or a close, and a
@@ -40,14 +41,14 @@ Feature: Pushes say that there is something, never what or from whom
     And "B"'s message to "A" pushes "A" as any message would
 
   Scenario: Nothing is pushed in the quiet hours
-    Given "B" has a phone, a conversation and a round
-    When a message, a match or the round would be pushed between push_quiet_from_hour and push_quiet_to_hour in Helsinki
+    Given "B" has a phone and a conversation
+    When a message or a match would be pushed between push_quiet_from_hour and push_quiet_to_hour in Helsinki
     Then nothing is pushed, and nothing is kept to send later
     And outside those hours each of them pushes
 
   Scenario: A kind switched off is never pushed
     Given "B" has switched one kind of notification off
-    When a message, a match and the round would each be pushed
+    When a message and a match would each be pushed
     Then only the kinds still on are pushed
 
   Scenario: A match tells the one who liked first, in the app or not
@@ -55,12 +56,6 @@ Feature: Pushes say that there is something, never what or from whom
     When "A" likes "B" back
     Then "B" is pushed that there is a new match, and nothing of which
     And "A", who sees the match in the answer, is pushed nothing
-
-  Scenario: Today's round is told once to those who have not opened it
-    Given rounds for today and yesterday, opened and not, empty, with cards erased or blocked, and owners paused or banned
-    When the round's push runs at round_push_hour
-    Then only the owners of today's unopened rounds with a card to show are pushed, until the quiet hours begin
-    And a second run tells nobody again
 
   Scenario: A device's token goes when its session ends
     Given "A" registered a token on each of two phones

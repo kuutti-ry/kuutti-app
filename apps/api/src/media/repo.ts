@@ -310,7 +310,7 @@ export async function recordCardServed(
                       WHERE s.account_id = $1 AND s.at >= $5),
             used AS (SELECT count(*)::int AS n FROM today),
             allowed AS (SELECT EXISTS (SELECT 1 FROM live) AND NOT (SELECT b FROM blocked)
-                            AND ((SELECT n FROM used) < $6
+                            AND ($6 = 0 OR (SELECT n FROM used) < $6
                               OR EXISTS (SELECT 1 FROM today WHERE subject = $2)) AS ok),
             ins AS (INSERT INTO card_shown (account_id, photo_id, at)
                     SELECT $1, unnest($3::uuid[]), $4 FROM allowed WHERE allowed.ok
@@ -440,7 +440,8 @@ export async function insertPhotoAccess(
                                      WHERE id = $2 AND account_id <> $1
                                        AND blocked_between($1, account_id)) AS b),
           ins AS (INSERT INTO photo_access (account_id, photo_id, variant, at)
-                  SELECT $1, $2, $3, $4 FROM live, used, blocked WHERE used.n < $6 AND NOT blocked.b
+                  SELECT $1, $2, $3, $4 FROM live, used, blocked
+                   WHERE ($6 = 0 OR used.n < $6) AND NOT blocked.b
                   RETURNING 1 AS one)
      SELECT EXISTS (SELECT 1 FROM live) AS live,
             (SELECT n FROM used) AS used,

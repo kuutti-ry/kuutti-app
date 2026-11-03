@@ -15,7 +15,6 @@ import { PhoneLine } from "./PhoneLine";
 import { usePhonePermission } from "./usePhonePermission";
 
 const WORDS: Record<NotificationKind, { label: PlainMessageKey; hint: PlainMessageKey }> = {
-  round: { label: "notifications.kind.round.label", hint: "notifications.kind.round.hint" },
   message: { label: "notifications.kind.message.label", hint: "notifications.kind.message.hint" },
   match: { label: "notifications.kind.match.label", hint: "notifications.kind.match.hint" },
   moderation: {

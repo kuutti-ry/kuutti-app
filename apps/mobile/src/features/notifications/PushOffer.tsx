@@ -9,7 +9,7 @@ import { usePhonePermission } from "./usePhonePermission";
 
 /**
  * The home screen's one offer of notifications (#102, ADR-055 §9), beside
- * the way to today's round once matching is open, never at the first start:
+ * the way to the queue once matching is open, never at the first start:
  * the reason in words and two answers of equal weight. Allow shows the
  * phone's own question; No thanks leaves it unasked. Both wait from a tap
  * until the answer is in, so a second tap asks nothing. Either answer is kept

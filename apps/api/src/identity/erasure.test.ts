@@ -11,6 +11,7 @@ import { conversationBetween } from "../test/chat.ts";
 import { exportOf, openExport } from "../test/export.ts";
 import { captureLogger, englishT, type TestContext, test, testConfig } from "../test/harness.ts";
 import { fixtureJpeg, fixturePng, testMediaDeps } from "../test/media.ts";
+import { queued } from "../test/queue.ts";
 import { eraseAccount, exportAccount } from "./erasure.ts";
 import { REREGISTER_COOLDOWN_DAYS } from "./registration.ts";
 
@@ -412,10 +413,9 @@ describe("account erasure", () => {
       expect(document.account.home).toEqual({
         place: "Kallio",
         shownOnCard: "Helsinki",
-        movedAt: null,
       });
       expect(raw).not.toContain('"00530"');
-      expect(raw).not.toMatch(/homePlace|home_place/);
+      expect(raw).not.toMatch(/homePlace|home_place|movedAt/);
     });
 
     test("says what the card shows where the person chose their area, and the Swedish names in Swedish", async ({
@@ -427,7 +427,6 @@ describe("account erasure", () => {
       expect((await exportOf(app, a.headers)).account.home).toEqual({
         place: "Kallio",
         shownOnCard: "Kallio",
-        movedAt: null,
       });
       const swedish = await openExport(
         await app.request("/account/export", {
@@ -437,7 +436,6 @@ describe("account erasure", () => {
       expect(swedish.document.account.home).toEqual({
         place: "Berghäll",
         shownOnCard: "Berghäll",
-        movedAt: null,
       });
     });
 
@@ -451,7 +449,6 @@ describe("account erasure", () => {
       expect(document.account.home).toEqual({
         place: "Lieksa",
         shownOnCard: "Joensuu",
-        movedAt: null,
       });
       expect(raw).not.toContain('"422"');
     });
@@ -474,23 +471,69 @@ describe("account erasure", () => {
       expect((await exportOf(app, a.headers)).account.home).toEqual({
         place: "Helsinki",
         shownOnCard: "Helsinki",
-        movedAt: null,
       });
     });
+  });
 
-    test("says when the home last moved, and the erasure takes that with it", async ({ ctx }) => {
-      const { app } = await appWith(ctx);
-      const a = await signedInAccount(ctx.client);
-      await putHome(app, a.headers, { postalCode: "00530" });
-      await putHome(app, a.headers, { postalCode: "00100" });
-      const { movedAt } = (await exportOf(app, a.headers)).account.home ?? {};
-      expect(movedAt).toEqual(expect.any(String));
-      expect((await del(app, a.headers)).status).toBe(204);
-      const { rows } = await ctx.client.query("SELECT home_moved_at FROM account WHERE id = $1", [
-        a.accountId,
-      ]);
-      expect(rows).toEqual([{ home_moved_at: null }]);
-    });
+  test("The export says a skip in words and marks a second pass, and names nobody (ADR-062 §3, §6)", async ({
+    ctx,
+  }) => {
+    const { app } = await appWith(ctx);
+    const a = await signedInAccount(ctx.client);
+    const [skipped, passed, undecided] = [
+      await signedInAccount(ctx.client),
+      await signedInAccount(ctx.client),
+      await signedInAccount(ctx.client),
+    ];
+    const at = new Date("2026-10-16T09:00:00.000Z");
+    const round = await queued(
+      ctx.client,
+      a.accountId,
+      [skipped.accountId, passed.accountId, undecided.accountId],
+      at,
+    );
+    await ctx.client.query(
+      `UPDATE round_entries SET
+         decision = (CASE position WHEN 1 THEN 'skip' ELSE 'pass' END)::round_decision,
+         decided_at = $2, second_pass = position = 2
+       WHERE round_id = $1 AND position < 3`,
+      [round, at],
+    );
+    const { document, raw } = await openExport(
+      await app.request("/account/export", { headers: a.headers }),
+    );
+    expect(
+      document.rounds.items[0]?.entries.map((entry) => ({
+        position: entry.position,
+        decision: entry.decision,
+        decisionInWords: entry.decisionInWords,
+        decidedAt: entry.decidedAt,
+        secondPass: entry.secondPass,
+      })),
+    ).toEqual([
+      {
+        position: 1,
+        decision: "skip",
+        decisionInWords: "Left for later",
+        decidedAt: at.toISOString(),
+        secondPass: false,
+      },
+      {
+        position: 2,
+        decision: "pass",
+        decisionInWords: "Passed",
+        decidedAt: at.toISOString(),
+        secondPass: true,
+      },
+      {
+        position: 3,
+        decision: null,
+        decisionInWords: null,
+        decidedAt: null,
+        secondPass: false,
+      },
+    ]);
+    for (const other of [skipped, passed, undecided]) expect(raw).not.toContain(other.accountId);
   });
 
   test("The export works without object storage, with no photo files", async ({ ctx }) => {

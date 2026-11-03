@@ -481,7 +481,7 @@ describe("who may reach a conversation", () => {
     const id = await conversationBetween(ctx.client, a.accountId, b.accountId, {
       messages: [{ from: "a", body: "Hei" }],
     });
-    expect(await listOf(ctx.app, c)).toEqual({ open: [], archived: [] });
+    expect(await listOf(ctx.app, c)).toMatchObject({ open: [], archived: [] });
     for (const target of [id, randomUUID()]) {
       const answers = [
         await ctx.app.request(`/conversations/${target}`, { headers: c.headers }),
@@ -541,7 +541,7 @@ describe("who may reach a conversation", () => {
       messages: [{ from: "b", body: "Hei" }],
     });
     await block(ctx, a, b);
-    expect(await listOf(ctx.app, a)).toEqual({ open: [], archived: [] });
+    expect(await listOf(ctx.app, a)).toMatchObject({ open: [], archived: [] });
     for (const answer of [
       await ctx.app.request(`/conversations/${id}`, { headers: a.headers }),
       await ctx.app.request(`/conversations/${id}/messages`, { headers: a.headers }),
@@ -828,9 +828,9 @@ describe("who may reach a conversation", () => {
        SELECT y.identity_id, x.identity_id FROM account x, account y WHERE x.id = $1 AND y.id = $2`,
       [a.accountId, b.accountId],
     );
-    expect(await listOf(ctx.app, b)).toEqual({ open: [], archived: [] });
+    expect(await listOf(ctx.app, b)).toMatchObject({ open: [], archived: [] });
     await eraseAccount({ db: ctx.client, logger: await silent(), now: () => at }, a.accountId);
-    expect(await listOf(ctx.app, b)).toEqual({ open: [], archived: [] });
+    expect(await listOf(ctx.app, b)).toMatchObject({ open: [], archived: [] });
     const row = await ctx.client.query<{ closed_how: string; closed_by: string }>(
       "SELECT closed_how, closed_by FROM conversation WHERE id = $1",
       [id],

@@ -38,7 +38,7 @@ describe("BeforeSignIn: the terms and the privacy summary", () => {
     await renderWithTheme(<BeforeSignIn onAgreed={jest.fn()} />);
     expect(screen.getByRole("heading", { name: "Before you sign in" })).toBeTruthy();
     expect(screen.getByText("How we do things here")).toBeTruthy();
-    expect(screen.getByText(/One round a day/)).toBeTruthy();
+    expect(screen.getByText(/Nothing here is for sale/)).toBeTruthy();
     expect(screen.getByText("Terms of use")).toBeTruthy();
     expect(screen.getByText("Privacy")).toBeTruthy();
     // Both wordings carry the same version today; each card has its own link.

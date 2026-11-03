@@ -1,6 +1,6 @@
 # ADR-011: The research_id mapping, server-side track(), and the partitioned events table
 
-- Status: accepted, amended 2026-10-13 (§9: what makes the block anonymous, #51), 2026-10-15 (§7 and §10: the events leave the person's export, #51) and 2026-10-17 by ADR-029, proposed (§9: the research copy counts what it released, and a withheld value is `*`, #194; see History)
+- Status: accepted, amended 2026-10-13 (§9: what makes the block anonymous, #51), 2026-10-15 (§7 and §10: the events leave the person's export, #51) and 2026-10-17 by ADR-029, proposed (§9: the research copy counts what it released, and a withheld value is `*`, #194; see History); amended 2026-11-01 by ADR-062 (the registry: `round_built` goes, #502; see History)
 - Date: 2026-09-26
 - Follows: TD-5 (research use of events needs its own yes), TD-7 (the erasure table names the `research_id` mapping), CLAUDE.md rules 5, 6 and 10, `.claude/rules/db.md` (`events`: append-only, monthly partitions, 90-day retention, keyed by `research_id`), `.claude/rules/schema.md` (the event registry), `.claude/rules/api.md` (events and logs; nightly jobs), ADR-007 §4, ADR-009 §2, ADR-010 §4 and its consequences; issue #50
 
@@ -64,3 +64,4 @@ The research opt-in exists as a consent row bound to a wording (#46). Nothing ye
 - 2026-10-20 (#95, ADR-035 §6): `round_built` names the ordering of the places no rule forces (`count`, the first cut's).
 - 2026-10-20 (#378, ADR-039 §5): `like` carries `fish`, and `round_built` counts its `fish` places.
 - 2026-11-01 (#500, ADR-061 §8, ADR-013 §17): nobody chooses a pond, so §3's is null before the person has a home. §9 counts one pond, half the cells, so what it said of a second field now reads about half of them, and most with a third: estimates from the demo's shares on that day, not a measurement. Its floor is named the pond counter's.
+- 2026-11-01 (#502, ADR-062 §15, the agent's and not put to the maintainer): `round_built` and `RoundOrdering` leave the registry: nothing is built at night, and a set that no longer exists has no size to count. `profile_viewed`, `like` and `pass` stay, their `position` widened from `ROUND_ENTRIES_MAX` to the day's log (`ROUND_POSITION_MAX`), and a skip is no event. Rows already written stay as they are (§5), and the research copy leaves them out as it does any retired name (`readEvent`).

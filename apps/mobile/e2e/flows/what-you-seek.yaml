@@ -131,7 +131,7 @@ name: What you seek lists whom, the ages, why and the deal-breakers, and each ch
 - waitForAnimationToEnd
 
 # One answer, one door: the profile's own section no longer asks it.
-- tapOn: "Back to your profile|Takaisin profiiliisi|Tillbaka till din profil"
+- tapOn: "Back|Takaisin|Tillbaka"
 - extendedWaitUntil:
     visible: "(The basics|Perustiedot|Grunderna)(, .*)?"
     timeout: 15000

@@ -156,12 +156,11 @@ export const AccountExport = z
       /** Self-declared (#46); null before onboarding and after erasure. */
       gender: Gender.nullable(),
       pond: PondSummary.nullable(),
-      /** The home in words (ADR-061 §9): the place kept, the name the card shows and when it last moved, never a key; null before the step and after erasure. */
+      /** The home in words (ADR-061 §9): the place kept and the name the card shows, never a key; null before the step and after erasure. */
       home: z
         .object({
           place: z.string().max(PLACE_NAME_MAX),
           shownOnCard: z.string().max(PLACE_NAME_MAX),
-          movedAt: z.iso.datetime().nullable(),
         })
         .nullable(),
       /** When the gender last changed from an earlier answer (#147); null until then and after erasure. */

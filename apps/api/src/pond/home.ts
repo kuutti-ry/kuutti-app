@@ -13,14 +13,13 @@ import * as repo from "./repo.ts";
  * constant, with no detail. Nothing here logs more than the account (§9): a
  * home is in no log line, error, event, frame or push.
  */
-export type HomeDeps = { db: Queryable; logger: Logger; now?: () => Date };
+export type HomeDeps = { db: Queryable; logger: Logger };
 
 /**
  * A new home, what the card shows, or both. A new postal code starts from the
  * town again unless the same request says otherwise (§3), and a choice with
  * no area to show stays false. It changes whenever the person likes, with no
- * cadence, and the earlier home is overwritten (§1, §9); the time of the move
- * closes the day's short pool (§5). A pond held stays.
+ * cadence, and the earlier home is overwritten (§1, §9). A pond held stays.
  */
 export async function saveHome(
   deps: HomeDeps,
@@ -41,12 +40,7 @@ export async function saveHome(
     if (place === null) throw new AppError(400, "validation_failed", "A postal code first");
     const area = areaOf(place);
     const showArea = update.showArea === true && area !== null;
-    await repo.writeHomeOfAccount(
-      tx,
-      accountId,
-      { place: moved, showsArea: showArea },
-      deps.now?.() ?? new Date(),
-    );
+    await repo.writeHomeOfAccount(tx, accountId, { place: moved, showsArea: showArea });
     return { town: townOf(place, rules.townMin), area, showArea };
   });
   deps.logger.info({ accountId }, "home set");
@@ -72,7 +66,7 @@ const inLanguage = (name: PlaceName, locale: Locale): string =>
 
 /**
  * The export (§9): the place held and the name the card shows, in words,
- * never a key, and when it last moved. Null as `readHome` reads none.
+ * never a key. Null as `readHome` reads none.
  */
 export async function exportHome(
   db: Queryable,
@@ -88,6 +82,5 @@ export async function exportHome(
   return {
     place: inLanguage(nameOf(kept), locale),
     shownOnCard: inLanguage(shownPlace(home), locale),
-    movedAt: stored.movedAt?.toISOString() ?? null,
   };
 }

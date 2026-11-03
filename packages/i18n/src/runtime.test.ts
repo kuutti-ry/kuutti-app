@@ -233,7 +233,7 @@ describe("Stadi", () => {
     expect(tIn("fi")("round.like")).toBe("Tykkää");
   });
 
-  it.each([["load.retry"], ["legal.terms.title"], ["push.round"]] as const)(
+  it.each([["load.retry"], ["legal.terms.title"], ["push.match"]] as const)(
     "is the Finnish text where a key has none: %s",
     (key) => {
       expect(stadi(key)).toBe(tIn("fi")(key));

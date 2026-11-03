@@ -88,7 +88,6 @@ const consentsAnswer = {
 };
 
 const CHOICES = [
-  { kind: "round", enabled: true },
   { kind: "message", enabled: true },
   { kind: "match", enabled: true },
   { kind: "moderation", enabled: true },
@@ -580,7 +579,7 @@ describe("the settings screen", () => {
     await press(row("Notifications"));
     await press(await screen.findByRole("switch", { name: "Messages" }));
     await waitFor(() =>
-      expect(row("Notifications").props.accessibilityValue).toEqual({ text: "3 on, 1 off, open" }),
+      expect(row("Notifications").props.accessibilityValue).toEqual({ text: "2 on, 1 off, open" }),
     );
     await press(row("Ways to reach you"));
     await act(async () => {

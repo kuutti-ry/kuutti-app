@@ -1,6 +1,6 @@
 # ADR-036: The day's likes, their first cut
 
-- Status: accepted 2026-10-20 (#98's budget half, built as written here on the maintainer's decisions of that day, #98's comment of 20/10/2026; the points under "Open, the maintainer's" are his to confirm or change), amended 2026-10-22 (§5: a like earned by an invitation extends the day's budget, #107, ADR-044 §8; see History), amended 2026-10-30 (§6 and Open 1: the round says how many likes are left, the maintainer's of that day, #524; see History)
+- Status: accepted 2026-10-20 (#98's budget half, built as written here on the maintainer's decisions of that day, #98's comment of 20/10/2026; the points under "Open, the maintainer's" are his to confirm or change), amended 2026-10-22 (§5: a like earned by an invitation extends the day's budget, #107, ADR-044 §8; see History), amended 2026-10-30 (§6 and Open 1: the round says how many likes are left, the maintainer's of that day, #524; see History); amended 2026-11-01 by ADR-062 (the Consequences: `round_size` is gone and the day's budget binds, #502; see History)
 - Date: 2026-10-20
 - Follows: TD-11 (a like stays scarce), TD-14 (budgets that name no gender), TD-15 (a reward may raise a budget), ADR-034 §5 (a decision changes until the day ends, under the round's lock), ADR-035 (the first cut's round), CLAUDE.md rule 10 and Product constraints; issues #98, #97, #378, #85
 
@@ -51,3 +51,4 @@ TD-14's contest rule and its two budgets, the research buckets, approach 2's wei
 - 2026-10-20 (#378, ADR-039 §2, §3): a fish counts against the day's likes as a like; a like on a `fish` card is free as one on a `liked_you` card.
 - 2026-10-22 (#107, ADR-044 §8): §5 added, the maintainer's of that day. A like earned by an invitation is used by itself once the day's likes are spent, and the day's count leaves out the likes it paid for. #85's explicit "five more likes" is still for later.
 - 2026-10-30 (#524, a session of that day): §6 added and Open 1 answered, the maintainer's of that day. The round says how many likes are left, counting from the budget down to zero. The maintainer also decided that liking back spends a like; that is #503's to build, and §3 stands until it lands.
+- 2026-11-01 (#502, ADR-062 §1): `round_size` is gone, so the Consequences' number that reaches zero only on a round's last ordered card is over: a queue has no size, and the day's budget binds. A skip, like a pass, is never counted. §3's free like back and §5's earned likes stay with #503 (ADR-062 §15).

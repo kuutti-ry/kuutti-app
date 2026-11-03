@@ -427,23 +427,14 @@ describe("the development log of pushes (ADR-055 §8)", () => {
         collapseId: "match",
         tag: "match",
       },
-      {
-        ...pushTo(3),
-        body: "Today's round is ready",
-        data: { kind: "round" },
-        collapseId: "round",
-        tag: "round",
-        priority: "normal",
-      },
     ];
     const tickets = await logPusher(logger).send(sent);
     expect(tickets).toEqual([
       { status: "ok", id: "log-0" },
       { status: "ok", id: "log-1" },
-      { status: "ok", id: "log-2" },
     ]);
     const written = lines().filter((line) => line.msg === "push not sent: written here instead");
-    expect(written.map((line) => line.push)).toEqual(["message", "match", "round"]);
+    expect(written.map((line) => line.push)).toEqual(["message", "match"]);
     const raw = JSON.stringify(lines());
     for (const message of sent) {
       expect(raw).not.toContain(message.to);

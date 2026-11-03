@@ -18,7 +18,6 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import { type BootOptions, boot } from "./boot.ts";
 import { type IdentityBroker, OidcBroker } from "./identity/index.ts";
 import { runNightly } from "./jobs/nightly.ts";
-import { runRoundPush } from "./jobs/round-push.ts";
 import { CHALLENGE } from "./test/attempt.ts";
 import { captureLogger, type LogLine, TEST_DATABASE_URL, testConfig } from "./test/harness.ts";
 import { testSigningKeys } from "./test/media.ts";
@@ -204,7 +203,7 @@ describe("boot", () => {
     expect(await health.json()).toMatchObject({ db: "ok", migrations: "current" });
   });
 
-  it("pushes as PUSH says, saying whether with an access token and never the token, and gives the round's push the process's one sender (#102)", async () => {
+  it("pushes as PUSH says, saying whether with an access token and never the token (#102)", async () => {
     for (const [overrides, said] of [
       [{}, { push: "log", authenticated: false }],
       [{ PUSH: "off" }, { push: "off", authenticated: false }],
@@ -213,13 +212,9 @@ describe("boot", () => {
         { push: "expo", authenticated: true },
       ],
     ] as const) {
-      const { lines, push, roundPush } = await booted(overrides);
+      const { lines, push } = await booted(overrides);
       expect(line(lines, "push")).toMatchObject(said);
       expect(JSON.stringify(lines())).not.toContain("boot-test-expo-access");
-      // One push for the app and the round, which index.ts's shutdown waits for.
-      expect(roundPush.push).toBe(push);
-      // Nobody has a round in a fresh database: the run tells nobody and sends nothing.
-      expect(await runRoundPush(roundPush)).toEqual({ rounds: 0, pushed: 0 });
       // A message's push returns at once; settled waits for it. Nobody has a device here.
       expect(
         push.message({
@@ -243,7 +238,7 @@ describe("boot", () => {
       "end-suspensions",
       "pond-counter",
       "invitation-count",
-      "round-builder",
+      "prune-rounds",
       "reject-unreviewed-photos",
       "prune-photo-check-notes",
       "prune-reports",
@@ -676,7 +671,7 @@ describe("boot: a deployed box", () => {
     },
   );
 
-  it("with its photos on CloudFront, staging writes the research copy and builds rounds, and production does neither", async () => {
+  it("with its photos on CloudFront, staging writes the research copy and production does not, and both prune the rounds", async () => {
     const media = {
       S3_BUCKET: "kuutti-media-test",
       MEDIA_URL_BASE: "https://api.test",
@@ -696,9 +691,9 @@ describe("boot: a deployed box", () => {
     });
     expect(line(production.lines, "media")).toMatchObject({ mode: "cloudfront" });
     expect(production.jobs.map((j) => j.name)).not.toContain("research-export");
-    // Nor the rounds, before the maintainer has set how long they are kept (ADR-035, Open 1).
-    expect(staging.jobs.map((j) => j.name)).toContain("round-builder");
-    expect(production.jobs.map((j) => j.name)).not.toContain("round-builder");
+    // Rounds are kept a year, so production keeps them as staging does (ADR-062 §13).
+    expect(staging.jobs.map((j) => j.name)).toContain("prune-rounds");
+    expect(production.jobs.map((j) => j.name)).toContain("prune-rounds");
     const partitions = production.jobs.find((j) => j.name === "research-events-partitions");
     expect(await partitions?.run()).not.toHaveProperty("uncopied");
   });

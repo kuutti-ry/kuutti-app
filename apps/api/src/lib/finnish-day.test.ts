@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { finnishDay, finnishHour } from "./finnish-day.ts";
+import { addDays, finnishDay, finnishHour } from "./finnish-day.ts";
 
 describe("finnishDay", () => {
   it("names the day in Finland, not the server's", () => {
@@ -12,7 +12,28 @@ describe("finnishDay", () => {
   });
 });
 
-// The hour the quiet hours and the round's push read (#102, ADR-055 §6, §7).
+// The ladder's clocks and the year's prune count days by the calendar (ADR-062 §6, §13).
+describe("addDays", () => {
+  it.each([
+    ["2026-11-01", 0, "2026-11-01"],
+    ["2026-11-01", 1, "2026-11-02"],
+    ["2026-11-01", -1, "2026-10-31"],
+    // Across a month and a year, a leap day among them.
+    ["2026-12-31", 1, "2027-01-01"],
+    ["2028-02-28", 1, "2028-02-29"],
+    ["2028-03-01", -1, "2028-02-29"],
+    ["2026-02-28", 1, "2026-03-01"],
+    // The days of 25 and 23 hours are one day each.
+    ["2026-10-24", 2, "2026-10-26"],
+    ["2027-03-27", 2, "2027-03-29"],
+    // The longest clock.
+    ["2026-11-01", -365, "2025-11-01"],
+  ])("%s and %i days is %s", (day, days, expected) => {
+    expect(addDays(day, days)).toBe(expected);
+  });
+});
+
+// The hour the quiet hours read (#102, ADR-055 §7).
 describe("finnishHour", () => {
   it.each([
     // Summer time, UTC+3: midnight in Helsinki is 21:00 UTC.

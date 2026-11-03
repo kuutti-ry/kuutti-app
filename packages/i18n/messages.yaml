@@ -762,7 +762,7 @@ profile.seek.back:
 
 profile.seek.explain:
   en: "These work both ways: they decide whom you see and who sees you. Conversations you already have stay as they are."
-  description: "Line at the top of What you seek (#542): every answer here is a filter both ways. It names no moment and no absolute, since today's cards stand until the next round (the register's open row, ADR-034 Open 5)."
+  description: "Line at the top of What you seek (#542): every answer here is a filter both ways, and a change works on the next read (ADR-062 §8). It names no moment and no absolute."
   fi: "Nämä toimivat molempiin suuntiin: ne ratkaisevat, keitä näet ja ketkä näkevät sinut. Keskustelusi pysyvät ennallaan."
   sv: "De här gäller åt båda håll: de avgör vilka du ser och vilka som ser dig. Samtal du redan har förblir som de är."
   machine: { fi: true, sv: true }
@@ -3335,7 +3335,7 @@ errors.photo_budget_exceeded:
 
 errors.card_budget_exceeded:
   en: You have seen many profiles today. New ones come after midnight.
-  description: Card route (429 with Retry-After), the account has been shown the day's budget of cards from matching_config exposure_cards_per_day (TD-6, #47); the day rolls at midnight in Finland.
+  description: "Card route (429 with Retry-After): the account has been shown the day's budget of cards from matching_config exposure_cards_per_day, where that is not 0, which is off (TD-6, #47, ADR-062 §9); the day rolls at midnight in Finland."
   fi: Olet nähnyt tänään paljon profiileja. Uusia tulee keskiyön jälkeen.
   sv: Du har sett många profiler i dag. Nya kommer efter midnatt.
   machine: { fi: true, sv: true }
@@ -3369,10 +3369,17 @@ errors.report_window_closed:
   machine: { fi: true, sv: true }
 
 errors.round_expired:
-  en: "That round ended at midnight, so this was not saved."
-  description: "Today's round (409, #96, ADR-034): a card of a day that has ended was liked, passed or reported seen; the app reads today's round again."
-  fi: "Kierros päättyi keskiyöllä, joten tätä ei tallennettu."
-  sv: "Rundan tog slut vid midnatt, så det här sparades inte."
+  en: "That day ended at midnight, so this was not saved."
+  description: "The queue (409, #96, ADR-034): a card of a day that has ended was liked, passed, skipped or reported seen; the app reads the queue again."
+  fi: "Päivä päättyi keskiyöllä, joten tätä ei tallennettu."
+  sv: "Dagen tog slut vid midnatt, så det här sparades inte."
+  machine: { fi: true, sv: true }
+
+errors.your_turn_limit:
+  en: "Conversations are waiting for you. Answer or end one first."
+  description: "The queue (409, ADR-062 §5): a like or a fish while matching_config your_turn_limit conversations wait on the person's answer. Reading and passing go on. Nothing was saved. Never says what became of the card."
+  fi: "Keskustelut odottavat sinua. Vastaa tai lopeta yksi ensin."
+  sv: "Samtal väntar på dig. Svara på eller avsluta ett först."
   machine: { fi: true, sv: true }
 
 errors.found_them_answered:
@@ -4430,10 +4437,10 @@ onboarding.welcome.norm3:
   machine: { fi: true, sv: true }
 
 onboarding.welcome.norm4:
-  en: "One round a day. Nothing here is for sale."
+  en: "Nothing here is for sale."
   description: "Fourth norm of the welcome screen (#146)."
-  fi: "Yksi kierros päivässä. Täällä ei myydä mitään."
-  sv: "En omgång om dagen. Ingenting här är till salu."
+  fi: "Täällä ei myydä mitään."
+  sv: "Ingenting här är till salu."
   machine: { fi: true, sv: true }
 
 onboarding.welcome.accept:
@@ -5685,10 +5692,10 @@ settings.decisionButtons.label:
   machine: { fi: true, sv: true }
 
 settings.decisionButtons.explain:
-  en: "Where Like and Pass sit on today's round. Each keeps its own word and shape wherever it is."
+  en: "Where Like and Pass sit when you go through people. Each keeps its own word and shape wherever it is."
   description: "Decision buttons screen, its first line (#82): what the setting moves, and that the two buttons stay told apart by word and shape, never by colour or place alone."
-  fi: "Missä Tykkää ja Ohita ovat päivän kierroksella. Kummallakin on aina oma sanansa ja muotonsa, missä se onkin."
-  sv: "Var Gilla och Hoppa över finns i dagens runda. Båda behåller sitt eget ord och sin form var de än är."
+  fi: "Missä Tykkää ja Ohita ovat, kun katsot ihmisiä. Kummallakin on aina oma sanansa ja muotonsa, missä se onkin."
+  sv: "Var Gilla och Hoppa över finns när du går igenom människor. Båda behåller sitt eget ord och sin form var de än är."
   machine: { fi: true, sv: true }
 
 settings.decisionButtons.hand:
@@ -5720,10 +5727,10 @@ settings.decisionButtons.oneHanded:
   machine: { fi: true, sv: true }
 
 settings.decisionButtons.oneHandedHint:
-  en: "Undo, the fish, Pass and Like in one column at the bottom on your hand's side, within your thumb's reach."
+  en: "Undo, the fish, Later, Pass and Like in one column at the bottom on your hand's side, within your thumb's reach."
   description: "Decision buttons screen, under the one-handed switch (#82): what it does. The fish is the app's word for the super-like (ADR-039)."
-  fi: "Kumoa, kala, Ohita ja Tykkää yhdessä sarakkeessa alhaalla kätesi puolella, peukalon ulottuvilla."
-  sv: "Ångra, fisken, Hoppa över och Gilla i en kolumn längst ner på din hands sida, inom räckhåll för tummen."
+  fi: "Kumoa, kala, Myöhemmin, Ohita ja Tykkää yhdessä sarakkeessa alhaalla kätesi puolella, peukalon ulottuvilla."
+  sv: "Ångra, fisken, Senare, Hoppa över och Gilla i en kolumn längst ner på din hands sida, inom räckhåll för tummen."
   machine: { fi: true, sv: true }
 
 settings.decisionButtons.style:
@@ -6814,7 +6821,7 @@ admin.takeDown.effect:
   description: "Admin panel, the take-down's confirm step (#477, ADR-006 §2): what taking down an approved photo does, in words."
 
 admin.takeDown.tooFew:
-  en: "This leaves them fewer than {photos, number} approved photos: until another is approved, nobody is shown their card and they get no round."
+  en: "This leaves them fewer than {photos, number} approved photos: until another is approved, nobody is shown their card and they read no queue."
   description: "Admin panel, the take-down's confirm step (#477), only when the person would be left with fewer approved photos than a complete profile needs. {photos} is that number."
 
 admin.takeDown.confirm:
@@ -6930,16 +6937,16 @@ admin.matching.confirm.open.title:
   description: "Admin panel, matching: the confirm step's heading when opening matching."
 
 admin.matching.confirm.open.effect:
-  en: "Everybody with a finished profile is told that matching is open, and gets a round each night, or when they next open the app. Production builds no rounds yet, so there they are told it is open and no round comes."
-  description: "Admin panel, matching: the effect of opening matching in words (rules/admin.md). The night builds rounds, and the day's first read builds a missing one (ADR-035 §5), but neither in production until the maintainer has set how long rounds are kept (ADR-034 Open 2, ADR-035 Open 1); take that sentence out with that shortcut."
+  en: "Everybody with a finished profile is told that matching is open, and reads their queue from the moment they open the app."
+  description: "Admin panel, matching: the effect of opening matching in words (rules/admin.md). The first read opens a person's day (ADR-062 §1)."
 
 admin.matching.confirm.close.title:
   en: "Close matching?"
   description: "Admin panel, matching: the confirm step's heading when closing matching."
 
 admin.matching.confirm.close.effect:
-  en: "No new rounds are built from now on. Rounds already built stay for the day, and conversations go on. People with a finished profile are told that matching has not opened yet."
-  description: "Admin panel, matching: the effect of closing matching in words (ADR-060 §1): closing builds no new round and ends no conversation."
+  en: "Nobody new joins a queue from now on. Cards already queued stay for the day, and conversations go on. People with a finished profile are told that matching has not opened yet."
+  description: "Admin panel, matching: the effect of closing matching in words (ADR-060 §1): closing adds nobody to a queue and ends no conversation."
 
 admin.matching.apply.open:
   en: "Open matching"
@@ -7546,10 +7553,10 @@ account.export.report.outcome.acted:
   machine: { fi: true, sv: true }
 
 account.export.round.about:
-  en: "The rounds you were shown, a day each: when it was ready and opened, each card's place and why it was there, when you saw it, and whether you liked or passed it. Who was on a card is not written here."
+  en: "What you went through, a day each: when the day began and when you opened it, each card's place and why it was there, when you saw it, and whether you liked it, passed it or left it for later. A second pass, which holds a year, is marked. Who was on a card is not written here."
   description: "Inside the downloaded data file (#96, ADR-034), the text that opens the part listing the person's own rounds. Plain; says why no name is there."
-  fi: "Sinulle näytetyt kierrokset, yksi kultakin päivältä: milloin kierros oli valmis ja avattiin, kunkin kortin paikka ja miksi se oli mukana, milloin näit sen ja tykkäsitkö vai ohititko sen. Sitä, kuka kortilla oli, ei kirjoiteta tähän."
-  sv: "Rundorna du fick se, en för varje dag: när rundan var klar och öppnades, varje korts plats och varför det var med, när du såg det och om du gillade eller hoppade över det. Vem som fanns på ett kort står inte här."
+  fi: "Mitä kävit läpi, yksi kultakin päivältä: milloin päivä alkoi ja milloin avasit sen, kunkin kortin paikka ja miksi se oli mukana, milloin näit sen ja tykkäsitkö, ohititko vai jätitkö sen myöhemmäksi. Toinen ohitus, joka pätee vuoden, on merkitty. Sitä, kuka kortilla oli, ei kirjoiteta tähän."
+  sv: "Det du gick igenom, en för varje dag: när dagen började och när du öppnade den, varje korts plats och varför det var med, när du såg det och om du gillade det, hoppade över det eller lämnade det till senare. En andra överhoppning, som gäller ett år, är markerad. Vem som fanns på ett kort står inte här."
   machine: { fi: true, sv: true }
 
 account.export.round.reason.matches_filters:
@@ -7620,6 +7627,13 @@ account.export.round.decision.pass:
   description: "Inside the downloaded data file (#96), the person's decision on a card of their round."
   fi: "Ohitit"
   sv: "Hoppade över"
+  machine: { fi: true, sv: true }
+
+account.export.round.decision.skip:
+  en: "Left for later"
+  description: "Inside the downloaded data file (ADR-062 §3), the person's decision on a card: moved on without deciding."
+  fi: "Jätit myöhemmäksi"
+  sv: "Lämnade till senare"
   machine: { fi: true, sv: true }
 
 account.export.block.about:
@@ -7812,10 +7826,10 @@ account.foundThem.intro:
   machine: { fi: true, sv: true }
 
 account.foundThem.unchanged:
-  en: "Nothing changes in the app: your profile, your rounds and your conversations stay as they are. To step away, take a break or delete your account under Your account."
+  en: "Nothing changes in the app: your profile, the people you go through and your conversations stay as they are. To step away, take a break or delete your account under Your account."
   description: "\"Löysin hänet\" (#83): the answer changes nothing (the maintainer, 21/10/2026); stepping away is the break or the deletion, both under Your account (account.title)."
-  fi: "Sovelluksessa mikään ei muutu: profiilisi, kierroksesi ja keskustelusi pysyvät ennallaan. Jos haluat pitää taukoa tai poistaa tilisi, löydät ne kohdasta Tilisi."
-  sv: "Inget ändras i appen: din profil, dina rundor och dina samtal är kvar som de är. Vill du ta en paus eller radera ditt konto finns det under Ditt konto."
+  fi: "Sovelluksessa mikään ei muutu: profiilisi, ihmiset joita käyt läpi ja keskustelusi pysyvät ennallaan. Jos haluat pitää taukoa tai poistaa tilisi, löydät ne kohdasta Tilisi."
+  sv: "Inget ändras i appen: din profil, människorna du går igenom och dina samtal är kvar som de är. Vill du ta en paus eller radera ditt konto finns det under Ditt konto."
   machine: { fi: true, sv: true }
 
 account.foundThem.question:
@@ -8222,7 +8236,7 @@ pond.gate.closed:
 
 pond.gate.open:
   en: "Matching is open for you."
-  description: "Gate card when matching has opened for the person. It promises no round and no date: production builds no rounds yet (ADR-035 Open 1)."
+  description: "Gate card when matching has opened for the person. It promises no card and no date (ADR-062)."
   fi: "Seuranhaku on sinulle auki."
   sv: "Matchningen är öppen för dig."
   machine: { fi: true, sv: true }
@@ -8241,21 +8255,21 @@ pond.gate.failed:
   sv: "Det gick inte att kontrollera matchningen."
   machine: { fi: true, sv: true }
 
-# --- Today's round (#379, ADR-034): one card at a time, like and pass, come back tomorrow ---
+# --- The queue (#379, #502, ADR-034, ADR-062): one card at a time, like, pass and Later, to its end ---
 
 round.home.open:
-  en: "Today's round"
-  description: "Button on the gate card of the home screen, once matching is open for the person: opens the day's round (#379). Short; no count, no time."
-  fi: "Päivän kierros"
-  sv: "Dagens runda"
+  en: "See people"
+  description: "Button on the card of the home screen, once matching is open for the person: opens the queue of people to go through (#379, ADR-062 §14). Short; no count, no time."
+  fi: "Katso ihmisiä"
+  sv: "Se människor"
   machine: { fi: true, sv: true }
 
 round.title:
-  en: "Today's round"
-  description: "Title of the round screen, in its header beside the back arrow (#379)."
-  fi: "Päivän kierros"
-  sv: "Dagens runda"
-  slangi: "Päivän rundi"
+  en: "People"
+  description: "Title of the screen of the queue, in its header beside the back arrow (#379, ADR-062 §14)."
+  fi: "Ihmiset"
+  sv: "Människor"
+  slangi: "Jengi"
   machine: { fi: true, sv: true, slangi: true }
 
 round.back:
@@ -8266,17 +8280,17 @@ round.back:
   machine: { fi: true, sv: true }
 
 round.loading:
-  en: "Loading today's round…"
-  description: "Round screen while the day's round is read (#379)."
-  fi: "Ladataan päivän kierrosta…"
-  sv: "Läser in dagens runda…"
+  en: "Loading people…"
+  description: "The queue's screen while the next cards are read (#379, ADR-062)."
+  fi: "Ladataan ihmisiä…"
+  sv: "Läser in människor…"
   machine: { fi: true, sv: true }
 
 round.failed:
-  en: "Today's round did not load."
-  description: "Round screen when the day's round could not be read; why, and a button to try again, follow (#379)."
-  fi: "Päivän kierrosta ei voitu ladata."
-  sv: "Dagens runda kunde inte läsas in."
+  en: "People did not load."
+  description: "The queue's screen when the next cards could not be read; why, and a button to try again, follow (#379)."
+  fi: "Ihmisiä ei voitu ladata."
+  sv: "Det gick inte att läsa in människor."
   machine: { fi: true, sv: true }
 
 round.reason.matches_filters:
@@ -8343,10 +8357,10 @@ round.short.title:
   machine: { fi: true, sv: true }
 
 round.short.explain:
-  en: "Your deal-breakers leave few people today. You can relax one for today only: tomorrow's round follows them as you set them, and one tap undoes it."
+  en: "Your deal-breakers leave few people today. You can relax one for today only: tomorrow they hold as you set them, and one tap undoes it."
   description: "Short-pool panel (#99, ADR-042 §3): a relaxation is for the day only, by the reader's tap, undone by one; nothing else is ever relaxed."
-  fi: "Ehdottomat rajasi jättävät tänään vähän ihmisiä. Voit joustaa yhdestä vain tämän päivän ajan: huomisen kierros noudattaa niitä niin kuin asetit ne, ja yksi napautus peruu jouston."
-  sv: "Dina absoluta gränser lämnar få personer i dag. Du kan släppa på en bara för i dag: morgondagens runda följer dem som du har ställt in dem, och ett tryck ångrar det."
+  fi: "Ehdottomat rajasi jättävät tänään vähän ihmisiä. Voit joustaa yhdestä vain tämän päivän ajan: huomenna ne pätevät niin kuin asetit ne, ja yksi napautus peruu jouston."
+  sv: "Dina absoluta gränser lämnar få personer i dag. Du kan släppa på en bara för i dag: i morgon gäller de som du har ställt in dem, och ett tryck ångrar det."
   machine: { fi: true, sv: true }
 
 round.short.unanswered:
@@ -8410,6 +8424,14 @@ round.pass:
   max_length: 14
   machine: { fi: true, sv: true, slangi: true }
 
+round.skip:
+  en: "Later"
+  description: "Decision button on a card (ADR-062 §3): move on without deciding. It spends nothing and costs nobody anything, and the card returns another day. Plainer than Like and Pass, a text button. Finnish Ohita is already Pass, so this is never that word. One word."
+  fi: "Myöhemmin"
+  sv: "Senare"
+  max_length: 14
+  machine: { fi: true, sv: true }
+
 round.likesLeft:
   en: "{likes, plural, =0 {No likes left today. New ones tomorrow.} one {# like left today} other {# likes left today}}"
   description: "Line beside the decision buttons on a round card (#524, ADR-036 §6): how many of the day's likes the reader has left, counting down from matching_config like_budget_balanced to zero; a fish counts in them. A plain fact in the same words at ten as at one: never urgent, never 'only one left'. =0: none are left and new ones come tomorrow, and passing stays possible. It wraps at large text sizes. The number is a tunable, so never write it out."
@@ -8446,6 +8468,13 @@ round.revisit.pass:
   sv: "Du hoppade över den här personen. Du kan ändra det fram till midnatt."
   machine: { fi: true, sv: true }
 
+round.revisit.skip:
+  en: "You left this person for later. You can change that until midnight."
+  description: "Above a card the reader brought back with Undo, when its decision is a skip (ADR-062 §3): the skip stands until another button is pressed."
+  fi: "Jätit tämän henkilön myöhemmäksi. Voit muuttaa sitä keskiyöhön asti."
+  sv: "Du lämnade den här personen till senare. Du kan ändra det fram till midnatt."
+  machine: { fi: true, sv: true }
+
 round.revisit.fish:
   en: "You sent this person a fish. You can change that until midnight."
   description: "Above a card the reader brought back with Undo, when its decision is a fish (ADR-034 §5, ADR-039): changed the same day, the fish is given back."
@@ -8454,31 +8483,31 @@ round.revisit.fish:
   machine: { fi: true, sv: true }
 
 round.done:
-  en: "That was today's round. The next one comes tomorrow."
-  description: "Round screen after the day's last card is decided (#379). Calm and final: no countdown, no count, nothing that loads more."
-  fi: "Siinä oli päivän kierros. Seuraava tulee huomenna."
-  sv: "Det var dagens runda. Nästa kommer i morgon."
+  en: "That's everybody for now."
+  description: "The queue's screen at its end (ADR-062 §11): nobody is left to go through. The short pool's offers, then one button into What you seek, come under it. Calm and final: no count, no promise of when more come, and never 'come back tomorrow', which in a thin set would be false for a month."
+  fi: "Siinä kaikki tällä erää."
+  sv: "Det var alla för tillfället."
   machine: { fi: true, sv: true }
 
-round.empty:
-  en: "There is nobody to show you today. Come back tomorrow."
-  description: "Round screen when the day's round has no cards (#95): nobody in the pool both ways today. No filler, no count, nothing that blames the reader."
-  fi: "Tänään ei ole ketään näytettävää. Tule takaisin huomenna."
-  sv: "I dag finns det ingen att visa dig. Kom tillbaka i morgon."
+round.yourTurn.refused:
+  en: "{waiting, plural, one {# conversation is waiting for you.} other {# conversations are waiting for you.}} Answer or end one before you like anyone new."
+  description: "The queue's screen, above the card, when a like or a fish was refused because matching_config your_turn_limit conversations wait on the person's answer (ADR-062 §5). {waiting} is their own number. The card stays and Pass and Later still work."
+  fi: "{waiting, plural, one {# keskustelu odottaa sinua.} other {# keskustelua odottaa sinua.}} Vastaa tai lopeta yksi, ennen kuin tykkäät kenestäkään uudesta."
+  sv: "{waiting, plural, one {# samtal väntar på dig.} other {# samtal väntar på dig.}} Svara på eller avsluta ett innan du gillar någon ny."
   machine: { fi: true, sv: true }
 
 round.none:
-  en: "Your round is not ready yet. Come back tomorrow."
-  description: "Round screen when the reader has no round for the day (ADR-035 §5: the read builds none, for instance while matching is not open). No date, no count."
-  fi: "Kierroksesi ei ole vielä valmis. Tule takaisin huomenna."
-  sv: "Din runda är inte klar än. Kom tillbaka i morgon."
+  en: "There is nobody to show you yet."
+  description: "The queue's screen when the reader has no queue: matching is not open for them (ADR-062 §1). No date, no count."
+  fi: "Ei vielä ketään näytettävää."
+  sv: "Det finns ingen att visa dig än."
   machine: { fi: true, sv: true }
 
 round.newDay:
-  en: "Yesterday's round ended at midnight. This is today's."
-  description: "Round screen when the day ended while it was open and the new day's round was read in its place (ADR-034 §3). Said once, above the round."
-  fi: "Eilinen kierros päättyi keskiyöllä. Tämä on tämän päivän kierros."
-  sv: "Gårdagens runda tog slut vid midnatt. Det här är dagens."
+  en: "A new day began at midnight."
+  description: "The queue's screen when the day ended while it was open and the new day was read in its place (ADR-034 §3). Said once, above the card."
+  fi: "Uusi päivä alkoi keskiyöllä."
+  sv: "En ny dag började vid midnatt."
   machine: { fi: true, sv: true }
 
 round.gone:
@@ -8518,10 +8547,10 @@ round.match.open:
   machine: { fi: true, sv: true }
 
 round.match.continue:
-  en: "Back to the round"
-  description: "Button under a match on the round screen (#100): the round goes on with its next card, or says that it is done."
-  fi: "Takaisin kierrokselle"
-  sv: "Tillbaka till rundan"
+  en: "Back to people"
+  description: "Button under a match on the queue's screen (#100): the queue goes on with its next card, or says that it has reached its end."
+  fi: "Takaisin ihmisiin"
+  sv: "Tillbaka till människorna"
   machine: { fi: true, sv: true }
 
 # --- The chat (#348, ADR-031): the list of conversations, a conversation and its composer ---
@@ -8540,18 +8569,32 @@ chat.back:
   sv: "Tillbaka"
   machine: { fi: true, sv: true }
 
-chat.list.open:
-  en: "Open"
-  description: "Heading of the list's first group (#348): the conversations going on now."
-  fi: "Avoimet"
-  sv: "Öppna"
-  machine: { fi: true, sv: true }
-
 chat.list.archived:
   en: "Archived"
   description: "Heading of the list's second group (#348): conversations quiet for a week, and ended ones."
   fi: "Arkistoidut"
   sv: "Arkiverade"
+  machine: { fi: true, sv: true }
+
+chat.list.yourTurn:
+  en: "Your turn: {waiting}"
+  description: "Heading of the list's first group (ADR-062 §5): conversations waiting on the reader's answer, with how many. A fresh match with nothing said is here too. {waiting} is their own number."
+  fi: "Sinun vuorosi: {waiting}"
+  sv: "Din tur: {waiting}"
+  machine: { fi: true, sv: true }
+
+chat.list.theirTurn:
+  en: "Their turn"
+  description: "Heading of the list's second group (ADR-062 §5): conversations where the reader said the last thing. 'Their' is singular here, the other person in each conversation; no gender."
+  fi: "Toisen vuoro"
+  sv: "Den andras tur"
+  machine: { fi: true, sv: true }
+
+chat.list.turnWarning:
+  en: "{waiting, plural, one {# conversation is waiting for your answer.} other {# conversations are waiting for your answer.}} You can't like anyone new while {limit, plural, one {# is} other {# are}} waiting."
+  description: "Banner at the top of the list from matching_config your_turn_warning conversations on the reader's turn (ADR-062 §5). {waiting} is their number and {limit} matching_config your_turn_limit. Plain, no alarm."
+  fi: "{waiting, plural, one {# keskustelu odottaa vastaustasi.} other {# keskustelua odottaa vastaustasi.}} Et voi tykätä kenestäkään uudesta, kun {limit, plural, one {# odottaa} other {# odottaa}}."
+  sv: "{waiting, plural, one {# samtal väntar på ditt svar.} other {# samtal väntar på ditt svar.}} Du kan inte gilla någon ny medan {limit, plural, one {# väntar} other {# väntar}}."
   machine: { fi: true, sv: true }
 
 chat.list.archivedHint:
@@ -9620,10 +9663,10 @@ notifications.ask.heading:
   machine: { fi: true, sv: true }
 
 notifications.ask.body:
-  en: "Kuutti can tell this phone when today's round is ready, when someone likes you back and when a message arrives. A notification says only that there is something, never what or from whom. You choose which kinds in Settings."
-  description: "The home screen's offer of notifications (#102, ADR-055 §9), the reason in words, under its heading: the three pushes, what a push never carries, and where the kinds are chosen. Calm; no promise of more."
-  fi: "Kuutti voi kertoa tälle puhelimelle, kun päivän kierros on valmis, kun joku tykkää sinusta takaisin ja kun saat viestin. Ilmoitus kertoo vain, että jotain on, ei koskaan mitä tai keneltä. Lajit valitset asetuksista."
-  sv: "Kuutti kan berätta för den här telefonen när dagens omgång är klar, när någon gillar dig tillbaka och när ett meddelande kommer. En avisering säger bara att det finns något, aldrig vad eller från vem. Du väljer slagen i inställningarna."
+  en: "Kuutti can tell this phone when someone likes you back and when a message arrives. A notification says only that there is something, never what or from whom. You choose which kinds in Settings."
+  description: "The home screen's offer of notifications (#102, ADR-055 §9), the reason in words, under its heading: the two pushes, what a push never carries, and where the kinds are chosen. Calm; no promise of more."
+  fi: "Kuutti voi kertoa tälle puhelimelle, kun joku tykkää sinusta takaisin ja kun saat viestin. Ilmoitus kertoo vain, että jotain on, ei koskaan mitä tai keneltä. Lajit valitset asetuksista."
+  sv: "Kuutti kan berätta för den här telefonen när någon gillar dig tillbaka och när ett meddelande kommer. En avisering säger bara att det finns något, aldrig vad eller från vem. Du väljer slagen i inställningarna."
   machine: { fi: true, sv: true }
 
 notifications.ask.decline:
@@ -9645,13 +9688,6 @@ push.match:
   description: "A push (#102, ADR-055 §5), its one line: somebody the person liked liked them back and a conversation opened. Never who; the phone shows it on the lock screen. Short, no full stop."
   fi: "Sinulle on uusi mätsi"
   sv: "Du har en ny matchning"
-  machine: { fi: true, sv: true }
-
-push.round:
-  en: "Today's round is ready"
-  description: "A push (#102, ADR-055 §6), its one line, once a day at the round's hour: the day's round waits for the person. Calm, finite; no urgency. Short, no full stop."
-  fi: "Päivän kierros on valmis"
-  sv: "Dagens omgång är klar"
   machine: { fi: true, sv: true }
 
 push.channel:
@@ -9680,20 +9716,6 @@ notifications.saveFailed:
   description: "The Notifications screen (#176), a switch the API did not take (no connection, a server error); the switch shows the state as it was."
   fi: "Muutosta ei tallennettu. Yritä uudelleen."
   sv: "Ändringen sparades inte. Försök igen."
-  machine: { fi: true, sv: true }
-
-notifications.kind.round.label:
-  en: "A new round"
-  description: "The Notifications screen (#176), the switch of the round: each day the people matching opens for the person. A switch label; its state is read by the switch."
-  fi: "Uusi kierros"
-  sv: "En ny omgång"
-  machine: { fi: true, sv: true }
-
-notifications.kind.round.hint:
-  en: "When the day's people are ready for you."
-  description: "The Notifications screen (#176), the line under A new round."
-  fi: "Kun päivän ihmiset ovat valmiina sinulle."
-  sv: "När dagens personer är redo för dig."
   machine: { fi: true, sv: true }
 
 notifications.kind.message.label:

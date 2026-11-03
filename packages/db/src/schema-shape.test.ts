@@ -142,24 +142,27 @@ describe("a person's home (ADR-061)", () => {
       ?.columns.map((candidate) => candidate.name)
       .filter((name) => words.test(name));
 
-  it("is one place kept, the card's choice and the time of the latest move, on the account (§1, §2, §5)", () => {
+  it("is one place kept and the card's choice, on the account, and no time of a move (§1, §2, ADR-062 §8)", () => {
     expect(column("account", "home_place")?.getSQLType()).toBe("text");
     expect(column("account", "home_place")?.notNull).toBe(false);
     expect(column("account", "home_shows_area")?.getSQLType()).toBe("boolean");
     expect(column("account", "home_shows_area")?.notNull).toBe(true);
     expect(column("account", "home_shows_area")?.default).toBe(false);
-    expect(column("account", "home_moved_at")?.getSQLType()).toBe("timestamp with time zone");
-    expect(column("account", "home_moved_at")?.notNull).toBe(false);
     expect(named("account", /home|postal|place|location/)).toEqual([
       "home_place",
       "home_shows_area",
-      "home_moved_at",
     ]);
   });
 
   it("gives a round's entry a frozen band, null on an entry from before it (§5)", () => {
     expect(column("round_entries", "distance")?.getSQLType()).toBe("distance_band");
     expect(column("round_entries", "distance")?.notNull).toBe(false);
+  });
+
+  it("marks a second pass on its entry, off unless the pass is one (ADR-062 §6)", () => {
+    expect(column("round_entries", "second_pass")?.getSQLType()).toBe("boolean");
+    expect(column("round_entries", "second_pass")?.notNull).toBe(true);
+    expect(column("round_entries", "second_pass")?.default).toBe(false);
   });
 });
 

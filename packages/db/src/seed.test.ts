@@ -40,15 +40,11 @@ describe("seed", () => {
         );
         // The decisions log numbers, read back from the database.
         expect(byKey).toEqual({
-          round_size: 12,
-          impression_cap_per_day: 40,
           like_budget_balanced: 12,
           like_budget_contested: 5,
           contest_ratio_threshold: 1.5,
-          liked_you_cap: 10,
           like_expiry_days: 14,
           pass_cooldown_days: 90,
-          shown_cooldown_days: 30,
           silent_match_archive_days: 7,
           max_photos: 6,
           photo_moderation_label_threshold: 60,
@@ -96,8 +92,6 @@ describe("seed", () => {
           message_push_min_interval_minutes: 10,
           push_quiet_from_hour: 22,
           push_quiet_to_hour: 8,
-          round_push_hour: 9,
-          round_push_idle_days: 7,
           moderation_response_hours: 24,
           reports_per_day: 5,
           report_after_close_days: 30,
@@ -129,24 +123,35 @@ describe("seed", () => {
           distance_nearby_km: 5,
           distance_close_km: 15,
           distance_around_km: 50,
+          // #502, #503: the ladder, the your-turn limit and the inbox stop (ADR-062 §4 to §6).
+          liked_cooldown_days: 90,
+          ended_cooldown_days: 90,
+          second_pass_cooldown_days: 365,
+          your_turn_limit: 8,
+          your_turn_warning: 6,
+          inbox_stop: 30,
         });
         expect(byKey).toEqual(MATCHING_CONFIG_V1);
-        // Version 2 wins over version 1: the round is ten cards (#95, ADR-035), and ten likes a day (#98, ADR-036).
+        // Version 2 wins over version 1: ten likes a day (#98, ADR-036), a pass of thirty days, and no ceiling on cards with the cards alarm on (ADR-062 §6, §9).
         const later = Object.fromEntries(
           config.rows.filter((r) => r.version === 2).map((r) => [r.key, r.value]),
         );
         expect(later).toEqual({
-          round_size: 10,
           like_budget_balanced: 10,
           auto_shadow_ban_photo_fetches: 200,
           deal_breakers_max: 6,
+          pass_cooldown_days: 30,
+          exposure_cards_per_day: 0,
+          photo_fetches_per_day: { thumb: 600, card: 0, full: 60 },
+          auto_shadow_ban_cards_served: 300,
+          auto_shadow_ban_cards_served_minutes: 10,
         });
         expect(later).toEqual(MATCHING_CONFIG_V2);
-        // Version 3 (ADR-061 §7): the distance is a seventh deal-breaker.
+        // Version 3: the distance is a seventh deal-breaker (ADR-061 §7), and the photo alarm clears an honest reader (ADR-062 §9).
         const latest = Object.fromEntries(
           config.rows.filter((r) => r.version === 3).map((r) => [r.key, r.value]),
         );
-        expect(latest).toEqual({ deal_breakers_max: 7 });
+        expect(latest).toEqual({ deal_breakers_max: 7, auto_shadow_ban_photo_fetches: 1500 });
         expect(latest).toEqual(MATCHING_CONFIG_V3);
         expect(config.rows.filter((r) => r.version > 3)).toEqual([]);
       } finally {
@@ -199,20 +204,20 @@ describe("seed", () => {
         await pool.query(
           `INSERT INTO matching_config (version, key, value, valid_from, created_by, reason) VALUES
              (4, 'deal_breakers_max', '5'::jsonb, '2026-10-16T09:00:00Z', 'admin', 'Fewer at first'),
-             (2, 'liked_you_cap', '25'::jsonb, '2026-10-16T09:00:00Z', 'admin', 'Smaller ponds first')`,
+             (2, 'like_expiry_days', '25'::jsonb, '2026-10-16T09:00:00Z', 'admin', 'Smaller ponds first')`,
         );
         await seed(pool);
         expect(await withReason()).toEqual([
           { key: "deal_breakers_max", version: 4, value: 5, reason: "Fewer at first" },
-          { key: "liked_you_cap", version: 2, value: 25, reason: "Smaller ponds first" },
+          { key: "like_expiry_days", version: 2, value: 25, reason: "Smaller ponds first" },
         ]);
         const latest = await pool.query<{ key: string; version: number }>(
           `SELECT key, max(version) AS version FROM matching_config
-           WHERE key IN ('deal_breakers_max', 'liked_you_cap') GROUP BY key ORDER BY key`,
+           WHERE key IN ('deal_breakers_max', 'like_expiry_days') GROUP BY key ORDER BY key`,
         );
         expect(latest.rows).toEqual([
           { key: "deal_breakers_max", version: 4 },
-          { key: "liked_you_cap", version: 2 },
+          { key: "like_expiry_days", version: 2 },
         ]);
       } finally {
         await pool.end();

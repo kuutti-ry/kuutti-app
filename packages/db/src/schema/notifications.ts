@@ -16,18 +16,13 @@ import { sanction } from "./safety.ts";
 import { session } from "./sessions.ts";
 
 /**
- * What a person may be notified of (#176, ADR-032): a new round, a message,
- * a match, a moderator's decision. Each kind can be switched off; a kind the
- * person never touched is on, so no row means on. The push reads the switch
- * (#102: the round, the message, the match; #312 will read the decision's).
- * Erased with the account; in the export.
+ * What a person may be notified of (#176, ADR-032): a message, a match, a
+ * moderator's decision. Each kind can be switched off; a kind the person never
+ * touched is on, so no row means on. The push reads the switch (#102: the
+ * message, the match; #312 will read the decision's). Erased with the account;
+ * in the export.
  */
-export const notificationKind = pgEnum("notification_kind", [
-  "round",
-  "message",
-  "match",
-  "moderation",
-]);
+export const notificationKind = pgEnum("notification_kind", ["message", "match", "moderation"]);
 
 export const notificationPreference = pgTable(
   "notification_preference",

@@ -484,7 +484,7 @@ describe("migrate", () => {
             )
           ).rows;
           // Versions 1 and 2 of the migrations before it, every one of them;
-          // the keys a later migration adds (0072, #378; 0048, #303; 0052, #84; 0054, #348; 0057, #350; 0061, #351; 0065, #105; 0068, #376; 0075, #86; 0078, #385; 0080, #107; 0082 and 0083, #102; 0097, #514) are not there yet.
+          // the keys a later migration adds (0072, #378; 0048, #303; 0052, #84; 0054, #348; 0057, #350; 0061, #351; 0065, #105; 0068, #376; 0075, #86; 0078, #385; 0080, #107; 0082, #102; 0097, #514; 0104, #502) are not there yet.
           const later = new Set([
             "moderation_response_hours",
             "reports_per_day",
@@ -518,24 +518,41 @@ describe("migrate", () => {
             "message_push_min_interval_minutes",
             "push_quiet_from_hour",
             "push_quiet_to_hour",
-            "round_push_hour",
-            "round_push_idle_days",
             "home_min_inhabitants",
             "home_town_min_inhabitants",
             "distance_nearby_km",
             "distance_close_km",
             "distance_around_km",
+            "liked_cooldown_days",
+            "ended_cooldown_days",
+            "second_pass_cooldown_days",
+            "your_turn_limit",
+            "your_turn_warning",
+            "inbox_stop",
           ]);
-          // A key's second version a later migration writes (0069, #95; 0070, #98; 0088, #513; 0092, #508) is not there yet either.
+          // A key's second version a later migration writes (0070, #98; 0088, #513; 0092, #508; 0104, #502) is not there yet either.
           const laterVersions = new Set([
-            "round_size",
             "like_budget_balanced",
             "auto_shadow_ban_photo_fetches",
             "deal_breakers_max",
+            "pass_cooldown_days",
+            "exposure_cards_per_day",
+            "photo_fetches_per_day",
+            "auto_shadow_ban_cards_served",
+            "auto_shadow_ban_cards_served_minutes",
           ]);
-          // The gate's two keys and default_pond's two versions stand here still: the seed has none
-          // of them, and 0094 and 0101 delete them (#500).
-          const goneSince = ["gate_k", "majority_share_max", "default_pond", "default_pond"];
+          // The gate's two keys and default_pond's two versions stand here still, and so do the
+          // daily set's keys: the seed has none of them, and 0094, 0101 and 0104 delete them (#500, #502).
+          const goneSince = [
+            "gate_k",
+            "majority_share_max",
+            "default_pond",
+            "default_pond",
+            "round_size",
+            "impression_cap_per_day",
+            "liked_you_cap",
+            "shown_cooldown_days",
+          ];
           expect(rows).toHaveLength(
             Object.keys(MATCHING_CONFIG_V1).filter((key) => !later.has(key)).length +
               Object.keys(MATCHING_CONFIG_V2).filter((key) => !laterVersions.has(key)).length +
@@ -1035,6 +1052,8 @@ describe("migrate", () => {
 
   it("migration 0101 takes default_pond away, every version whoever wrote it, and no other key (#500)", async () => {
     const before = migrationsBefore("0101_default_pond_goes");
+    // 0101 alone: the keys 0102 and 0104 take are theirs.
+    const through = migrationsBefore("0102_round_push_goes");
     try {
       await withTemporaryDatabase(async (url) => {
         const pool = createPool({ connectionString: url, max: 2 });
@@ -1053,7 +1072,7 @@ describe("migrate", () => {
           const kept = await others();
           expect((await versionsOf(pool, "default_pond")).length).toBe(4);
 
-          expect((await migrate(pool, MIGRATIONS)).state).toBe("applied");
+          expect((await migrate(pool, through)).state).toBe("applied");
 
           expect(await versionsOf(pool, "default_pond")).toEqual([]);
           expect(await others()).toEqual(kept);
@@ -1063,6 +1082,7 @@ describe("migrate", () => {
       });
     } finally {
       rmSync(before, { recursive: true, force: true });
+      rmSync(through, { recursive: true, force: true });
     }
   });
 
@@ -1087,11 +1107,9 @@ describe("migrate", () => {
           expect((await migrate(pool, MIGRATIONS)).state).toBe("applied");
 
           const homes = await pool.query(
-            "SELECT DISTINCT home_place, home_shows_area, home_moved_at FROM account",
+            "SELECT DISTINCT home_place, home_shows_area FROM account",
           );
-          expect(homes.rows).toEqual([
-            { home_place: null, home_shows_area: false, home_moved_at: null },
-          ]);
+          expect(homes.rows).toEqual([{ home_place: null, home_shows_area: false }]);
           const write = (band: string) =>
             pool.query("UPDATE round_entries SET distance = $1 RETURNING distance", [band]);
           const entries = await pool.query("SELECT distance FROM round_entries");
@@ -1107,6 +1125,188 @@ describe("migrate", () => {
     } finally {
       rmSync(before, { recursive: true, force: true });
     }
+  });
+
+  describe("the queue's migrations (#502, ADR-062)", () => {
+    /** Every key of the daily set and the round's push, which 0102 and 0104 delete whole. */
+    const GONE = [
+      "round_size",
+      "liked_you_cap",
+      "shown_cooldown_days",
+      "impression_cap_per_day",
+      "round_push_hour",
+      "round_push_idle_days",
+    ];
+
+    it("migrations 0102 and 0104 take the daily set's keys and the round's push away, every version whoever wrote it, and no switch of the kind survives", async () => {
+      const before = migrationsBefore("0102_round_push_goes");
+      try {
+        await withTemporaryDatabase(async (url) => {
+          const pool = createPool({ connectionString: url, max: 2 });
+          try {
+            await migrate(pool, before);
+            const person = await aPerson(pool, "a", null);
+            await pool.query(
+              `INSERT INTO notification_preference (account_id, kind, enabled) VALUES
+                 ($1, 'round', false), ($1, 'message', false), ($1, 'match', true)`,
+              [person],
+            );
+            await pool.query(
+              `INSERT INTO matching_config (version, key, value, created_by, reason) VALUES
+                 (3, 'round_size', '8'::jsonb, 'admin', 'Fewer at first'),
+                 (2, 'round_push_hour', '10'::jsonb, 'admin', 'A little later')`,
+            );
+            const others = async () =>
+              (
+                await pool.query(
+                  `SELECT key, version, value FROM matching_config
+                    WHERE key <> ALL($1::text[]) AND created_by <> 'migration:0104'
+                    ORDER BY key, version`,
+                  [GONE],
+                )
+              ).rows;
+            const kept = await others();
+            for (const key of GONE) {
+              expect((await versionsOf(pool, key)).length, key).toBeGreaterThan(0);
+            }
+
+            expect((await migrate(pool, MIGRATIONS)).state).toBe("applied");
+
+            for (const key of GONE) expect(await versionsOf(pool, key), key).toEqual([]);
+            expect(await others()).toEqual(kept);
+            const switches = await pool.query(
+              "SELECT kind, enabled FROM notification_preference ORDER BY kind",
+            );
+            expect(switches.rows).toEqual([
+              { kind: "message", enabled: false },
+              { kind: "match", enabled: true },
+            ]);
+            const kinds = await pool.query<{ label: string }>(
+              "SELECT unnest(enum_range(NULL::notification_kind))::text AS label",
+            );
+            expect(kinds.rows.map((row) => row.label)).toEqual(["message", "match", "moderation"]);
+            await expect(
+              pool.query(
+                "INSERT INTO notification_preference (account_id, kind, enabled) VALUES ($1, 'round', false)",
+                [person],
+              ),
+            ).rejects.toThrow(/invalid input value for enum notification_kind/);
+          } finally {
+            await pool.end();
+          }
+        });
+      } finally {
+        rmSync(before, { recursive: true, force: true });
+      }
+    });
+
+    it("migration 0103 adds the skip and the second pass's mark, which only a pass carries, and takes the move's time off the account", async () => {
+      const before = migrationsBefore("0103_queue_ladder");
+      try {
+        await withTemporaryDatabase(async (url) => {
+          const pool = createPool({ connectionString: url, max: 2 });
+          try {
+            await migrate(pool, before);
+            const [one, other] = [await aPerson(pool, "a", null), await aPerson(pool, "b", null)];
+            await pool.query("UPDATE account SET home_moved_at = now() WHERE id = $1", [one]);
+            const { rows: rounds } = await pool.query<{ id: string }>(
+              "INSERT INTO rounds (account_id, day) VALUES ($1, '2026-10-30') RETURNING id",
+              [one],
+            );
+            await pool.query(
+              `INSERT INTO round_entries (round_id, position, candidate_id, reason, decision, decided_at)
+               VALUES ($1, 1, $2, 'matches_filters', 'pass', now())`,
+              [rounds[0]?.id, other],
+            );
+
+            expect((await migrate(pool, MIGRATIONS)).state).toBe("applied");
+
+            const moved = await pool.query(
+              `SELECT 1 FROM information_schema.columns
+                WHERE table_schema = 'public' AND table_name = 'account' AND column_name = 'home_moved_at'`,
+            );
+            expect(moved.rows).toEqual([]);
+            const mark = (value: boolean, decision: string) =>
+              pool.query(
+                "UPDATE round_entries SET decision = $2::round_decision, second_pass = $1 RETURNING second_pass",
+                [value, decision],
+              );
+            // A pass from before it is a first pass.
+            const entries = await pool.query("SELECT second_pass FROM round_entries");
+            expect(entries.rows).toEqual([{ second_pass: false }]);
+            expect((await mark(true, "pass")).rows).toEqual([{ second_pass: true }]);
+            expect((await mark(false, "skip")).rows).toEqual([{ second_pass: false }]);
+            for (const decision of ["like", "skip"]) {
+              await expect(mark(true, decision), decision).rejects.toThrow(
+                /round_entries_second_pass_check/,
+              );
+            }
+          } finally {
+            await pool.end();
+          }
+        });
+      } finally {
+        rmSync(before, { recursive: true, force: true });
+      }
+    });
+
+    it("migration 0104 follows a value set in the panel with the next version, the photo budget's other sizes as they were, and writes the new keys", async () => {
+      const before = migrationsBefore("0104_queue_config");
+      try {
+        await withTemporaryDatabase(async (url) => {
+          const pool = createPool({ connectionString: url, max: 2 });
+          try {
+            await migrate(pool, before);
+            await pool.query(
+              `INSERT INTO matching_config (version, key, value, created_by, reason) VALUES
+                 (2, 'pass_cooldown_days', '60'::jsonb, 'admin', 'Two months'),
+                 (2, 'exposure_cards_per_day', '45'::jsonb, 'admin', 'Fewer'),
+                 (2, 'photo_fetches_per_day', '{"thumb": 500, "card": 200, "full": 30}'::jsonb, 'admin', 'Fewer'),
+                 (3, 'photo_fetches_per_day', '{"thumb": 400, "card": 100, "full": 20}'::jsonb, 'admin', 'Fewer still'),
+                 (2, 'auto_shadow_ban_cards_served', '45'::jsonb, 'admin', 'On'),
+                 (2, 'auto_shadow_ban_cards_served_minutes', '30'::jsonb, 'admin', 'Shorter'),
+                 (3, 'auto_shadow_ban_photo_fetches', '250'::jsonb, 'admin', 'Higher')`,
+            );
+
+            expect((await migrate(pool, MIGRATIONS)).state).toBe("applied");
+
+            const next = (version: number, value: unknown) => ({
+              version,
+              value,
+              created_by: "migration:0104",
+              reason: null,
+            });
+            for (const [key, version, value] of [
+              ["pass_cooldown_days", 3, 30],
+              ["exposure_cards_per_day", 3, 0],
+              ["photo_fetches_per_day", 4, { thumb: 400, card: 0, full: 20 }],
+              ["auto_shadow_ban_cards_served", 3, 300],
+              ["auto_shadow_ban_cards_served_minutes", 3, 10],
+              ["auto_shadow_ban_photo_fetches", 4, 1500],
+            ] as const) {
+              const versions = await versionsOf(pool, key);
+              expect(versions.at(-1), key).toEqual(next(version, value));
+              // The panel's own row stays as it was, its reason with it.
+              expect(versions.at(-2)?.created_by, key).toBe("admin");
+            }
+            for (const [key, value] of [
+              ["liked_cooldown_days", 90],
+              ["ended_cooldown_days", 90],
+              ["second_pass_cooldown_days", 365],
+              ["your_turn_limit", 8],
+              ["your_turn_warning", 6],
+              ["inbox_stop", 30],
+            ] as const) {
+              expect(await versionsOf(pool, key), key).toEqual([next(1, value)]);
+            }
+          } finally {
+            await pool.end();
+          }
+        });
+      } finally {
+        rmSync(before, { recursive: true, force: true });
+      }
+    });
   });
 
   it("is a no-op the second time", async () => {

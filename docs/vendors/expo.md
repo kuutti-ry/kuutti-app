@@ -11,8 +11,8 @@ The API sends each push to `https://exp.host/--/api/v2/push/send` (`apps/api/src
 | What | Why |
 |---|---|
 | The Expo push token of one installation of the app | where the push goes; the token names an installation to Expo, Apple and Google, nothing about the person to them |
-| One line of the app's own words, in the device's language: "You have a new message", "You have a new match" or "Today's round is ready" | what the phone shows |
-| `data`: the kind alone (`message`, `match` or `round`), never the conversation, whose one id on both people's phones would pair them | where the app goes on a tap |
+| One line of the app's own words, in the device's language: "You have a new message" or "You have a new match" | what the phone shows |
+| `data`: the kind alone (`message` or `match`), never the conversation, whose one id on both people's phones would pair them | where the app goes on a tap |
 | `collapseId` and `tag`: the kind | so a later push replaces an earlier one of its kind |
 | `ttl`: seconds until the quiet hours begin or the Finnish day ends, whichever is sooner | so a phone that was off is not told in the night or days later |
 | `channelId` `default`, a priority, `sound: "default"` | how the phone shows it |

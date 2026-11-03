@@ -34,7 +34,7 @@ const choicesRoute = createRoute({
   path: "/account/notifications",
   summary: "What the caller may be notified of",
   description:
-    "Every kind (a new round, a message, a match, a moderator's decision), in that order, each on unless the person switched it off. The push reads it for the round, a message and a match; nothing is sent for a moderator's decision yet.",
+    "Every kind (a message, a match, a moderator's decision), in that order, each on unless the person switched it off. The push reads it for a message and a match; nothing is sent for a moderator's decision yet.",
   ...bearer,
   responses: {
     200: { description: "Every kind and whether it is on.", ...json(NotificationChoices) },

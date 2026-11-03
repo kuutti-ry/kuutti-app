@@ -15,7 +15,7 @@ const token = (seed: string) => (seed + "x".repeat(43)).slice(0, 43);
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
 const choices = (off: string[] = []) => ({
-  choices: ["round", "message", "match", "moderation"].map((kind) => ({
+  choices: ["message", "match", "moderation"].map((kind) => ({
     kind,
     enabled: !off.includes(kind),
   })),
@@ -66,10 +66,13 @@ describe("NotificationChoices", () => {
     expect(
       await screen.findByText("This phone has not been asked yet whether Kuutti may notify it."),
     ).toBeTruthy();
-    for (const name of ["A new round", "Messages", "Moderators' decisions"]) {
+    for (const name of ["Messages", "Moderators' decisions"]) {
       expect(checked(name)).toBe(true);
     }
     expect(checked("Matches")).toBe(false);
+    // The round's push went with the daily set (ADR-062 §12), and its switch with it.
+    expect(screen.getAllByRole("switch")).toHaveLength(3);
+    expect(screen.queryByRole("switch", { name: "A new round" })).toBeNull();
     expect(
       screen.getByText("That there is a new message, never what it says or who sent it."),
     ).toBeTruthy();
@@ -114,6 +117,6 @@ describe("NotificationChoices", () => {
     await renderWithTheme(<NotificationChoices />);
     expect(await screen.findByText("Your choices could not be loaded.")).toBeTruthy();
     await act(async () => fireEvent.press(screen.getByRole("button", { name: "Try again" })));
-    expect(await screen.findByRole("switch", { name: "A new round" })).toBeTruthy();
+    expect(await screen.findByRole("switch", { name: "Messages" })).toBeTruthy();
   });
 });

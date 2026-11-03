@@ -1,6 +1,6 @@
 # The demo storyboard
 
-The first ten minutes of Kuutti, shown with the demo personas (#144, ADR-014, ADR-018). The story runs in the simulator against the mock bank and, all but scene 5, on the staging phone against Telia's test banks; only the sign-in differs. Scene 5, the round, runs in the simulator only (#379; the scene says why). `runbook.md` says how to prepare either. What a screen says is quoted from the catalogue as of 09/10/2026 (English); the app follows the phone's language.
+The first ten minutes of Kuutti, shown with the demo personas (#144, ADR-014, ADR-018). The story runs in the simulator against the mock bank and, all but scene 5, on the staging phone against Telia's test banks; only the sign-in differs. Scene 5, the queue, runs in the simulator only (#379; the scene says why). `runbook.md` says how to prepare either. What a screen says is quoted from the catalogue as of 09/10/2026 (English); the app follows the phone's language.
 
 The personas and their banks: `services/mock-idp/README.md`. Locally every persona is a button on the mock bank's page; on staging each persona of the other scenes is a test user of a bank (`docs/vendors/telia.md` 1.4), and the stories were written by the job of ADR-018.
 
@@ -44,22 +44,22 @@ In "Your profile", show "Fill in the rest when you have a moment" for one field 
 Sign out (Settings, "Log out") and sign in as Sanna Korhonen (locally her button; on staging Nordea `DEMOUSER4`). Her story is complete: a profile, five approved photos, matching open.
 
 - Home: "Matching is open for you."
-- "Your profile" → the eye, "See your card": the card as others see it (#150): the first photo, "Sanna, 49", "Woman", "Espoo", the town of the home she typed, one prompt answer, the other photos, the fields that are information (languages named in the reader's language, "Something long-term", the hobbies, "171 cm"), nothing that is a setting or a soft preference, and no distance, which only a round's card has.
+- "Your profile" → the eye, "See your card": the card as others see it (#150): the first photo, "Sanna, 49", "Woman", "Espoo", the town of the home she typed, one prompt answer, the other photos, the fields that are information (languages named in the reader's language, "Something long-term", the hobbies, "171 cm"), nothing that is a setting or a soft preference, and no distance, which only a card of the queue has.
 
-## Scene 5: Today's round (3 min)
+## Scene 5: People (3 min)
 
-Locally only. Sign out and sign in as Iida Mattila (her button). She and the four women of her round exist at the mock bank only: on staging the job gives their stories and her round too, and nobody signs in as any of them there (ADR-018 §1), so this scene has no staging version. A round on staging for a persona of Telia's bed, whom the phone can sign in as, is the maintainer's open decision (ADR-014, Open 1). Her story is complete: a profile, three approved photos (release v3 of the pictures), and a round for the day, which the stories give her. The four women of her round, Henna, Katja, Minna and Riikka, have stories too, and Henna liked Iida yesterday (#379).
+Locally only. Sign out and sign in as Iida Mattila (her button). She and the four women of her queue exist at the mock bank only: on staging the job gives their stories and her day too, and nobody signs in as any of them there (ADR-018 §1), so this scene has no staging version. A queue on staging for a persona of Telia's bed, whom the phone can sign in as, is the maintainer's open decision (ADR-014, Open 1). Her story is complete: a profile, three approved photos (release v3 of the pictures), and a day opened for her, which the stories give her. The four women of her queue, Henna, Katja, Minna and Riikka, have stories too, and Henna liked Iida the day before the reset (#379).
 
-Her round is right only on the Finnish day of the reset that built it. On a later day the builder makes her a round of Henna alone: Katja, Minna and Riikka were shown on the reset's day and wait out `shown_cooldown_days` (thirty, TD-12), and Henna's like still waits while Iida has not decided on her card (once she has, the round is empty). So the reset for this scene is run on the morning of the demo, and the morning's checks sign in as Iida (`runbook.md`).
+Her queue holds from the reset for as long as nobody looks. An entry never displayed is nothing, so on a later day the same four come again, Henna first while her like waits, for two weeks from the day it was given (ADR-062 §2). A card looked at and left on an earlier day reads as a skip and comes back labelled "Seen before", and a decision holds for its clock, a pass thirty days and a like ninety (ADR-062 §3, §6). So the reset for this scene follows any rehearsal, and the morning's checks sign in as Iida and decide nothing (`runbook.md`).
 
-1. Home: "Matching is open for you." and under it "Today's round".
-2. The first card is Henna's, labelled "Liked you": a like waits first in the round, and never unlabelled (ADR-037). Under the name her town and "Nearby": a distance is a word on a round's card, never kilometres, and it stays what it was when the round was built, whoever moves (ADR-061 §5). Like and Pass are buttons at the bottom, never a swipe: Pass an outlined rectangle at the left, Like a filled pill at the right, each with its word. On her card there is no fish: a fish would only answer her like.
-3. Like: "It's a match", and "Go to the conversation" opens it, empty but for the composer (ADR-038). Back returns to the round.
-4. The next card says "Matches your filters". Show "Send a fish" above Like and Pass: a like with a mark, first in the other person's round, few in a rolling window (ADR-039). Pass, then Undo in the header: the card comes back with "You passed on this person. You can change that until midnight." (ADR-034 §5). Like.
+1. Home: "Matching is open for you." and under it "See people". The screen is People: one card at a time, as far as she likes (ADR-062 §1).
+2. The first card is Henna's, labelled "Liked you": a like waits first in the queue, and never unlabelled (ADR-037). Under the name her town and "Nearby": a distance is a word on a card, never kilometres, and it stays what it was when her entry was written, whoever moves (ADR-061 §5). Like and Pass are buttons at the bottom, never a swipe: Pass an outlined rectangle at the left, Like a filled pill at the right, each with its word, and Later, a text button, moves on and costs nobody anything (ADR-062 §3). On her card there is no fish: a fish would only answer her like.
+3. Like: "It's a match", and "Go to the conversation" opens it, empty but for the composer (ADR-038). Back returns to the queue.
+4. The next card says "Matches your filters". Show "Send a fish" above Like and Pass: a like with a mark, first in the other person's queue, one a calendar week (ADR-039). Pass, then Undo in the header: the card comes back with "You passed on this person. You can change that until midnight." (ADR-034 §5). Like.
 5. The third card: "Block or report" beside the name, the same dialog as anywhere (ADR-030 §11). Report and block, a reason, a few words, Send report; Done, and the card is gone.
-6. The last card, then "That was today's round. The next one comes tomorrow." No count, no countdown, nothing loads more.
+6. The last card, then "That's everybody for now.", the short pool's offers if there are any, and one button, "What you seek", the same words for everybody (ADR-062 §11). No count, no countdown, and nothing says to come back tomorrow.
 
-Katja, Minna and Riikka come nearest first (ADR-061 §6): each lives in a band of her own from Iida's home, Close, Around and Far, so the soft matches and the day's hash have nothing left to decide among them (`packages/db/src/seed/histories.ts`, and a test holds it to the list). Once a release carries faces for the population's pool (v2 has none), a population with faces written before the reset may put women of it whom Iida's pool takes in among them, and into her later rounds too. A match and a report are final: `pnpm demo:reset` gives Iida her round anew, for the day it runs.
+Katja, Minna and Riikka come nearest first (ADR-061 §6): each lives in a band of her own from Iida's home, Close, Around and Far, so the soft matches and the day's hash have nothing left to decide among them (`packages/db/src/seed/histories.ts`, and a test holds it to the list). Once a release carries faces for the population's pool (v2 has none), a population with faces written before the reset may put women of it whom Iida's pool takes in among them, and into her queue on later days too. A match and a report are final: `pnpm demo:reset` gives Iida her day anew.
 
 ## Scene 6: The moderation queue (2 min)
 
@@ -87,4 +87,4 @@ Then `pnpm demo:reset` (locally) or the reset in the container (staging): everyb
 
 ## What is deliberately not shown
 
-No swipes, no scores, no streaks, no list of "people who liked you" (a like shows as a labelled card in the round, nothing more), no feed, no count of cards or likes (CLAUDE.md, Product constraints).
+No swipes, no scores, no streaks, no list of "people who liked you" (a like shows as a labelled card in the queue, nothing more), no feed that does not end, no count of cards or of likes received (CLAUDE.md, Product constraints).

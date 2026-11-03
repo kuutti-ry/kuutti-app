@@ -158,7 +158,7 @@ beforeEach(async () => {
 describe("SeekScreen", () => {
   it("keeps the title and the way back pinned above the list", async () => {
     await opened();
-    expectPinnedHeader("What you seek", "Back to your profile");
+    expectPinnedHeader("What you seek", "Back");
   });
 
   it("says at the top that the answers work both ways, naming no moment", async () => {
@@ -173,7 +173,7 @@ describe("SeekScreen", () => {
   it("has four rows, by onboarding's questions, in their order, and nothing else to press", async () => {
     await opened();
     expect(screen.getAllByRole("button").map((node) => node.props.accessibilityLabel)).toEqual([
-      "Back to your profile",
+      "Back",
       WHOM,
       AGES,
       INTENT,
@@ -264,7 +264,7 @@ describe("SeekScreen", () => {
       "/profile/deal-breakers",
     ]);
     expect(router.back).not.toHaveBeenCalled();
-    await press(row("Back to your profile"));
+    await press(row("Back"));
     expect(router.back).toHaveBeenCalledTimes(1);
   });
 
@@ -408,7 +408,7 @@ describe("SeekScreen", () => {
       "fi-FI",
       {
         title: "Mitä etsit",
-        back: "Takaisin profiiliisi",
+        back: "Takaisin",
         explain:
           "Nämä toimivat molempiin suuntiin: ne ratkaisevat, keitä näet ja ketkä näkevät sinut. Keskustelusi pysyvät ennallaan.",
         whom: ["Ketä etsit?", "Naisia, Muunsukupuolisia"],
@@ -421,7 +421,7 @@ describe("SeekScreen", () => {
       "sv-FI",
       {
         title: "Vad du söker",
-        back: "Tillbaka till din profil",
+        back: "Tillbaka",
         explain:
           "De här gäller åt båda håll: de avgör vilka du ser och vilka som ser dig. Samtal du redan har förblir som de är.",
         whom: ["Vem söker du?", "Kvinnor, Icke-binära personer"],

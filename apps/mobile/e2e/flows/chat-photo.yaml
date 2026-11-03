@@ -27,12 +27,12 @@ name: A photo with a caption reaches the other person, small in the thread and f
       PERSONA: Antti Nurmi
 - openLink: kuutti://chats
 - extendedWaitUntil:
-    visible: "Open|Avoimet|Öppna"
+    visible: "Your turn: \\d+|Their turn|Sinun vuorosi: \\d+|Toisen vuoro|Din tur: \\d+|Den andras tur"
     timeout: 15000
 - waitForAnimationToEnd
 - tapOn:
     text: "Ville, \\d+, .*"
-    below: "Open|Avoimet|Öppna"
+    below: "Your turn: \\d+|Their turn|Sinun vuorosi: \\d+|Toisen vuoro|Din tur: \\d+|Den andras tur"
 # The field is its label, and on iOS its placeholder after it.
 - extendedWaitUntil:
     visible: "(Message|Viesti|Meddelande)( .*)?"

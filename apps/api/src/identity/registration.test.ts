@@ -43,7 +43,6 @@ function accountRow(identityId: string): Account {
     pondId: null,
     homePlace: null,
     homeShowsArea: false,
-    homeMovedAt: null,
     genderChangedAt: null,
     email: null,
     foundThemAnswered: false,

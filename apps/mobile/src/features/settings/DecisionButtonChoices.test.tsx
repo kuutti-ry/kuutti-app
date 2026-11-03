@@ -26,12 +26,12 @@ beforeEach(() => {
 describe("the decision buttons' choices", () => {
   it("says what it moves, offers the two hands with the right chosen, and one-handed off", async () => {
     await renderWithTheme(<DecisionButtonChoices />);
-    expect(screen.getByText(/^Where Like and Pass sit on today's round/)).toBeTruthy();
+    expect(screen.getByText(/^Where Like and Pass sit when you go through people/)).toBeTruthy();
     expect(screen.getByLabelText("Which hand").props.accessibilityRole).toBe("radiogroup");
     expect(chosen(/Right hand/)).toBe(true);
     expect(chosen(/Left hand/)).toBe(false);
     expect(oneHanded()).toBe(false);
-    expect(screen.getByText(/^Undo, the fish, Pass and Like in one column/)).toBeTruthy();
+    expect(screen.getByText(/^Undo, the fish, Later, Pass and Like in one column/)).toBeTruthy();
     const found = pressables(screen.toJSON() as HostNode);
     expect(found.flatMap((node) => a11yProblems(node))).toEqual([]);
     // The two hands, the switch and the three styles.

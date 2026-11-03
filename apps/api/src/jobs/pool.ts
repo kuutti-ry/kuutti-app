@@ -19,7 +19,7 @@ import { ageInYears, answeredFieldsOf, answeredPromptsOf, completeness } from ".
 
 /**
  * Who of a pond is complete, and what their pools ask of them (#94, #500,
- * ADR-060): one reader for the round builder, for what a person is told of
+ * ADR-060): one reader for the queue's builder, for what a person is told of
  * their matching, and for the invitations. It lives here and not in a slice
  * because it reads across several (accounts, consents, profiles, photos,
  * preferences, ponds, blocks) and none of them should depend on the others for
@@ -152,7 +152,7 @@ function subjectFrom(
 }
 
 /** The complete people of a pond among `accounts`, with whom each blocked and their deal-breakers. */
-async function subjectsOf(
+export async function subjectsAmong(
   db: Queryable,
   pondId: string,
   accounts: readonly string[],
@@ -197,7 +197,7 @@ export async function subjectsOfPond(db: Queryable, pondId: string, at: Date): P
     "SELECT id FROM account WHERE pond_id = $1 AND state IN ('active', 'shadow_banned')",
     [pondId],
   );
-  return subjectsOf(
+  return subjectsAmong(
     db,
     pondId,
     rows.map((row) => row.id),
@@ -212,7 +212,7 @@ export async function subjectOf(
   accountId: string,
   at: Date,
 ): Promise<Subject | null> {
-  return (await subjectsOf(db, pondId, [accountId], at))[0] ?? null;
+  return (await subjectsAmong(db, pondId, [accountId], at))[0] ?? null;
 }
 
 /**
@@ -265,14 +265,6 @@ async function dealBreakersOf(
   return new Map([...byAccount].map(([account, list]) => [account, dealBreakersFrom(list)]));
 }
 
-/** The ponds an admin has opened (ADR-060 §1): the night builds their rounds. */
-export async function openPondIds(db: Queryable): Promise<string[]> {
-  const { rows } = await db.query<{ id: string }>(
-    "SELECT id FROM ponds WHERE matching_open ORDER BY id",
-  );
-  return rows.map((row) => row.id);
-}
-
 /** The pond a live person is in, with its switch (rule 6: the statement names the caller). */
 async function ownPond(
   db: Queryable,
@@ -284,6 +276,11 @@ async function ownPond(
     [accountId],
   );
   return rows[0] ?? null;
+}
+
+/** The pond a live person is in, open or not: a card already in the day's log is asked the filters either way (ADR-062 §8). */
+export async function pondIdOf(db: Queryable, accountId: string): Promise<string | null> {
+  return (await ownPond(db, accountId))?.id ?? null;
 }
 
 /** The person's pond while matching is open in it; null otherwise. */

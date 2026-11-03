@@ -436,7 +436,7 @@ describe("the status read racing another request", () => {
 
   test("an erasure just after the home is written clears what it wrote", async ({ ctx }) => {
     const me = await signedInAccount(ctx.client, undefined, { state: "registered" });
-    const db = interleaved(ctx.client, { after: /UPDATE account\s+SET home_moved_at/ }, () =>
+    const db = interleaved(ctx.client, { after: /UPDATE account\s+SET home_place/ }, () =>
       eraseOnOtherDevice(ctx, me.accountId),
     );
     const { app } = await appOn(db);

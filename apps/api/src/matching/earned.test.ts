@@ -1,14 +1,13 @@
 import type { Queryable } from "@kuutti/db";
 import { ErrorResponse, RoundDecisionAnswer, RoundResponse } from "@kuutti/schema";
 import { type App, createApp } from "../app.ts";
-import { conversationBetween, openConversation } from "../chat/index.ts";
 import { finnishDay } from "../lib/finnish-day.ts";
 import { signInAs } from "../test/account.ts";
 import { captureLogger, describe, expect, test, testConfig } from "../test/harness.ts";
 import { earnedUnits, unitsOf } from "../test/invitations.ts";
-import { people } from "../test/people.ts";
 import { pidOf, waitsFor, watched, withTwoConnections } from "../test/races.ts";
-import { decide, type Matches, saveRound } from "./rounds.ts";
+import { fitsAt, type LoggedCard, logged, MATCHES, peopleWhoFit } from "../test/rounds.ts";
+import { decide } from "./rounds.ts";
 
 // Earned likes and fish in today's round (#107, ADR-044 §8,
 // features/matching/earned.feature): a unit used by itself past the day's or
@@ -21,7 +20,6 @@ import { decide, type Matches, saveRound } from "./rounds.ts";
 const T = new Date("2026-10-16T09:00:00.000Z");
 const DAY_MS = 24 * 60 * 60 * 1000;
 const TODAY = finnishDay(T);
-const MATCHES: Matches = { between: conversationBetween, open: openConversation };
 
 type Person = { accountId: string; headers: { authorization: string } };
 type Card = Person | { person: Person; reason: "liked_you" };
@@ -34,34 +32,22 @@ async function appAt(db: Queryable): Promise<App> {
 }
 
 async function cast(db: Queryable, count: number): Promise<Person[]> {
-  const ids = await people(db, null, count, { complete: true, consented: true });
+  const ids = await peopleWhoFit(db, count);
   return Promise.all(ids.map((id) => signInAs(db, id)));
 }
 
 /** A round for `owner` `days` before today with these cards, matching every filter unless said; the entries' ids in order. */
 async function roundOf(db: Queryable, owner: Person, cards: Card[], days = 0): Promise<string[]> {
-  const at = daysBefore(days);
-  const built = await saveRound(
-    { db, logger: (await captureLogger()).logger, now: () => at },
-    {
-      accountId: owner.accountId,
-      day: finnishDay(at),
-      ordering: "count",
-      entries: cards.map((card) =>
-        "person" in card
-          ? { candidateId: card.person.accountId, reason: card.reason, distance: "nearby" as const }
-          : {
-              candidateId: card.accountId,
-              reason: "matches_filters" as const,
-              distance: "nearby" as const,
-            },
-      ),
-    },
+  const written = cards.map(
+    (card): LoggedCard =>
+      "person" in card
+        ? { candidateId: card.person.accountId, reason: card.reason }
+        : card.accountId,
   );
-  if (!built) throw new Error("round not built");
+  const roundId = await logged(db, owner.accountId, finnishDay(daysBefore(days)), written);
   const { rows } = await db.query<{ id: string }>(
     "SELECT id FROM round_entries WHERE round_id = $1 ORDER BY position",
-    [built.roundId],
+    [roundId],
   );
   return rows.map((row) => row.id);
 }
@@ -367,7 +353,7 @@ describe("earned fish", () => {
 describe("two devices", () => {
   test("A pass that gives an earned like back and a like on another device are taken one after the other", async () => {
     await withTwoConnections("kuutti-107-give-back", async (pool, first, second) => {
-      const ids = await people(pool, null, 4, { complete: true, consented: true });
+      const ids = await peopleWhoFit(pool, 4);
       const [a, b, c, d] = ids;
       if (!a || !b || !c || !d) throw new Error("cast not written");
       await likeBudget(pool, 1);
@@ -383,18 +369,24 @@ describe("two devices", () => {
         position,
         decision,
       });
-      await decide(deps(pool), MATCHES, choice(1, "like"));
-      await decide(deps(pool), MATCHES, choice(2, "like"));
+      const fits = fitsAt(() => T);
+      await decide(deps(pool), MATCHES, fits, choice(1, "like"));
+      await decide(deps(pool), MATCHES, fits, choice(2, "like"));
       const firstPid = await pidOf(first);
       const secondPid = await pidOf(second);
       await first.query("BEGIN");
       await second.query("BEGIN");
       // One device's pass holds the round's row and has given the unit back; the other's like waits.
-      await decide(deps(first), MATCHES, choice(2, "pass"));
-      const racing = watched(decide(deps(second), MATCHES, choice(3, "like")));
+      await decide(deps(first), MATCHES, fits, choice(2, "pass"));
+      const racing = watched(decide(deps(second), MATCHES, fits, choice(3, "like")));
       expect(await waitsFor(pool, secondPid, firstPid, racing.settled)).toBe(true);
       await first.query("COMMIT");
-      expect(await racing.outcome).toEqual({ match: null, fishToSend: true, likesLeft: 0 });
+      expect(await racing.outcome).toEqual({
+        match: null,
+        fishToSend: true,
+        likesLeft: 0,
+        yourTurn: 0,
+      });
       await second.query("COMMIT");
       expect(await decisionsOf(pool, entries)).toEqual(["like", "pass", "like"]);
       expect(await unitsOf(pool, a)).toEqual([{ kind: "like", spent: true, entryId: entries[2] }]);

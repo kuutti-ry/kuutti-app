@@ -69,10 +69,10 @@ export async function distanceEdges(db: Queryable): Promise<DistanceEdges> {
 }
 
 /**
- * An hour of the day, 0 to 23, read as matchingConfigNumber reads a number:
- * the push's quiet hours and the round's hour (#102, ADR-055 §6, §7). The
- * panel keeps a number whole and from 0 but has no ceiling, and a 24 would
- * arm a timer for no hour there is, so anything else fails as a missing row.
+ * An hour of the day, 0 to 23, read as matchingConfigNumber reads a number: the
+ * push's quiet hours (#102, ADR-055 §7). The panel keeps a number whole and from
+ * 0 but has no ceiling, and a 24 is no hour there is, so anything else fails as
+ * a missing row.
  */
 export function asHour(key: string, value: number): number {
   if (!Number.isInteger(value) || value < 0 || value > 23) {

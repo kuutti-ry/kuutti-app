@@ -4,8 +4,8 @@ Feature: The fish, a like that says a little more
   fish_budget of them in each fish_window_days counted from a Monday, one a
   calendar week, Monday to Sunday in Finland (the maintainer, 29/10/2026,
   #475; one in any seven days, rolling, before). It goes to the front
-  of the other person's liked-you places, ahead of ordinary likes, oldest
-  first within each, labelled as a fish. It is a like for every other rule:
+  of the other person's queue, ahead of ordinary likes, oldest first within
+  each, labelled as a fish (ADR-062 §2). It is a like for every other rule:
   the day's likes, the expiry, the match, and the sender learns nothing
   unless it becomes a match. The sender's own round says whether a fish can
   go today, and nothing of when the next comes: on Monday. Nobody can buy one, an
@@ -14,13 +14,13 @@ Feature: The fish, a like that says a little more
 
   Scenario: A fish sent today is at the front of the recipient's next round, ahead of every ordinary like
     Given "B" liked "A" two days ago, and "C" sent "A" a fish yesterday
-    When the night builds the rounds
-    Then "A"'s round opens with "C", labelled fish, then "B", labelled liked you
+    When "A" reads the queue
+    Then "A"'s queue opens with "C", labelled fish, then "B", labelled liked you
 
   Scenario Outline: Fish and likes waiting on one person come fish oldest first, then likes oldest first
     Given fish from "F1" three days ago and "F2" one day ago, and likes from "L1" four, "L2" two and "L3" one day ago, all waiting on "A"
-    When the night builds the rounds
-    Then "<sender>" is at place <place> of "A"'s round, labelled <label>
+    When "A" reads the queue
+    Then "<sender>" is at place <place> of "A"'s queue, labelled <label>
 
     Examples:
       | sender | place | label     |
@@ -47,7 +47,7 @@ Feature: The fish, a like that says a little more
 
   Scenario: A round read after the week's fish offers no other fish this week
     Given "A" sent a fish today
-    When "A" reads today's round
+    When "A" reads the queue
     Then it says no fish can go today
 
   Scenario: A fish changed to a like or a pass the same day is given back

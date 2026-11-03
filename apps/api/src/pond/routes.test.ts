@@ -197,7 +197,11 @@ describe("the home's write", () => {
     let erased = false;
     const db: Queryable = {
       async query<R extends QueryResultRow = QueryResultRow>(text: string, values?: unknown[]) {
-        if (!erased && text.includes("home_moved_at FROM account") && text.includes("FOR UPDATE")) {
+        if (
+          !erased &&
+          text.includes("home_place, home_shows_area FROM account") &&
+          text.includes("FOR UPDATE")
+        ) {
           erased = true;
           await ctx.client.query(
             "UPDATE account SET state = 'deleted', deleted_at = now() WHERE id = $1",
@@ -431,7 +435,7 @@ describe("the features of the home", () => {
       expect((await putHome(app, a.headers, { postalCode })).status).toBe(200);
     }
 
-    // The account's columns are all there is of a home: only the last is held, with the time of the latest move.
+    // The account's columns are all there is of a home: only the last is held, and no time of a move.
     const account = await ctx.client.query<Record<string, unknown>>(
       "SELECT to_jsonb(a) AS row FROM account a WHERE id = $1",
       [person],
@@ -441,10 +445,8 @@ describe("the features of the home", () => {
     expect(JSON.stringify(row)).not.toMatch(/00530|00100/);
     expect(Object.keys(row).filter((column) => column.includes("home"))).toEqual([
       "home_place",
-      "home_moved_at",
       "home_shows_area",
     ]);
-    expect(row.home_moved_at).toEqual(expect.any(String));
     expect(row.pond_id).toBe(pondId);
   });
 

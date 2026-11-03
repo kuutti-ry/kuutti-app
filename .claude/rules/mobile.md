@@ -19,7 +19,7 @@ Stack: Expo SDK 57, React Native 0.86, React 19, TypeScript, dev client (`expo s
 
 - Upload only through the API. Pre-resize to 1600 px with `expo-image-manipulator` (which drops EXIF) before upload.
 - Render with `expo-image`; `cacheKey` is `photoId/variant`, never the signed URL. Use the blurhash from the profile JSON as the placeholder.
-- Variants: thumb in lists, card on open, full only on zoom. Never prefetch beyond the current round; prefetch counts as exposure.
+- Variants: thumb in lists, card on open, full only on zoom. Never prefetch beyond the card on the screen; prefetch counts as exposure.
 - Screenshots are never blocked (the maintainer's decision of 15/10/2026, #296): blind and partially sighted people describe a photo from a screenshot with Be My AI or Seeing AI, and TD-6's premise is that single-user capture cannot be prevented; the controls are the exposure budget and the fetch log (#52, ADR-008). Nor is a screenshot noticed, on either platform (ADR-056 §4): no `expo-screen-capture`, whose Android side announces every screenshot once it is linked.
 
 ## UI
@@ -30,9 +30,9 @@ Stack: Expo SDK 57, React Native 0.86, React 19, TypeScript, dev client (`expo s
 - Sizes are minimums, never fixed heights (`min-h-touch`, 44 pt, `TOUCH_TARGET` in `src/theme/a11y.ts`); a control drawn smaller extends its target with `hitSlopFor`. Text scales with the OS up to `MAX_FONT_SCALE`, headings less (`HEADING_FONT_SCALE`), and a screen's title is `ScreenHeader`'s one line, shrinking to fit, so no word breaks in the middle (#467). A disabled or read-only control is drawn, never faded: no fill, a dashed `--input` outline, its label, icon or thumb in `--muted-foreground` (`Button`, `Input`, `Switch`, `Label`; #467). The enabled state says `border-solid`: on Android a border style that goes away keeps its dash (#548). `src/test/a11y.ts` (`pressables`, `a11yProblems`) checks role, label and target of everything pressable; run it over every new screen's tree.
 - Every animation and haptic is gated by `useReducedMotion` / `useMotionDuration` / `useHapticTap` from `src/theme/`.
 - Icons: one import per icon (`lucide-react-native/icons/<name>`), never the package root, which pulls the whole set into the bundle.
-- Decisions are buttons with configurable placement (order, left or right thumb, one-handed). No swipe as primary input, no rapid repeat.
+- Decisions are buttons with configurable placement (order, left or right thumb, one-handed): Like, Pass, the fish and Later. No swipe as primary input, no rapid repeat.
 - Every candidate card shows its reason label: matches all filters, liked you, sent you a fish (#378), seen before, or included because you relaxed X.
-- Candidate lists are bounded to the round. No pagination, no "load more", no on-demand fetch of the next profile.
+- The queue is one card at a time (`useRound`), a page of `QUEUE_PAGE` read at a time, the next read only once the cards held are decided: never a list of people, a scroll or a "load more", and nothing fetched ahead of a decision. It ends: "That's everybody for now.", and nothing says to come back tomorrow (ADR-062 §1, §11).
 - Glyph sets never imitate console vendors' trademarked shapes or names. One exception, the maintainer's of 30/10/2026 (#520): Like and Pass may carry ✕ and ○, or A and B, as our own drawings in the text's colour, never more than these two shapes on a screen, and never a vendor's name, logo, colours or button artwork.
 - Text is Saiga (ADR-052) through `font-sans`, which `Text`, `Input`, `Label` and the dialog's title and description carry; a new text primitive carries it too. Saiga has no 600: `font-semibold` is Bold (`tailwind.config.js`), and no tabular figures. A build without Saiga, and every web preview, is in the system font: a screen never depends on Saiga's metrics.
 - The Android theme declares `android:forceDarkAllowed=false` (`plugins/withNoForceDark.js`, #27): the app follows the system scheme and ships its own dark and high-contrast sets, so a launcher's forced dark mode (MIUI) must not repaint them.
@@ -40,7 +40,7 @@ Stack: Expo SDK 57, React Native 0.86, React 19, TypeScript, dev client (`expo s
 
 ## Notifications
 
-- One push per day at round time (`round_push_hour`, to those who have not opened the day's round). Two exceptions, the maintainer's of 25/10/2026: a message, to somebody not in the app, at most once a conversation per `message_push_min_interval_minutes`; and a new match, to the person whose earlier like it met. Nothing in the quiet hours. A push says that there is something, never what or from whom: no message text, no name, no account id, no badge (ADR-055).
+- Two pushes, the maintainer's of 25/10/2026, and no daily one (ADR-062 §12): a message, to somebody not in the app, at most once a conversation per `message_push_min_interval_minutes`; and a new match, to the person whose earlier like it met. Nothing in the quiet hours. A push says that there is something, never what or from whom: no message text, no name, no account id, no badge (ADR-055).
 - The permission is asked once there is something to tell (the home screen's offer, once matching is open), with the reason, never at the first start; an answer is remembered and the offer never comes back. Everything works without it.
 
 ## i18n

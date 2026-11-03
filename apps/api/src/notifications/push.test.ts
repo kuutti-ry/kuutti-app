@@ -30,10 +30,9 @@ import {
   REQUEST_SPACING_MS,
 } from "./push.ts";
 
-// The push's decisions (#102, ADR-055 §1, §4-§8): whom a message, a match
-// and the day's round tell, in which words, when not, how long a push may
-// wait for its phone, and what a ticket or a receipt does to a token. On the
-// real database in the harness's rolled-back transaction, a memory pusher
+// The push's decisions (#102, ADR-055 §1, §4, §5, §7, §8): whom a message and a
+// match tell, in which words, when not, how long a push may wait for its phone,
+// and what a ticket or a receipt does to a token. On the real database in the harness's rolled-back transaction, a memory pusher
 // for Expo, a held schedule for the receipts' timer, a recorded pause between
 // requests, and a clock the test moves. A message's and a match's push run
 // after their caller, so a scene waits for them with `settled`. Every push a
@@ -56,11 +55,6 @@ const LINES = {
     sv: "Du har ett nytt meddelande",
   },
   match: { en: "You have a new match", fi: "Sinulle on uusi mätsi", sv: "Du har en ny matchning" },
-  round: {
-    en: "Today's round is ready",
-    fi: "Päivän kierros on valmis",
-    sv: "Dagens omgång är klar",
-  },
 } as const;
 
 /** What each scene recorded, checked against the payload rule once its test is done. */
@@ -155,6 +149,12 @@ async function scene(ctx: TestContext, options: { pusher?: false } = {}) {
     return written;
   }
 
+  /** A match's push to `accountId`, waited for: how a test of a delivery sends one. */
+  async function match(accountId: string) {
+    push.match({ accountId });
+    await push.settled();
+  }
+
   return {
     a,
     b,
@@ -167,6 +167,7 @@ async function scene(ctx: TestContext, options: { pusher?: false } = {}) {
     push,
     logs: lines,
     send,
+    match,
     device,
     ids,
     conversations,
@@ -270,27 +271,6 @@ describe("a message's push (ADR-055 §4)", () => {
     expect(RECEIPT_DELAY_MS).toBe(15 * MINUTE);
   });
 
-  test("settled waits for a round's delivery too, as a shutdown must", async ({ ctx }) => {
-    const s = await scene(ctx);
-    await s.device(s.b);
-    const expo = gate();
-    const reached = gate();
-    s.pusher.gate = expo.promise;
-    s.pusher.reached = reached.open;
-    const delivery = s.push.round([s.b]);
-    await reached.promise;
-    let settled = false;
-    const waiting = s.push.settled().then(() => {
-      settled = true;
-    });
-    await Promise.resolve();
-    expect(settled).toBe(false);
-    expo.open();
-    expect(await delivery).toBe(1);
-    await waiting;
-    expect(settled).toBe(true);
-  });
-
   test("returns at once and runs after its caller, and settled waits for it and for a push started while it waits", async ({
     ctx,
   }) => {
@@ -356,7 +336,7 @@ describe("a message's push (ADR-055 §4)", () => {
     expect(s.pusher.sent()).toEqual([]);
     // On again, with every other kind off: the message's switch alone decides.
     await switchOff(ctx, s.b, "message", true);
-    for (const kind of ["round", "match", "moderation"]) await switchOff(ctx, s.b, kind);
+    for (const kind of ["match", "moderation"]) await switchOff(ctx, s.b, kind);
     await s.send("a", "Hei taas!");
     expect(s.pusher.sent().map((m) => m.to)).toEqual([device.token]);
   });
@@ -792,7 +772,6 @@ describe("a message's push (ADR-055 §4)", () => {
     });
     push.match({ accountId: randomUUID() });
     await push.settled();
-    expect(await push.round([randomUUID()])).toBe(0);
     expect(read).toBe(false);
     expect(statements).toEqual([]);
   });
@@ -884,64 +863,7 @@ describe("a match's push (ADR-055 §5)", () => {
   });
 });
 
-describe("the round's push (ADR-055 §6)", () => {
-  test("goes to each account named, worded in each device's language, until the quiet hours begin", async ({
-    ctx,
-  }) => {
-    const s = await scene(ctx);
-    const a = await s.device(s.a, "sv", 1);
-    const fi = await s.device(s.b, "fi", 2);
-    const en = await s.device(s.b, "en", 3);
-    // The round reads no socket: whom its job names is told.
-    s.online.add(s.a);
-    expect(await s.push.round([s.a, s.b])).toBe(3);
-    const sent = s.pusher.sent();
-    // By account, then by when each device registered; the accounts' order is their ids'.
-    expect(new Set(sent.map((m) => `${m.to} ${m.body}`))).toEqual(
-      new Set([
-        `${a.token} ${LINES.round.sv}`,
-        `${fi.token} ${LINES.round.fi}`,
-        `${en.token} ${LINES.round.en}`,
-      ]),
-    );
-    expect(sent.filter((m) => m.to !== a.token).map((m) => m.to)).toEqual([fi.token, en.token]);
-    for (const message of sent) {
-      expect({ ...message, to: "", body: "" }).toStrictEqual({
-        to: "",
-        body: "",
-        data: { kind: "round" },
-        collapseId: "round",
-        tag: "round",
-        channelId: "default",
-        priority: "normal",
-        sound: "default",
-        ttl: TTL_AT_T,
-      });
-    }
-  });
-
-  test("leaves out an account whose round switch is off, answers what Expo took, and nothing in the quiet hours", async ({
-    ctx,
-  }) => {
-    const s = await scene(ctx);
-    const a = await s.device(s.a, "en", 1);
-    const gone = await s.device(s.b, "en", 2);
-    const kept = await s.device(s.b, "en", 3);
-    await switchOff(ctx, s.a, "round");
-    s.pusher.ticket = (message) =>
-      message.to === gone.token
-        ? { status: "error", error: "DeviceNotRegistered" }
-        : { status: "ok", id: "ticket-round" };
-    expect(await s.push.round([s.a, s.b])).toBe(1);
-    expect(s.pusher.sent().map((m) => m.to)).toEqual([gone.token, kept.token]);
-    expect(await tokensLeft(ctx.client, [s.a, s.b])).toEqual([a.token, kept.token]);
-    // Nobody, or the quiet hours: nothing is sent.
-    expect(await s.push.round([])).toBe(0);
-    s.clock.at = helsinki("23:00:00");
-    expect(await s.push.round([s.b])).toBe(0);
-    expect(s.pusher.batches).toHaveLength(1);
-  });
-
+describe("a delivery in requests (ADR-055 §8)", () => {
   test("a hundred pushes go in a request, and one refused loses only its own: the tickets before it are read", async ({
     ctx,
   }) => {
@@ -959,13 +881,13 @@ describe("the round's push (ADR-055 §6)", () => {
       s.pusher.failure =
         s.pusher.batches.length === 2 ? new PushFailed("TOO_MANY_REQUESTS", 429) : undefined;
     };
-    expect(await s.push.round([s.b])).toBe(99);
+    await s.match(s.b);
     expect(s.pusher.batches.map((batch) => batch.length)).toEqual([100, 50]);
     // Spaced to Expo's rate: one pause, between the two requests.
     expect(s.pauses).toEqual([{ ms: REQUEST_SPACING_MS, after: 1 }]);
     expect(lineOf(s.logs(), "push not sent")).toEqual([
       expect.objectContaining({
-        push: "round",
+        push: "match",
         reason: "TOO_MANY_REQUESTS",
         status: 429,
         pushes: 50,
@@ -983,34 +905,13 @@ describe("the round's push (ADR-055 §6)", () => {
     expect(s.pusher.asked.flat()).toHaveLength(99);
   });
 
-  test("a round's failure is its job's to log: a missing parameter rejects, a refused send answers none", async ({
-    ctx,
-  }) => {
-    const s = await scene(ctx);
-    await s.device(s.b);
-    s.pusher.failure = new PushFailed("TOO_MANY_REQUESTS", 429);
-    expect(await s.push.round([s.b])).toBe(0);
-    expect(lineOf(s.logs(), "push not sent")).toEqual([
-      expect.objectContaining({ push: "round", reason: "TOO_MANY_REQUESTS", status: 429 }),
-    ]);
-    // A quiet hour that is no hour of the day, then none at all: the run fails, naming it.
-    await withMatchingConfig(ctx.client, { [QUIET_TO_KEY]: 24 });
-    await expect(s.push.round([s.b])).rejects.toThrow(
-      "matching_config push_quiet_to_hour is not an hour",
-    );
-    await ctx.client.query("DELETE FROM matching_config WHERE key = $1", [QUIET_FROM_KEY]);
-    await expect(s.push.round([s.b])).rejects.toThrow(/push_quiet_from_hour/);
-    expect(s.pusher.batches).toHaveLength(1);
-    expect(lineOf(s.logs(), "push failed")).toEqual([]);
-  });
-
   test("spaces its requests to Expo's rate: a pause between two requests, never before the first", async ({
     ctx,
   }) => {
     const s = await scene(ctx);
     // A hundred devices are one request, with no pause.
     for (let i = 0; i < 100; i += 1) await s.device(s.a, "en", i % 60);
-    expect(await s.push.round([s.a])).toBe(100);
+    await s.match(s.a);
     expect(s.pusher.batches.map((batch) => batch.length)).toEqual([100]);
     expect(s.pauses).toEqual([]);
     // Two hundred and one are three, with a pause before each after the first,
@@ -1023,11 +924,11 @@ describe("the round's push (ADR-055 §6)", () => {
       reached.open();
       await holding.promise;
     };
-    const round = s.push.round([s.b]);
+    s.push.match({ accountId: s.b });
     await reached.promise;
     expect(s.pusher.batches.map((batch) => batch.length)).toEqual([100, 100]);
     holding.open();
-    expect(await round).toBe(201);
+    await s.push.settled();
     expect(s.pusher.batches.map((batch) => batch.length)).toEqual([100, 100, 100, 1]);
     expect(s.pauses).toEqual([
       { ms: REQUEST_SPACING_MS, after: 2 },
@@ -1054,12 +955,12 @@ describe("the round's push (ADR-055 §6)", () => {
         online: () => false,
         schedule: s.schedule.schedule,
       });
-      const round = push.round([s.b]);
+      push.match({ accountId: s.b });
       await first.promise;
       await vi.advanceTimersByTimeAsync(REQUEST_SPACING_MS - 1);
       expect(s.pusher.batches).toHaveLength(1);
       await vi.advanceTimersByTimeAsync(1);
-      expect(await round).toBe(101);
+      await push.settled();
       expect(s.pusher.batches.map((batch) => batch.length)).toEqual([100, 1]);
     } finally {
       vi.useRealTimers();
@@ -1087,7 +988,7 @@ describe("a request refused for tokens of more than one Expo project (ADR-055 §
       const batch = s.pusher.batches.at(-1) ?? [];
       s.pusher.failure = batch.some((m) => strays.includes(m.to)) ? mixed : undefined;
     };
-    expect(await s.push.round([s.b])).toBe(3);
+    await s.match(s.b);
     expect(s.pusher.batches.map((batch) => batch.map((m) => m.to))).toEqual([
       [t1, t2, t3, t4, t5, t6],
       [t1, t3, t5],
@@ -1099,7 +1000,7 @@ describe("a request refused for tokens of more than one Expo project (ADR-055 §
     expect(s.pusher.asked.flat()).toHaveLength(3);
     const lines = s.logs();
     expect(lineOf(lines, "push tokens of another project gone")).toEqual([
-      expect.objectContaining({ push: "round", strays: 3, level: 40 }),
+      expect.objectContaining({ push: "match", strays: 3, level: 40 }),
     ]);
     expect(lineOf(lines, "push not sent")).toEqual([]);
     expectNoToken(lines, [t1, t2, t3, t4, t5, t6]);
@@ -1120,17 +1021,17 @@ describe("a request refused for tokens of more than one Expo project (ADR-055 §
     s.pusher.failure = new PushFailed(MIXED_PROJECTS, 400, {
       [EXPO_PROJECT]: [first.token, second.token],
     });
-    expect(await s.push.round([s.b])).toBe(0);
+    await s.match(s.b);
     expect(s.pusher.batches).toHaveLength(1);
     expect(await tokensLeft(ctx.client, [s.b])).toEqual([first.token, second.token]);
     const lines = s.logs();
     expect(lineOf(lines, "push not sent")).toEqual([
-      expect.objectContaining({ push: "round", reason: MIXED_PROJECTS, status: 400, pushes: 2 }),
+      expect.objectContaining({ push: "match", reason: MIXED_PROJECTS, status: 400, pushes: 2 }),
     ]);
     expect(lineOf(lines, "push tokens of another project gone")).toEqual([]);
     // Without the projects it names, the refusal is any other: nothing forgotten either.
     s.pusher.failure = new PushFailed(MIXED_PROJECTS, 400);
-    expect(await s.push.round([s.b])).toBe(0);
+    await s.match(s.b);
     expect(await tokensLeft(ctx.client, [s.b])).toEqual([first.token, second.token]);
     expect(lineOf(s.logs(), "push not sent")).toHaveLength(2);
     expectNoToken(s.logs(), [first.token, second.token]);
@@ -1152,7 +1053,7 @@ describe("a request refused for tokens of more than one Expo project (ADR-055 §
       const batch = s.pusher.batches.at(-1) ?? [];
       s.pusher.failure = batch.some((m) => m.to === stray.token) ? mixed : undefined;
     };
-    expect(await s.push.round([s.b])).toBe(2);
+    await s.match(s.b);
     expect(
       s.pusher.batches
         .at(-1)
@@ -1177,7 +1078,7 @@ describe("a request refused for tokens of more than one Expo project (ADR-055 §
       [EXPO_PROJECT]: ["ExponentPushToken[one]"],
       "@someone/else": ["ExponentPushToken[two]"],
     });
-    expect(await s.push.round([s.b])).toBe(0);
+    await s.match(s.b);
     expect(await tokensLeft(ctx.client, [s.b])).toEqual([first.token, second.token]);
     expect(lineOf(s.logs(), "push not sent")).toEqual([
       expect.objectContaining({ reason: MIXED_PROJECTS, pushes: 2 }),
@@ -1219,7 +1120,7 @@ describe("a request refused for tokens of more than one Expo project (ADR-055 §
       "@someone/else": [first.token],
       "@another/app": [second.token],
     });
-    expect(await s.push.round([s.b])).toBe(0);
+    await s.match(s.b);
     expect(await tokensLeft(ctx.client, [s.b])).toEqual([first.token, second.token]);
     expect(lineOf(s.logs(), "push not sent")).toEqual([
       expect.objectContaining({ reason: MIXED_PROJECTS, pushes: 2 }),
@@ -1246,10 +1147,10 @@ describe("a request refused for tokens of more than one Expo project (ADR-055 §
       "CREATE TRIGGER refuse_delete BEFORE DELETE ON push_token FOR EACH ROW EXECUTE FUNCTION pg_temp.refuse_delete()",
     );
     await ctx.client.query("SAVEPOINT before_delete");
-    expect(await s.push.round([s.b])).toBe(1);
+    await s.match(s.b);
     await ctx.client.query("ROLLBACK TO SAVEPOINT before_delete");
     expect(lineOf(s.logs(), "push refusal not handled")).toEqual([
-      expect.objectContaining({ push: "round", level: 50 }),
+      expect.objectContaining({ push: "match", level: 50 }),
     ]);
     // What Expo took still waits for its receipt.
     expect(s.schedule.tasks).toHaveLength(1);
@@ -1290,9 +1191,7 @@ describe("the quiet hours and the switches, for every kind", () => {
     const device = await s.device(s.b);
     const everyKind = async () => {
       await s.send("a", `Viesti ${s.clock.at.toISOString()}`);
-      s.push.match({ accountId: s.b });
-      await s.push.settled();
-      await s.push.round([s.b]);
+      await s.match(s.b);
     };
     // 22:00, 03:00 and 07:59:59 in Helsinki, each after the interval had passed.
     for (const at of [helsinki("22:00:00"), helsinki("03:00:00"), helsinki("07:59:59")]) {
@@ -1303,10 +1202,10 @@ describe("the quiet hours and the switches, for every kind", () => {
     // 21:59:59 and 08:00 are not quiet: every kind pushes.
     s.clock.at = helsinki("21:59:59");
     await everyKind();
-    expect(s.pusher.sent().map((m) => m.data.kind)).toEqual(["message", "match", "round"]);
+    expect(s.pusher.sent().map((m) => m.data.kind)).toEqual(["message", "match"]);
     s.clock.at = new Date(helsinki("08:00:00").getTime() + 2 * 24 * HOUR);
     await everyKind();
-    expect(s.pusher.sent().map((m) => m.to)).toEqual(Array(6).fill(device.token));
+    expect(s.pusher.sent().map((m) => m.to)).toEqual(Array(4).fill(device.token));
   });
 
   test("Quiet hours from and to the same hour are none", async ({ ctx }) => {
@@ -1324,11 +1223,9 @@ describe("the quiet hours and the switches, for every kind", () => {
     const everyKind = async (minute: number) => {
       s.clock.at = new Date(T.getTime() + minute * 10 * MINUTE);
       await s.send("a", `Viesti ${minute}`);
-      s.push.match({ accountId: s.b });
-      await s.push.settled();
-      await s.push.round([s.b]);
+      await s.match(s.b);
     };
-    const kinds: Array<PushData["kind"]> = ["message", "match", "round"];
+    const kinds: Array<PushData["kind"]> = ["message", "match"];
     for (const [i, off] of kinds.entries()) {
       for (const kind of kinds) await switchOff(ctx, s.b, kind, kind !== off);
       const before = s.pusher.sent().length;
@@ -1342,7 +1239,7 @@ describe("the quiet hours and the switches, for every kind", () => {
       ).toEqual(kinds.filter((kind) => kind !== off));
     }
     // Every push went to the one device, and none of a kind switched off.
-    expect(s.pusher.sent()).toHaveLength(6);
+    expect(s.pusher.sent()).toHaveLength(2);
     expect(new Set(s.pusher.sent().map((m) => m.to))).toEqual(new Set([device.token]));
   });
 });
@@ -1382,9 +1279,7 @@ describe("how long a push waits for its phone (ADR-055 §7)", () => {
       s.clock.at = new Date(at);
       const before = s.pusher.sent().length;
       await s.send("a", `Viesti ${at}`);
-      s.push.match({ accountId: s.b });
-      await s.push.settled();
-      await s.push.round([s.b]);
+      await s.match(s.b);
       expect(
         s.pusher
           .sent()
@@ -1394,7 +1289,6 @@ describe("how long a push waits for its phone (ADR-055 §7)", () => {
       ).toEqual([
         ["message", ttl],
         ["match", ttl],
-        ["round", ttl],
       ]);
     }
   });
@@ -1414,15 +1308,19 @@ describe("the payload rule (ADR-055 §1)", () => {
 
   it("passes a push that says only that there is something", () => {
     expect(payloadBreaches(clean, withheld)).toEqual([]);
-    for (const kind of ["message", "match", "round"] as const) {
+    for (const kind of ["message", "match"] as const) {
       for (const body of Object.values(LINES[kind])) {
         expect(payloadBreaches({ ...clean, body }, withheld)).toEqual([]);
       }
     }
-    for (const kind of ["match", "round"] as const) {
-      const other: PushMessage = { ...clean, data: { kind }, collapseId: kind, tag: kind, ttl: 60 };
-      expect(payloadBreaches(other, withheld)).toEqual([]);
-    }
+    const match: PushMessage = {
+      ...clean,
+      data: { kind: "match" },
+      collapseId: "match",
+      tag: "match",
+      ttl: 60,
+    };
+    expect(payloadBreaches(match, withheld)).toEqual([]);
   });
 
   it.each<[string, PushMessage, string]>([

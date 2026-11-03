@@ -72,6 +72,7 @@ export type MessageParams = {
   "account.export.round.decision.fish": Record<never, never>;
   "account.export.round.decision.like": Record<never, never>;
   "account.export.round.decision.pass": Record<never, never>;
+  "account.export.round.decision.skip": Record<never, never>;
   "account.export.round.reason.fish": Record<never, never>;
   "account.export.round.reason.liked_you": Record<never, never>;
   "account.export.round.reason.matches_filters": Record<never, never>;
@@ -546,8 +547,10 @@ export type MessageParams = {
   "chat.list.empty": Record<never, never>;
   "chat.list.failed": Record<never, never>;
   "chat.list.loading": Record<never, never>;
-  "chat.list.open": Record<never, never>;
+  "chat.list.theirTurn": Record<never, never>;
   "chat.list.title": Record<never, never>;
+  "chat.list.turnWarning": { "waiting": number; "limit": number };
+  "chat.list.yourTurn": { "waiting": string };
   "chat.message.label": { "who": string; "time": string; "text": string };
   "chat.message.read": Record<never, never>;
   "chat.message.sending": Record<never, never>;
@@ -644,6 +647,7 @@ export type MessageParams = {
   "errors.unauthenticated": Record<never, never>;
   "errors.unsupported_media_type": Record<never, never>;
   "errors.validation_failed": Record<never, never>;
+  "errors.your_turn_limit": Record<never, never>;
   "feedback.another": Record<never, never>;
   "feedback.explain": Record<never, never>;
   "feedback.failed": Record<never, never>;
@@ -758,8 +762,6 @@ export type MessageParams = {
   "notifications.kind.message.label": Record<never, never>;
   "notifications.kind.moderation.hint": Record<never, never>;
   "notifications.kind.moderation.label": Record<never, never>;
-  "notifications.kind.round.hint": Record<never, never>;
-  "notifications.kind.round.label": Record<never, never>;
   "notifications.loading": Record<never, never>;
   "notifications.phone.allowed": Record<never, never>;
   "notifications.phone.denied": Record<never, never>;
@@ -1416,11 +1418,9 @@ export type MessageParams = {
   "push.channel": Record<never, never>;
   "push.match": Record<never, never>;
   "push.message": Record<never, never>;
-  "push.round": Record<never, never>;
   "round.back": Record<never, never>;
   "round.decision.failed": Record<never, never>;
   "round.done": Record<never, never>;
-  "round.empty": Record<never, never>;
   "round.failed": Record<never, never>;
   "round.fish": Record<never, never>;
   "round.gone": Record<never, never>;
@@ -1446,6 +1446,7 @@ export type MessageParams = {
   "round.revisit.fish": Record<never, never>;
   "round.revisit.like": Record<never, never>;
   "round.revisit.pass": Record<never, never>;
+  "round.revisit.skip": Record<never, never>;
   "round.short.aside": { "field": string };
   "round.short.explain": Record<never, never>;
   "round.short.failed": Record<never, never>;
@@ -1453,9 +1454,11 @@ export type MessageParams = {
   "round.short.nobody": Record<never, never>;
   "round.short.title": Record<never, never>;
   "round.short.unanswered": { "field": string };
+  "round.skip": Record<never, never>;
   "round.title": Record<never, never>;
   "round.undo": Record<never, never>;
   "round.undo.label": Record<never, never>;
+  "round.yourTurn.refused": { "waiting": number };
   "row.state.closed": Record<never, never>;
   "row.state.open": Record<never, never>;
   "row.state.withValue": { "value": string; "state": string };
