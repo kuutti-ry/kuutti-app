@@ -72,6 +72,8 @@ updates:
         update-types: ["version-update:semver-major"]
       - dependency-name: "@types/jest"
         update-types: ["version-update:semver-major"]
+      - dependency-name: "babel-jest"
+        update-types: ["version-update:semver-major"]
 
   # The API image's base image (apps/api/Dockerfile). Node 22 is the
   # project's engine (package.json), and newer Node images drop Corepack, so
