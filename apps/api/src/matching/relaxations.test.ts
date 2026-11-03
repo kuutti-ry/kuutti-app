@@ -4,7 +4,7 @@ import { finnishDay } from "../lib/finnish-day.ts";
 import { signedInAccount } from "../test/account.ts";
 import { captureLogger, describe, expect, test } from "../test/harness.ts";
 import { logged } from "../test/rounds.ts";
-import { appendRelaxed, decide, undoRelaxation } from "./rounds.ts";
+import { appendRelaxed, type CardOf, decide, readAdded, undoRelaxation } from "./rounds.ts";
 
 // The short pool's writers (#99, ADR-042 §5, §6) where the routes cannot reach
 // them: a relaxation recorded or undone between the route's look and the
@@ -53,6 +53,43 @@ const NOBODY_FITS = { fits: async () => new Set<string>() };
 /** People a relaxation lets in who need none of the day's other relaxations. */
 const as = (ids: string[]) =>
   ids.map((candidateId) => ({ candidateId, needs: [], distance: "close" as const }));
+
+describe("the relaxation's answer", () => {
+  test("leaves out somebody who narrowed their filters after the pool was walked (ADR-062 §8)", async ({
+    ctx,
+  }) => {
+    const owner = await signedInAccount(ctx.client);
+    const stays = await signedInAccount(ctx.client);
+    const narrowed = await signedInAccount(ctx.client);
+    const deps = await depsOf(ctx.client);
+    const roundId = await roundWith(ctx.client, owner.accountId, []);
+    const placed = await appendRelaxed(deps, {
+      accountId: owner.accountId,
+      day: DAY,
+      relaxation: ASIDE,
+      basis: [],
+      candidates: as([stays.accountId, narrowed.accountId]),
+    });
+    expect(placed).toEqual([1, 2]);
+    const cards = [] as string[];
+    const cardOf: CardOf = async (_viewer, subject) => {
+      cards.push(subject);
+      return { accountId: subject, fields: {} } as Awaited<ReturnType<CardOf>>;
+    };
+
+    const fits = { fits: async () => new Set([stays.accountId]) };
+    const entries = await readAdded(deps, fits, owner.accountId, DAY, placed, cardOf, []);
+
+    expect(entries.map((entry) => entry.position)).toEqual([1]);
+    // Its card is never built, so nothing of it is shown or counted.
+    expect(cards).toEqual([stays.accountId]);
+    // It stays in the log, for a read once it fits again.
+    expect((await placesOf(ctx.client, roundId)).map((place) => place.candidate_id)).toEqual([
+      stays.accountId,
+      narrowed.accountId,
+    ]);
+  });
+});
 
 describe("the relaxation's writer", () => {
   test("refuses a deal-breaker relaxed since the route looked, and adds nothing", async ({

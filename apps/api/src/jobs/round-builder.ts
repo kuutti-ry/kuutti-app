@@ -301,9 +301,15 @@ async function todayOf(deps: BuilderDeps, accountId: string): Promise<Today | nu
 /**
  * Of these people, those whose pile keeps them out of everybody's ordinary queue
  * (ADR-062 §4): `inbox_stop` likes their own inbox can show now. Counted raw
- * first, in one statement, and asked exactly only of those at the stop, which is
- * few; the raw count is never below the exact one, so nobody is missed.
+ * first, in one statement, and asked exactly only of those at the stop, three
+ * statements each; the raw count is never below the exact one, so nobody is missed.
  */
+// shortcut: this and `waitingOn` go through a candidate's whole kept year of
+// entries for two weeks of likes, some thousands of rows each by a year's end, and
+// each walk asks again of whoever is at the stop; a partial index on
+// `round_entries (candidate_id) WHERE decision = 'like'` and a memo per walk lift
+// it, when capacity.md's run asks.
+
 async function heldBack(
   db: Queryable,
   t: Pick<Today, "day" | "byId" | "config">,

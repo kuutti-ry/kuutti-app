@@ -756,6 +756,26 @@ describe("what seen means (ADR-062 §2)", () => {
     expect(await earlierEntries(ctx.client, other)).toEqual(new Set([queued]));
   });
 
+  test("the day's first read holds today's people before it deletes, so that an erasure meets no deadlock", async ({
+    ctx,
+  }) => {
+    const { women, men } = await pondOf(ctx, "test-seen-deleted-order", 1, 1);
+    const [a] = women;
+    const [b] = men;
+    if (!a || !b) throw new Error("people not written");
+    await shownBefore(ctx.client, a, b, 1, null, { displayed: false });
+    let heldFirst: string[] = [];
+    const db = interleaved(ctx.client, /DELETE FROM round_entries/, async () => {
+      heldFirst = candidates(await roundOf(ctx.client, a));
+    });
+
+    await fillQueue({ ...(await deps(ctx.client)), db }, a);
+
+    expect(db.ran()).toBe(true);
+    expect(heldFirst).toEqual([b]);
+    expect(await earlierEntries(ctx.client, a)).toEqual(new Set());
+  });
+
   test("only the day's first read deletes, and a person with no matching deletes nothing", async ({
     ctx,
   }) => {
@@ -1336,6 +1356,33 @@ describe("liked-you (#97, ADR-037, ADR-062 §2)", () => {
       candidate_id: b,
       reason: "liked_you",
     });
+  });
+
+  test("A liked-you card queued before a shadow ban waits for the lift too", async ({ ctx }) => {
+    const { women, men } = await pondOf(ctx, "test-liked-shadow-after", 1, 2);
+    const [a] = women;
+    const [b, c] = men;
+    if (!a || !b || !c) throw new Error("people not written");
+    await shownBefore(ctx.client, b, a, 1, "like");
+    const app = await appAt(ctx.client);
+    const seen = async () =>
+      ((await readToday(app, ctx.client, a)).entries ?? []).map((entry) => [
+        entry.card.accountId,
+        entry.reason,
+      ]);
+    expect(await seen()).toEqual([
+      [b, "liked_you"],
+      [c, "matches_filters"],
+    ]);
+
+    await ctx.client.query("UPDATE account SET state = 'shadow_banned' WHERE id = $1", [a]);
+    expect(await seen()).toEqual([[c, "matches_filters"]]);
+
+    await ctx.client.query("UPDATE account SET state = 'active' WHERE id = $1", [a]);
+    expect(await seen()).toEqual([
+      [b, "liked_you"],
+      [c, "matches_filters"],
+    ]);
   });
 
   test("The sender learns nothing of what became of a like", async ({ ctx }) => {

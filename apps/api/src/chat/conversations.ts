@@ -344,6 +344,11 @@ export async function openConversation(
   tx: Queryable,
   input: { first: string; second: string; at: Date },
 ): Promise<string> {
+  // shortcut: a send takes no pair's lock, so one that brings the archived
+  // conversation back between the caller's read and this close lands in a closed
+  // conversation, beside the new one. It takes a message and a second match in
+  // the same moment, 90 days on; locking the pair's unclosed conversations before
+  // that read would close it.
   await repo.closeConversationsOf(tx, {
     accountIds: [input.second],
     how: "unmatch",

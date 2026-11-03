@@ -308,6 +308,23 @@ describe("a match", () => {
     expect(await between(ctx.client, c, d)).toBe(0);
   });
 
+  test("Only a new like makes a match, so a like made a fish opens nothing", async ({ ctx }) => {
+    const [a, b] = await cast(ctx.client, 2);
+    if (!a || !b) throw new Error("cast not written");
+    await roundOf(ctx.client, a, [b]);
+    await roundOf(ctx.client, b, [a]);
+    const app = await appAt(ctx.client);
+    expect(await answered(await decideBy(app, a, 1, "like"))).toBeNull();
+    await ctx.client.query("UPDATE account SET state = 'shadow_banned' WHERE id = $1", [
+      b.accountId,
+    ]);
+    expect(await answered(await decideBy(app, b, 1, "like"))).toBeNull();
+    await ctx.client.query("UPDATE account SET state = 'active' WHERE id = $1", [b.accountId]);
+
+    expect(await answered(await decideBy(app, a, 1, "fish"))).toBeNull();
+    expect(await between(ctx.client, a, b)).toBe(0);
+  });
+
   test("a match is a match event for each of the two, saying whose like made it", async ({
     ctx,
   }) => {

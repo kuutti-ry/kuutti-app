@@ -276,6 +276,7 @@ export function roundRoutes(
     try {
       const entries = await readAdded(
         rounds(),
+        queue,
         accountId,
         day,
         positions,

@@ -122,6 +122,11 @@ Feature: Two likes make a match, and the match is a conversation
     When "A" likes "B" again and makes "C" a like
     Then both are answered, and nothing is refused
 
+  Scenario: Only a new like makes a match, so a like made a fish opens nothing
+    Given "A" liked "B" today, and "B" liked "A" while shadow-banned, which made no match
+    When the ban is lifted, and "A" makes the like a fish
+    Then the fish is recorded, and no conversation opens
+
   Scenario: A your_turn_limit of 0 is off
     Given your_turn_limit is 0, 8 conversations are on "A"'s turn, and "B" is in "A"'s round today
     When "A" likes "B"

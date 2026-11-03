@@ -184,6 +184,11 @@ Feature: The queue: whom it holds and in which order
     When "A" reads the queue, and again the day after the ban is lifted
     Then "A"'s first day holds "B" in no place, and the second opens with "B", labelled liked you
 
+  Scenario: A liked-you card queued before a shadow ban waits for the lift too
+    Given "B" liked "A" yesterday, and "A" has read today's queue with "B" undecided in it
+    When "A" is shadow-banned and reads the queue, and reads it again once the ban is lifted
+    Then the first read leaves "B" out, and the second serves "B", labelled liked you
+
   Scenario: The sender learns nothing of what became of a like
     Given "B" liked "A" yesterday, and "B" has read today's queue
     When "A" passes "B"

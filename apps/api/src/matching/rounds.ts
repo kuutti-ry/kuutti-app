@@ -276,14 +276,6 @@ export async function addPlaces(
        ON CONFLICT (account_id, day) DO NOTHING`,
       [input.accountId, input.day, deps.now()],
     );
-    if (opened.rowCount === 1) {
-      await tx.query(
-        `DELETE FROM round_entries e USING rounds r
-          WHERE r.id = e.round_id AND r.account_id = $1 AND r.day < $2::date
-            AND e.seen_at IS NULL AND e.decision IS NULL`,
-        [input.accountId, input.day],
-      );
-    }
     const round = await tx.query<{ id: string; last: number }>(
       `SELECT r.id, ${PLACES} AS last FROM rounds r
         WHERE r.account_id = $1 AND r.day = $2 FOR UPDATE OF r`,
@@ -291,7 +283,6 @@ export async function addPlaces(
     );
     const stands = round.rows[0];
     if (!stands) throw new Error("addPlaces: the day's round is not there");
-    if (input.places.length === 0) return 0;
     const written = await tx.query<{ position: number }>(
       `INSERT INTO round_entries
          (round_id, position, candidate_id, reason, distance, relaxed_field, relaxed_with)
@@ -324,6 +315,17 @@ export async function addPlaces(
         `UPDATE rounds SET completed_at = NULL, last_position = $3
           WHERE id = $1 AND account_id = $2`,
         [stands.id, input.accountId, stands.last + input.places.length],
+      );
+    }
+    // After the people above are held: an erasure holds the person, then deletes
+    // their entries, so an entry of somebody also in today's places, deleted first,
+    // would leave each waiting for the other.
+    if (opened.rowCount === 1) {
+      await tx.query(
+        `DELETE FROM round_entries e USING rounds r
+          WHERE r.id = e.round_id AND r.account_id = $1 AND r.day < $2::date
+            AND e.seen_at IS NULL AND e.decision IS NULL`,
+        [input.accountId, input.day],
       );
     }
     return added;
@@ -382,8 +384,10 @@ async function entriesOf(
 /**
  * The next cards of the day's log (`entriesOf`), those undecided that fit now,
  * both ways (ADR-062 §8): one that does not stays in the log, left out while it
- * does not fit. Null with no log for the day. The first read that finds the
- * round stamps `opened_at`.
+ * does not fit. A shadow-banned person's liked-you and fish cards wait for the
+ * lift, those queued before the ban too (ADR-037 §7): a like back would make no
+ * match, and so tell them of it (ADR-024 §7). Null with no log for the day. The
+ * first read that finds the round stamps `opened_at`.
  */
 async function nextCards(
   deps: RoundDeps,
@@ -396,7 +400,9 @@ async function nextCards(
   const { rows } = await deps.db.query<EntryRow & { id: string }>(
     `SELECT r.id, e.position, e.candidate_id, e.reason, e.decision, e.fish, e.relaxed_field,
             e.distance
-       FROM rounds r LEFT JOIN round_entries e ON e.round_id = r.id AND e.decision IS NULL
+       FROM rounds r JOIN account me ON me.id = r.account_id
+       LEFT JOIN round_entries e ON e.round_id = r.id AND e.decision IS NULL
+        AND NOT (me.state = 'shadow_banned' AND e.reason IN ('liked_you', 'fish'))
       WHERE r.account_id = $1 AND r.day = $2
       ORDER BY e.position`,
     [accountId, day],
@@ -665,9 +671,11 @@ export async function decide(
     );
     let match = decision === "like" ? standing : null;
     let opened = false;
-    if (decision === "like" && !standing) {
-      // The other's like of the person, still standing and not expired, today's
-      // included: under the pair's lock it is committed or it is not there.
+    if (decision === "like" && entry.decision !== "like" && !standing) {
+      // A new like alone: one made a fish or back was asked neither the limit nor
+      // the filters above. The other's like of the person, still standing and not
+      // expired, today's included: under the pair's lock it is committed or it is
+      // not there.
       const mutual = await tx.query(
         `SELECT 1 FROM round_entries e JOIN rounds r ON r.id = e.round_id
           WHERE r.account_id = $1 AND e.candidate_id = $2 AND e.decision = 'like'
@@ -983,9 +991,14 @@ export async function relax(
   return appendRelaxed(deps, { ...input, day: today, ...found });
 }
 
-/** The cards at these places of today's round, as the read gives them (`entriesOf`), for the answer of a relaxation. */
+/**
+ * The cards at these places of today's round, as the read gives them
+ * (`entriesOf`), for the answer of a relaxation, those that fit now: somebody may
+ * have narrowed their filters since the pool was walked (ADR-062 §8).
+ */
 export async function readAdded(
   deps: RoundDeps,
+  queue: Pick<Queue, "fits">,
   accountId: string,
   day: string,
   positions: readonly number[],
@@ -1000,7 +1013,14 @@ export async function readAdded(
       ORDER BY e.position`,
     [accountId, day, positions],
   );
-  return entriesOf(accountId, rows, cardOf, dealBreakers);
+  const added = rows.flatMap((row) => (row.candidate_id ? [row.candidate_id] : []));
+  const fitting = await queue.fits(deps.db, accountId, added);
+  return entriesOf(
+    accountId,
+    rows.filter((row) => row.candidate_id !== null && fitting.has(row.candidate_id)),
+    cardOf,
+    dealBreakers,
+  );
 }
 
 /** How long a round and its entries are kept (ADR-062 §13, the maintainer's of 01/11/2026): the longest clock of the ladder reads them this far back. */
