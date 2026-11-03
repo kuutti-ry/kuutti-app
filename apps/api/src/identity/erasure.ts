@@ -7,7 +7,9 @@ import type { Logger } from "../lib/logger.ts";
 import {
   deletePreferencesOfAccount,
   eraseRoundsOf,
+  eraseStarsOf,
   exportRounds,
+  exportStars,
   readDealBreakers,
   readPreferences,
 } from "../matching/index.ts";
@@ -51,8 +53,9 @@ import { visibleState } from "./standing.ts";
 // attempts, photos with their review rows and objects, the fetch log, and the
 // age on the account row, which stays as an anonymised tombstone. Kept: the
 // identity row (with one more deletion and the cooldown), the audit log,
-// staff rows. Likes, matches, bookmarks and push tokens join here as their
-// slices land; the research_id mapping goes (#50), the events keyed by it stay.
+// staff rows. Likes, matches and push tokens join here as their slices land, and
+// TD-7's bookmarks are the stars (#575, ADR-064): those the person put and those
+// put on them go. The research_id mapping goes (#50), the events keyed by it stay.
 // The photo check's notes (#253) go too, and are in the export in plain words.
 // The consent rows go (ADR-010 §14): what they proved goes in the same
 // transaction, and the research events carry their own consent_version.
@@ -113,6 +116,8 @@ export type ErasureSummary = {
   rounds: number;
   /** The entries in which the person was somebody's card, decisions on them included (#96). */
   roundEntriesAsCandidate: number;
+  /** The stars the person put and those put on them (#575). */
+  stars: number;
   /** The consent rows (ADR-010 §14). */
   consents: number;
   /** The export requests (#237). */
@@ -184,6 +189,7 @@ export async function eraseAccount(deps: ErasureDeps, accountId: string): Promis
     // The person's rounds, and the entries in which they are somebody's card,
     // others' likes on them included (TD-7, #96).
     const rounds = await eraseRoundsOf(tx, accountId);
+    const stars = await eraseStarsOf(tx, accountId);
     // The consent rows go (ADR-010 §14): the terms were the condition of use,
     // the sensitive answers they covered went just above, and the events keep
     // the version they were written under; nothing is left to prove.
@@ -220,6 +226,7 @@ export async function eraseAccount(deps: ErasureDeps, accountId: string): Promis
       profileRows,
       preferences,
       rounds,
+      stars,
       consents,
       exports,
       feedback,
@@ -247,6 +254,7 @@ export async function eraseAccount(deps: ErasureDeps, accountId: string): Promis
     preferences: result.preferences,
     rounds: result.rounds.rounds,
     roundEntriesAsCandidate: result.rounds.entriesAsCandidate,
+    stars: result.stars,
     consents: result.consents,
     exports: result.exports,
     feedback: result.feedback,
@@ -345,6 +353,7 @@ export async function exportAccount(
     contacts,
     notifications,
     rounds,
+    stars,
     invitations,
   ] = await Promise.all([
     findPondOfAccount(deps.db, accountId),
@@ -371,6 +380,7 @@ export async function exportAccount(
     exportContacts(deps, accountId),
     exportNotifications(deps.db, accountId),
     exportRounds(deps.db, accountId, EXPORT_HISTORY_LIMIT),
+    exportStars(deps.db, accountId),
     exportInvitations(deps.db, accountId),
   ]);
   const document: AccountExport = {
@@ -490,6 +500,11 @@ export async function exportAccount(
           distanceInWords: entry.distance ? t(`profile.option.distance.${entry.distance}`) : null,
         })),
       })),
+    },
+    // When the person put each star (#575, ADR-064 §9); never on whom.
+    stars: {
+      about: t("account.export.star.about"),
+      items: stars.map((at) => ({ at: at.toISOString() })),
     },
     // The invitations made and the one used, and the units (#107, ADR-044 §10); never a code or whom.
     invitations,

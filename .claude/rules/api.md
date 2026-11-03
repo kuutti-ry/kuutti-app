@@ -30,6 +30,7 @@ One process: HTTP routes, WebSockets through `@hono/node-server`'s own upgrade o
 - Drizzle query builder only; a raw `sql` template needs a comment explaining why.
 - Visibility is computed, never stored. Inactivity is a timestamp.
 - The queue's filters are asked now, never remembered: both people's on every read of a card and on every new like (`fitsNow`, in `decide`'s transaction for a like, ADR-062 §8), a pass or a skip asking only the state and the block, so that a like can always be taken back. A read with no card left walks the whole pool in the request (`fillQueue`, `subjectsOfPond`), once every ten cards: what that costs is `docs/runbooks/capacity.md`'s.
+- A star (#575, ADR-064 §8) is read only by its owner's list and queue: never by anybody else's order, the inbox stop, exposure or an event, and no answer tells anybody else of one. Used for any of those it is a desirability signal, which is never built. The list asks the filters, the state and the stop on every read (`starsShown`), never remembered.
 
 ## Media
 

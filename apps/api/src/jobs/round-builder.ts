@@ -281,6 +281,13 @@ async function todayOf(deps: BuilderDeps, accountId: string): Promise<Today | nu
     [accountId, day],
   );
   const inLog = new Set(placed.rows.map((row) => row.candidate_id));
+  // A star is the person's own way back to somebody, so they are no ordinary card
+  // meanwhile (ADR-064 §4); nothing else of this walk, or anybody else's, reads it.
+  const starred = await deps.db.query<{ candidate_id: string }>(
+    "SELECT candidate_id FROM star WHERE account_id = $1",
+    [accountId],
+  );
+  const stars = new Set(starred.rows.map((row) => row.candidate_id));
   const shown = subjects.filter((subject) => subject.visible && subject.id !== accountId);
   const byId = new Map(
     subjects.filter((subject) => subject.visible).map((subject) => [subject.id, subject]),
@@ -291,7 +298,8 @@ async function todayOf(deps: BuilderDeps, accountId: string): Promise<Today | nu
       !history.refused.has(subject.id) &&
       !history.cooling.has(subject.id) &&
       !inbox.waits.has(subject.id) &&
-      !inLog.has(subject.id),
+      !inLog.has(subject.id) &&
+      !stars.has(subject.id),
   );
   const relaxed = (await relaxationsOf(deps.db, accountId, day))?.relaxed ?? [];
   const effective = relaxedBy(owner.person, relaxed);
@@ -315,8 +323,17 @@ async function heldBack(
   t: Pick<Today, "day" | "byId" | "config">,
   ids: readonly string[],
 ): Promise<Set<string>> {
+  return heldOf(db, t, await atTheStop(db, t, ids));
+}
+
+/** The raw count's half of `heldBack`. */
+async function atTheStop(
+  db: Queryable,
+  t: Pick<Today, "day" | "config">,
+  ids: readonly string[],
+): Promise<string[]> {
   const stop = t.config.inbox_stop;
-  if (stop <= 0) return new Set();
+  if (stop <= 0) return [];
   const { rows } = await db.query<{ id: string }>(
     `SELECT e.candidate_id AS id
        FROM round_entries e JOIN rounds r ON r.id = e.round_id
@@ -330,15 +347,65 @@ async function heldBack(
      HAVING count(DISTINCT r.account_id) >= $4`,
     [ids, t.day, t.config.like_expiry_days, stop],
   );
+  return rows.map((row) => row.id);
+}
+
+/** The exact half of `heldBack`: of these, whose raw count reached the stop, those it holds out. */
+async function heldOf(
+  db: Queryable,
+  t: Pick<Today, "day" | "byId" | "config">,
+  ids: readonly string[],
+): Promise<Set<string>> {
   const held = new Set<string>();
-  for (const { id } of rows) {
+  for (const id of ids) {
     const person = t.byId.get(id);
     if (!person) continue;
     const history = await historyOf(db, id, t.day, t.config);
     const { places } = await inboxOf(db, person, t.day, t.config, history, t.byId);
-    if (places.length >= stop) held.add(id);
+    if (places.length >= t.config.inbox_stop) held.add(id);
   }
   return held;
+}
+
+/**
+ * Of these people, those the inbox stop holds out (ADR-062 §4), for a reader that
+ * has walked no pool: the Starred list (ADR-064 §6), which reads the pool only when
+ * somebody on it is at the stop.
+ */
+export async function stoppedAmong(
+  deps: Pick<BuilderDeps, "now">,
+  db: Queryable,
+  pondId: string,
+  ids: readonly string[],
+): Promise<ReadonlySet<string>> {
+  const at = deps.now();
+  const t = { day: finnishDay(at), config: await matchingConfigNumbers(db, ALL_KEYS) };
+  const raw = await atTheStop(db, t, ids);
+  if (raw.length === 0) return new Set();
+  const subjects = await subjectsOfPond(db, pondId, at);
+  const byId = new Map(
+    subjects.filter((subject) => subject.visible).map((subject) => [subject.id, subject]),
+  );
+  return heldOf(db, { ...t, byId }, raw);
+}
+
+/**
+ * Whether this person's like or fish waits on the owner, by the rule of the owner's
+ * inbox (ADR-062 §2): the card's label, for a card that comes by another way (the
+ * Starred list, ADR-064 §4). Null with none.
+ */
+export async function likeWaiting(
+  db: Queryable,
+  owner: Subject,
+  candidate: Subject,
+  day: string,
+): Promise<"liked_you" | "fish" | null> {
+  const config = await matchingConfigNumbers(db, KEYS);
+  const history = await historyOf(db, owner.id, day, config);
+  const byId = new Map([[candidate.id, candidate]]);
+  const inbox = await inboxOf(db, owner, day, config, history, byId);
+  if (!inbox.places.some((place) => place.id === candidate.id)) return null;
+  return inbox.fish.has(candidate.id) ? "fish" : "liked_you";
 }
 
 /**
@@ -494,13 +561,24 @@ export async function fitsNow(
   accountId: string,
   candidateIds: readonly string[],
 ): Promise<ReadonlySet<string>> {
+  const fitting = await fittingNow(deps, db, accountId, candidateIds);
+  return new Set(fitting.map((subject) => subject.id));
+}
+
+/** The people `fitsNow` names, as subjects: the Starred list also asks whether they are seen by others (ADR-064 §6). */
+export async function fittingNow(
+  deps: Pick<BuilderDeps, "now">,
+  db: Queryable,
+  accountId: string,
+  candidateIds: readonly string[],
+): Promise<Subject[]> {
   const at = deps.now();
   const day = finnishDay(at);
   const pondId = await pondIdOf(db, accountId);
-  if (!pondId) return new Set();
+  if (!pondId) return [];
   const subjects = await subjectsAmong(db, pondId, [accountId, ...candidateIds], at);
   const owner = subjects.find((subject) => subject.id === accountId);
-  if (!owner) return new Set();
+  if (!owner) return [];
   const { like_expiry_days: expiry } = await matchingConfigNumbers(db, ["like_expiry_days"]);
   const { rows: likes } = await db.query<{ id: string; waived: Relaxation["field"][] }>(
     `SELECT r.account_id AS id,
@@ -515,15 +593,11 @@ export async function fitsNow(
   const waived = new Map(likes.map((like) => [like.id, waivedAs(like.waived)]));
   const relaxed = (await relaxationsOf(db, accountId, day))?.relaxed ?? [];
   const person = { ...owner, person: relaxedBy(owner.person, relaxed) };
-  return new Set(
-    subjects
-      .filter((subject) =>
-        mayMeet(person, {
-          ...subject,
-          person: relaxedBy(subject.person, waived.get(subject.id) ?? []),
-        }),
-      )
-      .map((subject) => subject.id),
+  return subjects.filter((subject) =>
+    mayMeet(person, {
+      ...subject,
+      person: relaxedBy(subject.person, waived.get(subject.id) ?? []),
+    }),
   );
 }
 

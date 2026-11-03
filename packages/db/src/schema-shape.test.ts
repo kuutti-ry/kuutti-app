@@ -91,6 +91,8 @@ describe("the tables", () => {
       "rounds",
       "sanction",
       "session",
+      // One person's private mark on another (#575, ADR-064).
+      "star",
     ]);
   });
 
@@ -241,6 +243,9 @@ describe("the foreign keys", () => {
       "rounds",
       "sanction",
       "session",
+      // Who put a star and on whom (#575): gone at the erasure of either.
+      "star",
+      "star",
     ]);
     const toIdentity = references
       .filter((reference) => reference.includes(" -> identity.id"))
@@ -368,6 +373,8 @@ describe("the indexes", () => {
     ["notification_preference", "notification_preference_kind_idx", ["account_id", "kind"]],
     ["found_them_count", "found_them_count_day_reason_idx", ["day", "reason"]],
     ["round_relaxation", "round_relaxation_round_field_idx", ["round_id", "field"]],
+    // Starred or not, with no degrees (#575).
+    ["star", "star_account_candidate_idx", ["account_id", "candidate_id"]],
     // One invitation per code, and one redeemed per person (#107).
     ["invitation", "invitation_code_hash_idx", ["code_hash"]],
     ["invitation", "invitation_redeemed_by_idx", ["redeemed_by_account_id"]],
@@ -388,6 +395,8 @@ describe("the indexes", () => {
     ["sanction", "sanction_account_created_idx", ["account_id", "created_at"]],
     ["sanction", "sanction_identity_open_idx", ["identity_id"]],
     ["report", "report_reporter_created_idx", ["reporter_account_id", "created_at"]],
+    // The erasure of the person starred finds the stars on them (#575).
+    ["star", "star_candidate_idx", ["candidate_id"]],
     ["photo", "photo_message_day_idx", ["account_id", "created_at"]],
     ["report_message", "report_message_photo_idx", ["photo_id"]],
     // The SET NULL of a deleted photo finds the reports pointing at it (#476).

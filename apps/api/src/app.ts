@@ -29,6 +29,7 @@ import {
 } from "./identity/index.ts";
 import { isComplete, matchingStatusOf } from "./jobs/pool.ts";
 import { fillQueue, fitsNow, relaxationOffers, relaxedCandidates } from "./jobs/round-builder.ts";
+import { starPlace, starredPeople, starsShown } from "./jobs/stars.ts";
 import { requireAdmin } from "./lib/admin-middleware.ts";
 import { requireSession } from "./lib/auth-middleware.ts";
 import type { Config } from "./lib/config.ts";
@@ -49,7 +50,7 @@ import { servedDocument } from "./lib/openapi.ts";
 import type { Pusher } from "./lib/push.ts";
 import { addressOf, limited, personOf, rateLimit } from "./lib/rate-limit.ts";
 import { serverRequestId } from "./lib/request-id.ts";
-import { preferencesRoutes, readPreferences, roundRoutes } from "./matching/index.ts";
+import { preferencesRoutes, readPreferences, roundRoutes, starRoutes } from "./matching/index.ts";
 import { type MediaDeps, photoAdminRoutes, photoRoutes, UPLOAD_ROUTE } from "./media/index.ts";
 import { createPush, notificationRoutes, type Push } from "./notifications/index.ts";
 import { pondAdminRoutes, pondRoutes } from "./pond/index.ts";
@@ -336,28 +337,29 @@ export function createApp(deps: Deps) {
   // 429 goes through. Who comes next, and whether two people fit now, are the
   // queue's builder's, which reads across slices and lives with the jobs (#95).
   // A read is checked by the velocity rules after it (#86, ADR-041).
+  const cardOf = async (viewerAccountId: string, subjectAccountId: string) => {
+    try {
+      const built = await buildCard(
+        {
+          db: deps.db,
+          logger: deps.logger,
+          now: deps.now ?? (() => new Date()),
+          readPreferences,
+        },
+        { viewerAccountId, subjectAccountId },
+      );
+      return built.card;
+    } catch (error) {
+      if (error instanceof AppError && error.status === 404) return null;
+      throw error;
+    }
+  };
   app.route(
     "/",
     roundRoutes(
       deps,
       guard,
-      async (viewerAccountId, subjectAccountId) => {
-        try {
-          const built = await buildCard(
-            {
-              db: deps.db,
-              logger: deps.logger,
-              now: deps.now ?? (() => new Date()),
-              readPreferences,
-            },
-            { viewerAccountId, subjectAccountId },
-          );
-          return built.card;
-        } catch (error) {
-          if (error instanceof AppError && error.status === 404) return null;
-          throw error;
-        }
-      },
+      cardOf,
       {
         fill: (accountId) => fillQueue(builderDeps(), accountId),
         fits: (db, accountId, candidateIds) => fitsNow(builderDeps(), db, accountId, candidateIds),
@@ -377,6 +379,25 @@ export function createApp(deps: Deps) {
         candidates: (accountId, relaxation) =>
           relaxedCandidates(builderDeps(), accountId, relaxation),
       },
+      ownFieldsOf,
+    ),
+  );
+  // The stars (#575, ADR-064) serve a card as the queue does, and read across
+  // slices as its builder does, from the jobs.
+  app.route(
+    "/",
+    starRoutes(
+      deps,
+      guard,
+      cardOf,
+      {
+        shown: (db, accountId, candidateIds) =>
+          starsShown(builderDeps(), db, accountId, candidateIds),
+        place: (accountId, candidateId) => starPlace(builderDeps(), accountId, candidateId),
+        people: (accountId) => starredPeople(builderDeps(), accountId),
+      },
+      { yourTurn: conversationsOnTurn },
+      roundRead,
       ownFieldsOf,
     ),
   );

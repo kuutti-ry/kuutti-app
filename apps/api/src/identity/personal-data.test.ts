@@ -204,6 +204,7 @@ const REGISTER: Record<string, Entry> = {
     exported: ["sanctions"],
   },
   session: { erasure: "goes", by: "deleteAccountSessions", exported: ["sessions"] },
+  star: { erasure: "goes", by: "eraseStarsOf", exported: ["stars"] },
   pond_counter: { erasure: "nobody", why: "A pond's counts by day (ADR-013)." },
 };
 

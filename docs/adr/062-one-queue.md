@@ -1,6 +1,6 @@
 # ADR-062: One queue to the end of the pool
 
-- Status: accepted 2026-11-01 (#502, the maintainer's decisions of 2026-10-29, 2026-10-31 and 2026-11-01, built as written here; §15 marks what is the agent's and was not put to him; the points under "Open, the maintainer's" are his to confirm or change; amends ADR-007, ADR-008, ADR-011, ADR-014, ADR-031, ADR-032, ADR-034, ADR-035, ADR-036, ADR-037, ADR-038, ADR-039, ADR-041, ADR-042, ADR-044, ADR-055, ADR-056, ADR-060 and ADR-061), amended 2026-11-03 (Open 2: the model is not run again for one pool, the maintainer's of 2026-11-01, #503; see History)
+- Status: accepted 2026-11-01 (#502, the maintainer's decisions of 2026-10-29, 2026-10-31 and 2026-11-01, built as written here; §15 marks what is the agent's and was not put to him; the points under "Open, the maintainer's" are his to confirm or change; amends ADR-007, ADR-008, ADR-011, ADR-014, ADR-031, ADR-032, ADR-034, ADR-035, ADR-036, ADR-037, ADR-038, ADR-039, ADR-041, ADR-042, ADR-044, ADR-055, ADR-056, ADR-060 and ADR-061), amended 2026-11-03 (Open 2: the model is not run again for one pool, the maintainer's of 2026-11-01, #503; see History), amended 2026-11-03 by ADR-064 (§1, §2: a starred person is no ordinary card and comes through the Starred list, unless their like waits, #575)
 - Date: 2026-11-01
 - Follows: TD-11, TD-12, TD-13 and TD-14 (departed from here, see Context), TD-6 (the exposure budget), CLAUDE.md rules 6 and 7 and Product constraints, ADR-034 (the round record), ADR-061 (one home, one pool), #502, #503
 

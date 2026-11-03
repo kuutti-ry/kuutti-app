@@ -11,9 +11,12 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { AppState } from "react-native";
 import { ApiError } from "@/lib/api";
 import {
+  clearStar,
   decide,
   fetchRound,
   fetchYourTurn,
+  openStar,
+  putStar,
   relaxToday,
   reportSeen,
   undoRelaxation,
@@ -28,6 +31,8 @@ type RoundView =
    * budget (ADR-062 §9): said in words, nothing to try again.
    */
   | { status: "budget" }
+  /** A star opened that the list no longer shows (#575, ADR-064 §6): said with no word why. */
+  | { status: "gone" }
   /** The cards the phone holds; with none left to decide, the queue's end, or null entries before matching opens. */
   | { status: "ready"; round: RoundResponse };
 
@@ -52,6 +57,9 @@ export type RoundNotice =
       | "errors.already_relaxed"
       | "errors.relaxations_changed"
       | "errors.card_budget_exceeded"
+      | "errors.stars_full"
+      | "round.star.first"
+      | "round.star.failed"
       | "round.short.nobody"
       | "round.short.failed"
       | "round.gone"
@@ -96,8 +104,13 @@ const byPosition = (entries: readonly RoundEntry[]): RoundEntry[] =>
  * and one whose next read finds another day. An answer to the old day's
  * request that lands after that changes nothing of the new day. A card that is
  * gone meanwhile (404) leaves the screen.
+ *
+ * Given `star`, the id of a star on the Starred list (#575, ADR-064 §2), the same
+ * for that one card, as it stands in today's log, however it was left there, and
+ * no read after it: its decision and its Undo are the queue's, and what comes next
+ * is the way back to the list.
  */
-export function useRound() {
+export function useRound(star?: string) {
   // The cards the phone holds, of one day; null until a read answers.
   const [round, setRound] = useState<RoundResponse | null>(null);
   const [more, setMore] = useState<More>({ status: "loading" });
@@ -143,7 +156,7 @@ export function useRound() {
     asked.current += 1;
     const mine = asked.current;
     setMore({ status: "loading" });
-    fetchRound().then(
+    (star ? openStar(star) : fetchRound()).then(
       (answer) => {
         if (mine !== asked.current) return;
         readOn.current = finnishDay(Date.now());
@@ -154,8 +167,10 @@ export function useRound() {
           ...answer,
           entries: answer.entries && byPosition([...(kept ?? []), ...answer.entries]),
         });
+        // The opened card comes as it stands, Later on it or not, and nothing after it.
+        if (star) setRevisit(answer.entries?.[0]?.position ?? null);
         setMore({
-          status: answer.entries?.some((entry) => entry.decision === null) ? "ask" : "end",
+          status: !star && answer.entries?.some((entry) => entry.decision === null) ? "ask" : "end",
         });
       },
       (error: unknown) => {
@@ -163,11 +178,13 @@ export function useRound() {
         setMore(
           codeOf(error) === "card_budget_exceeded"
             ? { status: "budget" }
-            : { status: "failed", error },
+            : star && statusOf(error) === 404
+              ? { status: "gone" }
+              : { status: "failed", error },
         );
       },
     );
-  }, [showRound, leaveDay]);
+  }, [star, showRound, leaveDay]);
 
   // Never after the screen is gone: a read serves the cards again (ADR-008).
   const read = useCallback(
@@ -239,11 +256,11 @@ export function useRound() {
         today !== readOn.current
       ) {
         read("round.newDay");
-      } else if (backOnScreen) {
+      } else if (backOnScreen && !star) {
         setMore((was) => (was.status === "end" ? { status: "ask" } : was));
       }
     },
-    [read],
+    [star, read],
   );
 
   // In sight: the app in the foreground, and no conversation pushed over the
@@ -300,9 +317,14 @@ export function useRound() {
   const choose = useCallback(
     async ({ day, entry }: RoundCard, decision: RoundChoice) => {
       const { position } = entry;
+      // A like or a pass takes the star off (ADR-064 §3); a skip decides nothing.
       const decided = (round: RoundResponse, as: RoundChoice) =>
         rewrite(round, (entries) =>
-          entries.map((each) => (each.position === position ? { ...each, decision: as } : each)),
+          entries.map((each) =>
+            each.position === position
+              ? { ...each, decision: as, star: as === "skip" ? each.star : null }
+              : each,
+          ),
         );
       setBusy(true);
       setNotice(null);
@@ -357,6 +379,50 @@ export function useRound() {
       }
     },
     [rewrite, onDay, read, drop, showRound],
+  );
+
+  /**
+   * A star on the card, or off it (#575, ADR-064 §1): it decides nothing, so the
+   * card stays on the screen. The first the list shows says that only the person
+   * sees it (§7); one refused at the most a list may hold says so in words (§5). A
+   * star gone meanwhile is off; a card gone meanwhile leaves the screen.
+   */
+  const toggleStar = useCallback(
+    async ({ day, entry }: RoundCard) => {
+      const { position } = entry;
+      const marked = (id: string | null) => {
+        const round = onDay(day);
+        if (!round) return;
+        rewrite(round, (entries) =>
+          entries.map((each) => (each.position === position ? { ...each, star: id } : each)),
+        );
+      };
+      setBusy(true);
+      setNotice(null);
+      try {
+        if (entry.star) {
+          await clearStar(entry.star);
+          marked(null);
+        } else {
+          const answer = await putStar(day, position);
+          marked(answer.id);
+          if (answer.first && onDay(day)) setNotice("round.star.first");
+        }
+      } catch (error) {
+        if (!onDay(day)) return;
+        const code = codeOf(error);
+        if (code === "round_expired") read("errors.round_expired");
+        else if (code === "stars_full") setNotice("errors.stars_full");
+        else if (statusOf(error) === 404 && entry.star) marked(null);
+        else if (statusOf(error) === 404) {
+          drop(day, position);
+          setNotice("round.gone");
+        } else setNotice("round.star.failed");
+      } finally {
+        setBusy(false);
+      }
+    },
+    [onDay, rewrite, read, drop],
   );
 
   /**
@@ -434,6 +500,7 @@ export function useRound() {
     match,
     notice,
     choose,
+    toggleStar,
     undo,
     drop,
     relax,

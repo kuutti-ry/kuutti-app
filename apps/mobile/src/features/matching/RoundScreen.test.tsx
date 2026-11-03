@@ -67,7 +67,14 @@ const entry = (
   name: string,
   reason: RoundEntry["reason"] = "matches_filters",
   decision: RoundEntry["decision"] = null,
-): RoundEntry => ({ position, reason, decision, card: card(position, name), distance: null });
+): RoundEntry => ({
+  position,
+  reason,
+  decision,
+  card: card(position, name),
+  distance: null,
+  star: null,
+});
 
 const ROUND: RoundResponse = {
   day: DAY,
@@ -2862,6 +2869,349 @@ describe("undoing a relaxation from a card (#99, ADR-042 §6)", () => {
 
     expect(
       screen.getByText("Your relaxations for today changed meanwhile. Look again and choose."),
+    ).toBeTruthy();
+  });
+});
+
+describe("a star on a card (#575, ADR-064)", () => {
+  const KEY = "kuutti.preference.decisionButtons";
+  const STAR_ID = "7a1c1c4e-9a8e-4a0b-9c3a-0c8d1e2f3a01";
+  const CARD_STAR = `/rounds/${DAY}/entries/2/star`;
+  const CLEAR = `/stars/${STAR_ID}`;
+  const FIRST = "Only you can see your stars. Nobody is told.";
+  const STRANGERS: RoundResponse = {
+    day: DAY,
+    entries: [entry(2, "Katja"), entry(4, "Minna")],
+    fishToSend: true,
+    likesLeft: 10,
+    yourTurn: 0,
+  };
+  const toggle = () => screen.getByRole("button", { name: "Star: Katja" });
+  const isOn = () => toggle().props.accessibilityState?.selected === true;
+  /** What the star's icon is filled with: react-native-svg's { type: 2 } is the text's colour, and null nothing. */
+  const fill = () => {
+    const nodes = (node: HostNode | string): HostNode[] =>
+      typeof node === "string" ? [] : [node, ...(node.children ?? []).flatMap(nodes)];
+    const button = nodes(screen.toJSON() as HostNode).find(
+      (node) => node.props.accessibilityLabel === "Star: Katja",
+    );
+    return (button ? nodes(button) : []).find((node) => node.type === "RNSVGGroup")?.props.fill;
+  };
+  const put =
+    (first = false): Answer =>
+    (call) =>
+      call.path === CARD_STAR && call.method === "PUT" ? json({ id: STAR_ID, first }) : undefined;
+  const thenClear =
+    (first?: boolean): Answer =>
+    (call) =>
+      call.path === CLEAR && call.method === "DELETE" ? noContent() : put(first)(call);
+
+  it("fills on a tap and clears on a second, in words and in its icon, and the card stays", async () => {
+    const { calls } = api(thenClear(), STRANGERS);
+    await show();
+    expect(within(toggle()).getByText("Star")).toBeTruthy();
+    expect(isOn()).toBe(false);
+    expect(fill()).toBeNull();
+
+    await press("Star: Katja");
+
+    expect(isOn()).toBe(true);
+    expect(within(toggle()).getByText("Starred")).toBeTruthy();
+    expect(fill()).toEqual({ type: 2 });
+    expect(heading("Katja, 32")).toBeTruthy();
+
+    await press("Star: Katja");
+
+    expect(isOn()).toBe(false);
+    expect(within(toggle()).getByText("Star")).toBeTruthy();
+    expect(heading("Katja, 32")).toBeTruthy();
+    expect(calls.filter((c) => c.path.endsWith("/decision"))).toEqual([]);
+    expect(calls.filter((c) => c.path === "/rounds/today")).toHaveLength(1);
+  });
+
+  it("says that only the person sees it when it is the first", async () => {
+    api(put(true), STRANGERS);
+    await show();
+
+    await press("Star: Katja");
+
+    expect(screen.getByText(FIRST).props.accessibilityLiveRegion).toBe("polite");
+    expect(announced()).toContain(FIRST);
+  });
+
+  it("says nothing of that on a later star", async () => {
+    api(put(false), STRANGERS);
+    await show();
+
+    await press("Star: Katja");
+
+    expect(screen.queryByText(FIRST)).toBeNull();
+  });
+
+  it("says in words when the list is full, and the card keeps no star", async () => {
+    api((call) => (call.path === CARD_STAR ? refusal("stars_full", 409) : undefined), STRANGERS);
+    await show();
+
+    await press("Star: Katja");
+
+    expect(
+      screen.getByText("You have as many stars as you can have. Take one off to add another."),
+    ).toBeTruthy();
+    expect(isOn()).toBe(false);
+    expect(heading("Katja, 32")).toBeTruthy();
+  });
+
+  it("says it was not saved when it fails, and the card stays as it was", async () => {
+    api((call) => (call.path === CARD_STAR ? refusal("internal", 500) : undefined), STRANGERS);
+    await show();
+
+    await press("Star: Katja");
+
+    expect(screen.getByText("The star was not saved. Try again.")).toBeTruthy();
+    expect(isOn()).toBe(false);
+  });
+
+  it("reads the new day when the day has ended", async () => {
+    const { reads } = api(
+      (call) => (call.path === CARD_STAR ? refusal("round_expired", 409) : undefined),
+      STRANGERS,
+    );
+    await show();
+
+    await press("Star: Katja");
+
+    expect(reads()).toBe(2);
+    expect(screen.getByText("That day ended at midnight, so this was not saved.")).toBeTruthy();
+  });
+
+  it("takes a card gone off the screen, in words", async () => {
+    api((call) => (call.path === CARD_STAR ? refusal("not_found", 404) : undefined), STRANGERS);
+    await show();
+
+    await press("Star: Katja");
+
+    expect(screen.getByText("That card is no longer available.")).toBeTruthy();
+    expect(heading("Minna, 34")).toBeTruthy();
+  });
+
+  it("reads a star gone meanwhile as off, and the card stays", async () => {
+    const held: RoundResponse = {
+      ...STRANGERS,
+      entries: [{ ...entry(2, "Katja"), star: STAR_ID }, entry(4, "Minna")],
+    };
+    api((call) => (call.path === CLEAR ? refusal("not_found", 404) : undefined), held);
+    await show();
+    expect(isOn()).toBe(true);
+
+    await press("Star: Katja");
+
+    expect(isOn()).toBe(false);
+    expect(heading("Katja, 32")).toBeTruthy();
+    expect(screen.queryByText("That card is no longer available.")).toBeNull();
+  });
+
+  it("reads back a star the API says stands on the card", async () => {
+    api(undefined, {
+      ...STRANGERS,
+      entries: [{ ...entry(2, "Katja"), star: STAR_ID }],
+    });
+    await show();
+    expect(isOn()).toBe(true);
+    expect(within(toggle()).getByText("Starred")).toBeTruthy();
+  });
+
+  it.each([
+    ["Like", "Like"],
+    ["Pass", "Pass"],
+    ["Send a fish", "Send a fish"],
+  ])("is gone from a card %s was chosen on, once Undo brings it back", async (_name, button) => {
+    api(put(), STRANGERS);
+    await show();
+    await press("Star: Katja");
+
+    await press(button);
+    await press("Undo your last decision");
+
+    expect(heading("Katja, 32")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Star: Katja" })).toBeNull();
+  });
+
+  it("stays on a card Later was chosen on, and can be cleared there", async () => {
+    api(thenClear(), STRANGERS);
+    await show();
+    await press("Star: Katja");
+
+    await press("Later");
+    expect(heading("Minna, 34")).toBeTruthy();
+    await press("Undo your last decision");
+
+    expect(isOn()).toBe(true);
+    await press("Star: Katja");
+    expect(isOn()).toBe(false);
+  });
+
+  it("is a named control of the card's own, with its target, and no problem to a screen reader", async () => {
+    api(undefined, STRANGERS);
+    await show();
+    const row = screen.getByText("Matches your filters").parent?.parent;
+    expect(row && within(row).getByRole("button", { name: "Star: Katja" })).toBeTruthy();
+    expect(screen.queryByTestId("round-one-handed")).toBeNull();
+    noProblems();
+  });
+
+  it("comes down to the thumb's column with Undo, one-handed, and leaves the card", async () => {
+    store.set(KEY, JSON.stringify({ hand: "right", oneHanded: true }));
+    api(undefined, STRANGERS);
+    await show();
+    await settle();
+    const column = screen.getByTestId("round-one-handed");
+    expect(within(column).getByRole("button", { name: "Star: Katja" })).toBeTruthy();
+    expect(screen.getAllByRole("button", { name: "Star: Katja" })).toHaveLength(1);
+    noProblems();
+  });
+});
+
+describe("a card opened from the Starred list (#575, ADR-064 §2)", () => {
+  const STAR_ID = "7a1c1c4e-9a8e-4a0b-9c3a-0c8d1e2f3a01";
+  const OPEN = `/stars/${STAR_ID}/open`;
+  const OPENED: RoundResponse = {
+    day: DAY,
+    entries: [{ ...entry(9, "Katja", "seen_before"), star: STAR_ID }],
+    fishToSend: true,
+    likesLeft: 10,
+    yourTurn: 0,
+  };
+  const opening =
+    (round: RoundResponse = OPENED): Answer =>
+    (call) =>
+      call.path === OPEN && call.method === "POST" ? json(round) : undefined;
+  const showStar = async () => {
+    await renderWithTheme(<RoundScreen star={STAR_ID} />);
+    await settle();
+  };
+  const BACK = "Back to Starred";
+
+  it("shows that one card with the star on it, reports it seen, and reads no queue", async () => {
+    const { seen, reads } = api(opening());
+    await showStar();
+
+    expect(heading("Katja, 39")).toBeTruthy();
+    expect(screen.getByText("Seen before")).toBeTruthy();
+    expect(
+      screen.getByRole("button", { name: "Star: Katja" }).props.accessibilityState?.selected,
+    ).toBe(true);
+    expect(screen.getByRole("heading", { name: "Starred" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: BACK })).toBeTruthy();
+    expect(seen()).toEqual([9]);
+    expect(reads()).toBe(0);
+    noProblems();
+  });
+
+  it("brings a card Later stands on as it stands, not past it", async () => {
+    api(
+      opening({
+        ...OPENED,
+        entries: [{ ...entry(9, "Katja", "seen_before", "skip"), star: STAR_ID }],
+      }),
+    );
+    await showStar();
+    expect(heading("Katja, 39")).toBeTruthy();
+    expect(screen.queryByText("Done with this card.")).toBeNull();
+  });
+
+  it("after a decision says it is done, leads back, keeps Undo, and reads nothing more", async () => {
+    const { calls, decisions, reads } = api(opening());
+    await showStar();
+
+    await press("Pass");
+
+    expect(decisions()).toEqual([`${DAY}/9 pass`]);
+    expect(screen.getByText("Done with this card.")).toBeTruthy();
+    expect(screen.queryByText("That's everybody for now.")).toBeNull();
+    expect(reads()).toBe(0);
+    expect(calls.filter((c) => c.path === OPEN)).toHaveLength(1);
+
+    await press("Undo your last decision");
+    expect(heading("Katja, 39")).toBeTruthy();
+    await press("Pass");
+
+    const buttons = screen.getAllByRole("button", { name: BACK });
+    await act(async () => {
+      fireEvent.press(buttons[buttons.length - 1] as never);
+    });
+    expect(router.back).toHaveBeenCalled();
+  });
+
+  it("does not open it again when the screen comes back in sight after a decision", async () => {
+    const { calls } = api(opening());
+    await showStar();
+    await press("Like");
+
+    await act(async () => {
+      blurRound();
+      focusRound();
+    });
+    await settle();
+
+    expect(calls.filter((c) => c.path === OPEN)).toHaveLength(1);
+    expect(screen.getByText("Done with this card.")).toBeTruthy();
+  });
+
+  it("offers the conversation or the way back when the like makes a match", async () => {
+    api((call) =>
+      call.path.endsWith("/decision")
+        ? json({
+            match: { conversationId: CONVERSATION },
+            fishToSend: true,
+            likesLeft: 10,
+            yourTurn: 0,
+          })
+        : opening()(call),
+    );
+    await showStar();
+
+    await press("Like");
+
+    expect(screen.getByRole("heading", { name: "It's a match" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Back to people" })).toBeNull();
+    const buttons = screen.getAllByRole("button", { name: BACK });
+    await act(async () => {
+      fireEvent.press(buttons[buttons.length - 1] as never);
+    });
+    expect(router.back).toHaveBeenCalled();
+  });
+
+  it("says a card gone and leads back when the list no longer shows them, with no word why", async () => {
+    api((call) => (call.path === OPEN ? refusal("not_found", 404) : undefined));
+    await showStar();
+
+    expect(screen.getByText("That card is no longer available.")).toBeTruthy();
+    expect(screen.queryByText("Try again")).toBeNull();
+    const buttons = screen.getAllByRole("button", { name: BACK });
+    expect(buttons.length).toBe(2);
+    noProblems();
+  });
+
+  it("says a failed opening and tries again", async () => {
+    let failing = true;
+    api((call) => {
+      if (call.path !== OPEN) return undefined;
+      return failing ? refusal("internal", 500) : json(OPENED);
+    });
+    await showStar();
+    expect(screen.getByText("People did not load.")).toBeTruthy();
+
+    failing = false;
+    await press("Try again");
+
+    expect(heading("Katja, 39")).toBeTruthy();
+  });
+
+  it("says the day's cards are used up where the panel has set a budget", async () => {
+    api((call) => (call.path === OPEN ? refusal("card_budget_exceeded", 429) : undefined));
+    await showStar();
+    expect(
+      screen.getByText("You have seen many profiles today. New ones come after midnight."),
     ).toBeTruthy();
   });
 });

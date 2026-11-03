@@ -91,6 +91,7 @@ export type MessageParams = {
   "account.export.sanction.reason.scraping": Record<never, never>;
   "account.export.sanction.reason.under_age": Record<never, never>;
   "account.export.saved": Record<never, never>;
+  "account.export.star.about": Record<never, never>;
   "account.export.title": Record<never, never>;
   "account.export.working": Record<never, never>;
   "account.found.consequence": Record<never, never>;
@@ -642,6 +643,7 @@ export type MessageParams = {
   "errors.session_expired": Record<never, never>;
   "errors.session_revoked": Record<never, never>;
   "errors.special_category_locked": Record<never, never>;
+  "errors.stars_full": Record<never, never>;
   "errors.text_contact_details": Record<never, never>;
   "errors.too_many_changes": Record<never, never>;
   "errors.unauthenticated": Record<never, never>;
@@ -1458,6 +1460,11 @@ export type MessageParams = {
   "round.short.title": Record<never, never>;
   "round.short.unanswered": { "field": string };
   "round.skip": Record<never, never>;
+  "round.star": Record<never, never>;
+  "round.star.failed": Record<never, never>;
+  "round.star.first": Record<never, never>;
+  "round.star.label": { "name": string };
+  "round.star.on": Record<never, never>;
   "round.title": Record<never, never>;
   "round.undo": Record<never, never>;
   "round.undo.label": Record<never, never>;
@@ -1658,6 +1665,18 @@ export type MessageParams = {
   "signIn.title": Record<never, never>;
   "signIn.tryAgain": Record<never, never>;
   "signIn.unavailable": Record<never, never>;
+  "stars.back": Record<never, never>;
+  "stars.card.back": Record<never, never>;
+  "stars.card.done": Record<never, never>;
+  "stars.clear.failed": Record<never, never>;
+  "stars.clear.label": { "name": string };
+  "stars.explain": Record<never, never>;
+  "stars.failed": Record<never, never>;
+  "stars.home.open": Record<never, never>;
+  "stars.loading": Record<never, never>;
+  "stars.none": Record<never, never>;
+  "stars.photo.label": { "name": string };
+  "stars.title": Record<never, never>;
   "support.call": { "name": string; "number": string };
   "support.emergency": Record<never, never>;
   "support.independent": Record<never, never>;

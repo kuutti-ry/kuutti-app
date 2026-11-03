@@ -3,6 +3,7 @@ import {
   boolean,
   check,
   date,
+  index,
   pgEnum,
   pgTable,
   smallint,
@@ -122,6 +123,34 @@ export const roundEntries = pgTable(
       sql`(${table.reason} = 'relaxed') = (${table.relaxedField} IS NOT NULL)
           AND (${table.relaxedField} IS NULL OR ${table.relaxedField} = ANY(${table.relaxedWith}))`,
     ),
+  ],
+);
+
+/**
+ * A star (#575, ADR-064): one person's private mark on another, to come back to
+ * later without a like or a pass. Starred or not, with no degrees: one per pair.
+ * Nothing reads it but the person's own list and queue, so it never reaches the
+ * starred person and feeds no order, count or event. No clock: it goes when the
+ * person clears it, likes or passes, and when either person is erased.
+ */
+export const star = pgTable(
+  "star",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    accountId: uuid("account_id")
+      .notNull()
+      .references(() => account.id),
+    candidateId: uuid("candidate_id")
+      .notNull()
+      .references(() => account.id),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    // One per pair, and the person's own list.
+    uniqueIndex("star_account_candidate_idx").on(table.accountId, table.candidateId),
+    // Erasure of the person starred.
+    index("star_candidate_idx").on(table.candidateId),
+    check("star_not_oneself_check", sql`${table.accountId} <> ${table.candidateId}`),
   ],
 );
 
