@@ -8,7 +8,6 @@ import { captureLogger, describe, expect, type TestContext, test } from "../test
 import { people, pondNamed } from "../test/people.ts";
 import {
   countPonds,
-  countsBands,
   ensureFirstSnapshot,
   POND_COUNTER_LOCK_KEY,
   pondCounterJob,
@@ -417,23 +416,20 @@ describe("the bands of the bar (#507)", () => {
     expect((await countPonds(ctx.client)).get(pond)).toMatchObject({ verified: 3, finishing: 0 });
   });
 
-  test("A count told to leave the bands out counts none", async ({ ctx }) => {
-    const pond = await pondNamed(ctx.client, "test-band-none");
-    await people(ctx.client, pond, 12, { complete: true, consented: true, seeks: ["man"] });
-    const { deps: job } = await deps(ctx, DAY_1);
-    await takeSnapshot({ ...job, bands: false });
-    const { rows } = await ctx.client.query<{ verified: number; seeks_men: number }>(
-      "SELECT verified, seeks_men FROM pond_counter WHERE pond_id = $1",
-      [pond],
+  test("A finished profile on a withdrawn consent stands in no band", async ({ ctx }) => {
+    const pond = await pondNamed(ctx.client, "test-band-withdrawn");
+    const [withdrawn] = await people(ctx.client, pond, 2, {
+      complete: true,
+      consented: true,
+      seeks: ["man"],
+    });
+    await ctx.client.query(
+      `UPDATE consent SET withdrawn_at = '2026-10-04T10:00:00Z'
+        WHERE account_id = $1 AND kind = 'special_category'`,
+      [withdrawn],
     );
-    expect(rows[0]).toEqual({ verified: 12, seeks_men: 0 });
-  });
-
-  test("Production counts no bands, every other environment does", () => {
-    expect(countsBands("production")).toBe(false);
-    for (const env of ["development", "test", "preview", "staging"]) {
-      expect(countsBands(env)).toBe(true);
-    }
+    expect(await bandsOf(ctx, pond)).toEqual([1, 0, 0]);
+    expect((await countPonds(ctx.client)).get(pond)).toMatchObject({ verified: 2, finishing: 0 });
   });
 
   test("the job's log line says no band, as it says no figure", async ({ ctx }) => {
