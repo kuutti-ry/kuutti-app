@@ -1213,7 +1213,7 @@
     },
     {
       "name": "i18next",
-      "version": "26.5.10",
+      "version": "26.5.11",
       "license": "MIT",
       "provider": "Jan Mühlemann",
       "licences": [
@@ -1312,7 +1312,7 @@
     },
     {
       "name": "lucide-react-native",
-      "version": "1.61.0",
+      "version": "1.62.0",
       "license": "ISC",
       "provider": "Eric Fennis",
       "licences": [
@@ -1489,7 +1489,7 @@
     },
     {
       "name": "react-i18next",
-      "version": "17.1.8",
+      "version": "17.1.9",
       "license": "MIT",
       "provider": "Jan Mühlemann",
       "licences": [
