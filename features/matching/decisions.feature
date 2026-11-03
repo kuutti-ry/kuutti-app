@@ -152,18 +152,23 @@ Feature: The queue's cards, seen and decided
 
   # The day's likes (#98's first cut, ADR-036; the maintainer, 20/10/2026):
   # one budget for everybody, like_budget_balanced a Finnish day, counted
-  # from the day's standing decisions. Liking back somebody who liked the
-  # person answers a like and is free; a pass or a skip is never counted.
+  # from the day's standing decisions. A like back spends one like any other
+  # like (#503; the maintainer, 30/10/2026); a pass or a skip is never counted.
 
   Scenario: The day's likes stop at the budget, and the next is refused with the time they come back
     Given like_budget_balanced is 2 and "A"'s round today holds "B", "C" and "D"
     When "A" likes all three
     Then "B" and "C" are liked, and the like of "D" is refused with the wait until midnight, nothing of it written
 
-  Scenario: A like back on a card of somebody who liked the person is free
+  Scenario: A like back spends one of the day's likes
+    Given like_budget_balanced is 1 and "A"'s round today holds "B" who liked "A", and "C"
+    When "A" likes "B" and then "C"
+    Then the two are a match, and the like of "C" is refused with the wait until midnight
+
+  Scenario: A like back past the budget is refused, and the like it would answer keeps waiting
     Given like_budget_balanced is 1 and "A"'s round today holds "B" who liked "A", and "C"
     When "A" likes "C" and then "B"
-    Then both are liked
+    Then the like of "B" is refused with the wait until midnight, no match is made, and B's like still stands
 
   Scenario: A pass is never counted, and a like taken back gives its place back
     Given like_budget_balanced is 1 and "A"'s round today holds "B", "C" and "D"
@@ -194,8 +199,8 @@ Feature: The queue's cards, seen and decided
     When "A" passes "B", likes "C", then changes "C" to a pass
     Then the answers say two, one and two are left
 
-  Scenario: A like back leaves the likes left as they were
-    Given like_budget_balanced is 1 and "A"'s round today holds "B" who liked "A"
+  Scenario: A like back takes one off the likes left
+    Given like_budget_balanced is 2 and "A"'s round today holds "B" who liked "A"
     When "A" likes "B"
     Then the answer says one is left
 

@@ -37,7 +37,9 @@ export const PutNotificationChoice = z
 export type PutNotificationChoice = z.infer<typeof PutNotificationChoice>;
 
 /** What a notice is about. Mirrors the database's enum; #312 and M5 add theirs. */
-export const NoticeKind = z.enum(["warning", "invitation_counted"]).meta({ id: "NoticeKind" });
+export const NoticeKind = z
+  .enum(["warning", "invitation_counted", "invitation_friend"])
+  .meta({ id: "NoticeKind" });
 export type NoticeKind = z.infer<typeof NoticeKind>;
 
 /** The newest notices the home screen is given; fewer than a screen, never a feed. */
@@ -65,9 +67,18 @@ export const InvitationCountedNotice = NoticeBase.extend({
   reward: RewardUnits,
 }).meta({ id: "InvitationCountedNotice" });
 
+/**
+ * The invitation the person used, counted (#503, ADR-044 §9): what it earned
+ * them, from their own units. Never who invited them.
+ */
+export const InvitationFriendNotice = NoticeBase.extend({
+  kind: z.literal("invitation_friend"),
+  reward: RewardUnits,
+}).meta({ id: "InvitationFriendNotice" });
+
 /** A notice in the app: no text of its own, the app says it from the kind and what it points at. */
 export const Notice = z
-  .discriminatedUnion("kind", [WarningNotice, InvitationCountedNotice])
+  .discriminatedUnion("kind", [WarningNotice, InvitationCountedNotice, InvitationFriendNotice])
   .meta({ id: "Notice" });
 export type Notice = z.infer<typeof Notice>;
 

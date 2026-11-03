@@ -24,14 +24,16 @@ import { completed, consented, earnedUnits, hashOf, invitationOf } from "../test
 import { people } from "../test/people.ts";
 import { pidOf, waitsFor, watched, withTwoConnections } from "../test/races.ts";
 import { drawCode, hashInvitationCode, makeInvitation, redeemInvitation } from "./invitations.ts";
+import { markCounted } from "./repo.ts";
 
 // The invitation routes (#107, ADR-044): the caller's own, a new one past the
 // completeness and up to the open ones' cap, its withdrawal, and a code typed
 // with the caller checked first, one answer for every code that does not
 // work and the day's tries; each route's validation, nobody, the wrong
 // person, an account erased on the way, and the races on one code and on the
-// cap. The night's count is jobs/invitation-count.test.ts, the spend in a
-// decision matching/earned.test.ts, erasure and the export erasure.test.ts.
+// cap. The night's count is jobs/invitation-count.test.ts, all but which of
+// its people it may write for, which is here; the spend in a decision
+// matching/earned.test.ts, erasure and the export erasure.test.ts.
 
 type Person = Awaited<ReturnType<typeof signedInAccount>>;
 
@@ -93,7 +95,7 @@ const rowOf = async (db: Queryable, id: string) =>
     }>("SELECT code_hash, redeemed_by_account_id, redeemed_at FROM invitation WHERE id = $1", [id])
   ).rows[0];
 
-const NOTHING = { fish: 0, likes: 0 };
+const NOTHING = { fish: 0 };
 
 describe("the caller's invitations", () => {
   test("say whether the person may invite or still type a code, what an invitation earns, and nothing of anybody invited", async ({
@@ -106,7 +108,7 @@ describe("the caller's invitations", () => {
     expect(await listOf(app, a)).toEqual({
       canInvite: true,
       redeemable: false,
-      reward: { fish: 1, likes: 0 },
+      reward: { inviterFish: 1, friendFish: 1 },
       open: [],
       counted: 0,
       earned: NOTHING,
@@ -115,8 +117,10 @@ describe("the caller's invitations", () => {
     // Without the consents of the welcome, no code yet.
     expect(await listOf(app, bare)).toMatchObject({ canInvite: false, redeemable: false });
     // What earns what is the config's, read as it stands.
-    await withMatchingConfig(ctx.client, { invitation_reward: { fish: 0, likes: 3 } });
-    expect((await listOf(app, a)).reward).toEqual({ fish: 0, likes: 3 });
+    await withMatchingConfig(ctx.client, {
+      invitation_reward: { inviterFish: 0, friendFish: 3 },
+    });
+    expect((await listOf(app, a)).reward).toEqual({ inviterFish: 0, friendFish: 3 });
   });
 
   test("count the invitations that counted and what they earned, used units aside", async ({
@@ -125,10 +129,10 @@ describe("the caller's invitations", () => {
     const { app } = await appOn(ctx.client);
     const a = await inviter(ctx.client);
     await earnedUnits(ctx.client, a.accountId, { fish: 1 });
-    await earnedUnits(ctx.client, a.accountId, { fish: 1, likes: 2 });
+    await earnedUnits(ctx.client, a.accountId, { fish: 2 });
     await ctx.client.query(
       `UPDATE reward SET spent_at = now() WHERE id = (
-         SELECT id FROM reward WHERE account_id = $1 AND kind = 'like' LIMIT 1)`,
+         SELECT id FROM reward WHERE account_id = $1 LIMIT 1)`,
       [a.accountId],
     );
     // A redeemed one that has not counted is not said anywhere: it left the open list, that is all.
@@ -137,27 +141,65 @@ describe("the caller's invitations", () => {
     expect(await listOf(app, a)).toMatchObject({
       open: [],
       counted: 2,
-      earned: { fish: 2, likes: 1 },
+      earned: { fish: 2 },
     });
+  });
+
+  test("count what the invitation the person used earned them, in what is left and never as an invitation of theirs (#503)", async ({
+    ctx,
+  }) => {
+    const { app } = await appOn(ctx.client);
+    const a = await inviter(ctx.client);
+    const friend = await signedInAccount(ctx.client);
+    await completed(ctx.client, friend.accountId);
+    const id = await invitationOf(ctx.client, a.accountId, {
+      redeemedBy: friend.accountId,
+      countedAt: T,
+    });
+    await ctx.client.query(
+      `INSERT INTO reward (account_id, kind, invitation_id, earned_at)
+       SELECT $1, 'fish', $2, $3 FROM generate_series(1, 2)`,
+      [friend.accountId, id, T],
+    );
+    expect(await listOf(app, friend)).toMatchObject({ counted: 0, earned: { fish: 2 } });
+    // The units are the friend's own: the inviter's list says the invitation counted, and no fish.
+    expect(await listOf(app, a)).toMatchObject({ counted: 1, earned: NOTHING });
+    // Used, a unit is no longer left, as anybody's.
+    await ctx.client.query(
+      `UPDATE reward SET spent_at = now() WHERE id = (
+         SELECT id FROM reward WHERE account_id = $1 LIMIT 1)`,
+      [friend.accountId],
+    );
+    expect(await listOf(app, friend)).toMatchObject({ earned: { fish: 1 } });
   });
 
   test("a reward in the config of another shape fails loudly, naming the key", async ({ ctx }) => {
     const { app, lines } = await appOn(ctx.client);
     const a = await inviter(ctx.client);
-    for (const broken of [
-      { fish: 1 },
-      { fish: 1, likes: 0, boosts: 2 },
-      { fish: 1.5, likes: 0 },
+    const broken = [
+      { fish: 1, likes: 0 },
+      { inviterFish: 1 },
+      { friendFish: 1 },
+      { inviterFish: 1, friendFish: 1, boosts: 2 },
+      { inviterFish: 1, friendFish: 1, likes: 0 },
+      { inviterFish: 1.5, friendFish: 1 },
+      { inviterFish: 11, friendFish: 1 },
+      { inviterFish: 1, friendFish: 11 },
+      { inviterFish: -1, friendFish: 1 },
       1,
-    ]) {
-      await withMatchingConfig(ctx.client, { invitation_reward: broken });
+    ];
+    for (const reward of broken) {
+      await withMatchingConfig(ctx.client, { invitation_reward: reward });
       const answer = await app.request("/invitations", { headers: a.headers });
-      expect(answer.status, JSON.stringify(broken)).toBe(500);
-      expect(await errorCode(answer)).toBe("internal_error");
+      expect(answer.status, JSON.stringify(reward)).toBe(500);
+      const { error } = ErrorResponse.parse(await answer.json());
+      expect(error.code).toBe("internal_error");
+      expect(error.message).not.toContain("invitation_reward");
     }
-    expect(lines().some((l) => (l.detail as { key?: string })?.key === "invitation_reward")).toBe(
-      true,
-    );
+    // The key is named in the log, once for each, and in no answer.
+    expect(
+      lines().filter((l) => (l.detail as { key?: string })?.key === "invitation_reward"),
+    ).toHaveLength(broken.length);
   });
 });
 
@@ -519,6 +561,61 @@ describe("nobody, and an account erased on the way", () => {
         ])
       ).rows,
     ).toHaveLength(1);
+  });
+});
+
+describe("the night's count, held to the people it locked", () => {
+  /** An invitation of `a`'s that `friend` used and that the night has found countable. */
+  async function countable(db: Queryable) {
+    const a = await inviter(db);
+    const friend = await inviter(db);
+    const id = await invitationOf(db, a.accountId, { redeemedBy: friend.accountId });
+    return { a: a.accountId, friend: friend.accountId, id };
+  }
+
+  test("marks an invitation only with both its people locked: nobody's units are written for a person the night does not hold", async ({
+    ctx,
+  }) => {
+    const { a, friend, id } = await countable(ctx.client);
+    const redeemers = [friend];
+    const mark = (parties: string[]) => markCounted(ctx.client, { parties, redeemers, at: T });
+
+    expect(await mark([])).toEqual([]);
+    expect(await mark([a])).toEqual([]);
+    expect(await mark([friend])).toEqual([]);
+    expect(await mark([friend, a])).toEqual([
+      { invitationId: id, inviterId: a, redeemerId: friend },
+    ]);
+    // Once: the next finds it counted.
+    expect(await mark([friend, a])).toEqual([]);
+  });
+
+  test("marks an invitation whose inviter is gone with its friend locked alone", async ({
+    ctx,
+  }) => {
+    const { a, friend, id } = await countable(ctx.client);
+    await ctx.client.query("UPDATE invitation SET inviter_account_id = NULL WHERE id = $1", [id]);
+    const mark = (parties: string[]) =>
+      markCounted(ctx.client, { parties, redeemers: [friend], at: T });
+
+    expect(await mark([a])).toEqual([]);
+    expect(await mark([friend])).toEqual([
+      { invitationId: id, inviterId: null, redeemerId: friend },
+    ]);
+  });
+
+  test("marks only those the night found complete, however many it locked", async ({ ctx }) => {
+    const { a, friend, id } = await countable(ctx.client);
+    const marked = await markCounted(ctx.client, {
+      parties: [a, friend],
+      redeemers: [],
+      at: T,
+    });
+    expect(marked).toEqual([]);
+    const { rows } = await ctx.client.query("SELECT counted_at FROM invitation WHERE id = $1", [
+      id,
+    ]);
+    expect(rows).toEqual([{ counted_at: null }]);
   });
 });
 

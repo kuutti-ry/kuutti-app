@@ -281,7 +281,7 @@ describe("changeConfig against the key's declaration", () => {
     const admin = await staffSession(ctx.client, "admin");
     const change = (value: number) =>
       changeConfig(ctx.client, {
-        key: "contest_ratio_threshold",
+        key: "photo_tip_tight_crop_face_area_min",
         value,
         reason: "Trying it out",
         actor: admin.identityId,

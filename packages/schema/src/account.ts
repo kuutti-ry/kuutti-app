@@ -236,7 +236,7 @@ export const AccountExport = z
     notifications: ExportedNotifications,
     /** The person's own rounds (#96, ADR-034): places, reasons and their own decisions; never whom, and never a round in which the person was somebody's card. */
     rounds: ExportedRounds,
-    /** The invitations the person made and the one they joined with, and what theirs earned (#107, ADR-044 §10); never a code and never the other person. */
+    /** The invitations the person made and the one they joined with, and what these earned them (#107, ADR-044 §10); never a code and never the other person. */
     invitations: ExportedInvitations,
   })
   .meta({ id: "AccountExport" });

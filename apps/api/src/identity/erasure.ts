@@ -82,12 +82,13 @@ import { visibleState } from "./standing.ts";
 // The notification choices and the notices go (#176, ADR-032); the export
 // carries both.
 // The invitations the person made go while open, and the units they earned
-// and their notices go with the account (#107, ADR-044 §10); a redeemed one
-// stays for its redeemer, the link to the person cut. The invitation the
-// person joined with goes until it counts, and once counted stays for its
-// inviter without the person; one that would name nobody goes. The export
-// carries the invitations made, the one used by its two times, and the
-// units; never a code and never the other person.
+// and their notices go with the account, whichever side of an invitation
+// earned them (#107, #503, ADR-044 §10); a redeemed one stays for its
+// redeemer, the link to the person cut. The invitation the person joined with
+// goes until it counts, and once counted stays for its inviter without the
+// person; one that would name nobody goes. The export carries the invitations
+// made, the one used by its two times, and the units; never a code and never
+// the other person.
 
 export type ErasureDeps = {
   db: Queryable;
@@ -137,7 +138,7 @@ export type ErasureSummary = {
   madeInvitationsDeleted: number;
   /** The invitations the person made that somebody redeemed, kept for their redeemers without the person (#107). */
   madeInvitationsKept: number;
-  /** The units of the reward ledger the person's invitations earned (#107). */
+  /** The units of the reward ledger invitations earned the person (#107, #503). */
   rewardUnits: number;
   /** 0 or 1: the invitation the person joined with, gone because it had not counted or its inviter was erased before (#107). */
   usedInvitationsDeleted: number;

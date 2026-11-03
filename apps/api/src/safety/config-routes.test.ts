@@ -240,7 +240,7 @@ describe("POST /admin/config/{key}", () => {
   test("an app without a clock of its own dates the version by the wall clock", async ({ ctx }) => {
     const staff = await admin(ctx);
     const before = Date.now();
-    const response = await ctx.app.request("/admin/config/like_budget_contested", {
+    const response = await ctx.app.request("/admin/config/like_expiry_days", {
       method: "POST",
       headers: { ...staff.headers, "content-type": "application/json" },
       body: JSON.stringify({ value: 35, reason: REASON }),
@@ -320,6 +320,66 @@ describe("POST /admin/config/{key}", () => {
       );
     }
     expect(await footprint(ctx)).toEqual(before);
+  });
+
+  test("the invitation's reward takes the shape its latest migration gave it, not the one its first version had (#503, ADR-044 §4)", async ({
+    ctx,
+    api,
+  }) => {
+    const staff = await admin(ctx);
+    const value = { inviterFish: 2, friendFish: 0 };
+    const written = await change(api, staff.headers, "invitation_reward", {
+      value,
+      reason: REASON,
+    });
+    expect(written.status).toBe(200);
+    expect(ConfigChange.parse(await written.json())).toMatchObject({
+      key: "invitation_reward",
+      value,
+    });
+  });
+
+  test("the invitation's reward refuses the shape of its first version, which the night and the app would refuse (#503)", async ({
+    ctx,
+    api,
+  }) => {
+    const staff = await admin(ctx);
+    const before = await footprint(ctx);
+    await refused(
+      await change(api, staff.headers, "invitation_reward", {
+        value: { fish: 2, likes: 0 },
+        reason: REASON,
+      }),
+      400,
+      "config_shape",
+    );
+    expect(await footprint(ctx)).toEqual(before);
+  });
+
+  test.for([
+    ["inviterFish", { inviterFish: 11, friendFish: 1 }],
+    ["friendFish", { inviterFish: 1, friendFish: 11 }],
+  ] as const)(
+    "the invitation's reward refuses %s past the ceiling its reader holds, which would answer 500 to everybody (#503)",
+    async ([, value], { ctx, api }) => {
+      const staff = await admin(ctx);
+      const before = await footprint(ctx);
+      await refused(
+        await change(api, staff.headers, "invitation_reward", { value, reason: REASON }),
+        400,
+        "config_shape",
+      );
+      expect(await footprint(ctx)).toEqual(before);
+    },
+  );
+
+  test("the invitation's reward takes the ceiling itself (#503)", async ({ ctx, api }) => {
+    const staff = await admin(ctx);
+    const written = await change(api, staff.headers, "invitation_reward", {
+      value: { inviterFish: 10, friendFish: 10 },
+      reason: REASON,
+    });
+    expect(written.status).toBe(200);
   });
 
   test("a value of another shape is config_shape, logged with the kind it expects, and nothing is written", async ({

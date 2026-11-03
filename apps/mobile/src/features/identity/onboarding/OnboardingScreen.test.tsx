@@ -75,7 +75,13 @@ type Profile = {
  * over without a word.
  */
 function fakeApi(
-  options: { version?: string; age?: number; redeemable?: boolean; redeem?: () => Response } = {},
+  options: {
+    version?: string;
+    age?: number;
+    redeemable?: boolean;
+    reward?: unknown;
+    redeem?: () => Response;
+  } = {},
 ) {
   // A version the API holds as current that this build does not carry, for every kind but the sensitive answers'.
   const current = (version: string) => options.version ?? version;
@@ -164,10 +170,10 @@ function fakeApi(
       return json({
         canInvite: false,
         redeemable: options.redeemable,
-        reward: { fish: 1, likes: 0 },
+        reward: options.reward ?? { inviterFish: 1, friendFish: 1 },
         open: [],
         counted: 0,
-        earned: { fish: 0, likes: 0 },
+        earned: { fish: 0 },
       });
     }
     if (path === "/invitations/redeem") {
@@ -393,6 +399,11 @@ describe("OnboardingScreen", () => {
     // Offered once and never required: no number, as the welcome step has none.
     expect(screen.queryByText(/^Step \d+ of \d+$/)).toBeNull();
     expect(screen.getByLabelText("Invitation code")).toBeTruthy();
+    expect(
+      screen.getByText(
+        "The code earns you a fish and your friend a fish once your profile is complete. A fish is a like that says a little more.",
+      ),
+    ).toBeTruthy();
     checkA11y();
     await press(screen.getByRole("button", { name: "Skip" }));
     await waitFor(() => expect(screen.getByText("What should we call you?")).toBeTruthy());
@@ -405,6 +416,61 @@ describe("OnboardingScreen", () => {
     expect(screen.getByText("What should we call you?")).toBeTruthy();
     expect(calls.filter((c) => c.path === "/invitations")).toHaveLength(1);
     expect(calls.filter((c) => c.path === "/invitations/redeem")).toEqual([]);
+  });
+
+  it("says one moment while the invitations are read, and the step comes with their answer (#503)", async () => {
+    const { server } = fakeApi({ redeemable: true });
+    server.consents.push(consented("terms"), consented("privacy"));
+    // The server above, but the invitations wait for the test.
+    const answered = globalThis.fetch;
+    let release = () => {};
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    globalThis.fetch = jest.fn(async (input: Request | string, init?: RequestInit) => {
+      const request = input instanceof Request ? input : new Request(input, init);
+      if (new URL(request.url).pathname === "/invitations") await held;
+      return answered(request);
+    }) as unknown as typeof fetch;
+    await show(<OnboardingScreen />);
+    await waitFor(() => expect(screen.getByText("One moment…")).toBeTruthy());
+    expect(screen.queryByText("Did a friend invite you?")).toBeNull();
+    await act(async () => {
+      release();
+      await settle();
+    });
+    await waitFor(() => expect(screen.getByText("Did a friend invite you?")).toBeTruthy());
+    expect(screen.queryByText("One moment…")).toBeNull();
+  });
+
+  it.each([
+    [
+      { inviterFish: 1, friendFish: 1 },
+      "The code earns you a fish and your friend a fish once your profile is complete. A fish is a like that says a little more.",
+    ],
+    [
+      { inviterFish: 0, friendFish: 2 },
+      "The code earns you 2 fish once your profile is complete. A fish is a like that says a little more.",
+    ],
+  ])(
+    "says at the step what the reward %j read from the API earns (#503)",
+    async (reward, words) => {
+      const { server } = fakeApi({ redeemable: true, reward });
+      server.consents.push(consented("terms"), consented("privacy"));
+      await show(<OnboardingScreen />);
+      await waitFor(() => expect(screen.getByText(words)).toBeTruthy());
+      checkA11y();
+    },
+  );
+
+  it("leaves the line out of the step when the reward read earns the person nothing (#503)", async () => {
+    const { server } = fakeApi({ redeemable: true, reward: { inviterFish: 1, friendFish: 0 } });
+    server.consents.push(consented("terms"), consented("privacy"));
+    await show(<OnboardingScreen />);
+    await waitFor(() => expect(screen.getByText("Did a friend invite you?")).toBeTruthy());
+    expect(screen.getByLabelText("Invitation code")).toBeTruthy();
+    expect(screen.queryByText(/says a little more/)).toBeNull();
+    checkA11y();
   });
 
   it("takes a code that works, thanks the person, and Continue goes on to the name (#107)", async () => {
@@ -448,10 +514,11 @@ describe("OnboardingScreen", () => {
   });
 
   it.each([
-    ["the API says no code may be typed", false],
-    ["the invitations cannot be read", undefined],
-  ])("goes straight on to the name when %s (#107)", async (_why, redeemable) => {
-    const { server, calls } = fakeApi({ redeemable });
+    ["the API says no code may be typed", false, undefined],
+    ["the invitations cannot be read", undefined, undefined],
+    ["the answer is not the contract", true, { fish: 1, likes: 0 }],
+  ])("goes straight on to the name when %s (#107)", async (_why, redeemable, reward) => {
+    const { server, calls } = fakeApi({ redeemable, reward });
     server.consents.push(consented("terms"), consented("privacy"));
     await show(<OnboardingScreen />);
     await waitFor(() => expect(screen.getByText("What should we call you?")).toBeTruthy());

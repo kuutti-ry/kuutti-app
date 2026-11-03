@@ -51,7 +51,7 @@ describe("the notification choices", () => {
 
 describe("the notices", () => {
   it("carry a warning's reason, and no more than a screen of them", () => {
-    expect(NoticeKind.options).toEqual(["warning", "invitation_counted"]);
+    expect(NoticeKind.options).toEqual(["warning", "invitation_counted", "invitation_friend"]);
     expect(Notices.parse({ notices: [notice] }).notices).toEqual([notice]);
     expect(codes(Notices, { notices: [{ ...notice, reason: "rude" }] })).toEqual(["invalid_value"]);
     expect(codes(Notices, { notices: [{ ...notice, kind: "match" }] })).toEqual(["invalid_union"]);
@@ -66,7 +66,7 @@ describe("the notices", () => {
       kind: "invitation_counted",
       at,
       readAt: at,
-      reward: { fish: 1, likes: 0 },
+      reward: { fish: 1 },
     };
     expect(Notices.parse({ notices: [counted, notice] }).notices).toEqual([counted, notice]);
     const named = Notices.parse({ notices: [{ ...counted, invitee: "Sanna" }] }).notices[0];
@@ -76,11 +76,34 @@ describe("the notices", () => {
       codes(Notices, { notices: [{ ...counted, reward: undefined, reason: "other" }] }),
     ).toEqual(["invalid_type"]);
     const { reason: _reason, ...noReason } = notice;
-    expect(codes(Notices, { notices: [{ ...noReason, reward: { fish: 1, likes: 0 } }] })).toEqual([
+    expect(codes(Notices, { notices: [{ ...noReason, reward: { fish: 1 } }] })).toEqual([
       "invalid_value",
     ]);
-    expect(codes(Notices, { notices: [{ ...counted, reward: { fish: -1, likes: 0 } }] })).toEqual([
+    expect(codes(Notices, { notices: [{ ...counted, reward: { fish: -1 } }] })).toEqual([
       "too_small",
+    ]);
+  });
+
+  it("carry what the invitation a person used earned them, and never who invited them (#503)", () => {
+    const friend = {
+      id: notice.id,
+      kind: "invitation_friend",
+      at,
+      readAt: null,
+      reward: { fish: 2 },
+    };
+    expect(Notices.parse({ notices: [friend] }).notices).toEqual([friend]);
+    const named = Notices.parse({ notices: [{ ...friend, inviter: "Sanna" }] }).notices[0];
+    expect(named).toEqual(friend);
+    // Like a counted invitation's, it carries its reward and no reason.
+    expect(
+      codes(Notices, { notices: [{ ...friend, reward: undefined, reason: "other" }] }),
+    ).toEqual(["invalid_type"]);
+    expect(codes(Notices, { notices: [{ ...friend, reward: { fish: -1 } }] })).toEqual([
+      "too_small",
+    ]);
+    expect(codes(Notices, { notices: [{ ...friend, reward: { fish: 1.5 } }] })).toEqual([
+      "invalid_type",
     ]);
   });
 
@@ -89,12 +112,14 @@ describe("the notices", () => {
       choices: [{ kind: "message", enabled: false }],
       notices: [
         { kind: "warning", at, readAt: at, reason: "other" },
-        { kind: "invitation_counted", at, readAt: null, reward: { fish: 1, likes: 0 } },
+        { kind: "invitation_counted", at, readAt: null, reward: { fish: 1 } },
+        { kind: "invitation_friend", at, readAt: at, reward: { fish: 1 } },
       ],
     });
     expect(exported.notices).toEqual([
       { kind: "warning", at, readAt: at },
       { kind: "invitation_counted", at, readAt: null },
+      { kind: "invitation_friend", at, readAt: at },
     ]);
   });
 });

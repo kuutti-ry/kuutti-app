@@ -27,8 +27,8 @@ name: An invitation made in Settings shows its code once, is shared, and is with
 - extendedWaitUntil:
     visible: "Make an invitation|Tee kutsu|Skapa en inbjudan"
     timeout: 15000
-# What an invitation earns, from matching_config invitation_reward: one fish.
-- assertVisible: "When a friend you invite finishes their profile, you get a fish\\..*|Kun kutsumasi ystävä saa profiilinsa valmiiksi, saat kalan\\..*|När en vän du bjuder in gör klart sin profil får du en fisk\\..*"
+# What an invitation earns, from matching_config invitation_reward: a fish each.
+- assertVisible: "When a friend you invite finishes their profile, you get a fish and your friend gets a fish\\..*|Kun kutsumasi ystävä saa profiilinsa valmiiksi, saat kalan ja ystäväsi saa kalan\\..*|När en vän du bjuder in gör klart sin profil får du en fisk och din vän får en fisk\\..*"
 - tapOn: "Make an invitation|Tee kutsu|Skapa en inbjudan"
 - extendedWaitUntil:
     visible: "Your invitation is ready\\. Its code is below\\.|Kutsusi on valmis\\. Sen koodi on alla\\.|Din inbjudan är klar\\. Koden finns nedan\\."

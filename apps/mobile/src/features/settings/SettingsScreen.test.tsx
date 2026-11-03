@@ -95,10 +95,10 @@ const CHOICES = [
 const INVITATIONS = {
   canInvite: true,
   redeemable: false,
-  reward: { fish: 1, likes: 0 },
+  reward: { inviterFish: 1, friendFish: 1 },
   open: [{ id: "8c1e6d2a-6a43-4c55-9d0b-3f1a2b3c4d5e", createdAt: "2026-10-28T10:00:00.000Z" }],
   counted: 0,
-  earned: { fish: 0, likes: 0 },
+  earned: { fish: 0 },
 };
 const HEALTH = {
   status: "ok",

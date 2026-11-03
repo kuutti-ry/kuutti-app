@@ -14,8 +14,8 @@ import { Invitations } from "./Invitations";
 // shared through the sheet it is handed; the open invitations, each
 // withdrawn only after asking; how many counted and what waits; anybody who
 // may not invite told when they may; a code from a friend for whoever may
-// still type one; each refusal and failure in words; no accessibility
-// problem in any of it.
+// still type one, with what it earns them (#503); each refusal and failure in
+// words; no accessibility problem in any of it.
 
 const { __focus: focus } = jest.requireMock("expo-router") as { __focus: () => void };
 const token = (seed: string) => (seed + "x".repeat(43)).slice(0, 43);
@@ -42,21 +42,26 @@ const withdrawLabel = (at: string) =>
 const TEXT = {
   intro:
     "Invite a friend with a code. They get the app at kuutti.app, sign in with their bank and type the code before their profile is complete. Each code works once.",
-  fish: "When a friend you invite finishes their profile, you get a fish. An earned fish is used by itself once your own fish are used up.",
+  earns:
+    "When a friend you invite finishes their profile, you get a fish and your friend gets a fish. An earned fish is used by itself once your own fish are used up.",
   made: "Your invitation is ready. Its code is below.",
   once: "Kuutti shows this code only now and keeps no copy of it. Share it with one friend, or write it down.",
   withdrawn: "The invitation was withdrawn. Its code no longer works.",
   notYet: "You can invite friends once your profile is complete.",
+  explain:
+    "If a friend gave you a code, type it here. Their invitation counts once your profile is complete.",
+  redeemEarns:
+    "The code earns you a fish and your friend a fish once your profile is complete. A fish is a like that says a little more.",
   done: "The code is in. Your friend's invitation counts once your profile is complete.",
 };
 
 const answer = (over: Partial<InvitationsAnswer> = {}): InvitationsAnswer => ({
   canInvite: true,
   redeemable: false,
-  reward: { fish: 1, likes: 0 },
+  reward: { inviterFish: 1, friendFish: 1 },
   open: [],
   counted: 0,
-  earned: { fish: 0, likes: 0 },
+  earned: { fish: 0 },
   ...over,
 });
 
@@ -139,29 +144,100 @@ describe("Invitations", () => {
     fakeApi(answer());
     await renderWithTheme(<Invitations />);
     expect(await screen.findByText(TEXT.intro)).toBeTruthy();
-    expect(screen.getByText(TEXT.fish)).toBeTruthy();
+    expect(screen.getByText(TEXT.earns)).toBeTruthy();
     expect(screen.getByText("No friend you invited has finished their profile yet.")).toBeTruthy();
     expect(screen.queryByText(/waiting\.$/)).toBeNull();
     expect(screen.queryByRole("heading", { name: "Waiting to be used" })).toBeNull();
     // Somebody who may invite cannot type a code: the two never meet.
     expect(screen.queryByLabelText("Invitation code")).toBeNull();
+    expect(screen.queryByText(/says a little more/)).toBeNull();
     noProblems();
   });
 
   it.each([
+    ["en", { inviterFish: 1, friendFish: 1 }, TEXT.earns],
     [
-      { fish: 0, likes: 5 },
-      "When a friend you invite finishes their profile, you get 5 extra likes. An extra like is used by itself on a day your likes run out.",
+      "en",
+      { inviterFish: 2, friendFish: 3 },
+      "When a friend you invite finishes their profile, you get 2 fish and your friend gets 3 fish. An earned fish is used by itself once your own fish are used up.",
     ],
     [
-      { fish: 2, likes: 1 },
-      "When a friend you invite finishes their profile, you get 2 fish and an extra like. They are used by themselves once your own fish or likes run out.",
+      "en",
+      { inviterFish: 1, friendFish: 0 },
+      "When a friend you invite finishes their profile, you get a fish. An earned fish is used by itself once your own fish are used up.",
     ],
     [
-      { fish: 0, likes: 0 },
+      "en",
+      { inviterFish: 3, friendFish: 0 },
+      "When a friend you invite finishes their profile, you get 3 fish. An earned fish is used by itself once your own fish are used up.",
+    ],
+    [
+      "en",
+      { inviterFish: 0, friendFish: 1 },
+      "When a friend you invite finishes their profile, your friend gets a fish.",
+    ],
+    [
+      "en",
+      { inviterFish: 0, friendFish: 2 },
+      "When a friend you invite finishes their profile, your friend gets 2 fish.",
+    ],
+    [
+      "en",
+      { inviterFish: 0, friendFish: 0 },
       "Invitations earn nothing just now, but every friend you bring is welcome.",
     ],
-  ])("says the reward %j in words", async (reward, words) => {
+    [
+      "fi",
+      { inviterFish: 1, friendFish: 1 },
+      "Kun kutsumasi ystävä saa profiilinsa valmiiksi, saat kalan ja ystäväsi saa kalan. Ansaittu kala käytetään automaattisesti, kun omat kalasi on käytetty.",
+    ],
+    [
+      "fi",
+      { inviterFish: 2, friendFish: 3 },
+      "Kun kutsumasi ystävä saa profiilinsa valmiiksi, saat 2 kalaa ja ystäväsi saa 3 kalaa. Ansaittu kala käytetään automaattisesti, kun omat kalasi on käytetty.",
+    ],
+    [
+      "fi",
+      { inviterFish: 1, friendFish: 0 },
+      "Kun kutsumasi ystävä saa profiilinsa valmiiksi, saat kalan. Ansaittu kala käytetään automaattisesti, kun omat kalasi on käytetty.",
+    ],
+    [
+      "fi",
+      { inviterFish: 0, friendFish: 1 },
+      "Kun kutsumasi ystävä saa profiilinsa valmiiksi, ystäväsi saa kalan.",
+    ],
+    [
+      "fi",
+      { inviterFish: 0, friendFish: 0 },
+      "Kutsut eivät juuri nyt tuo mitään, mutta jokainen tuomasi ystävä on tervetullut.",
+    ],
+    [
+      "sv",
+      { inviterFish: 1, friendFish: 1 },
+      "När en vän du bjuder in gör klart sin profil får du en fisk och din vän får en fisk. En intjänad fisk används automatiskt när dina egna fiskar är slut.",
+    ],
+    [
+      "sv",
+      { inviterFish: 2, friendFish: 3 },
+      "När en vän du bjuder in gör klart sin profil får du 2 fiskar och din vän får 3 fiskar. En intjänad fisk används automatiskt när dina egna fiskar är slut.",
+    ],
+    [
+      "sv",
+      { inviterFish: 1, friendFish: 0 },
+      "När en vän du bjuder in gör klart sin profil får du en fisk. En intjänad fisk används automatiskt när dina egna fiskar är slut.",
+    ],
+    [
+      "sv",
+      { inviterFish: 0, friendFish: 1 },
+      "När en vän du bjuder in gör klart sin profil får din vän en fisk.",
+    ],
+    [
+      "sv",
+      { inviterFish: 0, friendFish: 0 },
+      "Inbjudningar ger ingenting just nu, men varje vän du tar med är välkommen.",
+    ],
+  ])("says in %s what the reward %j earns", async (locale, reward, words) => {
+    (useLocales as jest.Mock).mockReturnValue([{ languageTag: locale }]);
     fakeApi(answer({ reward }));
     await renderWithTheme(<Invitations />);
     expect(await screen.findByText(words)).toBeTruthy();
@@ -170,22 +246,17 @@ describe("Invitations", () => {
   it.each([
     [
       1,
-      { fish: 2, likes: 0 },
+      { fish: 2 },
       "One friend you invited has finished their profile.",
       ["You have 2 earned fish waiting."],
     ],
     [
       3,
-      { fish: 1, likes: 1 },
+      { fish: 1 },
       "3 friends you invited have finished their profiles.",
-      ["You have an earned fish waiting.", "You have an extra like waiting."],
+      ["You have an earned fish waiting."],
     ],
-    [
-      2,
-      { fish: 0, likes: 4 },
-      "2 friends you invited have finished their profiles.",
-      ["You have 4 extra likes waiting."],
-    ],
+    [2, { fish: 0 }, "2 friends you invited have finished their profiles.", []],
   ])("says %i counted and what waits, %j", async (counted, earned, countedWords, waiting) => {
     fakeApi(answer({ counted, earned }));
     await renderWithTheme(<Invitations />);
@@ -255,20 +326,44 @@ describe("Invitations", () => {
     expect(button("Make an invitation").props.accessibilityState?.disabled).toBe(false);
   });
 
-  it("hands the share sheet the invitation's message with the code, and nothing about the sender", async () => {
-    fakeApi(answer());
-    const share = jest.fn(async () => ({ action: "sharedAction" as const }));
-    await renderWithTheme(<Invitations share={share as never} />);
-    await press(await screen.findByRole("button", { name: "Make an invitation" }));
-    await press(button("Share the code"));
-    expect(share).toHaveBeenCalledWith({
-      message:
-        "You're invited to Kuutti, a free dating app for Finland where everyone signs in with their bank ID. Get the app at https://kuutti.app/ and type this code after signing in: ABCDE-FGHJK",
-    });
-    expect(
-      screen.queryByText("The share did not open. You can copy the code above instead."),
-    ).toBeNull();
-  });
+  const INVITED =
+    "You're invited to Kuutti, a free dating app for Finland where everyone signs in with their bank ID.";
+  const GET_IT =
+    "Get the app at https://kuutti.app/ and type this code after signing in: ABCDE-FGHJK";
+  const LITTLE_MORE = "A fish is a like that says a little more.";
+
+  it.each([
+    [
+      "both earn",
+      { inviterFish: 1, friendFish: 1 },
+      `${INVITED} The code earns you a fish and your friend a fish once your profile is complete. ${LITTLE_MORE} ${GET_IT}`,
+    ],
+    [
+      "both earn, in numbers of their own",
+      { inviterFish: 3, friendFish: 2 },
+      `${INVITED} The code earns you 2 fish and your friend 3 fish once your profile is complete. ${LITTLE_MORE} ${GET_IT}`,
+    ],
+    [
+      "the friend alone earns",
+      { inviterFish: 0, friendFish: 1 },
+      `${INVITED} The code earns you a fish once your profile is complete. ${LITTLE_MORE} ${GET_IT}`,
+    ],
+    ["the inviter alone earns", { inviterFish: 1, friendFish: 0 }, `${INVITED} ${GET_IT}`],
+    ["neither earns", { inviterFish: 0, friendFish: 0 }, `${INVITED} ${GET_IT}`],
+  ])(
+    "hands the share sheet the invitation's message and the code when %s, and nothing else about the sender",
+    async (_name, reward, message) => {
+      fakeApi(answer({ reward }));
+      const share = jest.fn(async () => ({ action: "sharedAction" as const }));
+      await renderWithTheme(<Invitations share={share as never} />);
+      await press(await screen.findByRole("button", { name: "Make an invitation" }));
+      await press(button("Share the code"));
+      expect(share).toHaveBeenCalledWith({ message });
+      expect(
+        screen.queryByText("The share did not open. You can copy the code above instead."),
+      ).toBeNull();
+    },
+  );
 
   it("says so when the share sheet does not open, and keeps the code to copy", async () => {
     fakeApi(answer());
@@ -479,6 +574,8 @@ describe("Invitations", () => {
     expect(screen.queryByRole("button", { name: "Make an invitation" })).toBeNull();
     expect(screen.queryByText(TEXT.intro)).toBeNull();
     expect(screen.queryByLabelText("Invitation code")).toBeNull();
+    // What a code earns goes with the field: nobody here may type one.
+    expect(screen.queryByText(/says a little more/)).toBeNull();
   });
 
   it("takes a code from a friend while one may be typed, and thanks the person after it", async () => {
@@ -487,11 +584,12 @@ describe("Invitations", () => {
     await renderWithTheme(<Invitations />);
     expect(await screen.findByRole("heading", { name: "Have an invitation code?" })).toBeTruthy();
     expect(screen.getByText(TEXT.notYet)).toBeTruthy();
-    expect(
-      screen.getByText(
-        "If a friend gave you a code, type it here. Their invitation counts once your profile is complete.",
-      ),
-    ).toBeTruthy();
+    expect(screen.getByText(TEXT.explain)).toBeTruthy();
+    expect(screen.getByText(TEXT.redeemEarns)).toBeTruthy();
+    // Under the explanation, above the field.
+    const flat = JSON.stringify(screen.toJSON());
+    expect(flat.indexOf(TEXT.explain)).toBeLessThan(flat.indexOf(TEXT.redeemEarns));
+    expect(flat.indexOf(TEXT.redeemEarns)).toBeLessThan(flat.indexOf("Use the code"));
     noProblems();
     await act(async () =>
       fireEvent.changeText(screen.getByLabelText("Invitation code"), "ABCDE FGHJK"),
@@ -504,7 +602,66 @@ describe("Invitations", () => {
     await waitFor(() => expect(seen.filter((sent) => sent.method === "GET")).toHaveLength(2));
     expect(screen.getByText(TEXT.done).props.accessibilityLiveRegion).toBe("polite");
     expect(screen.queryByLabelText("Invitation code")).toBeNull();
+    expect(screen.queryByText(TEXT.redeemEarns)).toBeNull();
   });
+
+  it.each([
+    [
+      "en",
+      { inviterFish: 2, friendFish: 3 },
+      "The code earns you 3 fish and your friend 2 fish once your profile is complete. A fish is a like that says a little more.",
+    ],
+    [
+      "en",
+      { inviterFish: 0, friendFish: 1 },
+      "The code earns you a fish once your profile is complete. A fish is a like that says a little more.",
+    ],
+    [
+      "en",
+      { inviterFish: 0, friendFish: 2 },
+      "The code earns you 2 fish once your profile is complete. A fish is a like that says a little more.",
+    ],
+    [
+      "fi",
+      { inviterFish: 2, friendFish: 3 },
+      "Koodista saat 3 kalaa ja ystäväsi saa 2 kalaa, kun profiilisi on valmis. Kala on tykkäys, joka sanoo vähän enemmän.",
+    ],
+    [
+      "fi",
+      { inviterFish: 0, friendFish: 1 },
+      "Koodista saat kalan, kun profiilisi on valmis. Kala on tykkäys, joka sanoo vähän enemmän.",
+    ],
+    [
+      "sv",
+      { inviterFish: 2, friendFish: 3 },
+      "Koden ger dig 3 fiskar och din vän 2 fiskar när din profil är klar. En fisk är ett gillande som säger lite mer.",
+    ],
+    [
+      "sv",
+      { inviterFish: 0, friendFish: 1 },
+      "Koden ger dig en fisk när din profil är klar. En fisk är ett gillande som säger lite mer.",
+    ],
+  ])("says in %s what the reward %j earns whoever types a code", async (locale, reward, words) => {
+    (useLocales as jest.Mock).mockReturnValue([{ languageTag: locale }]);
+    fakeApi(answer({ canInvite: false, redeemable: true, reward }));
+    await renderWithTheme(<Invitations />);
+    expect(await screen.findByText(words)).toBeTruthy();
+    noProblems();
+  });
+
+  it.each([[{ inviterFish: 1, friendFish: 0 }], [{ inviterFish: 0, friendFish: 0 }]])(
+    "leaves out what a code earns where it earns the person nothing, %j",
+    async (reward) => {
+      fakeApi(answer({ canInvite: false, redeemable: true, reward }));
+      await renderWithTheme(<Invitations />);
+      expect(await screen.findByRole("heading", { name: "Have an invitation code?" })).toBeTruthy();
+      expect(screen.getByText(TEXT.explain)).toBeTruthy();
+      expect(screen.getByLabelText("Invitation code")).toBeTruthy();
+      expect(screen.queryByText(/says a little more/)).toBeNull();
+      expect(screen.queryByText(/you get/)).toBeNull();
+      noProblems();
+    },
+  );
 
   it("speaks the phone's language", async () => {
     (useLocales as jest.Mock).mockReturnValue([{ languageTag: "sv-FI" }]);

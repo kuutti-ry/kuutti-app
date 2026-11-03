@@ -648,6 +648,32 @@ async function likeBudget(db: Queryable, likes: number) {
   );
 }
 
+/** `liker` liked `liked` yesterday; that round of theirs. */
+async function likedYesterday(db: Queryable, liker: Person, liked: Person) {
+  const roundId = await roundFor(db, liker, [liked], YESTERDAY);
+  await db.query(
+    "UPDATE round_entries SET decision = 'like', decided_at = $2 WHERE round_id = $1",
+    [roundId, T],
+  );
+  return roundId;
+}
+
+/** The people of the conversations these two are in, the earlier liker first (#100). */
+async function participantsOf(db: Queryable, ...who: Person[]) {
+  const { rows } = await db.query<{ account_id: string }>(
+    "SELECT account_id FROM conversation_participant WHERE account_id = ANY($1::uuid[]) ORDER BY side",
+    [who.map((person) => person.accountId)],
+  );
+  return rows.map((row) => row.account_id);
+}
+
+/** A refusal's wait from 12:00 in Finland, a few ticking seconds on: about twelve hours until midnight. */
+function expectWaitUntilMidnight(refused: Response) {
+  const wait = Number(refused.headers.get("retry-after"));
+  expect(wait).toBeGreaterThan(12 * 3600 - 60);
+  expect(wait).toBeLessThanOrEqual(12 * 3600);
+}
+
 describe("the day's likes (#98, ADR-036)", () => {
   test("The day's likes stop at the budget, and the next is refused with the time they come back", async ({
     ctx,
@@ -665,10 +691,7 @@ describe("the day's likes (#98, ADR-036)", () => {
 
     expect(refused.status).toBe(429);
     expect(await errorCode(refused)).toBe("like_budget_exceeded");
-    // 12:00 in Finland, a few ticking seconds on: about twelve hours until midnight.
-    const wait = Number(refused.headers.get("retry-after"));
-    expect(wait).toBeGreaterThan(12 * 3600 - 60);
-    expect(wait).toBeLessThanOrEqual(12 * 3600);
+    expectWaitUntilMidnight(refused);
     expect((await entriesOf(ctx.client, roundId)).map((e) => e.decision)).toEqual([
       "like",
       "like",
@@ -693,16 +716,60 @@ describe("the day's likes (#98, ADR-036)", () => {
     );
   });
 
-  test("A like back on a card of somebody who liked the person is free", async ({ ctx, app }) => {
+  test("A like back spends one of the day's likes", async ({ ctx, app }) => {
     await likeBudget(ctx.client, 1);
     const [a, b, c] = await cast(ctx, 3);
     if (!a || !b || !c) throw new Error("cast not written");
+    await likedYesterday(ctx.client, b, a);
+    const roundId = await roundFor(ctx.client, a, [{ person: b, reason: "liked_you" }, c]);
+
+    const answer = await decideBy(app, a, TODAY, 1, "like");
+    expect(answer.status).toBe(200);
+    expect(RoundDecisionAnswer.parse(await answer.json()).match).not.toBeNull();
+    const refused = await decideBy(app, a, TODAY, 2, "like");
+
+    expect(refused.status).toBe(429);
+    expect(await errorCode(refused)).toBe("like_budget_exceeded");
+    expectWaitUntilMidnight(refused);
+    expect((await entriesOf(ctx.client, roundId)).map((e) => e.decision)).toEqual(["like", null]);
+    expect(await participantsOf(ctx.client, a, b)).toEqual([b.accountId, a.accountId]);
+  });
+
+  test("A like back past the budget is refused, and the like it would answer keeps waiting", async ({
+    ctx,
+    app,
+  }) => {
+    await likeBudget(ctx.client, 1);
+    const [a, b, c] = await cast(ctx, 3);
+    if (!a || !b || !c) throw new Error("cast not written");
+    await joinStudy(app, a);
+    const ofB = await likedYesterday(ctx.client, b, a);
     const roundId = await roundFor(ctx.client, a, [{ person: b, reason: "liked_you" }, c]);
 
     expect((await decideBy(app, a, TODAY, 2, "like")).status).toBe(200);
-    expect((await decideBy(app, a, TODAY, 1, "like")).status).toBe(200);
+    const refused = await decideBy(app, a, TODAY, 1, "like");
 
-    expect((await entriesOf(ctx.client, roundId)).map((e) => e.decision)).toEqual(["like", "like"]);
+    expect(refused.status).toBe(429);
+    expect(await errorCode(refused)).toBe("like_budget_exceeded");
+    expectWaitUntilMidnight(refused);
+    // Nothing of it written: the card undecided, no conversation, no event of it.
+    expect(
+      (await entriesOf(ctx.client, roundId)).map((e) => [e.decision, e.decided_at !== null]),
+    ).toEqual([
+      [null, false],
+      ["like", true],
+    ]);
+    expect(await participantsOf(ctx.client, a, b)).toEqual([]);
+    expect(await eventsOf(ctx.client, "like")).toHaveLength(1);
+    expect(await eventsOf(ctx.client, "match")).toEqual([]);
+    // B's like stands as it was, and a like given back answers it.
+    expect((await entriesOf(ctx.client, ofB)).map((e) => [e.candidate_id, e.decision])).toEqual([
+      [a.accountId, "like"],
+    ]);
+    expect((await decideBy(app, a, TODAY, 2, "pass")).status).toBe(200);
+    const answer = await decideBy(app, a, TODAY, 1, "like");
+    expect(answer.status).toBe(200);
+    expect(RoundDecisionAnswer.parse(await answer.json()).match).not.toBeNull();
   });
 
   test("A pass is never counted, and a like taken back gives its place back", async ({
@@ -839,13 +906,16 @@ describe("the likes left (#524, ADR-036 §6)", () => {
     expect(await likesLeftAfter(await decideBy(app, a, TODAY, 2, "pass"))).toBe(2);
   });
 
-  test("A like back leaves the likes left as they were", async ({ ctx, app }) => {
-    await likeBudget(ctx.client, 1);
+  test("A like back takes one off the likes left", async ({ ctx, app }) => {
+    await likeBudget(ctx.client, 2);
     const [a, b] = await cast(ctx, 2);
     if (!a || !b) throw new Error("cast not written");
+    await likedYesterday(ctx.client, b, a);
     await roundFor(ctx.client, a, [{ person: b, reason: "liked_you" }]);
 
     expect(await likesLeftAfter(await decideBy(app, a, TODAY, 1, "like"))).toBe(1);
+
+    expect((await readToday(app, a)).likesLeft).toBe(1);
   });
 
   test("The likes left are the person's own, of today", async ({ ctx, app }) => {

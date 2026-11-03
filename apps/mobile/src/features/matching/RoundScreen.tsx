@@ -370,7 +370,10 @@ function DecisionBar({
       {t("round.likesLeft", { likes: likesLeft })}
     </Text>
   );
-  const fish = !ANSWERS_A_LIKE.has(entry.reason) && (fishToSend || entry.decision === "fish") && (
+  // A fish counts in the day's likes, so with none left it can go only on a
+  // card whose like is paid for (#503, the maintainer's of 01/11/2026).
+  const fishCanGo = fishToSend && (likesLeft > 0 || entry.decision === "like");
+  const fish = !ANSWERS_A_LIKE.has(entry.reason) && (fishCanGo || entry.decision === "fish") && (
     <Button
       variant="secondary"
       className={cn("rounded-lg", oneHanded && "w-full")}

@@ -80,10 +80,10 @@ beforeEach(async () => {
       return json({
         canInvite: true,
         redeemable: false,
-        reward: { fish: 1, likes: 0 },
+        reward: { inviterFish: 1, friendFish: 1 },
         open: [],
         counted: 0,
-        earned: { fish: 0, likes: 0 },
+        earned: { fish: 0 },
       });
     }
     if (url.pathname === "/consents") {

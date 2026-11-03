@@ -126,8 +126,10 @@ export const RelaxationParams = z
  * Whether the fish's budget lets the caller send one today (#475, ADR-039
  * §3, §6): one of the week's own, or one their invitations earned waiting
  * (ADR-044 §8). The day's likes, which a fish counts in too, are `likesLeft`'s.
- * The round offers Send a fish only while it is true, and on the card that
- * holds the fish. Never a count, nor anything of the fish others sent.
+ * The round offers Send a fish only while it is true and a like is left, or
+ * on a card the person already liked (the maintainer's of 01/11/2026, #503),
+ * and on the card that holds the fish. Never a count, nor anything of the fish
+ * others sent.
  */
 const fishToSend = z.boolean();
 

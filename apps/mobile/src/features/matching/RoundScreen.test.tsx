@@ -16,8 +16,9 @@ import { RoundScreen } from "./RoundScreen";
 // own words, the way into What you seek, and every refusal of the routes said:
 // a day that ended, a card gone, the day's likes and cards used up, a like that
 // made a match, too many conversations waiting. The likes left are said beside
-// the buttons. A new day is never touched by the old day's answers, and a queue
-// left open past midnight is read anew.
+// the buttons, and a fish, which counts in them, goes while one is left, or on a
+// card already liked (#503). A new day is never touched by the old day's answers,
+// and a queue left open past midnight is read anew.
 
 const {
   __router: router,
@@ -467,16 +468,20 @@ describe("the queue", () => {
   });
 
   it.each([
-    ["liked the reader", "liked_you", "Liked you"],
-    ["sent the reader a fish", "fish", "Sent you a fish"],
+    ["liked the reader", 10, "liked_you", "Liked you"],
+    ["liked the reader", 1, "liked_you", "Liked you"],
+    ["liked the reader", 0, "liked_you", "Liked you"],
+    ["sent the reader a fish", 10, "fish", "Sent you a fish"],
+    ["sent the reader a fish", 1, "fish", "Sent you a fish"],
+    ["sent the reader a fish", 0, "fish", "Sent you a fish"],
   ] as const)(
-    "offers no fish on a card that %s, which a like answers (ADR-039 §2)",
-    async (_what, reason, label) => {
+    "offers no fish on a card that %s, which a like answers, at %i likes left (ADR-039 §2)",
+    async (_what, likesLeft, reason, label) => {
       api(undefined, {
         day: DAY,
         entries: [entry(1, "Henna", reason)],
         fishToSend: true,
-        likesLeft: 10,
+        likesLeft,
         yourTurn: 0,
       });
       await show();
@@ -2279,6 +2284,181 @@ describe("the likes left (#524, ADR-036 §6)", () => {
     await show();
     expect(screen.getByText(words)).toBeTruthy();
   });
+});
+
+describe("the fish and the day's likes (#503, the maintainer's of 01/11/2026)", () => {
+  const STRANGERS = { day: DAY, entries: [entry(2, "Katja"), entry(4, "Minna")], yourTurn: 0 };
+  const ALL = ["Send a fish", "Later", "Pass", "Like"];
+  const NO_FISH = ["Later", "Pass", "Like"];
+  /** What the decision bar offers, in the order a screen reader meets it. */
+  const bar = () =>
+    screen
+      .getAllByRole("button")
+      .map((button) => button.props.accessibilityLabel as string)
+      .filter((label) => ALL.includes(label));
+  const selected = (name: string) =>
+    screen.getByRole("button", { name }).props.accessibilityState?.selected;
+  /** The API's decisions: each leaves these likes, the fish as `fishToSend` says. */
+  const leaving =
+    (likesLeft: number, fishToSend = true) =>
+    (call: Call) =>
+      call.path.endsWith("/decision")
+        ? json({ match: null, fishToSend, likesLeft, yourTurn: 0 })
+        : undefined;
+  const isA = (call: Call, ...decisions: string[]) =>
+    call.path.endsWith("/decision") &&
+    decisions.includes((call.body as { decision: string }).decision);
+  const usedUp = () => refusal("like_budget_exceeded", 429, { "retry-after": "3600" });
+  const NONE_LEFT = "No likes left today. New ones tomorrow.";
+
+  it.each([
+    ["ten likes left", true, 10, ALL],
+    ["the last like left", true, 1, ALL],
+    ["no like left", true, 0, NO_FISH],
+    ["the week's fish sent and likes left", false, 10, NO_FISH],
+    ["neither left", false, 0, NO_FISH],
+  ])(
+    "offers the fish on a card not decided only with both a like and a fish left: %s",
+    async (_what, fishToSend, likesLeft, offered) => {
+      api(undefined, { ...STRANGERS, fishToSend, likesLeft });
+      await show();
+      expect(heading("Katja, 32")).toBeTruthy();
+      expect(bar()).toEqual(offered);
+      noProblems();
+    },
+  );
+
+  it("offers the fish on a card the person liked with no like left, whose like is paid for", async () => {
+    const sent = api(leaving(0), { ...STRANGERS, fishToSend: true, likesLeft: 1 });
+    await show();
+    await press("Like");
+    // The day's last like took the fish off the next card, not yet decided.
+    expect(heading("Minna, 34")).toBeTruthy();
+    expect(screen.getByText(NONE_LEFT)).toBeTruthy();
+    expect(bar()).toEqual(NO_FISH);
+    await press("Undo your last decision");
+    expect(heading("Katja, 32")).toBeTruthy();
+    expect(screen.getByText(NONE_LEFT)).toBeTruthy();
+    expect(bar()).toEqual(ALL);
+    expect(selected("Like")).toBe(true);
+    expect(selected("Send a fish")).toBe(false);
+    noProblems();
+    await press("Send a fish");
+    expect(heading("Minna, 34")).toBeTruthy();
+    expect(sent.decisions()).toEqual([`${DAY}/2 like`, `${DAY}/2 fish`]);
+  });
+
+  it.each([
+    ["with a fish to send", true],
+    ["with the week's sent", false],
+  ])(
+    "reads the fish back on the card that holds it with no like left, %s, open to change",
+    async (_what, fishToSend) => {
+      const sent = api(leaving(0, fishToSend), { ...STRANGERS, fishToSend: true, likesLeft: 1 });
+      await show();
+      await press("Send a fish");
+      expect(heading("Minna, 34")).toBeTruthy();
+      expect(bar()).toEqual(NO_FISH);
+      await press("Undo your last decision");
+      expect(heading("Katja, 32")).toBeTruthy();
+      expect(bar()).toEqual(ALL);
+      expect(selected("Send a fish")).toBe(true);
+      expect(selected("Like")).toBe(false);
+      expect(selected("Pass")).toBe(false);
+      noProblems();
+      await press("Like");
+      expect(sent.decisions()).toEqual([`${DAY}/2 fish`, `${DAY}/2 like`]);
+    },
+  );
+
+  it.each([
+    ["liked, the week's fish sent", "matches_filters", "Like", false],
+    ["passed", "matches_filters", "Pass", true],
+    ["liked, answering a like", "liked_you", "Like", true],
+    ["liked, answering a fish", "fish", "Like", true],
+  ] as const)(
+    "offers no fish on a card brought back with no like left: %s",
+    async (_what, reason, decision, fishToSend) => {
+      api(leaving(0, fishToSend), {
+        ...STRANGERS,
+        entries: [entry(2, "Katja", reason), entry(4, "Minna")],
+        fishToSend: true,
+        likesLeft: 1,
+      });
+      await show();
+      await press(decision);
+      await press("Undo your last decision");
+      expect(heading("Katja, 32")).toBeTruthy();
+      expect(selected(decision)).toBe(true);
+      expect(bar()).toEqual(NO_FISH);
+    },
+  );
+
+  it("brings the fish back when a pass gives the like back", async () => {
+    api((call) => leaving(isA(call, "pass") ? 1 : 0)(call), {
+      ...STRANGERS,
+      fishToSend: true,
+      likesLeft: 1,
+    });
+    await show();
+    await press("Like");
+    expect(bar()).toEqual(NO_FISH);
+    await press("Undo your last decision");
+    await press("Pass");
+    expect(heading("Minna, 34")).toBeTruthy();
+    expect(screen.getByText("1 like left today")).toBeTruthy();
+    expect(bar()).toEqual(ALL);
+  });
+
+  it.each([
+    ["a stranger's card", "matches_filters"],
+    ["a card that answers a like", "liked_you"],
+    ["a card that answers a fish", "fish"],
+  ] as const)(
+    "keeps Like on %s with no like left, refuses it in words, and leaves the card for a pass",
+    async (_what, reason) => {
+      const sent = api((call) => (isA(call, "like") ? usedUp() : leaving(0)(call)), {
+        ...STRANGERS,
+        entries: [entry(2, "Katja", reason), entry(4, "Minna")],
+        fishToSend: true,
+        likesLeft: 0,
+      });
+      await show();
+      await press("Like");
+      expect(
+        screen.getByText(
+          "You have used today's likes. New ones come after midnight; you can still pass.",
+        ),
+      ).toBeTruthy();
+      expect(heading("Katja, 32")).toBeTruthy();
+      expect(screen.getByText(NONE_LEFT)).toBeTruthy();
+      expect(bar()).toEqual(NO_FISH);
+      // Refused, nothing stands to take back.
+      expect(screen.queryByRole("button", { name: "Undo your last decision" })).toBeNull();
+      await press("Pass");
+      expect(heading("Minna, 34")).toBeTruthy();
+      expect(sent.decisions()).toEqual([`${DAY}/2 like`, `${DAY}/2 pass`]);
+    },
+  );
+
+  it.each(["Like", "Send a fish"])(
+    "takes the fish away when %s finds the day's likes spent on another phone",
+    async (name) => {
+      api((call) => (isA(call, "like", "fish") ? usedUp() : undefined), {
+        ...STRANGERS,
+        fishToSend: true,
+        likesLeft: 1,
+      });
+      await show();
+      expect(bar()).toEqual(ALL);
+      await press(name);
+      expect(screen.getByText(/You have used today's likes/)).toBeTruthy();
+      expect(screen.getByText(NONE_LEFT)).toBeTruthy();
+      expect(heading("Katja, 32")).toBeTruthy();
+      expect(bar()).toEqual(NO_FISH);
+      noProblems();
+    },
+  );
 });
 
 describe("how far each person lives (#514, ADR-061 §5)", () => {

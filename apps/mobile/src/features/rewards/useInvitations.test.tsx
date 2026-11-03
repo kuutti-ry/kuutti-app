@@ -17,10 +17,10 @@ const failure = () =>
 const invitations = (counted: number) => ({
   canInvite: true,
   redeemable: false,
-  reward: { fish: 1, likes: 0 },
+  reward: { inviterFish: 1, friendFish: 1 },
   open: [],
   counted,
-  earned: { fish: 0, likes: 0 },
+  earned: { fish: 0 },
 });
 
 /** Each read waits for the test to answer it. */

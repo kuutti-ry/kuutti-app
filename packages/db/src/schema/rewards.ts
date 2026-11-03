@@ -18,15 +18,16 @@ import { roundEntries } from "./matching.ts";
  * SHA-256 of the normalised code is kept: the code is shown once, in the
  * answer that made it, and is in no row, log or export. Single use: once
  * redeemed it names its redeemer, and the night's count sets `counted_at` the
- * first night the redeemer is complete, when the inviter earns the reward.
+ * first night the redeemer is complete, when the two earn the reward.
  *
  * Erasure (ADR-007, ADR-044 §10): an erased inviter's open invitations go,
  * and their reward rows and notices with the account; the redeemed ones stay
  * for their redeemers with the link cut (`inviter_account_id` null), so a
- * redeemer has still redeemed one, ever, and their export still says when.
- * An erased redeemer's uncounted invitation goes; a counted one keeps its
- * count without the person (`redeemed_by_account_id` null), and the inviter
- * keeps what it earned. A row that would name nobody goes.
+ * redeemer has still redeemed one, ever, their export still says when, they
+ * keep what it earned them, and one not counted yet counts for them alone. An erased redeemer's uncounted invitation
+ * goes; a counted one keeps its count without the person
+ * (`redeemed_by_account_id` null), and the inviter keeps what it earned. A row
+ * that would name nobody goes.
  */
 export const invitation = pgTable(
   "invitation",
@@ -68,18 +69,18 @@ export const invitation = pgTable(
   ],
 );
 
-/** What one unit of the reward ledger is (#107, ADR-044): a like or a fish. Mirrors RewardKind in packages/schema. */
-export const rewardKind = pgEnum("reward_kind", ["like", "fish"]);
+/** What one unit of the reward ledger is (#107, ADR-044, #503): a fish. Mirrors RewardKind in packages/schema. */
+export const rewardKind = pgEnum("reward_kind", ["fish"]);
 
 /**
- * The reward ledger's first cut (TD-15, #85, ADR-044): one row per unit a
- * person earned, today by an invitation that counted alone, in the kinds and
- * amounts of matching_config invitation_reward read that night. Never bought
- * and never transferable. A unit is spent by the decision it paid for, a like
- * or a fish past the day's or the window's budget, and given back when that
- * decision changes the same day. One spent stays spent when its round entry
- * goes later (an erased candidate, a prune): the link goes null, the time
- * stays. Erasure deletes the person's units with their invitations.
+ * The reward ledger's first cut (TD-15, #85, ADR-044): one row per fish a
+ * person earned, today by an invitation that counted alone, its inviter's and
+ * its friend's, in the amounts of matching_config invitation_reward read that
+ * night. Never bought and never transferable. A unit is spent by the fish past
+ * the window's budget it paid for, and given back when that decision changes
+ * the same day. One spent stays spent when its round entry goes later (an
+ * erased candidate, a prune): the link goes null, the time stays. Erasure
+ * deletes the person's units with their invitations.
  */
 export const reward = pgTable(
   "reward",
@@ -99,12 +100,12 @@ export const reward = pgTable(
     }),
   },
   (table) => [
-    // The person's units of a kind: what a decision spends, oldest first, and what is left.
+    // The person's units: what a fish spends, oldest first, and what is left.
     index("reward_account_kind_idx").on(table.accountId, table.kind),
     // An invitation's units: its notice's count, and the cascade.
     index("reward_invitation_idx").on(table.invitationId),
-    // What an entry was paid with: the give-back, the day's counts that leave
-    // paid likes and fish out, and the set null when an entry goes.
+    // What an entry was paid with: the give-back, the window's count that
+    // leaves paid fish out, and the set null when an entry goes.
     index("reward_spent_entry_idx")
       .on(table.spentEntryId)
       .where(sql`${table.spentEntryId} IS NOT NULL`),

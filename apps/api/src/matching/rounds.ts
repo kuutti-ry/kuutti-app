@@ -119,19 +119,18 @@ const notFound = () => new AppError(404, "not_found", "No such card in today's r
 
 /**
  * The day's likes (#98's first cut, the maintainer's of 20/10/2026): one
- * budget for everybody, whatever their pond's contest. A like on the card of somebody who liked
- * the person answers a like rather than sending one, and is free; a pass is
- * never counted. Past the budget a like an invitation earned is used by
- * itself (#107, ADR-044 §8, ADR-036 §5), and the likes it paid for are left
- * out of the count.
+ * budget for everybody. A like spends one wherever it goes, and a like back
+ * too (#503, the maintainer's of 30/10/2026, ADR-036 §3), so one limit bounds
+ * what a person proposes and what they answer; a pass is never counted.
  */
 const LIKE_BUDGET_KEY = "like_budget_balanced";
-const FREE_LIKES: readonly RoundReason[] = ["liked_you", "fish"];
+
+/** The cards whose like answers somebody's: a fish on one is a like (ADR-039 §2). */
+const ANSWERS_A_LIKE: readonly RoundReason[] = ["liked_you", "fish"];
 
 /**
- * The person's likes of the day against the budget, those a free card took or
- * an earned like paid for left out: one count for the refusal and for the
- * number the round says (#524), so the two never disagree.
+ * The person's likes of the day against the budget: one count for the refusal
+ * and for the number the round says (#524), so the two never disagree.
  */
 async function likesSent(
   db: Queryable,
@@ -142,9 +141,8 @@ async function likesSent(
   const { rows } = await db.query<{ n: number }>(
     `SELECT count(*)::int AS n
        FROM round_entries e JOIN rounds r ON r.id = e.round_id
-      WHERE r.account_id = $1 AND r.day = $2 AND e.decision = 'like'
-        AND e.reason <> ALL($3::round_reason[]) AND e.id <> ALL($4::uuid[])`,
-    [accountId, today, FREE_LIKES, await entriesPaidBy(db, accountId, "like")],
+      WHERE r.account_id = $1 AND r.day = $2 AND e.decision = 'like'`,
+    [accountId, today],
   );
   return { sent: rows[0]?.n ?? 0, budget };
 }
@@ -154,9 +152,6 @@ async function likesSent(
  * budget down to zero, a shadow-banned person's the same way.
  */
 async function likesLeftOf(db: Queryable, accountId: string, today: string): Promise<number> {
-  // shortcut: an earned like is not in the number, so somebody holding one reads
-  // zero while their next like still goes. Nobody holds one while
-  // invitation_reward earns no likes; #503 settles what the number counts.
   const { sent, budget } = await likesSent(db, accountId, today);
   return Math.max(0, budget - sent);
 }
@@ -201,7 +196,7 @@ async function fishSent(
     `SELECT count(*)::int AS n
        FROM round_entries e JOIN rounds r ON r.id = e.round_id
       WHERE r.account_id = $1 AND e.fish AND r.day >= $2::date AND e.id <> ALL($3::uuid[])`,
-    [accountId, from, await entriesPaidBy(db, accountId, "fish")],
+    [accountId, from, await entriesPaidBy(db, accountId)],
   );
   return { sent: rows[0]?.n ?? 0, budget, next: addDays(from, window) };
 }
@@ -516,10 +511,10 @@ export async function markSeen(
  * may still be taken back until midnight. No match is made while the person
  * is shadow-banned, nor with a block between the two.
  *
- * A like or a fish past its budget spends a unit the person's invitations
- * earned, in this transaction, and a change of it gives the unit back (#107,
- * ADR-044 §8); the reward table is the rewards slice's, reached through its
- * index.ts. The answer says whether a fish can still go today (#475) and how
+ * A fish past its budget spends one an invitation earned the person, in this
+ * transaction, and a change of it gives the unit back (#107, ADR-044 §8); the
+ * reward table is the rewards slice's, reached through its index.ts. The
+ * answer says whether a fish can still go today (#475) and how
  * many likes are left (#524), which the decision moves, read in this
  * transaction after the write.
  */
@@ -572,7 +567,7 @@ export async function decide(
     const entry = found.rows[0];
     if (!entry) throw notFound();
     // A fish on a card that answers a like is a like (ADR-039 §2).
-    const fish = input.decision === "fish" && !FREE_LIKES.includes(entry.reason);
+    const fish = input.decision === "fish" && !ANSWERS_A_LIKE.includes(entry.reason);
     await tx.query(PAIR_LOCK, [input.accountId, entry.candidate_id]);
     const standing = await matches.between(
       tx,
@@ -601,19 +596,9 @@ export async function decide(
     // Counted under the round's lock from the day's standing decisions, so a
     // like taken back gives its place back and two devices cannot both pass
     // the count; the refusal writes nothing. A like made a fish was counted.
-    // A like an earned like paid for is not counted; past the budget the like
-    // takes the oldest one left, and is refused only with none.
-    if (decision === "like" && entry.decision !== "like" && !FREE_LIKES.includes(entry.reason)) {
+    if (decision === "like" && entry.decision !== "like") {
       const count = await likesSent(tx, input.accountId, today);
-      if (
-        count.sent >= count.budget &&
-        !(await spendEarned(tx, {
-          accountId: input.accountId,
-          kind: "like",
-          entryId: entry.id,
-          at,
-        }))
-      ) {
+      if (count.sent >= count.budget) {
         throw new AppError(429, "like_budget_exceeded", "The day's likes are used up", {
           retryAfterSeconds: secondsUntil(dayWindow(at).end, at),
         });
@@ -626,12 +611,7 @@ export async function decide(
       const count = await fishSent(tx, input.accountId, today);
       if (
         count.sent >= count.budget &&
-        !(await spendEarned(tx, {
-          accountId: input.accountId,
-          kind: "fish",
-          entryId: entry.id,
-          at,
-        }))
+        !(await spendEarned(tx, { accountId: input.accountId, entryId: entry.id, at }))
       ) {
         const back = dayWindow(new Date(`${count.next}T12:00:00Z`)).start;
         throw new AppError(429, "fish_budget_exceeded", "The period's fish are sent", {
@@ -639,15 +619,9 @@ export async function decide(
         });
       }
     }
-    // What a changed like used is given back (ADR-044 §8): a pass or a skip
-    // gives back every unit the card's like or fish took, a fish made a like
-    // its fish's; a like made a fish keeps its like's.
-    if (entry.decision === "like" && (decision !== "like" || (entry.fish && !fish))) {
-      await releaseEarned(tx, {
-        accountId: input.accountId,
-        entryId: entry.id,
-        kinds: decision === "like" ? ["fish"] : ["like", "fish"],
-      });
+    // What a fish took is given back when it is a fish no more (ADR-044 §8).
+    if (entry.fish && !fish) {
+      await releaseEarned(tx, { accountId: input.accountId, entryId: entry.id });
     }
     // The mark that holds a year (ADR-062 §6), read from the person's own earlier
     // days: the same day's pass changed back and forth is one pass.
