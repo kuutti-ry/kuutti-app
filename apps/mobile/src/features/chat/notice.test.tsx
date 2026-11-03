@@ -23,7 +23,7 @@ function HandOver({ photoOf }: { photoOf?: string }) {
 
 const ROUTES = {
   index: () => <Text>Home</Text>,
-  round: () => <Text>Today's round</Text>,
+  round: () => <Text>People</Text>,
   "chats/index": () => <Text>Conversations</Text>,
   "chats/[id]": () => <HandOver />,
   "chats/photo/[messageId]": () => <HandOver photoOf="c1" />,
@@ -76,7 +76,7 @@ describe("handing over to the list (#491)", () => {
     // Back finds the round, not the reported conversation's "no longer available".
     await act(async () => router.back());
     expect(app.pathname()).toBe("/round");
-    expect(screen.getByText("Today's round")).toBeTruthy();
+    expect(screen.getByText("People")).toBeTruthy();
   });
 
   it("goes back down to the list after a photo's report in a conversation the list opened, as before", async () => {

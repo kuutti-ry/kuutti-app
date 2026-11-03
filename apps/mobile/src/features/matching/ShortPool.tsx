@@ -9,14 +9,13 @@ import { useHapticTap } from "@/theme/haptics";
 import { fetchRelaxations } from "./client";
 
 /**
- * The short pool (#99, ADR-042), at the end of a short round or an empty one:
- * what the person may relax for today, each a button that says the
- * deal-breaker, the way and how much it widens their pool (in the counter's
- * steps, `pond_counter_k`, never a count of cards), and what is relaxed today, each undone by one tap.
+ * The short pool (#99, ADR-042, ADR-062 §10), at the queue's end: what the
+ * person may relax for today, each a button that says the deal-breaker, the way
+ * and how much it widens their pool (in the counter's steps, `pond_counter_k`,
+ * never a count of cards), and what is relaxed today, each undone by one tap.
  * Read when it comes into sight, as the offers are counted on asking, and
  * again after each tap. Nothing relaxes but the person's tap; a read that
- * fails shows nothing, and the round's end says to come back tomorrow as
- * before.
+ * fails shows nothing, and the end stands as it does without offers.
  */
 export function ShortPool({
   day,

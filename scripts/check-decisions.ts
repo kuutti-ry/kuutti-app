@@ -11,7 +11,7 @@
  *   holds the two identical), and a deployed database holds only what the
  *   migrations wrote.
  * - The register names a key in a table's Where cell as a bare lowercase word
- *   in backticks, `round_size`. A constant is upper case and a file has a
+ *   in backticks, `like_expiry_days`. A constant is upper case and a file has a
  *   slash or a dot, so neither reads as a key.
  * - Fails on a key without a row, a Where cell naming a key no migration
  *   writes (a key renamed or dropped), and a register with no table that has
@@ -107,17 +107,23 @@ function problemsOf(keys: string[], register: string): string[] {
 function selfTest(): void {
   const sql = `-- comment; with a semicolon
 INSERT INTO "matching_config" ("version", "key", "value", "created_by") VALUES
-  (1, 'round_size', '12'::jsonb, 'migration:0007'),
+  (1, 'like_expiry_days', '12'::jsonb, 'migration:0007'),
   (1, 'photo_fetches_per_day', '{"thumb": 600, "full": 60}'::jsonb, 'migration:0010')
 ON CONFLICT ("key", "version") DO NOTHING;
 INSERT INTO "matching_config" ("version", "key", "value", "created_by")
 SELECT coalesce(max("version"), 0) + 1, 'default_pond', '"suomi"'::jsonb, 'migration:0025'
   FROM "matching_config" WHERE "key" = 'default_pond';
+INSERT INTO "matching_config" ("version", "key", "value", "created_by")
+SELECT "version" + 1, 'photo_fetches_per_day', jsonb_set("value", '{card}', '0'::jsonb), 'migration:0104'
+  FROM "matching_config" WHERE "key" = 'photo_fetches_per_day' ORDER BY "version" DESC LIMIT 1;
 INSERT INTO "ponds" ("slug", "name") VALUES ('suomi', 'Suomi');`;
   const parsed = keysAfter([], sql);
-  const expectedKeys = ["round_size", "photo_fetches_per_day", "default_pond"];
+  const expectedKeys = ["like_expiry_days", "photo_fetches_per_day", "default_pond"];
   const deleted = keysAfter(
-    keysAfter(parsed, `DELETE FROM "matching_config" WHERE "key" IN ('round_size', 'gone');`),
+    keysAfter(
+      parsed,
+      `DELETE FROM "matching_config"\n WHERE "key" IN ('like_expiry_days', 'gone');`,
+    ),
     `DELETE FROM "ponds" WHERE "slug" = 'default_pond';`,
   );
   const expectedDeleted = ["photo_fetches_per_day", "default_pond"];
@@ -131,9 +137,9 @@ INSERT INTO "ponds" ("slug", "name") VALUES ('suomi', 'Suomi');`;
   const expectedRenamed = ["photo_fetches_per_day", "first_pond"];
   const again = keysAfter(
     deleted,
-    `INSERT INTO "matching_config" ("version", "key", "value") VALUES (1, 'round_size', '10'::jsonb);`,
+    `INSERT INTO "matching_config" ("version", "key", "value") VALUES (1, 'like_expiry_days', '10'::jsonb);`,
   );
-  const expectedAgain = ["photo_fetches_per_day", "default_pond", "round_size"];
+  const expectedAgain = ["photo_fetches_per_day", "default_pond", "like_expiry_days"];
   for (const [what, got, expected] of [
     ["the migrations' keys", parsed, expectedKeys],
     ["a key a later migration deletes", deleted, expectedDeleted],
@@ -146,41 +152,41 @@ INSERT INTO "ponds" ("slug", "name") VALUES ('suomi', 'Suomi');`;
       process.exit(1);
     }
   }
-  const keys = ["round_size", "default_pond"];
+  const keys = ["like_expiry_days", "default_pond"];
   const header =
     "| Decision | Value | Where | Recorded in | Source | Review |\n|---|---|---|---|---|---|";
   const row = (where: string) => `| A rule | 10 | ${where} | ADR-035 | maintainer | |`;
-  const both = `${header}\n${row("`round_size`")}\n${row("`default_pond`, `SEED_PONDS` in `packages/db/src/seed.ts`")}`;
+  const both = `${header}\n${row("`like_expiry_days`")}\n${row("`default_pond`, `SEED_PONDS` in `packages/db/src/seed.ts`")}`;
   const cases: Array<[string, string, string[]]> = [
     ["every key with a row", both, []],
     [
       "a key left out",
-      `${header}\n${row("`round_size`")}`,
+      `${header}\n${row("`like_expiry_days`")}`,
       ["matching_config default_pond has no row"],
     ],
     [
       "a key gone",
-      `${both}\n${row("`round_size_old`")}`,
-      ["docs/decisions.md names `round_size_old` in a Where cell"],
+      `${both}\n${row("`like_expiry_days_old`")}`,
+      ["docs/decisions.md names `like_expiry_days_old` in a Where cell"],
     ],
     [
       "a key named outside the Where cell",
-      `${header}\n${row("`round_size`")}\n| The pond \`default_pond\` | x | \`apps/api/src/pond/index.ts\` | | | |`,
+      `${header}\n${row("`like_expiry_days`")}\n| The pond \`default_pond\` | x | \`apps/api/src/pond/index.ts\` | | | |`,
       ["matching_config default_pond has no row"],
     ],
     [
       "one key in each of two tables",
-      `${header}\n${row("`round_size`")}\n\n## Pond\n\n${header}\n${row("`default_pond`")}`,
+      `${header}\n${row("`like_expiry_days`")}\n\n## Pond\n\n${header}\n${row("`default_pond`")}`,
       [],
     ],
     [
       "a table without a Where column",
-      "| Session | Read |\n|---|---|\n| `round_size` | yes |",
+      "| Session | Read |\n|---|---|\n| `like_expiry_days` | yes |",
       ["docs/decisions.md has no table with a Where column"],
     ],
     [
       "a cell with an escaped bar",
-      `${header}\n| A \\| rule | 10 | \`round_size\` | | | |\n${row("`default_pond`")}`,
+      `${header}\n| A \\| rule | 10 | \`like_expiry_days\` | | | |\n${row("`default_pond`")}`,
       [],
     ],
   ];

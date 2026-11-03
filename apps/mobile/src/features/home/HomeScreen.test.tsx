@@ -144,12 +144,12 @@ describe("HomeScreen", () => {
     }
   });
 
-  it("leads to today's round from the gate card once matching is open, and not before (#379)", async () => {
+  it("leads to the queue from the gate card once matching is open, and not before (#379)", async () => {
     await renderWithTheme(<HomeScreen />);
     expect(
       await screen.findByText("Your profile is finished. Matching has not opened yet."),
     ).toBeTruthy();
-    expect(screen.queryByRole("button", { name: "Today's round" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "See people" })).toBeNull();
 
     (globalThis.fetch as jest.Mock).mockImplementation(async (input: Request | string) => {
       const url = new URL(input instanceof Request ? input.url : input);
@@ -158,7 +158,7 @@ describe("HomeScreen", () => {
       return json({ error: { code: "not_found" } }, 404);
     });
     await renderWithTheme(<HomeScreen />);
-    const round = await screen.findByRole("button", { name: "Today's round" });
+    const round = await screen.findByRole("button", { name: "See people" });
     expect(screen.getByText("Matching is open for you.")).toBeTruthy();
     await userEvent.setup().press(round);
     expect(router.push).toHaveBeenCalledWith("/round");
@@ -185,7 +185,7 @@ describe("HomeScreen", () => {
     await renderWithTheme(<HomeScreen />);
     expect(await screen.findByText(heading)).toBeTruthy();
     const card = screen.getByLabelText("Matching");
-    expect(within(card).getByRole("button", { name: "Today's round" })).toBeTruthy();
+    expect(within(card).getByRole("button", { name: "See people" })).toBeTruthy();
     expect(within(card).getByRole("button", { name: "Allow notifications" })).toBeTruthy();
     expect(within(card).getByRole("button", { name: "No thanks" })).toBeTruthy();
   });

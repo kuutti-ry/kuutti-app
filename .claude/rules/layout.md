@@ -47,7 +47,7 @@ The seam between apps is shared vocabulary and one shared contract, never shared
 apps/api/src/
   <slice>/      routes.ts  service.ts  repo.ts  index.ts  *.test.ts
   lib/          db.ts  config.ts  logger.ts  s3.ts  ssm.ts  auth-middleware.ts
-  jobs/         the nightly runner and its jobs (pond counter, who of a pond is complete, the slices' sweeps)
+  jobs/         the nightly runner, and what reads across slices: the pond counter and the invitation count, who of a pond is complete, the queue's builder. A slice's own sweep stays in its slice
   app.ts
 
 apps/mobile/

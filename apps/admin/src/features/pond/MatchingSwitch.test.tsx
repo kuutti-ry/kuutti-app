@@ -142,8 +142,7 @@ describe("turning the switch", () => {
 
     const dialog = within(step());
     expect(dialog.getByRole("heading", { name: "Open matching?" })).toBeInTheDocument();
-    expect(dialog.getByText(/gets a round each night/)).toBeInTheDocument();
-    expect(dialog.getByText(/Production builds no rounds yet/)).toBeInTheDocument();
+    expect(dialog.getByText(/reads their queue from the moment/)).toBeInTheDocument();
     // Nothing is sent before the step's own button.
     expect(calls.filter(isPress)).toEqual([]);
     fireEvent.click(dialog.getByRole("button", { name: "Open matching" }));

@@ -7,6 +7,7 @@ import {
   chatRoutes,
   chatSocketRoutes,
   conversationBetween,
+  conversationsOnTurn,
   createLive,
   type Live,
   messageReaders,
@@ -27,7 +28,7 @@ import {
   wellKnownRoutes,
 } from "./identity/index.ts";
 import { isComplete, matchingStatusOf } from "./jobs/pool.ts";
-import { buildRoundOf, relaxationOffers, relaxedCandidates } from "./jobs/round-builder.ts";
+import { fillQueue, fitsNow, relaxationOffers, relaxedCandidates } from "./jobs/round-builder.ts";
 import { requireAdmin } from "./lib/admin-middleware.ts";
 import { requireSession } from "./lib/auth-middleware.ts";
 import type { Config } from "./lib/config.ts";
@@ -329,11 +330,11 @@ export function createApp(deps: Deps) {
   // The caller's own answers, which the deal-breakers' pause and the cards' "did not answer" read (#149, #99).
   const ownFieldsOf = async (accountId: string) =>
     (await exportProfile(deps.db, accountId))?.fields ?? {};
-  // Today's round (#96, ADR-034) serves its cards through the profile slice's
-  // builder, handed in here since profile already imports matching; a card
-  // the builder refuses (404) is a card the round leaves out, and its budget's
-  // 429 goes through. A day's first read with no round builds it through the
-  // round builder, which reads across slices and lives with the jobs (#95).
+  // The queue (#96, #502, ADR-034, ADR-062) serves its cards through the profile
+  // slice's builder, handed in here since profile already imports matching; a
+  // card the builder refuses (404) is a card the read leaves out, and its budget's
+  // 429 goes through. Who comes next, and whether two people fit now, are the
+  // queue's builder's, which reads across slices and lives with the jobs (#95).
   // A read is checked by the velocity rules after it (#86, ADR-041).
   app.route(
     "/",
@@ -357,15 +358,18 @@ export function createApp(deps: Deps) {
           throw error;
         }
       },
-      // shortcut: nothing is built in production until the maintainer has set how long
-      // rounds are kept (ADR-034 Open 2, ADR-035 Open 1) and the filters are asked on read
-      // and on `decide` (#502, his word on #542): both lift this and boot.ts's twin.
-      deps.config.APP_ENV === "production"
-        ? async () => false
-        : (accountId) => buildRoundOf(builderDeps(), accountId),
+      {
+        fill: (accountId) => fillQueue(builderDeps(), accountId),
+        fits: (db, accountId, candidateIds) => fitsNow(builderDeps(), db, accountId, candidateIds),
+      },
       // A match is a conversation (#100, ADR-031): the chat slice's, handed in
       // here since the chat imports the profile, which imports matching.
-      { between: conversationBetween, open: openConversation, made: push.match },
+      {
+        between: conversationBetween,
+        open: openConversation,
+        yourTurn: conversationsOnTurn,
+        made: push.match,
+      },
       roundRead,
       // A short round's relaxations (#99, ADR-042) read the pond as the builder does.
       {

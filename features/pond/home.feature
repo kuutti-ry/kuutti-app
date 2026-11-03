@@ -11,9 +11,10 @@ Feature: The home
   narrows anybody below it. A card says a name and never digits: the nearest
   town of at least home_town_min_inhabitants people (20,000), or the area where
   an area is kept and the person asks for it. The home changes whenever the
-  person likes, which is safe because a band is written with a round's entry,
-  and a move closes the day's short pool (features/matching/rounds.feature), so
-  it is one new reading a night. A filter on distance is
+  person likes: an entry keeps the band it was written with
+  (features/matching/rounds.feature), and a move works on the next read, as every
+  change of what fits does; that a person can narrow down an area by moving, the
+  maintainer accepted on 01/11/2026 (ADR-062 §8). A filter on distance is
   features/matching/filters.feature's. There is one pond, the country (ADR-061
   §8), and the write that sets a home sets it.
 
@@ -133,7 +134,7 @@ Feature: The home
   Scenario: A home changes whenever the person likes, and the earlier one is gone
     Given a person with a home
     When they give another postal code, and another straight after
-    Then both are taken, and only the last home is held anywhere, with the time of that move
+    Then both are taken, and only the last home is held anywhere
     And their pond is as it was
 
   Scenario: The home write sets the one pond, and reading the status sets nothing

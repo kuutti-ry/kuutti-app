@@ -3,6 +3,7 @@ import {
   DealBreakersResponse,
   ErrorResponse,
   type ProfileFields,
+  QUEUE_PAGE,
   RelaxationAnswer,
   RelaxationsResponse,
   RelaxationUndone,
@@ -12,7 +13,6 @@ import { vi } from "vitest";
 import { type App, createApp } from "../app.ts";
 import { exportAccount } from "../identity/index.ts";
 import { finnishDay } from "../lib/finnish-day.ts";
-import { saveRound } from "../matching/index.ts";
 import { signInAs } from "../test/account.ts";
 import {
   captureLogger,
@@ -23,24 +23,24 @@ import {
   test,
   testConfig,
 } from "../test/harness.ts";
-import { HOMES, openPond, type PeopleOptions, people, pondNamed } from "../test/people.ts";
-import { buildRounds } from "./round-builder.ts";
+import { HOME, HOMES, openPond, type PeopleOptions, people, pondNamed } from "../test/people.ts";
+import { endedConversation, shownAt } from "../test/rounds.ts";
+import { fillQueue } from "./round-builder.ts";
 
-// The short pool (#99, ADR-042, features/matching/short-pool.feature): the
-// order of coming back, an unopened round, the offers and their steps, a
-// relaxation and its undo at the routes, the next day's round, rule 7, a
-// relaxed like, and "did not answer"; then the routes' edges. The pure rules
-// are matching/pool.test.ts (relaxedBy) and matching/round-order.test.ts
+// The short pool (#99, ADR-042, ADR-062 §10,
+// features/matching/short-pool.feature): the order of coming back, when a round
+// is short, the offers and their steps, a relaxation and its undo at the routes,
+// a page at a time, the next day's queue, rule 7, a relaxed like, a move, and
+// "did not answer"; then the routes' edges. The pure rules are
+// matching/pool.test.ts (relaxedBy) and matching/round-order.test.ts
 // (comingBackOrder).
 
-/** 04:00 in Helsinki: the night of 2026-10-20. */
-const NIGHT = new Date("2026-10-20T01:00:00.000Z");
-const DAY = finnishDay(NIGHT);
-/** Noon the same day. */
+/** Noon in Helsinki, 2026-10-20. */
 const NOON = new Date("2026-10-20T09:00:00.000Z");
-const NEXT_NIGHT = new Date("2026-10-21T01:00:00.000Z");
-const NEXT_DAY = finnishDay(NEXT_NIGHT);
+const DAY = finnishDay(NOON);
+const DAY_MS = 24 * 3600 * 1000;
 const NEXT_NOON = new Date("2026-10-21T09:00:00.000Z");
+const NEXT_DAY = finnishDay(NEXT_NOON);
 
 /** A woman who seeks men and does not smoke; with a deal-breaker on smoking unless told otherwise. */
 const HER: PeopleOptions = {
@@ -53,11 +53,15 @@ const HER: PeopleOptions = {
 const MEN: PeopleOptions = { gender: "man", seeks: ["woman"], complete: true, consented: true };
 const men = (fields: ProfileFields): PeopleOptions => ({ ...MEN, fields });
 
-const deps = async (db: Queryable, now = NIGHT) => ({
+const deps = async (db: Queryable, now = NOON) => ({
   db,
   logger: (await captureLogger()).logger,
   now: () => now,
 });
+
+/** The person's next people, as a read that finds nothing left adds them: the day opened and its first page. */
+const opens = async (db: Queryable, accountId: string, now = NOON) =>
+  fillQueue(await deps(db, now), accountId);
 
 async function setConfig(db: Queryable, key: string, value: unknown) {
   await db.query(
@@ -120,37 +124,16 @@ async function roundOf(db: Queryable, accountId: string, day = DAY): Promise<Car
   return rows;
 }
 
-const daysBefore = (days: number) =>
-  finnishDay(new Date(NIGHT.getTime() - days * 24 * 3600 * 1000));
+const daysAgo = (days: number) => new Date(NOON.getTime() - days * DAY_MS);
 
-/** An earlier round of `owner` with `candidate` in it, decided as said; opened unless told otherwise. */
-async function shownBefore(
+/** `owner` was shown `candidate` `days` ago and decided as said; with no decision a card displayed and left. */
+const shownBefore = (
   db: Queryable,
   owner: string,
   candidate: string,
   days: number,
-  decision: "like" | "pass" | null,
-  opened = true,
-) {
-  const earlier = new Date(NIGHT.getTime() - days * 24 * 3600 * 1000);
-  const built = await saveRound(await deps(db, earlier), {
-    accountId: owner,
-    day: daysBefore(days),
-    ordering: "count",
-    entries: [{ candidateId: candidate, reason: "matches_filters", distance: "nearby" }],
-  });
-  if (!built) throw new Error("earlier round not written");
-  if (opened) {
-    await db.query("UPDATE rounds SET opened_at = $2 WHERE id = $1", [built.roundId, earlier]);
-  }
-  if (decision) {
-    await db.query("UPDATE round_entries SET decision = $2, decided_at = $3 WHERE round_id = $1", [
-      built.roundId,
-      decision,
-      earlier,
-    ]);
-  }
-}
+  decision: "like" | "pass" | "skip" | null,
+) => shownAt(db, daysAgo(days), owner, candidate, decision);
 
 async function appAt(db: Queryable, now = NOON): Promise<App> {
   const { logger } = await captureLogger();
@@ -164,6 +147,20 @@ async function readToday(app: App, headers: Headers): Promise<RoundResponse> {
   const answer = await app.request("/rounds/today", { headers });
   expect(answer.status).toBe(200);
   return RoundResponse.parse(await answer.json());
+}
+
+const decide = (app: App, headers: Headers, position: number, decision: string) =>
+  app.request(`/rounds/${DAY}/entries/${position}/decision`, {
+    method: "PUT",
+    headers: jsonHeaders(headers),
+    body: JSON.stringify({ decision }),
+  });
+
+/** Every card of a read or an answer, passed. */
+async function passAll(app: App, headers: Headers, entries: RoundResponse["entries"]) {
+  for (const entry of entries ?? []) {
+    expect((await decide(app, headers, entry.position, "pass")).status).toBe(200);
+  }
 }
 
 async function offers(app: App, headers: Headers, day = DAY): Promise<RelaxationsResponse> {
@@ -201,7 +198,6 @@ const ASIDE = { field: "smoking", kind: "aside" } as const;
 
 describe("coming back", () => {
   test("Everybody new comes before anybody shown before", async ({ ctx }) => {
-    await setConfig(ctx.client, "round_size", 2);
     const { a, of } = await pondWith(ctx, "test-short-new-first", [
       { fields: { smoking: "never" }, count: 3 },
     ]);
@@ -210,34 +206,83 @@ describe("coming back", () => {
     await shownBefore(ctx.client, a, c, 45, null);
     await shownBefore(ctx.client, a, d, 40, null);
 
-    await buildRounds(await deps(ctx.client));
+    await opens(ctx.client, a);
 
     expect((await roundOf(ctx.client, a)).map((e) => [e.candidate_id, e.reason])).toEqual([
       [b, "matches_filters"],
       [c, "seen_before"],
+      [d, "seen_before"],
     ]);
   });
 
-  test("Earlier people come back undecided first, then passed, each shown longest ago first", async ({
+  test("Earlier people come back skipped first, then passed, then liked with no answer, then former conversations, each shown longest ago first", async ({
     ctx,
   }) => {
     const { a, of } = await pondWith(ctx, "test-short-order", [
-      { fields: { smoking: "never" }, count: 4 },
+      { fields: { smoking: "never" }, count: 8 },
     ]);
-    const [c, d, e, f] = of[0] ?? [];
-    if (!c || !d || !e || !f) throw new Error("people not written");
-    await shownBefore(ctx.client, a, f, 100, "pass");
-    await shownBefore(ctx.client, a, d, 40, "like");
-    await shownBefore(ctx.client, a, e, 120, "pass");
-    await shownBefore(ctx.client, a, c, 45, null);
+    const [skippedFirst, skippedLater, passedFirst, passedLater, likedFirst, likedLater] =
+      of[0] ?? [];
+    const [endedFirst, endedLater] = of[0]?.slice(6) ?? [];
+    if (
+      !skippedFirst ||
+      !skippedLater ||
+      !passedFirst ||
+      !passedLater ||
+      !likedFirst ||
+      !likedLater ||
+      !endedFirst ||
+      !endedLater
+    ) {
+      throw new Error("people not written");
+    }
+    // Written against the order, and each group's days overlapping the others'.
+    await endedConversation(ctx.client, a, endedLater, daysAgo(95), "archived");
+    await shownBefore(ctx.client, a, endedLater, 96, "like");
+    await endedConversation(ctx.client, a, endedFirst, daysAgo(91), "closed");
+    await shownBefore(ctx.client, a, endedFirst, 150, "like");
+    await shownBefore(ctx.client, a, likedLater, 91, "like");
+    await shownBefore(ctx.client, a, likedFirst, 100, "like");
+    await shownBefore(ctx.client, a, passedLater, 31, "pass");
+    await shownBefore(ctx.client, a, passedFirst, 120, "pass");
+    await shownBefore(ctx.client, a, skippedLater, 1, null);
+    await shownBefore(ctx.client, a, skippedFirst, 200, "skip");
 
-    await buildRounds(await deps(ctx.client));
+    await opens(ctx.client, a);
 
+    expect((await roundOf(ctx.client, a)).map((x) => [x.candidate_id, x.reason])).toEqual(
+      [
+        skippedFirst,
+        skippedLater,
+        passedFirst,
+        passedLater,
+        likedFirst,
+        likedLater,
+        endedFirst,
+        endedLater,
+      ].map((id) => [id, "seen_before"]),
+    );
+  });
+
+  test("a former conversation whose rounds have gone comes back by the day it ended, and stays one", async ({
+    ctx,
+  }) => {
+    const { a, of } = await pondWith(ctx, "test-short-former", [
+      { fields: { smoking: "never" }, count: 3 },
+    ]);
+    const [first, later, liked] = of[0] ?? [];
+    if (!first || !later || !liked) throw new Error("people not written");
+    await endedConversation(ctx.client, a, later, daysAgo(100), "closed");
+    await endedConversation(ctx.client, a, first, daysAgo(200), "archived");
+    await shownBefore(ctx.client, a, liked, 300, "like");
+
+    await opens(ctx.client, a);
+
+    // Nothing of them is left in the rounds, and they are no new people.
     expect((await roundOf(ctx.client, a)).map((x) => [x.candidate_id, x.reason])).toEqual([
-      [c, "seen_before"],
-      [d, "seen_before"],
-      [e, "seen_before"],
-      [f, "seen_before"],
+      [liked, "seen_before"],
+      [first, "seen_before"],
+      [later, "seen_before"],
     ]);
   });
 
@@ -247,33 +292,59 @@ describe("coming back", () => {
     ]);
     const [c, d] = of[0] ?? [];
     if (!c || !d) throw new Error("people not written");
-    // C was passed long ago and left undecided since: the latest showing puts C among the undecided.
+    // C was passed long ago and left undecided since: the latest showing puts C among the skipped.
     await shownBefore(ctx.client, a, c, 120, "pass");
     await shownBefore(ctx.client, a, c, 45, null);
     await shownBefore(ctx.client, a, d, 100, "pass");
 
-    await buildRounds(await deps(ctx.client));
+    await opens(ctx.client, a);
 
     expect((await roundOf(ctx.client, a)).map((e) => e.candidate_id)).toEqual([c, d]);
-  });
-
-  test("A round never opened showed nobody", async ({ ctx }) => {
-    const { a, of } = await pondWith(ctx, "test-short-unopened", [
-      { fields: { smoking: "never" }, count: 1 },
-    ]);
-    const [b] = of[0] ?? [];
-    if (!b) throw new Error("people not written");
-    await shownBefore(ctx.client, a, b, 1, null, false);
-
-    await buildRounds(await deps(ctx.client));
-
-    expect(await roundOf(ctx.client, a)).toEqual([
-      { candidate_id: b, reason: "matches_filters", relaxed_field: null },
-    ]);
   });
 });
 
 describe("relaxing a deal-breaker for the day", () => {
+  test("A round is short once no new person is left in the queue", async ({ ctx }) => {
+    const { a } = await pondWith(ctx, "test-short-when", [
+      { fields: { smoking: "never" }, count: QUEUE_PAGE + 1 },
+      { fields: {}, count: 1 },
+    ]);
+    const app = await appAt(ctx.client);
+    const { headers } = await signInAs(ctx.client, a);
+    const first = await readToday(app, headers);
+    expect(first.entries).toHaveLength(QUEUE_PAGE);
+
+    // One new person is left out of the log: no offers yet.
+    expect(await offers(app, headers)).toEqual({ short: false, offers: [], relaxed: [] });
+
+    await passAll(app, headers, first.entries);
+    expect((await readToday(app, headers)).entries).toHaveLength(1);
+
+    expect(await offers(app, headers)).toEqual({
+      short: true,
+      offers: [
+        { ...UNANSWERED, more: 0 },
+        { ...ASIDE, more: 0 },
+      ],
+      relaxed: [],
+    });
+  });
+
+  test("somebody seen before keeps no round from being short", async ({ ctx }) => {
+    const { a, of } = await pondWith(ctx, "test-short-seen", [
+      { fields: { smoking: "never" }, count: 11 },
+      { fields: {}, count: 1 },
+    ]);
+    for (const seen of of[0] ?? []) await shownBefore(ctx.client, a, seen, 1, "skip");
+    await opens(ctx.client, a);
+    const app = await appAt(ctx.client);
+    const { headers } = await signInAs(ctx.client, a);
+
+    expect((await offers(app, headers)).short).toBe(true);
+    // One of the eleven is left out of the log, and comes as seen before once these are read.
+    expect(await roundOf(ctx.client, a)).toHaveLength(QUEUE_PAGE);
+  });
+
   test("A short round offers each deal-breaker relaxed, with the pool's growth in steps", async ({
     ctx,
   }) => {
@@ -281,7 +352,7 @@ describe("relaxing a deal-breaker for the day", () => {
       { fields: {}, count: 12 },
       { fields: { smoking: "regularly" }, count: 10 },
     ]);
-    await buildRounds(await deps(ctx.client));
+    await opens(ctx.client, a);
     const app = await appAt(ctx.client);
     const { headers } = await signInAs(ctx.client, a);
 
@@ -297,7 +368,7 @@ describe("relaxing a deal-breaker for the day", () => {
 
   test("Reading the offers relaxes nothing", async ({ ctx }) => {
     const { a } = await pondWith(ctx, "test-short-read-only", [{ fields: {}, count: 3 }]);
-    await buildRounds(await deps(ctx.client));
+    await opens(ctx.client, a);
     const app = await appAt(ctx.client);
     const { headers } = await signInAs(ctx.client, a);
     const before = {
@@ -323,83 +394,115 @@ describe("relaxing a deal-breaker for the day", () => {
     expect((await ctx.client.query("SELECT 1 FROM round_relaxation")).rows).toEqual([]);
   });
 
-  test("A relaxation adds the people it lets in, labelled with the field, up to the room left", async ({
+  test("A relaxation adds a page of the people it lets in, labelled with the field, and the queue goes on to the rest", async ({
     ctx,
   }) => {
-    await setConfig(ctx.client, "round_size", 3);
     const { a, of } = await pondWith(ctx, "test-short-relax", [
       { fields: { smoking: "never" }, count: 1 },
-      { fields: {}, count: 4 },
+      { fields: {}, count: QUEUE_PAGE + 2 },
     ]);
-    await buildRounds(await deps(ctx.client));
     const app = await appAt(ctx.client);
     const { headers } = await signInAs(ctx.client, a);
-    expect((await readToday(app, headers)).entries).toHaveLength(1);
+    await passAll(app, headers, (await readToday(app, headers)).entries);
 
     const entries = await added(await relax(app, headers, UNANSWERED));
 
     const unanswered = new Set(of[1]);
-    expect(entries.map((e) => [e.position, e.reason, e.relaxedField, e.decision])).toEqual([
-      [2, "relaxed", "smoking", null],
-      [3, "relaxed", "smoking", null],
-    ]);
+    expect(entries.map((e) => [e.position, e.reason, e.relaxedField, e.decision])).toEqual(
+      Array.from({ length: QUEUE_PAGE }, (_, i) => [i + 2, "relaxed", "smoking", null]),
+    );
     const round = await roundOf(ctx.client, a);
     expect(round.slice(1).every((e) => unanswered.has(e.candidate_id))).toBe(true);
-    expect(round.slice(1).map((e) => e.relaxed_field)).toEqual(["smoking", "smoking"]);
     // The answer's cards are the round's own, as its read serves them.
-    expect((await readToday(app, headers)).entries?.slice(1)).toEqual(entries);
+    expect((await readToday(app, headers)).entries).toEqual(entries);
     expect(await offers(app, headers)).toEqual({ short: false, offers: [], relaxed: [UNANSWERED] });
+
+    await passAll(app, headers, entries);
+    const rest = await readToday(app, headers);
+
+    expect(rest.entries?.map((e) => [e.position, e.reason, e.relaxedField])).toEqual([
+      [12, "relaxed", "smoking"],
+      [13, "relaxed", "smoking"],
+    ]);
+    expect((await roundOf(ctx.client, a)).slice(-2).map((e) => e.relaxed_field)).toEqual([
+      "smoking",
+      "smoking",
+    ]);
+    await passAll(app, headers, rest.entries);
+    expect((await readToday(app, headers)).entries).toEqual([]);
+    expect(await offers(app, headers)).toEqual({ short: true, offers: [], relaxed: [UNANSWERED] });
+  });
+
+  test("the rest of a relaxation carries every relaxation of the day it needs", async ({ ctx }) => {
+    const { a, of } = await pondWith(ctx, "test-short-rest-needs", [
+      { fields: { hasKids: "no" }, count: QUEUE_PAGE + 1 },
+    ]);
+    await dealBreaker(ctx.client, a, "hasKids", ["yes_with_me"], false);
+    await opens(ctx.client, a);
+    const app = await appAt(ctx.client);
+    const { headers } = await signInAs(ctx.client, a);
+    expect(await added(await relax(app, headers, UNANSWERED))).toEqual([]);
+    const page = await added(await relax(app, headers, { field: "hasKids", kind: "aside" }));
+    expect(page).toHaveLength(QUEUE_PAGE);
+    await passAll(app, headers, page);
+
+    expect((await readToday(app, headers)).entries).toHaveLength(1);
+    const { rows } = await ctx.client.query<{ relaxed_with: string[] }>(
+      `SELECT e.relaxed_with FROM round_entries e JOIN rounds r ON r.id = e.round_id
+        WHERE r.account_id = $1 AND e.candidate_id = ANY($2::uuid[]) AND e.decision IS NULL`,
+      [a, of[0]],
+    );
+    expect(rows.map((row) => [...row.relaxed_with].sort())).toEqual([["hasKids", "smoking"]]);
+
+    // So undoing either takes it back.
+    expect(
+      RelaxationUndone.parse(await (await undo(app, headers, "smoking")).json()).removed,
+    ).toEqual([QUEUE_PAGE + 1]);
   });
 
   test("One tap undoes a relaxation, and takes back its undecided cards only", async ({ ctx }) => {
-    await setConfig(ctx.client, "round_size", 3);
     const { a } = await pondWith(ctx, "test-short-undo", [
       { fields: { smoking: "never" }, count: 1 },
       { fields: {}, count: 4 },
     ]);
-    await buildRounds(await deps(ctx.client));
     const app = await appAt(ctx.client);
     const { headers } = await signInAs(ctx.client, a);
     await readToday(app, headers);
-    const [liked, other] = await added(await relax(app, headers, UNANSWERED));
-    if (!liked || !other) throw new Error("nothing added");
-    const decided = await app.request(`/rounds/${DAY}/entries/${liked.position}/decision`, {
-      method: "PUT",
-      headers: jsonHeaders(headers),
-      body: JSON.stringify({ decision: "like" }),
-    });
-    expect(decided.status).toBe(200);
+    const [liked, ...others] = await added(await relax(app, headers, UNANSWERED));
+    if (!liked || others.length !== 3) throw new Error("nothing added");
+    expect((await decide(app, headers, liked.position, "like")).status).toBe(200);
 
     const undone = await undo(app, headers, "smoking");
 
     expect(undone.status).toBe(200);
-    expect(RelaxationUndone.parse(await undone.json())).toEqual({ removed: [other.position] });
+    expect(RelaxationUndone.parse(await undone.json())).toEqual({
+      removed: others.map((card) => card.position),
+    });
     expect((await readToday(app, headers)).entries?.map((e) => [e.position, e.decision])).toEqual([
       [1, null],
-      [liked.position, "like"],
     ]);
-    // round_size 3: the card before, the liked one and the one taken back; an undo gives no room back.
-    expect(await offers(app, headers)).toEqual({ short: false, offers: [], relaxed: [] });
+    expect((await roundOf(ctx.client, a)).map((e) => e.relaxed_field)).toEqual([null, "smoking"]);
+    // Their places stay given: tapped again, the three come after the highest.
+    const again = await added(await relax(app, headers, ASIDE));
+    expect(again.map((card) => card.position)).toEqual([6, 7, 8]);
   });
 
-  test("Tomorrow's round is built from the deal-breakers as stored", async ({ ctx }) => {
-    await setConfig(ctx.client, "round_size", 3);
+  test("Tomorrow's queue reads the deal-breakers as stored", async ({ ctx }) => {
     const { a, of } = await pondWith(ctx, "test-short-tomorrow", [
       { fields: { smoking: "never" }, count: 1 },
       { fields: {}, count: 6 },
     ]);
-    await buildRounds(await deps(ctx.client));
     const app = await appAt(ctx.client);
     const { headers } = await signInAs(ctx.client, a);
     await readToday(app, headers);
-    expect(await added(await relax(app, headers, UNANSWERED))).toHaveLength(2);
+    expect(await added(await relax(app, headers, UNANSWERED))).toHaveLength(6);
 
-    await buildRounds(await deps(ctx.client, NEXT_NIGHT));
+    await opens(ctx.client, a, NEXT_NOON);
 
     const unanswered = new Set(of[1]);
     const tomorrow = await roundOf(ctx.client, a, NEXT_DAY);
     expect(tomorrow.filter((e) => unanswered.has(e.candidate_id))).toEqual([]);
-    expect(tomorrow.every((e) => e.reason !== "relaxed")).toBe(true);
+    expect(tomorrow.map((e) => e.reason)).toEqual(["matches_filters"]);
   });
 
   test("relaxations add up, and undoing the first takes back a card that needed both", async ({
@@ -414,7 +517,7 @@ describe("relaxing a deal-breaker for the day", () => {
     if (!b || !c) throw new Error("people not written");
     // A's second deal-breaker: kids as A has them. B fails it and did not answer smoking; C only the latter.
     await dealBreaker(ctx.client, a, "hasKids", ["yes_with_me"], false);
-    await buildRounds(await deps(ctx.client));
+    await opens(ctx.client, a);
     const app = await appAt(ctx.client);
     const { headers } = await signInAs(ctx.client, a);
     expect(await added(await relax(app, headers, UNANSWERED))).toHaveLength(1);
@@ -440,7 +543,7 @@ describe("relaxing a deal-breaker for the day", () => {
     const [d] = of[1] ?? [];
     if (!b || !d) throw new Error("people not written");
     await dealBreaker(ctx.client, a, "hasKids", ["yes_with_me"], false);
-    await buildRounds(await deps(ctx.client));
+    await opens(ctx.client, a);
     const app = await appAt(ctx.client);
     const { headers } = await signInAs(ctx.client, a);
     // B needs smoking alone, D kids alone.
@@ -458,7 +561,7 @@ describe("relaxing a deal-breaker for the day", () => {
     ctx,
   }) => {
     const { a } = await pondWith(ctx, "test-short-incomplete", [{ fields: {}, count: 2 }]);
-    await buildRounds(await deps(ctx.client));
+    await opens(ctx.client, a);
     const app = await appAt(ctx.client);
     const { headers } = await signInAs(ctx.client, a);
     await added(await relax(app, headers, ASIDE));
@@ -477,7 +580,7 @@ describe("relaxing a deal-breaker for the day", () => {
     ctx,
   }) => {
     const { a, pond } = await pondWith(ctx, "test-short-closed", [{ fields: {}, count: 2 }]);
-    await buildRounds(await deps(ctx.client));
+    await opens(ctx.client, a);
     const app = await appAt(ctx.client);
     const { headers } = await signInAs(ctx.client, a);
     expect((await offers(app, headers)).offers).not.toEqual([]);
@@ -495,20 +598,15 @@ describe("relaxing a deal-breaker for the day", () => {
     const [b] = of[0] ?? [];
     if (!b) throw new Error("people not written");
     await dealBreaker(ctx.client, a, "hasKids", ["yes_with_me"], false);
-    await buildRounds(await deps(ctx.client));
+    await opens(ctx.client, a);
     const app = await appAt(ctx.client);
     const { headers } = await signInAs(ctx.client, a);
     expect(await added(await relax(app, headers, UNANSWERED))).toEqual([]);
     const [card] = await added(await relax(app, headers, { field: "hasKids", kind: "aside" }));
     if (!card) throw new Error("nothing added");
-    const liked = await app.request(`/rounds/${DAY}/entries/${card.position}/decision`, {
-      method: "PUT",
-      headers: jsonHeaders(headers),
-      body: JSON.stringify({ decision: "like" }),
-    });
-    expect(liked.status).toBe(200);
+    expect((await decide(app, headers, card.position, "like")).status).toBe(200);
 
-    await buildRounds(await deps(ctx.client, NEXT_NIGHT));
+    await opens(ctx.client, b, NEXT_NOON);
 
     expect(await roundOf(ctx.client, b, NEXT_DAY)).toEqual([
       { candidate_id: a, reason: "liked_you", relaxed_field: null },
@@ -523,7 +621,7 @@ describe("relaxing a deal-breaker for the day", () => {
     if (!liker || !other) throw new Error("people not written");
     // The liker's like of yesterday waits on A, whose smoking deal-breaker keeps the liker away.
     await shownBefore(ctx.client, liker, a, 1, "like");
-    await buildRounds(await deps(ctx.client));
+    await opens(ctx.client, a);
     const app = await appAt(ctx.client);
     const { headers } = await signInAs(ctx.client, a);
     expect(await roundOf(ctx.client, a)).toEqual([]);
@@ -533,19 +631,22 @@ describe("relaxing a deal-breaker for the day", () => {
     expect((await roundOf(ctx.client, a)).map((e) => e.candidate_id)).toEqual([other]);
   });
 
-  test("a relaxation adds nobody passed or shown within the cooldowns", async ({ ctx }) => {
-    const { a, of } = await pondWith(ctx, "test-short-cooling", [{ fields: {}, count: 3 }]);
-    const [passed, shown, fresh] = of[0] ?? [];
-    if (!passed || !shown || !fresh) throw new Error("people not written");
+  test("a relaxation adds nobody within their clock, and new people before those seen", async ({
+    ctx,
+  }) => {
+    const { a, of } = await pondWith(ctx, "test-short-cooling", [{ fields: {}, count: 4 }]);
+    const [passed, liked, skipped, fresh] = of[0] ?? [];
+    if (!passed || !liked || !skipped || !fresh) throw new Error("people not written");
     await shownBefore(ctx.client, a, passed, 2, "pass");
-    await shownBefore(ctx.client, a, shown, 3, null);
-    await buildRounds(await deps(ctx.client));
+    await shownBefore(ctx.client, a, liked, 3, "like");
+    await shownBefore(ctx.client, a, skipped, 3, "skip");
+    await opens(ctx.client, a);
     const app = await appAt(ctx.client);
     const { headers } = await signInAs(ctx.client, a);
 
     await added(await relax(app, headers, UNANSWERED));
 
-    expect((await roundOf(ctx.client, a)).map((e) => e.candidate_id)).toEqual([fresh]);
+    expect((await roundOf(ctx.client, a)).map((e) => e.candidate_id)).toEqual([fresh, skipped]);
   });
 
   test("A relaxation never lets in somebody whose own filters exclude the person", async ({
@@ -560,7 +661,7 @@ describe("relaxing a deal-breaker for the day", () => {
     if (!b || !c) throw new Error("people not written");
     // B did not answer smoking, and has a kids deal-breaker of his own that A's answer fails.
     await dealBreaker(ctx.client, b, "hasKids", ["no"], false);
-    await buildRounds(await deps(ctx.client));
+    await opens(ctx.client, a);
     const app = await appAt(ctx.client);
     const { headers } = await signInAs(ctx.client, a);
 
@@ -573,30 +674,60 @@ describe("relaxing a deal-breaker for the day", () => {
     const { a, of } = await pondWith(ctx, "test-short-relaxed-like", [{ fields: {}, count: 1 }]);
     const [b] = of[0] ?? [];
     if (!b) throw new Error("people not written");
-    await buildRounds(await deps(ctx.client));
+    await opens(ctx.client, a);
     const app = await appAt(ctx.client);
     const { headers } = await signInAs(ctx.client, a);
     const [card] = await added(await relax(app, headers, UNANSWERED));
     if (!card) throw new Error("nothing added");
-    const liked = await app.request(`/rounds/${DAY}/entries/${card.position}/decision`, {
-      method: "PUT",
-      headers: jsonHeaders(headers),
-      body: JSON.stringify({ decision: "like" }),
-    });
-    expect(liked.status).toBe(200);
+    expect((await decide(app, headers, card.position, "like")).status).toBe(200);
     // Without the like's waiver, A's stored deal-breaker keeps B away from A.
+    await opens(ctx.client, b);
     expect((await roundOf(ctx.client, b)).map((e) => e.candidate_id)).toEqual([]);
 
-    await buildRounds(await deps(ctx.client, NEXT_NIGHT));
+    await opens(ctx.client, b, NEXT_NOON);
 
     expect(await roundOf(ctx.client, b, NEXT_DAY)).toEqual([
       { candidate_id: a, reason: "liked_you", relaxed_field: null },
     ]);
   });
 
+  test("A like on a relaxed card goes through while the day's relaxation stands", async ({
+    ctx,
+  }) => {
+    const { a, of } = await pondWith(ctx, "test-short-like-relaxed", [{ fields: {}, count: 2 }]);
+    const [b] = of[0] ?? [];
+    if (!b) throw new Error("people not written");
+    await opens(ctx.client, a);
+    const app = await appAt(ctx.client);
+    const { headers } = await signInAs(ctx.client, a);
+    const [card] = await added(await relax(app, headers, UNANSWERED));
+    if (!card) throw new Error("nothing added");
+
+    expect((await decide(app, headers, card.position, "like")).status).toBe(200);
+
+    expect((await offers(app, headers)).relaxed).toEqual([UNANSWERED]);
+  });
+
+  test("a card that needs a relaxation is gone with it, and its place answers not_found", async ({
+    ctx,
+  }) => {
+    const { a } = await pondWith(ctx, "test-short-like-undone", [{ fields: {}, count: 1 }]);
+    await opens(ctx.client, a);
+    const app = await appAt(ctx.client);
+    const { headers } = await signInAs(ctx.client, a);
+    const [card] = await added(await relax(app, headers, UNANSWERED));
+    if (!card) throw new Error("nothing added");
+    expect((await undo(app, headers, "smoking")).status).toBe(200);
+
+    const refused = await decide(app, headers, card.position, "like");
+
+    expect(refused.status).toBe(404);
+    expect(await codeOf(refused)).toBe("not_found");
+  });
+
   test("The same deal-breaker is relaxed once a day", async ({ ctx }) => {
     const { a } = await pondWith(ctx, "test-short-twice", [{ fields: {}, count: 4 }]);
-    await buildRounds(await deps(ctx.client));
+    await opens(ctx.client, a);
     const app = await appAt(ctx.client);
     const { headers } = await signInAs(ctx.client, a);
     expect(await added(await relax(app, headers, UNANSWERED))).toHaveLength(4);
@@ -624,15 +755,13 @@ describe("relaxing a deal-breaker for the day", () => {
     const [b] = of[0] ?? [];
     const [c] = of[1] ?? [];
     if (!b || !c) throw new Error("people not written");
-    await buildRounds(await deps(ctx.client));
+    await opens(ctx.client, a);
     const app = await appAt(ctx.client);
     const { headers } = await signInAs(ctx.client, a);
 
     const { entries } = await readToday(app, headers);
 
-    const byPerson = new Map(
-      (await roundOf(ctx.client, a)).map((e, index) => [e.candidate_id, entries?.[index]]),
-    );
+    const byPerson = new Map(entries?.map((entry) => [entry.card.accountId, entry]));
     expect(byPerson.get(b)?.notAnswered).toEqual(["smoking"]);
     expect(byPerson.get(c)?.notAnswered).toEqual([]);
     expect(byPerson.get(b)?.relaxedField).toBeUndefined();
@@ -652,19 +781,87 @@ describe("relaxing a deal-breaker for the day", () => {
     const [c] = of[1] ?? [];
     if (!b || !c) throw new Error("people not written");
     await hidden(ctx.client, [c], "smoking");
-    await buildRounds(await deps(ctx.client));
+    await opens(ctx.client, a);
     const app = await appAt(ctx.client);
     const { headers } = await signInAs(ctx.client, a);
 
     const { entries } = await readToday(app, headers);
 
-    const byPerson = new Map(
-      (await roundOf(ctx.client, a)).map((e, index) => [e.candidate_id, entries?.[index]]),
-    );
+    const byPerson = new Map(entries?.map((entry) => [entry.card.accountId, entry]));
     expect(byPerson.get(b)?.card.fields.smoking).toBeUndefined();
     expect(byPerson.get(c)?.card.fields.smoking).toBeUndefined();
     expect(byPerson.get(b)?.notAnswered).toEqual(["smoking"]);
     expect(byPerson.get(c)?.notAnswered).toEqual(["smoking"]);
+  });
+});
+
+describe("the inbox stop and the short pool (ADR-062 §4)", () => {
+  /** matching_config inbox_stop, the maintainer's of 01/11/2026. */
+  const STOP = 30;
+
+  /** A woman's likes of `liked` until their inbox is at the stop. */
+  async function pileOn(ctx: TestContext, pond: string, liked: string) {
+    const likers = await people(ctx.client, pond, STOP, HER);
+    for (const liker of likers) await shownBefore(ctx.client, liker, liked, 1, "like");
+  }
+
+  test("The stop holds a person out of what a relaxation lets in", async ({ ctx }) => {
+    const { pond, a, of } = await pondWith(ctx, "test-stop-relaxed", [
+      { fields: {}, count: QUEUE_PAGE + 3 },
+    ]);
+    const [held, ...others] = of[0] ?? [];
+    if (!held) throw new Error("people not written");
+    await pileOn(ctx, pond, held);
+    await opens(ctx.client, a);
+    const app = await appAt(ctx.client);
+    const { headers } = await signInAs(ctx.client, a);
+
+    const page = await added(await relax(app, headers, UNANSWERED));
+
+    expect(page).toHaveLength(QUEUE_PAGE);
+    await passAll(app, headers, page);
+    await passAll(app, headers, (await readToday(app, headers)).entries);
+    expect((await readToday(app, headers)).entries).toEqual([]);
+    const log = (await roundOf(ctx.client, a)).map((e) => e.candidate_id);
+    expect(new Set(log)).toEqual(new Set(others));
+  });
+
+  test("somebody held is no new person left: the round is short, and offers", async ({ ctx }) => {
+    const { pond, a, of } = await pondWith(ctx, "test-stop-short", [
+      { fields: { smoking: "never" }, count: 1 },
+      { fields: {}, count: 1 },
+    ]);
+    const [held] = of[0] ?? [];
+    if (!held) throw new Error("people not written");
+    await pileOn(ctx, pond, held);
+    await opens(ctx.client, a);
+    const app = await appAt(ctx.client);
+    const { headers } = await signInAs(ctx.client, a);
+
+    expect(await offers(app, headers)).toEqual({
+      short: true,
+      offers: [
+        { ...UNANSWERED, more: 0 },
+        { ...ASIDE, more: 0 },
+      ],
+      relaxed: [],
+    });
+  });
+
+  test("a relaxation that would let in nobody but somebody held is not offered", async ({
+    ctx,
+  }) => {
+    const { pond, a, of } = await pondWith(ctx, "test-stop-not-offered", [
+      { fields: {}, count: 1 },
+    ]);
+    const [held] = of[0] ?? [];
+    if (!held) throw new Error("people not written");
+    await pileOn(ctx, pond, held);
+    await opens(ctx.client, a);
+    const app = await appAt(ctx.client);
+    const { headers } = await signInAs(ctx.client, a);
+
+    expect(await offers(app, headers)).toEqual({ short: true, offers: [], relaxed: [] });
   });
 });
 
@@ -686,7 +883,7 @@ describe("A hidden answer counts under a deal-breaker as a shown one does", () =
     const [c] = of[1] ?? [];
     await hidden(ctx.client, [b, c], "smoking");
 
-    await buildRounds(await deps(ctx.client));
+    await opens(ctx.client, a);
 
     expect((await roundOf(ctx.client, a)).map((e) => e.candidate_id)).toEqual([c]);
   });
@@ -701,7 +898,7 @@ describe("a person's own hidden answer", () => {
     const [c] = of[1] ?? [];
     await hidden(ctx.client, [a], "smoking");
 
-    await buildRounds(await deps(ctx.client));
+    await opens(ctx.client, a);
 
     const app = await appAt(ctx.client);
     const { headers } = await signInAs(ctx.client, a);
@@ -732,7 +929,7 @@ describe("a deal-breaker on height through the night (#508)", () => {
     ctx,
   }) => {
     const { a, tall, same, open } = await taller(ctx, "test-height-round");
-    await buildRounds(await deps(ctx.client));
+    for (const id of [a, same, tall]) await opens(ctx.client, id);
 
     const hers = (await roundOf(ctx.client, a)).map((e) => e.candidate_id);
     expect(new Set(hers)).toEqual(new Set([tall, open]));
@@ -743,9 +940,7 @@ describe("a deal-breaker on height through the night (#508)", () => {
     const app = await appAt(ctx.client);
     const { headers } = await signInAs(ctx.client, a);
     const { entries } = await readToday(app, headers);
-    const byPerson = new Map(
-      (await roundOf(ctx.client, a)).map((e, index) => [e.candidate_id, entries?.[index]]),
-    );
+    const byPerson = new Map(entries?.map((entry) => [entry.card.accountId, entry]));
     expect(byPerson.get(open)?.notAnswered).toEqual(["height"]);
     expect(byPerson.get(tall)?.notAnswered).toEqual([]);
   });
@@ -753,7 +948,7 @@ describe("a deal-breaker on height through the night (#508)", () => {
   test("a height hidden from the card is compared all the same (#515)", async ({ ctx }) => {
     const { a, tall, same, open } = await taller(ctx, "test-height-hidden");
     await hidden(ctx.client, [tall, same], "height");
-    await buildRounds(await deps(ctx.client));
+    await opens(ctx.client, a);
 
     const hers = (await roundOf(ctx.client, a)).map((e) => e.candidate_id);
     expect(new Set(hers)).toEqual(new Set([tall, open]));
@@ -761,16 +956,14 @@ describe("a deal-breaker on height through the night (#508)", () => {
     const app = await appAt(ctx.client);
     const { headers } = await signInAs(ctx.client, a);
     const { entries } = await readToday(app, headers);
-    const byPerson = new Map(
-      (await roundOf(ctx.client, a)).map((e, index) => [e.candidate_id, entries?.[index]]),
-    );
+    const byPerson = new Map(entries?.map((entry) => [entry.card.accountId, entry]));
     // The card says nothing of it, as of one not given (ADR-042 §8).
     expect(byPerson.get(tall)?.notAnswered).toEqual(["height"]);
   });
 
   test("a short round offers to set it aside for the day", async ({ ctx }) => {
     const { a, same } = await taller(ctx, "test-height-relaxed");
-    await buildRounds(await deps(ctx.client));
+    await opens(ctx.client, a);
     const app = await appAt(ctx.client);
     const { headers } = await signInAs(ctx.client, a);
 
@@ -810,7 +1003,7 @@ describe("a deal-breaker on distance through the night (#514, ADR-061 §7)", () 
       "test-distance-offer",
       Array.from({ length: 12 }, () => HOMES.close),
     );
-    await buildRounds(await deps(ctx.client));
+    await opens(ctx.client, a);
     const app = await appAt(ctx.client);
     const { headers } = await signInAs(ctx.client, a);
 
@@ -834,7 +1027,7 @@ describe("a deal-breaker on distance through the night (#514, ADR-061 §7)", () 
     const [b, c] = men;
     if (!b || !c) throw new Error("people not written");
     await dealBreaker(ctx.client, b, "distance", ["nearby"], true);
-    await buildRounds(await deps(ctx.client));
+    await opens(ctx.client, a);
     const app = await appAt(ctx.client);
     const { headers } = await signInAs(ctx.client, a);
 
@@ -848,55 +1041,27 @@ describe("a deal-breaker on distance through the night (#514, ADR-061 §7)", () 
     ]);
   });
 
-  test("A move closes the day's short pool, so a home typed answers nothing until the next round", async ({
-    ctx,
-  }) => {
-    // The offer is on smoking: a move must say nothing through any deal-breaker's.
+  test("A move closes nothing: the offers read the pool as it stands", async ({ ctx }) => {
+    // The offer is on smoking, and the one man it would let in lives in Kallio.
     const { a } = await pondWith(ctx, "test-short-moved", [{ fields: {}, count: 1 }]);
     await dealBreaker(ctx.client, a, "distance", ["nearby", "close", "around"], true);
-    await buildRounds(await deps(ctx.client));
+    await opens(ctx.client, a);
     const app = await appAt(ctx.client);
     const { headers } = await signInAs(ctx.client, a);
-    await added(await relax(app, headers, UNANSWERED));
-    await undo(app, headers, "smoking");
     const open = await offers(app, headers);
-    expect(open.offers.map((offer) => offer.field)).toContain("smoking");
+    expect(open.offers.map((offer) => offer.field)).toEqual(["smoking", "smoking"]);
 
-    expect((await putHome(app, headers, { postalCode: "96100" })).status).toBe(200);
+    expect((await putHome(app, headers, { postalCode: HOMES.far })).status).toBe(200);
 
-    // Both ways of asking are shut for the day, and neither says why.
-    expect(await offers(app, headers)).toEqual({ short: false, offers: [], relaxed: [] });
-    const tapped = await relax(app, headers, UNANSWERED);
-    expect(tapped.status).toBe(404);
-    expect(await codeOf(tapped)).toBe("not_found");
-    expect(await roundOf(ctx.client, a)).toEqual([]);
+    // From Rovaniemi he is past her distance as well: smoking alone lets nobody in.
+    expect(await offers(app, headers)).toEqual({ short: true, offers: [], relaxed: [] });
+    expect(await added(await relax(app, headers, UNANSWERED))).toEqual([]);
+    expect((await undo(app, headers, "smoking")).status).toBe(200);
 
-    // The next night's round is built from the new home, and opens again.
-    await buildRounds(await deps(ctx.client, NEXT_NIGHT));
-    const nextDay = await appAt(ctx.client, NEXT_NOON);
-    const next = await offers(nextDay, headers, NEXT_DAY);
-    expect(next.short).toBe(true);
-  });
+    expect((await putHome(app, headers, { postalCode: HOME })).status).toBe(200);
 
-  test("A home typed again is no move, and the first home is none", async ({ ctx }) => {
-    const { a } = await pondWith(ctx, "test-short-same", [{ fields: {}, count: 1 }]);
-    await buildRounds(await deps(ctx.client));
-    const app = await appAt(ctx.client);
-    const { headers } = await signInAs(ctx.client, a);
-    const before = await offers(app, headers);
-    expect(before.offers).not.toEqual([]);
-
-    // Two codes of one kept place, the second a code too small to keep; and the choice alone.
-    const { rows } = await ctx.client.query<{ home_place: string }>(
-      "SELECT home_place FROM account WHERE id = $1",
-      [a],
-    );
-    expect((await putHome(app, headers, { postalCode: rows[0]?.home_place })).status).toBe(200);
-    expect((await putHome(app, headers, { showArea: true })).status).toBe(200);
-
-    expect(await offers(app, headers)).toEqual(before);
-    const moved = await ctx.client.query("SELECT home_moved_at FROM account WHERE id = $1", [a]);
-    expect(moved.rows).toEqual([{ home_moved_at: null }]);
+    expect(await offers(app, headers)).toEqual(open);
+    expect(await added(await relax(app, headers, UNANSWERED))).toHaveLength(1);
   });
 
   test("set aside, it is undone as any other, and tomorrow's round filters again", async ({
@@ -904,7 +1069,7 @@ describe("a deal-breaker on distance through the night (#514, ADR-061 §7)", () 
   }) => {
     const { a, men } = await nearbyOnly(ctx, "test-distance-undo", [HOMES.close]);
     const [b] = men;
-    await buildRounds(await deps(ctx.client));
+    await opens(ctx.client, a);
     const app = await appAt(ctx.client);
     const { headers } = await signInAs(ctx.client, a);
     await added(await relax(app, headers, SET_ASIDE));
@@ -914,7 +1079,7 @@ describe("a deal-breaker on distance through the night (#514, ADR-061 §7)", () 
     expect(RelaxationUndone.parse(await undone.json()).removed).toEqual([1]);
     expect(await roundOf(ctx.client, a)).toEqual([]);
 
-    await buildRounds(await deps(ctx.client, NEXT_NIGHT));
+    await opens(ctx.client, a, NEXT_NOON);
     expect(await roundOf(ctx.client, a, NEXT_DAY)).toEqual([]);
   });
 
@@ -922,19 +1087,14 @@ describe("a deal-breaker on distance through the night (#514, ADR-061 §7)", () 
     const { a, men } = await nearbyOnly(ctx, "test-distance-like", [HOMES.close]);
     const [b] = men;
     if (!b) throw new Error("people not written");
-    await buildRounds(await deps(ctx.client));
+    await opens(ctx.client, a);
     const app = await appAt(ctx.client);
     const { headers } = await signInAs(ctx.client, a);
     const [card] = await added(await relax(app, headers, SET_ASIDE));
     if (!card) throw new Error("nothing added");
-    const liked = await app.request(`/rounds/${DAY}/entries/${card.position}/decision`, {
-      method: "PUT",
-      headers: jsonHeaders(headers),
-      body: JSON.stringify({ decision: "like" }),
-    });
-    expect(liked.status).toBe(200);
+    expect((await decide(app, headers, card.position, "like")).status).toBe(200);
 
-    await buildRounds(await deps(ctx.client, NEXT_NIGHT));
+    await opens(ctx.client, b, NEXT_NOON);
 
     expect(await roundOf(ctx.client, b, NEXT_DAY)).toEqual([
       { candidate_id: a, reason: "liked_you", relaxed_field: null },
@@ -944,7 +1104,7 @@ describe("a deal-breaker on distance through the night (#514, ADR-061 §7)", () 
   test("A card never says that its person did not answer a distance", async ({ ctx }) => {
     const { a, men } = await nearbyOnly(ctx, "test-distance-card", [HOMES.nearby]);
     const [b] = men;
-    await buildRounds(await deps(ctx.client));
+    await opens(ctx.client, a);
     const app = await appAt(ctx.client);
     const { headers } = await signInAs(ctx.client, a);
 
@@ -973,7 +1133,7 @@ describe("a deal-breaker on distance through the night (#514, ADR-061 §7)", () 
     await openPond(ctx.client, pond);
     await shownBefore(ctx.client, waited, a, 1, "like");
     await shownBefore(ctx.client, a, seen, 45, null);
-    await buildRounds(await deps(ctx.client));
+    await opens(ctx.client, a);
     const app = await appAt(ctx.client);
     const { headers } = await signInAs(ctx.client, a);
     await added(await relax(app, headers, ASIDE));
@@ -1026,7 +1186,7 @@ describe("the routes' edges", () => {
     "a relaxation with %s is refused before anything is read",
     async ([, body], { ctx }) => {
       const { a } = await pondWith(ctx, "test-short-invalid", [{ fields: {}, count: 1 }]);
-      await buildRounds(await deps(ctx.client));
+      await opens(ctx.client, a);
       const app = await appAt(ctx.client);
       const { headers } = await signInAs(ctx.client, a);
 
@@ -1041,7 +1201,7 @@ describe("the routes' edges", () => {
     ctx,
   }) => {
     const { a } = await pondWith(ctx, "test-short-days", [{ fields: {}, count: 1 }]);
-    await buildRounds(await deps(ctx.client));
+    await opens(ctx.client, a);
     const later = await appAt(ctx.client, new Date("2026-10-21T09:00:00.000Z"));
     const { headers } = await signInAs(ctx.client, a);
 
@@ -1086,7 +1246,7 @@ describe("the routes' edges", () => {
       if (!a) throw new Error("A not written");
       await dealBreaker(ctx.client, a, "smoking", ["never"], includeUnknown);
       await openPond(ctx.client, pond);
-      await buildRounds(await deps(ctx.client));
+      await opens(ctx.client, a);
       const app = await appAt(ctx.client);
       const { headers } = await signInAs(ctx.client, a);
       const before = await roundOf(ctx.client, a);
@@ -1103,12 +1263,10 @@ describe("the routes' edges", () => {
   test("a round that is not short offers nothing, and a relaxation that finds nobody adds no card", async ({
     ctx,
   }) => {
-    await setConfig(ctx.client, "round_size", 1);
     const { a } = await pondWith(ctx, "test-short-full", [
-      { fields: { smoking: "never" }, count: 1 },
-      { fields: {}, count: 1 },
+      { fields: { smoking: "never" }, count: QUEUE_PAGE + 1 },
     ]);
-    await buildRounds(await deps(ctx.client));
+    await opens(ctx.client, a);
     const app = await appAt(ctx.client);
     const { headers } = await signInAs(ctx.client, a);
 
@@ -1130,7 +1288,7 @@ describe("the routes' edges", () => {
     // A second deal-breaker A answered, and a third on languages, which A did not: paused.
     await dealBreaker(ctx.client, a, "hasKids", ["yes_with_me"], false);
     await dealBreaker(ctx.client, a, "languages", ["fi"], false);
-    await buildRounds(await deps(ctx.client));
+    await opens(ctx.client, a);
     const app = await appAt(ctx.client);
     const { headers } = await signInAs(ctx.client, a);
     await added(await relax(app, headers, UNANSWERED));
@@ -1145,12 +1303,12 @@ describe("the routes' edges", () => {
     ]);
   });
 
-  test("a relaxation that runs out the day's cards is kept, its cards in the round, and says so with the wait", async ({
+  test("a relaxation past a ceiling set in the panel is kept, its cards in the round, and says so with the wait", async ({
     ctx,
   }) => {
     const { a } = await pondWith(ctx, "test-short-card-budget", [{ fields: {}, count: 2 }]);
-    await buildRounds(await deps(ctx.client));
-    await setConfig(ctx.client, "exposure_cards_per_day", 0);
+    await opens(ctx.client, a);
+    await setConfig(ctx.client, "exposure_cards_per_day", 1);
     const app = await appAt(ctx.client);
     const { headers } = await signInAs(ctx.client, a);
 
@@ -1164,7 +1322,7 @@ describe("the routes' edges", () => {
 
   test("the routes take the clock of the day when the app is given none", async ({ ctx }) => {
     const { a } = await pondWith(ctx, "test-short-clock", [{ fields: {}, count: 1 }]);
-    await buildRounds(await deps(ctx.client));
+    await opens(ctx.client, a);
     const { headers } = await signInAs(ctx.client, a);
     // The harness's app passes no now, so the routes read the clock: frozen at noon of the round's day.
     vi.useFakeTimers({ toFake: ["Date"] });
@@ -1186,7 +1344,7 @@ describe("the routes' edges", () => {
     ["DELETE", "/rounds/today/relaxations/smoking"],
   ] as const)("%s %s is refused before anything is read", async ([method, path], { ctx }) => {
     const { a } = await pondWith(ctx, "test-short-params", [{ fields: {}, count: 1 }]);
-    await buildRounds(await deps(ctx.client));
+    await opens(ctx.client, a);
     const app = await appAt(ctx.client);
     const { headers } = await signInAs(ctx.client, a);
 
@@ -1205,7 +1363,7 @@ describe("the routes' edges", () => {
     ctx,
   }) => {
     const { a } = await pondWith(ctx, "test-short-paused-owner", [{ fields: {}, count: 2 }]);
-    await buildRounds(await deps(ctx.client));
+    await opens(ctx.client, a);
     await ctx.client.query("UPDATE account SET state = 'paused' WHERE id = $1", [a]);
     const app = await appAt(ctx.client);
     const { headers } = await signInAs(ctx.client, a);
@@ -1217,7 +1375,7 @@ describe("the routes' edges", () => {
 
   test("undoing what was not relaxed today is not found", async ({ ctx }) => {
     const { a } = await pondWith(ctx, "test-short-undo-none", [{ fields: {}, count: 1 }]);
-    await buildRounds(await deps(ctx.client));
+    await opens(ctx.client, a);
     const app = await appAt(ctx.client);
     const { headers } = await signInAs(ctx.client, a);
 
@@ -1233,7 +1391,8 @@ describe("the routes' edges", () => {
     if (!other) throw new Error("other not written");
     await dealBreaker(ctx.client, other, "smoking", ["never"], false);
     await openPond(ctx.client, pond);
-    await buildRounds(await deps(ctx.client));
+    await opens(ctx.client, a);
+    await opens(ctx.client, other);
     const app = await appAt(ctx.client);
     const { headers } = await signInAs(ctx.client, a);
     const theirs = await roundOf(ctx.client, other);
@@ -1248,7 +1407,7 @@ describe("the routes' edges", () => {
 
   test("the person's export names the field a relaxed card came in by", async ({ ctx }) => {
     const { a } = await pondWith(ctx, "test-short-export", [{ fields: {}, count: 1 }]);
-    await buildRounds(await deps(ctx.client));
+    await opens(ctx.client, a);
     const app = await appAt(ctx.client);
     const { headers } = await signInAs(ctx.client, a);
     await added(await relax(app, headers, UNANSWERED));

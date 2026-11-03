@@ -19,9 +19,9 @@ import * as repo from "./repo.ts";
  * no event (rules/api.md).
  */
 
-export const EMAIL_CODE_MINUTES_KEY = "email_code_minutes";
-export const EMAIL_CODE_ATTEMPTS_KEY = "email_code_attempts";
-export const EMAIL_CODES_PER_DAY_KEY = "email_codes_per_day";
+const EMAIL_CODE_MINUTES_KEY = "email_code_minutes";
+const EMAIL_CODE_ATTEMPTS_KEY = "email_code_attempts";
+const EMAIL_CODES_PER_DAY_KEY = "email_codes_per_day";
 
 /** Six digits from a number below a million, zeros in front. */
 export const codeOf = (n: number): string => String(n).padStart(EMAIL_CODE_LENGTH, "0");

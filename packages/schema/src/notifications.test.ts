@@ -28,21 +28,23 @@ const notice = {
 };
 
 describe("the notification choices", () => {
-  it("are four kinds, in the order Settings lists them", () => {
-    expect(NotificationKind.options).toEqual(["round", "message", "match", "moderation"]);
+  it("are three kinds, in the order Settings lists them", () => {
+    expect(NotificationKind.options).toEqual(["message", "match", "moderation"]);
     expect(NotificationKindParams.parse({ kind: "match" })).toEqual({ kind: "match" });
     expect(codes(NotificationKindParams, { kind: "push" })).toEqual(["invalid_value"]);
+    // The round's went with its push (ADR-062 §12).
+    expect(codes(NotificationKindParams, { kind: "round" })).toEqual(["invalid_value"]);
   });
 
   it("take a boolean and nothing else", () => {
     expect(PutNotificationChoice.parse({ enabled: false })).toEqual({ enabled: false });
     expect(codes(PutNotificationChoice, { enabled: "no" })).toEqual(["invalid_type"]);
     expect(codes(PutNotificationChoice, {})).toEqual(["invalid_type"]);
-    expect(codes(PutNotificationChoice, { enabled: true, kind: "round" })).toEqual([
+    expect(codes(PutNotificationChoice, { enabled: true, kind: "match" })).toEqual([
       "unrecognized_keys",
     ]);
     const all = NotificationKind.options.map((kind) => ({ kind, enabled: true }));
-    expect(NotificationChoices.parse({ choices: all }).choices).toHaveLength(4);
+    expect(NotificationChoices.parse({ choices: all }).choices).toHaveLength(3);
     expect(codes(NotificationChoices, { choices: [...all, all[0]] })).toEqual(["too_big"]);
   });
 });
@@ -133,13 +135,14 @@ describe("a device's push token", () => {
 
 describe("a push's data", () => {
   it("names its kind and nothing else", () => {
-    for (const kind of ["message", "match", "round"] as const) {
+    for (const kind of ["message", "match"] as const) {
       expect(PushData.parse({ kind })).toEqual({ kind });
     }
   });
 
   it("refuses an unknown kind and anything besides the kind: a conversation, a text, a name", () => {
     expect(codes(PushData, { kind: "moderation" })).toEqual(["invalid_value"]);
+    expect(codes(PushData, { kind: "round" })).toEqual(["invalid_value"]);
     expect(codes(PushData, {})).toEqual(["invalid_value"]);
     // Both people's phones would carry the same conversation id (the maintainer's of 25/10/2026).
     expect(

@@ -94,6 +94,7 @@ const detail = (over: Partial<ConversationDetail> = {}): ConversationDetail => (
   counterpart: { deleted: false, name: "Sanna", age: 31, thumb: null },
   lastMessage: null,
   unread: 0,
+  yourTurn: true,
   limits: { maxLength: 30 },
   counterpartReadUpTo: 0,
   contacts: { mine: [], theirs: [] },

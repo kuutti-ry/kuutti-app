@@ -3,10 +3,9 @@ import type { RoundChoice, RoundReason } from "@kuutti/schema";
 import { useFocusEffect, useRouter } from "expo-router";
 import Fish from "lucide-react-native/icons/fish";
 import Undo2 from "lucide-react-native/icons/undo-2";
-import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
+import { type ReactNode, useCallback, useRef, useState } from "react";
 import {
   AccessibilityInfo,
-  Platform,
   ScrollView,
   type Text as TextNode,
   useWindowDimensions,
@@ -18,7 +17,7 @@ import { ScreenHeader } from "@/components/ScreenHeader";
 import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
 import { Text } from "@/components/ui/text";
-import { fieldLabelKey, ProfileCardView } from "@/features/profile";
+import { fieldLabelKey, ProfileCardView, SEEK_PATH, useSpokenOnIos } from "@/features/profile";
 import { useDecisionButtons } from "@/lib/decision-buttons";
 import { useT } from "@/lib/locale";
 import { cn } from "@/lib/utils";
@@ -40,6 +39,7 @@ const REASON: Readonly<Record<RoundReason, PlainMessageKey>> = {
 const REVISIT: Readonly<Record<RoundChoice, PlainMessageKey>> = {
   like: "round.revisit.like",
   pass: "round.revisit.pass",
+  skip: "round.revisit.skip",
   fish: "round.revisit.fish",
 };
 
@@ -57,26 +57,29 @@ const ANSWERS_A_LIKE: ReadonlySet<RoundReason> = new Set(["liked_you", "fish"]);
 const WORDLESS_UNDO_FONT_SCALE = 1.3;
 
 /**
- * Today's round (#379, ADR-034): one card at a time through the card others
- * see (#47), with why it is there above it, and Block or report on it
- * (ADR-030 §11). Like and pass are buttons at the bottom, never a swipe: pass
- * an outlined rectangle at the left, like a filled pill at the right, each
- * with its word and its icon, no red and green; the fish (#378), a like with
- * a mark, a filled rounded square above them, on a card that answers nobody's
- * like, while a fish can go today and on the card that holds it (#475): once
- * the week's is sent it is left out, as on a liked-you card, and nothing says
- * when the next comes, which is Monday's (the maintainer's of 29/10/2026).
- * Beside them the bar says in words how many of the day's likes are left
- * (#524). Undo in the header brings the last card back. Where they sit is the
- * person's (#82): for the right hand as above, or mirrored for the left; and
- * one-handed, Undo, the fish, Pass and Like in one column at the bottom on
- * that side, Undo brought down from the header, within a thumb's reach. A like that
- * makes a match says so and leads to the conversation. The end of the round,
- * an empty one and one not built say to come back tomorrow, with no count
- * and no countdown, and nothing loads more; the end of a short round offers
- * to relax a deal-breaker for today (#99, ADR-042), each relaxed card says
- * the deal-breaker it came in by and undoes it in one tap, and every card
- * names the person's deal-breakers its person did not answer.
+ * The queue (#379, #502, ADR-034, ADR-062): one card at a time through the card
+ * others see (#47), with why it is there above it, and Block or report on it
+ * (ADR-030 §11), as far as the person likes, to the end of who fits them. Like
+ * and pass are buttons at the bottom, never a swipe: pass an outlined rectangle
+ * at the left, like a filled pill at the right, each with its word and its
+ * icon, no red and green; the fish (#378), a like with a mark, a filled rounded
+ * square above them, on a card that answers nobody's like, while a fish can go
+ * today and on the card that holds it (#475): once the week's is sent it is
+ * left out, as on a liked-you card, and nothing says when the next comes, which
+ * is Monday's (the maintainer's of 29/10/2026). Later, a text button beside the
+ * fish, moves on and costs nobody anything (ADR-062 §3). Beside them the bar
+ * says in words how many of the day's likes are left (#524). Undo in the header
+ * brings the last card back. Where they sit is the person's (#82): for the
+ * right hand as above, or mirrored for the left; and one-handed, Undo, the fish,
+ * Later, Pass and Like in one column at the bottom on that side, Undo brought
+ * down from the header, within a thumb's reach. A like that makes a match says
+ * so and leads to the conversation; one refused over the conversations waiting
+ * says how many, and the card stays (ADR-062 §5). The queue's end says so, with
+ * no count and nothing about tomorrow, which in a thin set would be false for a
+ * month; then what may be relaxed for today (#99, ADR-042), and one plain way
+ * into What you seek, the same words for everybody (ADR-062 §11). Each relaxed
+ * card says the deal-breaker it came in by and undoes it in one tap, and every
+ * card names the person's deal-breakers its person did not answer.
  *
  * As a card, the end or a match takes the place of what had the focus, the
  * screen reader is taken to its first line; a notice is spoken where it
@@ -111,11 +114,17 @@ export function RoundScreen() {
   const focus = useCallback((node: TextNode | null) => {
     if (node) AccessibilityInfo.sendAccessibilityEvent(node, "focus");
   }, []);
-  const words = notice === null ? null : t(notice);
-  // iOS has no live regions; Android's speak the same words already.
-  useEffect(() => {
-    if (words !== null && Platform.OS === "ios") AccessibilityInfo.announceForAccessibility(words);
-  }, [words]);
+  const words =
+    notice === null
+      ? null
+      : typeof notice === "string"
+        ? t(notice)
+        : t("round.yourTurn.refused", notice);
+  useSpokenOnIos(words);
+  // A read past the last card takes the place of the button the focus was on, and
+  // one that fails does: iOS has no live region for either line to speak through.
+  useSpokenOnIos(round.readingOn ? t("round.loading") : null);
+  useSpokenOnIos(view.status === "failed" ? t("round.failed") : null);
 
   const entries = view.status === "ready" ? view.round.entries : undefined;
   const entry = current?.entry;
@@ -177,7 +186,6 @@ export function RoundScreen() {
           </Text>
         )}
         {entries === null && <Text ref={focus}>{t("round.none")}</Text>}
-        {entries?.length === 0 && <Text ref={focus}>{t("round.empty")}</Text>}
         {match !== null && (
           <View className="gap-4">
             <Text ref={focus} variant="h2" accessibilityLiveRegion="polite">
@@ -264,17 +272,26 @@ export function RoundScreen() {
             )}
           </View>
         )}
-        {match === null && !entry && entries && entries.length > 0 && (
-          <Text ref={focus}>{t("round.done")}</Text>
-        )}
-        {/* A short or empty round's end offers to relax a deal-breaker for today (#99, ADR-042), after the line the reader is taken to. */}
+        {/* The queue's end (ADR-062 §11): the line the reader is taken to, what may be relaxed for today (#99, ADR-042), and the same way into What you seek for everybody. */}
         {match === null && !entry && entries && view.status === "ready" && (
-          <ShortPool
-            day={view.round.day}
-            busy={round.busy}
-            onRelax={(relaxation) => round.relax(view.round.day, relaxation)}
-            onUndo={(field) => round.unrelax(view.round.day, field)}
-          />
+          <>
+            <Text ref={focus}>{t("round.done")}</Text>
+            <ShortPool
+              day={view.round.day}
+              busy={round.busy}
+              onRelax={(relaxation) => round.relax(view.round.day, relaxation)}
+              onUndo={(field) => round.unrelax(view.round.day, field)}
+            />
+            <Button
+              variant="outline"
+              onPress={() => {
+                tap();
+                router.push(SEEK_PATH);
+              }}
+            >
+              {t("profile.seek.title")}
+            </Button>
+          </>
         )}
       </ScrollView>
       {match === null && current && view.status === "ready" && (
@@ -291,7 +308,7 @@ export function RoundScreen() {
         />
       )}
       {/* One-handed, Undo stays at the thumb when no card is left to decide:
-          after the round's last decision it can still be taken back (ADR-034 §5). */}
+          after the queue's last decision it can still be taken back (ADR-034 §5). */}
       {match === null && !current && placement.oneHanded && undo && (
         <View className="border-t border-border bg-background px-6 py-3">
           <View
@@ -307,15 +324,19 @@ export function RoundScreen() {
 }
 
 /**
- * Like, Pass and the fish at the bottom of the round (#82): in a row for the
- * right hand (Pass, Like) or mirrored for the left, the fish above on the
- * hand's side; one-handed, a column on that side, Undo first and Like last,
- * nearest the thumb. Each keeps its shape, word and icon wherever it sits.
+ * Like, Pass, Later and the fish at the bottom of the queue (#82): in a row for
+ * the right hand (Pass, Like) or mirrored for the left, the fish and Later above
+ * on the hand's side; one-handed, a column on that side, Undo first and Like
+ * last, nearest the thumb. Each keeps its shape, word and icon wherever it sits.
  * The fish is there while one can go today, and on the card that holds it,
- * read back selected and open to change (#475). How many of the day's likes
- * are left is plain text beside the fish, above it where the two do not fit
- * on one row, the same at ten as at one: no colour, no motion, and nothing
- * announces it after a decision (#524).
+ * read back selected and open to change (#475). Later is there on every card,
+ * a text button with no fill and no outline, plainer than the two that decide:
+ * it spends nothing and answers nobody (ADR-062 §3), and a wide word in the row
+ * of two would take their room, so it sits with the fish and wraps with it, never
+ * on a line of its own while there is room beside the fish. How many of the
+ * day's likes are left is plain text beside those two, above them where they do
+ * not fit on one row, the same at ten as at one: no colour, no motion, and
+ * nothing announces it after a decision (#524).
  */
 function DecisionBar({
   card,
@@ -362,6 +383,18 @@ function DecisionBar({
       <Text>{t("round.fish")}</Text>
     </Button>
   );
+  const later = (
+    <Button
+      variant="ghost"
+      className={cn(oneHanded && "w-full")}
+      disabled={busy}
+      accessibilityLabel={t("round.skip")}
+      accessibilityState={{ selected: entry.decision === "skip" }}
+      onPress={() => onChoose(card, "skip")}
+    >
+      {t("round.skip")}
+    </Button>
+  );
   const pass = (
     <Button
       key="pass"
@@ -401,6 +434,7 @@ function DecisionBar({
           {undo}
           {likes}
           {fish}
+          {later}
           {pass}
           {like}
         </View>
@@ -414,7 +448,15 @@ function DecisionBar({
             )}
           >
             {likes}
-            {fish}
+            <View
+              className={cn(
+                "flex-row flex-wrap items-center justify-end gap-x-4 gap-y-3",
+                left && "flex-row-reverse",
+              )}
+            >
+              {fish}
+              {later}
+            </View>
           </View>
           <View className="flex-row gap-4">{left ? [like, pass] : [pass, like]}</View>
         </>

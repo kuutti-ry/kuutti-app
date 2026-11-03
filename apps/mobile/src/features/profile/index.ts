@@ -17,7 +17,7 @@ export { ProfileScreen } from "./ProfileScreen";
 export { PromptsEditor } from "./PromptsEditor";
 export { SectionScreen } from "./SectionScreen";
 export { SeekAgesScreen } from "./seek/SeekAgesScreen";
-export { SeekScreen } from "./seek/SeekScreen";
+export { SEEK_PATH, SeekScreen } from "./seek/SeekScreen";
 export { SeeksChips } from "./seek/SeeksChips";
 export { SeekWhomScreen } from "./seek/SeekWhomScreen";
 export { useProfile } from "./useProfile";

@@ -735,7 +735,7 @@ describe("taking a photo down on a person's page", () => {
     show();
     const step = await openStep();
     const words =
-      "This leaves them fewer than 2 approved photos: until another is approved, nobody is shown their card and they get no round.";
+      "This leaves them fewer than 2 approved photos: until another is approved, nobody is shown their card and they read no queue.";
     if (says) expect(step).toHaveTextContent(words);
     else expect(step).not.toHaveTextContent("fewer than");
   });

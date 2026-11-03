@@ -637,7 +637,7 @@ describe("OnboardingScreen", () => {
     const { server, calls } = fakeApi();
     await show(<OnboardingScreen />);
     await waitFor(() => expect(screen.getByText("How we do things here")).toBeTruthy());
-    expect(screen.getByText(/One round a day/)).toBeTruthy();
+    expect(screen.getByText(/Nothing here is for sale/)).toBeTruthy();
     expect(screen.getByText("Terms of use")).toBeTruthy();
     expect(screen.getByText("Privacy")).toBeTruthy();
     // English is a translation: the Finnish text is the binding one.

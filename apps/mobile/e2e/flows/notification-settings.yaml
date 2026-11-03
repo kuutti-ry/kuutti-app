@@ -28,19 +28,19 @@ name: The messages switch in Settings, Notifications, goes off, is kept on the s
     timeout: 15000
 # A switch's text, to Maestro, is its value ("0" off, "1" on) on iOS, and its
 # words with its state on Android. Every switch sits at the right edge, so the
-# Messages switch is found between the round's line and its own, not by
-# rightOf, which compares x alone and would take any switch.
+# Messages switch, the first, is found between the phone's line and its own, not
+# by rightOf, which compares x alone and would take any switch.
 - extendedWaitUntil:
     visible:
       text: "1|(Messages|Viestit|Meddelanden), on"
-      below: "When the day's people are ready for you\\.|Kun päivän ihmiset ovat valmiina sinulle\\.|När dagens personer är redo för dig\\."
+      below: "This phone has not been asked yet whether Kuutti may notify it\\.|Tältä puhelimelta ei ole vielä kysytty, saako Kuutti lähettää sille ilmoituksia\\.|Den här telefonen har inte frågats än om Kuutti får skicka aviseringar till den\\."
       above: "That there is a new message, never what it says or who sent it\\.|Että sinulle on uusi viesti, ei koskaan mitä siinä lukee tai kuka sen lähetti\\.|Att det finns ett nytt meddelande, aldrig vad det säger eller vem som skickade det\\."
     timeout: 15000
 - tapOn: "Messages|Viestit|Meddelanden"
 - extendedWaitUntil:
     visible:
       text: "0|(Messages|Viestit|Meddelanden), off"
-      below: "When the day's people are ready for you\\.|Kun päivän ihmiset ovat valmiina sinulle\\.|När dagens personer är redo för dig\\."
+      below: "This phone has not been asked yet whether Kuutti may notify it\\.|Tältä puhelimelta ei ole vielä kysytty, saako Kuutti lähettää sille ilmoituksia\\.|Den här telefonen har inte frågats än om Kuutti får skicka aviseringar till den\\."
       above: "That there is a new message, never what it says or who sent it\\.|Että sinulle on uusi viesti, ei koskaan mitä siinä lukee tai kuka sen lähetti\\.|Att det finns ett nytt meddelande, aldrig vad det säger eller vem som skickade det\\."
     timeout: 15000
 - assertNotVisible: "The change was not saved\\. Try again\\.|Muutosta ei tallennettu\\. Yritä uudelleen\\.|Ändringen sparades inte\\. Försök igen\\."
@@ -60,14 +60,14 @@ name: The messages switch in Settings, Notifications, goes off, is kept on the s
 - extendedWaitUntil:
     visible:
       text: "0|(Messages|Viestit|Meddelanden), off"
-      below: "When the day's people are ready for you\\.|Kun päivän ihmiset ovat valmiina sinulle\\.|När dagens personer är redo för dig\\."
+      below: "This phone has not been asked yet whether Kuutti may notify it\\.|Tältä puhelimelta ei ole vielä kysytty, saako Kuutti lähettää sille ilmoituksia\\.|Den här telefonen har inte frågats än om Kuutti får skicka aviseringar till den\\."
       above: "That there is a new message, never what it says or who sent it\\.|Että sinulle on uusi viesti, ei koskaan mitä siinä lukee tai kuka sen lähetti\\.|Att det finns ett nytt meddelande, aldrig vad det säger eller vem som skickade det\\."
     timeout: 15000
 - tapOn: "Messages|Viestit|Meddelanden"
 - extendedWaitUntil:
     visible:
       text: "1|(Messages|Viestit|Meddelanden), on"
-      below: "When the day's people are ready for you\\.|Kun päivän ihmiset ovat valmiina sinulle\\.|När dagens personer är redo för dig\\."
+      below: "This phone has not been asked yet whether Kuutti may notify it\\.|Tältä puhelimelta ei ole vielä kysytty, saako Kuutti lähettää sille ilmoituksia\\.|Den här telefonen har inte frågats än om Kuutti får skicka aviseringar till den\\."
       above: "That there is a new message, never what it says or who sent it\\.|Että sinulle on uusi viesti, ei koskaan mitä siinä lukee tai kuka sen lähetti\\.|Att det finns ett nytt meddelande, aldrig vad det säger eller vem som skickade det\\."
     timeout: 15000
 - assertNotVisible: "The change was not saved\\. Try again\\.|Muutosta ei tallennettu\\. Yritä uudelleen\\.|Ändringen sparades inte\\. Försök igen\\."

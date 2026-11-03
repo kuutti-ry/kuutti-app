@@ -1,6 +1,6 @@
 # ADR-032: Notification choices and the notices in the app
 
-- Status: accepted 2026-10-18 (#176, built as written here on the maintainer's decisions of that day, #176's comment; the points under "Open, the maintainer's" are his to confirm or change), amended 2026-10-22 (§2 and §7: a second kind, an invitation that counted, #107, ADR-044 §9) and 2026-10-25 (§4: the push and the phone's line came with #102, ADR-055; see History)
+- Status: accepted 2026-10-18 (#176, built as written here on the maintainer's decisions of that day, #176's comment; the points under "Open, the maintainer's" are his to confirm or change), amended 2026-10-22 (§2 and §7: a second kind, an invitation that counted, #107, ADR-044 §9) and 2026-10-25 (§4: the push and the phone's line came with #102, ADR-055; see History); amended 2026-11-01 by ADR-062 (§1 and §4: the `round` kind and its switch go, the maintainer's word of that day, #502; see History)
 - Date: 2026-10-18
 - Follows: TD-3 (one box, push through Expo), TD-18 (notifications), TD-7 (erasure), ADR-007 §3 and §4 (export and erasure), ADR-022 §6 (Settings), ADR-024 §7 (a warning's notice is #176's), CLAUDE.md rule 6 and Product constraints (no real-time engagement push); issues #176, #102, #101, #184, #312
 
@@ -43,3 +43,4 @@
 - 2026-10-18: written with #176: the choices, the notices, a warning's notice, erasure and the export; the permission line left to #102.
 - 2026-10-22 (#107, ADR-044 §9): a second kind of notice, `invitation_counted`, written by the night's count of invitations: §2 names it and §7 says how it is written and read; `Notice` became a union by kind.
 - 2026-10-25 (#102, ADR-055): the push exists: the round, message and match switches are read by its senders, and Settings › Notifications says whether the phone lets Kuutti notify, with the way to the phone's settings, or the phone's own question while it was never asked (§4 amended). The opening line no longer says that nothing is sent.
+- 2026-11-01 (#502, ADR-062 §12, the maintainer's word of that day): the round's push goes, and with it §1's `round` kind of `notification_kind` and its switch (migrations 0102 and 0103); a row left on it was deleted first. `notification_kind` is `message | match | moderation`, and §4's push reads the message and match switches.

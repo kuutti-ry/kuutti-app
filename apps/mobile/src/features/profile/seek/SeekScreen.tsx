@@ -38,9 +38,10 @@ function useDealBreakers(): [readonly StoredDealBreaker[] | null, () => void] {
  * What a person seeks, as a list of its own (#542), built like the profile's
  * and the settings': each row its answer under onboarding's own question,
  * opening a screen of its own, and nothing edited here. Every answer is a
- * filter both ways, which the line at the top says, naming no moment: today's
- * cards stand until the next round (ADR-034 Open 5). Reached from the profile
- * alone, not Home. The list reads everything again when a screen hands back.
+ * filter both ways, which the line at the top says, naming no moment: a change
+ * works on the next read (ADR-062 §8). Reached from the profile and from the
+ * queue's end (§11), not Home, so its way back names neither. The list reads
+ * everything again when a screen hands back.
  */
 export function SeekScreen() {
   const { t } = useT();
@@ -112,7 +113,7 @@ export function SeekScreen() {
     <SafeAreaView className="flex-1 bg-background">
       <ScreenHeader
         title={t("profile.seek.title")}
-        backLabel={t("profile.section.back")}
+        backLabel={t("profile.back")}
         onBack={() => router.back()}
       />
       <ScrollView contentContainerClassName="flex-grow gap-6 p-6">

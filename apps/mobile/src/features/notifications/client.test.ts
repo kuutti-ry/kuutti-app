@@ -12,7 +12,6 @@ const refusal = (code: string, status: number) =>
   json({ error: { code, message: "x", requestId: "r" } }, status);
 const CHOICES = {
   choices: [
-    { kind: "round", enabled: true },
     { kind: "message", enabled: false },
     { kind: "match", enabled: true },
     { kind: "moderation", enabled: true },

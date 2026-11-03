@@ -95,7 +95,7 @@ export function HomeScreen() {
             {/* What must reach the person even without a push, unread, first (#176). */}
             <Notices />
             {/* How many people are on Kuutti (#54), and whether matching is open for the person
-                (#500); once it is, the way to today's round (#379) and the one offer of
+                (#500); once it is, the way to the queue (#379) and the one offer of
                 notifications, since now there is something to tell (#102, ADR-055 §9). */}
             <PondCard />
             <GateCard

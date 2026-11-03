@@ -12,7 +12,7 @@ import { useGate } from "./useGate";
  * each of three things: the profile lacks something, it is finished and
  * matching has not opened, or open. No number and nothing that can be tapped to
  * move ahead. Once matching is open, the card carries what the home screen
- * hands it for that: the way to today's round (#379).
+ * hands it for that: the way to the queue (#379, ADR-062).
  */
 export function GateCard({ whenOpen }: { whenOpen?: ReactNode }) {
   const { t } = useT();

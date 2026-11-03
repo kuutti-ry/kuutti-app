@@ -132,6 +132,8 @@ export const ConversationSummary = z
     lastMessage: LastMessage.nullable(),
     /** The counterpart's messages the caller has not read. */
     unread: z.int().min(0),
+    /** Whether it waits on the caller's answer (ADR-062 §5): open and not archived, and the last thing said came from the other person, or nothing has been said. */
+    yourTurn: z.boolean(),
   })
   .meta({ id: "ConversationSummary" });
 export type ConversationSummary = z.infer<typeof ConversationSummary>;
@@ -146,11 +148,23 @@ export const ConversationListQuery = z
   .meta({ id: "ConversationListQuery" });
 export type ConversationListQuery = z.infer<typeof ConversationListQuery>;
 
+/**
+ * The conversations on the caller's turn against the limit (ADR-062 §5): at
+ * `limit` they can make no new match, and from `warning` the list says so.
+ * Their own conversations; nothing about anybody else.
+ */
+export const YourTurnCount = z
+  .object({ waiting: z.int().min(0), limit: z.int().min(0), warning: z.int().min(0) })
+  .strict()
+  .meta({ id: "YourTurnCount" });
+export type YourTurnCount = z.infer<typeof YourTurnCount>;
+
 /** The list: each group newest first, by the last message or, before one, by the opening. */
 export const ConversationList = z
   .object({
     open: z.array(ConversationSummary).max(CONVERSATIONS_MAX),
     archived: z.array(ConversationSummary).max(CONVERSATIONS_MAX),
+    yourTurn: YourTurnCount,
   })
   .meta({ id: "ConversationList" });
 export type ConversationList = z.infer<typeof ConversationList>;

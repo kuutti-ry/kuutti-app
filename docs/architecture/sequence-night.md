@@ -3,17 +3,16 @@
 <!-- draws
 apps/api/src/jobs/nightly.ts
 apps/api/src/boot.ts
-apps/api/src/jobs/round-push.ts
 infra/modules/observability/
 -->
 
-What the API does at night, from the system's side: the timer that runs inside the API's own process at 04:00 in Helsinki, the fourteen jobs it runs one after another, what each reads and writes, and how a failed job reaches the maintainer's mailbox through the log and an alarm. It is written for a contributor who adds or changes a job, and for whoever answers the alarm. There is no cron and no second process: the jobs are listed in the API's boot and run by a timer in the same process as HTTP and the socket. This view draws ADR-006 §2, ADR-011 §6 and §9, ADR-013, ADR-015, ADR-024 §5, ADR-029, ADR-030 §8, ADR-031 §8, ADR-035 and ADR-044 §7.
+What the API does at night, from the system's side: the timer that runs inside the API's own process at 04:00 in Helsinki, the fourteen jobs it runs one after another, what each reads and writes, and how a failed job reaches the maintainer's mailbox through the log and an alarm. It is written for a contributor who adds or changes a job, and for whoever answers the alarm. There is no cron and no second process: the jobs are listed in the API's boot and run by a timer in the same process as HTTP and the socket. This view draws ADR-006 §2, ADR-011 §6 and §9, ADR-013, ADR-015, ADR-024 §5, ADR-029, ADR-030 §8, ADR-031 §8, ADR-044 §7 and ADR-062 §1 and §13. Nothing of the queue is built at night: the first read of a Finnish day opens a person's log, and what the night does for rounds is delete those past their year.
 
 In these diagrams every arrow is built. Mermaid's sequence diagrams take a message's words as they are, so the labels are not in quotes, and they name an environment as `{env}`, staging or prod.
 
 ## The jobs, in order
 
-"Everywhere" is every process the API runs in: staging, a developer's machine, and each pull request's preview against its own database. Production runs the same list but the two jobs it holds back.
+"Everywhere" is every process the API runs in: staging, a developer's machine, and each pull request's preview against its own database. Production runs the same list but the one job it holds back.
 
 | # | Job, as the log names it | Where the work lives | Reads | Writes | Runs |
 |---|---|---|---|---|---|
@@ -25,7 +24,7 @@ In these diagrams every arrow is built. Mermaid's sequence diagrams take a messa
 | 6 | `end-suspensions` | safety | sanctions | lifts each suspension past its day, settles the account | everywhere |
 | 7 | `pond-counter` | jobs | accounts, profiles, photos, preferences, ponds | the day's figures per pond | everywhere |
 | 8 | `invitation-count` | rewards | invitations, accounts, consents, profiles, photos, preferences | invitations counted, the inviter's reward units, a notice | everywhere |
-| 9 | `round-builder` | jobs, written through matching | the pond's switch, accounts, profiles, photos, preferences, consents, blocks, rounds, likes, conversations | the day's round and its cards | everywhere but production |
+| 9 | `prune-rounds` | matching | rounds | deletes the rounds of days over 365 days back, their entries and relaxations with them | everywhere |
 | 10 | `reject-unreviewed-photos` | media | profile photos in the human queue | rejects those waiting past `photo_queue_reject_days` as not reviewed | everywhere |
 | 11 | `prune-photo-check-notes` | safety | the photo check's notes | deletes notes older than 365 days | everywhere |
 | 12 | `prune-reports` | safety | reports, their frozen copies, erased senders' sent photos | deletes reports older than 365 days, then the photos no copy holds, then their objects | everywhere; the objects where media is configured |
@@ -107,21 +106,19 @@ sequenceDiagram
 17. Under the partitions' lock again, each month whose first day is 90 days old or more is dropped whole: the only deletion the events table allows, so no event lives past the ninety days the research text promises (ADR-011 §6). The drop goes ahead whether or not the copy has the days.
 18. `research-anonymity` (research, ADR-011 §9): counts the distinct people in each cell of pond, age band and snapshot, over the table. A cell under k is a warning line with counts only, `research events: cells under k`; it is not a failure, and the alarm does not count it.
 
-## Part 3: the pond and the round
+## Part 3: the pond, and the rounds past their year
 
 ```mermaid
 sequenceDiagram
-  accTitle: The night's jobs, part 3: the pond and the round
-  accDescr: Suspensions past their day end first, so a person let back in is counted the same night. Then the counter's figures, the invitations whose redeemer is complete, and, outside production, the Finnish day's round for each complete person of an open pond.
+  accTitle: The night's jobs, part 3: the pond, and the rounds past their year
+  accDescr: Suspensions past their day end first, so a person let back in is counted the same night. Then the counter's figures, the invitations whose redeemer is complete, and the rounds past the year they are kept, their entries and relaxations with them.
   autonumber 19
   participant api as The API's nightly run
   participant db as PostgreSQL
   api->>db: end-suspensions. Lift each suspension past its day and settle its account, one account per transaction
   api->>db: pond-counter. Under its lock, count each pond, and move its figures when k people came or went
   api->>db: invitation-count. Count each invitation whose redeemer is complete now, give the inviter its units, write a notice
-  opt not in production
-    api->>db: round-builder. In each pond an admin has opened, write the Finnish day's round for each complete person
-  end
+  api->>db: prune-rounds. Delete the rounds of days over 365 days back, their entries and relaxations with them
 ```
 
 ### Steps
@@ -129,7 +126,7 @@ sequenceDiagram
 19. `end-suspensions` (safety, #307, ADR-024 §5): every suspension still open past its day is lifted by nobody, and its account's state settled from the sanctions still open, one account per transaction. It runs before the counts so that a person let back in is counted the same night. A login on the end day before 04:00 is still refused: a `shortcut:` in `safety/sanctions.ts`.
 20. `pond-counter` (`jobs/`, #54, ADR-013): under its own advisory lock, counts each pond: live, bank-verified accounts with a pond. A pond's figures move only when at least k people have come or gone since they were taken, and the bands of whom its finished profiles seek on their own, in every environment but production (#507). The counter's route serves the figures all day, and to a session the bands of the caller's own pond, as shares. A database with no figures gets its first ones at boot.
 21. `invitation-count` (rewards, #107, ADR-044 §7, ADR-060 §7): in one transaction, each invitation not counted yet whose redeemer's profile and onboarding are complete now is counted once; its inviter gets the units `matching_config invitation_reward` says tonight, and one notice in the app (ADR-032). Its line says how many and of what, never who.
-22. `round-builder` (`jobs/`, #95, ADR-035, ADR-060 §5): in each pond an admin has opened, each complete person gets a round for the Finnish day, written through the matching slice's one writer. The people whose like waits on the person come first (ADR-037, ADR-039). Somebody the night did not build for gets theirs at the day's first read. Not in production, by night or by read, until the maintainer has set how long rounds are kept (ADR-034 Open 2, ADR-035 Open 1): a `shortcut:` in `boot.ts` and `app.ts`. The day's round is told later, at `matching_config round_push_hour` (9 in Helsinki), by a timer of its own in the same process and not by a nightly job: one push to each person whose round was built and who has not opened it, and who opened a round within `matching_config round_push_idle_days` (7), through Expo; a failed run is tried again three times five minutes apart, the same day (#102, ADR-055 §6; [Components](components.md), step 21).
+22. `prune-rounds` (matching, #502, ADR-062 §13): the rounds of Finnish days more than 365 days back are deleted, and their entries and relaxations go with them by the cascade. The year covers the longest clock of the queue's ladder, a second pass. Nothing else is done for the round at night: `GET /rounds/today` opens a person's log at their first read of the day and adds the next people as they read (ADR-062 §1), and no push tells of it (ADR-062 §12).
 
 ## Part 4: photos, reports and silent conversations
 
@@ -173,17 +170,15 @@ sequenceDiagram
 
 ## Where it lives
 
-- The timer and the list: `apps/api/src/jobs/nightly.ts` (`msUntilNightly` over `msUntilFinnishHour`, which the round's push uses too, `runNightly`, `scheduleNightly`), `apps/api/src/boot.ts` (the jobs, in order, and the two held back in production), `apps/api/src/index.ts` (`scheduleNightly` at start)
-- The jobs: `apps/api/src/identity/sessions.ts` and `admin-session.ts`; `apps/api/src/research/copy.ts`, `copy-store.ts`, `partitions.ts`, `anonymity.ts`; `apps/api/src/safety/sanctions.ts` (`endSuspensions`), `photo-check.ts`, `reports.ts` (`pruneReports`); `apps/api/src/jobs/pond-counter.ts`, `pool.ts`, `invitation-count.ts` with `apps/api/src/rewards/invitations.ts`, `round-builder.ts` with `apps/api/src/matching/rounds.ts` (`saveRound`); `apps/api/src/media/moderation.ts` (`rejectUnreviewedPhotos`, `sweepPendingPhotos`); `apps/api/src/chat/archive.ts`
+- The timer and the list: `apps/api/src/jobs/nightly.ts` (`msUntilNightly` over `msUntilFinnishHour`, which a push's time to live uses too, `runNightly`, `scheduleNightly`), `apps/api/src/boot.ts` (the jobs, in order, and the one held back in production), `apps/api/src/index.ts` (`scheduleNightly` at start)
+- The jobs: `apps/api/src/identity/sessions.ts` and `admin-session.ts`; `apps/api/src/research/copy.ts`, `copy-store.ts`, `partitions.ts`, `anonymity.ts`; `apps/api/src/safety/sanctions.ts` (`endSuspensions`), `photo-check.ts`, `reports.ts` (`pruneReports`); `apps/api/src/jobs/pond-counter.ts`, `pool.ts`, `invitation-count.ts` with `apps/api/src/rewards/invitations.ts`; `apps/api/src/matching/rounds.ts` (`pruneRounds`); `apps/api/src/media/moderation.ts` (`rejectUnreviewedPhotos`, `sweepPendingPhotos`); `apps/api/src/chat/archive.ts`
 - The alarm: `infra/modules/observability/main.tf` (the topic, the e-mail subscription, the metric filter `nightly-failures`, the alarm `nightly-job-failed`), `infra/modules/compute/main.tf` and `templates/user_data.sh.tpl` (the log group and the `awslogs` driver), `infra/envs/staging/main.tf` and `infra/envs/prod/main.tf` (each composes it), `docs/runbooks/alerts.md`
-- Specs: `features/safety/sanctions.feature` (the night lifts a suspension), `features/pond/opening.feature`, `features/pond/counter.feature`, `features/matching/rounds.feature`, `features/media/moderation.feature`, `features/chat/conversations.feature`
-- ADRs: [ADR-006](../adr/006-photo-moderation.md) §2 and §4, [ADR-011](../adr/011-research-events.md) §6 and §9, [ADR-013](../adr/013-waitlist-counter.md), [ADR-060](../adr/060-no-waiting-at-the-pond.md), [ADR-022](../adr/022-taking-a-break.md) §4, [ADR-024](../adr/024-sanctions.md) §5, [ADR-029](../adr/029-the-research-copy.md) §1 to §6 and §12, [ADR-030](../adr/030-reports-and-blocks.md) §8 and §12, [ADR-031](../adr/031-chat.md) §8, [ADR-032](../adr/032-notification-choices-and-notices.md), [ADR-034](../adr/034-the-round-record.md), [ADR-035](../adr/035-the-round-builder-first-cut.md), [ADR-037](../adr/037-liked-you-in-the-round.md), [ADR-039](../adr/039-the-fish.md), [ADR-044](../adr/044-invitations.md) §7
-- Issues: #35, #49, #50, #54, #84, #95, #107, #194, #253, #307, #348, #351, #376, #500; the alarm #11 and #194
+- Specs: `features/safety/sanctions.feature` (the night lifts a suspension), `features/pond/opening.feature`, `features/pond/counter.feature`, `features/matching/decisions.feature`, `features/media/moderation.feature`, `features/chat/conversations.feature`
+- ADRs: [ADR-006](../adr/006-photo-moderation.md) §2 and §4, [ADR-011](../adr/011-research-events.md) §6 and §9, [ADR-013](../adr/013-waitlist-counter.md), [ADR-060](../adr/060-no-waiting-at-the-pond.md), [ADR-022](../adr/022-taking-a-break.md) §4, [ADR-024](../adr/024-sanctions.md) §5, [ADR-029](../adr/029-the-research-copy.md) §1 to §6 and §12, [ADR-030](../adr/030-reports-and-blocks.md) §8 and §12, [ADR-031](../adr/031-chat.md) §8, [ADR-032](../adr/032-notification-choices-and-notices.md), [ADR-034](../adr/034-the-round-record.md) §7, [ADR-044](../adr/044-invitations.md) §7, [ADR-062](../adr/062-one-queue.md) §1 and §13
+- Issues: #35, #49, #50, #54, #84, #107, #194, #253, #307, #348, #351, #376, #500, #502; the alarm #11 and #194
 
 ## Open
 
-- **Two jobs held back in production, the maintainer's to lift.** `round-builder` waits for how long rounds are kept (ADR-034 Open 2, ADR-035 Open 1) and for the filters to be asked on read and on `decide` (#502, #542), and `research-export` for ADR-029's ninety days. Both are `shortcut:` lines in `boot.ts`.
-- **"As cron".** `.claude/rules/api.md` says the nightly jobs run "as cron inside the same container". There is no cron: one timer in the API's process (`jobs/nightly.ts`). Drawn as the code.
-- **What `jobs/` holds.** `.claude/rules/layout.md` says `jobs/` holds the nightly runner and its jobs, "the slices' sweeps" among them. The sweeps live in their slices, `jobs/` also holds the round builder and the invitation count, and the order is `boot.ts`'s list. Drawn as `boot.ts`.
+- **One job held back in production, the maintainer's to lift.** `research-export` waits for ADR-029's ninety days, a `shortcut:` line in `boot.ts`.
 - **"Every 24 hours".** The comment at the top of `jobs/nightly.ts` says one timer to the next 04:00, then every 24 hours. The code arms the timer again for the next 04:00 after each run, so on the nights summer time begins or ends the wait is 23 or 25 hours. Drawn as the code: 04:00 in Helsinki, every night.
 - **Whether staging's export succeeds tonight.** `infra/README.md` says staging's `research-export` fails every night with AccessDenied until `modules/research` is applied; whether it has been applied is not in the repository.

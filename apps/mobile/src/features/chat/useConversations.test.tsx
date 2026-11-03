@@ -25,9 +25,11 @@ const list = (unread: number): ConversationList => ({
       counterpart: { deleted: false, name: "Sanna", age: 31, thumb: null },
       lastMessage: null,
       unread,
+      yourTurn: true,
     },
   ],
   archived: [],
+  yourTurn: { waiting: 1, limit: 8, warning: 6 },
 });
 
 /** Every read waits until the test answers it, in the order they were asked. */
@@ -105,6 +107,7 @@ describe("the list as the socket moved it", () => {
     counterpart: { deleted: false, name: "Sanna", age: 31, thumb: null },
     lastMessage: { seq: 2, at: at(1), kind: "text", preview: "Vanha", side: "theirs" },
     unread: 1,
+    yourTurn: true,
     ...over,
   });
   const liveOf = (
@@ -130,11 +133,17 @@ describe("the list as the socket moved it", () => {
   const B = "3f9a2c1e-5b7d-4f01-8a2b-1c3d4e5f6a72";
   const C = "3f9a2c1e-5b7d-4f01-8a2b-1c3d4e5f6a73";
   const D = "3f9a2c1e-5b7d-4f01-8a2b-1c3d4e5f6a74";
+  /** The count of `open` rows on the person's turn, against the seed's limit and warning. */
+  const counted = (waiting: number) => ({ waiting, limit: 8, warning: 6 });
 
   it("makes a newer message the row's last line, counts theirs as unread, brings it back from the archive and to the top, and leaves the rest as they were", () => {
     const list: ConversationList = {
       open: [row(A), row(B)],
-      archived: [row(C, { state: "archived" }), row(D, { state: "closed", closedHow: "unmatch" })],
+      archived: [
+        row(C, { state: "archived", yourTurn: false }),
+        row(D, { state: "closed", closedHow: "unmatch", yourTurn: false }),
+      ],
+      yourTurn: counted(2),
     };
     const moved = withLive(list, {
       // Older than the row's last line, and a closed conversation's: nothing.
@@ -155,7 +164,9 @@ describe("the list as the socket moved it", () => {
     });
     expect(moved.open[1]).toMatchObject({ unread: 2, lastMessage: { seq: 3, preview: "Moi" } });
     expect(moved.open[2]).toEqual(row(A));
-    expect(moved.archived[0]).toEqual(row(D, { state: "closed", closedHow: "unmatch" }));
+    expect(moved.archived[0]).toEqual(
+      row(D, { state: "closed", closedHow: "unmatch", yourTurn: false }),
+    );
   });
 
   it("makes a photo the row's last line by its caption, or by nothing for the row to call Photo, with its kind (#350)", () => {
@@ -170,7 +181,7 @@ describe("the list as the socket moved it", () => {
       photo: null,
     });
     const moved = withLive(
-      { open: [row(A), row(B)], archived: [] },
+      { open: [row(A), row(B)], archived: [], yourTurn: counted(2) },
       {
         [A]: { ...liveOf([]), messages: [photo(3, "Mökillä")] },
         [B]: { ...liveOf([]), messages: [photo(4, null)] },
@@ -186,10 +197,81 @@ describe("the list as the socket moved it", () => {
     const list: ConversationList = {
       open: [row(A, { lastMessage: null, unread: 0 })],
       archived: [],
+      yourTurn: counted(1),
     };
     const moved = withLive(list, {
       [A]: liveOf([{ seq: 1, side: "theirs", body: "", minute: 2 }]),
     });
     expect(moved.open[0]).toMatchObject({ unread: 1, lastMessage: { seq: 1, preview: "" } });
+  });
+
+  // Whose turn it is follows the last line (ADR-062 §5), and the count follows the rows.
+  it.each([
+    ["their line, on a row on the other's turn", false, "theirs", true, 2],
+    ["their line, on a row already on the person's", true, "theirs", true, 2],
+    ["the person's line, on a row on their turn", true, "mine", false, 1],
+    ["the person's line, on a row on the other's", false, "mine", false, 1],
+  ] as const)("says whose turn it is after %s", (_what, was, side, now, waiting) => {
+    const list: ConversationList = {
+      open: [row(A, { yourTurn: was }), row(B, { yourTurn: true })],
+      archived: [],
+      yourTurn: counted(was ? 2 : 1),
+    };
+    const moved = withLive(list, {
+      [A]: liveOf([{ seq: 3, side, body: "Moi", minute: 4 }]),
+    });
+    expect(moved.open.find((c) => c.id === A)?.yourTurn).toBe(now);
+    expect(moved.yourTurn).toEqual(counted(waiting));
+  });
+
+  it("goes by the last of several lines, whoever wrote those before it", () => {
+    const moved = withLive(
+      { open: [row(A, { yourTurn: false })], archived: [], yourTurn: counted(0) },
+      {
+        [A]: liveOf([
+          { seq: 3, side: "theirs", body: "Moi", minute: 4 },
+          { seq: 4, side: "mine", body: "Hei", minute: 5 },
+          { seq: 5, side: "theirs", body: "Nähdäänkö?", minute: 6 },
+        ]),
+      },
+    );
+    expect(moved.open[0]?.yourTurn).toBe(true);
+    expect(moved.yourTurn).toEqual(counted(1));
+  });
+
+  it.each([
+    ["their line", "theirs", true, 2],
+    ["the person's own", "mine", false, 1],
+  ] as const)(
+    "counts a conversation that %s brings back from the archive as a line says",
+    (_what, side, now, waiting) => {
+      const moved = withLive(
+        {
+          open: [row(A)],
+          archived: [row(C, { state: "archived", yourTurn: false })],
+          yourTurn: counted(1),
+        },
+        { [C]: liveOf([{ seq: 3, side, body: "Moi", minute: 4 }]) },
+      );
+      expect(moved.open.find((c) => c.id === C)).toMatchObject({ state: "open", yourTurn: now });
+      expect(moved.yourTurn).toEqual(counted(waiting));
+    },
+  );
+
+  it("moves no count for a line that is old news, or a closed conversation's", () => {
+    const moved = withLive(
+      {
+        open: [row(A)],
+        archived: [row(D, { state: "closed", closedHow: "unmatch", yourTurn: false })],
+        yourTurn: counted(1),
+      },
+      {
+        [A]: liveOf([{ seq: 2, side: "mine", body: "Vanha", minute: 1 }]),
+        [D]: liveOf([{ seq: 3, side: "theirs", body: "Myöhässä", minute: 7 }]),
+      },
+    );
+    expect(moved.open[0]?.yourTurn).toBe(true);
+    expect(moved.archived[0]?.yourTurn).toBe(false);
+    expect(moved.yourTurn).toEqual(counted(1));
   });
 });

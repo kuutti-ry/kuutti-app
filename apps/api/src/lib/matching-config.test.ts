@@ -101,8 +101,8 @@ describe("matchingConfigNumbers", () => {
   });
 });
 
-// The push's quiet hours and the round's hour (#102, ADR-055 §6, §7): the
-// panel keeps a number whole and from 0, with no ceiling.
+// The push's quiet hours (#102, ADR-055 §7): the panel keeps a number whole and
+// from 0, with no ceiling.
 describe("distanceEdges", () => {
   test("are the three bands' keys, the latest version of each", async ({ ctx }) => {
     expect(await distanceEdges(ctx.client)).toEqual({ nearby: 5, close: 15, around: 50 });
@@ -115,6 +115,49 @@ describe("distanceEdges", () => {
     await expect(distanceEdges(ctx.client)).rejects.toMatchObject({
       status: 500,
       detail: { key: "distance_around_km" },
+    });
+  });
+});
+
+describe("the queue's numbers (ADR-062)", () => {
+  test("read through to the latest version of each key, the maintainer's of 29/10 and 01/11/2026", async ({
+    ctx,
+  }) => {
+    expect(
+      await matchingConfigNumbers(ctx.client, [
+        "pass_cooldown_days",
+        "second_pass_cooldown_days",
+        "liked_cooldown_days",
+        "ended_cooldown_days",
+        "like_expiry_days",
+        "inbox_stop",
+        "your_turn_limit",
+        "your_turn_warning",
+        "exposure_cards_per_day",
+        "auto_shadow_ban_cards_served",
+        "auto_shadow_ban_cards_served_minutes",
+        "auto_shadow_ban_photo_fetches",
+        "auto_shadow_ban_photo_fetches_minutes",
+      ]),
+    ).toEqual({
+      pass_cooldown_days: 30,
+      second_pass_cooldown_days: 365,
+      liked_cooldown_days: 90,
+      ended_cooldown_days: 90,
+      like_expiry_days: 14,
+      inbox_stop: 30,
+      your_turn_limit: 8,
+      your_turn_warning: 6,
+      exposure_cards_per_day: 0,
+      auto_shadow_ban_cards_served: 300,
+      auto_shadow_ban_cards_served_minutes: 10,
+      auto_shadow_ban_photo_fetches: 1500,
+      auto_shadow_ban_photo_fetches_minutes: 60,
+    });
+    expect(await readMatchingConfig(ctx.client, "photo_fetches_per_day")).toEqual({
+      thumb: 600,
+      card: 0,
+      full: 60,
     });
   });
 });

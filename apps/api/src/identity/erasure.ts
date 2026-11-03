@@ -484,6 +484,7 @@ export async function exportAccount(
             ? t(`account.export.round.decision.${entry.decision}`)
             : null,
           decidedAt: entry.decidedAt?.toISOString() ?? null,
+          secondPass: entry.secondPass,
           distance: entry.distance,
           distanceInWords: entry.distance ? t(`profile.option.distance.${entry.distance}`) : null,
         })),

@@ -107,6 +107,7 @@ export const ERROR_MESSAGE_KEYS = {
   report_budget_exceeded: "errors.report_budget_exceeded",
   report_window_closed: "errors.report_window_closed",
   round_expired: "errors.round_expired",
+  your_turn_limit: "errors.your_turn_limit",
   like_budget_exceeded: "errors.like_budget_exceeded",
   fish_budget_exceeded: "errors.fish_budget_exceeded",
   invitation_not_yet: "errors.invitation_not_yet",

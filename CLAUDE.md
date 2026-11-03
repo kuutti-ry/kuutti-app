@@ -134,7 +134,7 @@ From TD-1, TD-6, TD-7. A change that violates one is wrong regardless of who ask
 
 ## Product constraints
 
-The evidence base behind these is in the maintainers' private design document. Never build: compatibility or chemistry scores, desirability signals, infinite feeds, real-time engagement push, streaks, leaderboards, boosts or anything purchasable, ads or ad SDKs, pre-match links to external profiles, under-18 access. If asked, refuse and cite this section. Every tunable lives in `matching_config`, not in code. Every rule and its value has a row in `docs/decisions.md` (#396), with who decided it: a change to a rule changes its row in the same pull request, and its draws block has `pnpm check:docs` ask for it.
+The evidence base behind these is in the maintainers' private design document. Never build: compatibility or chemistry scores, desirability signals, infinite feeds, real-time engagement push, streaks, leaderboards, boosts or anything purchasable, ads or ad SDKs, pre-match links to external profiles, under-18 access. If asked, refuse and cite this section. A pool browsed to its end is no infinite feed: the queue ends (the maintainer's reading, ADR-062). Every tunable lives in `matching_config`, not in code. Every rule and its value has a row in `docs/decisions.md` (#396), with who decided it: a change to a rule changes its row in the same pull request, and its draws block has `pnpm check:docs` ask for it.
 
 ## Decisions
 

@@ -413,7 +413,7 @@ describe("PII in logs", () => {
     );
     await ctx.client.query(
       `INSERT INTO photo_access (account_id, photo_id, variant, at)
-       SELECT $1, $2, 'card', $3::timestamptz - g * interval '1 second' FROM generate_series(1, 199) g`,
+       SELECT $1, $2, 'card', $3::timestamptz - g * interval '1 second' FROM generate_series(1, 1499) g`,
       [a.accountId, photo, new Date(tick)],
     );
     const probe = `?${new URLSearchParams({ hetu: FIXTURES.hetu, email: FIXTURES.email, text: FIXTURES.message })}`;
@@ -428,7 +428,7 @@ describe("PII in logs", () => {
     }
     const banned = lines().filter((line) => line.msg === "automatic shadow ban");
     expect(banned.map(({ rule, count }) => ({ rule, count }))).toEqual([
-      { rule: "photo_fetches", count: 200 },
+      { rule: "photo_fetches", count: 1500 },
       { rule: "round_reads", count: 30 },
     ]);
     for (const line of banned) {
@@ -709,7 +709,7 @@ describe("PII in logs", () => {
     let armed = false;
     const db: Queryable = {
       async query<R extends QueryResultRow = QueryResultRow>(text: string, values?: unknown[]) {
-        if (armed && /UPDATE account\s+SET home_moved_at/.test(text)) {
+        if (armed && /UPDATE account\s+SET home_place/.test(text)) {
           armed = false;
           throw new Error("Connection terminated unexpectedly");
         }

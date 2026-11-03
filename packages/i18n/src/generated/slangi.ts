@@ -3,6 +3,6 @@ export const slangi: Readonly<Record<string, string>> = {
   "round.like": "Digaan",
   "round.match.title": "Nyt natsaa",
   "round.pass": "Skippaan",
-  "round.title": "Päivän rundi",
+  "round.title": "Jengi",
   "settings.title": "Säädöt",
 };

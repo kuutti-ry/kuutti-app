@@ -3,7 +3,7 @@
  * pull request's own, replacing the one that was there.
  *
  *   pnpm demo:population                      three hundred people, the usual seed
- *   pnpm demo:population -- --size 5000       as many as the round builder must carry
+ *   pnpm demo:population -- --size 5000       as many as the queue must walk
  *   pnpm demo:population -- --seed 7          other people, the same ponds
  *   pnpm demo:population -- --photos          with faces of the release, drawn by seed, through the pipeline (#142)
  *   pnpm demo:population -- --remove          removes them and writes nobody

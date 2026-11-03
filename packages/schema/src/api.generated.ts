@@ -3043,7 +3043,7 @@ export interface paths {
         };
         /**
          * What the caller may be notified of
-         * @description Every kind (a new round, a message, a match, a moderator's decision), in that order, each on unless the person switched it off. The push reads it for the round, a message and a match; nothing is sent for a moderator's decision yet.
+         * @description Every kind (a message, a match, a moderator's decision), in that order, each on unless the person switched it off. The push reads it for a message and a match; nothing is sent for a moderator's decision yet.
          */
         get: {
             parameters: {
@@ -6318,8 +6318,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Today's round
-         * @description The Finnish day and its cards in order, each with why it is there, how far its person lives as it stood when the entry was written, and the caller's own decision. The first read of a day builds the caller's round once their matching has opened; entries null while they have none, an empty list for a round with nobody to show. A card that cannot be shown now is left out. fishToSend says whether the fish's budget lets the caller send one today, one of matching_config fish_budget in the calendar week (fish_window_days counted from a Monday) or an earned one, never how many. likesLeft says how many of the day's likes the caller has left, from matching_config like_budget_balanced down to zero, by the count that refuses a like. Serving a card writes the shown record and counts against matching_config exposure_cards_per_day (ADR-008).
+         * The next cards of the queue
+         * @description The Finnish day and the next cards to go through, at most ten, in order: likes waiting, then new people, then people coming back. Each says why it is there and how far its person lives as it stood when the entry was written. With nothing left to go through a read adds the next people; entries null while the caller's matching has not opened, an empty list at the queue's end. A card that cannot be shown now, a filter of either side included, is left out. fishToSend says whether the fish's budget lets the caller send one today, one of matching_config fish_budget in the calendar week (fish_window_days counted from a Monday) or an earned one, never how many. likesLeft says how many of the day's likes the caller has left, from matching_config like_budget_balanced down to zero, by the count that refuses a like. yourTurn says how many conversations wait on the caller's answer. Serving a card writes the shown record and counts against matching_config exposure_cards_per_day, where that is not 0 (ADR-008, ADR-062).
          */
         get: {
             parameters: {
@@ -6330,7 +6330,7 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                /** @description Today's round. */
+                /** @description The next cards. */
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -6417,7 +6417,7 @@ export interface paths {
                         "application/json": components["schemas"]["ErrorResponse"];
                     };
                 };
-                /** @description not_found: no round today, no card at that place, a card that can no longer be shown, or a day not begun. */
+                /** @description not_found: no round today, no card at that place, a card that can no longer be shown (a block, a sanction, or for a like a filter of either side), or a day not begun. */
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -6452,8 +6452,8 @@ export interface paths {
         };
         get?: never;
         /**
-         * Like or pass a card
-         * @description Recorded, or replacing the day's earlier decision on the card; the same decision again writes nothing. A day that has ended answers round_expired. A like counts against the day's matching_config like_budget_balanced, except one on a liked_you or fish card; a pass never does. A like of somebody whose like of the caller stands is a match: the answer names its conversation, and that like is final. A fish is a like with a mark, matching_config fish_budget of them in each fish_window_days counted from a Monday, the calendar week; on a liked_you or fish card it is a like. Past either budget, a like or a fish the caller's invitations earned is used by itself, left out of the counts after, and given back when the decision changes the same day. The answer's fishToSend and likesLeft are the round's after this decision.
+         * Like, pass or skip a card
+         * @description Recorded, or replacing the day's earlier decision on the card; the same decision again writes nothing. A day that has ended answers round_expired. A skip moves on, spends nothing and answers no like; the card returns another day. A like counts against the day's matching_config like_budget_balanced, except one on a liked_you or fish card; a pass or a skip never does. A new like or fish answers your_turn_limit with matching_config your_turn_limit conversations waiting on the caller, and not_found where either side's filters no longer let the two meet. A like of somebody whose like of the caller stands is a match: the answer names its conversation, and that like is final. A fish is a like with a mark, matching_config fish_budget of them in each fish_window_days counted from a Monday, the calendar week; on a liked_you or fish card it is a like. Past either budget, a like or a fish the caller's invitations earned is used by itself, left out of the counts after, and given back when the decision changes the same day. The answer's fishToSend, likesLeft and yourTurn are the queue's after this decision.
          */
         put: {
             parameters: {
@@ -6471,7 +6471,7 @@ export interface paths {
                 };
             };
             responses: {
-                /** @description Recorded, with the conversation the card's like is part of, or null for a pass and a like that made no match. */
+                /** @description Recorded, with the conversation the card's like is part of, or null for a pass, a skip and a like that made no match. */
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -6498,7 +6498,7 @@ export interface paths {
                         "application/json": components["schemas"]["ErrorResponse"];
                     };
                 };
-                /** @description not_found: no round today, no card at that place, a card that can no longer be shown, or a day not begun. */
+                /** @description not_found: no round today, no card at that place, a card that can no longer be shown (a block, a sanction, or for a like a filter of either side), or a day not begun. */
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -6507,7 +6507,7 @@ export interface paths {
                         "application/json": components["schemas"]["ErrorResponse"];
                     };
                 };
-                /** @description round_expired: the day named has ended; match_made: the card's like made a match and stays. Nothing was written. */
+                /** @description round_expired: the day named has ended; match_made: the card's like made a match and stays; your_turn_limit: too many conversations wait on the caller's answer. Nothing was written. */
                 409: {
                     headers: {
                         [name: string]: unknown;
@@ -6543,7 +6543,7 @@ export interface paths {
         };
         /**
          * What today's round may relax, and what is relaxed
-         * @description For a short round (fewer ordered places than matching_config round_size, the liked-you and fish places aside), every deal-breaker of the caller's that is not paused and not relaxed today, each way it can be relaxed for the day: unanswered (let through those who did not answer its field) and aside (set it aside), each listed only when it would add somebody today, with more: how much it widens the caller's pool, rounded down to a step of matching_config pond_counter_k. Counted on asking. Also the relaxations in force today. Never another filter (ADR-042).
+         * @description Once no new person is left in the queue, every deal-breaker of the caller's that is not paused and not relaxed today, each way it can be relaxed for the day: unanswered (let through those who did not answer its field) and aside (set it aside), each listed only when it would add somebody today, with more: how much it widens the caller's pool, rounded down to a step of matching_config pond_counter_k. Counted on asking. Also the relaxations in force today. Never another filter (ADR-042).
          */
         get: {
             parameters: {
@@ -6606,7 +6606,7 @@ export interface paths {
         put?: never;
         /**
          * Relax a deal-breaker for today
-         * @description One of the caller's own deal-breakers loosened for the day only: the people it lets in today are added after the round's last place, as many as the room left (round_size less the ordered places), new people first, reason relaxed with the field. Tomorrow's round is built from the filters as stored. The answer is the cards added, served as the round's read serves them (ADR-008).
+         * @description One of the caller's own deal-breakers loosened for the day only: the people it lets in today join the queue, new people first, reason relaxed with the field. Tomorrow's queue reads the filters as stored. The answer is the first cards added, at most ten, served as a read serves them (ADR-008); the next read goes on to the rest.
          */
         post: {
             parameters: {
@@ -7009,8 +7009,6 @@ export interface components {
                 home: {
                     place: string;
                     shownOnCard: string;
-                    /** Format: date-time */
-                    movedAt: string | null;
                 } | null;
                 /** Format: date-time */
                 genderChangedAt: string | null;
@@ -7439,7 +7437,7 @@ export interface components {
             enabled: boolean;
         };
         /** @enum {string} */
-        NotificationKind: "round" | "message" | "match" | "moderation";
+        NotificationKind: "message" | "match" | "moderation";
         /** @enum {string} */
         NoticeKind: "warning" | "invitation_counted";
         ExportedRounds: {
@@ -7481,13 +7479,14 @@ export interface components {
             decisionInWords: string | null;
             /** Format: date-time */
             decidedAt: string | null;
+            secondPass: boolean;
             distance: components["schemas"]["DistanceBand"];
             distanceInWords: string | null;
         };
         /** @enum {string} */
         RoundReason: "matches_filters" | "liked_you" | "seen_before" | "relaxed" | "fish";
         /** @enum {string|null} */
-        RoundChoice: "like" | "pass" | "fish" | null;
+        RoundChoice: "like" | "pass" | "fish" | "skip" | null;
         /** @enum {string|null} */
         DistanceBand: "nearby" | "close" | "around" | "far" | null;
         ExportedInvitations: {
@@ -8056,6 +8055,7 @@ export interface components {
         ConversationList: {
             open: components["schemas"]["ConversationSummary"][];
             archived: components["schemas"]["ConversationSummary"][];
+            yourTurn: components["schemas"]["YourTurnCount"];
         };
         ConversationSummary: {
             /** Format: uuid */
@@ -8065,6 +8065,7 @@ export interface components {
             counterpart: components["schemas"]["Counterpart"];
             lastMessage: components["schemas"]["LastMessage"];
             unread: number;
+            yourTurn: boolean;
         };
         Counterpart: components["schemas"]["CounterpartPerson"] | components["schemas"]["CounterpartDeleted"] | null;
         CounterpartPerson: {
@@ -8097,6 +8098,11 @@ export interface components {
         } | null;
         /** @enum {string} */
         MessageSide: "mine" | "theirs";
+        YourTurnCount: {
+            waiting: number;
+            limit: number;
+            warning: number;
+        };
         ConversationDetail: {
             /** Format: uuid */
             id: string;
@@ -8105,6 +8111,7 @@ export interface components {
             counterpart: components["schemas"]["Counterpart"];
             lastMessage: components["schemas"]["LastMessage"];
             unread: number;
+            yourTurn: boolean;
             limits: {
                 maxLength: number;
             };
@@ -8601,6 +8608,7 @@ export interface components {
             entries: components["schemas"]["RoundEntry"][] | null;
             fishToSend: boolean;
             likesLeft: number;
+            yourTurn: number;
         };
         RoundEntry: {
             position: number;
@@ -8618,6 +8626,7 @@ export interface components {
             } | null;
             fishToSend: boolean;
             likesLeft: number;
+            yourTurn: number;
         };
         RoundDecisionUpdate: {
             decision: components["schemas"]["RoundChoice"];

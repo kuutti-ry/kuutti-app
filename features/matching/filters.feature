@@ -2,8 +2,9 @@
 Feature: The filters, hard both ways, and the soft preferences that only order
   Nobody is shown to somebody who did not opt into them, in either direction
   (rule 7, the field sheet's mutual rule; #87). The hard filters are one
-  function, inEachOthersPool, which the round builder asks of everybody
-  (ADR-035 §2). Gender and whom one seeks, the age window and what one is
+  function, inEachOthersPool, which the queue asks of everybody (ADR-035 §2),
+  and both people's filters are asked on every read of a card and on every new
+  like (ADR-062 §8). Gender and whom one seeks, the age window and what one is
   here for are the two outlines below; a block is
   features/safety/blocks.feature's. The deal-breakers are here. A
   deal-breaker (#149) filters on a field the holder answered themselves; with
@@ -16,9 +17,9 @@ Feature: The filters, hard both ways, and the soft preferences that only order
   accepted is no filter. Everybody has a home, so it is never paused and nobody
   is unknown to it. Without one the whole country is a person's pool.
   The soft preferences (education, drinking, the attitude to drugs) are a
-  person's own answers. They only order a round, counted where the two are
-  similar from both sides. They never take anybody out of a pool, and never
-  reach a card, an event or a log line as a number.
+  person's own answers. They only order the new people of a queue, counted
+  where the two are similar from both sides. They never take anybody out of a
+  pool, and never reach a card, an event or a log line as a number.
 
   Scenario Outline: A deal-breaker lets through only the answers its holder accepts, asked from either side
     Given a person with a deal-breaker on <field> accepting <accept>, <unknown> people who did not answer
@@ -84,8 +85,8 @@ Feature: The filters, hard both ways, and the soft preferences that only order
   Scenario Outline: A hidden answer counts under a deal-breaker as a shown one does
     Given "A"'s deal-breaker on smoking accepts never, <unknown> people who did not answer
     And "B" smokes regularly and "C" never, and both hid it from their cards
-    When the night builds the rounds
-    Then "C" is in "A"'s round and "B" is not
+    When "A" reads the queue
+    Then "C" is in "A"'s queue and "B" is not
 
     Examples:
       | unknown |
@@ -95,14 +96,14 @@ Feature: The filters, hard both ways, and the soft preferences that only order
   Scenario: Hiding one's own answer leaves a deal-breaker on it in force
     Given "A"'s deal-breaker on smoking accepts never, and "B" smokes regularly and "C" never
     When "A" hides their own smoking answer from their card
-    Then the deal-breaker is not paused, "C" is in "A"'s round and "B" is not
+    Then the deal-breaker is not paused, "C" is in "A"'s queue and "B" is not
 
   Scenario: The round leaves a pair a deal-breaker excludes out of each other's cards
     Given people of an open pond, each in every other's pool
     And one of them has a deal-breaker on smoking that another's answer does not pass
-    When the night builds the rounds
-    Then neither of the two is a card in the other's round
-    And after the holder takes their own smoking answer back, the next night shows them to each other
+    When each of them reads the queue
+    Then neither of the two is a card in the other's queue
+    And after the holder takes their own smoking answer back, the next day's read shows them to each other
 
   Scenario Outline: Two people are in each other's pool only when each passes what the other asked for
     Given a <a_gender> of <a_age> who seeks <a_seeks> between <a_min> and <a_max>, here for <a_intent>
@@ -188,7 +189,7 @@ Feature: The filters, hard both ways, and the soft preferences that only order
 
   Scenario: A distance deal-breaker keeps the two out of each other's rounds
     Given "A"'s deal-breaker on distance accepts nearby, "B" lives nearby and "C" close
-    When the night builds the rounds
+    When each of them reads the queue
     Then "A" and "B" are in each other's rounds, "C" is not in "A"'s, and "A" is not in "C"'s
 
   Scenario: A short round offers a distance deal-breaker set aside, never for those who did not answer
@@ -205,7 +206,7 @@ Feature: The filters, hard both ways, and the soft preferences that only order
 
   Scenario: A card never says that its person did not answer a distance
     Given "A"'s deal-breaker on distance lets "B" through
-    When "A" reads today's round
+    When "A" reads the queue
     Then "B"'s card lists nothing as not answered
 
   Scenario Outline: Soft preferences count only what is similar from both sides
@@ -235,4 +236,75 @@ Feature: The filters, hard both ways, and the soft preferences that only order
     Then whether they are in each other's pool does not change
 
   Scenario: The soft count is read by the round's order alone
-    Then no file of the apps reads the soft count but its own, until the round builder orders a round with it (#95)
+    Then no file of the apps reads the soft count but its own and the order of new people (#95)
+
+  # Filters at once (ADR-062 §8, the maintainer, 01/11/2026): a card that does not
+  # fit now is left out while it does not fit, and every change of filters or home
+  # works on the next read, the narrow ones and the wide ones alike. That a person
+  # can aim at somebody this way, or narrow down an area by moving home, he
+  # accepted. Gender's thirty days stay (preferences.feature).
+
+  Scenario Outline: A change of what fits works on the next read, whoever makes it
+    Given "B" is undecided in "A"'s queue today
+    When <who> <change>
+    Then "B"'s card is left out of "A"'s next read, and stays in the log
+    When that is changed back
+    Then "B"'s card comes again, at its place
+
+    Examples:
+      | who | change                                 |
+      | "A" | seeks somebody else                    |
+      | "B" | seeks somebody else                    |
+      | "A" | narrows the age window                 |
+      | "B" | narrows the age window                 |
+      | "A" | wants something else from it           |
+      | "B" | wants something else from it           |
+      | "A" | sets a deal-breaker "B" fails          |
+      | "B" | sets a deal-breaker "A" fails          |
+      | "A" | moves past their distance deal-breaker |
+      | "B" | moves past "A"'s distance deal-breaker |
+
+  Scenario: One change narrows and widens at once, and both work on the next read
+    Given "B" is undecided in "A"'s queue today, and "C" has never fit "A"
+    When "A" changes whom they seek from "B"'s gender to "C"'s
+    Then the next read leaves "B" out and brings "C"
+
+  Scenario: Widening at the queue's end works on the next read
+    Given "A" has reached the queue's end, and "C" does not fit "A"
+    When "A" widens whom they seek
+    Then the next read brings "C"
+
+  Scenario Outline: A new like asks both people's filters, and a card that no longer fits answers not_found
+    Given "B" is undecided in "A"'s queue today
+    When <who> narrows so that the two no longer fit, and "A" likes the card
+    Then the answer is not_found, nothing is written, and the like spends nothing
+
+    Examples:
+      | who |
+      | "A" |
+      | "B" |
+
+  Scenario Outline: A pass or a skip of a card that no longer fits still works
+    Given "B" is undecided in "A"'s queue today, and the two no longer fit
+    When "A" <decides> the card
+    Then the decision is written
+
+    Examples:
+      | decides |
+      | passes  |
+      | skips   |
+
+  Scenario: A like taken back works when the card no longer fits
+    Given "A" liked "B" today, and the two no longer fit
+    When "A" changes it to a pass
+    Then the pass is written, and the like is gone
+
+  Scenario: A like on a relaxed card goes through while the day's relaxation stands
+    Given "A" relaxed smoking for today, and "B", who did not answer it, came in by it
+    When "A" likes the card
+    Then the like is written
+
+  Scenario: A like back asks the filters with what the other person's like waived
+    Given "B" relaxed smoking for a day and liked "A", who smokes, and that like waits on "A"
+    When "A" reads the queue and likes "B"
+    Then "B"'s card comes, and the two are a match

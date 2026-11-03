@@ -55,7 +55,6 @@ const warn = (ctx: TestContext, who: Person, kind: "warn" | "shadow_ban" = "warn
     at: new Date(),
   });
 const ALL_ON = [
-  { kind: "round", enabled: true },
   { kind: "message", enabled: true },
   { kind: "match", enabled: true },
   { kind: "moderation", enabled: true },
@@ -86,9 +85,11 @@ describe("the notification choices", () => {
     const a = await signedInAccount(ctx.client);
     for (const [kind, body] of [
       ["push", { enabled: false }],
+      // A kind that went with its push (ADR-062 §12).
+      ["round", { enabled: false }],
       ["message", { enabled: "no" }],
       ["message", {}],
-      ["message", { enabled: false, kind: "round" }],
+      ["message", { enabled: false, kind: "match" }],
     ] as const) {
       const answer = await choose(ctx.app, a, kind, body);
       expect(answer.status, JSON.stringify([kind, body])).toBe(400);

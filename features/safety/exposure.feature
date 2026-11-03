@@ -8,7 +8,10 @@ Feature: Exposure is budgeted and counted
   of one's own (ADR-056). A photo sent in a conversation is logged with the
   purpose message and never counted (ADR-031 §10, ADR-008). A refusal is said
   in plain words and counted; nobody is limited in silence. The day is the
-  calendar day in Finland (#52, ADR-008).
+  calendar day in Finland (#52, ADR-008). A ceiling of 0 is off, as a threshold
+  of 0 is: there is none on cards or on card-size photos, and what stands is the
+  alarms of features/safety/velocity.feature (ADR-062 §9), so the records go on
+  being written.
 
   Scenario Outline: The photo fetch budget of a day
     Given matching_config allows <limit> fetches of the <variant> variant per day
@@ -30,6 +33,16 @@ Feature: Exposure is budgeted and counted
     Given the account has used the day's budget for a variant
     When it fetches the variant once more
     Then Retry-After is the number of seconds until the next midnight in Helsinki
+
+  Scenario: A ceiling of 0 is off for the size it names, and the other sizes stay limited
+    Given photo_fetches_per_day is 0 for the card size, and a number for the thumb and the full size
+    When the account fetches the card size again and again, and the other two past their numbers
+    Then every card-size fetch is issued and written to the fetch log, and the other two are refused at their numbers
+
+  Scenario: A day's cards with a ceiling of 0 are all recorded, and the day's count goes on
+    Given exposure_cards_per_day is 0
+    When the account is served one card after another
+    Then each is recorded, and a ceiling set later in the panel reads the same day's count
 
   Scenario: The count resets at the day boundary
     Given the account used the whole budget of a variant two days ago

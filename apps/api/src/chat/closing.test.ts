@@ -117,7 +117,7 @@ describe("ending a conversation", () => {
       await count(ctx, "SELECT count(*) AS n FROM report WHERE conversation_id = $1", [id]),
     ).toBe(1);
     // The report blocked: B no longer has it, and A still reads it ended.
-    expect(await listOf(ctx.app, b)).toEqual({ open: [], archived: [] });
+    expect(await listOf(ctx.app, b)).toMatchObject({ open: [], archived: [] });
     expect((await detailOf(ctx.app, a, id)).state).toBe("closed");
   });
 

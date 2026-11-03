@@ -66,8 +66,8 @@ executionOrder:
     - What you seek lists whom, the ages, why and the deal-breakers, and each change is kept by going back
     # Laura and Emmi, the report's pair (#351): a block is final, so once per reset.
     - A report from a conversation takes it from the reporter's list, and the other finds it ended and can still report it
-    # Iida, the round's (#379): a match and a report are final, so once per reset.
-    - Today's round shows one card at a time, liking back makes a match, Undo takes a decision back, and a report takes a card away
+    # Iida, the queue's (#379): a match and a report are final, so once per reset.
+    - The queue shows one card at a time, liking back makes a match, Later and Undo leave a decision open, and a report takes a card away
     # Aino, who tells Kuutti she found someone, then whose account goes: last.
     - I found someone tells Kuutti the reason once, thanks the person, and asks no more
     - Deleting the account asks first, signs the person out, and the next login is refused until the cooldown ends

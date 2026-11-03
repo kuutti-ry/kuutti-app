@@ -33,10 +33,10 @@ const AUTO_SHADOW_BAN_FIRST_MESSAGES_MINUTES_KEY = "auto_shadow_ban_first_messag
 /** matching_config: the same first message to people within the hours. */
 const AUTO_SHADOW_BAN_SAME_FIRST_MESSAGE_KEY = "auto_shadow_ban_same_first_message";
 const AUTO_SHADOW_BAN_SAME_FIRST_MESSAGE_HOURS_KEY = "auto_shadow_ban_same_first_message_hours";
-/** matching_config: URLs of other people's photos in the card and full sizes within the minutes (the maintainer, 21/10/2026; 200 since 29/10/2026, #513). */
+/** matching_config: URLs of other people's photos in the card and full sizes within the minutes (the maintainer, 21/10/2026; 1,500 since 01/11/2026, ADR-062 §9). */
 const AUTO_SHADOW_BAN_PHOTO_FETCHES_KEY = "auto_shadow_ban_photo_fetches";
 const AUTO_SHADOW_BAN_PHOTO_FETCHES_MINUTES_KEY = "auto_shadow_ban_photo_fetches_minutes";
-/** matching_config: different people's cards served within the minutes; 0, off, while the round bounds them. */
+/** matching_config: different people's cards served within the minutes (the maintainer, 01/11/2026, ADR-062 §9): with no ceiling on cards, this alarm is what stands. */
 const AUTO_SHADOW_BAN_CARDS_SERVED_KEY = "auto_shadow_ban_cards_served";
 const AUTO_SHADOW_BAN_CARDS_SERVED_MINUTES_KEY = "auto_shadow_ban_cards_served_minutes";
 /** matching_config: reads of the day's round within the minutes. */

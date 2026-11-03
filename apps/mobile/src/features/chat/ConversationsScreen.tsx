@@ -1,7 +1,7 @@
-import type { ConversationSummary } from "@kuutti/schema";
+import type { ConversationSummary, YourTurnCount } from "@kuutti/schema";
 import { Image } from "expo-image";
 import { useFocusEffect, useRouter } from "expo-router";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   AccessibilityInfo,
   Platform,
@@ -120,13 +120,63 @@ function Row({ conversation }: { conversation: ConversationSummary }) {
   );
 }
 
+/** A group of the list under its heading, left out with nobody in it. */
+function Group({
+  title,
+  hint,
+  conversations,
+}: {
+  title: string;
+  hint?: string;
+  conversations: readonly ConversationSummary[];
+}) {
+  if (conversations.length === 0) return null;
+  return (
+    <View className="gap-1">
+      <Text variant="h4" accessibilityRole="header">
+        {title}
+      </Text>
+      {hint !== undefined && <Text variant="muted">{hint}</Text>}
+      {conversations.map((conversation) => (
+        <Row key={conversation.id} conversation={conversation} />
+      ))}
+    </View>
+  );
+}
+
 /**
- * The list of conversations (#348): the open ones, then the archived and the
- * closed ones under a heading of their own, each newest first, as the API
- * orders them. Read again on focus, by pulling down, and when the socket
- * brings something new (#349), with a line at the top while it is lost. A
- * row opens the conversation. Back from a report, a block or an end in a
- * conversation (#351), the top says what happened, once, to a screen reader
+ * The line that says the limit is near (ADR-062 §5), from `warning`
+ * conversations on the person's turn on, while a limit stands: 0 is off for
+ * either. Plain words in an outline, no colour and no alarm, wrapped at any
+ * text size. iOS has no live regions, so VoiceOver is told when it appears and
+ * when the number moves; TalkBack reads the region itself.
+ */
+function TurnWarning({ count }: { count: YourTurnCount }) {
+  const { t } = useT();
+  const { waiting, limit, warning } = count;
+  const words =
+    limit > 0 && warning > 0 && waiting >= warning
+      ? t("chat.list.turnWarning", { waiting, limit })
+      : null;
+  useEffect(() => {
+    if (words !== null && Platform.OS === "ios") AccessibilityInfo.announceForAccessibility(words);
+  }, [words]);
+  if (words === null) return null;
+  return (
+    <View testID="turn-warning" className="rounded-lg border border-border p-4">
+      <Text accessibilityLiveRegion="polite">{words}</Text>
+    </View>
+  );
+}
+
+/**
+ * The list of conversations (#348, ADR-062 §5): those on the person's turn,
+ * with how many, those on the other's, then the archived and the closed ones,
+ * each under a heading of its own and newest first, as the API orders them, and
+ * a group with nobody in it left out. Read again on focus, by pulling down, and
+ * when the socket brings something new (#349), with a line at the top while it
+ * is lost. A row opens the conversation. Back from a report, a block or an end
+ * in a conversation (#351), the top says what happened, once, to a screen reader
  * too, with the way to the support page (#510).
  */
 export function ConversationsScreen() {
@@ -183,26 +233,23 @@ export function ConversationsScreen() {
         {view.status === "ready" &&
           view.list.open.length === 0 &&
           view.list.archived.length === 0 && <Text>{t("chat.list.empty")}</Text>}
-        {view.status === "ready" && view.list.open.length > 0 && (
-          <View className="gap-1">
-            <Text variant="h4" accessibilityRole="header">
-              {t("chat.list.open")}
-            </Text>
-            {view.list.open.map((conversation) => (
-              <Row key={conversation.id} conversation={conversation} />
-            ))}
-          </View>
-        )}
-        {view.status === "ready" && view.list.archived.length > 0 && (
-          <View className="gap-1">
-            <Text variant="h4" accessibilityRole="header">
-              {t("chat.list.archived")}
-            </Text>
-            <Text variant="muted">{t("chat.list.archivedHint")}</Text>
-            {view.list.archived.map((conversation) => (
-              <Row key={conversation.id} conversation={conversation} />
-            ))}
-          </View>
+        {view.status === "ready" && (
+          <>
+            <TurnWarning count={view.list.yourTurn} />
+            <Group
+              title={t("chat.list.yourTurn", { waiting: String(view.list.yourTurn.waiting) })}
+              conversations={view.list.open.filter((conversation) => conversation.yourTurn)}
+            />
+            <Group
+              title={t("chat.list.theirTurn")}
+              conversations={view.list.open.filter((conversation) => !conversation.yourTurn)}
+            />
+            <Group
+              title={t("chat.list.archived")}
+              hint={t("chat.list.archivedHint")}
+              conversations={view.list.archived}
+            />
+          </>
         )}
       </ScrollView>
     </SafeAreaView>

@@ -1,14 +1,16 @@
 import type { Queryable } from "@kuutti/db";
+import { QUEUE_PAGE, ROUND_POSITION_MAX } from "@kuutti/schema";
 import { finnishDay } from "../lib/finnish-day.ts";
 import { signedInAccount } from "../test/account.ts";
 import { captureLogger, describe, expect, test } from "../test/harness.ts";
-import { appendRelaxed, decide, saveRound, undoRelaxation } from "./rounds.ts";
+import { logged } from "../test/rounds.ts";
+import { appendRelaxed, decide, undoRelaxation } from "./rounds.ts";
 
 // The short pool's writers (#99, ADR-042 §5, §6) where the routes cannot reach
 // them: a relaxation recorded or undone between the route's look and the
 // write, as a second device's tap would be; a candidate who stopped being
-// one meanwhile; the round's places and its completion. The routes are
-// jobs/short-pool.test.ts.
+// one meanwhile; the round's places and its completion; a page at a time
+// (ADR-062 §10). The routes are jobs/short-pool.test.ts.
 
 const NOON = new Date("2026-10-20T09:00:00.000Z");
 const DAY = finnishDay(NOON);
@@ -22,20 +24,8 @@ const depsOf = async (db: Queryable) => ({
 });
 
 /** A's round of today with these people in it at places 1, 2…, and nobody else. */
-async function roundWith(db: Queryable, accountId: string, cards: string[]) {
-  const built = await saveRound(await depsOf(db), {
-    accountId,
-    day: DAY,
-    ordering: "count",
-    entries: cards.map((candidateId) => ({
-      candidateId,
-      reason: "matches_filters" as const,
-      distance: "nearby" as const,
-    })),
-  });
-  if (!built) throw new Error("round not written");
-  return built.roundId;
-}
+const roundWith = (db: Queryable, accountId: string, cards: string[]) =>
+  logged(db, accountId, DAY, cards);
 
 async function placesOf(db: Queryable, roundId: string) {
   const { rows } = await db.query<{ position: number; candidate_id: string; reason: string }>(
@@ -52,7 +42,13 @@ const completedAt = async (db: Queryable, roundId: string) =>
     ])
   ).rows[0]?.at ?? null;
 
-const NO_MATCHES = { between: async () => null, open: async () => "" };
+const NO_MATCHES = {
+  between: async () => null,
+  open: async () => "",
+  yourTurn: async () => 0,
+};
+/** A pass asks nobody's filters (ADR-062 §8), so nobody needs to fit. */
+const NOBODY_FITS = { fits: async () => new Set<string>() };
 
 /** People a relaxation lets in who need none of the day's other relaxations. */
 const as = (ids: string[]) =>
@@ -213,7 +209,7 @@ describe("the relaxation's writer", () => {
     if (!b || !c) throw new Error("not written");
     const deps = await depsOf(ctx.client);
     const roundId = await roundWith(ctx.client, a.accountId, [b.accountId]);
-    await decide(deps, NO_MATCHES, {
+    await decide(deps, NO_MATCHES, NOBODY_FITS, {
       accountId: a.accountId,
       day: DAY,
       position: 1,
@@ -271,14 +267,79 @@ describe("the relaxation's writer", () => {
     expect((await ctx.client.query("SELECT 1 FROM round_relaxation")).rows).toEqual([]);
   });
 
-  test("an undo gives no room back: a day's round holds at most round_size ordered people", async ({
+  test("writes a page at a time, whoever comes first, however many it lets in", async ({ ctx }) => {
+    const a = await signedInAccount(ctx.client);
+    const many = await Promise.all(
+      Array.from({ length: QUEUE_PAGE + 2 }, () => signedInAccount(ctx.client)),
+    );
+    const ids = many.map((person) => person.accountId);
+    const roundId = await roundWith(ctx.client, a.accountId, []);
+
+    const placed = await appendRelaxed(await depsOf(ctx.client), {
+      accountId: a.accountId,
+      day: DAY,
+      relaxation: ASIDE,
+      basis: [],
+      candidates: as(ids),
+    });
+
+    expect(placed).toEqual(Array.from({ length: QUEUE_PAGE }, (_, index) => index + 1));
+    expect((await placesOf(ctx.client, roundId)).map((e) => e.candidate_id)).toEqual(
+      ids.slice(0, QUEUE_PAGE),
+    );
+  });
+
+  test("past the column's last place it records the relaxation and adds nobody", async ({
     ctx,
   }) => {
-    // A version above every one a migration wrote, so it is the one read.
-    await ctx.client.query(
-      `INSERT INTO matching_config (version, key, value, created_by)
-       SELECT max(version) + 1, 'round_size', '2'::jsonb, 'test' FROM matching_config WHERE key = 'round_size'`,
-    );
+    const a = await signedInAccount(ctx.client);
+    const b = await signedInAccount(ctx.client);
+    const roundId = await roundWith(ctx.client, a.accountId, []);
+    await ctx.client.query("UPDATE rounds SET last_position = $2 WHERE id = $1", [
+      roundId,
+      ROUND_POSITION_MAX,
+    ]);
+
+    const placed = await appendRelaxed(await depsOf(ctx.client), {
+      accountId: a.accountId,
+      day: DAY,
+      relaxation: ASIDE,
+      basis: [],
+      candidates: as([b.accountId]),
+    });
+
+    expect(placed).toEqual([]);
+    expect(await placesOf(ctx.client, roundId)).toEqual([]);
+    const { rows } = await ctx.client.query("SELECT 1 FROM round_relaxation WHERE round_id = $1", [
+      roundId,
+    ]);
+    expect(rows).toHaveLength(1);
+  });
+
+  test("the last place before the column's end is given, and no further", async ({ ctx }) => {
+    const a = await signedInAccount(ctx.client);
+    const [b, c] = await Promise.all([1, 2].map(() => signedInAccount(ctx.client)));
+    if (!b || !c) throw new Error("not written");
+    const roundId = await roundWith(ctx.client, a.accountId, []);
+    await ctx.client.query("UPDATE rounds SET last_position = $2 WHERE id = $1", [
+      roundId,
+      ROUND_POSITION_MAX - 1,
+    ]);
+
+    const placed = await appendRelaxed(await depsOf(ctx.client), {
+      accountId: a.accountId,
+      day: DAY,
+      relaxation: ASIDE,
+      basis: [],
+      candidates: as([b.accountId, c.accountId]),
+    });
+
+    expect(placed).toEqual([ROUND_POSITION_MAX]);
+  });
+
+  test("an undo gives no place back, and a later relaxation goes on after the highest given", async ({
+    ctx,
+  }) => {
     const a = await signedInAccount(ctx.client);
     const [b, c, d] = await Promise.all([1, 2, 3].map(() => signedInAccount(ctx.client)));
     if (!b || !c || !d) throw new Error("not written");
@@ -302,8 +363,11 @@ describe("the relaxation's writer", () => {
       candidates: as([d.accountId]),
     });
 
-    expect(after).toEqual([]);
-    expect((await placesOf(ctx.client, roundId)).map((e) => e.candidate_id)).toEqual([b.accountId]);
+    expect(after).toEqual([3]);
+    expect((await placesOf(ctx.client, roundId)).map((e) => e.candidate_id)).toEqual([
+      b.accountId,
+      d.accountId,
+    ]);
   });
 
   test("undoing one relaxation takes back only the cards that need it", async ({ ctx }) => {

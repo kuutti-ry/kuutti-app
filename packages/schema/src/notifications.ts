@@ -5,11 +5,11 @@ import { SanctionReason } from "./sanction.ts";
 // Notification choices and the notices in the app (#176, ADR-032): what a
 // person may be told of, each kind on or off, and what must reach them even
 // without a push. Nothing here is a push: the senders come later and read the
-// switches (#102 the message, #95 the round, #100 the match, #312 a decision).
+// switches (#102 the message, #100 the match, #312 a decision).
 
 /** What a person may be notified of, in the order Settings lists them. Mirrors the database's enum. */
 export const NotificationKind = z
-  .enum(["round", "message", "match", "moderation"])
+  .enum(["message", "match", "moderation"])
   .meta({ id: "NotificationKind" });
 export type NotificationKind = z.infer<typeof NotificationKind>;
 
@@ -115,9 +115,9 @@ export const PushTokenRequest = z
   .meta({ id: "PushTokenRequest" });
 export type PushTokenRequest = z.infer<typeof PushTokenRequest>;
 
-/** What a push's `data` carries: its kind, which tells the app where a tap goes (the conversations or today's round). */
+/** What a push's `data` carries: its kind. A tap goes to the conversations. */
 export const PushData = z
-  .object({ kind: z.enum(["message", "match", "round"]) })
+  .object({ kind: z.enum(["message", "match"]) })
   .strict()
   .meta({ id: "PushData" });
 export type PushData = z.infer<typeof PushData>;

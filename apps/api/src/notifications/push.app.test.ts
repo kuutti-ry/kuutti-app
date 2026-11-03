@@ -8,7 +8,6 @@ import { createLive, type Live } from "../chat/index.ts";
 import { eraseAccount } from "../identity/index.ts";
 import { finnishDay } from "../lib/finnish-day.ts";
 import { PushFailed } from "../lib/push.ts";
-import { saveRound } from "../matching/index.ts";
 import { applySanction } from "../safety/index.ts";
 import { signInAs, withMatchingConfig } from "../test/account.ts";
 import { cardShown } from "../test/cards.ts";
@@ -21,7 +20,7 @@ import {
   testConfig,
 } from "../test/harness.ts";
 import { fixtureJpeg, testMediaDeps } from "../test/media.ts";
-import { people } from "../test/people.ts";
+import { people, pondNamed } from "../test/people.ts";
 import {
   expectNamesNothing,
   gate,
@@ -30,6 +29,7 @@ import {
   memoryPusher,
   type Withheld,
 } from "../test/push.ts";
+import { FITTING, queued } from "../test/queue.ts";
 import { createPush } from "./push.ts";
 
 // The push through the routes (#102, ADR-055 §4, §5,
@@ -100,6 +100,7 @@ async function appWith(ctx: TestContext, options: { db?: Queryable } = {}) {
   const names: string[] = [];
   const texts: string[] = [];
   const settled = () => push.settled();
+  const pondId = await pondNamed(ctx.client, `push-app-${randomUUID()}`);
   recorded.push({
     pusher,
     settled,
@@ -117,9 +118,9 @@ async function appWith(ctx: TestContext, options: { db?: Queryable } = {}) {
     },
   });
 
-  /** A signed-in person with a complete profile and a name of their own. */
+  /** A signed-in person with a complete profile, a name of their own, and who fits everybody of the test. */
   async function person(name: string): Promise<Person> {
-    const [accountId] = await people(ctx.client, null, 1, { complete: true, consented: true });
+    const [accountId] = await people(ctx.client, pondId, 1, FITTING);
     if (!accountId) throw new Error("no person");
     await ctx.client.query("UPDATE profile SET display_name = $2 WHERE account_id = $1", [
       accountId,
@@ -569,24 +570,13 @@ describe("a message's push through the routes (ADR-055 §4)", () => {
 describe("a match's push through the routes (ADR-055 §5)", () => {
   const TODAY = finnishDay(T);
 
-  async function roundOf(ctx: TestContext, owner: Person, cards: Person[], days = 0) {
-    const at = new Date(T.getTime() - days * DAY);
-    const built = await saveRound(
-      { db: ctx.client, logger: (await captureLogger()).logger, now: () => at },
-      {
-        accountId: owner.accountId,
-        day: finnishDay(at),
-        ordering: "count",
-        entries: cards.map((card) => ({
-          candidateId: card.accountId,
-          reason: "matches_filters",
-          distance: "nearby",
-        })),
-      },
+  const roundOf = (ctx: TestContext, owner: Person, cards: Person[], days = 0) =>
+    queued(
+      ctx.client,
+      owner.accountId,
+      cards.map((card) => card.accountId),
+      new Date(T.getTime() - days * DAY),
     );
-    if (!built) throw new Error("round not built");
-    return built.roundId;
-  }
 
   /** A decision through the route, answered; the push it starts may still be running. */
   const decideBy = (app: App, who: Person, position: number, decision: string) =>

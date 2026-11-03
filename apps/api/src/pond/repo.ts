@@ -36,18 +36,16 @@ export async function findPondOfAccount(
 }
 
 /** A home as `account` holds it: the kept place's key, and whether the card shows its area (ADR-061 §2, §3). */
-export type StoredHome = { place: string | null; showsArea: boolean; movedAt: Date | null };
+export type StoredHome = { place: string | null; showsArea: boolean };
 
 type HomeRow = {
   home_place: string | null;
   home_shows_area: boolean;
-  home_moved_at: Date | null;
 };
 
 const storedHome = (row: HomeRow): StoredHome => ({
   place: row.home_place,
   showsArea: row.home_shows_area,
-  movedAt: row.home_moved_at,
 });
 
 /** The person's own home; a tombstone holds none, and nobody else's is read here (rule 6). */
@@ -56,7 +54,7 @@ export async function findHomeOfAccount(
   accountId: string,
 ): Promise<StoredHome | null> {
   const { rows } = await db.query<HomeRow>(
-    "SELECT home_place, home_shows_area, home_moved_at FROM account WHERE id = $1",
+    "SELECT home_place, home_shows_area FROM account WHERE id = $1",
     [accountId],
   );
   return rows[0] ? storedHome(rows[0]) : null;
@@ -72,7 +70,7 @@ export async function lockHomeOfAccount(
   accountId: string,
 ): Promise<StoredHome | null> {
   const { rows } = await tx.query<HomeRow>(
-    `SELECT home_place, home_shows_area, home_moved_at FROM account
+    `SELECT home_place, home_shows_area FROM account
      WHERE id = $1 AND state <> 'deleted' FOR UPDATE`,
     [accountId],
   );
@@ -84,22 +82,19 @@ export async function lockHomeOfAccount(
  * statement, so that nobody has a home without one and the counter's
  * `verified` still starts after a gender is declared. The slug is the row every
  * database has (migration 0027, kept by 0095); a pond already held stays.
- * `place` null leaves the kept place as it is, and another place than the one
- * held is a move, at `at` (§5).
+ * `place` null leaves the kept place as it is.
  */
 export async function writeHomeOfAccount(
   tx: Queryable,
   accountId: string,
-  home: Pick<StoredHome, "place" | "showsArea">,
-  at: Date,
+  home: StoredHome,
 ): Promise<void> {
   await tx.query(
     `UPDATE account
-        SET home_moved_at = CASE WHEN $2::text <> home_place THEN $4 ELSE home_moved_at END,
-            home_place = COALESCE($2, home_place), home_shows_area = $3,
+        SET home_place = COALESCE($2, home_place), home_shows_area = $3,
             pond_id = COALESCE(pond_id, (SELECT id FROM ponds WHERE slug = 'suomi'))
       WHERE id = $1`,
-    [accountId, home.place, home.showsArea, at],
+    [accountId, home.place, home.showsArea],
   );
 }
 

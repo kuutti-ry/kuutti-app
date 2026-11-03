@@ -16,7 +16,7 @@ export type PushMessage = {
   collapseId: string;
   tag: string;
   channelId: "default";
-  priority: "normal" | "high";
+  priority: "high";
   sound: "default";
   /** Seconds the push may wait for a phone that is off; Expo's four weeks when absent. */
   ttl?: number;
