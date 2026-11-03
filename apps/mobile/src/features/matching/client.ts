@@ -11,6 +11,9 @@ import {
   RoundDecisionAnswer,
   type RoundEntry,
   RoundResponse,
+  StarAnswer,
+  StarList,
+  type StarredPerson,
 } from "@kuutti/schema";
 import { ApiError, api } from "@/lib/api";
 
@@ -105,4 +108,35 @@ export async function undoRelaxation(day: string, field: DealBreakerField): Prom
   });
   if (!data) throw failed(response, error, "undo relaxation");
   return RelaxationUndone.parse(data).removed;
+}
+
+/** The people the person starred who may be shown now, the latest star first (#575, ADR-064 §6). It serves no card and signs no photo. */
+export async function fetchStars(): Promise<StarredPerson[]> {
+  const { data, error, response } = await api.GET("/stars");
+  if (!data) throw failed(response, error, "stars");
+  return StarList.parse(data).items;
+}
+
+/** A star on today's card (§1): the star, and whether it is the first the list shows. */
+export async function putStar(day: string, position: number): Promise<StarAnswer> {
+  const { data, error, response } = await api.PUT("/rounds/{day}/entries/{position}/star", {
+    params: { path: { day, position } },
+  });
+  if (!data) throw failed(response, error, "star");
+  return StarAnswer.parse(data);
+}
+
+/** A star taken off, on a card or on the list. */
+export async function clearStar(id: string): Promise<void> {
+  const { error, response } = await api.DELETE("/stars/{id}", { params: { path: { id } } });
+  if (!response.ok) throw failed(response, error, "clear star");
+}
+
+/** A starred person's card, in today's log (§4): answered as a read of the queue is, with that one card. */
+export async function openStar(id: string): Promise<RoundResponse> {
+  const { data, error, response } = await api.POST("/stars/{id}/open", {
+    params: { path: { id } },
+  });
+  if (!data) throw failed(response, error, "open star");
+  return RoundResponse.parse(data);
 }

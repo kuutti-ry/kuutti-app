@@ -31,7 +31,9 @@ describe("the decision buttons' choices", () => {
     expect(chosen(/Right hand/)).toBe(true);
     expect(chosen(/Left hand/)).toBe(false);
     expect(oneHanded()).toBe(false);
-    expect(screen.getByText(/^Undo, the fish, Later, Pass and Like in one column/)).toBeTruthy();
+    expect(
+      screen.getByText(/^Undo, the star, the fish, Later, Pass and Like in one column/),
+    ).toBeTruthy();
     const found = pressables(screen.toJSON() as HostNode);
     expect(found.flatMap((node) => a11yProblems(node))).toEqual([]);
     // The two hands, the switch and the three styles.

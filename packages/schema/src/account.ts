@@ -5,7 +5,7 @@ import { StoredContact } from "./contact.ts";
 import { DEAL_BREAKERS_CAP, StoredDealBreaker } from "./deal-breakers.ts";
 import { ExportedFeedback } from "./feedback.ts";
 import { AuthPlatform, IdentityStanding, USER_AGENT_MAX } from "./identity.ts";
-import { ExportedRounds } from "./matching.ts";
+import { ExportedRounds, ExportedStars } from "./matching.ts";
 import {
   EXPORT_DESCRIPTION_TEXT_MAX,
   EXPORT_PHOTO_PATH_MAX,
@@ -236,6 +236,8 @@ export const AccountExport = z
     notifications: ExportedNotifications,
     /** The person's own rounds (#96, ADR-034): places, reasons and their own decisions; never whom, and never a round in which the person was somebody's card. */
     rounds: ExportedRounds,
+    /** When the person put each star that stands (#575, ADR-064 §9); never on whom, and never a star put on the person. */
+    stars: ExportedStars,
     /** The invitations the person made and the one they joined with, and what these earned them (#107, ADR-044 §10); never a code and never the other person. */
     invitations: ExportedInvitations,
   })

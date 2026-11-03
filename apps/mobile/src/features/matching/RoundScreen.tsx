@@ -2,6 +2,7 @@ import type { PlainMessageKey } from "@kuutti/i18n";
 import type { RoundChoice, RoundReason } from "@kuutti/schema";
 import { useFocusEffect, useRouter } from "expo-router";
 import Fish from "lucide-react-native/icons/fish";
+import Star from "lucide-react-native/icons/star";
 import Undo2 from "lucide-react-native/icons/undo-2";
 import { type ReactNode, useCallback, useRef, useState } from "react";
 import {
@@ -81,15 +82,21 @@ const WORDLESS_UNDO_FONT_SCALE = 1.3;
  * card says the deal-breaker it came in by and undoes it in one tap, and every
  * card names the person's deal-breakers its person did not answer.
  *
+ * A card that holds no like or pass takes a star (#575, ADR-064): beside the
+ * reason, and one-handed at the thumb with Undo, its word and an outlined icon
+ * against a filled one, so that the state is never colour alone. It decides
+ * nothing and the card stays. Given `star`, the id of one on the Starred list, the
+ * screen is that one card, and what comes after it is the way back to the list.
+ *
  * As a card, the end or a match takes the place of what had the focus, the
  * screen reader is taken to its first line; a notice is spoken where it
  * appears, under the header, in sight however far the card was scrolled.
  */
-export function RoundScreen() {
+export function RoundScreen({ star }: { star?: string }) {
   const { t } = useT();
   const router = useRouter();
   const tap = useHapticTap();
-  const round = useRound();
+  const round = useRound(star);
   const { view, current, notice, match } = round;
   // A photo URL the API refused (the day's photos, #52), for the card it was
   // refused on, by its day and place: a new day's card there starts without it.
@@ -154,12 +161,41 @@ export function RoundScreen() {
       {!wordless && <Text>{t("round.undo")}</Text>}
     </Button>
   );
+  // A like or a pass takes the star off, so a card holding one has none to offer.
+  const starred = !!entry?.star;
+  const starToggle = current && (entry?.decision === null || entry?.decision === "skip") && (
+    <Button
+      variant="ghost"
+      className={cn(placement.oneHanded && "w-full")}
+      disabled={round.busy}
+      accessibilityLabel={t("round.star.label", { name: current.entry.card.displayName })}
+      accessibilityState={{ selected: starred }}
+      onPress={() => {
+        tap();
+        void round.toggleStar(current);
+      }}
+    >
+      <Icon as={Star} fill={starred ? "currentColor" : "none"} />
+      <Text>{t(starred ? "round.star.on" : "round.star")}</Text>
+    </Button>
+  );
+  const backToStars = (
+    <Button
+      variant="outline"
+      onPress={() => {
+        tap();
+        router.back();
+      }}
+    >
+      {t("stars.card.back")}
+    </Button>
+  );
 
   return (
     <SafeAreaView className="flex-1 bg-background">
       <ScreenHeader
-        title={t("round.title")}
-        backLabel={t("round.back")}
+        title={t(star ? "stars.title" : "round.title")}
+        backLabel={t(star ? "stars.card.back" : "round.back")}
         onBack={() => router.back()}
       >
         {!placement.oneHanded && undo}
@@ -185,6 +221,14 @@ export function RoundScreen() {
             {t("errors.card_budget_exceeded")}
           </Text>
         )}
+        {view.status === "gone" && (
+          <>
+            <Text ref={focus} accessibilityLiveRegion="polite">
+              {t("round.gone")}
+            </Text>
+            {backToStars}
+          </>
+        )}
         {entries === null && <Text ref={focus}>{t("round.none")}</Text>}
         {match !== null && (
           <View className="gap-4">
@@ -201,30 +245,37 @@ export function RoundScreen() {
             >
               {t("round.match.open")}
             </Button>
-            <Button
-              variant="outline"
-              onPress={() => {
-                tap();
-                round.closeMatch();
-              }}
-            >
-              {t("round.match.continue")}
-            </Button>
+            {star ? (
+              backToStars
+            ) : (
+              <Button
+                variant="outline"
+                onPress={() => {
+                  tap();
+                  round.closeMatch();
+                }}
+              >
+                {t("round.match.continue")}
+              </Button>
+            )}
           </View>
         )}
         {match === null && current && (
           <View className="gap-3">
-            <Text
-              ref={focus}
-              variant="small"
-              className="self-start rounded-full bg-secondary px-3 py-1 text-secondary-foreground"
-            >
-              {current.entry.relaxedField
-                ? t("round.reason.relaxedField", {
-                    field: t(fieldLabelKey(current.entry.relaxedField)),
-                  })
-                : t(REASON[current.entry.reason])}
-            </Text>
+            <View className="flex-row flex-wrap items-center justify-between gap-2">
+              <Text
+                ref={focus}
+                variant="small"
+                className="rounded-full bg-secondary px-3 py-1 text-secondary-foreground"
+              >
+                {current.entry.relaxedField
+                  ? t("round.reason.relaxedField", {
+                      field: t(fieldLabelKey(current.entry.relaxedField)),
+                    })
+                  : t(REASON[current.entry.reason])}
+              </Text>
+              {!placement.oneHanded && starToggle}
+            </View>
             {(current.entry.notAnswered ?? []).map((field) => (
               <Text key={field} variant="muted">
                 {t("round.notAnswered", { field: t(fieldLabelKey(field)) })}
@@ -273,7 +324,13 @@ export function RoundScreen() {
           </View>
         )}
         {/* The queue's end (ADR-062 §11): the line the reader is taken to, what may be relaxed for today (#99, ADR-042), and the same way into What you seek for everybody. */}
-        {match === null && !entry && entries && view.status === "ready" && (
+        {star && match === null && !entry && entries && view.status === "ready" && (
+          <>
+            <Text ref={focus}>{t("stars.card.done")}</Text>
+            {backToStars}
+          </>
+        )}
+        {!star && match === null && !entry && entries && view.status === "ready" && (
           <>
             <Text ref={focus}>{t("round.done")}</Text>
             <ShortPool
@@ -304,6 +361,7 @@ export function RoundScreen() {
           oneHanded={placement.oneHanded}
           icons={DECISION_ICONS[placement.style]}
           undo={undo}
+          star={starToggle}
           onChoose={choose}
         />
       )}
@@ -336,7 +394,8 @@ export function RoundScreen() {
  * on a line of its own while there is room beside the fish. How many of the
  * day's likes are left is plain text beside those two, above them where they do
  * not fit on one row, the same at ten as at one: no colour, no motion, and
- * nothing announces it after a decision (#524).
+ * nothing announces it after a decision (#524). The star is no decision and sits on
+ * the card; one-handed it comes down with Undo, within the thumb's reach (#575).
  */
 function DecisionBar({
   card,
@@ -347,6 +406,7 @@ function DecisionBar({
   oneHanded,
   icons,
   undo,
+  star,
   onChoose,
 }: {
   card: RoundCard;
@@ -361,6 +421,8 @@ function DecisionBar({
   icons: DecisionIcons;
   /** Undo, which comes down from the header in one-handed mode; nothing while there is nothing to undo. */
   undo: ReactNode;
+  /** The star, which comes down from the card in one-handed mode; nothing on a card holding a like or a pass. */
+  star: ReactNode;
   onChoose: (card: RoundCard, decision: RoundChoice) => void;
 }) {
   const { t } = useT();
@@ -435,6 +497,7 @@ function DecisionBar({
           className={cn("w-2/3 gap-3", left ? "self-start" : "self-end")}
         >
           {undo}
+          {star}
           {likes}
           {fish}
           {later}

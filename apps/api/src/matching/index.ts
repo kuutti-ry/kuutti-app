@@ -43,3 +43,6 @@ export {
   relaxationsOf,
 } from "./rounds.ts";
 export { preferencesRoutes } from "./routes.ts";
+// The stars (#575, ADR-064): the routes, and the halves erasure and the export call.
+export { starRoutes } from "./star-routes.ts";
+export { eraseStarsOf, exportStars } from "./stars.ts";

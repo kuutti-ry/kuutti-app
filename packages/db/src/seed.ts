@@ -179,6 +179,9 @@ export const MATCHING_CONFIG_V1 = {
   // #502 (ADR-062 §4, migration 0104): the unread likes that keep a person out
   // of everybody's ordinary queue until they have gone through them.
   inbox_stop: 30,
+  // #575 (ADR-064 §5, migration 0108): the most stars a person's list may hold,
+  // the maintainer's of 03/11/2026. Those it leaves out do not count, and 0 is off.
+  stars_max: 10,
 } as const;
 
 /**

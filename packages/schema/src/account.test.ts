@@ -305,6 +305,8 @@ function anExport(): Record<string, unknown> {
         },
       ],
     },
+    // When each star was put (#575), never on whom.
+    stars: { about: "Your stars", items: [{ at }] },
     // The invitations made and used, and what they earned (#107), never a code or whom.
     invitations: {
       made: [{ createdAt: at, state: "counted", countedAt: at }],

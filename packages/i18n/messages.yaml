@@ -3459,6 +3459,13 @@ errors.invitations_full:
   sv: "Du har redan så många väntande inbjudningar som du kan ha. Dra tillbaka en, eller vänta tills en vän använder den."
   machine: { fi: true, sv: true }
 
+errors.stars_full:
+  en: "You have as many stars as you can have. Take one off to add another."
+  description: "A card (409, #575, ADR-064 §5): the person's list shows matching_config stars_max people. Never a number: the limit is a tunable. Nothing was saved."
+  fi: "Sinulla on jo niin monta tähteä kuin voi olla. Poista jokin niistä, niin voit lisätä uuden."
+  sv: "Du har redan så många stjärnor som du kan ha. Ta bort en för att lägga till en ny."
+  machine: { fi: true, sv: true }
+
 errors.invitation_not_for_you:
   en: "This account cannot use an invitation code. A code is for someone new, before their profile is complete, and works once."
   description: "Typing an invitation code (409, #107, ADR-044 §6): the person cannot use one: their profile is complete, they used a code before, the current terms are not accepted, or their identity had an account deleted before. Must not say which, and says nothing of the code, which was not looked up."
@@ -5748,10 +5755,10 @@ settings.decisionButtons.oneHanded:
   machine: { fi: true, sv: true }
 
 settings.decisionButtons.oneHandedHint:
-  en: "Undo, the fish, Later, Pass and Like in one column at the bottom on your hand's side, within your thumb's reach."
-  description: "Decision buttons screen, under the one-handed switch (#82): what it does. The fish is the app's word for the super-like (ADR-039)."
-  fi: "Kumoa, kala, Myöhemmin, Ohita ja Tykkää yhdessä sarakkeessa alhaalla kätesi puolella, peukalon ulottuvilla."
-  sv: "Ångra, fisken, Senare, Hoppa över och Gilla i en kolumn längst ner på din hands sida, inom räckhåll för tummen."
+  en: "Undo, the star, the fish, Later, Pass and Like in one column at the bottom on your hand's side, within your thumb's reach."
+  description: "Decision buttons screen, under the one-handed switch (#82): what it does. The fish is the app's word for the super-like (ADR-039); the star is a private mark to come back to somebody later (#575), no decision and no rating."
+  fi: "Kumoa, tähti, kala, Myöhemmin, Ohita ja Tykkää yhdessä sarakkeessa alhaalla kätesi puolella, peukalon ulottuvilla."
+  sv: "Ångra, stjärnan, fisken, Senare, Hoppa över och Gilla i en kolumn längst ner på din hands sida, inom räckhåll för tummen."
   machine: { fi: true, sv: true }
 
 settings.decisionButtons.style:
@@ -7657,6 +7664,13 @@ account.export.round.decision.skip:
   sv: "Lämnade till senare"
   machine: { fi: true, sv: true }
 
+account.export.star.about:
+  en: "When you put each star you have now. Who it is on is not written here."
+  description: "Inside the downloaded data file (#575, ADR-064 §9), the text that opens the part listing the person's stars by date only. Plain; says why no name is there."
+  fi: "Milloin laitoit kunkin nykyisen tähtesi. Sitä, kenelle se on, ei kirjoiteta tähän."
+  sv: "När du satte var och en av dina stjärnor. Vem den gäller står inte här."
+  machine: { fi: true, sv: true }
+
 account.export.block.about:
   en: "When you blocked someone. Who it was is not written here. A block holds even if either of you deletes their account and comes back."
   description: "Inside the downloaded data file (#84, ADR-030 §8), the text that opens the part listing the person's blocks by date only. Plain; says why no name is there and that a block outlives a deletion."
@@ -8572,6 +8586,129 @@ round.match.continue:
   description: "Button under a match on the queue's screen (#100): the queue goes on with its next card, or says that it has reached its end."
   fi: "Takaisin ihmisiin"
   sv: "Tillbaka till människorna"
+  machine: { fi: true, sv: true }
+
+# --- The stars (#575, ADR-064): somebody marked for later, without a like or a pass ---
+
+round.star:
+  en: "Star"
+  description: "Button on a card with no star on it (#575, ADR-064 §1): mark this person to come back to later, without a like or a pass. A private bookmark that spends nothing. Never a rating, a super like or anything the other person sees. One word."
+  fi: "Tähti"
+  sv: "Stjärna"
+  max_length: 14
+  machine: { fi: true, sv: true }
+
+round.star.on:
+  en: "Starred"
+  description: "The same button with the star on it (#575): a tap takes it off. The icon is filled as well, so the state is never colour alone. One word."
+  fi: "Tähdellä"
+  sv: "Stjärnmärkt"
+  max_length: 14
+  machine: { fi: true, sv: true }
+
+round.star.label:
+  en: "Star: {name}"
+  description: "What a screen reader says for the star on a card (#575), naming the person; the reader adds whether it is selected. {name} stays in the nominative after the colon."
+  fi: "Tähti: {name}"
+  sv: "Stjärna: {name}"
+  machine: { fi: true, sv: true }
+
+round.star.first:
+  en: "Only you can see your stars. Nobody is told."
+  description: "Above the card when a star is the only one on the person's list (#575, ADR-064 §7), so that it cannot be taken for a super like, which other apps use a star for. Plain and calm."
+  fi: "Vain sinä näet tähtesi. Kenellekään ei kerrota."
+  sv: "Bara du ser dina stjärnor. Ingen får veta."
+  machine: { fi: true, sv: true }
+
+round.star.failed:
+  en: "The star was not saved. Try again."
+  description: "Above the card when a star did not reach the API or failed there; the card stays as it was (#575)."
+  fi: "Tähteä ei tallennettu. Yritä uudelleen."
+  sv: "Stjärnan sparades inte. Försök igen."
+  machine: { fi: true, sv: true }
+
+stars.title:
+  en: "Starred"
+  description: "Title of the list of people the person put a star on (#575, ADR-064 §6). A plain name, and it shrinks to fit one line."
+  fi: "Tähdellä merkityt"
+  sv: "Stjärnmärkta"
+  machine: { fi: true, sv: true }
+
+stars.home.open:
+  en: "Starred"
+  description: "Button on the home screen into the list of people the person starred, shown only when there is one (#575, ADR-064 §6). Its word only: no count."
+  fi: "Tähdellä merkityt"
+  sv: "Stjärnmärkta"
+  machine: { fi: true, sv: true }
+
+stars.back:
+  en: "Back to home"
+  description: "Back arrow of the Starred list, heard by a screen reader: where it goes (#575)."
+  fi: "Takaisin alkuun"
+  sv: "Tillbaka till start"
+  machine: { fi: true, sv: true }
+
+stars.explain:
+  en: "Only you can see this list. A like or a pass takes the star off."
+  description: "The line at the top of the Starred list (#575, ADR-064 §3, §7). Never says anything about anybody who has left the list."
+  fi: "Vain sinä näet tämän listan. Tykkäys tai ohitus poistaa tähden."
+  sv: "Bara du ser den här listan. Ett gillande eller en överhoppning tar bort stjärnan."
+  machine: { fi: true, sv: true }
+
+stars.loading:
+  en: "Loading your stars…"
+  description: "The Starred list while it is read (#575)."
+  fi: "Ladataan tähtiä…"
+  sv: "Läser in stjärnor…"
+  machine: { fi: true, sv: true }
+
+stars.failed:
+  en: "Your stars did not load."
+  description: "The Starred list when it could not be read; why, and a button to try again, follow (#575)."
+  fi: "Tähtiä ei voitu ladata."
+  sv: "Det gick inte att läsa in stjärnorna."
+  machine: { fi: true, sv: true }
+
+stars.none:
+  en: "Nobody here right now. A star on a card brings that person here."
+  description: "The Starred list with nobody to show (#575). It may hold stars left out for now, so it never says the person has none, and never why anybody is gone (ADR-064 §6)."
+  fi: "Täällä ei ole nyt ketään. Kortin tähti tuo ihmisen tänne."
+  sv: "Ingen här just nu. En stjärna på ett kort tar personen hit."
+  machine: { fi: true, sv: true }
+
+stars.clear.label:
+  en: "Take the star off: {name}"
+  description: "What a screen reader says for the star on a row of the Starred list (#575): a tap takes it off and the row goes. {name} stays in the nominative after the colon."
+  fi: "Poista tähti: {name}"
+  sv: "Ta bort stjärnan: {name}"
+  machine: { fi: true, sv: true }
+
+stars.clear.failed:
+  en: "The star was not taken off. Try again."
+  description: "Above the Starred list when taking a star off did not reach the API or failed there; the row stays (#575)."
+  fi: "Tähteä ei poistettu. Yritä uudelleen."
+  sv: "Stjärnan togs inte bort. Försök igen."
+  machine: { fi: true, sv: true }
+
+stars.photo.label:
+  en: "Photo: {name}"
+  description: "What a screen reader says for a row's small photo on the Starred list (#575), where it reads the photo at all: the row says the name first. {name} stays in the nominative after the colon."
+  fi: "Kuva: {name}"
+  sv: "Foto: {name}"
+  machine: { fi: true, sv: true }
+
+stars.card.back:
+  en: "Back to Starred"
+  description: "The back arrow's spoken name and the button on a card opened from the Starred list, once it is decided (#575): where they go."
+  fi: "Takaisin tähdellä merkittyihin"
+  sv: "Tillbaka till stjärnmärkta"
+  machine: { fi: true, sv: true }
+
+stars.card.done:
+  en: "Done with this card."
+  description: "On a card opened from the Starred list, after a decision or a block (#575): the line the screen reader is taken to, above the button back. Undo may still stand in the header. Says nothing about the other person."
+  fi: "Tämä kortti on nyt käsitelty."
+  sv: "Det här kortet är klart."
   machine: { fi: true, sv: true }
 
 # --- The chat (#348, ADR-031): the list of conversations, a conversation and its composer ---
