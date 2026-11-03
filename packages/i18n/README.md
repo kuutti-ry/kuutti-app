@@ -56,7 +56,7 @@ A native reviewer reads machine text and approves it; `docs/i18n/translation-rev
 
 `pnpm check:legal-versions` (CI job `i18n`, #208, ADR-010 §4): each kind's version in `CONSENT_VERSIONS` is the one the website publishes in `https://kuutti.app/legal/versions.json`, the app's link to the full text (`legalPageUrl`) is the address the site gives for it, and the site's research and sensitive-answers text is this package's Finnish `legal.<kind>.title` and summary (by the site's fingerprint, `siteFingerprint`). The site's full Finnish page binds and leads: a new version is published there first, and the app follows with the same `consent_version`. `--file <path>` reads a local copy instead of the deployed file.
 
-`pnpm i18n:translate` sends message text (with approved translations from the same namespace as examples), the glossary and the tone guide to the Claude API (`claude-opus-5`), and nothing else; credentials come from the developer's environment (`ANTHROPIC_API_KEY` or an `ant auth login` profile) and are never committed. Every answer is validated and written as machine text.
+`pnpm i18n:translate` sends message text (with approved translations from the same namespace as examples), the glossary and the tone guide to the Claude API (`claude-opus-5-5`), and nothing else; credentials come from the developer's environment (`ANTHROPIC_API_KEY` or an `ant auth login` profile) and are never committed. Every answer is validated and written as machine text.
 
 | command | does |
 |---|---|
