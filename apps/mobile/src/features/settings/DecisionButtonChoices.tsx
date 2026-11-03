@@ -30,7 +30,7 @@ const STYLES: ReadonlyArray<{
 
 /**
  * The decision buttons (#82), in their Settings row (#511): which hand the round's Like and Pass
- * are placed for, one-handed mode, which puts Undo, the fish, Later, Pass and Like
+ * are placed for, one-handed mode, which puts Undo, the star, the fish, Later, Pass and Like
  * in one column on that side, and the marks Like and Pass carry (#520). Kept
  * on the phone (src/lib/decision-buttons.tsx); the buttons keep their words
  * and shapes wherever they sit and whatever they carry.

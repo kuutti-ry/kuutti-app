@@ -30,7 +30,8 @@ import {
 // and the card it opens are here. It reaches nobody, and feeds no order, no count
 // and no event. Every statement names the caller (rule 6), and no route takes
 // another person's id: a star is put on a card by its place, and read, opened and
-// cleared by its own id, which answers 404 to anybody but its owner.
+// cleared by its own id, which answers 404 to anybody but its owner. Raw
+// parameterised SQL through Queryable, as `rounds.ts`, under whose locks it writes.
 
 /** The most stars a person's list may hold (ADR-064 §5); 0 is off, and STARS_CEILING stands either way. */
 const STARS_MAX_KEY = "stars_max";
@@ -108,7 +109,7 @@ export async function putStar(
     const max = await matchingConfigNumber(tx, STARS_MAX_KEY);
     if (max > 0 && shown.size >= max) throw full();
     const written = await tx.query<{ id: string }>(
-      `INSERT INTO star (account_id, candidate_id, created_at) VALUES ($1, $2, $3) RETURNING id`,
+      "INSERT INTO star (account_id, candidate_id, created_at) VALUES ($1, $2, $3) RETURNING id",
       [input.accountId, candidateId, at],
     );
     const id = written.rows[0]?.id;

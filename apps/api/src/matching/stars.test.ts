@@ -423,7 +423,7 @@ describe("the cap", () => {
       const firstApp = await appOn(first);
       const secondApp = await appOn(second);
       await star(firstApp, a, 1);
-      const racing = watched(putStar(secondApp, a, TODAY, 2));
+      const racing = watched(Promise.resolve(putStar(secondApp, a, TODAY, 2)));
       expect(await waitsFor(pool, secondPid, firstPid, racing.settled)).toBe(true);
       await first.query("COMMIT");
       const answer = await racing.outcome;
@@ -449,6 +449,13 @@ describe("the queue and a star", () => {
     );
     expect(cardsOf(await readToday(app, a))).toEqual([]);
     expect(await starsOf(ctx.client, a)).toEqual([b.accountId]);
+    // Nor written into the day's log and hidden there: a page is not spent on them.
+    const { rows } = await ctx.client.query<{ candidate_id: string }>(
+      `SELECT e.candidate_id FROM round_entries e JOIN rounds r ON r.id = e.round_id
+        WHERE r.account_id = $1 AND r.day = $2`,
+      [a.accountId, TODAY],
+    );
+    expect(rows.map((row) => row.candidate_id)).toEqual([c.accountId]);
   });
 
   test("A card starred today leaves the queue at the next read", async ({ ctx }) => {

@@ -1355,7 +1355,8 @@ describe("migrate", () => {
               (
                 await pool.query(
                   `SELECT key, version, value FROM matching_config
-                    WHERE key <> ALL($1::text[]) AND created_by <> 'migration:0104'
+                    WHERE key <> ALL($1::text[])
+                      AND created_by NOT IN ('migration:0104', 'migration:0106')
                     ORDER BY key, version`,
                   [GONE],
                 )

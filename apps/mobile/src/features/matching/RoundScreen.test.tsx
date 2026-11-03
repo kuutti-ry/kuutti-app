@@ -3036,6 +3036,19 @@ describe("a star on a card (#575, ADR-064)", () => {
     expect(screen.queryByRole("button", { name: "Star: Katja" })).toBeNull();
   });
 
+  it("does not come back when a like is taken back: the like took it off", async () => {
+    api(put(), STRANGERS);
+    await show();
+    await press("Star: Katja");
+
+    await press("Like");
+    await press("Undo your last decision");
+    await press("Later");
+    await press("Undo your last decision");
+
+    expect(isOn()).toBe(false);
+  });
+
   it("stays on a card Later was chosen on, and can be cleared there", async () => {
     api(thenClear(), STRANGERS);
     await show();

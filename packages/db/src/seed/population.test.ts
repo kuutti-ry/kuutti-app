@@ -478,7 +478,17 @@ describe("writing the population", () => {
           [`${DEMO_SUBJECT_PREFIX}demo-0001`],
         );
         expect(await count("SELECT count(*) AS n FROM photo_check_note")).toBe(1);
+        // A star between two of them goes too, or its foreign keys would stop the removal (#575).
+        await pool.query(
+          `INSERT INTO star (account_id, candidate_id)
+           SELECT x.id, y.id FROM account x JOIN identity xi ON xi.id = x.identity_id,
+                  account y JOIN identity yi ON yi.id = y.identity_id
+            WHERE xi.broker_subject = $1 AND yi.broker_subject = $2`,
+          [`${DEMO_SUBJECT_PREFIX}demo-0001`, `${DEMO_SUBJECT_PREFIX}demo-0002`],
+        );
+        expect(await count("SELECT count(*) AS n FROM star")).toBe(1);
         expect(await removePopulation(pool)).toEqual({ removed: 100, spared: 0 });
+        expect(await count("SELECT count(*) AS n FROM star")).toBe(0);
         expect(await count("SELECT count(*) AS n FROM photo_check_note")).toBe(0);
         expect(await marked()).toBe(0);
         expect(await count("SELECT count(*) AS n FROM identity")).toBe(others);

@@ -1156,7 +1156,7 @@ export const fi: Readonly<Record<string, string>> = {
   "settings.decisionButtons.label": "Valintapainikkeet",
   "settings.decisionButtons.left": "Vasen käsi",
   "settings.decisionButtons.oneHanded": "Yhdellä kädellä",
-  "settings.decisionButtons.oneHandedHint": "Kumoa, kala, Myöhemmin, Ohita ja Tykkää yhdessä sarakkeessa alhaalla kätesi puolella, peukalon ulottuvilla.",
+  "settings.decisionButtons.oneHandedHint": "Kumoa, tähti, kala, Myöhemmin, Ohita ja Tykkää yhdessä sarakkeessa alhaalla kätesi puolella, peukalon ulottuvilla.",
   "settings.decisionButtons.right": "Oikea käsi",
   "settings.decisionButtons.style": "Painikkeiden tyyli",
   "settings.decisionButtons.style.kuutti": "Kuutti",

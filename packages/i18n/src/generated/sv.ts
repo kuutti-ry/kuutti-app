@@ -1148,7 +1148,7 @@ export const sv: Readonly<Record<string, string>> = {
   "settings.decisionButtons.label": "Valknappar",
   "settings.decisionButtons.left": "Vänster hand",
   "settings.decisionButtons.oneHanded": "Med en hand",
-  "settings.decisionButtons.oneHandedHint": "Ångra, fisken, Senare, Hoppa över och Gilla i en kolumn längst ner på din hands sida, inom räckhåll för tummen.",
+  "settings.decisionButtons.oneHandedHint": "Ångra, stjärnan, fisken, Senare, Hoppa över och Gilla i en kolumn längst ner på din hands sida, inom räckhåll för tummen.",
   "settings.decisionButtons.right": "Höger hand",
   "settings.decisionButtons.style": "Knappstil",
   "settings.decisionButtons.style.kuutti": "Kuutti",

@@ -5734,10 +5734,10 @@ settings.decisionButtons.oneHanded:
   machine: { fi: true, sv: true }
 
 settings.decisionButtons.oneHandedHint:
-  en: "Undo, the fish, Later, Pass and Like in one column at the bottom on your hand's side, within your thumb's reach."
-  description: "Decision buttons screen, under the one-handed switch (#82): what it does. The fish is the app's word for the super-like (ADR-039)."
-  fi: "Kumoa, kala, Myöhemmin, Ohita ja Tykkää yhdessä sarakkeessa alhaalla kätesi puolella, peukalon ulottuvilla."
-  sv: "Ångra, fisken, Senare, Hoppa över och Gilla i en kolumn längst ner på din hands sida, inom räckhåll för tummen."
+  en: "Undo, the star, the fish, Later, Pass and Like in one column at the bottom on your hand's side, within your thumb's reach."
+  description: "Decision buttons screen, under the one-handed switch (#82): what it does. The fish is the app's word for the super-like (ADR-039); the star is a private mark to come back to somebody later (#575), no decision and no rating."
+  fi: "Kumoa, tähti, kala, Myöhemmin, Ohita ja Tykkää yhdessä sarakkeessa alhaalla kätesi puolella, peukalon ulottuvilla."
+  sv: "Ångra, stjärnan, fisken, Senare, Hoppa över och Gilla i en kolumn längst ner på din hands sida, inom räckhåll för tummen."
   machine: { fi: true, sv: true }
 
 settings.decisionButtons.style:

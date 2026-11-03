@@ -1536,7 +1536,7 @@ export const enXA: Readonly<Record<string, string>> = {
   "settings.decisionButtons.label": "［Dééçííšííóóñ búúttóóñš］",
   "settings.decisionButtons.left": "［Lééft hááñd］",
   "settings.decisionButtons.oneHanded": "［ÓÓñéé-hááñdééd］",
-  "settings.decisionButtons.oneHandedHint": "［ÚÚñdóó, théé fííšh, Láátéér, Páášš ááñd Lííkéé ííñ óóñéé çóólúúmñ áát théé bóóttóóm óóñ ýýóóúúr hááñd'š šíídéé, wííthííñ ýýóóúúr thúúmb'š rééááçh.］",
+  "settings.decisionButtons.oneHandedHint": "［ÚÚñdóó, théé štáár, théé fííšh, Láátéér, Páášš ááñd Lííkéé ííñ óóñéé çóólúúmñ áát théé bóóttóóm óóñ ýýóóúúr hááñd'š šíídéé, wííthííñ ýýóóúúr thúúmb'š rééááçh.］",
   "settings.decisionButtons.right": "［Rííght hááñd］",
   "settings.decisionButtons.style": "［Búúttóóñ štýýléé］",
   "settings.decisionButtons.style.kuutti": "［Kúúúúttíí］",

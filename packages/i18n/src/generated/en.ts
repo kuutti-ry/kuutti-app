@@ -1536,7 +1536,7 @@ export const en: Readonly<Record<string, string>> = {
   "settings.decisionButtons.label": "Decision buttons",
   "settings.decisionButtons.left": "Left hand",
   "settings.decisionButtons.oneHanded": "One-handed",
-  "settings.decisionButtons.oneHandedHint": "Undo, the fish, Later, Pass and Like in one column at the bottom on your hand's side, within your thumb's reach.",
+  "settings.decisionButtons.oneHandedHint": "Undo, the star, the fish, Later, Pass and Like in one column at the bottom on your hand's side, within your thumb's reach.",
   "settings.decisionButtons.right": "Right hand",
   "settings.decisionButtons.style": "Button style",
   "settings.decisionButtons.style.kuutti": "Kuutti",
