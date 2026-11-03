@@ -1640,6 +1640,13 @@ describe("the your-turn limit (ADR-062 §5)", () => {
     ["like", "fish"].includes((call.body as { decision: string }).decision)
       ? refusal("your_turn_limit", 409)
       : undefined;
+  /** The list a refusal asks how many wait now: this many, or this answer. */
+  const list = (waiting: number | (() => Response | Promise<Response>)) => (call: Call) => {
+    if (call.path !== "/conversations") return undefined;
+    return typeof waiting === "function"
+      ? waiting()
+      : json({ open: [], archived: [], yourTurn: { waiting, limit: 8, warning: 6 } });
+  };
 
   it.each([
     ["like", "Like"],
@@ -1647,7 +1654,8 @@ describe("the your-turn limit (ADR-062 §5)", () => {
   ] as const)(
     "refuses a %s in words with the number, and the card stays for Pass and Later",
     async (kind, button) => {
-      const sent = api(limited, round(8));
+      const asked = list(8);
+      const sent = api((call) => limited(call) ?? asked(call), round(8));
       await show();
       await press(button);
       expect(screen.getByText(WAITING(8))).toBeTruthy();
@@ -1664,13 +1672,17 @@ describe("the your-turn limit (ADR-062 §5)", () => {
       await press("Pass");
       expect(heading("Riikka, 35")).toBeTruthy();
       expect(sent.decisions()).toEqual([`${DAY}/2 ${kind}`, `${DAY}/2 skip`, `${DAY}/4 pass`]);
-      // The refusal's read of the number, and no other.
-      expect(sent.reads()).toBe(2);
+      // A refusal serves no card again and counts towards no alarm (ADR-008, ADR-041).
+      expect(sent.reads()).toBe(1);
     },
   );
 
   it("refuses a like back on a liked-you card too, which waits on for another day", async () => {
-    const sent = api(limited, { ...page(entry(1, "Henna", "liked_you")), yourTurn: 8 });
+    const asked = list(8);
+    const sent = api((call) => limited(call) ?? asked(call), {
+      ...page(entry(1, "Henna", "liked_you")),
+      yourTurn: 8,
+    });
     await show();
     await press("Like");
     expect(screen.getByText(WAITING(8))).toBeTruthy();
@@ -1680,48 +1692,97 @@ describe("the your-turn limit (ADR-062 §5)", () => {
     expect(sent.decisions()).toEqual([`${DAY}/1 like`, `${DAY}/1 skip`]);
   });
 
-  it("says how many wait now, not the number the phone held, and keeps the card and the fish", async () => {
-    const reads = reading(round(2), round(8));
-    const sent = api((call) => limited(call) ?? reads(call));
+  it("says how many wait now, from the list without thumbs, not the number the phone held", async () => {
+    const paths: string[] = [];
+    const asked = list(8);
+    const sent = api((call) => {
+      paths.push(call.path);
+      return limited(call) ?? asked(call);
+    }, round(2));
+    const fetched = globalThis.fetch as jest.Mock;
     await show();
     await press("Like");
     expect(screen.getByText(WAITING(8))).toBeTruthy();
     expect(heading("Katja, 32")).toBeTruthy();
-    expect(sent.reads()).toBe(2);
+    expect(sent.reads()).toBe(1);
+    expect(paths.filter((path) => path === "/conversations")).toHaveLength(1);
+    const listed = fetched.mock.calls
+      .map(([input]) => new URL((input as Request).url))
+      .find((url) => url.pathname === "/conversations");
+    expect(listed?.searchParams.get("thumbs")).toBe("false");
   });
 
-  it("says the number it holds when that read fails, and the card stays", async () => {
-    const reads = reading(round(3), () => refusal("internal", 500));
-    api((call) => limited(call) ?? reads(call));
-    await show();
-    await press("Like");
-    expect(screen.getByText(WAITING(3))).toBeTruthy();
-    expect(heading("Katja, 32")).toBeTruthy();
-    expect(screen.queryByText("People did not load.")).toBeNull();
-  });
+  it.each([
+    ["refused", () => refusal("internal", 500)],
+    ["no list", () => json({ nothing: true })],
+  ])(
+    "says the number it holds when the list fails: %s, and the card stays",
+    async (_what, gone) => {
+      const asked = list(gone);
+      api((call) => limited(call) ?? asked(call), round(3));
+      await show();
+      await press("Like");
+      expect(screen.getByText(WAITING(3))).toBeTruthy();
+      expect(heading("Katja, 32")).toBeTruthy();
+      expect(screen.queryByText("People did not load.")).toBeNull();
+    },
+  );
 
-  it("takes the number of a decision's answer into a read that fails", async () => {
-    const reads = reading(round(8), () => refusal("internal", 500));
+  it("takes the number of a decision's answer into a list that fails", async () => {
+    const asked = list(() => refusal("internal", 500));
     api((call) => {
       if (
         call.path.endsWith("/decision") &&
         (call.body as { decision: string }).decision === "pass"
       )
         return json({ ...BUDGETS, match: null, yourTurn: 9 });
-      return limited(call) ?? reads(call);
-    });
+      return limited(call) ?? asked(call);
+    }, round(8));
     await show();
     await press("Pass");
     await press("Like");
     expect(screen.getByText(WAITING(9))).toBeTruthy();
   });
 
-  it("drops the answer of a read that lands on another day", async () => {
-    const reads = reading(round(8), { ...page(entry(2, "Katja")), day: "2030-01-02", yourTurn: 1 });
-    api((call) => limited(call) ?? reads(call));
+  it("holds the number it was told, for the next list that fails", async () => {
+    let lists = 0;
+    const asked = list(() => {
+      lists += 1;
+      return lists === 1
+        ? json({ open: [], archived: [], yourTurn: { waiting: 8, limit: 8, warning: 6 } })
+        : refusal("internal", 500);
+    });
+    api((call) => limited(call) ?? asked(call), round(2));
     await show();
     await press("Like");
     expect(screen.getByText(WAITING(8))).toBeTruthy();
+    await press("Like");
+    expect(lists).toBe(2);
+    expect(screen.getByText(WAITING(8))).toBeTruthy();
+  });
+
+  it("says nothing of an old day's refusal once another day was read meanwhile", async () => {
+    const now = jest.spyOn(Date, "now").mockReturnValue(NOON);
+    const late = waiting();
+    const reads = reading(round(8), { ...page(entry(1, "Riikka")), day: NEXT_DAY });
+    const asked = list(late.read);
+    api((call) => limited(call) ?? asked(call) ?? reads(call));
+    await show();
+    await act(async () => {
+      fireEvent.press(screen.getByRole("button", { name: "Like" }));
+    });
+    await settle();
+    // The phone comes back on another day while the list is still on its way.
+    now.mockReturnValue(NEXT_MORNING);
+    await appBecomes("active");
+    expect(heading("Riikka, 31")).toBeTruthy();
+    await late.answer(
+      json({ open: [], archived: [], yourTurn: { waiting: 8, limit: 8, warning: 6 } }),
+    );
+    await settle();
+    expect(screen.queryByText(WAITING(8))).toBeNull();
+    expect(heading("Riikka, 31")).toBeTruthy();
+    now.mockRestore();
   });
 
   it.each([
@@ -1740,7 +1801,8 @@ describe("the your-turn limit (ADR-062 §5)", () => {
     ["sv", 8, "8 samtal väntar på dig. Svara på eller avsluta ett innan du gillar någon ny."],
   ] as const)("says it in %s for %i", async (languageTag, yourTurn, words) => {
     (useLocales as jest.Mock).mockReturnValue([{ languageTag }]);
-    api(limited, round(yourTurn));
+    const asked = list(yourTurn);
+    api((call) => limited(call) ?? asked(call), round(yourTurn));
     await show();
     await press(languageTag === "en" ? "Like" : languageTag === "fi" ? "Tykkää" : "Gilla");
     expect(screen.getByText(words)).toBeTruthy();
@@ -1748,7 +1810,8 @@ describe("the your-turn limit (ADR-062 §5)", () => {
 
   it("says it where a notice is said, each time: in sight under the header, aloud on iOS", async () => {
     jest.replaceProperty(Platform, "OS", "ios");
-    api(limited, round(8));
+    const asked = list(8);
+    api((call) => limited(call) ?? asked(call), round(8));
     await show();
     await press("Like");
     await press("Like");

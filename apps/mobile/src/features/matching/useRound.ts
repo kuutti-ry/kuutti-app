@@ -10,7 +10,14 @@ import { useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AppState } from "react-native";
 import { ApiError } from "@/lib/api";
-import { decide, fetchRound, relaxToday, reportSeen, undoRelaxation } from "./client";
+import {
+  decide,
+  fetchRound,
+  fetchYourTurn,
+  relaxToday,
+  reportSeen,
+  undoRelaxation,
+} from "./client";
 
 type RoundView =
   | { status: "loading" }
@@ -79,7 +86,9 @@ const byPosition = (entries: readonly RoundEntry[]): RoundEntry[] =>
  * final (ADR-038 §3), so nothing offers it back. Each card reports itself seen
  * once. Whether a fish can go today, how many likes are left and how many
  * conversations wait come with each read and with every decision's answer
- * (#475, #524, ADR-062 §5), never from a read of their own (ADR-008).
+ * (#475, #524, ADR-062 §5), never from a read of the queue of their own (ADR-008);
+ * a like refused over the conversations waiting asks the list, which hands over
+ * no card.
  *
  * A day that ended while the screen was open is read anew: the API refuses
  * the old day's writes (409 `round_expired`), and the screen says why it
@@ -332,12 +341,12 @@ export function useRound() {
           setNotice("errors.fish_budget_exceeded");
         } else if (code === "your_turn_limit") {
           // Nothing was saved: the card stays, for a pass or Later (ADR-062 §5). The
-          // refusal carries no number, and the one held may be hours old, so a read
-          // says how many wait now; one that fails leaves the number held.
-          const fresh = await fetchRound().catch(() => null);
+          // refusal carries no number, and the one held may be hours old, so the list
+          // says how many wait now; a read that fails leaves the number held.
+          const now = await fetchYourTurn().catch(() => null);
           const held = onDay(day);
           if (!held) return;
-          const waiting = fresh?.day === day ? fresh.yourTurn : held.yourTurn;
+          const waiting = now ?? held.yourTurn;
           showRound({ ...held, yourTurn: waiting });
           setNotice({ waiting });
         } else {

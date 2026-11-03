@@ -1,5 +1,6 @@
 import {
   type ApiComponents,
+  ConversationList,
   type DealBreakerField,
   ErrorResponse,
   type Relaxation,
@@ -43,6 +44,20 @@ export async function reportSeen(day: string, position: number): Promise<void> {
     params: { path: { day, position } },
   });
   if (!response.ok) throw failed(response, error, "seen");
+}
+
+/**
+ * How many conversations wait on the person's answer now (ADR-062 §5), for the
+ * refusal that carries no number: the list without thumbs, which signs and spends
+ * nothing, where a read of the queue would serve its cards again (ADR-008) and
+ * count towards its alarm (ADR-041).
+ */
+export async function fetchYourTurn(): Promise<number> {
+  const { data, error, response } = await api.GET("/conversations", {
+    params: { query: { thumbs: "false" } },
+  });
+  if (!data) throw failed(response, error, "conversations");
+  return ConversationList.parse(data).yourTurn.waiting;
 }
 
 /**

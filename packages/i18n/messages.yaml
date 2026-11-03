@@ -8255,7 +8255,7 @@ pond.gate.failed:
   sv: "Det gick inte att kontrollera matchningen."
   machine: { fi: true, sv: true }
 
-# --- Today's round (#379, ADR-034): one card at a time, like and pass, come back tomorrow ---
+# --- The queue (#379, #502, ADR-034, ADR-062): one card at a time, like, pass and Later, to its end ---
 
 round.home.open:
   en: "See people"

@@ -50,6 +50,7 @@ So there is one queue, an inbox stop, a your-turn limit and a ladder of clocks. 
 15. **Following from those, the agent's and not put to him:**
     - `QUEUE_PAGE` is 10, a contract constant and no tunable: nobody meets it, and it bounds a read and how often a read walks the pool.
     - The two budgets stay in the code with 0 for off, the idiom of the automatic rules, rather than being taken out, so that a ceiling can come back from the panel on the day it is needed.
+    - The pile counts only the likes the inbox could show now, and only a like or a pass clears one: #502's comment of 31/10/2026 proposed it and the question he answered with 30 described it, but he was not asked about it by itself.
     - The stop holds a person out of seen-before cards too, where the issue says "new card": a second look brings likes as a first one does.
     - `round_built` and `RoundOrdering` go: a set that no longer exists has no size to count. `profile_viewed`, `like` and `pass` stay, their `position` widened. A skip is no event.
     - A pass on a card clears nothing of the mark's meaning: a third pass is another year, and a pass whose earlier one has been pruned counts as a first.
