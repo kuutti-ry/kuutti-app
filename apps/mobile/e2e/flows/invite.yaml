@@ -61,9 +61,13 @@ name: An invitation made in Settings shows its code once, is shared, and is with
       platform: Android
     commands:
       - back
-- extendedWaitUntil:
-    visible: "Share the code|Jaa koodi|Dela koden"
-    timeout: 15000
+# The swipe also scrolls the page under the sheet, since Settings is one long
+# list (#511), so on iOS the button may have gone down the page.
+- scrollUntilVisible:
+    element: "Share the code|Jaa koodi|Dela koden"
+    direction: DOWN
+    centerElement: true
+    timeout: 60000
 - assertNotVisible: "The share did not open\\..*|Jakaminen ei avautunut\\..*|Delningen öppnades inte\\..*"
 
 # The newest open invitation, first under its heading, is the one just made:
