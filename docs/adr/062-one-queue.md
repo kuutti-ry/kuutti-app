@@ -69,6 +69,14 @@ So there is one queue, an inbox stop, a your-turn limit and a ladder of clocks. 
 - Reading the first months' measures (#503) reads the round records, so what was shown, skipped and answered stays readable for a year.
 - #374's review notes name daily rounds and the exposure cap as what makes the design different; both are gone.
 
+## Migrations
+
+Rows the schema's DSL cannot express, so two of the three are `generate --custom` (CLAUDE.md rule 10):
+
+- `0102_round_push_goes`: `DELETE FROM "matching_config" WHERE "key" IN ('round_push_hour', 'round_push_idle_days')`, and `DELETE FROM "notification_preference" WHERE "kind" = 'round'`, before the next migration takes `round` out of the enum.
+- `0103_queue_ladder`, generated: `skip` in `round_decision`, `round` out of `notification_kind`, `round_entries.second_pass` with its check, `account.home_moved_at` gone.
+- `0104_queue_config`: `DELETE FROM "matching_config" WHERE "key" IN ('round_size', 'liked_you_cap', 'shown_cooldown_days', 'impression_cap_per_day')`; version 1 of `liked_cooldown_days`, `ended_cooldown_days`, `second_pass_cooldown_days`, `your_turn_limit`, `your_turn_warning` and `inbox_stop`; and the next version of `pass_cooldown_days`, `exposure_cards_per_day`, `photo_fetches_per_day`, `auto_shadow_ban_cards_served`, `auto_shadow_ban_cards_served_minutes` and `auto_shadow_ban_photo_fetches`, each the next of its key, so that a value set in the panel before it ran is followed, not kept.
+
 ## Alternatives
 
 - **Keep a ceiling of 60 or 300 cards a day.** Stronger against copying, but it keeps the limit Nanna called patronising, or one nobody honest meets. Rejected by the maintainer, 01/11/2026.
