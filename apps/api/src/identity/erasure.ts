@@ -116,7 +116,7 @@ export type ErasureSummary = {
   rounds: number;
   /** The entries in which the person was somebody's card, decisions on them included (#96). */
   roundEntriesAsCandidate: number;
-  /** The stars the person put and those put on them (#575). */
+  /** The stars the person put (#575). Those put on them go too, and are in no count (ADR-064 §8). */
   stars: number;
   /** The consent rows (ADR-010 §14). */
   consents: number;

@@ -9,6 +9,7 @@ import {
 import { AppError } from "../lib/errors.ts";
 import { finnishDay } from "../lib/finnish-day.ts";
 import { matchingConfigNumber } from "../lib/matching-config.ts";
+import { wasShown } from "../media/index.ts";
 import {
   addPlaces,
   budgetsOf,
@@ -60,8 +61,9 @@ const full = () => new AppError(409, "stars_full", "The person's list of stars i
  * two accounts in id order and then the round's row, so an erasure under way
  * finishes first, one that comes later waits, and two devices cannot both pass
  * the count. A card holding a like or a pass takes none, since those take the star
- * off (§3), and one that can no longer be shown takes none either: both are the
- * 404 of a card gone. Past the most a list may hold it answers `stars_full`: the
+ * off (§3), one that can no longer be shown takes none, and neither does one the
+ * person was never served, since the list says a name and an age and no budget
+ * would count them (ADR-008): all are the 404 of a card gone. Past the most a list may hold it answers `stars_full`: the
  * count is of those the list shows now (§5), so it never says full to somebody
  * who sees fewer.
  */
@@ -94,6 +96,11 @@ export async function putStar(
       [input.accountId, today, input.position],
     );
     if (open.rows.length === 0) throw notFound();
+    const served = await wasShown(tx, {
+      viewerAccountId: input.accountId,
+      subjectAccountId: candidateId,
+    });
+    if (!served) throw notFound();
     const held = await tx.query<{ id: string; candidate_id: string }>(
       "SELECT id, candidate_id FROM star WHERE account_id = $1",
       [input.accountId],
@@ -193,14 +200,13 @@ export async function openStar(
 
 /**
  * Erasure's part (TD-7, ADR-007 §4, ADR-064 §9), inside its transaction: the stars
- * the person put and those put on them. How many, either way.
+ * the person put and those put on them. How many the person put, for the summary:
+ * how many were on them is in no count, a log line's included (§8).
  */
 export async function eraseStarsOf(tx: Queryable, accountId: string): Promise<number> {
-  const { rowCount } = await tx.query(
-    "DELETE FROM star WHERE account_id = $1 OR candidate_id = $1",
-    [accountId],
-  );
-  return rowCount ?? 0;
+  const own = await tx.query("DELETE FROM star WHERE account_id = $1", [accountId]);
+  await tx.query("DELETE FROM star WHERE candidate_id = $1", [accountId]);
+  return own.rowCount ?? 0;
 }
 
 /** The person's own stars for their export, the latest first: when, never on whom. */

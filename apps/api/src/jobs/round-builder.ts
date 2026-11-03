@@ -323,13 +323,21 @@ async function heldBack(
   t: Pick<Today, "day" | "byId" | "config">,
   ids: readonly string[],
 ): Promise<Set<string>> {
-  return heldOf(db, t, await atTheStop(db, t, ids));
+  const held = new Set<string>();
+  for (const id of await atTheStop(db, t, ids)) {
+    const person = t.byId.get(id);
+    if (!person) continue;
+    const history = await historyOf(db, id, t.day, t.config);
+    const { places } = await inboxOf(db, person, t.day, t.config, history, t.byId);
+    if (places.length >= t.config.inbox_stop) held.add(id);
+  }
+  return held;
 }
 
 /** The raw count's half of `heldBack`. */
 async function atTheStop(
   db: Queryable,
-  t: Pick<Today, "day" | "config">,
+  t: { day: string; config: BuilderConfig },
   ids: readonly string[],
 ): Promise<string[]> {
   const stop = t.config.inbox_stop;
@@ -350,43 +358,42 @@ async function atTheStop(
   return rows.map((row) => row.id);
 }
 
-/** The exact half of `heldBack`: of these, whose raw count reached the stop, those it holds out. */
-async function heldOf(
-  db: Queryable,
-  t: Pick<Today, "day" | "byId" | "config">,
-  ids: readonly string[],
-): Promise<Set<string>> {
-  const held = new Set<string>();
-  for (const id of ids) {
-    const person = t.byId.get(id);
-    if (!person) continue;
-    const history = await historyOf(db, id, t.day, t.config);
-    const { places } = await inboxOf(db, person, t.day, t.config, history, t.byId);
-    if (places.length >= t.config.inbox_stop) held.add(id);
-  }
-  return held;
-}
-
 /**
- * Of these people, those the inbox stop holds out (ADR-062 §4), for a reader that
- * has walked no pool: the Starred list (ADR-064 §6), which reads the pool only when
- * somebody on it is at the stop.
+ * Of these people, whom a person's Starred list leaves out by the queue's rules
+ * (ADR-064 §6). Nothing may tell that somebody's pile is at the inbox stop (ADR-062
+ * §4), so the stop is asked with care. Whoever the person's own queue shows today
+ * anyway, in today's log or with a like waiting on them, is not asked it: their
+ * leaving the list while the queue still shows them would say why, and a like on
+ * them is no new way past the stop. The rest are asked the raw count alone, one
+ * statement whoever is on the list: the exact count reads the whole pool for
+ * whoever is at the stop, so the answer's time would say it. A shadow-banned
+ * person's star on somebody whose like waits waits for the lift as the like does,
+ * since that person is no ordinary card meanwhile (ADR-037 §7).
  */
-export async function stoppedAmong(
+export async function heldFromStars(
   deps: Pick<BuilderDeps, "now">,
   db: Queryable,
-  pondId: string,
+  accountId: string,
   ids: readonly string[],
 ): Promise<ReadonlySet<string>> {
-  const at = deps.now();
-  const t = { day: finnishDay(at), config: await matchingConfigNumbers(db, ALL_KEYS) };
-  const raw = await atTheStop(db, t, ids);
-  if (raw.length === 0) return new Set();
-  const subjects = await subjectsOfPond(db, pondId, at);
-  const byId = new Map(
-    subjects.filter((subject) => subject.visible).map((subject) => [subject.id, subject]),
+  const day = finnishDay(deps.now());
+  const config = await matchingConfigNumbers(db, KEYS);
+  const waits = new Set((await waitingOn(db, accountId, day, config)).map((like) => like.id));
+  const inLog = await db.query<{ candidate_id: string }>(
+    `SELECT e.candidate_id FROM round_entries e JOIN rounds r ON r.id = e.round_id
+      WHERE r.account_id = $1 AND r.day = $2`,
+    [accountId, day],
   );
-  return heldOf(db, { ...t, byId }, raw);
+  const queued = new Set(inLog.rows.map((row) => row.candidate_id));
+  const stopped = await atTheStop(
+    db,
+    { day, config },
+    ids.filter((id) => !waits.has(id) && !queued.has(id)),
+  );
+  const me = await db.query("SELECT 1 FROM account WHERE id = $1 AND state = 'shadow_banned'", [
+    accountId,
+  ]);
+  return new Set([...stopped, ...(me.rows.length > 0 ? ids.filter((id) => waits.has(id)) : [])]);
 }
 
 /**
@@ -454,7 +461,7 @@ const letsIn = (wider: PoolPerson, narrower: PoolPerson) => (subject: Subject) =
   inEachOthersPool(wider, subject.person) && !inEachOthersPool(narrower, subject.person);
 
 /** The day's relaxations somebody needs: those without which the person's filters still keep them out. */
-function needsOf(owner: PoolPerson, relaxed: readonly Relaxation[], candidate: PoolPerson) {
+export function needsOf(owner: PoolPerson, relaxed: readonly Relaxation[], candidate: PoolPerson) {
   return relaxed
     .filter(
       (r) =>

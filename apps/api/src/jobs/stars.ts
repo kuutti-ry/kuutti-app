@@ -1,10 +1,16 @@
 import type { Queryable } from "@kuutti/db";
 import type { StarredPerson } from "@kuutti/schema";
 import { finnishDay } from "../lib/finnish-day.ts";
-import { bandBetween, type Place } from "../matching/index.ts";
+import { bandBetween, type Place, relaxationsOf } from "../matching/index.ts";
 import { ageInYears } from "../profile/index.ts";
 import { openPondOf, subjectsAmong } from "./pool.ts";
-import { type BuilderDeps, fittingNow, likeWaiting, stoppedAmong } from "./round-builder.ts";
+import {
+  type BuilderDeps,
+  fittingNow,
+  heldFromStars,
+  likeWaiting,
+  needsOf,
+} from "./round-builder.ts";
 
 /**
  * What the stars read across slices (#575, ADR-064), with the jobs for the reason
@@ -15,9 +21,10 @@ import { type BuilderDeps, fittingNow, likeWaiting, stoppedAmong } from "./round
 /**
  * Which of these people a person's Starred list shows now (ADR-064 §6): matching
  * open for the person, the two in each other's pool both ways as the queue asks it
- * (ADR-062 §8), the other seen by others, and not past the inbox stop. Asked on
- * every read, and never remembered, so somebody left out comes back by themselves
- * when they pass again. In the caller's transaction when there is one.
+ * (ADR-062 §8), the other seen by others, and not held back by the queue's rules
+ * (`heldFromStars`). Asked on every read, and never remembered, so somebody left
+ * out comes back by themselves when they pass again. In the caller's transaction
+ * when there is one.
  */
 export async function starsShown(
   deps: Pick<BuilderDeps, "now">,
@@ -26,22 +33,23 @@ export async function starsShown(
   candidateIds: readonly string[],
 ): Promise<ReadonlySet<string>> {
   if (candidateIds.length === 0) return new Set();
-  const pondId = await openPondOf(db, accountId);
-  if (!pondId) return new Set();
+  if (!(await openPondOf(db, accountId))) return new Set();
   const fitting = (await fittingNow(deps, db, accountId, candidateIds))
     .filter((subject) => subject.visible)
     .map((subject) => subject.id);
-  const stopped = await stoppedAmong(deps, db, pondId, fitting);
-  return new Set(fitting.filter((id) => !stopped.has(id)));
+  const held = await heldFromStars(deps, db, accountId, fitting);
+  return new Set(fitting.filter((id) => !held.has(id)));
 }
 
 /**
  * Where a starred card goes in today's log when opened (ADR-064 §4): as the queue
- * would have this person now, a like waiting first, and otherwise seen before, the
- * person having been shown them; never a label of its own, which would carry a star
- * into the research events. A shadow-banned person's card never says a like waits
- * (ADR-037 §7). With the band as it stands now (ADR-061 §5). Null while either is
- * not complete, or matching is not open for the person.
+ * would have this person now, a like waiting first; then, for somebody who fits
+ * only through today's relaxations, as those bring them, so that a like on them
+ * waives those deal-breakers and can arrive (ADR-042 §5, §7); and otherwise seen
+ * before, the person having been shown them. Never a label of its own, which would
+ * carry a star into the research events. A shadow-banned person's card never says
+ * a like waits (ADR-037 §7). With the band as it stands now (ADR-061 §5). Null while
+ * either is not complete, or matching is not open for the person.
  */
 export async function starPlace(
   deps: BuilderDeps,
@@ -55,12 +63,15 @@ export async function starPlace(
   const owner = subjects.find((subject) => subject.id === accountId);
   const candidate = subjects.find((subject) => subject.id === candidateId);
   if (!owner || !candidate) return null;
-  const waits = owner.visible ? await likeWaiting(deps.db, owner, candidate, finnishDay(at)) : null;
-  return {
-    candidateId,
-    reason: waits ?? "seen_before",
-    distance: bandBetween(owner.person.home, candidate.person.home),
-  };
+  const day = finnishDay(at);
+  const distance = bandBetween(owner.person.home, candidate.person.home);
+  const waits = owner.visible ? await likeWaiting(deps.db, owner, candidate, day) : null;
+  if (waits) return { candidateId, reason: waits, distance };
+  const relaxed = (await relaxationsOf(deps.db, accountId, day))?.relaxed ?? [];
+  const needs = needsOf(owner.person, relaxed, candidate.person);
+  return needs.length > 0
+    ? { candidateId, reason: "relaxed", distance, relaxedWith: needs }
+    : { candidateId, reason: "seen_before", distance };
 }
 
 /**

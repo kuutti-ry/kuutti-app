@@ -9,6 +9,7 @@ import {
 } from "@kuutti/schema";
 import { type App, createApp } from "../app.ts";
 import { CURRENT_CONSENT_VERSIONS, eraseAccount, exportAccount } from "../identity/index.ts";
+import { starPlace } from "../jobs/stars.ts";
 import { finnishDay } from "../lib/finnish-day.ts";
 import { ensureEventPartitions } from "../research/index.ts";
 import { signInAs, withMatchingConfig } from "../test/account.ts";
@@ -25,7 +26,7 @@ import {
 import { openPond, people, pondNamed } from "../test/people.ts";
 import { FITTING } from "../test/queue.ts";
 import { pidOf, waitsFor, watched, withTwoConnections } from "../test/races.ts";
-import { logged, shownAt } from "../test/rounds.ts";
+import { type LoggedCard, logged, shownAt } from "../test/rounds.ts";
 
 // The stars (#575, ADR-064, features/matching/stars.feature): a star on a card, the
 // queue leaving a starred person out, the list and whoever it leaves out, a card
@@ -134,6 +135,29 @@ async function starsOf(db: Queryable, who: Person): Promise<string[]> {
   return rows.map((row) => row.candidate_id);
 }
 
+/** These cards in `owner`'s log of today, at the next places, each served as a read serves one. */
+async function queued(db: Queryable, owner: Person, cards: readonly LoggedCard[]) {
+  await logged(db, owner.accountId, TODAY, cards);
+  for (const card of cards) {
+    const candidate = typeof card === "string" ? card : card.candidateId;
+    await cardShown(db, owner.accountId, candidate, NOON);
+  }
+}
+
+/** The statements a read of the list runs, in order, each with its parameters taken out. */
+async function statementsOfList(db: Queryable, who: Person): Promise<string[]> {
+  const statements: string[] = [];
+  const counting: Queryable = {
+    query: (text, values) => {
+      statements.push(text.replace(/\s+/g, " ").trim());
+      return db.query(text, values) as never;
+    },
+  };
+  const answer = await (await appOn(counting)).request("/stars", { headers: who.headers });
+  expect(answer.status).toBe(200);
+  return statements;
+}
+
 /** `owner` was shown `candidate`'s card yesterday, left it undecided and left a star on it; the star's id. */
 async function starredYesterday(db: Queryable, owner: Person, candidate: Person): Promise<string> {
   await shownAt(db, YESTERDAY_NOON, owner.accountId, candidate.accountId, null);
@@ -196,7 +220,7 @@ describe("a star on a card", () => {
   test("A star spends nothing and leaves the card undecided", async ({ ctx }) => {
     const { app, who } = await scene(ctx, 3);
     const [a, b, c] = [person(who, 0), person(who, 1), person(who, 2)];
-    await logged(ctx.client, a.accountId, TODAY, [b.accountId, c.accountId]);
+    await queued(ctx.client, a, [b.accountId, c.accountId]);
     await withMatchingConfig(ctx.client, { like_budget_balanced: 0 });
 
     const { id } = await star(app, a, 1);
@@ -221,7 +245,7 @@ describe("a star on a card", () => {
     const { app, who } = await scene(ctx, 2);
     const [a, b] = [person(who, 0), person(who, 1)];
     await joinStudy(app, a);
-    await logged(ctx.client, a.accountId, TODAY, [b.accountId]);
+    await queued(ctx.client, a, [b.accountId]);
     const before = await readToday(app, b);
     const events = async () =>
       (await ctx.client.query<{ n: number }>("SELECT count(*)::int AS n FROM events")).rows[0]?.n;
@@ -240,7 +264,7 @@ describe("a star on a card", () => {
     const [a, b, c, liker] = [person(who, 0), person(who, 1), person(who, 2), person(who, 3)];
     await withMatchingConfig(ctx.client, { inbox_stop: 2 });
     await likedYesterday(ctx.client, liker, b);
-    await logged(ctx.client, a.accountId, TODAY, [b.accountId]);
+    await queued(ctx.client, a, [b.accountId]);
 
     await star(app, a, 1);
 
@@ -250,7 +274,7 @@ describe("a star on a card", () => {
   test("A star again answers the same star", async ({ ctx }) => {
     const { app, who } = await scene(ctx, 2);
     const [a, b] = [person(who, 0), person(who, 1)];
-    await logged(ctx.client, a.accountId, TODAY, [b.accountId]);
+    await queued(ctx.client, a, [b.accountId]);
 
     const first = await star(app, a, 1);
     const again = await star(app, a, 1);
@@ -262,7 +286,7 @@ describe("a star on a card", () => {
   test("The first star says it is the only one", async ({ ctx }) => {
     const { app, who } = await scene(ctx, 3);
     const [a, b, c] = [person(who, 0), person(who, 1), person(who, 2)];
-    await logged(ctx.client, a.accountId, TODAY, [b.accountId, c.accountId]);
+    await queued(ctx.client, a, [b.accountId, c.accountId]);
 
     expect((await star(app, a, 1)).first).toBe(true);
     expect((await star(app, a, 2)).first).toBe(false);
@@ -290,7 +314,7 @@ describe("a star on a card", () => {
   test("Another person's card is out of reach", async ({ ctx }) => {
     const { app, who } = await scene(ctx, 3);
     const [a, b, c] = [person(who, 0), person(who, 1), person(who, 2)];
-    await logged(ctx.client, a.accountId, TODAY, [b.accountId]);
+    await queued(ctx.client, a, [b.accountId]);
 
     const answer = await putStar(app, c, TODAY, 1);
 
@@ -302,7 +326,7 @@ describe("a star on a card", () => {
   test("A card that can no longer be shown takes no star", async ({ ctx }) => {
     const { app, who } = await scene(ctx, 3);
     const [a, b, c] = [person(who, 0), person(who, 1), person(who, 2)];
-    await logged(ctx.client, a.accountId, TODAY, [b.accountId, c.accountId]);
+    await queued(ctx.client, a, [b.accountId, c.accountId]);
     await block(ctx.client, a, b);
     await setState(ctx.client, c, "suspended");
 
@@ -313,10 +337,23 @@ describe("a star on a card", () => {
     expect(await starsOf(ctx.client, a)).toEqual([]);
   });
 
+  test("A card never served takes no star", async ({ ctx }) => {
+    const { app, who } = await scene(ctx, 2);
+    const [a, b] = [person(who, 0), person(who, 1)];
+    // In the log but never handed over, as past a day's budget of cards where the panel sets one.
+    await logged(ctx.client, a.accountId, TODAY, [b.accountId]);
+
+    const answer = await putStar(app, a, TODAY, 1);
+
+    expect(answer.status).toBe(404);
+    expect(await errorCode(answer)).toBe("not_found");
+    expect(await starsOf(ctx.client, a)).toEqual([]);
+  });
+
   test("A card holding a like or a pass takes no star", async ({ ctx }) => {
     const { app, who } = await scene(ctx, 3);
     const [a, b, c] = [person(who, 0), person(who, 1), person(who, 2)];
-    await logged(ctx.client, a.accountId, TODAY, [b.accountId, c.accountId]);
+    await queued(ctx.client, a, [b.accountId, c.accountId]);
     expect((await decide(app, a, TODAY, 1, "like")).status).toBe(200);
     expect((await decide(app, a, TODAY, 2, "pass")).status).toBe(200);
 
@@ -351,7 +388,7 @@ describe("the cap", () => {
     const { app, who } = await scene(ctx, 4);
     const [a, b, c, d] = [person(who, 0), person(who, 1), person(who, 2), person(who, 3)];
     await withMatchingConfig(ctx.client, { stars_max: 2 });
-    await logged(ctx.client, a.accountId, TODAY, [b.accountId, c.accountId, d.accountId]);
+    await queued(ctx.client, a, [b.accountId, c.accountId, d.accountId]);
     await star(app, a, 1);
     await star(app, a, 2);
 
@@ -366,7 +403,7 @@ describe("the cap", () => {
     const { app, who } = await scene(ctx, 3);
     const [a, b, c] = [person(who, 0), person(who, 1), person(who, 2)];
     await withMatchingConfig(ctx.client, { stars_max: 2 });
-    await logged(ctx.client, a.accountId, TODAY, [b.accountId, c.accountId]);
+    await queued(ctx.client, a, [b.accountId, c.accountId]);
     await star(app, a, 1);
 
     await star(app, a, 2);
@@ -378,7 +415,7 @@ describe("the cap", () => {
     const { app, who } = await scene(ctx, 3);
     const [a, b, c] = [person(who, 0), person(who, 1), person(who, 2)];
     await withMatchingConfig(ctx.client, { stars_max: 0 });
-    await logged(ctx.client, a.accountId, TODAY, [b.accountId, c.accountId]);
+    await queued(ctx.client, a, [b.accountId, c.accountId]);
     // All but one of the ceiling, on people the list leaves out: no profile, so quick to write.
     const pond = await pondNamed(ctx.client, "test-stars-ceiling");
     const others = await people(ctx.client, pond, STARS_CEILING - 1);
@@ -400,7 +437,7 @@ describe("the cap", () => {
     const { app, who } = await scene(ctx, 4);
     const [a, b, c, d] = [person(who, 0), person(who, 1), person(who, 2), person(who, 3)];
     await withMatchingConfig(ctx.client, { stars_max: 2 });
-    await logged(ctx.client, a.accountId, TODAY, [b.accountId, c.accountId, d.accountId]);
+    await queued(ctx.client, a, [b.accountId, c.accountId, d.accountId]);
     await star(app, a, 1);
     await star(app, a, 2);
     await setAges(ctx.client, c, { min: 18, max: 19 });
@@ -415,7 +452,7 @@ describe("the cap", () => {
       const who = await cast(pool, 3);
       const [a, b, c] = [person(who, 0), person(who, 1), person(who, 2)];
       await withMatchingConfig(pool, { stars_max: 1 });
-      await logged(pool, a.accountId, TODAY, [b.accountId, c.accountId]);
+      await queued(pool, a, [b.accountId, c.accountId]);
       const firstPid = await pidOf(first);
       const secondPid = await pidOf(second);
       await first.query("BEGIN");
@@ -461,7 +498,7 @@ describe("the queue and a star", () => {
   test("A card starred today leaves the queue at the next read", async ({ ctx }) => {
     const { app, who } = await scene(ctx, 2);
     const [a, b] = [person(who, 0), person(who, 1)];
-    await logged(ctx.client, a.accountId, TODAY, [b.accountId]);
+    await queued(ctx.client, a, [b.accountId]);
     expect(cardsOf(await readToday(app, a))).toEqual([b.accountId]);
 
     await star(app, a, 1);
@@ -498,10 +535,7 @@ describe("the queue and a star", () => {
   test("A read says the star on a card that holds one, and null on another", async ({ ctx }) => {
     const { app, who } = await scene(ctx, 3);
     const [a, b, c] = [person(who, 0), person(who, 1), person(who, 2)];
-    await logged(ctx.client, a.accountId, TODAY, [
-      { candidateId: b.accountId, reason: "liked_you" },
-      c.accountId,
-    ]);
+    await queued(ctx.client, a, [{ candidateId: b.accountId, reason: "liked_you" }, c.accountId]);
     const { id } = await star(app, a, 1);
 
     const round = await readToday(app, a);
@@ -518,7 +552,7 @@ describe("the queue and a star", () => {
     ])("$choice", async ({ choice, on }, { ctx }) => {
       const { app, who } = await scene(ctx, 2);
       const [a, b] = [person(who, 0), person(who, 1)];
-      await logged(ctx.client, a.accountId, TODAY, [b.accountId]);
+      await queued(ctx.client, a, [b.accountId]);
       await star(app, a, 1);
 
       expect((await decide(app, a, TODAY, 1, choice)).status).toBe(200);
@@ -530,7 +564,7 @@ describe("the queue and a star", () => {
   test("A like refused leaves the star on", async ({ ctx }) => {
     const { app, who } = await scene(ctx, 2);
     const [a, b] = [person(who, 0), person(who, 1)];
-    await logged(ctx.client, a.accountId, TODAY, [b.accountId]);
+    await queued(ctx.client, a, [b.accountId]);
     await star(app, a, 1);
     await withMatchingConfig(ctx.client, { like_budget_balanced: 0 });
 
@@ -543,7 +577,7 @@ describe("the queue and a star", () => {
   test("A like taken back does not bring the star back", async ({ ctx }) => {
     const { app, who } = await scene(ctx, 2);
     const [a, b] = [person(who, 0), person(who, 1)];
-    await logged(ctx.client, a.accountId, TODAY, [b.accountId]);
+    await queued(ctx.client, a, [b.accountId]);
     await star(app, a, 1);
     expect((await decide(app, a, TODAY, 1, "like")).status).toBe(200);
 
@@ -562,7 +596,7 @@ describe("the list", () => {
   }) => {
     const { app, who } = await scene(ctx, 3);
     const [a, b, c] = [person(who, 0), person(who, 1), person(who, 2)];
-    await logged(ctx.client, a.accountId, TODAY, [b.accountId, c.accountId]);
+    await queued(ctx.client, a, [b.accountId, c.accountId]);
     const photoOfB = await cardShown(ctx.client, a.accountId, b.accountId, NOON);
     const photoOfC = await cardShown(ctx.client, a.accountId, c.accountId, NOON);
     const starOnB = await star(app, a, 1);
@@ -592,8 +626,8 @@ describe("the list", () => {
   test("The list offers no photo the person was never shown", async ({ ctx }) => {
     const { app, who } = await scene(ctx, 2);
     const [a, b] = [person(who, 0), person(who, 1)];
-    await logged(ctx.client, a.accountId, TODAY, [b.accountId]);
-    const { id } = await star(app, a, 1);
+    // The star's row with no shown record behind it, as after a new set of photos.
+    const id = await starredYesterday(ctx.client, a, b);
 
     expect(await listOf(app, a)).toEqual([{ id, name: "Aino", age: 36, photo: null }]);
   });
@@ -601,7 +635,7 @@ describe("the list", () => {
   test("An empty list is a list, and it holds nobody else's stars", async ({ ctx }) => {
     const { app, who } = await scene(ctx, 3);
     const [a, b, c] = [person(who, 0), person(who, 1), person(who, 2)];
-    await logged(ctx.client, a.accountId, TODAY, [b.accountId]);
+    await queued(ctx.client, a, [b.accountId]);
     await star(app, a, 1);
 
     expect(await listOf(app, c)).toEqual([]);
@@ -662,7 +696,7 @@ describe("the list", () => {
     test.for(rows)("$what", async ({ on, off }, { ctx }) => {
       const { app, who } = await scene(ctx, 2);
       const [a, b] = [person(who, 0), person(who, 1)];
-      await logged(ctx.client, a.accountId, TODAY, [b.accountId]);
+      await queued(ctx.client, a, [b.accountId]);
       const { id } = await star(app, a, 1);
 
       await on(ctx.client, a, b);
@@ -711,6 +745,53 @@ describe("the list", () => {
 
     expect((await listOf(app, a)).map((item) => item.id)).toEqual([id]);
     expect((await open(app, a, id)).status).toBe(200);
+  });
+
+  test("Somebody the person's own queue shows today stays on the list past the inbox stop", async ({
+    ctx,
+  }) => {
+    const { app, who } = await scene(ctx, 3);
+    const [a, b, liker] = [person(who, 0), person(who, 1), person(who, 2)];
+    await queued(ctx.client, a, [b.accountId]);
+    const { id } = await star(app, a, 1);
+    await withMatchingConfig(ctx.client, { inbox_stop: 1 });
+    await likedYesterday(ctx.client, liker, b);
+
+    expect((await listOf(app, a)).map((item) => item.id)).toEqual([id]);
+    expect((await open(app, a, id)).status).toBe(200);
+  });
+
+  test("Somebody whose like waits on the person stays on the list past the inbox stop", async ({
+    ctx,
+  }) => {
+    const { app, who } = await scene(ctx, 3);
+    const [a, b, liker] = [person(who, 0), person(who, 1), person(who, 2)];
+    await withMatchingConfig(ctx.client, { inbox_stop: 1 });
+    await likedYesterday(ctx.client, liker, b);
+    await likedYesterday(ctx.client, b, a);
+    const id = await starredYesterday(ctx.client, a, b);
+
+    expect((await listOf(app, a)).map((item) => item.id)).toEqual([id]);
+    // The queue shows B all the same, so the list's silence would have told why.
+    expect(cardsOf(await readToday(app, a))).toContain(b.accountId);
+  });
+
+  test("A read of the list asks the same of somebody at the inbox stop as of anybody", async ({
+    ctx,
+  }) => {
+    const { app, who } = await scene(ctx, 3);
+    const [a, b, liker] = [person(who, 0), person(who, 1), person(who, 2)];
+    await withMatchingConfig(ctx.client, { inbox_stop: 1 });
+    const id = await starredYesterday(ctx.client, a, b);
+    const below = await statementsOfList(ctx.client, a);
+
+    await likedYesterday(ctx.client, liker, b);
+
+    expect(await listOf(app, a)).toEqual([]);
+    expect(await statementsOfList(ctx.client, a)).toEqual(below);
+    // Nor by the person's pool: the answer's time says nothing of anybody's pile (ADR-064 §6).
+    expect(below.filter((statement) => /WHERE pond_id = /.test(statement))).toEqual([]);
+    expect(id).toEqual(expect.any(String));
   });
 
   test("An inbox stop of zero is off, and leaves nobody out", async ({ ctx }) => {
@@ -803,7 +884,7 @@ describe("a card opened from the list", () => {
   test("A card starred today opens at the place it has, as it stands", async ({ ctx }) => {
     const { app, who } = await scene(ctx, 2);
     const [a, b] = [person(who, 0), person(who, 1)];
-    await logged(ctx.client, a.accountId, TODAY, [b.accountId]);
+    await queued(ctx.client, a, [b.accountId]);
     const { id } = await star(app, a, 1);
     expect((await decide(app, a, TODAY, 1, "skip")).status).toBe(200);
 
@@ -855,19 +936,97 @@ describe("a card opened from the list", () => {
     expect((await opened(app, a, id)).entries?.[0]?.reason).toBe("fish");
   });
 
-  test("A shadow-banned person's list never says a like waits", async ({ ctx }) => {
+  describe("A shadow-banned person's star on somebody whose like waits waits for the lift", () => {
+    test.for([{ when: "yesterday" }, { when: "today, before the ban" }])(
+      "starred $when",
+      async ({ when }, { ctx }) => {
+        const { app, who } = await scene(ctx, 2);
+        const [a, b] = [person(who, 0), person(who, 1)];
+        await likedYesterday(ctx.client, b, a);
+        let id: string;
+        if (when === "yesterday") {
+          id = await starredYesterday(ctx.client, a, b);
+        } else {
+          await queued(ctx.client, a, [{ candidateId: b.accountId, reason: "liked_you" }]);
+          id = (await star(app, a, 1)).id;
+        }
+        await setState(ctx.client, a, "shadow_banned");
+
+        expect(await listOf(app, a)).toEqual([]);
+        expect((await open(app, a, id)).status).toBe(404);
+        expect(await starsOf(ctx.client, a)).toEqual([b.accountId]);
+
+        await setState(ctx.client, a, "active");
+
+        expect((await listOf(app, a)).map((item) => item.id)).toEqual([id]);
+        expect((await opened(app, a, id)).entries?.[0]?.reason).toBe("liked_you");
+      },
+    );
+  });
+
+  test("A shadow-banned person's list otherwise reads as anybody's", async ({ ctx }) => {
     const { app, who } = await scene(ctx, 2);
     const [a, b] = [person(who, 0), person(who, 1)];
     const id = await starredYesterday(ctx.client, a, b);
-    await likedYesterday(ctx.client, b, a);
     await setState(ctx.client, a, "shadow_banned");
 
+    expect((await listOf(app, a)).map((item) => item.id)).toEqual([id]);
     const { entries } = await opened(app, a, id);
 
     expect(entries?.[0]?.reason).toBe("seen_before");
-    const answer = await decide(app, a, TODAY, entries?.[0]?.position ?? 0, "like");
-    expect(answer.status).toBe(200);
-    expect(RoundDecisionAnswer.parse(await answer.json()).match).toBeNull();
+  });
+
+  test("A place for a shadow-banned person never says a like waits, should one come meanwhile", async ({
+    ctx,
+  }) => {
+    const { who } = await scene(ctx, 2);
+    const [a, b] = [person(who, 0), person(who, 1)];
+    await likedYesterday(ctx.client, b, a);
+    await setState(ctx.client, a, "shadow_banned");
+    const { logger } = await captureLogger();
+
+    const place = await starPlace(
+      { db: ctx.client, logger, now: () => NOON },
+      a.accountId,
+      b.accountId,
+    );
+
+    expect(place?.reason).toBe("seen_before");
+  });
+
+  test("A star opened through today's relaxation carries it, and its like arrives", async ({
+    ctx,
+  }) => {
+    const { app, who } = await scene(ctx, 2);
+    const [a, b] = [person(who, 0), person(who, 1)];
+    const id = await starredYesterday(ctx.client, a, b);
+    // A has a deal-breaker B does not pass, A's own answer standing so that it filters, relaxed for today.
+    await ctx.client.query(
+      `INSERT INTO preferences (account_id, field, value, mode, include_unknown)
+       VALUES ($1, 'smoking', '["never"]'::jsonb, 'hard', false)`,
+      [a.accountId],
+    );
+    await ctx.client.query(
+      `UPDATE profile SET fields = fields || '{"smoking": "never"}'::jsonb WHERE account_id = $1`,
+      [a.accountId],
+    );
+    expect(await listOf(app, a)).toEqual([]);
+    const round = await logged(ctx.client, a.accountId, TODAY, []);
+    await ctx.client.query(
+      "INSERT INTO round_relaxation (round_id, field, kind) VALUES ($1, 'smoking', 'aside')",
+      [round],
+    );
+
+    const { entries } = await opened(app, a, id);
+
+    expect(entries?.[0]).toMatchObject({ reason: "relaxed", relaxedField: "smoking" });
+    const liked = await decide(app, a, TODAY, entries?.[0]?.position ?? 0, "like");
+    expect(liked.status).toBe(200);
+    // The next day B's inbox shows it, A's deal-breaker waived for B by the like (ADR-042 §7).
+    const tomorrow = await appOn(ctx.client, () => new Date(NOON.getTime() + DAY_MS));
+    const round2 = await readToday(tomorrow, b);
+    expect(cardsOf(round2)).toEqual([a.accountId]);
+    expect(round2.entries?.[0]?.reason).toBe("liked_you");
   });
 
   test("A star stays while its card is opened and left, and the queue does not offer it", async ({
@@ -960,7 +1119,8 @@ describe("erasure and the export", () => {
         erased === "A" ? a.accountId : b.accountId,
       );
 
-      expect(summary.stars).toBe(1);
+      // How many the person put; how many were on them is in no count, a log line's included (§8).
+      expect(summary.stars).toBe(erased === "A" ? 1 : 0);
       expect(await starsOf(ctx.client, a)).toEqual([]);
     });
   });

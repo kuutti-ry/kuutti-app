@@ -95,6 +95,11 @@ Feature: A star: somebody marked for later, without a like or a pass
     When "A" stars the card
     Then the answer is not_found and nothing is written
 
+  Scenario: A card never served takes no star
+    Given "B" is in "A"'s log today, and "A" was never handed the card
+    When "A" stars that place
+    Then the answer is not_found and nothing is written
+
   Scenario: At the most stars a person may hold, one more is refused
     Given matching_config stars_max is two, and "A" starred "B" and "C"
     When "A" stars "D"'s card
@@ -116,7 +121,7 @@ Feature: A star: somebody marked for later, without a like or a pass
     Then "C" comes first and then "B", each with a name, an age and a photo "A" was shown
 
   Scenario: The list offers no photo the person was never shown
-    Given "A" starred "B", and "B" has one photo "A" was never shown since their others went
+    Given "A" starred "B", and "A" was shown none of the photos "B" has now
     When "A" reads the list
     Then "B" comes with no photo
 
@@ -146,6 +151,21 @@ Feature: A star: somebody marked for later, without a like or a pass
     When "A" reads the list, and "B" goes through one of the likes, and "A" reads it again
     Then "B" is left out the first time and back the second
 
+  Scenario: Somebody the person's own queue shows today stays on the list past the inbox stop
+    Given "A" starred "B" from today's queue, and "B" has as many likes waiting as the inbox stop
+    When "A" reads the list and opens the star
+    Then "B" is there: the list going silent while the queue still shows "B" would say why
+
+  Scenario: Somebody whose like waits on the person stays on the list past the inbox stop
+    Given "A" starred "B", "B"'s like waits on "A", and "B" has as many likes waiting as the inbox stop
+    When "A" reads the list and the queue
+    Then "B" is on both
+
+  Scenario: A read of the list asks the same of somebody at the inbox stop as of anybody
+    Given "A" starred "B"
+    When "A" reads the list with "B" below the inbox stop, and again with "B" at it
+    Then the two reads run the same statements, so the answer's time says nothing of a pile
+
   Scenario: The list of somebody with no open matching is empty
     Given "A" starred "B", and an admin closed matching since
     When "A" reads the list
@@ -171,10 +191,25 @@ Feature: A star: somebody marked for later, without a like or a pass
     When "A" opens the star and likes the card
     Then the card says liked you, and the like makes a match
 
-  Scenario: A shadow-banned person's list never says a like waits
-    Given "A" starred "B" yesterday, "B" liked "A" since, and "A" was shadow-banned
+  Scenario Outline: A shadow-banned person's star on somebody whose like waits waits for the lift
+    Given "B"'s like waits on "A", "A" starred "B" <when>, and "A" was shadow-banned
+    When "A" reads the list and opens the star, and then the ban is lifted
+    Then "B" is left out and the star answers not_found, and after the lift "B" comes as liked you
+
+    Examples:
+      | when                  |
+      | yesterday             |
+      | today, before the ban |
+
+  Scenario: A shadow-banned person's list otherwise reads as anybody's
+    Given "A" starred "B" yesterday, and "A" was shadow-banned
+    When "A" reads the list and opens the star
+    Then "B" comes, seen before
+
+  Scenario: A star opened through today's relaxation carries it, and its like arrives
+    Given "A" starred "B", who fits "A" only through a deal-breaker "A" relaxed today
     When "A" opens the star and likes the card
-    Then the card says seen before, and no match is made
+    Then the card names the relaxation, and "A"'s like reaches "B" the next day
 
   Scenario: A star stays while its card is opened and left, and the queue does not offer it
     Given "A" opened the star on "B" today and left the card undecided
