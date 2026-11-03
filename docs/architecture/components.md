@@ -144,7 +144,7 @@ Code inside each app is organised by slice, never by layer (`.claude/rules/layou
 | rewards | yes | yes | no directory | no | light, light, none |
 | notifications | yes | yes | no directory | no | light, light, none |
 
-Besides the slices, the API has `health/`, `jobs/` (the nightly timer, and what reads across slices: the pond counter and the invitation count, which the night runs, and who of a pond is complete and the queue's builder, which the routes ask), `lib/` and `test/`; the phone app has `home/` and `settings/` among its features, and `src/lib/`; the admin panel has `src/lib/` and `src/components/ui/` (shadcn/ui's components, ADR-050).
+Besides the slices, the API has `health/`, `jobs/` (the nightly timer, and what reads across slices: the pond counter and the invitation count, which the night runs, and who of a pond is complete, the queue's builder and the Starred list, which the routes ask), `lib/` and `test/`; the phone app has `home/` and `settings/` among its features, and `src/lib/`; the admin panel has `src/lib/` and `src/components/ui/` (shadcn/ui's components, ADR-050).
 
 1. **identity**: the bank login, accounts, sessions, re-registration, taking a break, staff sessions. In all three apps; specs in `features/identity`.
 2. **profile**: onboarding, profile fields and prompts, completeness. API and phone app.

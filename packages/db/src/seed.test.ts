@@ -128,6 +128,8 @@ describe("seed", () => {
           your_turn_limit: 8,
           your_turn_warning: 6,
           inbox_stop: 30,
+          // #575: the most stars a list may hold (ADR-064 §5).
+          stars_max: 10,
         });
         expect(byKey).toEqual(MATCHING_CONFIG_V1);
         // Version 2 wins over version 1: ten likes a day (#98, ADR-036), a pass of thirty days, no ceiling on cards

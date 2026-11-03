@@ -490,7 +490,7 @@ describe("migrate", () => {
             )
           ).rows;
           // Versions 1 and 2 of the migrations before it, every one of them;
-          // the keys a later migration adds (0072, #378; 0048, #303; 0052, #84; 0054, #348; 0057, #350; 0061, #351; 0065, #105; 0068, #376; 0075, #86; 0078, #385; 0080, #107; 0082, #102; 0097, #514; 0104, #502) are not there yet.
+          // the keys a later migration adds (0072, #378; 0048, #303; 0052, #84; 0054, #348; 0057, #350; 0061, #351; 0065, #105; 0068, #376; 0075, #86; 0078, #385; 0080, #107; 0082, #102; 0097, #514; 0104, #502; 0108, #575) are not there yet.
           const later = new Set([
             "moderation_response_hours",
             "reports_per_day",
@@ -535,6 +535,7 @@ describe("migrate", () => {
             "your_turn_limit",
             "your_turn_warning",
             "inbox_stop",
+            "stars_max",
           ]);
           // A key's second version a later migration writes (0070, #98; 0088, #513; 0092, #508; 0104, #502; 0105, #503) is not there yet either.
           const laterVersions = new Set([
@@ -1163,6 +1164,7 @@ describe("migrate", () => {
               await pool.query(
                 `SELECT key, version, value, created_by, reason FROM matching_config
                  WHERE key NOT IN ('invitation_reward', 'like_budget_contested', 'contest_ratio_threshold')
+                   AND created_by <> 'migration:0108'
                  ORDER BY key, version`,
               )
             ).rows;
@@ -1354,7 +1356,8 @@ describe("migrate", () => {
               (
                 await pool.query(
                   `SELECT key, version, value FROM matching_config
-                    WHERE key <> ALL($1::text[]) AND created_by <> 'migration:0104'
+                    WHERE key <> ALL($1::text[])
+                      AND created_by NOT IN ('migration:0104', 'migration:0108')
                     ORDER BY key, version`,
                   [GONE],
                 )
@@ -1556,6 +1559,7 @@ describe("migrate", () => {
           "rounds",
           "sanction",
           "session",
+          "star",
         ]);
       } finally {
         await pool.end();

@@ -30,7 +30,7 @@ export {
   identity,
   identityStanding,
 } from "./identity.ts";
-// Today's round and its entries (#96, ADR-034).
+// Today's round and its entries (#96, ADR-034), and the stars (#575, ADR-064).
 export {
   distanceBand,
   relaxationKind,
@@ -39,6 +39,7 @@ export {
   roundReason,
   roundRelaxation,
   rounds,
+  star,
 } from "./matching.ts";
 export { matchingConfig } from "./matching-config.ts";
 export {

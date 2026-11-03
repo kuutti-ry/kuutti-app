@@ -10,7 +10,7 @@ import { Ink } from "@/components/ui/ink";
 import { Text } from "@/components/ui/text";
 import { ChatsButton } from "@/features/chat";
 import { useOnboardingGate, useSession } from "@/features/identity";
-import { RoundButton } from "@/features/matching";
+import { RoundButton, StarsButton } from "@/features/matching";
 import { Notices, PushOffer } from "@/features/notifications";
 import { GateCard, PondCard } from "@/features/pond";
 import { isProduction } from "@/lib/environment";
@@ -95,13 +95,15 @@ export function HomeScreen() {
             {/* What must reach the person even without a push, unread, first (#176). */}
             <Notices />
             {/* How many people are on Kuutti (#54), and whether matching is open for the person
-                (#500); once it is, the way to the queue (#379) and the one offer of
+                (#500); once it is, the way to the queue (#379), the way to the people
+                the person starred while there are any (#575), and the one offer of
                 notifications, since now there is something to tell (#102, ADR-055 §9). */}
             <PondCard />
             <GateCard
               whenOpen={
                 <>
                   <RoundButton />
+                  <StarsButton />
                   <PushOffer />
                 </>
               }

@@ -104,7 +104,7 @@ const YOUR_TURN_LIMIT_KEY = "your_turn_limit";
 const FILL_TRIES = 3;
 
 /** An entry `e` of round `r` whose candidate can still be shown to the round's owner. */
-const SERVABLE = `EXISTS (SELECT 1 FROM account c WHERE c.id = e.candidate_id AND c.state = 'active')
+export const SERVABLE = `EXISTS (SELECT 1 FROM account c WHERE c.id = e.candidate_id AND c.state = 'active')
   AND NOT blocked_between(r.account_id, e.candidate_id)`;
 
 /**
@@ -115,7 +115,11 @@ const SERVABLE = `EXISTS (SELECT 1 FROM account c WHERE c.id = e.candidate_id AN
 const PLACES = `greatest(r.last_position,
            coalesce((SELECT max(e.position) FROM round_entries e WHERE e.round_id = r.id), 0))::int`;
 
-const notFound = () => new AppError(404, "not_found", "No such card in today's round");
+export const notFound = () => new AppError(404, "not_found", "No such card in today's round");
+
+/** The round's owner's own star on an entry `e`'s person, for `entriesOf` (#575, ADR-064). */
+export const STAR_OF_ENTRY = `(SELECT s.id FROM star s
+      WHERE s.account_id = r.account_id AND s.candidate_id = e.candidate_id) AS star`;
 
 /**
  * The day's likes (#98's first cut, the maintainer's of 20/10/2026): one
@@ -213,7 +217,7 @@ async function fishToSendOf(db: Queryable, accountId: string, today: string): Pr
 }
 
 /** What the round and each decision's answer say of the person's own budgets and turn, one read for both. */
-async function budgetsOf(
+export async function budgetsOf(
   db: Queryable,
   matches: Pick<Matches, "yourTurn">,
   accountId: string,
@@ -328,7 +332,7 @@ export async function addPlaces(
 }
 
 /** A row of a round's entry as the read takes it. */
-type EntryRow = {
+export type EntryRow = {
   position: number | null;
   candidate_id: string | null;
   reason: RoundReason | null;
@@ -336,6 +340,7 @@ type EntryRow = {
   fish: boolean | null;
   relaxed_field: DealBreakerField | null;
   distance: DistanceBand | null;
+  star: string | null;
 };
 
 /**
@@ -349,7 +354,7 @@ type EntryRow = {
  * without it (ADR-061 §7). The band is the one written with the entry, never
  * computed here (§5).
  */
-async function entriesOf(
+export async function entriesOf(
   accountId: string,
   rows: readonly EntryRow[],
   cardOf: CardOf,
@@ -367,6 +372,7 @@ async function entriesOf(
       decision: choiceOf(row.decision, row.fish === true),
       card,
       distance: row.distance,
+      star: row.star,
       ...(row.relaxed_field ? { relaxedField: row.relaxed_field } : {}),
       notAnswered: dealBreakers.flatMap(({ field }) =>
         field === "distance" || card.fields[field] !== undefined ? [] : [field],
@@ -381,8 +387,10 @@ async function entriesOf(
  * both ways (ADR-062 §8): one that does not stays in the log, left out while it
  * does not fit. A shadow-banned person's liked-you and fish cards wait for the
  * lift, those queued before the ban too (ADR-037 §7): a like back would make no
- * match, and so tell them of it (ADR-024 §7). Null with no log for the day. The
- * first read that finds the round stamps `opened_at`.
+ * match, and so tell them of it (ADR-024 §7). A starred card comes through the list
+ * alone, unless somebody's like waits on it, which a star does not touch (ADR-064
+ * §4). Null with no log for the day. The first read that finds the round stamps
+ * `opened_at`.
  */
 async function nextCards(
   deps: RoundDeps,
@@ -394,10 +402,13 @@ async function nextCards(
 ): Promise<RoundEntry[] | null> {
   const { rows } = await deps.db.query<EntryRow & { id: string }>(
     `SELECT r.id, e.position, e.candidate_id, e.reason, e.decision, e.fish, e.relaxed_field,
-            e.distance
+            e.distance, ${STAR_OF_ENTRY}
        FROM rounds r JOIN account me ON me.id = r.account_id
        LEFT JOIN round_entries e ON e.round_id = r.id AND e.decision IS NULL
         AND NOT (me.state = 'shadow_banned' AND e.reason IN ('liked_you', 'fish'))
+        AND (e.reason IN ('liked_you', 'fish') OR NOT EXISTS (
+              SELECT 1 FROM star s
+               WHERE s.account_id = r.account_id AND s.candidate_id = e.candidate_id))
       WHERE r.account_id = $1 AND r.day = $2
       ORDER BY e.position`,
     [accountId, day],
@@ -444,7 +455,7 @@ export async function readQueue(
 }
 
 /** The day named, checked against today before anything is read: an ended day's round answers round_expired, a later one is nobody's yet. */
-function todayOrRefuse(deps: RoundDeps, day: string): { at: Date; today: string } {
+export function todayOrRefuse(deps: RoundDeps, day: string): { at: Date; today: string } {
   const at = deps.now();
   const today = finnishDay(at);
   if (day < today) {
@@ -636,6 +647,14 @@ export async function decide(
       [roundId, input.accountId, entry.id, decision, at, fish, secondPass],
     );
     if (updated.rowCount !== 1) throw notFound();
+    // A like or a pass takes the star off (ADR-064 §3), so the list holds only the
+    // undecided; here, so that one refused or rolled back leaves it. A skip decides nothing.
+    if (decision !== "skip") {
+      await tx.query("DELETE FROM star WHERE account_id = $1 AND candidate_id = $2", [
+        input.accountId,
+        entry.candidate_id,
+      ]);
+    }
     await tx.query(
       `UPDATE rounds r SET completed_at = $3
         WHERE r.id = $1 AND r.account_id = $2 AND r.completed_at IS NULL
@@ -981,7 +1000,8 @@ export async function readAdded(
 ): Promise<RoundEntry[]> {
   if (positions.length === 0) return [];
   const { rows } = await deps.db.query<EntryRow>(
-    `SELECT e.position, e.candidate_id, e.reason, e.decision, e.fish, e.relaxed_field, e.distance
+    `SELECT e.position, e.candidate_id, e.reason, e.decision, e.fish, e.relaxed_field, e.distance,
+            ${STAR_OF_ENTRY}
        FROM round_entries e JOIN rounds r ON r.id = e.round_id
       WHERE r.account_id = $1 AND r.day = $2 AND e.position = ANY($3::smallint[])
       ORDER BY e.position`,

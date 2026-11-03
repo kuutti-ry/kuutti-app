@@ -66,6 +66,8 @@ executionOrder:
     - What you seek lists whom, the ages, why and the deal-breakers, and each change is kept by going back
     # Laura and Emmi, the report's pair (#351): a block is final, so once per reset.
     - A report from a conversation takes it from the reporter's list, and the other finds it ended and can still report it
+    # Iida, the star's (#575), which decides nothing and leaves her queue as it found it.
+    - A star on a card brings the person to a Starred list only they see, and taking it off leaves everything as it was
     # Iida, the queue's (#379): a match and a report are final, so once per reset.
     - The queue shows one card at a time, liking back makes a match, Later and Undo leave a decision open, and a report takes a card away
     # Aino, who tells Kuutti she found someone, then whose account goes: last.

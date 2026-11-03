@@ -3,6 +3,7 @@ import type { z } from "zod";
 import { DEAL_BREAKERS_CAP } from "./deal-breakers.ts";
 import {
   ExportedRoundEntry,
+  ExportedStars,
   QUEUE_PAGE,
   Relaxation,
   RelaxationAnswer,
@@ -20,6 +21,11 @@ import {
   RoundEntry,
   RoundEntryParams,
   RoundResponse,
+  STARS_CEILING,
+  StarAnswer,
+  StarList,
+  StarParams,
+  StarredPerson,
   sinceSeenBand,
 } from "./matching.ts";
 
@@ -182,6 +188,62 @@ describe("the next cards of the queue", () => {
   });
 });
 
+describe("a star (#575, ADR-064)", () => {
+  const id = "7a1c1c4e-9a8e-4a0b-9c3a-0c8d1e2f3a01";
+  const person = { id, name: "Katja", age: 44, photo: null };
+
+  it("on an entry is its id or null, and must be said", () => {
+    const star = RoundEntry.shape.star;
+    expect(star.parse(id)).toBe(id);
+    expect(star.parse(null)).toBeNull();
+    expect(codes(star, undefined)).toEqual(["invalid_type"]);
+    expect(codes(star, "not-a-uuid")).toEqual(["invalid_format"]);
+  });
+
+  it("put on a card answers its id and whether it is the first, and nothing else", () => {
+    expect(StarAnswer.parse({ id, first: true })).toEqual({ id, first: true });
+    expect(codes(StarAnswer, { id })).toEqual(["invalid_type"]);
+    expect(codes(StarAnswer, { id, first: true, count: 3 })).toEqual(["unrecognized_keys"]);
+  });
+
+  it("is addressed by its own id", () => {
+    expect(StarParams.parse({ id })).toEqual({ id });
+    expect(codes(StarParams, { id: "not-a-uuid" })).toEqual(["invalid_format"]);
+    expect(codes(StarParams, {})).toEqual(["invalid_type"]);
+  });
+
+  it("on the list is a name, an age and perhaps a photo, and nothing else about anybody", () => {
+    const photo = { id, blurhash: "LEHV6nWB2yk8pyo0adR*.7kCMdnj" };
+    expect(StarredPerson.parse({ ...person, photo })).toEqual({ ...person, photo });
+    expect(StarredPerson.parse(person)).toEqual(person);
+    expect(codes(StarredPerson, { ...person, accountId: id })).toEqual(["unrecognized_keys"]);
+    expect(codes(StarredPerson, { ...person, starredAt: "x" })).toEqual(["unrecognized_keys"]);
+    expect(codes(StarredPerson, { ...person, age: 17 })).toEqual(["too_small"]);
+    expect(codes(StarredPerson, { ...person, photo: { ...photo, url: "x" } })).toEqual([
+      "unrecognized_keys",
+    ]);
+  });
+
+  it("holds the list to the contract's ceiling, one past it refused", () => {
+    const at = (length: number) => ({ items: Array.from({ length }, () => person) });
+    expect(StarList.parse(at(STARS_CEILING)).items).toHaveLength(STARS_CEILING);
+    expect(codes(StarList, at(STARS_CEILING + 1))).toEqual(["too_big"]);
+    expect(codes(StarList, { items: [], count: 0 })).toEqual(["unrecognized_keys"]);
+  });
+
+  it("in the export says when, and holds nothing else of use", () => {
+    const at = "2026-11-03T10:00:00.000Z";
+    expect(ExportedStars.parse({ about: "x", items: [{ at }] }).items).toEqual([{ at }]);
+    // Zod strips what the contract does not name, so a person's id could not pass through.
+    expect(ExportedStars.parse({ about: "x", items: [{ at, candidateId: id }] }).items).toEqual([
+      { at },
+    ]);
+    expect(codes(ExportedStars, { about: "x", items: [{ at: "yesterday" }] })).toEqual([
+      "invalid_format",
+    ]);
+  });
+});
+
 describe("what a person does with a card", () => {
   it("is a like, a pass or a skip as stored, and a fish as chosen (ADR-062 §3)", () => {
     expect(RoundDecision.options).toEqual(["like", "pass", "skip"]);
@@ -253,7 +315,7 @@ describe("relaxing a deal-breaker for the day (#99, ADR-042)", () => {
 
   it("lets a card carry the field it came in by and who did not answer, or neither, as an older API sends it", () => {
     const card = RoundEntry.shape.card;
-    const base = { position: 1, reason: "relaxed", decision: null, distance: null };
+    const base = { position: 1, reason: "relaxed", decision: null, distance: null, star: null };
     expect(RoundEntry.shape.relaxedField.safeParse(undefined).success).toBe(true);
     expect(RoundEntry.shape.notAnswered.safeParse(["smoking", "languages"]).success).toBe(true);
     expect(RoundEntry.shape.notAnswered.safeParse(["intent"]).success).toBe(false);

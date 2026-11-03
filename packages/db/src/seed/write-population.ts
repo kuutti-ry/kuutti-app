@@ -136,6 +136,10 @@ export async function deleteIdentities(
   // The entries in which the accounts are somebody's card (#96); their own
   // rounds go with ACCOUNT_TABLES, their entries by the cascade.
   await tx.query("DELETE FROM round_entries WHERE candidate_id = ANY($1)", [accounts]);
+  // The stars the accounts put, and those put on them (#575).
+  await tx.query("DELETE FROM star WHERE account_id = ANY($1) OR candidate_id = ANY($1)", [
+    accounts,
+  ]);
   // Invitations on either side (#107): those the accounts made, and the one
   // each redeemed, whoever made it, with the units and notices they hold.
   await tx.query(

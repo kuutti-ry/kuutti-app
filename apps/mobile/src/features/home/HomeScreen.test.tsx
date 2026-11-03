@@ -167,6 +167,29 @@ describe("HomeScreen", () => {
     );
   });
 
+  it("offers the people the person starred beside the way to the queue, once matching is open and while there are any (#575)", async () => {
+    const answering = (items: unknown[]) => async (input: Request | string) => {
+      const url = new URL(input instanceof Request ? input.url : input);
+      if (url.pathname === "/ponds/counter") return json(counter);
+      if (url.pathname === "/gate") return json({ state: "open" });
+      if (url.pathname === "/stars") return json({ items });
+      return json({ error: { code: "not_found" } }, 404);
+    };
+    (globalThis.fetch as jest.Mock).mockImplementation(answering([]));
+    await renderWithTheme(<HomeScreen />);
+    await screen.findByRole("button", { name: "See people" });
+    expect(screen.queryByRole("button", { name: "Starred" })).toBeNull();
+
+    (globalThis.fetch as jest.Mock).mockImplementation(
+      answering([
+        { id: "7a1c1c4e-9a8e-4a0b-9c3a-0c8d1e2f3a01", name: "Katja", age: 44, photo: null },
+      ]),
+    );
+    await renderWithTheme(<HomeScreen />);
+    await userEvent.setup().press(await screen.findByRole("button", { name: "Starred" }));
+    expect(router.push).toHaveBeenCalledWith("/stars");
+  });
+
   it("offers notifications in the gate card once matching is open, never before (#102)", async () => {
     // A phone never asked, an offer never answered: the jest.setup.js defaults.
     const heading = "Shall Kuutti tell you?";

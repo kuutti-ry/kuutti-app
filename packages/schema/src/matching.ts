@@ -9,7 +9,8 @@ import { ProfileCard } from "./profile.ts";
 // change until the day ends. No answer carries a score, a seen time or
 // anybody's decision about the person, and the counts it carries are the
 // person's own: their likes left today (#524) and the conversations on their
-// turn (ADR-062 §5).
+// turn (ADR-062 §5). A star is the person's own too (#575, ADR-064): no answer
+// tells anybody else of one, and none says how many stars anybody has.
 
 /** The most cards one read hands over (ADR-062 §1): a bound of the contract, not a tunable; nobody meets it, the next read goes on. */
 export const QUEUE_PAGE = 10;
@@ -48,6 +49,8 @@ export const RoundEntry = z
     card: ProfileCard,
     /** How far the card's person lives, as it stood when the entry was written (ADR-061 §5). Null on an entry from before distance. */
     distance: DistanceBand.nullable(),
+    /** The person's own star on this card's person, by its id (#575, ADR-064); null with none. Nobody else's. */
+    star: z.uuid().nullable(),
     /** The deal-breaker a `relaxed` card came in by (#99, ADR-042 §9); absent on every other card. */
     relaxedField: DealBreakerField.optional(),
     /**
@@ -197,6 +200,64 @@ export const RoundDecisionAnswer = z
   .strict()
   .meta({ id: "RoundDecisionAnswer" });
 export type RoundDecisionAnswer = z.infer<typeof RoundDecisionAnswer>;
+
+/**
+ * How many stars one person's rows may ever hold, whatever matching_config
+ * stars_max says (#575, ADR-064 §5): those left out of the list do not count
+ * towards that, so without this a person could keep adding by narrowing their
+ * filters. A bound of the contract, as INVITATIONS_OPEN_CAP is, that nobody meets.
+ */
+export const STARS_CEILING = 100;
+
+/** A star by its id: the caller's own, or nobody's (rule 6). */
+export const StarParams = z.object({ id: z.uuid() }).meta({ id: "StarParams" });
+
+/**
+ * A star put on a card (#575): its id, to clear or open it by, and whether it is
+ * the only one the list shows, so the phone can say then that only the person
+ * sees it. Nothing about anybody else.
+ */
+export const StarAnswer = z
+  .object({ id: z.uuid(), first: z.boolean() })
+  .strict()
+  .meta({ id: "StarAnswer" });
+export type StarAnswer = z.infer<typeof StarAnswer>;
+
+/**
+ * Somebody the person starred, as the list shows them (#575): the star's id, never
+ * the account's, a name and an age, and the main one of the photos the person was
+ * shown, whose thumb the phone asks for as any photo's (ADR-008 §3). No count, no
+ * time and no word of whoever the list leaves out.
+ */
+export const StarredPerson = z
+  .object({
+    id: z.uuid(),
+    name: z.string().max(100),
+    age: z.int().min(18).max(130),
+    photo: z
+      .object({ id: z.uuid(), blurhash: z.string().max(100) })
+      .strict()
+      .nullable(),
+  })
+  .strict()
+  .meta({ id: "StarredPerson" });
+export type StarredPerson = z.infer<typeof StarredPerson>;
+
+/** The Starred list (#575, ADR-064): those who pass now, by when the person starred them, the latest first, and by nothing else. */
+export const StarList = z
+  .object({ items: z.array(StarredPerson).max(STARS_CEILING) })
+  .strict()
+  .meta({ id: "StarList" });
+export type StarList = z.infer<typeof StarList>;
+
+/** The person's own stars in their export (ADR-007 §4): when each was put, never on whom. */
+export const ExportedStars = z
+  .object({
+    about: z.string().meta({ description: "What this part is, in the request's language." }),
+    items: z.array(z.object({ at: z.iso.datetime() })).max(STARS_CEILING),
+  })
+  .meta({ id: "ExportedStars" });
+export type ExportedStars = z.infer<typeof ExportedStars>;
 
 /** The research events' coarse time from a card seen to its decision (ADR-011 §1), never the time itself. */
 export const SinceSeenBand = z

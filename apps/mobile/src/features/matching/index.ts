@@ -2,3 +2,5 @@
 
 export { RoundButton } from "./RoundButton";
 export { RoundScreen } from "./RoundScreen";
+export { StarredScreen } from "./StarredScreen";
+export { StarsButton } from "./StarsButton";
