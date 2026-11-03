@@ -272,7 +272,7 @@ profile.discard.title:
 
 profile.discard.unsaved:
   en: "Your changes are not saved yet."
-  description: "Text of the leave-without-saving dialog on the deal-breakers and the later questions: the person is leaving with changes they have not saved. It may show over another screen than the one that holds them."
+  description: "Text of the leave-without-saving dialog on the later questions and on Settings: the person is leaving with changes they have not saved."
   fi: "Muutoksiasi ei ole vielä tallennettu."
   sv: "Dina ändringar är inte sparade än."
   machine: { fi: true, sv: true }
@@ -622,121 +622,156 @@ profile.hide.never:
 
 profile.dealBreakers.title:
   en: "Deal-breakers"
-  description: "Heading of the deal-breakers screen (#149)."
+  description: "Heading of the deal-breakers' rows on What you seek, and the title of the same rows opened from the e-mail screen (#149, #551)."
   fi: "Ehdottomat rajat"
   sv: "Absoluta gränser"
   machine: { fi: true, sv: true }
 
 profile.dealBreakers.back:
   en: "Back"
-  description: "Screen-reader label of the back arrow of the deal-breakers screen: back to where it was opened, What you seek or the e-mail screen; with changes not saved it asks first."
+  description: "Screen-reader label of the back arrow of the deal-breakers' rows opened from the e-mail screen, and of a deal-breaker's own screen: back to where it was opened, which going back saves (#551)."
   fi: "Takaisin"
   sv: "Tillbaka"
   machine: { fi: true, sv: true }
 
 profile.dealBreakers.explain:
   en: "Up to {max, number}. Only on what you answered yourself, and both ways: yours apply to others, theirs to you."
-  description: "Explanation of the deal-breakers (#149, the disclose-to-filter rule)."
+  description: "Line over the deal-breakers' rows (#149, #551, the disclose-to-filter rule)."
   fi: "Enintään {max, number}. Vain siitä, mihin vastasit itse, ja molempiin suuntiin: sinun rajasi koskevat muita, heidän rajansa sinua."
   sv: "Högst {max, number}. Bara om det du själv svarat på, och åt båda hållen: dina gäller andra, deras gäller dig."
   machine: { fi: true, sv: true }
 
 profile.dealBreakers.gated:
   en: "To filter on this, share yours first."
-  description: "Shown under a field the person has not answered: a deal-breaker needs the own answer (#149)."
+  description: "On a deal-breaker's screen while the person has not answered its field: a deal-breaker needs the own answer (#149). Also what a save refused for the same reason says."
   fi: "Suodattaaksesi tällä kerro ensin omasi."
   sv: "För att filtrera på det här, dela ditt eget först."
   machine: { fi: true, sv: true }
 
 profile.dealBreakers.answer:
   en: "Answer it"
-  description: "Button under a gated field that opens its screen (#149)."
+  description: "Button under the line of a gated or paused deal-breaker, which opens the field's screen and comes back (#149, #542)."
   fi: "Vastaa"
   sv: "Svara"
   machine: { fi: true, sv: true }
 
-profile.dealBreakers.switch:
-  en: "Deal-breaker: {field}"
-  description: "Label of the switch that makes a field a deal-breaker (#149); {field} is the field's label, after a colon so nothing is inflected."
-  fi: "Ehdoton raja: {field}"
-  sv: "Absolut gräns: {field}"
-  machine: { fi: true, sv: true }
-
-profile.dealBreakers.pickOne:
-  en: "Pick at least one answer that is fine with you."
-  description: "Shown while a deal-breaker is switched on with nothing accepted; saving waits (#149)."
-  fi: "Valitse ainakin yksi vastaus, joka sopii sinulle."
-  sv: "Välj minst ett svar som är okej för dig."
-  machine: { fi: true, sv: true }
-
 profile.dealBreakers.accept:
   en: "Fine with me"
-  description: "Heading over the answers of others the person accepts (#149)."
+  description: "Heading over a deal-breaker's buttons: the answers of others the person accepts (#149)."
   fi: "Sopii minulle"
   sv: "Okej för mig"
   machine: { fi: true, sv: true }
 
 profile.dealBreakers.everyone:
   en: "Everyone"
-  description: "First button of the height row and of the distance row of the deal-breakers (#508, #514): no filter on it. Short: the row holds four buttons."
+  description: "First button of a deal-breaker's screen, and a row's value on What you seek: no filter on the field (#508, #551). Short: it shares a line with the options."
   fi: "Kaikki"
   sv: "Alla"
   machine: { fi: true, sv: true }
 
-profile.dealBreakers.everyoneOf:
-  en: "Everyone, {field}"
-  description: "Screen-reader name of the same button, heard instead of profile.dealBreakers.everyone (#514): two rows have one, and {field} is the row's label, after a comma so nothing is inflected."
-  fi: "Kaikki, {field}"
-  sv: "Alla, {field}"
-  machine: { fi: true, sv: true }
-
 profile.dealBreakers.includeUnknown:
   en: "Also people who did not answer"
-  description: "Label of the switch that lets an unanswered field pass (#149)."
+  description: "Label of the switch that lets people who left the field unanswered pass, on a deal-breaker's screen (#149, ADR-042 §8)."
   fi: "Myös ne, jotka eivät vastanneet"
   sv: "Även de som inte svarade"
   machine: { fi: true, sv: true }
 
 profile.dealBreakers.paused:
   en: "Paused until you answer it yourself."
-  description: "Said under a deal-breaker whose own answer was taken back (#149)."
+  description: "Said on a deal-breaker's screen and as its row's value while the person's own answer on the field was taken back (#149, #551)."
   fi: "Tauolla, kunnes vastaat siihen itse."
   sv: "Pausad tills du själv svarar på det."
   machine: { fi: true, sv: true }
 
 profile.dealBreakers.limit:
   en: "That is {max, number} already."
-  description: "Said when the person tries to switch on one more deal-breaker than allowed (#149)."
+  description: "Said when the person presses an answer that would set one more deal-breaker than allowed (#149)."
   fi: "Niitä on jo {max, number}."
   sv: "Det är redan {max, number}."
   machine: { fi: true, sv: true }
 
-profile.dealBreakers.save:
-  en: "Save the deal-breakers"
-  description: "Button that saves the deal-breakers (#149)."
-  fi: "Tallenna rajat"
-  sv: "Spara gränserna"
-  machine: { fi: true, sv: true }
-
-profile.dealBreakers.saved:
-  en: "Saved."
-  description: "Said after the deal-breakers were saved (#149)."
-  fi: "Tallennettu."
-  sv: "Sparat."
-  machine: { fi: true, sv: true }
-
-profile.dealBreakers.failed:
-  en: "They could not be saved. Try again."
-  description: "Said when saving the deal-breakers failed (#149)."
-  fi: "Rajoja ei voitu tallentaa. Yritä uudelleen."
-  sv: "Gränserna kunde inte sparas. Försök igen."
-  machine: { fi: true, sv: true }
-
 profile.dealBreakers.open:
   en: "Your deal-breakers"
-  description: "Row on What you seek and button on the e-mail screen that opens the deal-breakers (#149, #239, #542)."
+  description: "Button on the e-mail screen that opens the deal-breakers' rows (#149, #239, #551)."
   fi: "Ehdottomat rajasi"
   sv: "Dina absoluta gränser"
+  machine: { fi: true, sv: true }
+
+profile.dealBreakers.shareFirst:
+  en: "Share yours first"
+  description: "A deal-breaker's row on What you seek while the person has not answered its field and it holds no filter (#551): short, a value under the row's title."
+  fi: "Kerro ensin omasi"
+  sv: "Dela ditt eget först"
+  machine: { fi: true, sv: true }
+
+profile.dealBreakers.more:
+  en: "{answers} and {more, plural, one {# more} other {# more}}"
+  description: "A deal-breaker's row on What you seek when it accepts many answers (#551): {answers} is the first few, joined by commas, and {more} how many are left unsaid, since a list of languages takes sixty."
+  fi: "{answers} ja {more, plural, one {# muu} other {# muuta}}"
+  sv: "{answers} och {more, plural, one {# till} other {# till}}"
+  machine: { fi: true, sv: true }
+
+profile.dealBreakers.field.explain:
+  en: "It works both ways: it also decides who sees you."
+  description: "Line at the top of a deal-breaker's own screen (#551): every filter holds both ways. It names no moment, and no count of whom a choice leaves."
+  fi: "Tämä toimii molempiin suuntiin: se ratkaisee myös, ketkä näkevät sinut."
+  sv: "Det här gäller åt båda håll: det avgör också vilka som ser dig."
+  machine: { fi: true, sv: true }
+
+profile.dealBreakers.everyoneAgain:
+  en: "Back to Everyone."
+  description: "Said on a deal-breaker's screen when the person takes back the last accepted answer (#551): Everyone is chosen again by itself, which a screen reader would not otherwise hear. 'Everyone' is the button's word, profile.dealBreakers.everyone."
+  fi: "Takaisin kohtaan Kaikki."
+  sv: "Tillbaka till Alla."
+  machine: { fi: true, sv: true }
+
+profile.filterOption.smoking.never:
+  en: "Never"
+  description: "A deal-breaker's answer about somebody else's smoking (#551). profile.option.smoking.never is the person's own, in the first person in Finnish; the value stored is the same."
+  fi: "Ei koskaan"
+  sv: "Aldrig"
+  machine: { fi: true, sv: true }
+
+profile.filterOption.hasKids.no:
+  en: "No kids"
+  description: "A deal-breaker's answer about somebody else's kids (#551): they have none. The value stored is profile.option.hasKids.no's."
+  fi: "Ei lapsia"
+  sv: "Inga barn"
+  machine: { fi: true, sv: true }
+
+profile.filterOption.hasKids.yes_with_me:
+  en: "Kids at home"
+  description: "A deal-breaker's answer about somebody else's kids (#551): they live with that person. The person's own answer says 'living with me', profile.option.hasKids.yes_with_me; the value stored is the same. Names no pronoun."
+  fi: "Lapset asuvat kotona"
+  sv: "Barn som bor hemma"
+  machine: { fi: true, sv: true }
+
+profile.filterOption.hasKids.yes_not_with_me:
+  en: "Kids living elsewhere"
+  description: "A deal-breaker's answer about somebody else's kids (#551): they do not live with that person. The person's own answer says 'not living with me', profile.option.hasKids.yes_not_with_me; the value stored is the same. Names no pronoun."
+  fi: "Lapset asuvat muualla"
+  sv: "Barn som bor annanstans"
+  machine: { fi: true, sv: true }
+
+profile.filterOption.wantsKids.want:
+  en: "Wants kids"
+  description: "A deal-breaker's answer about whether somebody else wants kids (#551). profile.option.wantsKids.want is the person's own, in the first person; the value stored is the same."
+  fi: "Haluaa lapsia"
+  sv: "Vill ha barn"
+  machine: { fi: true, sv: true }
+
+profile.filterOption.wantsKids.dont_want:
+  en: "Doesn't want kids"
+  description: "A deal-breaker's answer about whether somebody else wants kids (#551). profile.option.wantsKids.dont_want is the person's own, in the first person; the value stored is the same."
+  fi: "Ei halua lapsia"
+  sv: "Vill inte ha barn"
+  machine: { fi: true, sv: true }
+
+profile.filterOption.wantsKids.not_sure:
+  en: "Not sure"
+  description: "A deal-breaker's answer about whether somebody else wants kids (#551). profile.option.wantsKids.not_sure is the person's own, in the first person; the value stored is the same."
+  fi: "Ei ole varma"
+  sv: "Inte säker"
   machine: { fi: true, sv: true }
 
 profile.seek.title:
@@ -748,7 +783,7 @@ profile.seek.title:
 
 profile.seek.summary:
   en: "Whom, what ages, what you are here for and your deal-breakers"
-  description: "Second line of the row on the profile that opens What you seek (#542): what the list holds, never an answer; a screen reader hears it as the row's hint."
+  description: "Second line of the row on the profile that opens What you seek (#542, #551): what the list holds, never an answer; a screen reader hears it as the row's hint."
   fi: "Ketä, minkä ikäisiä, mitä etsit täältä ja ehdottomat rajasi"
   sv: "Vem, vilka åldrar, vad du är här för och dina absoluta gränser"
   machine: { fi: true, sv: true }
@@ -797,7 +832,7 @@ profile.seek.ages.summary:
 
 profile.seek.failed:
   en: "It could not be saved. Try again."
-  description: "Said when a change on the screens of whom one seeks, the ages and the gender could not be saved (#542, #552). None of them can hold a wrong answer, so only the server or the network can be at fault: nothing here asks the person to check anything."
+  description: "Said when a change on the screens of whom one seeks, the ages, the gender or a deal-breaker could not be saved (#542, #552, #551). None of them can hold a wrong answer, so only the server or the network can be at fault: nothing here asks the person to check anything."
   fi: "Tallentaminen ei onnistunut. Yritä uudelleen."
   sv: "Det gick inte att spara. Försök igen."
   machine: { fi: true, sv: true }
@@ -807,20 +842,6 @@ profile.seek.intent.explain:
   description: "Lead text of the screen that changes what one is here for (#542). Not the intent step's text, which says it can be changed later; the second sentence names the option Open to either."
   fi: "Tämä ratkaisee myös, ketkä näkevät sinut: ne, jotka haluavat samaa. Avoin kummallekin kattaa pitkäaikaisen ja rennon."
   sv: "Det här avgör också vilka som ser dig: de som vill samma sak. Öppen för båda omfattar långvarigt och avslappnat."
-  machine: { fi: true, sv: true }
-
-profile.seek.dealBreakers.none:
-  en: "None"
-  description: "Under the deal-breakers' row on What you seek when none is set (#542)."
-  fi: "Ei yhtään"
-  sv: "Inga"
-  machine: { fi: true, sv: true }
-
-profile.seek.dealBreakers.paused:
-  en: "{field} (paused)"
-  description: "A deal-breaker that waits for the person's own answer, named under the row on What you seek (#542); {field} is the field's label."
-  fi: "{field} (tauolla)"
-  sv: "{field} (pausad)"
   machine: { fi: true, sv: true }
 
 profile.gender.title:

@@ -90,15 +90,15 @@ export function optionTextKey(
 /** One choice: a button that says whether it is chosen, never a colour alone. */
 export function Chip({
   label,
-  heard,
   selected,
+  disabled,
   onPress,
   glyph,
 }: {
   label: string;
-  /** What a screen reader says where the label alone would not tell two chips apart. */
-  heard?: string;
   selected: boolean;
+  /** Read-only: says what stands and cannot be pressed (a paused deal-breaker's answers, #551). */
+  disabled?: boolean;
   onPress: () => void;
   /** A decorative glyph before the label (#213); the label still names the button. */
   glyph?: React.ReactNode;
@@ -108,7 +108,7 @@ export function Chip({
     return (
       <Button
         variant={variant}
-        accessibilityLabel={heard}
+        disabled={disabled}
         accessibilityState={{ selected }}
         onPress={onPress}
       >

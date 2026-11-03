@@ -7,7 +7,8 @@ import { fetchPreferences, fetchProfile, savePreferences } from "../client";
 type Seeking = {
   seeks: Gender[];
   ageWindow: AgeWindow;
-  intent: ProfileFields["intent"];
+  /** The person's own answers: what one is here for, and which deal-breakers are open. */
+  fields: ProfileFields;
 };
 
 type SeekingState =
@@ -23,7 +24,7 @@ async function readSeeking(): Promise<Seeking | null> {
     fetchProfile(),
   ]);
   if (!seeks || !ageWindow || !profile?.specialCategoryConsent) return null;
-  return { seeks, ageWindow, intent: profile.fields.intent };
+  return { seeks, ageWindow, fields: profile.fields };
 }
 
 /**

@@ -7,7 +7,7 @@ import {
   fetchOwnGender,
   fetchPreferences,
   fetchProfile,
-  saveDealBreakers,
+  saveDealBreaker,
   saveGender,
   saveHome,
   savePreferences,
@@ -381,15 +381,78 @@ describe("the profile client", () => {
     expect(await fetchDealBreakers()).toEqual({ dealBreakers: [height], max: 6 });
   });
 
-  it("saves the deal-breakers, and fails a refusal with its code", async () => {
-    const seen = answering(json(DEAL_BREAKERS), refusal("deal_breakers_limit", 422));
-    expect(await saveDealBreakers({ dealBreakers: [] })).toEqual(DEAL_BREAKERS);
-    expect(seen[0]?.method).toBe("PUT");
-    expect(JSON.parse(await (seen[0] as Request).text())).toEqual({ dealBreakers: [] });
-    await expect(saveDealBreakers({ dealBreakers: [] })).rejects.toMatchObject({
-      status: 422,
-      code: "deal_breakers_limit",
-      message: "deal-breakers save answered 422",
+  describe("saveDealBreaker (#551)", () => {
+    const smoking = { field: "smoking", accept: ["never"], includeUnknown: false };
+    const kids = { field: "hasKids", accept: ["no"], includeUnknown: true };
+    const asRead = (...rows: { field: string }[]) => ({
+      dealBreakers: rows.map((row) => ({ paused: false, ...row })),
+      max: 7,
+    });
+    const sentIn = async (request: Request | undefined) =>
+      JSON.parse(await (request as Request).text()) as unknown;
+
+    it("reads the set, then sends it with the one field in place, and answers what the API stored", async () => {
+      const stored = asRead(kids, smoking);
+      const seen = answering(json(asRead(smoking, kids)), json(stored));
+      const filter = { accept: ["never"], includeUnknown: false };
+      expect(await saveDealBreaker("smoking", filter)).toEqual(stored);
+      expect(seen.map((request) => `${request.method} ${pathOf(request)}`)).toEqual([
+        "GET /preferences/deal-breakers",
+        "PUT /preferences/deal-breakers",
+      ]);
+      expect(await sentIn(seen[1])).toEqual({ dealBreakers: [kids, smoking] });
+    });
+
+    it("adds a field the set does not hold", async () => {
+      const seen = answering(json(asRead(kids)), json(asRead(kids, smoking)));
+      await saveDealBreaker("smoking", { accept: ["never"], includeUnknown: false });
+      expect(await sentIn(seen[1])).toEqual({ dealBreakers: [kids, smoking] });
+    });
+
+    it("takes a field off with nothing accepted, the rest kept", async () => {
+      const seen = answering(json(asRead(smoking, kids)), json(asRead(kids)));
+      await saveDealBreaker("smoking", { accept: [], includeUnknown: true });
+      expect(await sentIn(seen[1])).toEqual({ dealBreakers: [kids] });
+    });
+
+    it("sends a paused filter back as it stands: the pause is the key, never the row", async () => {
+      const paused = { ...smoking, paused: true };
+      const seen = answering(
+        json({ dealBreakers: [paused], max: 7 }),
+        json({ dealBreakers: [paused], max: 7 }),
+      );
+      await saveDealBreaker("hasKids", { accept: ["no"], includeUnknown: true });
+      expect(await sentIn(seen[1])).toEqual({ dealBreakers: [smoking, kids] });
+    });
+
+    it("sends nothing when the set cannot be read first, and fails with that read's code", async () => {
+      const seen = answering(refusal("internal_error", 500));
+      await expect(
+        saveDealBreaker("smoking", { accept: ["never"], includeUnknown: false }),
+      ).rejects.toMatchObject({
+        status: 500,
+        code: "internal_error",
+        message: "deal-breakers answered 500",
+      });
+      expect(seen).toHaveLength(1);
+    });
+
+    it("fails a refusal with its code, which the screen says in words", async () => {
+      answering(json(asRead()), refusal("filter_unanswered", 409));
+      await expect(
+        saveDealBreaker("smoking", { accept: ["never"], includeUnknown: false }),
+      ).rejects.toMatchObject({
+        status: 409,
+        code: "filter_unanswered",
+        message: "deal-breakers save answered 409",
+      });
+    });
+
+    it("refuses an answer outside the contract", async () => {
+      answering(json(asRead()), json({ dealBreakers: "none" }));
+      await expect(
+        saveDealBreaker("smoking", { accept: ["never"], includeUnknown: false }),
+      ).rejects.toThrow();
     });
   });
 });
@@ -470,6 +533,101 @@ describe("the profile client: a save on its way (#238)", () => {
     waiting[0]?.answer(Promise.reject(new TypeError("Network request failed")) as never);
     await expect(save).rejects.toBeInstanceOf(TypeError);
     expect(await fetchProfile()).toEqual(EMPTY);
+  });
+
+  describe("a deal-breaker, in the same line (#551)", () => {
+    const smoking = { field: "smoking", accept: ["never"], includeUnknown: true };
+    const empty = { dealBreakers: [], max: 7 };
+
+    it("waits for a save before it, and reads the set only when its turn comes", async () => {
+      const waiting = holding();
+      const first = saveProfile(() => update);
+      const second = saveDealBreaker("smoking", { accept: ["never"], includeUnknown: true });
+      await flush();
+      expect(sent(waiting)).toEqual(["GET /profile"]);
+      waiting[0]?.answer(json(EMPTY));
+      await flush();
+      waiting[1]?.answer(json(EMPTY));
+      await first;
+      await flush();
+      expect(sent(waiting).slice(2)).toEqual(["GET /preferences/deal-breakers"]);
+      waiting[2]?.answer(json(empty));
+      await flush();
+      expect(sent(waiting).slice(3)).toEqual(["PUT /preferences/deal-breakers"]);
+      waiting[3]?.answer(json({ dealBreakers: [{ ...smoking, paused: false }], max: 7 }));
+      await second;
+    });
+
+    it("holds every read until it has landed, so the list shows what was stored", async () => {
+      const waiting = holding();
+      const save = saveDealBreaker("smoking", { accept: ["never"], includeUnknown: true });
+      const read = fetchDealBreakers();
+      const profile = fetchProfile();
+      await flush();
+      expect(sent(waiting)).toEqual(["GET /preferences/deal-breakers"]);
+      waiting[0]?.answer(json(empty));
+      await flush();
+      expect(sent(waiting).slice(1)).toEqual(["PUT /preferences/deal-breakers"]);
+      const stored = { dealBreakers: [{ ...smoking, paused: false }], max: 7 };
+      waiting[1]?.answer(json(stored));
+      await save;
+      await flush();
+      expect(sent(waiting).slice(2).sort()).toEqual([
+        "GET /preferences/deal-breakers",
+        "GET /profile",
+      ]);
+      for (const { answer, request } of waiting.slice(2)) {
+        answer(pathOf(request) === "/profile" ? json(EMPTY) : json(stored));
+      }
+      expect(await read).toEqual(stored);
+      await profile;
+    });
+
+    it("never waits for itself: its own read goes straight through", async () => {
+      const waiting = holding();
+      const save = saveDealBreaker("smoking", { accept: ["never"], includeUnknown: true });
+      await flush();
+      expect(sent(waiting)).toEqual(["GET /preferences/deal-breakers"]);
+      waiting[0]?.answer(json(empty));
+      await flush();
+      waiting[1]?.answer(json(empty));
+      await save;
+    });
+
+    it("holds up nothing after it when it is refused", async () => {
+      const waiting = holding();
+      const save = saveDealBreaker("smoking", { accept: ["never"], includeUnknown: true });
+      const read = fetchDealBreakers();
+      await flush();
+      waiting[0]?.answer(refusal("internal_error", 500));
+      await expect(save).rejects.toBeInstanceOf(ApiError);
+      await flush();
+      expect(sent(waiting).slice(1)).toEqual(["GET /preferences/deal-breakers"]);
+      waiting[1]?.answer(json(empty));
+      expect(await read).toEqual(empty);
+    });
+
+    it("lets a later save go after it, two saves never landing out of order", async () => {
+      const waiting = holding();
+      const first = saveDealBreaker("smoking", { accept: ["never"], includeUnknown: true });
+      const second = saveDealBreaker("hasKids", { accept: ["no"], includeUnknown: true });
+      await flush();
+      expect(sent(waiting)).toEqual(["GET /preferences/deal-breakers"]);
+      waiting[0]?.answer(json(empty));
+      await flush();
+      const one = { dealBreakers: [{ ...smoking, paused: false }], max: 7 };
+      waiting[1]?.answer(json(one));
+      await first;
+      await flush();
+      expect(sent(waiting).slice(2)).toEqual(["GET /preferences/deal-breakers"]);
+      waiting[2]?.answer(json(one));
+      await flush();
+      expect(JSON.parse((await waiting[3]?.request.text()) as string)).toEqual({
+        dealBreakers: [smoking, { field: "hasKids", accept: ["no"], includeUnknown: true }],
+      });
+      waiting[3]?.answer(json(one));
+      await second;
+    });
   });
 
   describe("the gender, in the same line (#552)", () => {

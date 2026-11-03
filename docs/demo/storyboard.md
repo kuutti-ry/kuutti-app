@@ -37,7 +37,7 @@ The home screen: "Kuutti", two cards and the way onward.
 - "Matching": where Aino stands. With her photos pending: "Matching opens for finished profiles. Yours still lacks something." Once her photos are approved: "Matching is open for you.", since the demo commands open the pond; once an admin has closed it, "Your profile is finished. Matching has not opened yet." (ADR-060).
 - Below: "Your profile". The profile list holds the rest (#239): "Photos" and the sections, each with a check mark once done or how far it is filled, then "What you seek", which holds whom she seeks, the ages, what she is here for and "Your deal-breakers" (up to seven: distance, which everybody can set, and the others only on what she answered herself, #149, ADR-061 §7) and, while a question is unanswered, "Fill in the rest when you have a moment" (the optional fields, one per screen, "Ask me later" on each, #148). The eye at the top opens her card.
 
-In "Your profile", show "Fill in the rest when you have a moment" for one field and skip it; open "What you seek" and show "Your deal-breakers": the field she has not answered says "To filter on this, share yours first."
+In "Your profile", show "Fill in the rest when you have a moment" for one field and skip it; open "What you seek" and show the deal-breakers' rows: the field she has not answered says "Share yours first."
 
 ## Scene 4: Sanna's card (1 min)
 

@@ -1,4 +1,4 @@
-import { act, fireEvent, screen, waitFor } from "@testing-library/react-native";
+import { act, fireEvent, screen, waitFor, within } from "@testing-library/react-native";
 import { useLocales } from "expo-localization";
 import type * as React from "react";
 import { saveSession } from "@/lib/session";
@@ -7,33 +7,17 @@ import { expectPinnedHeader } from "@/test/layout";
 import { renderWithTheme } from "@/test/render";
 import { DealBreakersScreen } from "./DealBreakersScreen";
 
-const {
-  __router: router,
-  __navigation: navigation,
-  __focus: focus,
-} = jest.requireMock("expo-router") as {
-  __router: { push: jest.Mock; replace: jest.Mock; back: jest.Mock };
-  __navigation: {
-    dispatch: jest.Mock;
-    setOptions: jest.Mock;
-    emit: (name: string, event: unknown) => void;
-  };
+// The deal-breakers' rows (#551), each saying what it holds and opening its own
+// screen. What you seek shows the same rows (seek/SeekScreen.test.tsx).
+
+const { __router: router, __focus: focus } = jest.requireMock("expo-router") as {
+  __router: { push: jest.Mock; back: jest.Mock };
   __focus: () => void;
 };
-const settle = (ms = 30) => new Promise<void>((resolve) => setTimeout(resolve, ms));
-/** The arrow, Android's back key or a pop of several screens, as the stack reports it. */
-const leave = async () => {
-  const event = { preventDefault: jest.fn(), data: { action: { type: "GO_BACK" } } };
-  await act(async () => {
-    navigation.emit("beforeRemove", event);
-    await settle();
-  });
-  return event;
-};
-const swipe = () => navigation.setOptions.mock.lastCall?.[0];
+const settle = (ms = 10) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 const show = (ui: React.ReactElement) =>
   act(async () => {
-    renderWithTheme(ui);
+    await renderWithTheme(ui);
     await settle();
   });
 const press = (element: ReturnType<typeof screen.getByRole>) =>
@@ -45,31 +29,46 @@ const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
 const token = (seed: string) => (seed + "x".repeat(43)).slice(0, 43);
 
-type DealBreaker = { field: string; accept: string[]; includeUnknown: boolean };
+type Stored = { field: string; accept: string[]; includeUnknown: boolean; paused: boolean };
+type Server = {
+  fields: Record<string, unknown>;
+  dealBreakers: Stored[];
+  max: number;
+  noProfile: boolean;
+  noDealBreakers: boolean;
+};
 
-/** A later field's own screen, opened for its one answer: the answer comes back here (#542). */
-const answerAt = (field: string) => ({
-  pathname: "/profile/later/[field]",
-  params: { field, once: "1" },
+const filter = (field: string, accept: string[], paused = false): Stored => ({
+  field,
+  accept,
+  includeUnknown: true,
+  paused,
 });
 
-/** A tiny server: the profile for the own answers, the deal-breakers read and replaced whole, paused read off the profile. */
-function fakeApi(fields: Record<string, unknown>, dealBreakers: DealBreaker[] = [], max = 2) {
-  const server = { fields, dealBreakers };
-  const puts: DealBreaker[][] = [];
+function fakeApi(start: Partial<Server> = {}) {
+  const server: Server = {
+    fields: {
+      monogamy: "monogamous",
+      hasKids: "no",
+      wantsKids: "want",
+      smoking: "never",
+      languages: ["fi"],
+      height: 170,
+    },
+    dealBreakers: [],
+    max: 7,
+    noProfile: false,
+    noDealBreakers: false,
+    ...start,
+  };
   const reads: string[] = [];
-  const stored = () => ({
-    dealBreakers: server.dealBreakers.map((d) => ({
-      ...d,
-      paused: d.field !== "distance" && server.fields[d.field] === undefined,
-    })),
-    max,
-  });
+  const broken = () => json({ error: { code: "x", message: "no", requestId: "r" } }, 500);
   globalThis.fetch = jest.fn(async (input: Request | string, init?: RequestInit) => {
     const request = input instanceof Request ? input : new Request(input, init);
     const path = new URL(request.url).pathname;
-    if (request.method === "GET") reads.push(path);
-    if (path === "/profile" && request.method === "GET") {
+    reads.push(`${request.method} ${path}`);
+    if (path === "/profile") {
+      if (server.noProfile) return broken();
       return json({
         profile: {
           displayName: "Aino",
@@ -84,34 +83,50 @@ function fakeApi(fields: Record<string, unknown>, dealBreakers: DealBreaker[] = 
         home: null,
       });
     }
-    if (path === "/preferences/deal-breakers" && request.method === "GET") return json(stored());
-    if (path === "/preferences/deal-breakers" && request.method === "PUT") {
-      const body = (await request.json()) as { dealBreakers: DealBreaker[] };
-      puts.push(body.dealBreakers);
-      server.dealBreakers = body.dealBreakers;
-      return json(stored());
+    if (path === "/preferences/deal-breakers") {
+      if (server.noDealBreakers) return broken();
+      return json({ dealBreakers: server.dealBreakers, max: server.max });
     }
     return json({ error: { code: "not_found", message: "no", requestId: "r" } }, 404);
   }) as unknown as typeof fetch;
-  return { server, puts, reads };
+  return { server, reads };
 }
 
-const answeredAll = {
-  monogamy: "monogamous",
-  hasKids: "no",
-  wantsKids: "want",
-  smoking: "never",
-  languages: ["fi"],
-  height: 170,
-};
+const TITLES = [
+  "Relationship structure",
+  "Kids",
+  "Kids in the future",
+  "Smoking",
+  "Languages",
+  "Height",
+  "Distance",
+];
 
-const checkA11y = () => {
-  const found = pressables(screen.toJSON() as HostNode);
-  expect(found.flatMap((node) => a11yProblems(node))).toEqual([]);
+const row = (title: string) => screen.getByRole("button", { name: title });
+const heard = (title: string) => row(title).props.accessibilityValue?.text as string | undefined;
+/** The answer drawn under the row's title and heard once, as the value: no hint repeats it. */
+function expectValue(title: string, words: string) {
+  expect(within(row(title)).getByText(words)).toBeTruthy();
+  expect(row(title).props.accessibilityValue).toEqual({ text: words });
+  expect(row(title).props.accessibilityHint).toBeUndefined();
+}
+
+const opened = async (start?: Partial<Server>) => {
+  const api = fakeApi(start);
+  await show(<DealBreakersScreen />);
+  await waitFor(() => expect(row("Smoking")).toBeTruthy());
+  await waitFor(() => expect(heard("Distance")).toBeDefined());
+  return api;
 };
+const backInFront = () =>
+  act(async () => {
+    focus();
+    await settle();
+  });
 
 beforeEach(async () => {
-  router.push.mockReset();
+  router.push.mockClear();
+  router.back.mockClear();
   await saveSession({
     sessionId: "6f1c1c4e-9a8e-4a0b-9c3a-0c8d1e2f3a4b",
     accessToken: token("access"),
@@ -122,597 +137,217 @@ beforeEach(async () => {
 });
 
 describe("DealBreakersScreen", () => {
-  it("gates a field the person has not answered and leads to its screen", async () => {
-    fakeApi({ ...answeredAll, hasKids: undefined });
-    await show(<DealBreakersScreen />);
-    await waitFor(() => expect(screen.getByText("Deal-breakers")).toBeTruthy());
-    expect(screen.getByText(/Up to 2\./)).toBeTruthy();
-    // Four switches for the answered lists, height has buttons; kids ask for the answer first.
-    expect(screen.getAllByRole("switch")).toHaveLength(4);
-    expect(screen.queryByLabelText("Deal-breaker: Kids")).toBeNull();
-    expect(screen.getAllByText("To filter on this, share yours first.")).toHaveLength(1);
-    checkA11y();
-    await press(screen.getByRole("button", { name: "Answer it" }));
-    expect(router.push).toHaveBeenCalledWith(answerAt("hasKids"));
-  });
-
-  it("goes back to where it was opened from an arrow pinned above the list, saving nothing", async () => {
-    const { puts } = fakeApi(answeredAll);
-    router.back.mockClear();
-    await show(<DealBreakersScreen />);
-    await waitFor(() => expect(screen.getByText("Deal-breakers")).toBeTruthy());
+  it("keeps its title and the way back pinned above the rows", async () => {
+    await opened();
     expectPinnedHeader("Deal-breakers", "Back");
-    await press(screen.getAllByRole("switch")[0] as ReturnType<typeof screen.getByRole>);
-    await press(screen.getByRole("button", { name: "Back" }));
+    await press(row("Back"));
     expect(router.back).toHaveBeenCalledTimes(1);
-    expect(puts).toEqual([]);
   });
 
-  it("asks before switches changed and not saved are left, and leaves only on the word", async () => {
-    const { puts } = fakeApi(answeredAll);
-    navigation.dispatch.mockClear();
-    await show(<DealBreakersScreen />);
-    await waitFor(() => expect(screen.getByText("Deal-breakers")).toBeTruthy());
-    expect(swipe()).toEqual({ gestureEnabled: true });
-    await press(screen.getByLabelText("Deal-breaker: Smoking"));
-    // The iOS swipe cannot be held without bouncing (#238), so it is off while something is unsaved.
-    expect(swipe()).toEqual({ gestureEnabled: false });
-
-    const first = await leave();
-    expect(first.preventDefault).toHaveBeenCalled();
-    expect(screen.getByText("Leave without saving?")).toBeTruthy();
-    expect(screen.getByText("Your changes are not saved yet.")).toBeTruthy();
-    await press(screen.getByRole("button", { name: "Keep editing" }));
-    expect(screen.queryByText("Leave without saving?")).toBeNull();
-    expect(navigation.dispatch).not.toHaveBeenCalled();
-    expect(screen.getByLabelText("Deal-breaker: Smoking").props.accessibilityState?.checked).toBe(
-      true,
-    );
-
-    await leave();
-    await press(screen.getByRole("button", { name: "Leave without saving" }));
-    expect(navigation.dispatch).toHaveBeenCalledWith({ type: "GO_BACK" });
-    expect(puts).toEqual([]);
-    // Dropped: back to what is stored, so a screen a link left mounted holds nothing.
-    expect(screen.getByLabelText("Deal-breaker: Smoking").props.accessibilityState?.checked).toBe(
-      false,
-    );
+  it("has a row per deal-breaker, the fields' order with the distance last, and nothing else to press", async () => {
+    await opened();
+    expect(screen.getAllByRole("button").map((node) => node.props.accessibilityLabel)).toEqual([
+      "Back",
+      ...TITLES,
+    ]);
+    expect(screen.queryByRole("switch")).toBeNull();
+    const found = pressables(screen.toJSON() as HostNode);
+    expect(found).toHaveLength(TITLES.length + 1);
+    expect(found.flatMap((node) => a11yProblems(node))).toEqual([]);
   });
 
-  it("lets go at once when nothing changed, and once the changes are saved", async () => {
-    fakeApi(answeredAll);
-    await show(<DealBreakersScreen />);
-    await waitFor(() => expect(screen.getByText("Deal-breakers")).toBeTruthy());
-    expect((await leave()).preventDefault).not.toHaveBeenCalled();
-
-    await press(screen.getByLabelText("Deal-breaker: Smoking"));
-    await press(screen.getByRole("button", { name: "Never" }));
-    // Switched off again: the same set as stored, so nothing to lose.
-    await press(screen.getByLabelText("Deal-breaker: Smoking"));
-    expect((await leave()).preventDefault).not.toHaveBeenCalled();
-
-    await press(screen.getByLabelText("Deal-breaker: Smoking"));
-    await press(screen.getByRole("button", { name: "Save the deal-breakers" }));
-    await waitFor(() => expect(screen.getByText("Saved.")).toBeTruthy());
-    expect(swipe()).toEqual({ gestureEnabled: true });
-    expect((await leave()).preventDefault).not.toHaveBeenCalled();
-    expect(screen.queryByText("Leave without saving?")).toBeNull();
+  it("draws each field's icon on its row, with the chevron, and neither is heard", async () => {
+    await opened();
+    const drawn = (node: unknown): number =>
+      JSON.stringify(node).match(/"vbWidth":24/g)?.length ?? 0;
+    // The arrow in the header, and an icon and a chevron on each row.
+    expect(drawn(screen.toJSON())).toBe(1 + 2 * TITLES.length);
+    expect(pressables(screen.toJSON() as HostNode)).toHaveLength(TITLES.length + 1);
   });
 
-  it("leads a field without a later screen to the section that holds it, for its one answer (#239, #542)", async () => {
-    fakeApi({ ...answeredAll, monogamy: undefined });
-    await show(<DealBreakersScreen />);
-    await waitFor(() => expect(screen.getByText("Deal-breakers")).toBeTruthy());
-    await press(screen.getByRole("button", { name: "Answer it" }));
-    expect(router.push).toHaveBeenCalledWith({
-      pathname: "/profile/section/[id]",
-      params: { id: "relationship", once: "1" },
+  it("says how many a person may hold and on what, over the rows", async () => {
+    await opened({ max: 3 });
+    expect(screen.getByText(/^Up to 3\. Only on what you answered yourself/)).toBeTruthy();
+  });
+
+  it("opens each row's own screen", async () => {
+    await opened();
+    for (const title of TITLES) await press(row(title));
+    expect(router.push.mock.calls.map(([path]) => path)).toEqual([
+      "/profile/deal-breakers/monogamy",
+      "/profile/deal-breakers/hasKids",
+      "/profile/deal-breakers/wantsKids",
+      "/profile/deal-breakers/smoking",
+      "/profile/deal-breakers/languages",
+      "/profile/deal-breakers/height",
+      "/profile/deal-breakers/distance",
+    ]);
+  });
+
+  describe("what a row says", () => {
+    it("says Everyone where nothing is set and the own answer is given", async () => {
+      await opened();
+      for (const title of TITLES) expectValue(title, "Everyone");
     });
-  });
 
-  it("switches deal-breakers on, takes what is fine, holds the limit, and saves the set", async () => {
-    const { puts } = fakeApi(answeredAll);
-    await show(<DealBreakersScreen />);
-    await waitFor(() => expect(screen.getByText("Deal-breakers")).toBeTruthy());
-    await press(screen.getByLabelText("Deal-breaker: Smoking"));
-    expect(screen.getByText("Pick at least one answer that is fine with you.")).toBeTruthy();
-    expect(
-      screen.getByRole("button", { name: "Save the deal-breakers" }).props.accessibilityState
-        ?.disabled,
-    ).toBe(true);
-    await press(screen.getByRole("button", { name: "Never" }));
-    await press(screen.getByRole("button", { name: "Quitting" }));
-    // On from the start (ADR-042 §8), switched off here.
-    expect(
-      screen.getByLabelText("Also people who did not answer").props.accessibilityState?.checked,
-    ).toBe(true);
-    await press(screen.getByLabelText("Also people who did not answer"));
-    await press(screen.getByLabelText("Deal-breaker: Kids"));
-    await press(screen.getByRole("button", { name: "No kids" }));
-    checkA11y();
-    // A third one: refused in words, and the switch stays off.
-    await press(screen.getByLabelText("Deal-breaker: Relationship structure"));
-    expect(screen.getByText("That is 2 already.")).toBeTruthy();
-    expect(
-      screen.getByLabelText("Deal-breaker: Relationship structure").props.accessibilityState
-        ?.checked,
-    ).toBe(false);
-    await press(screen.getByRole("button", { name: "Save the deal-breakers" }));
-    await waitFor(() => expect(screen.getByText("Saved.")).toBeTruthy());
-    // A new deal-breaker lets through who did not answer until switched off (ADR-042 §8): smoking's was.
-    expect(puts).toEqual([
+    it("asks for the own answer first where it is missing, but never of the distance", async () => {
+      await opened({ fields: {} });
+      for (const title of TITLES.slice(0, -1)) expectValue(title, "Share yours first");
+      expectValue("Distance", "Everyone");
+    });
+
+    it.each([
+      ["one answer, as a filter says it", "smoking", ["never"], "Smoking", "Never"],
       [
-        { field: "hasKids", accept: ["no"], includeUnknown: true },
-        { field: "smoking", accept: ["never", "quitting"], includeUnknown: false },
+        "the answers in the registry's order, whatever order they were stored in",
+        "smoking",
+        ["quitting", "never"],
+        "Smoking",
+        "Never, Quitting",
       ],
-    ]);
-  });
+      ["kids as somebody else's", "hasKids", ["yes_with_me"], "Kids", "Kids at home"],
+      [
+        "wanting kids as somebody else's",
+        "wantsKids",
+        ["want"],
+        "Kids in the future",
+        "Wants kids",
+      ],
+      ["a relation in its button's words", "height", ["taller"], "Height", "Taller than me"],
+      ["a band alone", "distance", ["nearby"], "Distance", "Nearby"],
+      ["the bands by the farthest", "distance", ["nearby", "close"], "Distance", "Close"],
+      [
+        "three answers in full",
+        "languages",
+        ["fi", "sv", "en"],
+        "Languages",
+        "Finnish, Swedish, English",
+      ],
+      [
+        "four as three and how many more",
+        "languages",
+        ["fi", "sv", "en", "de"],
+        "Languages",
+        "Finnish, Swedish, English and 1 more",
+      ],
+    ])("says %s", async (_what, field, accept, title, words) => {
+      await opened({ dealBreakers: [filter(field, accept)] });
+      expectValue(title, words);
+    });
 
-  it("says in words that a deal-breaker is paused while the own answer is missing", async () => {
-    fakeApi({ ...answeredAll, smoking: undefined }, [
-      { field: "smoking", accept: ["never"], includeUnknown: false },
-    ]);
-    await show(<DealBreakersScreen />);
-    await waitFor(() =>
-      expect(screen.getByText("Paused until you answer it yourself.")).toBeTruthy(),
-    );
-    expect(screen.getByLabelText("Deal-breaker: Smoking").props.accessibilityState?.checked).toBe(
-      true,
-    );
-    expect(screen.getByRole("button", { name: "Never" }).props.accessibilityState?.selected).toBe(
-      true,
-    );
-    await press(screen.getByRole("button", { name: "Answer it" }));
-    expect(router.push).toHaveBeenCalledWith(answerAt("smoking"));
-  });
+    it("keeps a row short however many a filter takes: sixty is the contract's", async () => {
+      const accept = ["fi", "sv", "en", "de", "fr", "es", "it", "ru", "et", "so"];
+      await opened({ dealBreakers: [filter("languages", accept)] });
+      expectValue("Languages", "Finnish, Swedish, English and 7 more");
+    });
 
-  describe("the way back from Answer it (#542)", () => {
-    const GATED = "To filter on this, share yours first.";
-    const PAUSED = "Paused until you answer it yourself.";
-    const ready = async () => {
-      await show(<DealBreakersScreen />);
-      await waitFor(() => expect(screen.getByText("Deal-breakers")).toBeTruthy());
-    };
-    const backInFront = () =>
-      act(async () => {
-        focus();
-        await settle();
+    it("says a filter is paused in words, naming no answer, and leaves the others as they are", async () => {
+      await opened({
+        fields: { hasKids: "no" },
+        dealBreakers: [filter("smoking", ["never"], true), filter("hasKids", ["no"])],
       });
-    const checked = (label: string) =>
-      screen.getByLabelText(label).props.accessibilityState?.checked;
-
-    it("reads the person's own answers on the first focus once, no more", async () => {
-      const { reads } = fakeApi(answeredAll);
-      await ready();
-      expect([...reads].sort()).toEqual(["/preferences/deal-breakers", "/profile"]);
+      expectValue("Smoking", "Paused until you answer it yourself.");
+      expectValue("Kids", "No kids");
+      expect(screen.queryByText("Never")).toBeNull();
     });
 
-    it("reads them again when it is back in front, which opens the row that was gated", async () => {
-      const { server, reads } = fakeApi({ ...answeredAll, hasKids: undefined });
-      await ready();
-      expect(screen.getByText(GATED)).toBeTruthy();
-      expect(screen.queryByLabelText("Deal-breaker: Kids")).toBeNull();
-
-      server.fields.hasKids = "no";
-      await backInFront();
-      expect(screen.queryByText(GATED)).toBeNull();
-      expect(screen.queryByRole("button", { name: "Answer it" })).toBeNull();
-      expect(checked("Deal-breaker: Kids")).toBe(false);
-      expect(reads.filter((path) => path === "/profile")).toHaveLength(2);
-    });
-
-    it("takes a pause off the same way, the deal-breaker on as it was", async () => {
-      const { server } = fakeApi({ ...answeredAll, smoking: undefined }, [
-        { field: "smoking", accept: ["never"], includeUnknown: false },
-      ]);
-      await ready();
-      expect(screen.getByText(PAUSED)).toBeTruthy();
-      server.fields.smoking = "never";
-      await backInFront();
-      expect(screen.queryByText(PAUSED)).toBeNull();
-      expect(checked("Deal-breaker: Smoking")).toBe(true);
-    });
-
-    it("stays gated when the person came back without an answer", async () => {
-      fakeApi({ ...answeredAll, hasKids: undefined });
-      await ready();
-      await backInFront();
-      expect(screen.getByText(GATED)).toBeTruthy();
-      expect(screen.queryByLabelText("Deal-breaker: Kids")).toBeNull();
-    });
-
-    it("leaves a draft not saved as it is, and asks nothing of the API for it", async () => {
-      const { server, puts, reads } = fakeApi({ ...answeredAll, hasKids: undefined });
-      await ready();
-      await press(screen.getByLabelText("Deal-breaker: Smoking"));
-      await press(screen.getByRole("button", { name: "Never" }));
-
-      server.fields.hasKids = "no";
-      await backInFront();
-      // Still the draft: on, its answer accepted, and still something for the leaving to ask about.
-      expect(checked("Deal-breaker: Smoking")).toBe(true);
-      expect(screen.getByRole("button", { name: "Never" }).props.accessibilityState?.selected).toBe(
-        true,
-      );
-      expect(swipe()).toEqual({ gestureEnabled: false });
-      expect(reads.filter((path) => path === "/preferences/deal-breakers")).toHaveLength(1);
-      expect(puts).toEqual([]);
-
-      // The row that opened joins it, and both go in the one save.
-      await press(screen.getByLabelText("Deal-breaker: Kids"));
-      await press(screen.getByRole("button", { name: "No kids" }));
-      await press(screen.getByRole("button", { name: "Save the deal-breakers" }));
-      await waitFor(() => expect(screen.getByText("Saved.")).toBeTruthy());
-      expect(puts).toEqual([
-        [
-          { field: "hasKids", accept: ["no"], includeUnknown: true },
-          { field: "smoking", accept: ["never"], includeUnknown: true },
-        ],
-      ]);
-    });
-
-    it("takes nothing away when the read on the way back fails", async () => {
-      const { server } = fakeApi({ ...answeredAll });
-      await ready();
-      await press(screen.getByLabelText("Deal-breaker: Smoking"));
-      const reads = globalThis.fetch;
-      globalThis.fetch = jest.fn(async () =>
-        json({ error: { code: "internal_error", message: "x", requestId: "r" } }, 500),
-      ) as unknown as typeof fetch;
-      await backInFront();
+    it("says nothing when the deal-breakers could not be read: a row's screen says why", async () => {
+      const api = fakeApi({ noDealBreakers: true });
+      await show(<DealBreakersScreen />);
+      await waitFor(() => expect(row("Smoking")).toBeTruthy());
+      expect(api.reads).toContain("GET /preferences/deal-breakers");
+      for (const title of TITLES) expect(heard(title)).toBeUndefined();
+      expect(screen.queryByText("Everyone")).toBeNull();
+      expect(screen.queryByText(/^Up to/)).toBeNull();
       expect(screen.queryByText("Your profile could not be loaded.")).toBeNull();
-      expect(checked("Deal-breaker: Smoking")).toBe(true);
-      // And the next time the read works, it counts.
-      globalThis.fetch = reads;
-      server.fields.hasKids = undefined;
-      await backInFront();
-      expect(screen.getByText(GATED)).toBeTruthy();
+      await press(row("Smoking"));
+      expect(router.push).toHaveBeenCalledWith("/profile/deal-breakers/smoking");
     });
   });
 
-  describe("the height row (#508)", () => {
-    const button = (name: string) => screen.getByRole("button", { name });
-    const selected = (name: string) => button(name).props.accessibilityState?.selected;
-    const ready = async () => {
-      await show(<DealBreakersScreen />);
-      await waitFor(() => expect(screen.getByText("Deal-breakers")).toBeTruthy());
-    };
+  it("reads everything once as it opens, and again when a deal-breaker's screen hands back", async () => {
+    const { server, reads } = await opened();
+    const count = (path: string) => reads.filter((read) => read === `GET ${path}`).length;
+    expect(count("/profile")).toBe(1);
+    expect(count("/preferences/deal-breakers")).toBe(1);
 
-    it("has four buttons where a list has its switch, with Everyone chosen", async () => {
-      fakeApi(answeredAll);
-      await ready();
-      expect(screen.queryByLabelText("Deal-breaker: Height")).toBeNull();
-      expect(selected("Everyone, Height")).toBe(true);
-      for (const name of ["Taller than me", "My height or taller", "Shorter than me"]) {
-        expect(selected(name)).toBe(false);
-      }
-      // Nothing to say of those who did not answer until a relation is chosen, and no heading of
-      // answers that are fine: the buttons are the sentence.
-      expect(screen.queryByLabelText("Also people who did not answer")).toBeNull();
-      expect(screen.queryByText("Fine with me")).toBeNull();
-      checkA11y();
-    });
-
-    it("takes one relation at a time, saves it, and Everyone takes it off", async () => {
-      const { puts } = fakeApi(answeredAll);
-      await ready();
-      await press(button("Taller than me"));
-      expect(selected("Taller than me")).toBe(true);
-      expect(selected("Everyone, Height")).toBe(false);
-      // On from the start (ADR-042 §8), as with every deal-breaker.
-      expect(
-        screen.getByLabelText("Also people who did not answer").props.accessibilityState?.checked,
-      ).toBe(true);
-      checkA11y();
-
-      await press(button("Shorter than me"));
-      expect(selected("Taller than me")).toBe(false);
-      expect(selected("Shorter than me")).toBe(true);
-      await press(button("Save the deal-breakers"));
-      await waitFor(() => expect(screen.getByText("Saved.")).toBeTruthy());
-
-      await press(button("Everyone, Height"));
-      expect(selected("Everyone, Height")).toBe(true);
-      expect(selected("Shorter than me")).toBe(false);
-      expect(screen.queryByLabelText("Also people who did not answer")).toBeNull();
-      await press(button("Save the deal-breakers"));
-      await waitFor(() => expect(puts).toHaveLength(2));
-      expect(puts).toEqual([[{ field: "height", accept: ["shorter"], includeUnknown: true }], []]);
-    });
-
-    it("shows a stored relation and sends its switch back", async () => {
-      const { puts } = fakeApi(answeredAll, [
-        { field: "height", accept: ["at_least_mine"], includeUnknown: false },
-      ]);
-      await ready();
-      expect(selected("My height or taller")).toBe(true);
-      expect(selected("Everyone, Height")).toBe(false);
-      expect(
-        screen.getByLabelText("Also people who did not answer").props.accessibilityState?.checked,
-      ).toBe(false);
-      await press(button("Taller than me"));
-      await press(button("Save the deal-breakers"));
-      await waitFor(() => expect(puts).toHaveLength(1));
-      expect(puts[0]).toEqual([{ field: "height", accept: ["taller"], includeUnknown: false }]);
-    });
-
-    it("counts a first relation against the limit", async () => {
-      fakeApi(answeredAll, [{ field: "smoking", accept: ["never"], includeUnknown: false }], 1);
-      await ready();
-      await press(button("Taller than me"));
-      expect(screen.getByText("That is 1 already.")).toBeTruthy();
-      expect(selected("Everyone, Height")).toBe(true);
-      expect(selected("Taller than me")).toBe(false);
-    });
-
-    it("never counts a change of relation against the limit", async () => {
-      fakeApi(answeredAll, [{ field: "height", accept: ["taller"], includeUnknown: true }], 1);
-      await ready();
-      await press(button("Shorter than me"));
-      expect(screen.queryByText("That is 1 already.")).toBeNull();
-      expect(selected("Shorter than me")).toBe(true);
-    });
-
-    it("asks for the person's own height first, and leads to its screen", async () => {
-      fakeApi({ ...answeredAll, height: undefined });
-      await ready();
-      expect(screen.getByText("To filter on this, share yours first.")).toBeTruthy();
-      expect(screen.queryByRole("button", { name: "Taller than me" })).toBeNull();
-      expect(screen.queryByRole("button", { name: "Everyone, Height" })).toBeNull();
-      await press(button("Answer it"));
-      expect(router.push).toHaveBeenCalledWith(answerAt("height"));
-    });
-
-    it("says in words that it is paused while the own height is missing, and can be taken off", async () => {
-      const { puts } = fakeApi({ ...answeredAll, height: undefined }, [
-        { field: "height", accept: ["taller"], includeUnknown: true },
-      ]);
-      await ready();
-      expect(screen.getByText("Paused until you answer it yourself.")).toBeTruthy();
-      expect(selected("Taller than me")).toBe(true);
-      await press(button("Everyone, Height"));
-      await press(button("Save the deal-breakers"));
-      await waitFor(() => expect(puts).toEqual([[]]));
-    });
+    server.dealBreakers = [filter("smoking", ["never"])];
+    server.fields = { smoking: "never" };
+    await backInFront();
+    await waitFor(() => expect(heard("Smoking")).toBe("Never"));
+    expectValue("Kids", "Share yours first");
+    expect(count("/profile")).toBe(2);
+    expect(count("/preferences/deal-breakers")).toBe(2);
   });
 
-  describe("the distance row (#514, ADR-061 §7)", () => {
-    const button = (name: string) => screen.getByRole("button", { name });
-    const selected = (name: string) => button(name).props.accessibilityState?.selected;
-    const ready = async () => {
-      await show(<DealBreakersScreen />);
-      await waitFor(() => expect(screen.getByText("Deal-breakers")).toBeTruthy());
-    };
-    const save = async (puts: DealBreaker[][], saves: number) => {
-      await press(button("Save the deal-breakers"));
-      await waitFor(() => expect(puts).toHaveLength(saves));
-    };
-
-    it("is the last row: four buttons, no switch, nothing on those who did not answer", async () => {
-      fakeApi(answeredAll);
-      await ready();
-      expect(screen.getByText("Distance")).toBeTruthy();
-      expect(screen.queryByLabelText("Deal-breaker: Distance")).toBeNull();
-      expect(selected("Everyone, Distance")).toBe(true);
-      for (const name of ["Nearby", "Close", "Around"]) expect(selected(name)).toBe(false);
-      // Far accepted is no filter, so there is no such button.
-      expect(screen.queryByRole("button", { name: "Far" })).toBeNull();
-      expect(screen.queryByText("Fine with me")).toBeNull();
-      expect(screen.queryByLabelText("Also people who did not answer")).toBeNull();
-      checkA11y();
-      const flat = JSON.stringify(screen.toJSON());
-      expect(flat.indexOf('"Height"')).toBeLessThan(flat.indexOf('"Distance"'));
-    });
-
-    it("is open with nothing answered: a home is everybody's, so it is never gated", async () => {
-      fakeApi({});
-      await ready();
-      expect(selected("Everyone, Distance")).toBe(true);
-      // Every field of the registry asks first; the distance does not, so one fewer than the rows.
-      expect(screen.getAllByText("To filter on this, share yours first.")).toHaveLength(6);
-      await press(button("Close"));
-      expect(selected("Close")).toBe(true);
-    });
-
-    it("is heard apart from height's Everyone, drawn alike", async () => {
-      fakeApi(answeredAll);
-      await ready();
-      expect(screen.getAllByText("Everyone")).toHaveLength(2);
-      expect(button("Everyone, Height")).toBeTruthy();
-      expect(button("Everyone, Distance")).toBeTruthy();
-      expect(screen.queryByRole("button", { name: "Everyone" })).toBeNull();
-      await press(button("Close"));
-      expect(selected("Everyone, Height")).toBe(true);
-      expect(selected("Everyone, Distance")).toBe(false);
-    });
-
-    it("takes a band with the nearer ones, one button chosen, and saves them as a list", async () => {
-      const { puts } = fakeApi(answeredAll);
-      await ready();
-      await press(button("Close"));
-      expect(selected("Close")).toBe(true);
-      expect(selected("Nearby")).toBe(false);
-      expect(selected("Around")).toBe(false);
-      expect(selected("Everyone, Distance")).toBe(false);
-      // Nothing on those who did not answer, once it is on either: everybody has a home.
-      expect(screen.queryByLabelText("Also people who did not answer")).toBeNull();
-      checkA11y();
-      await save(puts, 1);
-      await press(button("Around"));
-      await save(puts, 2);
-      await press(button("Nearby"));
-      await save(puts, 3);
-      expect(puts).toEqual([
-        [{ field: "distance", accept: ["nearby", "close"], includeUnknown: true }],
-        [{ field: "distance", accept: ["nearby", "close", "around"], includeUnknown: true }],
-        [{ field: "distance", accept: ["nearby"], includeUnknown: true }],
-      ]);
-    });
-
-    it.each([
-      ["a list of one", ["nearby"], "Nearby"],
-      ["a band with the nearer ones", ["nearby", "close"], "Close"],
-      ["every band a filter takes", ["nearby", "close", "around"], "Around"],
-      ["a list in another order", ["close", "nearby"], "Close"],
-      ["a list with a gap", ["nearby", "around"], "Around"],
-    ])("shows %s by its farthest band", async (_what, accept, chosen) => {
-      fakeApi(answeredAll, [{ field: "distance", accept, includeUnknown: true }]);
-      await ready();
-      for (const name of ["Nearby", "Close", "Around"]) {
-        expect(selected(name)).toBe(name === chosen);
-      }
-    });
-
-    it("comes off on Everyone, and saved it is gone", async () => {
-      const { puts } = fakeApi(answeredAll, [
-        { field: "distance", accept: ["nearby"], includeUnknown: true },
-      ]);
-      await ready();
-      await press(button("Everyone, Distance"));
-      expect(selected("Everyone, Distance")).toBe(true);
-      expect(selected("Nearby")).toBe(false);
-      await save(puts, 1);
-      expect(puts).toEqual([[]]);
-    });
-
-    it("is never paused, whatever the person has not answered", async () => {
-      fakeApi({}, [{ field: "distance", accept: ["nearby"], includeUnknown: true }]);
-      await ready();
-      expect(screen.queryByText("Paused until you answer it yourself.")).toBeNull();
-      expect(selected("Nearby")).toBe(true);
-    });
-
-    it("counts a first band against the limit, and a seventh as one more", async () => {
-      fakeApi(answeredAll, [{ field: "smoking", accept: ["never"], includeUnknown: false }], 1);
-      await ready();
-      await press(button("Nearby"));
-      expect(screen.getByText("That is 1 already.")).toBeTruthy();
-      expect(selected("Everyone, Distance")).toBe(true);
-    });
-
-    it("never counts a change of band against the limit", async () => {
-      fakeApi(answeredAll, [{ field: "distance", accept: ["nearby"], includeUnknown: true }], 1);
-      await ready();
-      await press(button("Around"));
-      expect(screen.queryByText("That is 1 already.")).toBeNull();
-      expect(selected("Around")).toBe(true);
-    });
-
-    it("asks before a band chosen and not saved is left", async () => {
-      fakeApi(answeredAll);
-      await ready();
-      await press(button("Close"));
-      expect(swipe()).toEqual({ gestureEnabled: false });
-      const left = await leave();
-      expect(left.preventDefault).toHaveBeenCalled();
-      expect(screen.getByText("Leave without saving?")).toBeTruthy();
-    });
-
-    it.each([
-      ["fi-FI", "Etäisyys", "Kaikki, Etäisyys", ["Lähellä", "Melko lähellä", "Samoilla seuduilla"]],
-      ["sv-FI", "Avstånd", "Alla, Avstånd", ["I närheten", "Ganska nära", "I trakten"]],
-    ])("speaks %s", async (tag, label, everyone, bands) => {
-      (useLocales as jest.Mock).mockReturnValue([{ languageTag: tag }]);
-      try {
-        fakeApi(answeredAll);
-        await show(<DealBreakersScreen />);
-        await waitFor(() => expect(screen.getByText(label)).toBeTruthy());
-        expect(button(everyone)).toBeTruthy();
-        for (const band of bands) expect(button(band)).toBeTruthy();
-      } finally {
-        (useLocales as jest.Mock).mockReturnValue([{ languageTag: "en-US" }]);
-      }
-    });
+  it("says it is loading until the own answers are read, in a live region", async () => {
+    globalThis.fetch = jest.fn(() => new Promise(() => {})) as unknown as typeof fetch;
+    await show(<DealBreakersScreen />);
+    expect(screen.getByText("Loading your profile…").props.accessibilityLiveRegion).toBe("polite");
+    expect(screen.queryByRole("button", { name: "Smoking" })).toBeNull();
   });
 
-  it("says when the deal-breakers could not be read, and tries again", async () => {
-    globalThis.fetch = jest.fn(async () =>
-      json({ error: { code: "x", message: "no", requestId: "r" } }, 500),
-    ) as unknown as typeof fetch;
+  it("says when the own answers could not be read, and tries again, the deal-breakers with them", async () => {
+    const { server, reads } = fakeApi({ noProfile: true });
     await show(<DealBreakersScreen />);
     await waitFor(() => expect(screen.getByText("Your profile could not be loaded.")).toBeTruthy());
-    fakeApi(answeredAll);
+    server.noProfile = false;
+    server.dealBreakers = [filter("smoking", ["never"])];
     await press(screen.getByRole("button", { name: "Try again" }));
-    await waitFor(() => expect(screen.getByText("Deal-breakers")).toBeTruthy());
+    await waitFor(() => expect(heard("Smoking")).toBe("Never"));
+    expect(reads.filter((read) => read === "GET /preferences/deal-breakers")).toHaveLength(2);
   });
 
-  it("searches a long list of answers it accepts", async () => {
-    fakeApi(answeredAll);
-    await show(<DealBreakersScreen />);
-    await waitFor(() => expect(screen.getByText("Deal-breakers")).toBeTruthy());
-    await press(screen.getByLabelText("Deal-breaker: Languages"));
-    expect(screen.getByRole("button", { name: "Finnish" })).toBeTruthy();
-    await act(async () => {
-      fireEvent.changeText(screen.getByLabelText("Search"), " GERM ");
-      await settle();
-    });
-    expect(screen.getByRole("button", { name: "German" })).toBeTruthy();
-    expect(screen.queryByRole("button", { name: "Finnish" })).toBeNull();
-    expect(screen.getByLabelText("Search").props.value).toBe(" GERM ");
-  });
-
-  it("leads the accepted languages with the first ten, as their picker does, and keeps an accepted one in view (#239)", async () => {
-    fakeApi(answeredAll, [{ field: "languages", accept: ["fi", "de"], includeUnknown: false }]);
-    await show(<DealBreakersScreen />);
-    await waitFor(() => expect(screen.getByText("Deal-breakers")).toBeTruthy());
-    expect(screen.getByRole("button", { name: "Somali" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "German" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Another language" })).toBeTruthy();
-    expect(screen.queryByRole("button", { name: "French" })).toBeNull();
-    // Taken back, an accepted language beyond the ten stays to be accepted again.
-    await press(screen.getByRole("button", { name: "German" }));
-    expect(screen.getByRole("button", { name: "German" }).props.accessibilityState?.selected).toBe(
-      false,
-    );
-    await press(screen.getByRole("button", { name: "German" }));
-    expect(screen.getByRole("button", { name: "German" }).props.accessibilityState?.selected).toBe(
-      true,
-    );
-  });
-
-  it("takes an accepted answer back, and switches a deal-breaker off again", async () => {
-    const { puts } = fakeApi(answeredAll, [
-      { field: "smoking", accept: ["never", "quitting"], includeUnknown: false },
-    ]);
-    await show(<DealBreakersScreen />);
-    await waitFor(() => expect(screen.getByText("Deal-breakers")).toBeTruthy());
-    await press(screen.getByRole("button", { name: "Quitting" }));
-    expect(
-      screen.getByRole("button", { name: "Quitting" }).props.accessibilityState?.selected,
-    ).toBe(false);
-    await press(screen.getByLabelText("Deal-breaker: Smoking"));
-    expect(screen.queryByRole("button", { name: "Never" })).toBeNull();
-    await press(screen.getByRole("button", { name: "Save the deal-breakers" }));
-    await waitFor(() => expect(screen.getByText("Saved.")).toBeTruthy());
-    expect(puts).toEqual([[]]);
-  });
-
-  it("says it is saving, and that the set could not be saved when the API refuses it", async () => {
-    fakeApi(answeredAll);
-    const reads = globalThis.fetch;
-    let answer: ((response: Response) => void) | undefined;
-    globalThis.fetch = jest.fn(async (input: Request | string, init?: RequestInit) => {
-      const request = input instanceof Request ? input : new Request(input, init);
-      if (request.method === "PUT") {
-        return new Promise<Response>((resolve) => {
-          answer = resolve;
-        });
-      }
-      return reads(input, init);
-    }) as unknown as typeof fetch;
-    await show(<DealBreakersScreen />);
-    await waitFor(() => expect(screen.getByText("Deal-breakers")).toBeTruthy());
-    await press(screen.getByRole("button", { name: "Save the deal-breakers" }));
-    expect(screen.getByText("Saving…")).toBeTruthy();
-    expect(
-      screen.getByRole("button", { name: "Save the deal-breakers" }).props.accessibilityState
-        ?.disabled,
-    ).toBe(true);
-    await act(async () => {
-      answer?.(json({ error: { code: "deal_breakers_limit", message: "x", requestId: "r" } }, 422));
-      await settle();
-    });
-    expect(screen.getByText("They could not be saved. Try again.")).toBeTruthy();
-    expect(screen.queryByText("Saving…")).toBeNull();
+  it.each([
+    [
+      "fi-FI",
+      {
+        title: "Ehdottomat rajat",
+        back: "Takaisin",
+        rows: [
+          ["Tupakointi", "Ei koskaan"],
+          ["Lapset", "Kaikki"],
+          ["Lapset tulevaisuudessa", "Kerro ensin omasi"],
+          ["Kielet", "Suomi, Ruotsi, Englanti ja 1 muu"],
+          ["Pituus", "Tauolla, kunnes vastaat siihen itse."],
+          ["Etäisyys", "Melko lähellä"],
+        ],
+      },
+    ],
+    [
+      "sv-FI",
+      {
+        title: "Absoluta gränser",
+        back: "Tillbaka",
+        rows: [
+          ["Rökning", "Aldrig"],
+          ["Barn", "Alla"],
+          ["Barn i framtiden", "Dela ditt eget först"],
+          ["Språk", "Finska, Svenska, Engelska och 1 till"],
+          ["Längd", "Pausad tills du själv svarar på det."],
+          ["Avstånd", "Ganska nära"],
+        ],
+      },
+    ],
+  ])("speaks %s", async (tag, words) => {
+    (useLocales as jest.Mock).mockReturnValue([{ languageTag: tag }]);
+    try {
+      fakeApi({
+        fields: { hasKids: "no", smoking: "never", languages: ["fi"] },
+        dealBreakers: [
+          filter("smoking", ["never"]),
+          filter("languages", ["fi", "sv", "en", "de"]),
+          filter("height", ["taller"], true),
+          filter("distance", ["nearby", "close"]),
+        ],
+      });
+      await show(<DealBreakersScreen />);
+      const [lastTitle] = words.rows.at(-1) as string[];
+      await waitFor(() => expect(heard(lastTitle as string)).toBeDefined());
+      expectPinnedHeader(words.title, words.back);
+      for (const [title, value] of words.rows) expectValue(title as string, value as string);
+    } finally {
+      (useLocales as jest.Mock).mockReturnValue([{ languageTag: "en-US" }]);
+    }
   });
 });

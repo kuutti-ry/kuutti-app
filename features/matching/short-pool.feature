@@ -50,6 +50,11 @@ Feature: The short pool: coming back, relaxing a deal-breaker for the day, and w
     When "A" undoes it
     Then the other cards leave the round, the liked one stays, and their places stay given
 
+  Scenario: A change to a deal-breaker keeps the day's relaxation of its field
+    Given "A" set smoking aside for today, and "B", who smokes regularly, came in by it
+    When "A" changes what its deal-breaker on smoking accepts
+    Then "B"'s card stays and smoking stays relaxed, and tomorrow's queue reads the deal-breaker as changed
+
   Scenario: Tomorrow's queue reads the deal-breakers as stored
     Given "A" relaxed smoking today
     When "A" reads the queue tomorrow

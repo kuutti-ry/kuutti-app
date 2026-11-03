@@ -1,6 +1,8 @@
 import {
   type ApiComponents,
   CardPreviewResponse,
+  type DealBreaker,
+  type DealBreakerField,
   DealBreakersResponse,
   type DealBreakersUpdate,
   ErrorResponse,
@@ -146,19 +148,48 @@ export function savePreferences(update: PreferencesUpdate): Promise<PreferencesR
 }
 
 // The deal-breakers (#149) live with the preferences on the API and with the
-// profile here: the screen is profile completion as much as a filter.
-export async function fetchDealBreakers(): Promise<DealBreakersResponse> {
-  // Which deal-breakers are open depends on the answers a section may still be saving.
-  await lastSave;
+// profile here: their rows are profile completion as much as a filter.
+async function readDealBreakers(): Promise<DealBreakersResponse> {
   const { data, error, response } = await api.GET("/preferences/deal-breakers");
   if (!data) throw failed(response, error, "deal-breakers");
   return DealBreakersResponse.parse(data);
 }
 
-export async function saveDealBreakers(update: DealBreakersUpdate): Promise<DealBreakersResponse> {
-  const { data, error, response } = await api.PUT("/preferences/deal-breakers", {
-    body: update as unknown as ApiComponents["schemas"]["DealBreakersUpdate"],
+export async function fetchDealBreakers(): Promise<DealBreakersResponse> {
+  // Which deal-breakers are open depends on the answers a section may still be saving.
+  await lastSave;
+  return readDealBreakers();
+}
+
+/** What a deal-breaker's screen edits: nothing accepted is Everyone, which is having none (#551). */
+export type DealBreakerFilter = Omit<DealBreaker, "field">;
+
+/**
+ * One deal-breaker changed or taken off, in the line of saves (#551). The API
+ * takes the whole set, so this reads the set when its turn comes and swaps the
+ * one field, as `saveProfile` does with the document: another screen's save is
+ * kept. Its own read, since `fetchDealBreakers` would wait for this very save.
+ * A paused filter goes back as it stands, which the API keeps: dropping `paused`
+ * drops the key, never the row.
+ */
+export function saveDealBreaker(
+  field: DealBreakerField,
+  filter: DealBreakerFilter,
+): Promise<DealBreakersResponse> {
+  const sent = lastSave.then(async () => {
+    const { dealBreakers } = await readDealBreakers();
+    const update: DealBreakersUpdate = {
+      dealBreakers: [
+        ...dealBreakers.flatMap(({ paused: _, ...kept }) => (kept.field === field ? [] : [kept])),
+        ...(filter.accept.length > 0 ? [{ field, ...filter }] : []),
+      ],
+    };
+    const { data, error, response } = await api.PUT("/preferences/deal-breakers", {
+      body: update as unknown as ApiComponents["schemas"]["DealBreakersUpdate"],
+    });
+    if (!data) throw failed(response, error, "deal-breakers save");
+    return DealBreakersResponse.parse(data);
   });
-  if (!data) throw failed(response, error, "deal-breakers save");
-  return DealBreakersResponse.parse(data);
+  lastSave = sent.catch(() => undefined);
+  return sent;
 }

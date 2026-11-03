@@ -29,10 +29,11 @@ executionOrder:
     - Field and work take as many choices as apply, Ask me later keeps what was stored, and long lists can be searched
     - A party and a star sign saved on their screens show on the card, and clearing them takes them off
     - The parties screen lists the parties and none of them, which stands alone, with no note and no search
-    - Each deal-breaker waits for an accepted answer, and leaving unsaved asks first
+    - A later question left unsaved asks first, on the arrow and on a link from outside
+    - A deal-breaker starts on Everyone, says what it accepts on its row, and going back saves it
     - Taking one's own answer back pauses the deal-breaker on it, and answering again lifts the pause
-    - Height takes one relation of its four buttons, kept when saved, and Everyone takes it off
-    - Distance takes a band of its four buttons, kept when saved, and Everyone takes it off
+    - Height takes one relation of its four buttons, kept by going back, and Everyone takes it off
+    - Distance takes a band of its four buttons, kept by going back, and Everyone takes it off
     - The home changes by a new postal code, the card says the name chosen, and digits are never shown back
     - Home says how many people are on Kuutti and the gate in words, and the wrench names the API
     - A malformed e-mail is refused in words, a valid one is saved, and it can be removed

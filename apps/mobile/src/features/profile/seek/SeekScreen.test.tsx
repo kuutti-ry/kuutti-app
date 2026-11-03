@@ -27,9 +27,9 @@ const json = (body: unknown, status = 200) =>
 const broken = () => json({ error: { code: "internal_error", message: "x", requestId: "r" } }, 500);
 
 const CONSENT = { version: "2026-10-01", at: "2026-10-01T10:00:00.000Z" };
-const dealBreaker = (field: string, paused = false) => ({
+const dealBreaker = (field: string, accept: string[], paused = false) => ({
   field,
-  accept: ["x"],
+  accept,
   includeUnknown: true,
   paused,
 });
@@ -106,7 +106,17 @@ const { __router: router, __focus: focus } = jest.requireMock("expo-router") as 
 const WHOM = "Whom are you looking for?";
 const AGES = "What ages?";
 const INTENT = "What are you here for?";
-const DEAL_BREAKERS = "Your deal-breakers";
+const SMOKING = "Smoking";
+const KIDS = "Kids";
+const DEAL_BREAKER_ROWS = [
+  "Relationship structure",
+  KIDS,
+  "Kids in the future",
+  SMOKING,
+  "Languages",
+  "Height",
+  "Distance",
+];
 
 const row = (title: string) => screen.getByRole("button", { name: title });
 const heard = (title: string) => row(title).props.accessibilityValue?.text as string | undefined;
@@ -170,30 +180,42 @@ describe("SeekScreen", () => {
     ).toBeTruthy();
   });
 
-  it("has four rows, by onboarding's questions, in their order, and nothing else to press", async () => {
+  it("has onboarding's three questions in their order, then a row per deal-breaker, and nothing else to press", async () => {
     await opened();
     expect(screen.getAllByRole("button").map((node) => node.props.accessibilityLabel)).toEqual([
       "Back",
       WHOM,
       AGES,
       INTENT,
-      DEAL_BREAKERS,
+      ...DEAL_BREAKER_ROWS,
     ]);
   });
 
+  it("puts the deal-breakers under a heading of their own, with the line on what they ask", async () => {
+    await opened();
+    await waitFor(() => expect(heard(SMOKING)).toBeDefined());
+    const heading = screen.getByRole("heading", { name: "Deal-breakers" });
+    expect(heading.props["aria-level"]).toBe("2");
+    expect(screen.getByText(/^Up to 2\. Only on what you answered yourself/)).toBeTruthy();
+    const flat = JSON.stringify(screen.toJSON());
+    expect(flat.indexOf(INTENT)).toBeLessThan(flat.indexOf('"Deal-breakers"'));
+    expect(flat.indexOf('"Deal-breakers"')).toBeLessThan(flat.indexOf("Up to 2"));
+    expect(flat.indexOf("Up to 2")).toBeLessThan(flat.indexOf(DEAL_BREAKER_ROWS[0] as string));
+  });
+
   it("draws each answer under its title and has it heard once, as the value", async () => {
-    await opened({ dealBreakers: [dealBreaker("smoking")] });
-    await waitFor(() => expect(heard(DEAL_BREAKERS)).toBe("Smoking"));
+    await opened({ dealBreakers: [dealBreaker("smoking", ["never"])] });
+    await waitFor(() => expect(heard(SMOKING)).toBe("Never"));
     expectAnswer(WHOM, "Women");
     expectAnswer(AGES, "Youngest 25, oldest 40");
     expectAnswer(INTENT, "Something long-term");
-    expectAnswer(DEAL_BREAKERS, "Smoking");
+    expectAnswer(SMOKING, "Never");
   });
 
   it("has every control labelled, a button and a full target", async () => {
     await opened();
     const found = pressables(screen.toJSON() as HostNode);
-    expect(found).toHaveLength(5);
+    expect(found).toHaveLength(4 + DEAL_BREAKER_ROWS.length);
     expect(found.flatMap((node) => a11yProblems(node))).toEqual([]);
   });
 
@@ -227,41 +249,60 @@ describe("SeekScreen", () => {
     expect(router.push).toHaveBeenCalledWith("/profile/section/intent");
   });
 
-  it.each([
-    ["one", [dealBreaker("smoking")], "Smoking"],
-    ["two in the stored order", [dealBreaker("smoking"), dealBreaker("hasKids")], "Smoking, Kids"],
-    [
-      "a paused one",
-      [dealBreaker("smoking", true), dealBreaker("hasKids")],
-      "Smoking (paused), Kids",
-    ],
-    ["the distance, which no field of the registry is", [dealBreaker("distance")], "Distance"],
-    ["none", [], "None"],
-  ])("names the deal-breakers set: %s", async (_what, dealBreakers, words) => {
-    await opened({ dealBreakers });
-    await waitFor(() => expect(heard(DEAL_BREAKERS)).toBe(words));
-    expectAnswer(DEAL_BREAKERS, words);
+  it("says what each deal-breaker holds, from what is stored and what the person answered (#551)", async () => {
+    await opened({
+      fields: { intent: "long_term", hasKids: "no", languages: ["fi"] },
+      dealBreakers: [
+        dealBreaker("hasKids", ["no", "yes_not_with_me"]),
+        dealBreaker("smoking", ["never"], true),
+        dealBreaker("languages", ["fi", "sv", "en", "de", "et"]),
+        dealBreaker("distance", ["nearby", "close"]),
+      ],
+    });
+    await waitFor(() => expect(heard(SMOKING)).toBeDefined());
+    // Unanswered and not set; answers said as somebody else's; paused; capped; by the farthest band.
+    expectAnswer("Relationship structure", "Share yours first");
+    expectAnswer(KIDS, "No kids, Kids living elsewhere");
+    expectAnswer(SMOKING, "Paused until you answer it yourself.");
+    expectAnswer("Languages", "Finnish, Swedish, English and 2 more");
+    expectAnswer("Distance", "Close");
   });
 
-  it("says nothing of the deal-breakers when they could not be read: their own screen says why", async () => {
+  it("says Everyone on what the person answered and set no filter on", async () => {
+    await opened({ fields: { intent: "long_term", smoking: "never" } });
+    await waitFor(() => expect(heard(SMOKING)).toBeDefined());
+    expectAnswer(SMOKING, "Everyone");
+    expectAnswer(KIDS, "Share yours first");
+  });
+
+  it("says nothing of the deal-breakers when they could not be read: each one's screen says why", async () => {
     const { reads } = await opened({ noDealBreakers: true });
     expect(reads.dealBreakers).toBe(1);
-    expect(heard(DEAL_BREAKERS)).toBeUndefined();
-    expect(row(DEAL_BREAKERS).props.accessibilityHint).toBeUndefined();
-    expect(screen.queryByText("None")).toBeNull();
+    for (const title of DEAL_BREAKER_ROWS) {
+      expect(heard(title)).toBeUndefined();
+      expect(row(title).props.accessibilityHint).toBeUndefined();
+    }
+    expect(screen.queryByText("Everyone")).toBeNull();
+    expect(screen.queryByText(/^Up to/)).toBeNull();
     expect(screen.queryByText("Your profile could not be loaded.")).toBeNull();
-    await press(row(DEAL_BREAKERS));
-    expect(router.push).toHaveBeenCalledWith("/profile/deal-breakers");
+    await press(row(SMOKING));
+    expect(router.push).toHaveBeenCalledWith("/profile/deal-breakers/smoking");
   });
 
   it("opens each row's own screen, and goes back with its back button", async () => {
     await opened();
-    for (const title of [WHOM, AGES, INTENT, DEAL_BREAKERS]) await press(row(title));
+    for (const title of [WHOM, AGES, INTENT, ...DEAL_BREAKER_ROWS]) await press(row(title));
     expect(router.push.mock.calls.map(([path]) => path)).toEqual([
       "/profile/seek/whom",
       "/profile/seek/ages",
       "/profile/section/intent",
-      "/profile/deal-breakers",
+      "/profile/deal-breakers/monogamy",
+      "/profile/deal-breakers/hasKids",
+      "/profile/deal-breakers/wantsKids",
+      "/profile/deal-breakers/smoking",
+      "/profile/deal-breakers/languages",
+      "/profile/deal-breakers/height",
+      "/profile/deal-breakers/distance",
     ]);
     expect(router.back).not.toHaveBeenCalled();
     await press(row("Back"));
@@ -275,11 +316,11 @@ describe("SeekScreen", () => {
 
     server.seeks = ["man"];
     server.ageWindow = { min: 30, max: 50 };
-    server.fields = { intent: "casual" };
-    server.dealBreakers = [dealBreaker("hasKids")];
+    server.fields = { intent: "casual", hasKids: "no" };
+    server.dealBreakers = [dealBreaker("hasKids", ["no"])];
     await handBack();
     expect(reads).toEqual({ preferences: 2, profile: 2, dealBreakers: 2 });
-    await waitFor(() => expect(heard(DEAL_BREAKERS)).toBe("Kids"));
+    await waitFor(() => expect(heard(KIDS)).toBe("No kids"));
     expectAnswer(WHOM, "Men");
     expectAnswer(AGES, "Youngest 30, oldest 50");
     expectAnswer(INTENT, "Something casual");
@@ -306,14 +347,17 @@ describe("SeekScreen", () => {
   });
 
   it("takes nothing away when a read again fails, but the deal-breakers it can no longer vouch for", async () => {
-    const { server } = await opened({ dealBreakers: [dealBreaker("smoking")] });
-    await waitFor(() => expect(heard(DEAL_BREAKERS)).toBe("Smoking"));
+    const { server } = await opened({
+      fields: { intent: "long_term", smoking: "never" },
+      dealBreakers: [dealBreaker("smoking", ["never"])],
+    });
+    await waitFor(() => expect(heard(SMOKING)).toBe("Never"));
     server.failing = true;
     await handBack();
     expect(screen.queryByText("Your profile could not be loaded.")).toBeNull();
     expectAnswer(WHOM, "Women");
-    expect(heard(DEAL_BREAKERS)).toBeUndefined();
-    expect(screen.queryByText("Smoking")).toBeNull();
+    expect(heard(SMOKING)).toBeUndefined();
+    expect(screen.queryByText("Never")).toBeNull();
   });
 
   it("goes back to Home when a screen hands back and the consent is gone", async () => {
@@ -335,7 +379,10 @@ describe("SeekScreen", () => {
   });
 
   it("shows the rows before the deal-breakers are known, saying nothing of them", async () => {
-    const { server } = fakeApi({ dealBreakers: [dealBreaker("smoking")] });
+    const { server } = fakeApi({
+      fields: { intent: "long_term", smoking: "never" },
+      dealBreakers: [dealBreaker("smoking", ["never"])],
+    });
     let answer: ((response: Response) => void) | undefined;
     const others = globalThis.fetch;
     globalThis.fetch = jest.fn(async (input: Request | string, init?: RequestInit) => {
@@ -349,17 +396,21 @@ describe("SeekScreen", () => {
     await show(<SeekScreen />);
     await waitFor(() => expect(row(WHOM)).toBeTruthy());
     await waitFor(() => expect(answer).toBeDefined());
-    expect(heard(DEAL_BREAKERS)).toBeUndefined();
-    expect(screen.queryByText("None")).toBeNull();
+    expect(heard(SMOKING)).toBeUndefined();
+    expect(screen.queryByText("Everyone")).toBeNull();
     await act(async () => {
       answer?.(json({ dealBreakers: server.dealBreakers, max: 2 }));
       await settle();
     });
-    await waitFor(() => expect(heard(DEAL_BREAKERS)).toBe("Smoking"));
+    await waitFor(() => expect(heard(SMOKING)).toBe("Never"));
   });
 
   it("says when the answers could not be read, and tries again, the deal-breakers with them", async () => {
-    const { server } = fakeApi({ failing: true, dealBreakers: [dealBreaker("smoking")] });
+    const { server } = fakeApi({
+      failing: true,
+      fields: { intent: "long_term", smoking: "never" },
+      dealBreakers: [dealBreaker("smoking", ["never"])],
+    });
     await show(<SeekScreen />);
     await waitFor(() => expect(screen.getByText("Your profile could not be loaded.")).toBeTruthy());
     // Why, in words: the API answered 500.
@@ -370,7 +421,7 @@ describe("SeekScreen", () => {
 
     server.failing = false;
     await press(screen.getByRole("button", { name: "Try again" }));
-    await waitFor(() => expect(heard(DEAL_BREAKERS)).toBe("Smoking"));
+    await waitFor(() => expect(heard(SMOKING)).toBe("Never"));
     expectAnswer(WHOM, "Women");
     expect(screen.queryByText("Your profile could not be loaded.")).toBeNull();
   });
@@ -414,7 +465,8 @@ describe("SeekScreen", () => {
         whom: ["Ketä etsit?", "Naisia, Muunsukupuolisia"],
         ages: ["Minkä ikäisiä?", "Nuorin 25, vanhin 40"],
         intent: ["Mitä etsit täältä?", "Jotain pitkäaikaista"],
-        dealBreakers: ["Ehdottomat rajasi", "Tupakointi (tauolla)"],
+        heading: "Ehdottomat rajat",
+        paused: ["Tupakointi", "Tauolla, kunnes vastaat siihen itse."],
       },
     ],
     [
@@ -427,33 +479,38 @@ describe("SeekScreen", () => {
         whom: ["Vem söker du?", "Kvinnor, Icke-binära personer"],
         ages: ["Vilka åldrar?", "Yngsta 25, äldsta 40"],
         intent: ["Vad är du här för?", "Något långvarigt"],
-        dealBreakers: ["Dina absoluta gränser", "Rökning (pausad)"],
+        heading: "Absoluta gränser",
+        paused: ["Rökning", "Pausad tills du själv svarar på det."],
       },
     ],
   ] as const)("speaks %s", async (tag, words) => {
     await inLocale(tag, async () => {
       fakeApi({
         seeks: ["non_binary", "woman"],
-        dealBreakers: [dealBreaker("smoking", true)],
+        dealBreakers: [dealBreaker("smoking", ["never"], true)],
       });
       await show(<SeekScreen />);
-      await waitFor(() => expect(heard(words.dealBreakers[0])).toBe(words.dealBreakers[1]));
+      await waitFor(() => expect(heard(words.paused[0])).toBe(words.paused[1]));
       expectPinnedHeader(words.title, words.back);
       expect(screen.getByText(words.explain)).toBeTruthy();
-      for (const [title, answer] of [words.whom, words.ages, words.intent, words.dealBreakers]) {
+      expect(screen.getByRole("heading", { name: words.heading })).toBeTruthy();
+      for (const [title, answer] of [words.whom, words.ages, words.intent, words.paused]) {
         expectAnswer(title, answer);
       }
     });
   });
 
   it.each([
-    ["fi-FI", "Ketä etsit?", "Kenet tahansa", "Ehdottomat rajasi", "Ei yhtään"],
-    ["sv-FI", "Vem söker du?", "Vem som helst", "Dina absoluta gränser", "Inga"],
-  ])("says Anyone and None in %s", async (tag, whom, anyone, dealBreakers, none) => {
+    ["fi-FI", "Ketä etsit?", "Kenet tahansa", "Tupakointi", "Kaikki"],
+    ["sv-FI", "Vem söker du?", "Vem som helst", "Rökning", "Alla"],
+  ])("says Anyone and Everyone in %s", async (tag, whom, anyone, smoking, everyone) => {
     await inLocale(tag, async () => {
-      fakeApi({ seeks: ["woman", "man", "non_binary"] });
+      fakeApi({
+        seeks: ["woman", "man", "non_binary"],
+        fields: { intent: "long_term", smoking: "never" },
+      });
       await show(<SeekScreen />);
-      await waitFor(() => expect(heard(dealBreakers)).toBe(none));
+      await waitFor(() => expect(heard(smoking)).toBe(everyone));
       expectAnswer(whom, anyone);
     });
   });

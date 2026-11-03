@@ -102,13 +102,16 @@ const sameFilter = (a: DealBreaker, b: DealBreaker): boolean =>
   JSON.stringify([...a.accept].sort()) === JSON.stringify([...b.accept].sort());
 
 /**
- * The whole set, replaced: at most `max`, each on a distinct whitelisted
- * field, accepting options the field has, one relation of a number (#508), or
- * the bands up to one (ADR-061 §7). A filter set or changed on what the person will not say about themselves is
- * refused as `filter_unanswered`, with the field, so the screen can ask for
- * the answer instead; a paused one sent back as it stands is kept, since the
- * screen sends the whole set and a pause deletes nothing (ADR-009 §1). Nothing
- * of onboarding's two rows is touched.
+ * The whole set, replaced: each on a distinct whitelisted field, accepting
+ * options the field has, one relation of a number (#508), or the bands up to
+ * one (ADR-061 §7). At most `max`, though a person already past a number the
+ * panel lowered may still remove or change what they hold: only a new field
+ * past `max` is refused (#551), or removing one of five under three, which
+ * still sends four, would freeze them all. A filter set or changed on what the
+ * person will not say about themselves is refused as `filter_unanswered`, with
+ * the field, so the screen can ask for the answer instead; a paused one sent
+ * back as it stands is kept, since the phone sends the whole set and a pause
+ * deletes nothing (ADR-009 §1). Nothing of onboarding's two rows is touched.
  */
 export async function saveDealBreakers(
   db: Queryable,
@@ -118,9 +121,6 @@ export async function saveDealBreakers(
   max: number,
   at: Date,
 ): Promise<boolean> {
-  if (update.dealBreakers.length > max) {
-    throw new AppError(400, "validation_failed", "More deal-breakers than allowed", { max });
-  }
   const fields = update.dealBreakers.map((d) => d.field);
   if (new Set(fields).size !== fields.length) {
     throw new AppError(400, "validation_failed", "A field at most once");
@@ -155,13 +155,16 @@ export async function saveDealBreakers(
       [accountId],
     );
     if (live.rows.length === 0) return false;
-    // Read under the lock, so a paused filter is compared with what is stored now.
+    // Read under the lock, so the number and a paused filter are held to what is stored now.
     const { rows } = await tx.query<DealBreakerRow>(
       `SELECT field, value, include_unknown FROM preferences
        WHERE account_id = $1 AND mode = 'hard' AND field = ANY($2::text[])`,
       [accountId, WHITELIST],
     );
     const stored = dealBreakersFrom(rows);
+    if (fields.length > max && fields.some((field) => !stored.some((d) => d.field === field))) {
+      throw new AppError(400, "validation_failed", "More deal-breakers than allowed", { max });
+    }
     for (const dealBreaker of update.dealBreakers) {
       if (!pausedOf(dealBreaker.field, own)) continue;
       if (stored.some((kept) => sameFilter(kept, dealBreaker))) continue;
