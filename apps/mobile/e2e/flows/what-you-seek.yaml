@@ -1,6 +1,6 @@
 # What you seek (#542): a list of its own, opened from the profile, with whom,
-# the ages, what one is here for and the deal-breakers. The first three open a
-# screen with no Save button, and the deal-breakers keep theirs. A change is
+# the ages, what one is here for and a row per deal-breaker (#551). Each opens a
+# screen with no Save button. A change is
 # kept by going back and read again on the way in, as often as one wishes. The
 # only gender chosen stays chosen and says why, and what one is here for changes
 # and never clears. Ritva seeks men aged 60 to 72 for something long-term, and
@@ -31,7 +31,16 @@ name: What you seek lists whom, the ages, why and the deal-breakers, and each ch
 - assertVisible: "(Whom are you looking for\\?|Ketä etsit\\?|Vem söker du\\?)(, .*)?"
 - assertVisible: "(What ages\\?|Minkä ikäisiä\\?|Vilka åldrar\\?)(, .*)?"
 - assertVisible: "(What are you here for\\?|Mitä etsit täältä\\?|Vad är du här för\\?)(, .*)?"
-- assertVisible: "(Your deal-breakers|Ehdottomat rajasi|Dina absoluta gränser)(, .*)?"
+- scrollUntilVisible:
+    element: "Deal-breakers|Ehdottomat rajat|Absoluta gränser"
+    direction: DOWN
+    centerElement: true
+    timeout: 60000
+- scrollUntilVisible:
+    element: "These work both ways.*|Nämä toimivat molempiin suuntiin.*|De här gäller åt båda håll.*"
+    direction: UP
+    centerElement: true
+    timeout: 60000
 
 # Whom: from the stored answer. The only one chosen stays chosen, and says why.
 - tapOn: "(Whom are you looking for\\?|Ketä etsit\\?|Vem söker du\\?)(, .*)?"
@@ -118,15 +127,24 @@ name: What you seek lists whom, the ages, why and the deal-breakers, and each ch
     timeout: 15000
 - waitForAnimationToEnd
 
-# The deal-breakers are one row, and today's screen behind it.
-- tapOn: "(Your deal-breakers|Ehdottomat rajasi|Dina absoluta gränser)(, .*)?"
+# The deal-breakers are a row each, the distance last, and each opens its own screen.
+- scrollUntilVisible:
+    element: "(Distance|Etäisyys|Avstånd)(, .*)?"
+    direction: DOWN
+    centerElement: true
+    timeout: 60000
+- assertVisible: "((Distance|Etäisyys|Avstånd), )?(Everyone|Kaikki|Alla)"
+- tapOn: "(Distance|Etäisyys|Avstånd)(, .*)?"
 - extendedWaitUntil:
-    visible: "Deal-breakers|Ehdottomat rajat|Absoluta gränser"
+    visible: "It works both ways.*|Tämä toimii molempiin suuntiin.*|Det här gäller åt båda håll.*"
     timeout: 15000
 - waitForAnimationToEnd
+- assertVisible:
+    text: "Everyone|Kaikki|Alla"
+    selected: true
 - tapOn: "Back|Takaisin|Tillbaka"
 - extendedWaitUntil:
-    visible: "These work both ways.*|Nämä toimivat molempiin suuntiin.*|De här gäller åt båda håll.*"
+    visible: "(Distance|Etäisyys|Avstånd)(, .*)?"
     timeout: 15000
 - waitForAnimationToEnd
 

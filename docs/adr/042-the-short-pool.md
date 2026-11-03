@@ -44,6 +44,7 @@ TD-12 asks what a person sees when their filters leave too few people: the round
 
 ## History
 
+- 2026-11-03 (#551, the maintainer's word of that day): a change to a deal-breaker keeps the day's relaxation of its field until the day ends, as it always did, since `round_relaxation` is kept by field. A change ending it, undecided cards with it, was put to him and not chosen. So §3's "for the day" holds whatever is saved meanwhile.
 - 2026-11-01 (#542): the line under the alternatives that no screen edits the age window after onboarding no longer holds: What you seek does. The other half of that line stands: the maintainer kept the relaxation to deal-breakers, so nothing here changes.
 - 2026-10-31 (#514, ADR-061 §5): a move closes the day's short pool. Nothing is offered and a relaxation tapped is refused until the next round is built, because what is offered is counted from the home as it is now, and would answer from every place typed.
 - 2026-10-31 (#514, ADR-061 §6 and §7): §1, §3 and §8 amended. New people come by band, then by soft matches; people coming back keep §1's order, and whether a band should move them is open (ADR-061, Not decided here). There is one pond, so §3 no longer names it. Distance, the seventh deal-breaker, is relaxed `aside` like any other, and that is the only way: §8's "every deal-breaker field is a card field" ends here. `relaxed_field`, `relaxed_with` and `round_relaxation.field` hold `distance` as they hold any key, so no migration.

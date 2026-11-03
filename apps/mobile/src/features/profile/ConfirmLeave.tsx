@@ -23,8 +23,8 @@ const holders: Holder[] = [];
  * without the person's word (14/10/2026). The arrow, Android's back key and a
  * pop of several screens all pass through `beforeRemove`, which is held while
  * the screen holds something unsaved, the one in front or one under it that
- * the pop would take along (deal-breakers under a question opened from it).
- * The dialog shows over whatever is in front, from the root's portal. The iOS
+ * the pop would take along. The dialog shows over whatever is in front, from
+ * the root's portal. The iOS
  * swipe is off meanwhile: held, the native swipe pops the screen, puts it back
  * and pops it again (#238), so it cannot be held, only not begun.
  *

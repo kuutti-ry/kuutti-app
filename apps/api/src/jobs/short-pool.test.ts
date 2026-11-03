@@ -487,6 +487,39 @@ describe("relaxing a deal-breaker for the day", () => {
     expect(again.map((card) => card.position)).toEqual([6, 7, 8]);
   });
 
+  test("A change to a deal-breaker keeps the day's relaxation of its field", async ({ ctx }) => {
+    const { a, of } = await pondWith(ctx, "test-short-changed", [
+      { fields: { smoking: "never" }, count: 1 },
+      { fields: { smoking: "regularly" }, count: 1 },
+    ]);
+    const [b] = of[1] ?? [];
+    const app = await appAt(ctx.client);
+    const { headers } = await signInAs(ctx.client, a);
+    await readToday(app, headers);
+    const [card] = await added(await relax(app, headers, ASIDE));
+    if (!card) throw new Error("nothing added");
+
+    const changed = await app.request("/preferences/deal-breakers", {
+      method: "PUT",
+      headers: jsonHeaders(headers),
+      body: JSON.stringify({
+        dealBreakers: [{ field: "smoking", accept: ["never", "quitting"], includeUnknown: false }],
+      }),
+    });
+
+    expect(changed.status).toBe(200);
+    expect((await readToday(app, headers)).entries?.map((e) => e.position)).toContain(
+      card.position,
+    );
+    const again = await relax(app, headers, ASIDE);
+    expect(again.status).toBe(409);
+    expect(await codeOf(again)).toBe("already_relaxed");
+
+    await opens(ctx.client, a, NEXT_NOON);
+    const tomorrow = await roundOf(ctx.client, a, NEXT_DAY);
+    expect(tomorrow.map((e) => e.candidate_id)).not.toContain(b);
+  });
+
   test("Tomorrow's queue reads the deal-breakers as stored", async ({ ctx }) => {
     const { a, of } = await pondWith(ctx, "test-short-tomorrow", [
       { fields: { smoking: "never" }, count: 1 },

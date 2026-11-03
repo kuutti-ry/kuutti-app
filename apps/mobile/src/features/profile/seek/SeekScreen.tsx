@@ -1,6 +1,6 @@
-import { GENDERS, type StoredDealBreaker } from "@kuutti/schema";
+import { GENDERS } from "@kuutti/schema";
 import { useFocusEffect, useRouter } from "expo-router";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useRef } from "react";
 import { ScrollView, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LoadFailed } from "@/components/LoadFailed";
@@ -9,9 +9,8 @@ import { ScreenHeader } from "@/components/ScreenHeader";
 import { Text } from "@/components/ui/text";
 import { useT } from "@/lib/locale";
 import { useHapticTap } from "@/theme/haptics";
-import { fetchDealBreakers } from "../client";
-import { DEAL_BREAKERS_PATH } from "../DealBreakersScreen";
-import { fieldLabelKey, optionKey, seeksKey } from "../keys";
+import { DealBreakerRows, useDealBreakers } from "../DealBreakerRows";
+import { optionKey, seeksKey } from "../keys";
 import { INTENT_SECTION, sectionPath } from "../sections";
 import { SEEK_AGES_PATH } from "./SeekAgesScreen";
 import { SEEK_WHOM_PATH } from "./SeekWhomScreen";
@@ -20,24 +19,11 @@ import { useSeeking } from "./useSeeking";
 export const SEEK_PATH = "/profile/seek" as const;
 
 /**
- * The deal-breakers set; null until known, and when they could not be read:
- * the row then says nothing of them, its own screen says what failed.
- */
-function useDealBreakers(): [readonly StoredDealBreaker[] | null, () => void] {
-  const [stored, setStored] = useState<readonly StoredDealBreaker[] | null>(null);
-  const read = useCallback(() => {
-    fetchDealBreakers().then(
-      ({ dealBreakers }) => setStored(dealBreakers),
-      () => setStored(null),
-    );
-  }, []);
-  return [stored, read];
-}
-
-/**
  * What a person seeks, as a list of its own (#542), built like the profile's
- * and the settings': each row its answer under onboarding's own question,
- * opening a screen of its own, and nothing edited here. Every answer is a
+ * and the settings': each row its answer, opening a screen of its own, and
+ * nothing edited here. Whom, the ages and what one is here for under
+ * onboarding's own questions, then a row per deal-breaker under a heading
+ * (#551), so the list reflects what a person has shared. Every answer is a
  * filter both ways, which the line at the top says, naming no moment: a change
  * works on the next read (ADR-062 §8). Reached from the profile and from the
  * queue's end (§11), not Home, so its way back names neither. The list reads
@@ -90,7 +76,7 @@ export function SeekScreen() {
     );
   }
 
-  const { seeks, ageWindow, intent } = seeking.seeking;
+  const { seeks, ageWindow, fields } = seeking.seeking;
   const whom =
     seeks.length === GENDERS.length
       ? t("onboarding.seeks.anyone")
@@ -98,16 +84,7 @@ export function SeekScreen() {
           .map((gender) => t(seeksKey(gender)))
           .join(", ");
   const ages = t("profile.seek.ages.summary", ageWindow);
-  const here = intent && t(optionKey("intent", intent));
-  const set =
-    dealBreakers?.length === 0
-      ? t("profile.seek.dealBreakers.none")
-      : dealBreakers
-          ?.map(({ field, paused }) => {
-            const name = t(fieldLabelKey(field));
-            return paused ? t("profile.seek.dealBreakers.paused", { field: name }) : name;
-          })
-          .join(", ");
+  const here = fields.intent && t(optionKey("intent", fields.intent));
 
   return (
     <SafeAreaView className="flex-1 bg-background">
@@ -142,15 +119,14 @@ export function SeekScreen() {
               value: here,
               onPress: open(sectionPath(INTENT_SECTION)),
             },
-            {
-              key: "dealBreakers",
-              title: t("profile.dealBreakers.open"),
-              summary: set,
-              value: set,
-              onPress: open(DEAL_BREAKERS_PATH),
-            },
           ]}
         />
+        <View className="gap-3">
+          <Text variant="large" role="heading" aria-level="2">
+            {t("profile.dealBreakers.title")}
+          </Text>
+          <DealBreakerRows response={dealBreakers} own={fields} />
+        </View>
       </ScrollView>
     </SafeAreaView>
   );

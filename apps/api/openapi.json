@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Kuutti API",
-    "version": "0.97.0",
+    "version": "0.98.0",
     "description": "Free, non-commercial dating app for Finland. Every account is verified through a Finnish bank. Source: AGPL-3.0 with App Store exception."
   },
   "components": {
@@ -13290,7 +13290,7 @@
       },
       "put": {
         "summary": "Set the caller's deal-breakers",
-        "description": "The whole set, at most `max`, each on a distinct whitelisted field the person has answered themselves, accepting options the field has. One on distance has no field: it accepts the bands up to nearby, close or around, and lets through those who did not answer whatever the request says, since nobody can leave it unanswered. Hard rows: #87 applies them in the pool, both ways.",
+        "description": "The whole set, at most `max`, each on a distinct whitelisted field the person has answered themselves, accepting options the field has. A person already past a lowered `max` may still remove or change what they hold; only a new field past it is refused. One on distance has no field: it accepts the bands up to nearby, close or around, and lets through those who did not answer whatever the request says, since nobody can leave it unanswered. Hard rows: #87 applies them in the pool, both ways.",
         "security": [
           {
             "session": []
@@ -13318,7 +13318,7 @@
             }
           },
           "400": {
-            "description": "Validation failed: more than allowed, a field twice, an answer the field has not, or bands that do not run up to one.",
+            "description": "Validation failed: a new field past what is allowed, a field twice, an answer the field has not, or bands that do not run up to one.",
             "content": {
               "application/json": {
                 "schema": {

@@ -19,7 +19,9 @@ import PhotosRoute from "../app/photos/index";
 // biome-ignore lint/style/noRestrictedImports: a route file, not a slice internal
 import CardPreviewRoute from "../app/profile/card";
 // biome-ignore lint/style/noRestrictedImports: a route file, not a slice internal
-import DealBreakersRoute from "../app/profile/deal-breakers";
+import DealBreakerFieldRoute from "../app/profile/deal-breakers/[field]";
+// biome-ignore lint/style/noRestrictedImports: a route file, not a slice internal
+import DealBreakersRoute from "../app/profile/deal-breakers/index";
 // biome-ignore lint/style/noRestrictedImports: a route file, not a slice internal
 import GenderRoute from "../app/profile/gender";
 import ProfileRoute from "../app/profile/index";
@@ -122,6 +124,7 @@ jest.mock("@/features/profile", () => {
     createElement(Text, { testID: name }, JSON.stringify(props));
   return {
     CardPreviewScreen: probe("CardPreviewScreen"),
+    DealBreakerFieldScreen: probe("DealBreakerFieldScreen"),
     DealBreakersScreen: probe("DealBreakersScreen"),
     GenderScreen: probe("GenderScreen"),
     holdLinkWhileUnsaved: jest.fn((path: string) => path),
@@ -420,6 +423,16 @@ describe("the profile's routes with a param", () => {
     params({});
     await render(<LaterFieldRoute />);
     expect(propsOf("LaterFieldScreen")).toEqual({ field: "", once: false });
+  });
+
+  it("hands a deal-breaker's route its field, none to an address without one (#551)", async () => {
+    params({ field: "smoking" });
+    const view = await render(<DealBreakerFieldRoute />);
+    expect(propsOf("DealBreakerFieldScreen")).toEqual({ field: "smoking" });
+    await view.unmount();
+    params({});
+    await render(<DealBreakerFieldRoute />);
+    expect(propsOf("DealBreakerFieldScreen")).toEqual({ field: "" });
   });
 
   it("says a later field was opened for its one answer when the link says once (#542)", async () => {
