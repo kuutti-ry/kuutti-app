@@ -83,13 +83,10 @@ Feature: The pond counter
     When the figures are taken
     Then the men's band holds one and nobody is finishing
 
-  Scenario: A count told to leave the bands out counts none
-    Given a pond with twelve finished profiles
-    When the figures are taken without the bands
-    Then the total is twelve and every band is empty
-
-  Scenario: Production counts no bands, every other environment does
-    Then the night counts bands in every environment but production
+  Scenario: A finished profile on a withdrawn consent stands in no band
+    Given two finished profiles that seek men with the current consent, and one of them has withdrawn it
+    When the figures are taken
+    Then the men's band holds one and nobody is finishing
 
   Scenario: Only finished profiles stand in a band
     Given a pond with ten finished profiles and ten people still finishing theirs, all seeking men

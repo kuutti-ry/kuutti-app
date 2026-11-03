@@ -27,17 +27,7 @@ export type PondCounterDeps = {
   db: Queryable;
   logger: Logger;
   now: () => Date;
-  /** Whether the bar's bands are counted (`countsBands`); they are unless told otherwise. */
-  bands?: boolean;
 };
-
-/**
- * shortcut: no bands in production (#507, ADR-013 §16). The consent says whom one
- * seeks is stored only to match and never shown, and whether that wording or the
- * bar changes is the maintainer's; his answer lifts this. Without bands the route
- * says nothing, and the rest of the counter stands as it was.
- */
-export const countsBands = (appEnv: string) => appEnv !== "production";
 
 /**
  * One count at a time, across every process that may run one (two containers
@@ -87,13 +77,11 @@ const STANDS_AS_ACTIVE = new Set(["active", "shadow_banned"]);
  * tables are the shared ones of packages/db, read only. Whether a profile is
  * complete is decided by `completeness()` itself, from the same facts the
  * profile screen gathers, so the counter and the screen cannot disagree. A band
- * holds only somebody whose consent to the answer is current, as the rounds ask:
- * a finished profile on an older wording is finished, and in no band.
+ * holds only somebody whose consent to the answer is current, as the rounds ask,
+ * and the current wording is what names this count (ADR-013 §20): a finished
+ * profile on an older wording is finished, and in no band.
  */
-export async function countPonds(
-  db: Queryable,
-  bands = true,
-): Promise<Map<string, PondCounterCounts>> {
+export async function countPonds(db: Queryable): Promise<Map<string, PondCounterCounts>> {
   const { rows } = await db.query<FactsRow>(
     `SELECT a.pond_id, a.gender, a.state, p.display_name, p.bio, p.bio_preset, p.prompts,
             (SELECT count(*) FROM photo ph
@@ -133,7 +121,7 @@ export async function countPonds(
         ageWindow: preferences.ageWindow,
       }).complete;
     if (ready) {
-      const band = bands && row.seeks_consented ? seeksBand(preferences.seeks) : null;
+      const band = row.seeks_consented ? seeksBand(preferences.seeks) : null;
       if (band) counts[band] += 1;
     } else {
       counts.finishing += 1;
@@ -171,7 +159,7 @@ export async function takeSnapshot(deps: PondCounterDeps): Promise<SnapshotResul
       return { day, ponds: 0, moved: 0, counted: false };
     }
     const k = await readPondCounterK(tx);
-    const counts = await countPonds(tx, deps.bands);
+    const counts = await countPonds(tx);
     const standing = await readStandingFigures(tx);
     const ponds = await listPonds(tx);
     let moved = 0;

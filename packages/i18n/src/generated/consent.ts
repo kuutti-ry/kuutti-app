@@ -3,7 +3,7 @@
 export const CONSENT_VERSIONS: Readonly<Record<string, string>> = {
   "privacy": "2026-10-draft-3",
   "research": "2026-09-draft-1",
-  "special_category": "2026-10-draft-2",
+  "special_category": "2026-11-draft-3",
   "terms": "2026-09-draft-1",
 };
 
@@ -19,6 +19,6 @@ export const CONSENT_TEXT_LOCALES: Readonly<Record<string, readonly string[]>> =
 export const CONSENT_TEXT_HASHES: Readonly<Record<string, string>> = {
   "privacy": "7197e6c3209d4b4a",
   "research": "b55ab7542a8d4bb2",
-  "special_category": "507c62005dcc9d0d",
+  "special_category": "575a40e24df60b7d",
   "terms": "a947eb54ce1338cd",
 };
