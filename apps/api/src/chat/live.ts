@@ -12,7 +12,7 @@ import { toMessage } from "./messages.ts";
 import { createPresence, type LiveSocket, type Presence } from "./presence.ts";
 import * as repo from "./repo.ts";
 
-// The live half of the chat (#349, ADR-031 §5): Postgres is the store, the
+// The live half of the chat (#349, ADR-031 §9): Postgres is the store, the
 // socket the notifier. What changed arrives as a notification on
 // CHAT_CHANNEL, sent by the triggers of migration 0055 when its transaction
 // commits, with ids and numbers only. The hub turns each into the frames each

@@ -816,7 +816,7 @@ Languages, legal texts, accessibility, feedback from the app, and the moderation
 
 Where a record and the code disagree, or a tunable is not where CLAUDE.md puts it. Each names its row.
 
-- **Sign-in and identity, Every sign-in goes through the bank afresh.** ADR-016 is built, and the first login on Telia's bed showed it at work, yet its status still says proposed (#203). Its §2 says the freshness check comes before anything is derived, while `login.ts` derives the keyed hash first; nothing is written either way (#250).
+- **Sign-in and identity, Every sign-in goes through the bank afresh.** ADR-016 is built, and the first login on Telia's bed showed it at work, yet its status still says proposed (#203).
 - **Sign-in and identity, The lock's time in the background.** The four choices and the default of one minute are the build's reading of the maintainer's answer to #418, a range of 1 to 15 minutes with a question mark; nothing records him confirming that reading.
 - **Sign-in and identity, Onboarding's steps.** ADR-010 §10 and the comment on `ONBOARDING_STEPS` say onboarding asks for three photos; the step passes with two that are not rejected, and completeness asks for two approved (#56, PR #125).
 - **Profile, Gender.** ADR-010's Consequences still list the gender list and its texts as open, though the field sheet of 07/10/2026 kept the three genders and added the identity label after non-binary (#147).

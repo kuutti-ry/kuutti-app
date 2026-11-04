@@ -211,8 +211,9 @@ jobs:
       - uses: ./.github/actions/pnpm
 
       # EXPO_PUBLIC_* is inlined at export time: this bundle can only ever talk
-      # to this pull request's API. The web target runs against seed data and
-      # the mock IdP only (rules/mobile.md); it is not a product surface.
+      # to this pull request's API and its seed data. A preview never uses the
+      # real broker and no mock bank runs beside it, and the web target offers
+      # no bank login (rules/mobile.md); it is not a product surface.
       - name: Export the web target against the preview API
         working-directory: apps/mobile
         env:
