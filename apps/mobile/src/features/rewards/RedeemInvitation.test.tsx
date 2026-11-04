@@ -20,7 +20,7 @@ const settle = () => act(() => new Promise<void>((resolve) => setTimeout(resolve
 const noProblems = () =>
   expect(pressables(screen.toJSON() as HostNode).flatMap((node) => a11yProblems(node))).toEqual([]);
 
-const DONE = "The code is in. Your friend's invitation counts once your profile is complete.";
+const DONE = "The code is in.";
 const field = () => screen.getByLabelText("Invitation code");
 const button = () => screen.getByRole("button", { name: "Use the code" });
 const dimmed = () => button().props.accessibilityState?.disabled === true;

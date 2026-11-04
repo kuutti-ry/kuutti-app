@@ -16,17 +16,18 @@ export type InvitationsView =
  * foreground, since a friend may use a code and the night may count one while
  * the screen is open in a pocket. What is shown stays until the new answer is
  * there, and a quiet read that fails takes nothing away. `refresh` is such a
- * read after the screen's own changes, and resolves once it has answered.
+ * read after the screen's own changes, and resolves once it has answered,
+ * with whether the list was read.
  */
 export function useInvitations(): InvitationsView & {
   retry: () => void;
-  refresh: () => Promise<void>;
+  refresh: () => Promise<boolean>;
 } {
   const [state, setState] = useState<InvitationsView>({ status: "loading" });
   const mounted = useRef(true);
   const asked = useRef(0);
 
-  const read = useCallback((quietly: boolean): Promise<void> => {
+  const read = useCallback((quietly: boolean): Promise<boolean> => {
     asked.current += 1;
     const mine = asked.current;
     // Of two reads under way the later one speaks.
@@ -35,10 +36,15 @@ export function useInvitations(): InvitationsView & {
     return fetchInvitations().then(
       (invitations) => {
         if (current()) setState({ status: "ready", invitations });
+        return true;
       },
       (error: unknown) => {
-        if (!current()) return;
-        setState((was) => (quietly && was.status === "ready" ? was : { status: "failed", error }));
+        if (current()) {
+          setState((was) =>
+            quietly && was.status === "ready" ? was : { status: "failed", error },
+          );
+        }
+        return false;
       },
     );
   }, []);

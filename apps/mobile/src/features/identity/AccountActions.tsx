@@ -1,7 +1,7 @@
 import type { PlainMessageKey } from "@kuutti/i18n";
 import { Directory, File, Paths } from "expo-file-system";
 import { useRouter } from "expo-router";
-import { type ReactNode, useState } from "react";
+import { useState } from "react";
 import { Platform, Share, View } from "react-native";
 import { Notice as Said } from "@/components/Notice";
 import { Button } from "@/components/ui/button";
@@ -99,8 +99,8 @@ function useSaid() {
 
 /**
  * A copy of what Kuutti holds about the person (#51, ADR-007; #237, #465),
- * under its row of Settings (#511): what the file is, and the one button
- * that hands it over, as the system offers it.
+ * under its row of Settings (#511): the one button that hands it over, as the
+ * system offers it.
  */
 export function ExportData({ share }: { share?: typeof Share.share }) {
   const { t } = useT();
@@ -132,7 +132,6 @@ export function ExportData({ share }: { share?: typeof Share.share }) {
 
   return (
     <View className="gap-3">
-      <Text>{t("account.export.explain")}</Text>
       {busy === "exporting" && (
         <Text accessibilityLiveRegion="polite">{t("account.export.working")}</Text>
       )}
@@ -158,8 +157,8 @@ export function ExportData({ share }: { share?: typeof Share.share }) {
 /**
  * The account (#170, ADR-022; #83, ADR-040; ADR-007), under the "Your
  * account" row of Settings (#287, #511): "Löysin hänet", the break and the
- * deletion, in that order, each with what it does under it, the deletion
- * last, below a hairline. "Löysin hänet" and the break have screens of
+ * deletion, in that order, the deletion last, below a hairline. Each press
+ * only opens what says the rest. "Löysin hänet" and the break have screens of
  * their own; deletion is a button behind a confirmation that names the
  * cooldown; never a swipe, never colour alone (CLAUDE.md Accessibility).
  */
@@ -186,62 +185,46 @@ export function AccountActions() {
     }
   };
 
-  /** A button and, under it, what it does. */
-  const action = (button: ReactNode, consequence: string) => (
-    <View className="gap-1.5">
-      {button}
-      <Text variant="muted">{consequence}</Text>
-    </View>
-  );
-
   return (
     <View className="gap-4">
-      {/* "Löysin hänet" (#83): telling Kuutti one found somebody, which changes nothing else. */}
-      {action(
-        <Button
-          variant="outline"
-          accessibilityLabel={t("account.foundThem.button")}
-          disabled={deleting}
-          onPress={() => {
-            tap();
-            router.push("/settings/found-them");
-          }}
-        >
-          <Text>{t("account.foundThem.button")}</Text>
-        </Button>,
-        t("account.found.consequence"),
-      )}
+      {/* "Löysin hänet" (#83): the screen it opens says that nothing else changes. */}
+      <Button
+        variant="outline"
+        accessibilityLabel={t("account.foundThem.button")}
+        disabled={deleting}
+        onPress={() => {
+          tap();
+          router.push("/settings/found-them");
+        }}
+      >
+        <Text>{t("account.foundThem.button")}</Text>
+      </Button>
       {/* Taking a break (#170): the screen says what happens before anything does. */}
-      {action(
-        <Button
-          variant="outline"
-          accessibilityLabel={t("account.break.button")}
-          disabled={deleting}
-          onPress={() => {
-            tap();
-            router.push("/account/break");
-          }}
-        >
-          <Text>{t("account.break.button")}</Text>
-        </Button>,
-        t("account.break.consequence"),
-      )}
+      <Button
+        variant="outline"
+        accessibilityLabel={t("account.break.button")}
+        disabled={deleting}
+        onPress={() => {
+          tap();
+          router.push("/account/break");
+        }}
+      >
+        <Text>{t("account.break.button")}</Text>
+      </Button>
       <View className="mt-3 gap-3 border-t border-border pt-4">
         {deleting && <Text accessibilityLiveRegion="polite">{t("account.delete.working")}</Text>}
-        {action(
-          <Button
-            variant="destructive"
-            accessibilityLabel={t("account.delete.button")}
-            disabled={deleting}
-            onPress={() => {
-              tap();
-              setConfirming(true);
-            }}
-          >
-            <Text>{t("account.delete.button")}</Text>
-          </Button>,
-          t("account.delete.consequence", { days: REREGISTER_COOLDOWN_DAYS }),
-        )}
+        {/* The question it opens says what goes for good, and when a new account is possible (#581). */}
+        <Button
+          variant="destructive"
+          accessibilityLabel={t("account.delete.button")}
+          disabled={deleting}
+          onPress={() => {
+            tap();
+            setConfirming(true);
+          }}
+        >
+          <Text>{t("account.delete.button")}</Text>
+        </Button>
         {said !== null && <Said refused words={t(NOTICE[said.notice])} answer={said.answer} />}
       </View>
 

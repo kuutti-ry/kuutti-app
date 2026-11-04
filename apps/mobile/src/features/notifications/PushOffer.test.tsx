@@ -78,7 +78,12 @@ describe("PushOffer", () => {
   it("offers once, with the reason in words and two answers of equal weight", async () => {
     await renderWithTheme(<PushOffer />);
     expect(await screen.findByRole("header", { name: HEADING })).toBeTruthy();
-    expect(screen.getByText(/never what or from whom/)).toBeTruthy();
+    // What a lock screen shows, in true words, and that the kinds are separate (#581).
+    expect(
+      screen.getByText(
+        "Kuutti can tell this phone when someone likes you back and when a message arrives. A notification says that there is a new message or a new match, never what it says or from whom. You choose which kinds in Settings.",
+      ),
+    ).toBeTruthy();
     const allow = screen.getByRole("button", { name: "Allow notifications" });
     const decline = screen.getByRole("button", { name: "No thanks" });
     expect(allow.props.className).toBe(decline.props.className);

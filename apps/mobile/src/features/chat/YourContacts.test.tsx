@@ -2,6 +2,7 @@ import type { ContactKind } from "@kuutti/schema";
 import { act, fireEvent, screen, waitFor, within } from "@testing-library/react-native";
 import { useLocales } from "expo-localization";
 import * as SecureStore from "expo-secure-store";
+import { AccessibilityInfo, Platform } from "react-native";
 import { clearSession, saveSession } from "@/lib/session";
 import { UnsavedRow } from "@/lib/unsaved";
 import { a11yProblems, type HostNode, markBefore, pressables } from "@/test/a11y";
@@ -13,8 +14,24 @@ import { YourContacts } from "./YourContacts";
 // with its field as the kind wants it, a number's country code beside its
 // field, no Save (leaving the field keeps it), the phone's own check before
 // the API's, the stored form shown back, Remove only while one is kept, each
-// outcome said in words, and no value in a pressable's label.
+// outcome said in words, a removal said and not drawn (#581), and no value in
+// a pressable's label.
 
+const INTRO =
+  "Nobody sees them until you share one in a conversation. A change or a removal shows at once wherever you shared it.";
+const PHONE_HINT = "For another country's number, choose its code first.";
+const REMOVED = "Removed. Wherever you shared it, it is gone now.";
+/** Every text on the screen, in order. */
+const drawn = () => screen.queryAllByText(/./).map((node) => node.props.children);
+/** What a screen reader was told, by the call: `queued` is iOS's, `plain` Android's (sayAloud). */
+const told = () => ({
+  queued: (AccessibilityInfo.announceForAccessibilityWithOptions as jest.Mock).mock.calls.map(
+    ([words]) => words,
+  ),
+  plain: (AccessibilityInfo.announceForAccessibility as jest.Mock).mock.calls.map(
+    ([words]) => words,
+  ),
+});
 const token = (seed: string) => (seed + "x".repeat(43)).slice(0, 43);
 const AT = "2026-10-18T09:00:00.000Z";
 const json = (body: unknown, status = 200) =>
@@ -89,6 +106,8 @@ const show = async () => {
 
 beforeEach(async () => {
   (useLocales as jest.Mock).mockReturnValue([{ languageTag: "en-US" }]);
+  (AccessibilityInfo.announceForAccessibility as jest.Mock).mockClear();
+  (AccessibilityInfo.announceForAccessibilityWithOptions as jest.Mock).mockClear();
   await clearSession();
   await saveSession({
     sessionId: "6f1c1c4e-9a8e-4a0b-9c3a-0c8d1e2f3a4b",
@@ -98,6 +117,7 @@ beforeEach(async () => {
     refreshExpiresAt: "2030-04-01T00:00:00.000Z",
   });
 });
+afterEach(() => jest.restoreAllMocks());
 
 describe("Ways to reach you", () => {
   it("says it is loading, then a part per kind with what is kept, each field as its kind wants it", async () => {
@@ -114,20 +134,25 @@ describe("Ways to reach you", () => {
     await act(async () =>
       answer(json({ contacts: [{ kind: "phone", value: "+358401234567", updatedAt: AT }] })),
     );
-    await screen.findByText(
-      "Keep the ways to reach you outside the app here. Nobody sees them until you share one in a conversation, with the button at its top. A change or a removal shows at once wherever you shared it.",
-    );
+    await screen.findByText(INTRO);
     for (const title of ["Phone number", "WhatsApp", "Telegram", "Instagram", "Snapchat"]) {
       expect(screen.getByText(title)).toBeTruthy();
       // The service's mark before the title (#474), decorative.
       expect([title, markBefore(screen.toJSON() as HostNode, title)]).toEqual([title, true]);
     }
-    expect(
-      screen.getByText(
-        "With or without the 0 at the start. For another country's number, choose its code first.",
-      ),
-    ).toBeTruthy();
-    expect(screen.getAllByText("Your username, with or without the @ before it.")).toHaveLength(3);
+    // A hint on the phone number alone (#581): a Swedish 070 kept under +358 reaches a stranger.
+    expect(drawn()).toEqual([
+      INTRO,
+      "Phone number",
+      "Remove",
+      PHONE_HINT,
+      "+358",
+      "WhatsApp",
+      "+358",
+      "Telegram",
+      "Instagram",
+      "Snapchat",
+    ]);
     // A number is shown under its code, which stands beside the field.
     expect(field("Your phone number").props.value).toBe("40 1234567");
     expect(field("Your WhatsApp number").props.value).toBe("");
@@ -348,9 +373,7 @@ describe("Ways to reach you", () => {
     await act(async () => {
       fireEvent.changeText(screen.getByLabelText("Search by country or code"), "zzz");
     });
-    expect(
-      screen.getByText("No country matches. Search by name or by code, such as 46."),
-    ).toBeTruthy();
+    expect(screen.getByText("No country matches.")).toBeTruthy();
     await act(async () => {
       fireEvent.press(button("Close"));
     });
@@ -414,17 +437,36 @@ describe("Ways to reach you", () => {
     expect(server).toEqual({ telegram: "aino_k" });
   });
 
-  it("removes a piece, says it is gone wherever it was shared, and empties its field", async () => {
-    const { server, writes } = contactsApi({ phone: "+358401234567", telegram: "aino_k" });
+  it.each<["ios" | "android", ReturnType<typeof told>]>([
+    ["ios", { queued: [REMOVED], plain: [] }],
+    ["android", { queued: [], plain: [REMOVED] }],
+  ])(
+    "removes a piece on %s, says it is gone wherever it was shared, and draws nothing: its field empties and Remove goes (#581)",
+    async (os, said) => {
+      jest.replaceProperty(Platform, "OS", os);
+      const { server, writes } = contactsApi({ phone: "+358401234567", telegram: "aino_k" });
+      await show();
+      await press("Remove your phone number");
+      expect(writes()).toEqual([{ method: "DELETE", path: "/contacts/phone", body: null }]);
+      expect(server.phone).toBeUndefined();
+      expect(told()).toEqual(said);
+      expect(screen.queryByText(REMOVED)).toBeNull();
+      expect(field("Your phone number").props.value).toBe("");
+      expect(screen.queryByRole("button", { name: "Remove your phone number" })).toBeNull();
+      // The other part is as it was.
+      expect(field("Your Telegram username").props.value).toBe("aino_k");
+    },
+  );
+
+  it("takes the last answer's Saved. away with a removal", async () => {
+    contactsApi();
     await show();
-    await press("Remove your phone number");
-    expect(writes()).toEqual([{ method: "DELETE", path: "/contacts/phone", body: null }]);
-    expect(server.phone).toBeUndefined();
-    expect(screen.getByText("Removed. Wherever you shared it, it is gone now.")).toBeTruthy();
-    expect(field("Your phone number").props.value).toBe("");
-    expect(screen.queryByRole("button", { name: "Remove your phone number" })).toBeNull();
-    // The other part is as it was.
-    expect(field("Your Telegram username").props.value).toBe("aino_k");
+    await type("Your Telegram username", "aino_k");
+    await leave("Your Telegram username");
+    expect(screen.getByText("Saved.")).toBeTruthy();
+    await press("Remove your Telegram username");
+    expect(screen.queryByText("Saved.")).toBeNull();
+    expect(told().queued.at(-1)).toBe(REMOVED);
   });
 
   it("says a removal that failed, and keeps the piece", async () => {
@@ -435,6 +477,7 @@ describe("Ways to reach you", () => {
     await show();
     await press("Remove your phone number");
     expect(screen.getByText("Nothing changed. Check your connection and try again.")).toBeTruthy();
+    expect(told().queued).not.toContain(REMOVED);
     expect(field("Your phone number").props.value).toBe("40 1234567");
     expect(button("Remove your phone number")).toBeTruthy();
   });
@@ -507,6 +550,12 @@ describe("Ways to reach you", () => {
     contactsApi({ whatsapp: "+358401234567" });
     await renderWithTheme(<YourContacts />);
     expect(await screen.findByText("Puhelinnumero")).toBeTruthy();
+    expect(
+      screen.getByText(
+        "Kukaan ei näe niitä, ennen kuin jaat jonkin niistä keskustelussa. Muutos tai poisto näkyy heti kaikkialla, missä olet sen jakanut.",
+      ),
+    ).toBeTruthy();
+    expect(screen.getByText("Toisen maan numerolle valitse ensin sen maatunnus.")).toBeTruthy();
     expect(field("WhatsApp-numerosi").props.value).toBe("40 1234567");
     expect(button("Poista WhatsApp-numerosi")).toBeTruthy();
     expect(

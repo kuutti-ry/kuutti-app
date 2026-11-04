@@ -17,14 +17,19 @@ const checked = (name: string) =>
 beforeEach(() => store.clear());
 
 describe("the photo descriptions' choices", () => {
-  it("explains the descriptions and holds four labelled switches, the text off and the three parts on by default", async () => {
+  it("says that a description is automatic and can be wrong, and holds four labelled switches, the text off and the three parts on by default (#581)", async () => {
     await renderWithTheme(<PhotoDescriptionChoices />);
-    expect(screen.getByText(/^The photo check describes what a sighted viewer sees/)).toBeTruthy();
+    // One line: no hint under Show under photos, whose name says it.
+    expect(screen.queryAllByText(/./).map((node) => node.props.children)).toEqual([
+      "The description is automatic and can be wrong.",
+      "Show under photos",
+      "Tell me about",
+      "People and setting",
+      "Face",
+      "Activity and objects",
+    ]);
     expect(screen.getByRole("heading", { name: "Tell me about" })).toBeTruthy();
     expect(checked("Show under photos")).toBe(false);
-    expect(
-      screen.getByText("As text under each photo on the card, in your photos and full size."),
-    ).toBeTruthy();
     for (const part of ["People and setting", "Face", "Activity and objects"]) {
       expect(checked(part)).toBe(true);
     }
@@ -66,9 +71,11 @@ describe("the photo descriptions' choices", () => {
     await renderWithTheme(<PhotoDescriptionChoices />);
     expect(await screen.findByRole("switch", { name: "Näytä kuvien alla" })).toBeTruthy();
     expect(screen.getByRole("switch", { name: "Kasvot" })).toBeTruthy();
+    expect(screen.getByText("Kuvaus on automaattinen ja voi olla väärässä.")).toBeTruthy();
     store.set("kuutti.preference.locale", "sv");
     await renderWithTheme(<PhotoDescriptionChoices />);
     expect(await screen.findByRole("switch", { name: "Visa under fotona" })).toBeTruthy();
     expect(screen.getByRole("switch", { name: "Aktivitet och föremål" })).toBeTruthy();
+    expect(screen.getByText("Beskrivningen är automatisk och kan ha fel.")).toBeTruthy();
   });
 });

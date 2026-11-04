@@ -2,6 +2,7 @@ import type { PlainMessageKey } from "@kuutti/i18n";
 import * as Sentry from "@sentry/react-native";
 import { useEffect, useState } from "react";
 import { AccessibilityInfo, AppState, Linking, Platform, View } from "react-native";
+import { sayAloud } from "@/components/Notice";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -176,13 +177,13 @@ export function LockControls() {
           onDone={(code) => {
             void lock.setPasscode(code).then(() => {
               setChoosing(false);
-              announce(t("lock.settings.passcodeSet"));
+              // Change and Remove say it to the eye (#581).
+              sayAloud(t("lock.settings.passcodeSet"));
             });
           }}
         />
       ) : lock.settings?.passcode ? (
         <View className="gap-2">
-          <Text accessibilityLiveRegion="polite">{t("lock.settings.passcodeSet")}</Text>
           <Button
             variant="outline"
             onPress={() => {
@@ -233,7 +234,6 @@ export function LockControls() {
               />
             ))}
           </View>
-          <Text variant="muted">{t("lock.settings.always")}</Text>
         </View>
       )}
     </View>

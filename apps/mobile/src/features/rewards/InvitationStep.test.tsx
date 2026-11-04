@@ -7,12 +7,15 @@ import { InvitationStep } from "./InvitationStep";
 
 // Onboarding's optional step after the welcome (#107): what a code earns the
 // person while it earns them anything (#503), the field and Skip; after a code
-// that worked, the thanks and Continue; either way the step is done, in the
+// that worked, that it is in, and Continue; either way the step is done, in the
 // phone's language.
 
 const ONE_EACH = { inviterFish: 1, friendFish: 1 };
 const EARNS = "The code earns you a fish and your friend a fish once your profile is complete.";
-const TAIL = "A fish is a like that says a little more.";
+const EXPLAIN =
+  "If a friend gave you an invitation code, type it here. You can also skip this and type it later in Settings, until your profile is complete.";
+/** Every text on the screen, in order. */
+const drawn = () => screen.queryAllByText(/./).map((node) => node.props.children);
 const token = (seed: string) => (seed + "x".repeat(43)).slice(0, 43);
 const settle = () => act(() => new Promise<void>((resolve) => setTimeout(resolve, 20)));
 const noProblems = () =>
@@ -42,11 +45,7 @@ describe("InvitationStep", () => {
     const onDone = jest.fn();
     await renderWithTheme(<InvitationStep reward={ONE_EACH} onDone={onDone} />);
     expect(screen.getByRole("heading", { name: "Did a friend invite you?" })).toBeTruthy();
-    expect(
-      screen.getByText(
-        "If a friend gave you an invitation code, type it here. You can also skip this and type it later in Settings, until your profile is complete.",
-      ),
-    ).toBeTruthy();
+    expect(screen.getByText(EXPLAIN)).toBeTruthy();
     expect(screen.getByLabelText("Invitation code")).toBeTruthy();
     noProblems();
     await press("Skip");
@@ -62,42 +61,34 @@ describe("InvitationStep", () => {
   });
 
   it.each([
-    ["en", { inviterFish: 1, friendFish: 1 }, `${EARNS} ${TAIL}`],
+    ["en", { inviterFish: 1, friendFish: 1 }, EARNS],
     [
       "en",
       { inviterFish: 3, friendFish: 2 },
-      `The code earns you 2 fish and your friend 3 fish once your profile is complete. ${TAIL}`,
+      "The code earns you 2 fish and your friend 3 fish once your profile is complete.",
     ],
     [
       "en",
       { inviterFish: 0, friendFish: 1 },
-      `The code earns you a fish once your profile is complete. ${TAIL}`,
+      "The code earns you a fish once your profile is complete.",
     ],
     [
       "en",
       { inviterFish: 0, friendFish: 2 },
-      `The code earns you 2 fish once your profile is complete. ${TAIL}`,
+      "The code earns you 2 fish once your profile is complete.",
     ],
     [
       "fi",
       { inviterFish: 1, friendFish: 1 },
-      "Koodista saat kalan ja ystäväsi saa kalan, kun profiilisi on valmis. Kala on tykkäys, joka sanoo vähän enemmän.",
+      "Koodista saat kalan ja ystäväsi saa kalan, kun profiilisi on valmis.",
     ],
-    [
-      "fi",
-      { inviterFish: 0, friendFish: 2 },
-      "Koodista saat 2 kalaa, kun profiilisi on valmis. Kala on tykkäys, joka sanoo vähän enemmän.",
-    ],
+    ["fi", { inviterFish: 0, friendFish: 2 }, "Koodista saat 2 kalaa, kun profiilisi on valmis."],
     [
       "sv",
       { inviterFish: 1, friendFish: 1 },
-      "Koden ger dig en fisk och din vän en fisk när din profil är klar. En fisk är ett gillande som säger lite mer.",
+      "Koden ger dig en fisk och din vän en fisk när din profil är klar.",
     ],
-    [
-      "sv",
-      { inviterFish: 0, friendFish: 2 },
-      "Koden ger dig 2 fiskar när din profil är klar. En fisk är ett gillande som säger lite mer.",
-    ],
+    ["sv", { inviterFish: 0, friendFish: 2 }, "Koden ger dig 2 fiskar när din profil är klar."],
   ])("says in %s what the reward %j earns the person", async (locale, reward, words) => {
     (useLocales as jest.Mock).mockReturnValue([{ languageTag: locale }]);
     await renderWithTheme(<InvitationStep reward={reward} onDone={jest.fn()} />);
@@ -110,24 +101,25 @@ describe("InvitationStep", () => {
     async (reward) => {
       await renderWithTheme(<InvitationStep reward={reward} onDone={jest.fn()} />);
       expect(screen.getByLabelText("Invitation code")).toBeTruthy();
-      expect(screen.queryByText(/says a little more/)).toBeNull();
-      expect(screen.queryByText(/you get/)).toBeNull();
+      expect(drawn()).toEqual([
+        "Did a friend invite you?",
+        EXPLAIN,
+        "Invitation code",
+        "Use the code",
+        "Skip",
+      ]);
       noProblems();
     },
   );
 
-  it("thanks the person for a code that worked, and Continue is done with the step", async () => {
+  it("says that a code that worked is in, and Continue is done with the step", async () => {
     const onDone = jest.fn();
     await renderWithTheme(<InvitationStep reward={ONE_EACH} onDone={onDone} />);
     await act(async () =>
       fireEvent.changeText(screen.getByLabelText("Invitation code"), "abcdefghjk"),
     );
     await press("Use the code");
-    expect(
-      screen.getByText(
-        "The code is in. Your friend's invitation counts once your profile is complete.",
-      ).props.accessibilityLiveRegion,
-    ).toBe("polite");
+    expect(screen.getByText("The code is in.").props.accessibilityLiveRegion).toBe("polite");
     expect(screen.queryByRole("button", { name: "Skip" })).toBeNull();
     expect(screen.queryByLabelText("Invitation code")).toBeNull();
     expect(onDone).not.toHaveBeenCalled();

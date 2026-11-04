@@ -11,7 +11,7 @@ import { rewardParams } from "./words";
 /**
  * Onboarding's optional step right after the welcome (#107, ADR-044 Context
  * 5), for somebody the API says may still type a code: what it earns them
- * (#503), the field and Skip; after a code that worked, the thanks and
+ * (#503), the field and Skip; after a code that worked, that it is in, and
  * Continue. Either way the step is done for this walk, and nothing in it ever
  * holds onboarding up.
  */

@@ -40,7 +40,6 @@ export function DecisionButtonChoices() {
   const { settings, set } = useDecisionButtons();
   return (
     <>
-      <Text>{t("settings.decisionButtons.explain")}</Text>
       <View
         accessibilityRole="radiogroup"
         accessibilityLabel={t("settings.decisionButtons.hand")}
@@ -55,20 +54,18 @@ export function DecisionButtonChoices() {
           />
         ))}
       </View>
-      <View className="gap-1">
-        <View className="flex-row items-center justify-between gap-4">
-          <Label onPress={() => set({ oneHanded: !settings.oneHanded })}>
-            {t("settings.decisionButtons.oneHanded")}
-          </Label>
-          <Switch
-            accessibilityLabel={t("settings.decisionButtons.oneHanded")}
-            checked={settings.oneHanded}
-            onCheckedChange={(on) => set({ oneHanded: on })}
-          />
-        </View>
-        <Text variant="muted">{t("settings.decisionButtons.oneHandedHint")}</Text>
+      <View className="flex-row items-center justify-between gap-4">
+        <Label onPress={() => set({ oneHanded: !settings.oneHanded })}>
+          {t("settings.decisionButtons.oneHanded")}
+        </Label>
+        <Switch
+          accessibilityLabel={t("settings.decisionButtons.oneHanded")}
+          checked={settings.oneHanded}
+          onCheckedChange={(on) => set({ oneHanded: on })}
+        />
       </View>
       <View className="gap-2">
+        <Text variant="small">{t("settings.decisionButtons.style")}</Text>
         <View
           accessibilityRole="radiogroup"
           accessibilityLabel={t("settings.decisionButtons.style")}
@@ -84,7 +81,6 @@ export function DecisionButtonChoices() {
             />
           ))}
         </View>
-        <Text variant="muted">{t("settings.decisionButtons.styleHint")}</Text>
       </View>
     </>
   );

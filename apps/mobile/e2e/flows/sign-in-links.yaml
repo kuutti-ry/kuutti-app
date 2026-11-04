@@ -12,7 +12,7 @@ name: A sign-in link not asked for is refused without touching the session, and 
 - extendedWaitUntil:
     visible: "This sign-in link was not requested from this phone\\. Start the sign-in here, with the button\\.|Tätä kirjautumislinkkiä ei pyydetty tältä puhelimelta\\. Aloita kirjautuminen tästä painikkeella\\.|Den här inloggningslänken begärdes inte från den här telefonen\\. Starta inloggningen här med knappen\\."
     timeout: 15000
-# Still signed in.
+# Still signed in: Logging out is a row only with a session (#581).
 - openLink: kuutti://settings
 - extendedWaitUntil:
     visible: "Settings|Asetukset|Inställningar"

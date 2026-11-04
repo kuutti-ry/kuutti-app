@@ -4,5 +4,6 @@ export const slangi: Readonly<Record<string, string>> = {
   "round.match.title": "Nyt natsaa",
   "round.pass": "Skippaan",
   "round.title": "Jengi",
+  "settings.decisionButtons.label": "Digaan ja Skippaan",
   "settings.title": "Säädöt",
 };

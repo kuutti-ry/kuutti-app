@@ -287,7 +287,7 @@ describe("SectionScreen", () => {
     expect(router.push).toHaveBeenCalledTimes(1);
   });
 
-  it("says why in the question itself, where the line on something unsaved would say less", async () => {
+  it("says why in the question itself", async () => {
     fakeApi({ saveStatus: 400, saveCode: "text_contact_details" });
     const view = await show(<SectionScreen section="basics" />);
     await waitFor(() => expect(screen.getByLabelText("Name on your card")).toBeTruthy());
@@ -297,7 +297,6 @@ describe("SectionScreen", () => {
     await waitFor(() => expect(screen.getByText("Leave without saving?")).toBeTruthy());
     // On the screen and in the dialog: the screen's own line stays once the dialog has gone.
     expect(screen.getAllByText(/e-mail address, a link/)).toHaveLength(2);
-    expect(screen.queryByText("Your changes are not saved yet.")).toBeNull();
   });
 
   it("lets a refused draft go on the word, with no save on the way out", async () => {

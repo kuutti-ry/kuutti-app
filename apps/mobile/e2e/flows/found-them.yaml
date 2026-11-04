@@ -24,7 +24,8 @@ name: I found someone tells Kuutti the reason once, thanks the person, and asks 
 - extendedWaitUntil:
     visible: "Which is it\\?|Mikä on kyseessä\\?|Vilket gäller\\?"
     timeout: 15000
-- assertVisible: "Nothing changes in the app.*|Sovelluksessa mikään ei muutu.*|Inget ändras i appen.*"
+- assertVisible: "Your answer is shown to nobody, and it is counted without your name\\.|Vastaustasi ei näytetä kenellekään, ja se lasketaan ilman nimeäsi\\.|Ditt svar visas inte för någon, och det räknas utan ditt namn\\."
+- assertVisible: "Nothing changes in the app\\.|Sovelluksessa mikään ei muutu\\.|Inget ändras i appen\\."
 - assertVisible:
     text: "Tell Kuutti|Kerro Kuutille|Berätta för Kuutti"
     enabled: false
@@ -39,11 +40,11 @@ name: I found someone tells Kuutti the reason once, thanks the person, and asks 
 - assertNotVisible: "Which is it\\?|Mikä on kyseessä\\?|Vilket gäller\\?"
 
 # Opened again: thanked at once, nothing asked. Settings comes back with the
-# row open, told by the line under its button: the screen's own title has the
-# button's words.
+# row open, told by the break's button under the one pressed: the screen's own
+# title has that one's words.
 - tapOn: "Back|Takaisin|Tillbaka"
 - extendedWaitUntil:
-    visible: "Changes nothing else\\.|Ei muuta mitään muuta\\.|Ändrar inget annat\\."
+    visible: "Take a break|Pidä tauko|Ta en paus"
     timeout: 15000
 - tapOn: "I found someone|Löysin hänet|Jag hittade någon"
 - extendedWaitUntil:
@@ -52,5 +53,5 @@ name: I found someone tells Kuutti the reason once, thanks the person, and asks 
 - assertNotVisible: "Which is it\\?|Mikä on kyseessä\\?|Vilket gäller\\?"
 - tapOn: "Back|Takaisin|Tillbaka"
 - extendedWaitUntil:
-    visible: "Changes nothing else\\.|Ei muuta mitään muuta\\.|Ändrar inget annat\\."
+    visible: "Take a break|Pidä tauko|Ta en paus"
     timeout: 15000

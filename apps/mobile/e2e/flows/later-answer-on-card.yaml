@@ -43,8 +43,9 @@ name: A party and a star sign saved on their screens show on the card, and clear
     centerElement: true
     timeout: 60000
 - tapOn: "Save and continue|Tallenna ja jatka|Spara och fortsätt"
+# The star sign is the last field; the e-mail's screen follows.
 - extendedWaitUntil:
-    visible: "That is everything\\. Thank you\\.|Siinä kaikki\\. Kiitos\\.|Det var allt\\. Tack\\."
+    visible: "A way to stay in touch|Tapa pitää yhteyttä|Ett sätt att hålla kontakten"
     timeout: 15000
 
 # On the card, under their labels.
@@ -101,7 +102,7 @@ name: A party and a star sign saved on their screens show on the card, and clear
     timeout: 60000
 - tapOn: "Save and continue|Tallenna ja jatka|Spara och fortsätt"
 - extendedWaitUntil:
-    visible: "That is everything\\. Thank you\\.|Siinä kaikki\\. Kiitos\\.|Det var allt\\. Tack\\."
+    visible: "A way to stay in touch|Tapa pitää yhteyttä|Ett sätt att hålla kontakten"
     timeout: 15000
 - openLink: kuutti://profile/card
 - extendedWaitUntil:

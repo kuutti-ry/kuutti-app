@@ -9,6 +9,7 @@ import { AccessibilityInfo, AppState, Linking, Platform, View } from "react-nati
 import { clearSession, saveSession } from "@/lib/session";
 import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
 import { renderWithTheme, underProviders } from "@/test/render";
+import { LockControls } from "./LockControls";
 import { LockOfferScreen } from "./LockOfferScreen";
 import { rememberOpenRow } from "./open-rows";
 import { SettingsScreen } from "./SettingsScreen";
@@ -40,11 +41,9 @@ type StoredLock = {
 const stored = () => JSON.parse(store.get("kuutti.lock") ?? "null") as StoredLock | null;
 
 const TEXT = {
-  explain: /^Lock Kuutti on this phone, so that somebody else holding it/,
-  missing:
-    "This phone has no face or fingerprint unlock that Kuutti can use. A passcode works without one.",
-  denied:
-    "This iPhone does not let Kuutti use Face ID. You can allow it in the phone's settings. A passcode works without it.",
+  explain: "The lock stays on this phone, and logging out turns it off.",
+  missing: "This phone has no face or fingerprint unlock that Kuutti can use.",
+  denied: "This iPhone does not let Kuutti use Face ID.",
   openSettings: "Open the phone's settings",
   biometrics: "Face or fingerprint",
   failed: "Your face or fingerprint was not confirmed, so it was not turned on.",
@@ -59,7 +58,6 @@ const TEXT = {
   change: "Change the passcode",
   remove: "Remove the passcode",
   grace: "Lock again after Kuutti has been in the background",
-  always: "Kuutti always locks when it starts.",
   choices: ["Straight away", "1 minute", "5 minutes", "15 minutes"],
 };
 
@@ -104,6 +102,13 @@ const checked = (element: ReturnType<typeof screen.getByRole>) =>
   element.props.accessibilityState?.checked as boolean;
 const announced = () =>
   (AccessibilityInfo.announceForAccessibility as jest.Mock).mock.calls.map(([words]) => words);
+/** What VoiceOver is told with no line drawn, queued behind what is being said (sayAloud, #581). */
+const queued = () =>
+  (AccessibilityInfo.announceForAccessibilityWithOptions as jest.Mock).mock.calls.map(
+    ([words]) => words,
+  );
+/** Every text on the screen, in order. */
+const drawn = () => screen.queryAllByText(/./).map((node) => node.props.children);
 const noProblems = () =>
   expect(pressables(screen.toJSON() as HostNode).flatMap((node) => a11yProblems(node))).toEqual([]);
 
@@ -121,6 +126,7 @@ beforeEach(async () => {
   (useLocales as jest.Mock).mockReturnValue([{ languageTag: "en-US" }]);
   router.replace.mockReset();
   (AccessibilityInfo.announceForAccessibility as jest.Mock).mockClear();
+  (AccessibilityInfo.announceForAccessibilityWithOptions as jest.Mock).mockClear();
   (Sentry.captureException as jest.Mock).mockClear();
   // The phone of jest.setup.js: neither face nor fingerprint.
   auth.hasHardwareAsync.mockResolvedValue(true);
@@ -153,7 +159,27 @@ describe("the lock's settings", () => {
     expect(button(TEXT.setPasscode)).toBeTruthy();
     // Off: no time to choose before it locks again.
     expect(graceGroup()).toBeNull();
-    expect(screen.queryByText(TEXT.always)).toBeNull();
+    noProblems();
+  });
+
+  it("draws one sentence and its controls alone, with a passcode set too (#581)", async () => {
+    phoneWithFace({ success: true });
+    await show(<LockControls />);
+    expect(drawn()).toEqual([TEXT.explain, TEXT.biometrics, TEXT.setPasscode]);
+    await press(button(TEXT.setPasscode));
+    await setPasscode("123456");
+    // Change and Remove say that one is set; nothing says when it locks at a start.
+    expect(drawn()).toEqual([
+      TEXT.explain,
+      TEXT.biometrics,
+      TEXT.change,
+      TEXT.remove,
+      TEXT.grace,
+      "Straight away",
+      "✓ 1 minute",
+      "5 minutes",
+      "15 minutes",
+    ]);
     noProblems();
   });
 
@@ -549,14 +575,10 @@ describe("an iPhone not letting Kuutti use Face ID (#505)", () => {
   });
 
   it.each([
-    [
-      "fi-FI",
-      "Tämä iPhone ei anna Kuutin käyttää Face ID:tä. Voit sallia sen puhelimen asetuksista. Pääsykoodi toimii ilman sitä.",
-      "Avaa puhelimen asetukset",
-    ],
+    ["fi-FI", "Tämä iPhone ei anna Kuutin käyttää Face ID:tä.", "Avaa puhelimen asetukset"],
     [
       "sv-FI",
-      "Den här iPhonen låter inte Kuutti använda Face ID. Du kan tillåta det i telefonens inställningar. En lösenkod fungerar utan.",
+      "Den här iPhonen låter inte Kuutti använda Face ID.",
       "Öppna telefonens inställningar",
     ],
   ])("speaks %s", async (languageTag, words, settings) => {
@@ -578,7 +600,7 @@ describe("an iPhone not letting Kuutti use Face ID (#505)", () => {
 });
 
 describe("the passcode", () => {
-  it("typed twice the same, is set, kept only as a salted hash, and said aloud on iOS", async () => {
+  it("typed twice the same, is set, kept only as a salted hash, and said aloud on iOS, queued, with no line drawn (#581)", async () => {
     jest.replaceProperty(Platform, "OS", "ios");
     await showLock();
     await press(button(TEXT.setPasscode));
@@ -589,9 +611,12 @@ describe("the passcode", () => {
     expect(screen.queryByLabelText(TEXT.choose)).toBeNull();
     expect(screen.getByLabelText(TEXT.repeat).props.value).toBe("");
     expect(stored()).toBeNull();
+    // Nothing is said of a passcode not set yet.
+    expect(queued()).toEqual([]);
     await type(TEXT.repeat, "123456");
-    expect(screen.getByText(TEXT.passcodeSet).props.accessibilityLiveRegion).toBe("polite");
-    expect(announced()).toEqual([TEXT.passcodeSet]);
+    expect(queued()).toEqual([TEXT.passcodeSet]);
+    expect(announced()).toEqual([]);
+    expect(screen.queryByText(TEXT.passcodeSet)).toBeNull();
     expect(screen.queryByLabelText(TEXT.repeat)).toBeNull();
     const lock = stored();
     expect(lock).toMatchObject({ biometrics: false, graceMinutes: 1 });
@@ -606,13 +631,14 @@ describe("the passcode", () => {
     noProblems();
   });
 
-  it("is said by the live region alone on Android", async () => {
+  it("is said aloud on Android too, with no line for a live region to read (#581)", async () => {
     jest.replaceProperty(Platform, "OS", "android");
     await showLock();
     await press(button(TEXT.setPasscode));
     await setPasscode("123456");
-    expect(screen.getByText(TEXT.passcodeSet)).toBeTruthy();
-    expect(announced()).toEqual([]);
+    expect(announced()).toEqual([TEXT.passcodeSet]);
+    expect(queued()).toEqual([]);
+    expect(screen.queryByText(TEXT.passcodeSet)).toBeNull();
   });
 
   it("drops anything but digits and waits for the sixth", async () => {
@@ -638,7 +664,7 @@ describe("the passcode", () => {
     await type(TEXT.choose, "111111");
     expect(screen.queryByText(TEXT.mismatch)).toBeNull();
     await type(TEXT.repeat, "111111");
-    expect(screen.getByText(TEXT.passcodeSet)).toBeTruthy();
+    expect(queued()).toEqual([TEXT.passcodeSet]);
     expect(stored()?.passcode).not.toBeNull();
   });
 
@@ -658,8 +684,10 @@ describe("the passcode", () => {
     await press(button(TEXT.change));
     await type(TEXT.choose, "999999");
     await press(button(TEXT.cancel));
-    expect(screen.getByText(TEXT.passcodeSet)).toBeTruthy();
+    expect(button(TEXT.change)).toBeTruthy();
     expect(store.get("kuutti.lock")).toBe(before);
+    // Said for the one set; nothing for the one cancelled.
+    expect(queued()).toEqual([TEXT.passcodeSet]);
   });
 
   it("changing it replaces the hash and its salt", async () => {
@@ -673,7 +701,8 @@ describe("the passcode", () => {
     const after = stored()?.passcode;
     expect(after?.salt).not.toBe(before?.salt);
     expect(after?.hash).toBe(bytesToHex(sha256(utf8ToBytes(`${after?.salt}:654321`))));
-    expect(screen.getByText(TEXT.passcodeSet)).toBeTruthy();
+    // Said again, as the new one is saved.
+    expect(queued()).toEqual([TEXT.passcodeSet, TEXT.passcodeSet]);
   });
 
   it("removing it turns the lock off when nothing else holds it", async () => {
@@ -683,7 +712,6 @@ describe("the passcode", () => {
     await press(button(TEXT.remove));
     expect(stored()).toBeNull();
     expect(button(TEXT.setPasscode)).toBeTruthy();
-    expect(screen.queryByText(TEXT.passcodeSet)).toBeNull();
     expect(graceGroup()).toBeNull();
   });
 
@@ -707,7 +735,6 @@ describe("the time in the background before it locks again", () => {
     await press(button(TEXT.setPasscode));
     await setPasscode("123456");
     expect(graceGroup()?.props.accessibilityRole).toBe("radiogroup");
-    expect(screen.getByText(TEXT.always)).toBeTruthy();
     const radios = screen.getAllByRole("radio");
     expect(radios.map((radio) => radio.props.accessibilityLabel)).toEqual([
       "Straight away",
@@ -793,7 +820,8 @@ describe("the lock's one offer, after the e-mail", () => {
     expect(scroll?.props.keyboardShouldPersistTaps).toBe("handled");
     expect(scroll?.props.automaticallyAdjustKeyboardInsets).toBe(true);
     await setPasscode("123456");
-    expect(screen.getByText(TEXT.passcodeSet)).toBeTruthy();
+    expect(queued()).toEqual([TEXT.passcodeSet]);
+    expect(button(TEXT.change)).toBeTruthy();
     expect(button("Done")).toBeTruthy();
     noProblems();
   });

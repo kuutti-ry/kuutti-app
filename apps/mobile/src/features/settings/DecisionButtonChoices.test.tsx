@@ -5,10 +5,10 @@ import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
 import { renderWithTheme } from "@/test/render";
 import { DecisionButtonChoices } from "./DecisionButtonChoices";
 
-// The decision buttons in their Settings row (#82, #511): the two hands as a
-// labelled radio group, the one-handed switch with what it does, the marks
-// Like and Pass carry as a radio group of their own (#520), every control
-// labelled and 44 pt, each change kept on the phone.
+// Like and Pass in their Settings row (#82, #511): the two hands as a labelled
+// radio group, the one-handed switch, the marks they carry as a radio group of
+// their own (#520), named in sight over them and with no other line (#581),
+// every control labelled and 44 pt, each change kept on the phone.
 
 const store = (SecureStore as unknown as { __store: Map<string, string> }).__store;
 const KEY = "kuutti.preference.decisionButtons";
@@ -17,6 +17,8 @@ const chosen = (name: RegExp) =>
   screen.getByRole("radio", { name }).props.accessibilityState.checked as boolean;
 const oneHanded = () =>
   screen.getByRole("switch", { name: "One-handed" }).props.accessibilityState.checked as boolean;
+/** Every text on the screen, in order. */
+const drawn = () => screen.queryAllByText(/./).map((node) => node.props.children);
 
 beforeEach(() => {
   store.clear();
@@ -24,16 +26,21 @@ beforeEach(() => {
 });
 
 describe("the decision buttons' choices", () => {
-  it("says what it moves, offers the two hands with the right chosen, and one-handed off", async () => {
+  it("offers the two hands with the right chosen, and one-handed off, with no sentence or hint (#581)", async () => {
     await renderWithTheme(<DecisionButtonChoices />);
-    expect(screen.getByText(/^Where Like and Pass sit when you go through people/)).toBeTruthy();
     expect(screen.getByLabelText("Which hand").props.accessibilityRole).toBe("radiogroup");
     expect(chosen(/Right hand/)).toBe(true);
     expect(chosen(/Left hand/)).toBe(false);
     expect(oneHanded()).toBe(false);
-    expect(
-      screen.getByText(/^Undo, the star, the fish, Later, Pass and Like in one column/),
-    ).toBeTruthy();
+    expect(drawn()).toEqual([
+      "✓ Right hand",
+      "Left hand",
+      "One-handed",
+      "Button style",
+      "✓ Kuutti",
+      "✕ and ○",
+      "A and B",
+    ]);
     const found = pressables(screen.toJSON() as HostNode);
     expect(found.flatMap((node) => a11yProblems(node))).toEqual([]);
     // The two hands, the switch and the three styles.
@@ -69,7 +76,7 @@ describe("the decision buttons' choices", () => {
     expect(chosen(/^(✓ )?Kuutti$/)).toBe(false);
   });
 
-  it("offers the styles as a group of their own, Kuutti's chosen, and says which mark is which", async () => {
+  it("offers the styles as a group of their own, Kuutti's chosen, with its name in sight over them (#581)", async () => {
     await renderWithTheme(<DecisionButtonChoices />);
     const group = screen.getByLabelText("Button style");
     expect(group.props.accessibilityRole).toBe("radiogroup");
@@ -77,7 +84,9 @@ describe("the decision buttons' choices", () => {
     expect(chosen(/^(✓ )?Kuutti$/)).toBe(true);
     expect(chosen(/Cross and circle/)).toBe(false);
     expect(chosen(/A and B/)).toBe(false);
-    expect(screen.getByText(/the first mark is Like, the second Pass/)).toBeTruthy();
+    // Not only for a screen reader, which hears the group's name.
+    const lines = drawn();
+    expect(lines.indexOf("Button style")).toBe(lines.indexOf("✓ Kuutti") - 1);
   });
 
   it("keeps each style on the phone beside the hand, and back to Kuutti's own", async () => {
@@ -99,12 +108,12 @@ describe("the decision buttons' choices", () => {
   });
 
   it.each([
-    ["en-US", "✕ and ○", "Cross and circle", "A and B"],
-    ["fi-FI", "✕ ja ○", "Risti ja ympyrä", "A ja B"],
-    ["sv-FI", "✕ och ○", "Kryss och cirkel", "A och B"],
+    ["en-US", "✕ and ○", "Cross and circle", "A and B", "Button style"],
+    ["fi-FI", "✕ ja ○", "Risti ja ympyrä", "A ja B", "Painikkeiden tyyli"],
+    ["sv-FI", "✕ och ○", "Kryss och cirkel", "A och B", "Knappstil"],
   ])(
     "shows the shapes as marks and says them in words, in %s",
-    async (languageTag, shown, heard, letters) => {
+    async (languageTag, shown, heard, letters, style) => {
       (useLocales as jest.Mock).mockReturnValue([{ languageTag }]);
       store.set(KEY, JSON.stringify({ style: "shapes" }));
       await renderWithTheme(<DecisionButtonChoices />);
@@ -113,6 +122,8 @@ describe("the decision buttons' choices", () => {
       expect(screen.getByRole("radio", { name: `✓ ${heard}` })).toBeTruthy();
       expect(screen.getByRole("radio", { name: letters })).toBeTruthy();
       expect(screen.getByText(letters)).toBeTruthy();
+      expect(screen.getByText(style)).toBeTruthy();
+      expect(screen.getByLabelText(style).props.accessibilityRole).toBe("radiogroup");
       // The setting names no console (#520, .claude/rules/mobile.md).
       expect(JSON.stringify(screen.toJSON())).not.toMatch(/playstation|xbox|nintendo|sony/i);
     },

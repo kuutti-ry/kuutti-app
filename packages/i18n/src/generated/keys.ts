@@ -8,10 +8,8 @@ export type MessageParams = {
   "account.break.button": Record<never, never>;
   "account.break.comesBack": Record<never, never>;
   "account.break.confirm": Record<never, never>;
-  "account.break.consequence": Record<never, never>;
   "account.break.failed": Record<never, never>;
   "account.break.hidden": Record<never, never>;
-  "account.break.intro": Record<never, never>;
   "account.break.signedOut": Record<never, never>;
   "account.break.title": Record<never, never>;
   "account.break.understand": Record<never, never>;
@@ -23,7 +21,6 @@ export type MessageParams = {
   "account.delete.cancel": Record<never, never>;
   "account.delete.close": Record<never, never>;
   "account.delete.confirm": Record<never, never>;
-  "account.delete.consequence": { "days": number };
   "account.delete.failed": Record<never, never>;
   "account.delete.title": Record<never, never>;
   "account.delete.working": Record<never, never>;
@@ -32,11 +29,10 @@ export type MessageParams = {
   "account.email.codeFailed": Record<never, never>;
   "account.email.codeLabel": Record<never, never>;
   "account.email.codeNone": Record<never, never>;
-  "account.email.codeSent": { "time": string };
+  "account.email.codeSent": Record<never, never>;
   "account.email.codeSpent": Record<never, never>;
   "account.email.codeWrong": Record<never, never>;
   "account.email.confirm": Record<never, never>;
-  "account.email.confirmed": Record<never, never>;
   "account.email.confirmedNow": Record<never, never>;
   "account.email.done": Record<never, never>;
   "account.email.explain": Record<never, never>;
@@ -46,16 +42,15 @@ export type MessageParams = {
   "account.email.loadFailed": Record<never, never>;
   "account.email.loading": Record<never, never>;
   "account.email.mailUnavailable": Record<never, never>;
+  "account.email.removed": Record<never, never>;
   "account.email.save": Record<never, never>;
   "account.email.saved": Record<never, never>;
   "account.email.send": Record<never, never>;
   "account.email.sendAgain": Record<never, never>;
   "account.email.sendLimit": Record<never, never>;
   "account.email.title": Record<never, never>;
-  "account.email.unconfirmed": Record<never, never>;
   "account.export.block.about": Record<never, never>;
   "account.export.button": Record<never, never>;
-  "account.export.explain": Record<never, never>;
   "account.export.failed": Record<never, never>;
   "account.export.fileName": Record<never, never>;
   "account.export.limited": Record<never, never>;
@@ -94,7 +89,6 @@ export type MessageParams = {
   "account.export.star.about": Record<never, never>;
   "account.export.title": Record<never, never>;
   "account.export.working": Record<never, never>;
-  "account.found.consequence": Record<never, never>;
   "account.foundThem.button": Record<never, never>;
   "account.foundThem.failed": Record<never, never>;
   "account.foundThem.intro": Record<never, never>;
@@ -662,7 +656,6 @@ export type MessageParams = {
   "feedback.send": Record<never, never>;
   "feedback.sending": Record<never, never>;
   "feedback.text.label": Record<never, never>;
-  "feedback.thanks.body": Record<never, never>;
   "feedback.thanks.title": Record<never, never>;
   "feedback.title": Record<never, never>;
   "home.chats.label": { "unread": number };
@@ -677,7 +670,6 @@ export type MessageParams = {
   "invite.redeem.button": Record<never, never>;
   "invite.redeem.done": Record<never, never>;
   "invite.redeem.earns": { "reward": string; "friendFish": number; "inviterFish": number };
-  "invite.redeem.explain": Record<never, never>;
   "invite.redeem.failed": Record<never, never>;
   "invite.redeem.label": Record<never, never>;
   "invite.redeem.title": Record<never, never>;
@@ -723,7 +715,6 @@ export type MessageParams = {
   "lock.passcode.mismatch": Record<never, never>;
   "lock.passcode.repeat": Record<never, never>;
   "lock.passcode.wrong": { "left": number };
-  "lock.settings.always": Record<never, never>;
   "lock.settings.biometrics": Record<never, never>;
   "lock.settings.biometricsDenied": Record<never, never>;
   "lock.settings.biometricsFailed": Record<never, never>;
@@ -761,9 +752,7 @@ export type MessageParams = {
   "notifications.ask.heading": Record<never, never>;
   "notifications.failed": Record<never, never>;
   "notifications.intro": Record<never, never>;
-  "notifications.kind.match.hint": Record<never, never>;
   "notifications.kind.match.label": Record<never, never>;
-  "notifications.kind.message.hint": Record<never, never>;
   "notifications.kind.message.label": Record<never, never>;
   "notifications.kind.moderation.hint": Record<never, never>;
   "notifications.kind.moderation.label": Record<never, never>;
@@ -788,7 +777,6 @@ export type MessageParams = {
   "onboarding.consents.explain": Record<never, never>;
   "onboarding.consents.fullText": { "version": string };
   "onboarding.consents.outdatedApp": Record<never, never>;
-  "onboarding.consents.version": { "version": string };
   "onboarding.continue": Record<never, never>;
   "onboarding.done": Record<never, never>;
   "onboarding.failed": Record<never, never>;
@@ -1051,7 +1039,6 @@ export type MessageParams = {
   "profile.discard.keep": Record<never, never>;
   "profile.discard.leave": Record<never, never>;
   "profile.discard.title": Record<never, never>;
-  "profile.discard.unsaved": Record<never, never>;
   "profile.displayName.hint": { "max": number };
   "profile.displayName.label": Record<never, never>;
   "profile.error.generic": Record<never, never>;
@@ -1115,7 +1102,6 @@ export type MessageParams = {
   "profile.home.open": Record<never, never>;
   "profile.later.back": Record<never, never>;
   "profile.later.backOnce": Record<never, never>;
-  "profile.later.done": Record<never, never>;
   "profile.later.explain": Record<never, never>;
   "profile.later.next": Record<never, never>;
   "profile.later.open": Record<never, never>;
@@ -1505,12 +1491,10 @@ export type MessageParams = {
   "safety.sending": Record<never, never>;
   "settings.about.title": Record<never, never>;
   "settings.back": Record<never, never>;
-  "settings.close": Record<never, never>;
   "settings.contacts.country": Record<never, never>;
   "settings.contacts.countryHint": Record<never, never>;
   "settings.contacts.countryValue": { "country": string; "code": string };
   "settings.contacts.failed": Record<never, never>;
-  "settings.contacts.hint": { "kind": string };
   "settings.contacts.input": { "kind": string };
   "settings.contacts.intro": Record<never, never>;
   "settings.contacts.invalid": { "kind": string };
@@ -1518,6 +1502,7 @@ export type MessageParams = {
   "settings.contacts.loadFailed": Record<never, never>;
   "settings.contacts.loading": Record<never, never>;
   "settings.contacts.none": Record<never, never>;
+  "settings.contacts.phoneHint": Record<never, never>;
   "settings.contacts.phoneInvalid": { "code": string };
   "settings.contacts.phoneLong": Record<never, never>;
   "settings.contacts.phoneShort": Record<never, never>;
@@ -1535,19 +1520,16 @@ export type MessageParams = {
   "settings.country.none": Record<never, never>;
   "settings.country.search": Record<never, never>;
   "settings.country.searchLabel": Record<never, never>;
-  "settings.decisionButtons.explain": Record<never, never>;
   "settings.decisionButtons.hand": Record<never, never>;
   "settings.decisionButtons.label": Record<never, never>;
   "settings.decisionButtons.left": Record<never, never>;
   "settings.decisionButtons.oneHanded": Record<never, never>;
-  "settings.decisionButtons.oneHandedHint": Record<never, never>;
   "settings.decisionButtons.right": Record<never, never>;
   "settings.decisionButtons.style": Record<never, never>;
   "settings.decisionButtons.style.kuutti": Record<never, never>;
   "settings.decisionButtons.style.letters": Record<never, never>;
   "settings.decisionButtons.style.shapes": Record<never, never>;
   "settings.decisionButtons.style.shapes.spoken": Record<never, never>;
-  "settings.decisionButtons.styleHint": Record<never, never>;
   "settings.decisionButtons.withOneHanded": { "hand": string };
   "settings.email.label": Record<never, never>;
   "settings.email.none": Record<never, never>;
@@ -1558,10 +1540,8 @@ export type MessageParams = {
   "settings.invite.code.label": Record<never, never>;
   "settings.invite.code.once": Record<never, never>;
   "settings.invite.code.spoken": { "characters": string };
-  "settings.invite.counted": { "friends": number };
   "settings.invite.earned.fish": { "fish": number };
   "settings.invite.earns": { "reward": string; "inviterFish": number; "friendFish": number };
-  "settings.invite.intro": Record<never, never>;
   "settings.invite.label": Record<never, never>;
   "settings.invite.loadFailed": Record<never, never>;
   "settings.invite.loading": Record<never, never>;
@@ -1586,10 +1566,8 @@ export type MessageParams = {
   "settings.language.label": Record<never, never>;
   "settings.language.system": Record<never, never>;
   "settings.licenses.label": Record<never, never>;
-  "settings.licenses.summary": { "packages": number };
   "settings.lock.label": Record<never, never>;
   "settings.logout": Record<never, never>;
-  "settings.logout.explain": Record<never, never>;
   "settings.logoutAll": Record<never, never>;
   "settings.logoutAll.confirm.body": Record<never, never>;
   "settings.logoutAll.confirm.close": Record<never, never>;
@@ -1604,7 +1582,6 @@ export type MessageParams = {
   "settings.notifications.label": Record<never, never>;
   "settings.notifications.notAsked": Record<never, never>;
   "settings.notifications.someOn": { "on": number; "off": number };
-  "settings.open": Record<never, never>;
   "settings.photoDescriptions.explain": Record<never, never>;
   "settings.photoDescriptions.hint.body": Record<never, never>;
   "settings.photoDescriptions.hint.close": Record<never, never>;
@@ -1613,7 +1590,6 @@ export type MessageParams = {
   "settings.photoDescriptions.label": Record<never, never>;
   "settings.photoDescriptions.notShown": Record<never, never>;
   "settings.photoDescriptions.show": Record<never, never>;
-  "settings.photoDescriptions.showHint": Record<never, never>;
   "settings.photoDescriptions.shown": Record<never, never>;
   "settings.photoDescriptions.tell.face": Record<never, never>;
   "settings.photoDescriptions.tell.objects": Record<never, never>;
@@ -1639,7 +1615,6 @@ export type MessageParams = {
   "settings.theme.system": Record<never, never>;
   "settings.theme.withContrast": { "theme": string };
   "settings.title": Record<never, never>;
-  "settings.version.commit": { "commit": string };
   "settings.version.label": Record<never, never>;
   "signIn.agreements.research": Record<never, never>;
   "signIn.agreements.title": Record<never, never>;
@@ -1663,7 +1638,6 @@ export type MessageParams = {
   "signIn.lock.body": Record<never, never>;
   "signIn.lock.title": Record<never, never>;
   "signIn.opening": Record<never, never>;
-  "signIn.paused.body": Record<never, never>;
   "signIn.paused.title": Record<never, never>;
   "signIn.title": Record<never, never>;
   "signIn.tryAgain": Record<never, never>;

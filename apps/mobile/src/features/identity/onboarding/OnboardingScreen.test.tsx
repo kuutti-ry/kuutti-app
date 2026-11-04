@@ -401,7 +401,7 @@ describe("OnboardingScreen", () => {
     expect(screen.getByLabelText("Invitation code")).toBeTruthy();
     expect(
       screen.getByText(
-        "The code earns you a fish and your friend a fish once your profile is complete. A fish is a like that says a little more.",
+        "The code earns you a fish and your friend a fish once your profile is complete.",
       ),
     ).toBeTruthy();
     checkA11y();
@@ -446,12 +446,9 @@ describe("OnboardingScreen", () => {
   it.each([
     [
       { inviterFish: 1, friendFish: 1 },
-      "The code earns you a fish and your friend a fish once your profile is complete. A fish is a like that says a little more.",
+      "The code earns you a fish and your friend a fish once your profile is complete.",
     ],
-    [
-      { inviterFish: 0, friendFish: 2 },
-      "The code earns you 2 fish once your profile is complete. A fish is a like that says a little more.",
-    ],
+    [{ inviterFish: 0, friendFish: 2 }, "The code earns you 2 fish once your profile is complete."],
   ])(
     "says at the step what the reward %j read from the API earns (#503)",
     async (reward, words) => {
@@ -469,11 +466,11 @@ describe("OnboardingScreen", () => {
     await show(<OnboardingScreen />);
     await waitFor(() => expect(screen.getByText("Did a friend invite you?")).toBeTruthy());
     expect(screen.getByLabelText("Invitation code")).toBeTruthy();
-    expect(screen.queryByText(/says a little more/)).toBeNull();
+    expect(screen.queryByText(/^The code earns/)).toBeNull();
     checkA11y();
   });
 
-  it("takes a code that works, thanks the person, and Continue goes on to the name (#107)", async () => {
+  it("takes a code that works, says it is in, and Continue goes on to the name (#107)", async () => {
     const { server, calls } = fakeApi({ redeemable: true });
     server.consents.push(consented("terms"), consented("privacy"));
     await show(<OnboardingScreen />);
@@ -483,11 +480,7 @@ describe("OnboardingScreen", () => {
     expect(calls.filter((c) => c.path === "/invitations/redeem")).toEqual([
       { method: "POST", path: "/invitations/redeem", body: { code: "abcde-fghjk" } },
     ]);
-    expect(
-      screen.getByText(
-        "The code is in. Your friend's invitation counts once your profile is complete.",
-      ),
-    ).toBeTruthy();
+    expect(screen.getByText("The code is in.")).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Skip" })).toBeNull();
     checkA11y();
     await press(screen.getByRole("button", { name: "Continue" }));

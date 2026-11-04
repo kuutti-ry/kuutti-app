@@ -39,26 +39,31 @@ appId: fi.kuutti.app
       # once the list grew (#107's Invitations row did), and the flows that
       # test the row itself scroll to it. The list brings the opened row into
       # sight; the scroll is for a list still settling, to the line under Log
-      # out, which puts the whole button in sight (the row is the list's
+      # out everywhere, which puts both buttons in sight (the row is the list's
       # foot, where nothing can be centred), and the list's own scroll ends
-      # before the tap. The row says when there is no session.
+      # before the tap. The row is there only with a session (#581): a session
+      # the reset erased leaves no line to find, so the scroll is optional; it
+      # keeps the minute a scroll has elsewhere for a slow emulator, and that
+      # case, the first flow after a reset at most, spends it. The tap below
+      # asks for the button itself.
       - openLink: kuutti://settings?open=device
       - extendedWaitUntil:
           visible: "Settings|Asetukset|Inställningar"
           timeout: 15000
       - scrollUntilVisible:
-          element: "This phone only\\..*|Vain tämä puhelin\\..*|Bara den här telefonen\\..*|No session on this device\\.|Tällä laitteella ei ole istuntoa\\.|Ingen session på den här enheten\\."
+          element: "For a lost or lent phone\\.|Kadonnutta tai lainattua puhelinta varten\\.|För en borttappad eller utlånad telefon\\."
           direction: DOWN
           timeout: 60000
+          optional: true
       - waitForAnimationToEnd
-      # A session the reset erased is already gone: Settings says so and has no button.
+      # A session the reset erased is already gone: Settings has no row and no button.
       - runFlow:
           when:
             visible: "Log out|Kirjaudu ulos|Logga ut"
           commands:
             - tapOn: "Log out|Kirjaudu ulos|Logga ut"
-      # Opened over an onboarding step, Settings stays on screen after the logout
-      # ("No session on this device"): the root route is the sign-in screen, or
+      # Opened over an onboarding step, Settings stays on screen after the
+      # logout, its account rows gone: the root route is the sign-in screen, or
       # on a phone that has not recorded the current wordings the screens
       # before the bank (#418), which bank-login.yaml taps through.
       - openLink: kuutti://

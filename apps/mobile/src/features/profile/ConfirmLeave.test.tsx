@@ -1,6 +1,7 @@
 import { act, cleanup, fireEvent, screen } from "@testing-library/react-native";
 import { useState } from "react";
 import { Pressable, Text } from "react-native";
+import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
 import { renderWithTheme } from "@/test/render";
 import { ConfirmLeaveDialog, holdLinkWhileUnsaved, useConfirmLeave } from "./ConfirmLeave";
 
@@ -131,7 +132,6 @@ describe("useConfirmLeave", () => {
     expect(held).toBeInstanceOf(Promise);
     expect(screen.getByText("A asks")).toBeTruthy();
     expect(screen.getByText("Leave without saving?")).toBeTruthy();
-    expect(screen.getByText("Your changes are not saved yet.")).toBeTruthy();
     await press("Leave without saving");
     await expect(held).resolves.toBe("kuutti://");
     expect(screen.getByText("A is quiet")).toBeTruthy();
@@ -240,18 +240,27 @@ describe("ConfirmLeaveDialog", () => {
     <ConfirmLeaveDialog asking keep={jest.fn()} leave={jest.fn()} reason={reason} />
   );
 
-  it("says why nothing was saved in place of the unsaved line, where it is given one", async () => {
+  /** The dialog's texts, in order. */
+  const drawn = () => screen.queryAllByText(/./).map((node) => node.props.children);
+
+  it("says why nothing was saved between its title and its buttons, where it is given a reason", async () => {
     await renderWithTheme(dialog("That has an e-mail address in it."));
-    expect(screen.getByText("Leave without saving?")).toBeTruthy();
-    expect(screen.getByText("That has an e-mail address in it.")).toBeTruthy();
-    expect(screen.queryByText("Your changes are not saved yet.")).toBeNull();
+    expect(drawn()).toEqual([
+      "Leave without saving?",
+      "That has an e-mail address in it.",
+      "Keep editing",
+      "Leave without saving",
+    ]);
     expect(screen.getByRole("button", { name: "Keep editing" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Leave without saving" })).toBeTruthy();
   });
 
-  it("says that something is unsaved where it is given no reason", async () => {
+  it("is its title and its two buttons alone where it is given no reason, the title saying it all (#581)", async () => {
     await renderWithTheme(dialog());
-    expect(screen.getByText("Your changes are not saved yet.")).toBeTruthy();
+    expect(drawn()).toEqual(["Leave without saving?", "Keep editing", "Leave without saving"]);
+    expect(pressables(screen.toJSON() as HostNode).flatMap((node) => a11yProblems(node))).toEqual(
+      [],
+    );
   });
 
   it("shows nothing while it is not asking", async () => {

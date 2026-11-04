@@ -265,16 +265,9 @@ profile.saving:
 
 profile.discard.title:
   en: Leave without saving?
-  description: "Title of the dialog shown when leaving a profile section did not save (#227): a refusal or a failure; the reason is the dialog's text."
+  description: "Title of the dialog shown when leaving a profile section did not save (#227): a refusal or a failure; the reason is the dialog's text. On the later questions and in Settings, with nothing refused, the title stands alone (#581)."
   fi: Poistutaanko tallentamatta?
   sv: Lämna utan att spara?
-  machine: { fi: true, sv: true }
-
-profile.discard.unsaved:
-  en: "Your changes are not saved yet."
-  description: "Text of the leave-without-saving dialog on the later questions and on Settings: the person is leaving with changes they have not saved."
-  fi: "Muutoksiasi ei ole vielä tallennettu."
-  sv: "Dina ändringar är inte sparade än."
   machine: { fi: true, sv: true }
 
 profile.discard.keep:
@@ -1010,13 +1003,6 @@ profile.later.next:
   description: "Button that saves the answer and moves to the next later screen (#148)."
   fi: "Tallenna ja jatka"
   sv: "Spara och fortsätt"
-  machine: { fi: true, sv: true }
-
-profile.later.done:
-  en: "That is everything. Thank you."
-  description: "Said after the last later screen (#148)."
-  fi: "Siinä kaikki. Kiitos."
-  sv: "Det var allt. Tack."
   machine: { fi: true, sv: true }
 
 profile.later.open:
@@ -3073,13 +3059,6 @@ legal.special_category.summary:
   fi: "LUONNOS: Se, kenen seuraa etsit, puolueet, joita voisit äänestää, ja uskontosi ovat erityisiä henkilötietoryhmiä. Jos sanot kyllä, Kuutti tallentaa näihin kysymyksiin antamasi vastaukset: kenen seuraa etsit yhdistämistä varten ja, yhdessä kaikkien muiden vastausten kanssa laskettuna, etusivun osuuksia varten; omaa vastaustasi ei näytetä kenellekään; puolueet ja uskonnon kortillasi, jos päätät täyttää ne. Mikään niistä ei koskaan päädy lokiin eikä tutkimustapahtumaan, ja voit perua tämän suostumuksen milloin tahansa, jolloin vastaukset poistetaan. Ilman kyllä-vastaustasi nämä kysymykset jäävät vastaamatta."
   consent_version: "2026-11-draft-3"
 
-settings.open:
-  en: Settings
-  description: Screen-reader label of the icon button that opens the settings sheet (non-production builds).
-  fi: Asetukset
-  sv: Inställningar
-  machine: { fi: true, sv: true }
-
 settings.title:
   en: Settings
   description: "Title of the settings list."
@@ -3087,13 +3066,6 @@ settings.title:
   sv: Inställningar
   slangi: Säädöt
   machine: { fi: true, sv: true, slangi: true }
-
-settings.close:
-  en: Close settings
-  description: Screen-reader label of the close button of the settings sheet.
-  fi: Sulje asetukset
-  sv: Stäng inställningarna
-  machine: { fi: true, sv: true }
 
 settings.theme.label:
   en: Theme
@@ -3725,13 +3697,6 @@ signIn.paused.title:
   sv: "Ditt konto är på paus"
   machine: { fi: true, sv: true }
 
-signIn.paused.body:
-  en: "Sign in with your bank whenever you want to come back. Everything is as you left it."
-  description: "Sign-in screen, under the break card's title."
-  fi: "Kirjaudu pankkitunnuksilla, kun haluat palata. Kaikki on niin kuin sen jätit."
-  sv: "Logga in med din bank när du vill komma tillbaka. Allt är som du lämnade det."
-  machine: { fi: true, sv: true }
-
 signIn.agreements.title:
   en: "Before you sign in"
   description: "Heading of the screens before the bank login (#418, ADR-010 §15): first the norms with the terms and the privacy summary, which must be accepted before the bank button can be reached; then the research question, which never blocks."
@@ -3915,10 +3880,10 @@ lock.bank.explain:
   machine: { fi: true, sv: true }
 
 lock.settings.explain:
-  en: "Lock Kuutti on this phone, so that somebody else holding it cannot open your matches and conversations. The lock stays on this phone, and logging out turns it off."
+  en: "The lock stays on this phone, and logging out turns it off."
   description: "The lock's settings screen and its offer among the later screens, the paragraph at the top (#418, ADR-045)."
-  fi: "Lukitse Kuutti tällä puhelimella, jotta kukaan muu puhelinta pitelevä ei pääse matcheihisi ja keskusteluihisi. Lukitus koskee vain tätä puhelinta, ja uloskirjautuminen poistaa sen."
-  sv: "Lås Kuutti på den här telefonen, så att ingen annan som håller i den kan öppna dina matcher och samtal. Låset gäller bara den här telefonen, och när du loggar ut stängs det av."
+  fi: "Lukitus koskee vain tätä puhelinta, ja uloskirjautuminen poistaa sen."
+  sv: "Låset gäller bara den här telefonen, och när du loggar ut stängs det av."
   machine: { fi: true, sv: true }
 
 lock.settings.biometrics:
@@ -3929,17 +3894,17 @@ lock.settings.biometrics:
   machine: { fi: true, sv: true }
 
 lock.settings.biometricsMissing:
-  en: "This phone has no face or fingerprint unlock that Kuutti can use. A passcode works without one."
+  en: "This phone has no face or fingerprint unlock that Kuutti can use."
   description: "The lock's settings, instead of the biometrics switch when the phone has none Kuutti can use (#418, #464): none enrolled, or a face that unlocks only the phone itself (an Android class 1 face). An iPhone that keeps Face ID from Kuutti has lock.settings.biometricsDenied instead (#505)."
-  fi: "Tässä puhelimessa ei ole kasvojen- tai sormenjäljentunnistusta, jota Kuutti voi käyttää. Pääsykoodi toimii ilman sitä."
-  sv: "Den här telefonen har ingen upplåsning med ansikte eller fingeravtryck som Kuutti kan använda. En lösenkod fungerar utan."
+  fi: "Tässä puhelimessa ei ole kasvojen- tai sormenjäljentunnistusta, jota Kuutti voi käyttää."
+  sv: "Den här telefonen har ingen upplåsning med ansikte eller fingeravtryck som Kuutti kan använda."
   machine: { fi: true, sv: true }
 
 lock.settings.biometricsDenied:
-  en: "This iPhone does not let Kuutti use Face ID. You can allow it in the phone's settings. A passcode works without it."
+  en: "This iPhone does not let Kuutti use Face ID."
   description: "The lock's settings and its offer, on an iPhone only, instead of the biometrics switch when iOS answers that Face ID is not available to Kuutti (#505): after Don't Allow at iOS's question, with Kuutti's Face ID switch off in the iPhone's settings, and now and then for neither, so the words never say the person refused it. The button 'Open the phone's settings' follows."
-  fi: "Tämä iPhone ei anna Kuutin käyttää Face ID:tä. Voit sallia sen puhelimen asetuksista. Pääsykoodi toimii ilman sitä."
-  sv: "Den här iPhonen låter inte Kuutti använda Face ID. Du kan tillåta det i telefonens inställningar. En lösenkod fungerar utan."
+  fi: "Tämä iPhone ei anna Kuutin käyttää Face ID:tä."
+  sv: "Den här iPhonen låter inte Kuutti använda Face ID."
   machine: { fi: true, sv: true }
 
 lock.settings.biometricsFailed:
@@ -3979,7 +3944,7 @@ lock.settings.removePasscode:
 
 lock.settings.passcodeSet:
   en: "A passcode is set."
-  description: "The lock's settings, said when a passcode was saved and shown while one is set (#418)."
+  description: "Said to a screen reader as a passcode is saved, never drawn (#418, #581): Change the passcode and Remove the passcode say to the eye that one is set."
   fi: "Pääsykoodi on asetettu."
   sv: "En lösenkod är vald."
   machine: { fi: true, sv: true }
@@ -4003,13 +3968,6 @@ lock.settings.graceMinutes:
   description: "The lock's settings, a choice of how many minutes in the background before the app locks again (#418)."
   fi: "{minutes, plural, one {# minuutti} other {# minuuttia}}"
   sv: "{minutes, plural, one {# minut} other {# minuter}}"
-  machine: { fi: true, sv: true }
-
-lock.settings.always:
-  en: "Kuutti always locks when it starts."
-  description: "The lock's settings, under the background choices (#418)."
-  fi: "Kuutti lukittuu aina käynnistyessään."
-  sv: "Kuutti låses alltid när den startar."
   machine: { fi: true, sv: true }
 
 lock.offer.title:
@@ -4119,7 +4077,7 @@ settings.group.account:
 
 settings.session.none:
   en: No session on this device.
-  description: "Settings, shown on a screen whose setting needs a session when the device is not signed in (#287): this device, a consent, the e-mail, the account."
+  description: "I found someone, shown when the device is not signed in (#287, #581): the one screen of Settings that needs a session and can still be reached without one, by its address."
   fi: Tällä laitteella ei ole istuntoa.
   sv: Ingen session på den här enheten.
   machine: { fi: true, sv: true }
@@ -4138,18 +4096,11 @@ settings.logoutAll:
   sv: Logga ut överallt
   machine: { fi: true, sv: true }
 
-settings.logout.explain:
-  en: "This phone only. You log in again with your bank."
-  description: "Under Log out in Settings › Logging out (#511, #35)."
-  fi: "Vain tämä puhelin. Kirjaudut uudelleen pankkitunnuksilla."
-  sv: "Bara den här telefonen. Du loggar in igen med din bank."
-  machine: { fi: true, sv: true }
-
 settings.logoutAll.explain:
-  en: "Every phone logged in as you, this one too: for a lost or lent phone."
+  en: "For a lost or lent phone."
   description: "Under Log out everywhere in Settings › Logging out (#511, #35)."
-  fi: "Kaikki puhelimet, joilla olet kirjautuneena, myös tämä: kadonnutta tai lainattua puhelinta varten."
-  sv: "Alla telefoner där du är inloggad, även den här: för en borttappad eller utlånad telefon."
+  fi: "Kadonnutta tai lainattua puhelinta varten."
+  sv: "För en borttappad eller utlånad telefon."
   machine: { fi: true, sv: true }
 
 settings.logoutAll.confirm.title:
@@ -4378,13 +4329,6 @@ onboarding.consents.binding:
   description: "Shown above the legal texts in every language but Finnish (TD-17)."
   fi: "Suomenkielinen teksti on sitova; tämä on käännös."
   sv: "Den finska texten är den som gäller; det här är en översättning."
-  machine: { fi: true, sv: true }
-
-onboarding.consents.version:
-  en: "Version {version}"
-  description: "The consent version under each legal text; {version} is the consent_version string."
-  fi: "Versio {version}"
-  sv: "Version {version}"
   machine: { fi: true, sv: true }
 
 onboarding.consents.fullText:
@@ -5713,99 +5657,79 @@ photos.description.face.facialHair:
 # --- The Photo descriptions setting and the one-time screen-reader hint (#296 part 3) ---
 
 settings.decisionButtons.label:
-  en: "Decision buttons"
+  en: "Like and Pass"
   description: "Settings, title of the row in Appearance and language and of its screen (#82): where Like and Pass sit on today's round, for the right hand or the left, one-handed mode, and the marks they carry (#520)."
-  fi: "Valintapainikkeet"
-  sv: "Valknappar"
-  machine: { fi: true, sv: true }
-
-settings.decisionButtons.explain:
-  en: "Where Like and Pass sit when you go through people. Each keeps its own word and shape wherever it is."
-  description: "Decision buttons screen, its first line (#82): what the setting moves, and that the two buttons stay told apart by word and shape, never by colour or place alone."
-  fi: "Missä Tykkää ja Ohita ovat, kun katsot ihmisiä. Kummallakin on aina oma sanansa ja muotonsa, missä se onkin."
-  sv: "Var Gilla och Hoppa över finns när du går igenom människor. Båda behåller sitt eget ord och sin form var de än är."
-  machine: { fi: true, sv: true }
+  fi: "Tykkää ja Ohita"
+  sv: "Gilla och Hoppa över"
+  slangi: "Digaan ja Skippaan"
+  machine: { fi: true, sv: true, slangi: true }
 
 settings.decisionButtons.hand:
   en: "Which hand"
-  description: "Decision buttons screen, the name of the radio group of the two hands (#82), heard by a screen reader."
+  description: "Like and Pass screen, the name of the radio group of the two hands (#82), heard by a screen reader."
   fi: "Kumpi käsi"
   sv: "Vilken hand"
   machine: { fi: true, sv: true }
 
 settings.decisionButtons.right:
   en: "Right hand"
-  description: "Decision buttons screen, a choice (#82): Pass at the left and Like at the right, the default. Also the summary of the Settings row."
+  description: "Like and Pass screen, a choice (#82): Pass at the left and Like at the right, the default. Also the summary of the Settings row."
   fi: "Oikea käsi"
   sv: "Höger hand"
   machine: { fi: true, sv: true }
 
 settings.decisionButtons.left:
   en: "Left hand"
-  description: "Decision buttons screen, a choice (#82): Like at the left and Pass at the right. Also the summary of the Settings row."
+  description: "Like and Pass screen, a choice (#82): Like at the left and Pass at the right. Also the summary of the Settings row."
   fi: "Vasen käsi"
   sv: "Vänster hand"
   machine: { fi: true, sv: true }
 
 settings.decisionButtons.oneHanded:
   en: "One-handed"
-  description: "Decision buttons screen, the switch's label (#82): the round's buttons in one column on the chosen hand's side."
+  description: "Like and Pass screen, the switch's label (#82): the round's buttons in one column on the chosen hand's side."
   fi: "Yhdellä kädellä"
   sv: "Med en hand"
   machine: { fi: true, sv: true }
 
-settings.decisionButtons.oneHandedHint:
-  en: "Undo, the star, the fish, Later, Pass and Like in one column at the bottom on your hand's side, within your thumb's reach."
-  description: "Decision buttons screen, under the one-handed switch (#82): what it does. The fish is the app's word for the super-like (ADR-039); the star is a private mark to come back to somebody later (#575), no decision and no rating."
-  fi: "Kumoa, tähti, kala, Myöhemmin, Ohita ja Tykkää yhdessä sarakkeessa alhaalla kätesi puolella, peukalon ulottuvilla."
-  sv: "Ångra, stjärnan, fisken, Senare, Hoppa över och Gilla i en kolumn längst ner på din hands sida, inom räckhåll för tummen."
-  machine: { fi: true, sv: true }
-
 settings.decisionButtons.style:
   en: "Button style"
-  description: "Decision buttons screen, the name of the radio group of the marks Like and Pass carry (#520), heard by a screen reader."
+  description: "Like and Pass screen, in sight over the marks Like and Pass carry and heard as their radio group's name (#520, #581)."
   fi: "Painikkeiden tyyli"
   sv: "Knappstil"
   machine: { fi: true, sv: true }
 
 settings.decisionButtons.style.kuutti:
   en: "Kuutti"
-  description: "Decision buttons screen, a choice (#520), the default: Like and Pass carry the app's own heart and cross. The app's name."
+  description: "Like and Pass screen, a choice (#520), the default: Like and Pass carry the app's own heart and cross. The app's name."
   fi: "Kuutti"
   sv: "Kuutti"
   machine: { fi: true, sv: true }
 
 settings.decisionButtons.style.shapes:
   en: "✕ and ○"
-  description: "Decision buttons screen, a choice (#520): Like carries the ✕ and Pass the ○ of a game controller, in that order. Keep the two marks as they are. It names no console and no maker, on purpose (.claude/rules/mobile.md)."
+  description: "Like and Pass screen, a choice (#520): Like carries the ✕ and Pass the ○ of a game controller, in that order. Keep the two marks as they are. It names no console and no maker, on purpose (.claude/rules/mobile.md)."
   fi: "✕ ja ○"
   sv: "✕ och ○"
   machine: { fi: true, sv: true }
 
 settings.decisionButtons.style.shapes.spoken:
   en: "Cross and circle"
-  description: "Decision buttons screen, what a screen reader says for the choice shown as ✕ and ○ (#520): the two marks in words."
+  description: "Like and Pass screen, what a screen reader says for the choice shown as ✕ and ○ (#520): the two marks in words."
   fi: "Risti ja ympyrä"
   sv: "Kryss och cirkel"
   machine: { fi: true, sv: true }
 
 settings.decisionButtons.style.letters:
   en: "A and B"
-  description: "Decision buttons screen, a choice (#520): Like carries the A and Pass the B of a game controller, in that order. Keep the two letters as they are, in every language. It names no console and no maker, on purpose (.claude/rules/mobile.md)."
+  description: "Like and Pass screen, a choice (#520): Like carries the A and Pass the B of a game controller, in that order. Keep the two letters as they are, in every language. It names no console and no maker, on purpose (.claude/rules/mobile.md)."
   fi: "A ja B"
   sv: "A och B"
   machine: { fi: true, sv: true }
 
-settings.decisionButtons.styleHint:
-  en: "Like and Pass can carry a game controller's marks in place of their icons: the first mark is Like, the second Pass. Their words stay."
-  description: "Decision buttons screen, under the style choices (#520): what they do, and which mark is which. The words stay because the mark alone means nothing to anyone who does not play."
-  fi: "Tykkää ja Ohita voivat saada kuvakkeidensa tilalle peliohjaimen merkit: ensimmäinen merkki on Tykkää, toinen Ohita. Sanat pysyvät."
-  sv: "Gilla och Hoppa över kan få en spelkontrolls tecken i stället för sina ikoner: det första tecknet är Gilla, det andra Hoppa över. Orden står kvar."
-  machine: { fi: true, sv: true }
-
 settings.decisionButtons.withOneHanded:
   en: "{hand}, one-handed"
-  description: "Summary of the Decision buttons row while one-handed mode is on (#82); {hand} is the chosen hand's name (settings.decisionButtons.right or .left), in the nominative."
+  description: "Summary of the Like and Pass row while one-handed mode is on (#82); {hand} is the chosen hand's name (settings.decisionButtons.right or .left), in the nominative."
   fi: "{hand}, yhdellä kädellä"
   sv: "{hand}, med en hand"
   machine: { fi: true, sv: true }
@@ -5832,10 +5756,10 @@ settings.photoDescriptions.notShown:
   machine: { fi: true, sv: true }
 
 settings.photoDescriptions.explain:
-  en: "The photo check describes what a sighted viewer sees in a photo: how many people, indoors or outdoors, the setting, a smile or glasses, an activity or an object. A screen reader reads it with each photo, after the owner's own caption. It is automatic and can be wrong."
-  description: "Settings, the Photo descriptions screen, first text (#296): what the descriptions are and that they can be wrong."
-  fi: "Kuvatarkistus kuvailee, mitä näkevä katsoja näkee kuvassa: kuinka monta ihmistä, sisällä vai ulkona, ympäristön, hymyn tai lasit, tekemisen tai esineen. Ruudunlukija lukee kuvauksen jokaisen kuvan kanssa kuvan omistajan oman kuvatekstin jälkeen. Kuvaus on automaattinen ja voi olla väärässä."
-  sv: "Fotokontrollen beskriver vad en seende betraktare ser i ett foto: hur många personer, inomhus eller utomhus, omgivningen, ett leende eller glasögon, en aktivitet eller ett föremål. En skärmläsare läser upp den med varje foto, efter ägarens egen bildtext. Den är automatisk och kan ha fel."
+  en: "The description is automatic and can be wrong."
+  description: "Settings, the Photo descriptions screen, first text (#296, #581): that the descriptions can be wrong, which the screen cannot show by itself."
+  fi: "Kuvaus on automaattinen ja voi olla väärässä."
+  sv: "Beskrivningen är automatisk och kan ha fel."
   machine: { fi: true, sv: true }
 
 settings.photoDescriptions.show:
@@ -5843,13 +5767,6 @@ settings.photoDescriptions.show:
   description: "Settings, the Photo descriptions screen: label of the switch that shows the description as text under each photo on the card, in one's own photos and full size (#296). Off by default."
   fi: Näytä kuvien alla
   sv: Visa under fotona
-  machine: { fi: true, sv: true }
-
-settings.photoDescriptions.showHint:
-  en: "As text under each photo on the card, in your photos and full size."
-  description: "Settings, the Photo descriptions screen, under the Show under photos switch: where the text appears (#296)."
-  fi: "Tekstinä jokaisen kuvan alla kortilla, omissa kuvissasi ja täysikokoisena."
-  sv: "Som text under varje foto på kortet, bland dina foton och i full storlek."
   machine: { fi: true, sv: true }
 
 settings.photoDescriptions.tell.title:
@@ -7426,13 +7343,6 @@ account.export.button:
   sv: Ladda ner mina uppgifter
   machine: { fi: true, sv: true }
 
-account.export.explain:
-  en: A file with everything Kuutti holds about you, and nothing about anyone else.
-  description: Account card, text under the export button.
-  fi: Tiedosto, jossa on kaikki, mitä Kuutti tietää sinusta, eikä mitään kenestäkään muusta.
-  sv: En fil med allt Kuutti har om dig, och inget om någon annan.
-  machine: { fi: true, sv: true }
-
 account.export.working:
   en: Preparing your data…
   description: Account card, while the export is fetched.
@@ -7455,10 +7365,10 @@ account.export.failed:
   machine: { fi: true, sv: true }
 
 account.export.saved:
-  en: Done. The file is where you chose.
+  en: "Done."
   description: "Account card, once the export's file is handed over (#465): saved in the folder the person picked on Android, sent where they chose from the share sheet on iOS, downloaded on the web preview. Not shown when they back out of the picker or the sheet. Read out by the screen reader after the system's sheet closes."
-  fi: Valmis. Tiedosto on nyt siellä, minne sen valitsit.
-  sv: Klart. Filen finns nu där du valde.
+  fi: "Valmis."
+  sv: "Klart."
   machine: { fi: true, sv: true }
 
 account.export.limited:
@@ -7776,13 +7686,6 @@ account.break.title:
   sv: "Ta en paus från Kuutti"
   machine: { fi: true, sv: true }
 
-account.break.intro:
-  en: "A break hides you without deleting anything. Three things happen:"
-  description: "Break screen, the line above the three consequences (#170)."
-  fi: "Tauko piilottaa sinut poistamatta mitään. Kolme asiaa tapahtuu:"
-  sv: "En paus döljer dig utan att något raderas. Tre saker händer:"
-  machine: { fi: true, sv: true }
-
 account.break.hidden:
   en: "Your profile leaves everybody's view. Nobody new sees you while you are away."
   description: "Break screen, the first consequence."
@@ -7854,17 +7757,17 @@ account.foundThem.title:
   machine: { fi: true, sv: true }
 
 account.foundThem.intro:
-  en: "Your answer tells the association whether Kuutti works. It is shown to nobody, and it is counted without your name."
-  description: "\"Löysin hänet\" (#83), above the three choices: why the association asks, and that the answer is counted anonymously (a count by day and reason, ADR-040); no person is shown it, the moderators see totals only. For those in the study the research consent already covers the event. Fits every reason, \"another reason\" too."
-  fi: "Vastauksesi kertoo yhdistykselle, toimiiko Kuutti. Sitä ei näytetä kenellekään, ja se lasketaan ilman nimeäsi."
-  sv: "Ditt svar berättar för föreningen om Kuutti fungerar. Det visas inte för någon, och det räknas utan ditt namn."
+  en: "Your answer is shown to nobody, and it is counted without your name."
+  description: "\"Löysin hänet\" (#83), above the three choices (#581): that the answer is counted anonymously (a count by day and reason, ADR-040); no person is shown it, the moderators see totals only. For those in the study the research consent already covers the event. Fits every reason, \"another reason\" too."
+  fi: "Vastaustasi ei näytetä kenellekään, ja se lasketaan ilman nimeäsi."
+  sv: "Ditt svar visas inte för någon, och det räknas utan ditt namn."
   machine: { fi: true, sv: true }
 
 account.foundThem.unchanged:
-  en: "Nothing changes in the app: your profile, the people you go through and your conversations stay as they are. To step away, take a break or delete your account under Your account."
-  description: "\"Löysin hänet\" (#83): the answer changes nothing (the maintainer, 21/10/2026); stepping away is the break or the deletion, both under Your account (account.title)."
-  fi: "Sovelluksessa mikään ei muutu: profiilisi, ihmiset joita käyt läpi ja keskustelusi pysyvät ennallaan. Jos haluat pitää taukoa tai poistaa tilisi, löydät ne kohdasta Tilisi."
-  sv: "Inget ändras i appen: din profil, människorna du går igenom och dina samtal är kvar som de är. Vill du ta en paus eller radera ditt konto finns det under Ditt konto."
+  en: "Nothing changes in the app."
+  description: "\"Löysin hänet\" (#83): the answer changes nothing (the maintainer, 21/10/2026). Stepping away is the break or the deletion, the two buttons beside I found someone on Your account (account.title, #581)."
+  fi: "Sovelluksessa mikään ei muutu."
+  sv: "Inget ändras i appen."
   machine: { fi: true, sv: true }
 
 account.foundThem.question:
@@ -8004,9 +7907,16 @@ account.email.clear:
 
 account.email.saved:
   en: "Saved."
-  description: "Said after the e-mail is saved or removed (#148)."
+  description: "Said to a screen reader before the code's line after a save, and drawn only with a line saying that no code went (#385, #581): the field, the row's value and Remove say the rest to the eye."
   fi: "Tallennettu."
   sv: "Sparad."
+  machine: { fi: true, sv: true }
+
+account.email.removed:
+  en: "Removed."
+  description: "Said to a screen reader when the address is removed, never drawn (#385, #581): the field empties, Remove goes and the row's value changes. An agent's word, which the maintainer kept (04/11/2026): the table's row S28 calls Saved. the wrong word for a removal."
+  fi: "Poistettu."
+  sv: "Borttagen."
   machine: { fi: true, sv: true }
 
 account.email.invalid:
@@ -8023,25 +7933,11 @@ account.email.failed:
   sv: "Adressen kunde inte sparas. Försök igen."
   machine: { fi: true, sv: true }
 
-account.email.unconfirmed:
-  en: "An address is set, not confirmed yet."
-  description: "Said on the card while an e-mail is set and its code has not been typed (#148, #385); the address itself is in the input."
-  fi: "Osoite on tallennettu, mutta sitä ei ole vielä vahvistettu."
-  sv: "En adress är sparad men inte bekräftad ännu."
-  machine: { fi: true, sv: true }
-
-account.email.confirmed:
-  en: "An address is set and confirmed."
-  description: "Said on the card once the e-mail's code was typed right (#385)."
-  fi: "Osoite on tallennettu ja vahvistettu."
-  sv: "En adress är sparad och bekräftad."
-  machine: { fi: true, sv: true }
-
 account.email.codeSent:
-  en: "A code is on its way to the address. It works until {time}."
-  description: "Said on the card while a code waits (#385, ADR-043); {time} is when it stops working, as hours and minutes in the person's language."
-  fi: "Koodi on matkalla osoitteeseen. Se toimii kello {time} asti."
-  sv: "En kod är på väg till adressen. Den gäller till klockan {time}."
+  en: "A code is on its way to the address."
+  description: "The e-mail row (#385, ADR-043 §3, #581): over the code's field while one waits, and under the buttons after Send a new code, as the only answer to that press. No time: a late code is refused in words, with the way to a new one."
+  fi: "Koodi on matkalla osoitteeseen."
+  sv: "En kod är på väg till adressen."
   machine: { fi: true, sv: true }
 
 account.email.codeLabel:
@@ -9673,25 +9569,11 @@ settings.version.label:
   sv: "Version"
   machine: { fi: true, sv: true }
 
-settings.version.commit:
-  en: "Build {commit}"
-  description: "Summary of the version row: the app's git commit, seven characters (#287)."
-  fi: "Koontiversio {commit}"
-  sv: "Bygge {commit}"
-  machine: { fi: true, sv: true }
-
 settings.licenses.label:
   en: "Licences"
   description: "Title of the row that opens the packages' licences (#287)."
   fi: "Lisenssit"
   sv: "Licenser"
-  machine: { fi: true, sv: true }
-
-settings.licenses.summary:
-  en: "{packages, plural, one {# package} other {# packages}} this build is made of"
-  description: "Summary of the licences row (#287); {packages} is how many packages the build bundles."
-  fi: "{packages, plural, one {# paketti, josta tämä koontiversio koostuu} other {# pakettia, joista tämä koontiversio koostuu}}"
-  sv: "{packages, plural, one {# paket} other {# paket}} som det här bygget består av"
   machine: { fi: true, sv: true }
 
 settings.email.label:
@@ -9702,10 +9584,10 @@ settings.email.label:
   machine: { fi: true, sv: true }
 
 settings.email.none:
-  en: "None given"
-  description: "Value of the E-mail row in Settings while no address is kept (#511, #376): the row's second line and what a screen reader hears as its value."
-  fi: "Ei annettu"
-  sv: "Ingen angiven"
+  en: "Add your e-mail"
+  description: "Value of the E-mail row in Settings while no address is kept (#511, #376): what to do rather than that there is none (the maintainer, 04/11/2026, #581). The row's second line and what a screen reader hears as its value."
+  fi: "Lisää sähköpostisi"
+  sv: "Lägg till din e-post"
   machine: { fi: true, sv: true }
 
 settings.email.unconfirmed:
@@ -9723,10 +9605,10 @@ settings.contacts.label:
   machine: { fi: true, sv: true }
 
 settings.contacts.none:
-  en: "None kept"
-  description: "Value of the Ways to reach you row in Settings while no contact is kept (#511, #376)."
-  fi: "Ei yhtään tallennettu"
-  sv: "Inget sparat"
+  en: "Add a way to reach you"
+  description: "Value of the Ways to reach you row in Settings while no contact is kept (#511, #376): what to do rather than that there is none (the maintainer, 04/11/2026, #581; these words are an agent's)."
+  fi: "Lisää, mistä sinut tavoittaa"
+  sv: "Lägg till hur man når dig"
   machine: { fi: true, sv: true }
 
 settings.contacts.separator:
@@ -9765,29 +9647,29 @@ settings.notifications.someOn:
   machine: { fi: true, sv: true }
 
 notifications.intro:
-  en: "What you choose here decides what Kuutti tells your phones. A notification says only that there is something, never what or from whom. Each kind is on until you switch it off."
-  description: "The Notifications screen (#176, ADR-032; #102, ADR-055), its opening line: the choices are stored on the server and every phone of the person's follows them; a push carries no text and no name; a kind never touched is on. Plain and true."
-  fi: "Valintasi ratkaisevat, mistä Kuutti kertoo puhelimillesi. Ilmoitus kertoo vain, että jotain on, ei koskaan mitä tai keneltä. Jokainen laji on päällä, kunnes kytket sen pois."
-  sv: "Det du väljer här avgör vad Kuutti berättar för dina telefoner. En avisering säger bara att det finns något, aldrig vad eller från vem. Varje slag är på tills du stänger av det."
+  en: "A notification says that there is a new message or a new match, never what it says or from whom."
+  description: "The Notifications panel's one line (#176, ADR-032; #102, ADR-055; #581): what a lock screen will show, which cannot be seen until it has happened and which somebody else may read. A push says which kind and nothing more: no text, no name."
+  fi: "Ilmoitus kertoo, että sinulle on uusi viesti tai uusi mätsi, ei koskaan mitä siinä lukee tai keneltä se on."
+  sv: "En avisering säger att det finns ett nytt meddelande eller en ny matchning, aldrig vad det står eller från vem."
   machine: { fi: true, sv: true }
 
 notifications.phone.allowed:
   en: "This phone shows Kuutti's notifications."
-  description: "The Notifications screen (#102, ADR-055 §9), above the switches: the phone's own setting lets Kuutti notify. A plain statement of the state."
+  description: "Said to a screen reader when the phone's answer changes, never drawn (#102, ADR-055 §9, #581). This phone lets Kuutti notify it."
   fi: "Tämä puhelin näyttää Kuutin ilmoitukset."
   sv: "Den här telefonen visar Kuuttis aviseringar."
   machine: { fi: true, sv: true }
 
 notifications.phone.denied:
   en: "This phone does not show Kuutti's notifications. You can allow them in the phone's settings."
-  description: "The Notifications screen (#102, ADR-055 §9): the phone's own setting refuses Kuutti's notifications; a button to the phone's settings follows. The app never asks again by itself."
+  description: "Said to a screen reader when the phone's answer changes, never drawn (#102, ADR-055 §9, #581). This phone refuses Kuutti's notifications; the row's value says so and the button to the phone's settings stands first in the panel."
   fi: "Tämä puhelin ei näytä Kuutin ilmoituksia. Voit sallia ne puhelimen asetuksista."
   sv: "Den här telefonen visar inte Kuuttis aviseringar. Du kan tillåta dem i telefonens inställningar."
   machine: { fi: true, sv: true }
 
 notifications.phone.undetermined:
   en: "This phone has not been asked yet whether Kuutti may notify it."
-  description: "The Notifications screen (#102, ADR-055 §9): the phone has never shown its question; a button that shows it follows. On iOS the phone's settings have no Notifications row for the app until it has."
+  description: "Said to a screen reader when the phone's answer changes, never drawn (#102, ADR-055 §9, #581). This phone has not been asked; the row's value says so and Allow notifications stands first in the panel."
   fi: "Tältä puhelimelta ei ole vielä kysytty, saako Kuutti lähettää sille ilmoituksia."
   sv: "Den här telefonen har inte frågats än om Kuutti får skicka aviseringar till den."
   machine: { fi: true, sv: true }
@@ -9821,10 +9703,10 @@ notifications.ask.heading:
   machine: { fi: true, sv: true }
 
 notifications.ask.body:
-  en: "Kuutti can tell this phone when someone likes you back and when a message arrives. A notification says only that there is something, never what or from whom. You choose which kinds in Settings."
+  en: "Kuutti can tell this phone when someone likes you back and when a message arrives. A notification says that there is a new message or a new match, never what it says or from whom. You choose which kinds in Settings."
   description: "The home screen's offer of notifications (#102, ADR-055 §9), the reason in words, under its heading: the two pushes, what a push never carries, and where the kinds are chosen. Calm; no promise of more."
-  fi: "Kuutti voi kertoa tälle puhelimelle, kun joku tykkää sinusta takaisin ja kun saat viestin. Ilmoitus kertoo vain, että jotain on, ei koskaan mitä tai keneltä. Lajit valitset asetuksista."
-  sv: "Kuutti kan berätta för den här telefonen när någon gillar dig tillbaka och när ett meddelande kommer. En avisering säger bara att det finns något, aldrig vad eller från vem. Du väljer slagen i inställningarna."
+  fi: "Kuutti voi kertoa tälle puhelimelle, kun joku tykkää sinusta takaisin ja kun saat viestin. Ilmoitus kertoo, että sinulle on uusi viesti tai uusi mätsi, ei koskaan mitä siinä lukee tai keneltä se on. Lajit valitset asetuksista."
+  sv: "Kuutti kan berätta för den här telefonen när någon gillar dig tillbaka och när ett meddelande kommer. En avisering säger att det finns ett nytt meddelande eller en ny matchning, aldrig vad det står eller från vem. Du väljer slagen i inställningarna."
   machine: { fi: true, sv: true }
 
 notifications.ask.decline:
@@ -9883,25 +9765,11 @@ notifications.kind.message.label:
   sv: "Meddelanden"
   machine: { fi: true, sv: true }
 
-notifications.kind.message.hint:
-  en: "That there is a new message, never what it says or who sent it."
-  description: "The Notifications screen (#176), the line under Messages: a message push carries no text and no name (#102, rule 5)."
-  fi: "Että sinulle on uusi viesti, ei koskaan mitä siinä lukee tai kuka sen lähetti."
-  sv: "Att det finns ett nytt meddelande, aldrig vad det säger eller vem som skickade det."
-  machine: { fi: true, sv: true }
-
 notifications.kind.match.label:
   en: "Matches"
   description: "The Notifications screen (#176), the switch of a new match, which #102's push sends to the person whose earlier like it met."
   fi: "Mätsit"
   sv: "Matchningar"
-  machine: { fi: true, sv: true }
-
-notifications.kind.match.hint:
-  en: "When someone you liked likes you back."
-  description: "The Notifications screen (#176), the line under Matches."
-  fi: "Kun joku, josta tykkäsit, tykkää sinusta takaisin."
-  sv: "När någon du gillade gillar dig tillbaka."
   machine: { fi: true, sv: true }
 
 notifications.kind.moderation.label:
@@ -9912,10 +9780,10 @@ notifications.kind.moderation.label:
   machine: { fi: true, sv: true }
 
 notifications.kind.moderation.hint:
-  en: "About your photos and the reports you made. Nothing is sent to your phones for these yet. A warning to you is shown in the app whatever you choose here."
-  description: "The Notifications screen (#176), the line under Moderators' decisions: the switch will govern a push only, and none is sent yet (#312's, ADR-055 Not done); a warning always appears among the notices on the home screen (ADR-024 §7)."
-  fi: "Kuvistasi ja tekemistäsi ilmoituksista. Näistä ei vielä lähetetä puhelimillesi mitään. Sinulle annettu varoitus näytetään sovelluksessa, valitsitpa tässä mitä tahansa."
-  sv: "Om dina foton och de anmälningar du gjort. Inget skickas till dina telefoner om detta än. En varning till dig visas i appen vad du än väljer här."
+  en: "Nothing is sent to your phones for these yet."
+  description: "Under the Moderators' decisions switch (#176, ADR-032, #581): the one thing the panel cannot show, that nothing reads this switch yet. Goes when something is sent for it."
+  fi: "Näistä ei vielä lähetetä puhelimillesi mitään."
+  sv: "Inget skickas till dina telefoner om detta än."
   machine: { fi: true, sv: true }
 
 notices.title:
@@ -9992,10 +9860,10 @@ settings.invite.label:
   machine: { fi: true, sv: true }
 
 settings.invite.waiting:
-  en: "{waiting, plural, =0 {None waiting to be used} one {One waiting to be used} other {# waiting to be used}}"
-  description: "Value of the Invitations row in Settings once the person may invite (#511, #376): how many invitations they made wait to be used."
-  fi: "{waiting, plural, =0 {Ei yhtään odottamassa} one {Yksi odottaa käyttöä} other {# odottaa käyttöä}}"
-  sv: "{waiting, plural, =0 {Ingen väntar på att användas} one {En väntar på att användas} other {# väntar på att användas}}"
+  en: "{waiting, plural, =0 {Create an invitation} one {One waiting to be used} other {# waiting to be used}}"
+  description: "Value of the Invitations row in Settings once the person may invite (#511, #376): how many invitations they made wait to be used, or, with none, what to do, as the button in the panel says it (the maintainer, 04/11/2026, #581)."
+  fi: "{waiting, plural, =0 {Tee kutsu} one {Yksi odottaa käyttöä} other {# odottaa käyttöä}}"
+  sv: "{waiting, plural, =0 {Skapa en inbjudan} one {En väntar på att användas} other {# väntar på att användas}}"
   machine: { fi: true, sv: true }
 
 settings.invite.loading:
@@ -10012,29 +9880,22 @@ settings.invite.loadFailed:
   sv: "Dina inbjudningar kunde inte laddas."
   machine: { fi: true, sv: true }
 
-settings.invite.intro:
-  en: "Invite a friend with a code. They get the app at kuutti.app, sign in with their bank and type the code before their profile is complete. Each code works once."
-  description: "The Invitations screen, the opening line for a person who may invite (#107, ADR-044 §1, §2): the friend types the code after the bank login, before their profile is complete (ADR-060 §7); single use."
-  fi: "Kutsu ystävä koodilla. Hän lataa sovelluksen osoitteesta kuutti.app, kirjautuu pankkitunnuksillaan ja kirjoittaa koodin ennen kuin hänen profiilinsa on valmis. Jokainen koodi toimii kerran."
-  sv: "Bjud in en vän med en kod. Vännen hämtar appen på kuutti.app, loggar in med sina bankkoder och skriver in koden innan profilen är klar. Varje kod fungerar en gång."
-  machine: { fi: true, sv: true }
-
 settings.invite.earns:
-  en: "{reward, select, both {When a friend you invite finishes their profile, you get {inviterFish, plural, one {a fish} other {# fish}} and your friend gets {friendFish, plural, one {a fish} other {# fish}}. An earned fish is used by itself once your own fish are used up.} inviter {When a friend you invite finishes their profile, you get {inviterFish, plural, one {a fish} other {# fish}}. An earned fish is used by itself once your own fish are used up.} friend {When a friend you invite finishes their profile, your friend gets {friendFish, plural, one {a fish} other {# fish}}.} other {Invitations earn nothing just now, but every friend you bring is welcome.}}"
-  description: "The Invitations screen, what an invitation earns today (#107, ADR-044 §4, §8, #503), from matching_config invitation_reward: reward says which of the two earn, both, inviter, friend, or anything else when neither does; inviterFish and friendFish are their fish. Earned fish wait and are used by themselves once the person's own are used up; never a number of days or a period (tunables)."
-  fi: "{reward, select, both {Kun kutsumasi ystävä saa profiilinsa valmiiksi, saat {inviterFish, plural, one {kalan} other {# kalaa}} ja ystäväsi saa {friendFish, plural, one {kalan} other {# kalaa}}. Ansaittu kala käytetään automaattisesti, kun omat kalasi on käytetty.} inviter {Kun kutsumasi ystävä saa profiilinsa valmiiksi, saat {inviterFish, plural, one {kalan} other {# kalaa}}. Ansaittu kala käytetään automaattisesti, kun omat kalasi on käytetty.} friend {Kun kutsumasi ystävä saa profiilinsa valmiiksi, ystäväsi saa {friendFish, plural, one {kalan} other {# kalaa}}.} other {Kutsut eivät juuri nyt tuo mitään, mutta jokainen tuomasi ystävä on tervetullut.}}"
-  sv: "{reward, select, both {När en vän du bjuder in gör klart sin profil får du {inviterFish, plural, one {en fisk} other {# fiskar}} och din vän får {friendFish, plural, one {en fisk} other {# fiskar}}. En intjänad fisk används automatiskt när dina egna fiskar är slut.} inviter {När en vän du bjuder in gör klart sin profil får du {inviterFish, plural, one {en fisk} other {# fiskar}}. En intjänad fisk används automatiskt när dina egna fiskar är slut.} friend {När en vän du bjuder in gör klart sin profil får din vän {friendFish, plural, one {en fisk} other {# fiskar}}.} other {Inbjudningar ger ingenting just nu, men varje vän du tar med är välkommen.}}"
+  en: "{reward, select, both {When a friend you invite finishes their profile, you get {inviterFish, plural, one {a fish} other {# fish}} and your friend gets {friendFish, plural, one {a fish} other {# fish}}.} inviter {When a friend you invite finishes their profile, you get {inviterFish, plural, one {a fish} other {# fish}}.} other {When a friend you invite finishes their profile, your friend gets {friendFish, plural, one {a fish} other {# fish}}.}}"
+  description: "The Invitations panel, what an invitation earns today (#107, ADR-044 §4, §8, #503, #581), from matching_config invitation_reward: reward says which of the two earn, both, inviter, or the friend alone; inviterFish and friendFish are their fish. Not drawn when neither earns. Never a number of days or a period (tunables)."
+  fi: "{reward, select, both {Kun kutsumasi ystävä saa profiilinsa valmiiksi, saat {inviterFish, plural, one {kalan} other {# kalaa}} ja ystäväsi saa {friendFish, plural, one {kalan} other {# kalaa}}.} inviter {Kun kutsumasi ystävä saa profiilinsa valmiiksi, saat {inviterFish, plural, one {kalan} other {# kalaa}}.} other {Kun kutsumasi ystävä saa profiilinsa valmiiksi, ystäväsi saa {friendFish, plural, one {kalan} other {# kalaa}}.}}"
+  sv: "{reward, select, both {När en vän du bjuder in gör klart sin profil får du {inviterFish, plural, one {en fisk} other {# fiskar}} och din vän får {friendFish, plural, one {en fisk} other {# fiskar}}.} inviter {När en vän du bjuder in gör klart sin profil får du {inviterFish, plural, one {en fisk} other {# fiskar}}.} other {När en vän du bjuder in gör klart sin profil får din vän {friendFish, plural, one {en fisk} other {# fiskar}}.}}"
   machine: { fi: true, sv: true }
 
 settings.invite.notYet:
   en: "You can invite friends once your profile is complete."
-  description: "The Invitations screen for a person whose profile is not complete (#107, ADR-044 §1): no Make an invitation until then."
+  description: "The Invitations screen for a person whose profile is not complete (#107, ADR-044 §1): no Create an invitation until then."
   fi: "Voit kutsua ystäviä, kun profiilisi on valmis."
   sv: "Du kan bjuda in vänner när din profil är klar."
   machine: { fi: true, sv: true }
 
 settings.invite.make:
-  en: "Make an invitation"
+  en: "Create an invitation"
   description: "The Invitations screen, the button that makes a new code (#107, ADR-044 §5). A button in a row: short."
   fi: "Tee kutsu"
   sv: "Skapa en inbjudan"
@@ -10043,14 +9904,14 @@ settings.invite.make:
 
 settings.invite.made:
   en: "Your invitation is ready. Its code is below."
-  description: "The Invitations screen after Make an invitation (#107), said in a live region; the code follows."
+  description: "Said to a screen reader as an invitation is made, never drawn (#107, ADR-044, #581): the code's card appears under the button and comes into sight."
   fi: "Kutsusi on valmis. Sen koodi on alla."
   sv: "Din inbjudan är klar. Koden finns nedan."
   machine: { fi: true, sv: true }
 
 settings.invite.makeFailed:
   en: "The invitation could not be made. Try again."
-  description: "The Invitations screen when Make an invitation failed for a reason the app has no words of its own for (#107)."
+  description: "The Invitations screen when Create an invitation failed for a reason the app has no words of its own for (#107)."
   fi: "Kutsua ei voitu tehdä. Yritä uudelleen."
   sv: "Inbjudan kunde inte skapas. Försök igen."
   machine: { fi: true, sv: true }
@@ -10070,10 +9931,10 @@ settings.invite.code.spoken:
   machine: { fi: true, sv: true }
 
 settings.invite.code.once:
-  en: "Kuutti shows this code only now and keeps no copy of it. Share it with one friend, or write it down."
+  en: "Kuutti shows this code only now. Share it with one friend."
   description: "The Invitations screen, under a code just made (#107, ADR-044 §2): only its hash is kept, so it is never shown again."
-  fi: "Kuutti näyttää tämän koodin vain nyt eikä säilytä siitä kopiota. Jaa se yhdelle ystävälle tai kirjoita se muistiin."
-  sv: "Kuutti visar den här koden bara nu och sparar ingen kopia av den. Dela den med en vän, eller skriv upp den."
+  fi: "Kuutti näyttää tämän koodin vain nyt. Jaa se yhdelle ystävälle."
+  sv: "Kuutti visar den här koden bara nu. Dela den med en vän."
   machine: { fi: true, sv: true }
 
 settings.invite.share:
@@ -10128,10 +9989,10 @@ settings.invite.withdraw.title:
   machine: { fi: true, sv: true }
 
 settings.invite.withdraw.body:
-  en: "Its code stops working at once. A friend who has it can no longer use it."
+  en: "Its code stops working at once."
   description: "The withdraw dialog's text (#107, ADR-044 §5): the invitation is deleted, so its code works no more."
-  fi: "Sen koodi lakkaa toimimasta heti. Ystävä, jolla koodi on, ei voi enää käyttää sitä."
-  sv: "Koden slutar fungera direkt. En vän som har den kan inte längre använda den."
+  fi: "Sen koodi lakkaa toimimasta heti."
+  sv: "Koden slutar fungera direkt."
   machine: { fi: true, sv: true }
 
 settings.invite.withdraw.cancel:
@@ -10159,7 +10020,7 @@ settings.invite.withdraw.close:
 
 settings.invite.withdrawn:
   en: "The invitation was withdrawn. Its code no longer works."
-  description: "The Invitations screen after a withdrawal (#107), said in a live region; the invitation has left the list."
+  description: "Said to a screen reader as an invitation is withdrawn (#107, ADR-044, #581): it leaves the list, the row's value changes, and the dialog said what follows. Drawn only when the list could not be read again, so the invitation still stands there."
   fi: "Kutsu peruttiin. Sen koodi ei enää toimi."
   sv: "Inbjudan drogs tillbaka. Koden fungerar inte längre."
   machine: { fi: true, sv: true }
@@ -10169,13 +10030,6 @@ settings.invite.withdrawFailed:
   description: "The Invitations screen when a withdrawal failed (#107); the list is read again, so one used meanwhile is gone from it."
   fi: "Kutsua ei voitu perua. Yritä uudelleen."
   sv: "Inbjudan kunde inte dras tillbaka. Försök igen."
-  machine: { fi: true, sv: true }
-
-settings.invite.counted:
-  en: "{friends, plural, =0 {No friend you invited has finished their profile yet.} one {One friend you invited has finished their profile.} other {# friends you invited have finished their profiles.}}"
-  description: "The Invitations screen (#107, ADR-044 §1): friends is how many of the person's invitations have counted, ever. Never who, and nothing of an invitation used and not counted."
-  fi: "{friends, plural, =0 {Yksikään kutsumasi ystävä ei ole vielä saanut profiiliaan valmiiksi.} one {Yksi kutsumasi ystävä on saanut profiilinsa valmiiksi.} other {# kutsumaasi ystävää on saanut profiilinsa valmiiksi.}}"
-  sv: "{friends, plural, =0 {Ingen vän du bjudit in har gjort klart sin profil än.} one {En vän du bjudit in har gjort klart sin profil.} other {# vänner du bjudit in har gjort klart sina profiler.}}"
   machine: { fi: true, sv: true }
 
 settings.invite.earned.fish:
@@ -10193,17 +10047,10 @@ invite.redeem.title:
   machine: { fi: true, sv: true }
 
 invite.redeem.earns:
-  en: "{reward, select, both {The code earns you {friendFish, plural, one {a fish} other {# fish}} and your friend {inviterFish, plural, one {a fish} other {# fish}} once your profile is complete.} other {The code earns you {friendFish, plural, one {a fish} other {# fish}} once your profile is complete.}} A fish is a like that says a little more."
-  description: "Under the explanation of the code, on the Invitations screen and in onboarding's invitation step (#503, ADR-044 §12): what the invitation earns the person typing it, shown only while matching_config invitation_reward gives them a fish. reward is both when the inviter earns too; friendFish is the person's fish, inviterFish their friend's. The reader may not know the word yet, hence the last sentence."
-  fi: "{reward, select, both {Koodista saat {friendFish, plural, one {kalan} other {# kalaa}} ja ystäväsi saa {inviterFish, plural, one {kalan} other {# kalaa}}, kun profiilisi on valmis.} other {Koodista saat {friendFish, plural, one {kalan} other {# kalaa}}, kun profiilisi on valmis.}} Kala on tykkäys, joka sanoo vähän enemmän."
-  sv: "{reward, select, both {Koden ger dig {friendFish, plural, one {en fisk} other {# fiskar}} och din vän {inviterFish, plural, one {en fisk} other {# fiskar}} när din profil är klar.} other {Koden ger dig {friendFish, plural, one {en fisk} other {# fiskar}} när din profil är klar.}} En fisk är ett gillande som säger lite mer."
-  machine: { fi: true, sv: true }
-
-invite.redeem.explain:
-  en: "If a friend gave you a code, type it here. Their invitation counts once your profile is complete."
-  description: "The Invitations screen, under Have an invitation code? (#107, ADR-044 §7): the friend's invitation counts the first night the person's profile is complete."
-  fi: "Jos ystävä antoi sinulle koodin, kirjoita se tähän. Hänen kutsunsa lasketaan, kun profiilisi on valmis."
-  sv: "Om en vän gav dig en kod, skriv in den här. Vännens inbjudan räknas när din profil är klar."
+  en: "{reward, select, both {The code earns you {friendFish, plural, one {a fish} other {# fish}} and your friend {inviterFish, plural, one {a fish} other {# fish}} once your profile is complete.} other {The code earns you {friendFish, plural, one {a fish} other {# fish}} once your profile is complete.}}"
+  description: "Over the code's field, on the Invitations screen and in onboarding's invitation step (#503, ADR-044 §12, #581): what the invitation earns the person typing it, shown only while matching_config invitation_reward gives them a fish. reward is both when the inviter earns too; friendFish is the person's fish, inviterFish their friend's."
+  fi: "{reward, select, both {Koodista saat {friendFish, plural, one {kalan} other {# kalaa}} ja ystäväsi saa {inviterFish, plural, one {kalan} other {# kalaa}}, kun profiilisi on valmis.} other {Koodista saat {friendFish, plural, one {kalan} other {# kalaa}}, kun profiilisi on valmis.}}"
+  sv: "{reward, select, both {Koden ger dig {friendFish, plural, one {en fisk} other {# fiskar}} och din vän {inviterFish, plural, one {en fisk} other {# fiskar}} när din profil är klar.} other {Koden ger dig {friendFish, plural, one {en fisk} other {# fiskar}} när din profil är klar.}}"
   machine: { fi: true, sv: true }
 
 invite.redeem.label:
@@ -10222,10 +10069,10 @@ invite.redeem.button:
   machine: { fi: true, sv: true }
 
 invite.redeem.done:
-  en: "The code is in. Your friend's invitation counts once your profile is complete."
+  en: "The code is in."
   description: "After a code that worked (#107), said in a live region, in Settings and in onboarding."
-  fi: "Koodi on vastaanotettu. Ystäväsi kutsu lasketaan, kun profiilisi on valmis."
-  sv: "Koden är mottagen. Din väns inbjudan räknas när din profil är klar."
+  fi: "Koodi on vastaanotettu."
+  sv: "Koden är mottagen."
   machine: { fi: true, sv: true }
 
 invite.redeem.failed:
@@ -10265,10 +10112,10 @@ invite.share.message:
   machine: { fi: true, sv: true }
 
 settings.contacts.intro:
-  en: "Keep the ways to reach you outside the app here. Nobody sees them until you share one in a conversation, with the button at its top. A change or a removal shows at once wherever you shared it."
-  description: "Ways to reach you screen, the line above the five cards (#103): stored first, seen by nobody, shared one at a time from a conversation's header."
-  fi: "Pidä täällä yhteystiedot, joilla sinut tavoittaa sovelluksen ulkopuolella. Kukaan ei näe niitä, ennen kuin jaat jonkin niistä keskustelussa sen yläosan painikkeella. Muutos tai poisto näkyy heti kaikkialla, missä olet sen jakanut."
-  sv: "Spara här hur man når dig utanför appen. Ingen ser dem förrän du delar en av dem i ett samtal, med knappen högst upp. En ändring eller borttagning syns direkt överallt där du har delat den."
+  en: "Nobody sees them until you share one in a conversation. A change or a removal shows at once wherever you shared it."
+  description: "Ways to reach you screen, the line above the five cards (#103, #581): seen by nobody, shared one at a time, and what a change does once shared."
+  fi: "Kukaan ei näe niitä, ennen kuin jaat jonkin niistä keskustelussa. Muutos tai poisto näkyy heti kaikkialla, missä olet sen jakanut."
+  sv: "Ingen ser dem förrän du delar en av dem i ett samtal. En ändring eller borttagning syns direkt överallt där du har delat den."
   machine: { fi: true, sv: true }
 
 settings.contacts.loading:
@@ -10292,11 +10139,11 @@ settings.contacts.title:
   sv: "{kind, select, phone {Telefonnummer} whatsapp {WhatsApp} telegram {Telegram} instagram {Instagram} snapchat {Snapchat} other {Kontaktuppgift}}"
   machine: { fi: true, sv: true }
 
-settings.contacts.hint:
-  en: "{kind, select, phone {With or without the 0 at the start. For another country's number, choose its code first.} whatsapp {The number your WhatsApp uses. With or without the 0 at the start.} telegram {Your username, with or without the @ before it.} instagram {Your username, with or without the @ before it.} snapchat {Your username, with or without the @ before it.} other {A way to reach you.}}"
-  description: "Under the title of one kind under the Ways to reach you row (#103, #511): what to type. A number is typed after its country code, which stands beside the field (+358 unless another is chosen), with or without the 0 a country dials at home; the app stores it as +358…, a username without its @ (an Instagram or Snapchat one in lower case). No example number: one that looks real belongs to someone."
-  fi: "{kind, select, phone {Alun nollan kanssa tai ilman. Toisen maan numerolle valitse ensin sen maatunnus.} whatsapp {Numero, jota WhatsApp käyttää. Alun nollan kanssa tai ilman.} telegram {Käyttäjänimesi. Sen eteen saa kirjoittaa @ tai jättää sen pois.} instagram {Käyttäjänimesi. Sen eteen saa kirjoittaa @ tai jättää sen pois.} snapchat {Käyttäjänimesi. Sen eteen saa kirjoittaa @ tai jättää sen pois.} other {Tapa tavoittaa sinut.}}"
-  sv: "{kind, select, phone {Med eller utan 0 först. För ett nummer från ett annat land, välj först dess landsnummer.} whatsapp {Numret som WhatsApp använder. Med eller utan 0 först.} telegram {Ditt användarnamn, med eller utan @ före.} instagram {Ditt användarnamn, med eller utan @ före.} snapchat {Ditt användarnamn, med eller utan @ före.} other {Ett sätt att nå dig.}}"
+settings.contacts.phoneHint:
+  en: "For another country's number, choose its code first."
+  description: "Under the phone number's name in Settings (#103, #511, #581). A number typed under +358 is not always refused: a Swedish 070 123 45 67 reads as Finnish and is saved, and a match who calls it reaches a stranger, so this is what the field cannot show by itself."
+  fi: "Toisen maan numerolle valitse ensin sen maatunnus."
+  sv: "För ett nummer från ett annat land, välj först dess landsnummer."
   machine: { fi: true, sv: true }
 
 settings.contacts.input:
@@ -10329,7 +10176,7 @@ settings.contacts.saved:
 
 settings.contacts.removed:
   en: "Removed. Wherever you shared it, it is gone now."
-  description: "Said on a card of the Ways to reach you screen once it was removed (#103): every share of it ended with it."
+  description: "Said to a screen reader when a contact is removed, never drawn (#103, #511, #581): the field empties, Remove goes and the row's value changes."
   fi: "Poistettu. Se on poistunut myös sieltä, missä jaoit sen."
   sv: "Borttaget. Det är borta även där du delade det."
   machine: { fi: true, sv: true }
@@ -10419,10 +10266,10 @@ settings.country.searchLabel:
   machine: { fi: true, sv: true }
 
 settings.country.none:
-  en: "No country matches. Search by name or by code, such as 46."
+  en: "No country matches."
   description: "Said in the list of countries when a search finds none (#511)."
-  fi: "Yksikään maa ei vastaa hakua. Hae nimellä tai maatunnuksella, esimerkiksi 46."
-  sv: "Inget land matchar. Sök på namn eller landsnummer, till exempel 46."
+  fi: "Yksikään maa ei vastaa hakua."
+  sv: "Inget land matchar."
   machine: { fi: true, sv: true }
 
 settings.country.near:
@@ -10454,10 +10301,10 @@ feedback.title:
   machine: { fi: true, sv: true }
 
 feedback.explain:
-  en: "A few lines to the moderators: what went wrong, what you would like, what bothers you, or what works. The moderators see that it came from your account; nobody else does. The app's version, the platform and your language go with it. Nobody is mailed."
-  description: "Feedback, the line above the form (#171, #511): who sees the sender (the moderators see the account, ADR-023 §6), what is sent along with the words, and that no mail follows."
-  fi: "Muutama rivi moderaattoreille: mikä meni pieleen, mitä toivoisit, mikä häiritsee tai mikä toimii. Moderaattorit näkevät, että viesti tuli tililtäsi; kukaan muu ei näe. Mukana lähtevät sovelluksen versio, alusta ja kielesi. Kenellekään ei lähetetä sähköpostia."
-  sv: "Några rader till moderatorerna: vad som gick fel, vad du önskar, vad som stör dig eller vad som fungerar. Moderatorerna ser att det kom från ditt konto; ingen annan gör det. Appens version, plattformen och ditt språk följer med. Ingen får e-post."
+  en: "The moderators see that it came from your account; nobody else does. Nobody is mailed."
+  description: "Feedback, the line above the form (#171, #511): who sees the sender (the moderators see the account, ADR-023 §6) and that no mail follows (#581)."
+  fi: "Moderaattorit näkevät, että viesti tuli tililtäsi; kukaan muu ei näe. Kenellekään ei lähetetä sähköpostia."
+  sv: "Moderatorerna ser att det kom från ditt konto; ingen annan gör det. Ingen får e-post."
   machine: { fi: true, sv: true }
 
 feedback.kind.label:
@@ -10521,13 +10368,6 @@ feedback.thanks.title:
   description: "Feedback screen, the heading after a send (#171)."
   fi: "Kiitos"
   sv: "Tack"
-  machine: { fi: true, sv: true }
-
-feedback.thanks.body:
-  en: "The moderators will read it. Nobody is mailed."
-  description: "Feedback screen, the line under the thanks (#171): what happens next, and that no mail follows."
-  fi: "Moderaattorit lukevat sen. Kenellekään ei lähetetä sähköpostia."
-  sv: "Moderatorerna läser den. Ingen får e-post."
   machine: { fi: true, sv: true }
 
 feedback.another:
@@ -10787,27 +10627,6 @@ settings.row.unsaved:
   description: "Value of a row of Settings whose panel holds something not saved (#511): a contact refused or not sent, an address typed and not sent, feedback not sent; marked beside it."
   fi: "Ei tallennettu"
   sv: "Inte sparat"
-  machine: { fi: true, sv: true }
-
-account.found.consequence:
-  en: "Changes nothing else."
-  description: "Under the I found someone button in Settings › Your account (#511, #83): what pressing it does beyond telling Kuutti."
-  fi: "Ei muuta mitään muuta."
-  sv: "Ändrar inget annat."
-  machine: { fi: true, sv: true }
-
-account.break.consequence:
-  en: "You are hidden and logged out. Nothing is deleted."
-  description: "Under the Take a break button in Settings › Your account (#511, #170)."
-  fi: "Sinut piilotetaan ja kirjataan ulos. Mitään ei poisteta."
-  sv: "Du döljs och loggas ut. Inget raderas."
-  machine: { fi: true, sv: true }
-
-account.delete.consequence:
-  en: "Your account goes for good. A new one is possible after {days, plural, one {# day} other {# days}}."
-  description: "Under the Delete my account button in Settings › Your account (#511); {days} is the cooldown before the same person may register again."
-  fi: "Tilisi poistuu pysyvästi. Uuden voi luoda {days, plural, one {# päivän} other {# päivän}} kuluttua."
-  sv: "Ditt konto försvinner för gott. Ett nytt är möjligt efter {days, plural, one {# dag} other {# dagar}}."
   machine: { fi: true, sv: true }
 
 settings.export.label:
