@@ -22,12 +22,12 @@
     "openapi-fetch": "^0.17.0",
     "react": "catalog:",
     "react-dom": "catalog:",
-    "react-router": "8.5.0",
+    "react-router": "8.5.1",
     "tailwind-merge": "3.7.0",
     "zod": "^4.6.7"
   },
   "devDependencies": {
-    "@aws-sdk/client-s3": "3.1157.0",
+    "@aws-sdk/client-s3": "3.1158.0",
     "@playwright/test": "1.64.1",
     "@tailwindcss/vite": "4.3.3",
     "@testing-library/dom": "^10.4.2",

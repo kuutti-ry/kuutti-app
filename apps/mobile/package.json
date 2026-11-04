@@ -76,7 +76,7 @@
     "tailwind-merge": "3.7.0"
   },
   "devDependencies": {
-    "@expo/fingerprint": "0.21.6",
+    "@expo/fingerprint": "0.21.7",
     "@kuutti/notices": "workspace:*",
     "@react-native/jest-preset": "^0.86.3",
     "@testing-library/react-native": "^14.1.0",
