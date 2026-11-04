@@ -8,7 +8,7 @@ import {
 } from "./chat.ts";
 import { SessionToken } from "./identity.ts";
 
-// The chat's socket (#349, ADR-031 §5): what the phone and the API say to
+// The chat's socket (#349, ADR-031 §9): what the phone and the API say to
 // each other over GET /ws. Every frame in either direction is one of these,
 // parsed on arrival; a frame that is none of them closes the socket. Writing
 // stays on the HTTP routes: the socket tells the phone what changed.

@@ -15,7 +15,7 @@ variable "environment" {
 }
 
 variable "vpc_cidr" {
-  description = "One /16 per environment; the four subnets are carved from it."
+  description = "One /16 per environment; the three subnets are carved from it."
   type        = string
 }
 

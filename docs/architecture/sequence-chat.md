@@ -202,5 +202,4 @@ sequenceDiagram
 ## Open
 
 - **The socket's numbers and the refresh ahead are the maintainer's to confirm** (ADR-031, Open 11 and 12): the sockets per account, the first frame's time, the ping and the pong, and that a socket lives while its session's access token does. The view names them by their configuration keys.
-- **Which section of ADR-031 is the socket.** The code and the spec cite ADR-031 §5 for the socket (`chat/ws.ts`, `chat/live.ts`, `chat/listen.ts`, `chat/presence.ts`, `app.ts`, migration 0055's header, `features/chat/live.feature`, the phone's `socket.ts`); in the ADR the socket is §9, and §5 is the retention of messages. This view cites §9.
-- **The resume in ADR-031 §3.** §3 says the socket reuses `?after=` at every connect. The code, and §9, answer a `resume` frame with at most one page per conversation, and the phone reads the rest over `?after=` when it opens the conversation. Drawn as the code and §9.
+- **Migration 0055's header** cites ADR-031 §5 for the socket. In the ADR the socket is §9, as the code, the spec and this view say, and §5 is the retention of messages; a migration is never edited (rule 10).

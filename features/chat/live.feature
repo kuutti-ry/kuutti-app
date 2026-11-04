@@ -1,6 +1,6 @@
 # features/chat/live.feature
 Feature: The chat's live socket
-  One WebSocket per signed-in app in front (#349, ADR-031 §5) tells the phone
+  One WebSocket per signed-in app in front (#349, ADR-031 §9) tells the phone
   what changed in its conversations: a message, a read mark, the other's
   presence, a conversation archived, back or closed. Writing stays on the
   HTTP routes; Postgres is the store and the socket the notifier, so what is

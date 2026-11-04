@@ -915,7 +915,7 @@ export async function copyConversation(
   return result.rowCount ?? 0;
 }
 
-// The socket's fan-out (#349, ADR-031 §5). A notification names a
+// The socket's fan-out (#349, ADR-031 §9). A notification names a
 // conversation, a session or a block, never a person's text; the listener
 // finds whom it concerns with the two routing reads below, and then reads
 // what each of them may see through their own participant row (rule 6), with
