@@ -2,7 +2,7 @@ import type { PlainMessageKey } from "@kuutti/i18n";
 import { FEEDBACK_TEXT_MAX, type FeedbackKind, type FeedbackPlatform } from "@kuutti/schema";
 import { useState } from "react";
 import { Platform, View } from "react-native";
-import { Notice } from "@/components/Notice";
+import { Notice, sayAloud } from "@/components/Notice";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Text } from "@/components/ui/text";
@@ -62,6 +62,7 @@ export function FeedbackForm() {
       setKind(null);
       setText("");
       setState("sent");
+      sayAloud(t("feedback.thanks.title"));
     } catch (error) {
       setState(error instanceof ApiError && error.status === 429 ? "limited" : "failed");
     }
@@ -74,7 +75,6 @@ export function FeedbackForm() {
       ) : state === "sent" ? (
         <View className="gap-3">
           <Text variant="title">{t("feedback.thanks.title")}</Text>
-          <Notice words={t("feedback.thanks.body")} />
           <Button
             variant="outline"
             onPress={() => {

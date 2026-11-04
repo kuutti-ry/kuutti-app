@@ -17,12 +17,12 @@ import { useHapticTap } from "@/theme/haptics";
 
 /**
  * Logging out (#35), under its row in Settings (#511): here, or everywhere,
- * which is the recovery for a lost phone, each with what it does under it,
- * both outlined (red is the deletion's alone). Everywhere asks first, since
- * every phone then needs the bank again (the maintainer, 29/10/2026); here
- * asks nothing. A device with no session says so. A logout here clears the
- * session whatever the API answers; everywhere that the API did not take is
- * said, and this phone stays logged in.
+ * which is the recovery for a lost phone, and says so, both outlined (red is
+ * the deletion's alone). Everywhere asks first, since every phone then needs
+ * the bank again (the maintainer, 29/10/2026); here asks nothing. The row goes
+ * with the session (#581). A logout here clears the session whatever the API
+ * answers; everywhere that the API did not take is said, and this phone stays
+ * logged in.
  */
 export function DeviceActions() {
   const { t } = useT();
@@ -31,9 +31,7 @@ export function DeviceActions() {
   const [asking, setAsking] = useState(false);
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(0);
-  if (session.status !== "signed-in") {
-    return <Text variant="muted">{t("settings.session.none")}</Text>;
-  }
+  if (session.status !== "signed-in") return null;
   // One request at a time; a retry hides the last failure until it is answered.
   const everywhere = async () => {
     setAsking(false);
@@ -48,20 +46,17 @@ export function DeviceActions() {
   };
   return (
     <View className="gap-4">
-      <View className="gap-1.5">
-        <Button
-          variant="outline"
-          accessibilityLabel={t("settings.logout")}
-          disabled={busy}
-          onPress={() => {
-            tap();
-            void session.signOut();
-          }}
-        >
-          <Text>{t("settings.logout")}</Text>
-        </Button>
-        <Text variant="muted">{t("settings.logout.explain")}</Text>
-      </View>
+      <Button
+        variant="outline"
+        accessibilityLabel={t("settings.logout")}
+        disabled={busy}
+        onPress={() => {
+          tap();
+          void session.signOut();
+        }}
+      >
+        <Text>{t("settings.logout")}</Text>
+      </Button>
       <View className="gap-1.5">
         <Button
           variant="outline"

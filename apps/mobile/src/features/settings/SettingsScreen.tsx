@@ -1,4 +1,4 @@
-import { CONSENT_VERSIONS, LOCALE_NAMES } from "@kuutti/i18n";
+import { LOCALE_NAMES } from "@kuutti/i18n";
 import type { WithdrawableConsentKind } from "@kuutti/schema";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import CircleAlert from "lucide-react-native/icons/circle-alert";
@@ -37,7 +37,6 @@ import { FeedbackForm } from "./FeedbackForm";
 import { LanguageChoices } from "./LanguageChoices";
 import { LegalSummary } from "./LegalSummary";
 import { LockControls } from "./LockControls";
-import { LICENCES } from "./licences";
 import { useOpenRow } from "./open-rows";
 import { PhotoDescriptionChoices } from "./PhotoDescriptionChoices";
 import { ROW_ICONS } from "./row-icons";
@@ -92,12 +91,12 @@ function Section({ title, rows }: { title: string; rows: readonly Row[] }) {
  * pointing right, since neither is a setting. The row left open is the one
  * the list opens with while the app runs, and a row opened low on the list
  * is brought into sight. A row's second line is its value (the theme, a
- * consent on or off, the address, the contacts kept), never a description of
- * the row its title already names (#376), and a mark stands beside a setting
- * that does not do what it says (an address not confirmed, a consent for a
- * wording newer than the app, notifications the phone refuses); a row's
- * value reads what its panel holds and follows what the panel stores. A
- * link may name a row to open (`/settings?open=device`), which also takes a
+ * consent on or off, the address, the contacts kept) or, while it holds
+ * nothing, what to do (#581), never a description of the row its title already
+ * names (#376), and a mark stands beside a setting that does not do what it
+ * says (an address not confirmed, a consent for a wording newer than the app,
+ * notifications the phone refuses); a row's value reads what its panel holds
+ * and follows what the panel stores. A link may name a row to open (`/settings?open=device`), which also takes a
  * screen reader's focus. The tech config screen keeps what is technical
  * beyond the version and exists outside production only.
  */
@@ -182,7 +181,7 @@ export function SettingsScreen() {
   const buttonsSummary = buttons.oneHanded
     ? t("settings.decisionButtons.withOneHanded", { hand: handName })
     : handName;
-  const { version, commit } = buildInfo();
+  const { version } = buildInfo();
   const lockWords = useLock().settings === null ? t("settings.state.off") : t("settings.state.on");
   const consents = useConsentStates();
   const email = useEmailSummary(signedIn);
@@ -341,24 +340,15 @@ export function SettingsScreen() {
                   key: "version",
                   icon: ROW_ICONS.version,
                   title: t("settings.version.label"),
-                  summary: commit
-                    ? t("settings.version.commit", { commit: commit.slice(0, 7) })
-                    : undefined,
                   detail: version ?? "?",
                 },
                 {
                   ...holding("terms", <LegalSummary kind="terms" />),
                   title: t("legal.terms.title"),
-                  summary: t("onboarding.consents.version", {
-                    version: CONSENT_VERSIONS.terms ?? "",
-                  }),
                 },
                 {
                   ...holding("privacy", <LegalSummary kind="privacy" />),
                   title: t("legal.privacy.title"),
-                  summary: t("onboarding.consents.version", {
-                    version: CONSENT_VERSIONS.privacy ?? "",
-                  }),
                 },
                 {
                   ...holding("source", <SourcePanel />),
@@ -368,7 +358,6 @@ export function SettingsScreen() {
                   key: "licenses",
                   icon: ROW_ICONS.licenses,
                   title: t("settings.licenses.label"),
-                  summary: t("settings.licenses.summary", { packages: LICENCES.packages.length }),
                   onPress: () => {
                     tap();
                     router.push("/settings/licenses");
@@ -378,20 +367,16 @@ export function SettingsScreen() {
             />
             <Section
               title={t("settings.group.account")}
-              rows={[
-                // Always there: a device with no session says so under it, and a
-                // flow signing out finds the row whatever the session is.
+              rows={only(signedIn, [
                 {
                   ...holding("device", <DeviceActions />),
                   title: t("settings.session.label"),
                 },
-                ...only(signedIn, [
-                  {
-                    ...holding("account", <AccountActions />),
-                    title: t("account.title"),
-                  },
-                ]),
-              ]}
+                {
+                  ...holding("account", <AccountActions />),
+                  title: t("account.title"),
+                },
+              ])}
             />
           </View>
         </Unsaved.Provider>

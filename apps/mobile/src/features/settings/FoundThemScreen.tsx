@@ -24,8 +24,7 @@ type State = "checking" | "asking" | "sending" | "failed" | "thanked";
 /**
  * "Löysin hänet" (#83, ADR-040): the person tells Kuutti they found somebody,
  * and why, from three choices, and Kuutti thanks them. It is an indication
- * and nothing more: the screen says that nothing in the app changes, and
- * where the break and the deletion are for someone who wants to step away.
+ * and nothing more: the screen says that nothing in the app changes.
  * An account that told Kuutti before is thanked again, never asked twice.
  * The choice is said in words (the ticked option, never a colour alone); a
  * failure keeps it.

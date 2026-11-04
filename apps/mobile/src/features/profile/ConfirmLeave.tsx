@@ -103,7 +103,7 @@ export function holdLinkWhileUnsaved(
   return path;
 }
 
-/** The question itself (#227): why nothing was saved where a save was refused, else that something is unsaved. */
+/** The question itself (#227): why nothing was saved where a save was refused; else its title says it all (#581). */
 export function ConfirmLeaveDialog({
   asking,
   keep,
@@ -121,7 +121,7 @@ export function ConfirmLeaveDialog({
       <DialogContent closeLabel={t("profile.discard.close")}>
         <DialogHeader>
           <DialogTitle>{t("profile.discard.title")}</DialogTitle>
-          <DialogDescription>{reason ?? t("profile.discard.unsaved")}</DialogDescription>
+          {reason !== undefined && <DialogDescription>{reason}</DialogDescription>}
         </DialogHeader>
         <DialogFooter>
           <Button variant="outline" onPress={keep}>

@@ -256,7 +256,6 @@ export function SignInScreen({ code, error, until }: SignInParams) {
             <View accessibilityLabel={t("signIn.paused.title")} className="gap-6">
               <CardHeader>
                 <CardTitle>{t("signIn.paused.title")}</CardTitle>
-                <CardDescription>{t("signIn.paused.body")}</CardDescription>
               </CardHeader>
             </View>
           </Card>
