@@ -42,6 +42,7 @@ export type MessageParams = {
   "account.email.loadFailed": Record<never, never>;
   "account.email.loading": Record<never, never>;
   "account.email.mailUnavailable": Record<never, never>;
+  "account.email.removed": Record<never, never>;
   "account.email.save": Record<never, never>;
   "account.email.saved": Record<never, never>;
   "account.email.send": Record<never, never>;
@@ -1490,7 +1491,6 @@ export type MessageParams = {
   "safety.sending": Record<never, never>;
   "settings.about.title": Record<never, never>;
   "settings.back": Record<never, never>;
-  "settings.close": Record<never, never>;
   "settings.contacts.country": Record<never, never>;
   "settings.contacts.countryHint": Record<never, never>;
   "settings.contacts.countryValue": { "country": string; "code": string };
@@ -1582,7 +1582,6 @@ export type MessageParams = {
   "settings.notifications.label": Record<never, never>;
   "settings.notifications.notAsked": Record<never, never>;
   "settings.notifications.someOn": { "on": number; "off": number };
-  "settings.open": Record<never, never>;
   "settings.photoDescriptions.explain": Record<never, never>;
   "settings.photoDescriptions.hint.body": Record<never, never>;
   "settings.photoDescriptions.hint.close": Record<never, never>;

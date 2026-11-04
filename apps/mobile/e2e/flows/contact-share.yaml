@@ -23,7 +23,7 @@ name: A contact kept in Settings is shared from a conversation's header and show
     file: ../common/open-settings-row.yaml
     env:
       ROW: "Ways to reach you|Mistä sinut tavoittaa|Hur man når dig"
-      INSIDE: "Loading your contact details…|Ladataan yhteystietojasi…|Laddar dina kontaktuppgifter…|Keep the ways to reach you outside the app here\\..*|Pidä täällä yhteystiedot, joilla sinut tavoittaa sovelluksen ulkopuolella\\..*|Spara här hur man når dig utanför appen\\..*"
+      INSIDE: "Loading your contact details…|Ladataan yhteystietojasi…|Laddar dina kontaktuppgifter…|Nobody sees them until you share one in a conversation\\..*|Kukaan ei näe niitä, ennen kuin jaat jonkin niistä keskustelussa\\..*|Ingen ser dem förrän du delar en av dem i ett samtal\\..*"
 # The cards come once what is kept has been read, the phone number's first;
 # Instagram's is the fourth of five, below the fold. A field is its label.
 - extendedWaitUntil:
@@ -38,9 +38,8 @@ name: A contact kept in Settings is shared from a conversation's header and show
 - inputText: "elina.lukupiiri"
 # There is no Save (#511): leaving the field keeps it. The page keeps the
 # focused field in sight just above the keyboard, with the kind's title
-# above it (the hint between them is Telegram's too). A tap on the title,
-# which is no button and the brand's name in every language, closes the
-# keyboard and leaves the field (README, the keyboard).
+# above it. A tap on the title, which is no button and the brand's name in
+# every language, closes the keyboard and leaves the field (README, the keyboard).
 - tapOn: "Instagram"
 - extendedWaitUntil:
     visible: "Saved\\.|Tallennettu\\.|Sparat\\."
@@ -144,7 +143,7 @@ name: A contact kept in Settings is shared from a conversation's header and show
     file: ../common/open-settings-row.yaml
     env:
       ROW: "Ways to reach you|Mistä sinut tavoittaa|Hur man når dig"
-      INSIDE: "Loading your contact details…|Ladataan yhteystietojasi…|Laddar dina kontaktuppgifter…|Keep the ways to reach you outside the app here\\..*|Pidä täällä yhteystiedot, joilla sinut tavoittaa sovelluksen ulkopuolella\\..*|Spara här hur man når dig utanför appen\\..*"
+      INSIDE: "Loading your contact details…|Ladataan yhteystietojasi…|Laddar dina kontaktuppgifter…|Nobody sees them until you share one in a conversation\\..*|Kukaan ei näe niitä, ennen kuin jaat jonkin niistä keskustelussa\\..*|Ingen ser dem förrän du delar en av dem i ett samtal\\..*"
 - extendedWaitUntil:
     visible: "Your phone number|Puhelinnumerosi|Ditt telefonnummer"
     timeout: 15000
@@ -154,12 +153,14 @@ name: A contact kept in Settings is shared from a conversation's header and show
     centerElement: true
     timeout: 60000
 - tapOn: "Remove your Instagram username|Poista Instagram-käyttäjänimesi|Ta bort ditt användarnamn på Instagram"
+# Said aloud and not drawn (#581): Remove goes and the field is empty.
 - extendedWaitUntil:
-    visible: "Removed\\. Wherever you shared it, it is gone now\\.|Poistettu\\. Se on poistunut myös sieltä, missä jaoit sen\\.|Borttaget\\. Det är borta även där du delade det\\."
+    notVisible: "Remove your Instagram username|Poista Instagram-käyttäjänimesi|Ta bort ditt användarnamn på Instagram"
     timeout: 15000
-- assertNotVisible: "Remove your Instagram username|Poista Instagram-käyttäjänimesi|Ta bort ditt användarnamn på Instagram"
+- assertNotVisible: "elina\\.lukupiiri"
+- assertNotVisible: "Removed\\. Wherever you shared it, it is gone now\\.|Poistettu\\. Se on poistunut myös sieltä, missä jaoit sen\\.|Borttaget\\. Det är borta även där du delade det\\."
 - runFlow:
     file: ../common/close-settings-row.yaml
     env:
       ROW: "Ways to reach you|Mistä sinut tavoittaa|Hur man når dig"
-      INSIDE: "Loading your contact details…|Ladataan yhteystietojasi…|Laddar dina kontaktuppgifter…|Keep the ways to reach you outside the app here\\..*|Pidä täällä yhteystiedot, joilla sinut tavoittaa sovelluksen ulkopuolella\\..*|Spara här hur man når dig utanför appen\\..*"
+      INSIDE: "Loading your contact details…|Ladataan yhteystietojasi…|Laddar dina kontaktuppgifter…|Nobody sees them until you share one in a conversation\\..*|Kukaan ei näe niitä, ennen kuin jaat jonkin niistä keskustelussa\\..*|Ingen ser dem förrän du delar en av dem i ett samtal\\..*"

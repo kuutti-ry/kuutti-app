@@ -22,6 +22,7 @@ import { useSession } from "./session";
 
 type Notice =
   | "saved"
+  | "removed"
   | "codeSent"
   | "invalid"
   | "failed"
@@ -36,6 +37,7 @@ type Notice =
 
 const NOTICE: Readonly<Record<Notice, PlainMessageKey>> = {
   saved: "account.email.saved",
+  removed: "account.email.removed",
   codeSent: "account.email.codeSent",
   invalid: "account.email.invalid",
   failed: "account.email.failed",
@@ -142,8 +144,9 @@ export function EmailCard({
  * The card once the address is read: it holds what the API last answered,
  * whether a code waits included. The API answers none past the code's end, so
  * a card left open past it keeps the code's field until Confirm's answer says
- * the code expired. Every call clears the last notice and says its own, in a
- * live region and, on iOS, aloud.
+ * the code expired. Every call clears the last notice and says its own: what
+ * shows by itself is said aloud, with no line of its own (#581); anything else
+ * in a live region and, on iOS, aloud.
  */
 function EmailForm({
   first,
@@ -178,10 +181,15 @@ function EmailForm({
     setSaid([]);
     try {
       const next = await call();
-      // An address kept, and a code on its way if one went: the field, the
-      // row's value and the line over the code's field show it (#581).
+      // What shows by itself (#581): an address kept, and a code on its way if
+      // one went, in the field, the row's value and the line over the code's
+      // field; a removal, in the empty field; a first code, in its section,
+      // which comes with that line. A new code changes nothing on the screen,
+      // so its line under the button is the answer.
       const saidOnly =
-        next[0] === "saved" && next.every((line) => line === "saved" || line === "codeSent");
+        next[0] === "removed" ||
+        (next[0] === "saved" && next.every((line) => line === "saved" || line === "codeSent")) ||
+        (next[0] === "codeSent" && stored.codeExpiresAt === null);
       setSaid(saidOnly ? [] : next);
       setAnswers((n) => n + 1);
       // iOS has no live regions; Android's speak the same words already. Said
@@ -260,10 +268,11 @@ function EmailForm({
     }
     setForm({ stored: next, typed: next.email ?? "" });
     setCode("");
+    if (next.email === null) return ["removed"];
     // Setting or changing an address sends its confirmation (#385). The save
     // itself sends nothing, so a send that fails leaves the address saved:
     // "Saved.", then what the send says (ADR-043 §2).
-    const needsCode = next.email !== null && !next.confirmed && next.codeExpiresAt === null;
+    const needsCode = !next.confirmed && next.codeExpiresAt === null;
     return needsCode ? ["saved", ...(await send())] : ["saved"];
   };
 
@@ -380,7 +389,7 @@ function CodeSection({
   }
   return (
     <View className="gap-3">
-      {/* No live region: the card's notice says it as each code goes. */}
+      {/* No live region: each code as it goes is said aloud, or by the card's notice. */}
       <Text>{t("account.email.codeSent")}</Text>
       <View className="gap-2">
         <Text variant="small">{t("account.email.codeLabel")}</Text>
@@ -461,8 +470,8 @@ export function EmailScreen() {
 
 /**
  * The e-mail row's value in Settings (#376, #511): the address once
- * confirmed, the address and that it waits for its code, or that there is
- * none; nothing until it has been read.
+ * confirmed, the address and that it waits for its code, or, with none, what
+ * to do (#581); nothing until it has been read.
  */
 export function useEmailSummary(enabled: boolean) {
   const { t } = useT();

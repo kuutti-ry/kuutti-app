@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { CONSENT_VERSIONS } from "@kuutti/i18n";
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react-native";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react-native";
 import { useLocales } from "expo-localization";
 import * as SecureStore from "expo-secure-store";
 import * as React from "react";
@@ -90,7 +90,7 @@ describe("SignInScreen", () => {
     expect(found.flatMap((node) => a11yProblems(node))).toEqual([]);
   });
 
-  it("says the account is on a break right after this device paused it, and the way back", async () => {
+  it("says the account is on a break right after this device paused it, the card's title alone, and the way back (#581)", async () => {
     await saveSession(tokens);
     fetchMock.mockResolvedValueOnce(new Response(null, { status: 204 }));
     // The screen as the provider shows it once the break began on this device (#170).
@@ -104,10 +104,17 @@ describe("SignInScreen", () => {
     }
     await renderWithTheme(<Pausing />);
     expect(await screen.findByText("Your account is on a break")).toBeTruthy();
-    expect(screen.getByText(/Sign in with your bank whenever you want to come back/)).toBeTruthy();
+    expect(
+      within(screen.getByLabelText("Your account is on a break"))
+        .getAllByText(/./)
+        .map((node) => node.props.children),
+    ).toEqual(["Your account is on a break"]);
     expect(currentSession()).toBeNull();
     // The way back is the same button as always.
     expect(screen.getByRole("button", { name: "Sign in with your bank" })).toBeTruthy();
+    expect(pressables(screen.toJSON() as HostNode).flatMap((node) => a11yProblems(node))).toEqual(
+      [],
+    );
   });
 
   it("says nothing of a break or of the lock to a device that was simply signed out", async () => {

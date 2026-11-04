@@ -441,7 +441,7 @@ const readKept = () =>
     CONTACT_KINDS.filter((kind) => contacts.some((contact) => contact.kind === kind)),
   );
 
-/** The Ways to reach you row's value in Settings (#376, #511): the kinds kept, by name, or none. */
+/** The Ways to reach you row's value in Settings (#376, #511): the kinds kept, by name, or, with none, what to do (#581). */
 export function useContactsSummary(enabled: boolean) {
   const { t } = useT();
   const { data, stored } = useRowData<readonly ContactKind[]>(readKept, enabled);

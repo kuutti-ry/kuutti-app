@@ -1,6 +1,11 @@
 import type { InvitationReward } from "@kuutti/schema";
 
-/** Which of the two an invitation earns for, for the messages that word it (an ICU select): "none" falls to their other branch. */
+/**
+ * Which of the two an invitation earns for, for the messages that word it (an
+ * ICU select). In `settings.invite.earns` "friend" is the other branch, and
+ * "none" is never drawn; in `invite.share.message` "none" is the other branch,
+ * which is empty.
+ */
 type RewardShape = "both" | "inviter" | "friend" | "none";
 
 /**

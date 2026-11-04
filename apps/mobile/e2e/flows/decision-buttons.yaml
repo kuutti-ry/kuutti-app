@@ -1,4 +1,4 @@
-# The Decision buttons setting (#82): a row in Appearance and language that
+# The Like and Pass setting (#82, #581): a row in Appearance and language that
 # opens in place (#511) and chooses the hand the round's Like and Pass are
 # placed for, one-handed mode and the marks they carry (#520), each kept on
 # the phone. Where the buttons then sit and what they carry on the round is
@@ -7,7 +7,7 @@
 # leaves the setting as it found it, right hand, two hands and Kuutti's style,
 # and the row closed.
 appId: fi.kuutti.app
-name: The decision buttons setting places Like and Pass for either hand, and one-handed
+name: The Like and Pass setting places them for either hand, and one-handed
 ---
 - runFlow: ../common/sign-in.yaml
 - openLink: kuutti://settings
@@ -24,7 +24,7 @@ name: The decision buttons setting places Like and Pass for either hand, and one
 - runFlow:
     file: ../common/open-settings-row.yaml
     env:
-      ROW: "(Decision buttons|Valintapainikkeet|Valknappar)(, .*)?"
+      ROW: "(Like and Pass|Tykkää ja Ohita|Gilla och Hoppa över)(, .*)?"
       INSIDE: "One-handed|Yhdellä kädellä|Med en hand"
 - assertVisible: ".*✓.*(Right hand|Oikea käsi|Höger hand).*"
 - assertVisible:
@@ -47,6 +47,7 @@ name: The decision buttons setting places Like and Pass for either hand, and one
     direction: DOWN
     centerElement: true
     timeout: 30000
+- assertVisible: "Button style|Painikkeiden tyyli|Knappstil"
 - tapOn: "Cross and circle|Risti ja ympyrä|Kryss och cirkel"
 - extendedWaitUntil:
     visible: ".*✓.*(Cross and circle|Risti ja ympyrä|Kryss och cirkel).*"
@@ -54,14 +55,14 @@ name: The decision buttons setting places Like and Pass for either hand, and one
 - runFlow:
     file: ../common/close-settings-row.yaml
     env:
-      ROW: "(Decision buttons|Valintapainikkeet|Valknappar)(, .*)?"
+      ROW: "(Like and Pass|Tykkää ja Ohita|Gilla och Hoppa över)(, .*)?"
       INSIDE: "One-handed|Yhdellä kädellä|Med en hand"
 
 # Kept when the row is opened again; then back as it began.
 - runFlow:
     file: ../common/open-settings-row.yaml
     env:
-      ROW: "(Decision buttons|Valintapainikkeet|Valknappar)(, .*)?"
+      ROW: "(Like and Pass|Tykkää ja Ohita|Gilla och Hoppa över)(, .*)?"
       INSIDE: "One-handed|Yhdellä kädellä|Med en hand"
 - assertVisible: ".*✓.*(Left hand|Vasen käsi|Vänster hand).*"
 - assertVisible:
@@ -87,5 +88,5 @@ name: The decision buttons setting places Like and Pass for either hand, and one
 - runFlow:
     file: ../common/close-settings-row.yaml
     env:
-      ROW: "(Decision buttons|Valintapainikkeet|Valknappar)(, .*)?"
+      ROW: "(Like and Pass|Tykkää ja Ohita|Gilla och Hoppa över)(, .*)?"
       INSIDE: "One-handed|Yhdellä kädellä|Med en hand"

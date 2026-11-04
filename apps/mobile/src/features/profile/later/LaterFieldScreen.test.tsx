@@ -169,7 +169,7 @@ describe("LaterFieldScreen", () => {
     expect(navigation.setOptions.mock.lastCall?.[0]).toEqual({ gestureEnabled: false });
 
     expect((await leave()).preventDefault).toHaveBeenCalled();
-    expect(screen.getByText("Your changes are not saved yet.")).toBeTruthy();
+    expect(screen.getByText("Leave without saving?")).toBeTruthy();
     await press(screen.getByRole("button", { name: "Keep editing" }));
     expect(navigation.dispatch).not.toHaveBeenCalled();
 

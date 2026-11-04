@@ -31,7 +31,6 @@ export function DeviceActions() {
   const [asking, setAsking] = useState(false);
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(0);
-  if (session.status !== "signed-in") return null;
   // One request at a time; a retry hides the last failure until it is answered.
   const everywhere = async () => {
     setAsking(false);

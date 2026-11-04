@@ -6,7 +6,6 @@ import { Notice, sayAloud } from "@/components/Notice";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Text } from "@/components/ui/text";
-import { useSession } from "@/features/identity";
 import { ApiError } from "@/lib/api";
 import { buildInfo } from "@/lib/build";
 import { useT } from "@/lib/locale";
@@ -40,7 +39,6 @@ type State = "idle" | "sending" | "sent" | "failed" | "limited";
 export function FeedbackForm() {
   const { t, locale } = useT();
   const tap = useHapticTap();
-  const session = useSession();
   const [kind, setKind] = useState<FeedbackKind | null>(null);
   const [text, setText] = useState("");
   const [state, setState] = useState<State>("idle");
@@ -70,9 +68,7 @@ export function FeedbackForm() {
 
   return (
     <>
-      {session.status !== "signed-in" ? (
-        <Text variant="muted">{t("settings.session.none")}</Text>
-      ) : state === "sent" ? (
+      {state === "sent" ? (
         <View className="gap-3">
           <Text variant="title">{t("feedback.thanks.title")}</Text>
           <Button

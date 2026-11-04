@@ -99,8 +99,8 @@ function useSaid() {
 
 /**
  * A copy of what Kuutti holds about the person (#51, ADR-007; #237, #465),
- * under its row of Settings (#511): what the file is, and the one button
- * that hands it over, as the system offers it.
+ * under its row of Settings (#511): the one button that hands it over, as the
+ * system offers it.
  */
 export function ExportData({ share }: { share?: typeof Share.share }) {
   const { t } = useT();

@@ -80,7 +80,11 @@ describe("the found-them screen", () => {
     expect(screen.getByRole("heading", { name: "Which is it?" })).toBeTruthy();
     // The question names the group of choices for a screen reader too.
     expect(screen.getByLabelText("Which is it?").props.accessibilityRole).toBe("radiogroup");
-    expect(screen.getByText(/Nothing changes in the app/)).toBeTruthy();
+    // Who sees it and that nothing changes, in the fewest words (#581).
+    expect(
+      screen.getByText("Your answer is shown to nobody, and it is counted without your name."),
+    ).toBeTruthy();
+    expect(screen.getByText("Nothing changes in the app.")).toBeTruthy();
     noProblems();
     expect(tellButton().props.accessibilityState?.disabled).toBe(true);
 
@@ -101,7 +105,7 @@ describe("the found-them screen", () => {
     await renderWithTheme(<FoundThemScreen />);
     await thanked();
     expect(screen.queryByRole("radio")).toBeNull();
-    expect(screen.getByText(/Nothing changes in the app/)).toBeTruthy();
+    expect(screen.getByText("Nothing changes in the app.")).toBeTruthy();
     expect(sent).toEqual([]);
   });
 

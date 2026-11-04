@@ -48,7 +48,7 @@ const NOTICE: Readonly<Record<Notice, PlainMessageKey>> = {
   shareFailed: "settings.invite.shareFailed",
 };
 
-/** What the screen shows by itself: the code's card appears, the invitation leaves the list. Said, not drawn (#581). */
+/** What the screen shows by itself: the code's card appears, the invitation leaves the list. Said, not drawn (#581), unless `run` finds the list not read. */
 const SAID_ONLY: ReadonlySet<Notice> = new Set(["made", "withdrawn"]);
 
 /** Making one refused in the API's own words (ADR-044 §5); any other failure says it could not be made. */
@@ -74,10 +74,11 @@ const spoken = (code: string) =>
  * invitations by when they were
  * made, each withdrawn after asking; what they earned that waits. Anybody else reads that invitations open once the profile is
  * complete. Somebody who may still type a code finds its field. Nothing here
- * names a friend, or says that one used a code and has not finished. Every
- * outcome is said in a live region and, on iOS, aloud. The share sheet is
- * injected, as the export's is (AccountActions), so tests see what it was
- * handed.
+ * names a friend, or says that one used a code and has not finished. A made or
+ * withdrawn invitation shows by itself and is said aloud, with no line of its
+ * own (#581); any other outcome is said in a live region and, on iOS, aloud. The
+ * share sheet is injected, as the export's is (AccountActions), so tests see
+ * what it was handed.
  */
 export function Invitations({
   share = Share.share,
@@ -102,12 +103,12 @@ export function Invitations({
   const [answers, setAnswers] = useState(0);
   const [withdrawing, setWithdrawing] = useState<OpenInvitation | null>(null);
   const [redeemed, setRedeemed] = useState(false);
-  // The code just made comes into sight: it is drawn below the button, and
-  // "Its code is below" must not point under the screen's edge (#511).
+  // The code just made comes into sight: it is drawn below the button, nothing
+  // else shows that it was made, and it must not stay under the screen's edge (#511, #581).
   const codeCard = useRevealOn(made?.id ?? null);
 
-  const say = (next: Notice) => {
-    if (SAID_ONLY.has(next)) {
+  const say = (next: Notice, drawn = !SAID_ONLY.has(next)) => {
+    if (!drawn) {
       sayAloud(t(NOTICE[next]));
       return;
     }
@@ -122,8 +123,10 @@ export function Invitations({
     setBusy(true);
     setNotice(null);
     const outcome = await change();
-    await view.refresh();
-    say(outcome);
+    const read = await view.refresh();
+    // Only a read takes a withdrawn invitation off the list: without one it
+    // still stands there, and the words are all that tell the eye.
+    say(outcome, !SAID_ONLY.has(outcome) || (outcome === "withdrawn" && !read));
     setBusy(false);
   };
 

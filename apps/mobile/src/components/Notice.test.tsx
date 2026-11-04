@@ -1,10 +1,11 @@
 import { screen } from "@testing-library/react-native";
 import { AccessibilityInfo, Platform } from "react-native";
 import { renderWithTheme, underProviders } from "@/test/render";
-import { Notice } from "./Notice";
+import { Notice, sayAloud } from "./Notice";
 
 // What came of a change (#511): a live region for Android and the web, and
-// said aloud on iOS, which has none.
+// said aloud on iOS, which has none. Words for a screen reader alone (#581):
+// told on every platform, since no line is drawn for a live region to read.
 
 describe("Notice", () => {
   afterEach(() => jest.restoreAllMocks());
@@ -34,5 +35,29 @@ describe("Notice", () => {
     said.mockClear();
     await renderWithTheme(<Notice words="Saved." />);
     expect(said).not.toHaveBeenCalled();
+  });
+});
+
+describe("sayAloud", () => {
+  const calls = () => ({
+    queued: jest.spyOn(AccessibilityInfo, "announceForAccessibilityWithOptions").mockClear(),
+    plain: jest.spyOn(AccessibilityInfo, "announceForAccessibility").mockClear(),
+  });
+  afterEach(() => jest.restoreAllMocks());
+
+  it("queues the words on iOS behind what is being said, as leaving a field moves the focus", () => {
+    jest.replaceProperty(Platform, "OS", "ios");
+    const { queued, plain } = calls();
+    sayAloud("Saved.");
+    expect(queued.mock.calls).toEqual([["Saved.", { queue: true }]]);
+    expect(plain).not.toHaveBeenCalled();
+  });
+
+  it.each(["android", "web"] as const)("tells the reader on %s with the plain call", (os) => {
+    jest.replaceProperty(Platform, "OS", os);
+    const { queued, plain } = calls();
+    sayAloud("Saved.");
+    expect(plain.mock.calls).toEqual([["Saved."]]);
+    expect(queued).not.toHaveBeenCalled();
   });
 });

@@ -238,7 +238,7 @@ export function SignInScreen({ code, error, until }: SignInParams) {
         </Text>
         <Text className="w-full max-w-md text-center">{t("signIn.explain")}</Text>
 
-        {/* Right after a break began on this device (#170): why the sign-in is back, and that nothing is lost. */}
+        {/* Right after a break began on this device (#170): why the sign-in is back. */}
         {/* Right after the lock signed this phone out (#418): why, and that the lock is off now. */}
         {session.status === "signed-out" && session.notice === "lock" && (
           <Card className="w-full max-w-md">

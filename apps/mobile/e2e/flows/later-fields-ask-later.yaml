@@ -67,9 +67,8 @@ name: Fill in the rest walks the unanswered fields in order, and Ask me later wr
 
 # After the last: the way to stay in touch, then home. Nothing was written.
 - extendedWaitUntil:
-    visible: "That is everything\\. Thank you\\.|Siinä kaikki\\. Kiitos\\.|Det var allt\\. Tack\\."
+    visible: "A way to stay in touch|Tapa pitää yhteyttä|Ett sätt att hålla kontakten"
     timeout: 15000
-- assertVisible: "A way to stay in touch|Tapa pitää yhteyttä|Ett sätt att hålla kontakten"
 - assertVisible: "Your deal-breakers|Ehdottomat rajasi|Dina absoluta gränser"
 - openLink: kuutti://profile/later/drugsAttitude
 - extendedWaitUntil:

@@ -10,7 +10,7 @@ The association has one measure of success: people who find someone. #83 asked f
 
 ## Decision
 
-1. **An indication only.** Telling Kuutti changes no state, no visibility, no session, no round, no conversation, and nothing another person reads. Stepping away is the break (ADR-022) or the deletion (ADR-007), and the screen says where they are.
+1. **An indication only.** Telling Kuutti changes no state, no visibility, no session, no round, no conversation, and nothing another person reads. Stepping away is the break (ADR-022) or the deletion (ADR-007), both on the screen just left, Your account.
 2. **Three reasons, closed.** `here` (on Kuutti), `elsewhere`, `other` (`FoundReason`, `packages/schema/src/found-them.ts`), as radio buttons in words. "Another reason" never asks for words: there is no text to store, read or moderate.
 3. **The count names nobody.** `found_them_count` (migration 0073, generated) holds a count per Finnish day and reason, and nothing else. `POST /account/found-them` adds one to the day's row in the transaction that records the answer (`tellFoundThem`, `apps/api/src/identity/found-them.ts`). The row is not personal data, so it outlives every erasure, and the measure counts those who later left.
 4. **Once per account, never the reason.** `account.found_them_answered` (in 0073) is all the account keeps: the reason is in the count and, with research consent, in the event, never on the account. The answer takes the account row's lock first, so two devices answering at once count once; a second answer is 409 `found_them_answered`, said in the request's language, and counts nothing. `GET /account/found-them` tells the screen whether to ask or to thank. Erasure clears the flag with the tombstone; the export carries it (`foundThemAnswered`, ADR-007). A person who erases and registers again is a new account and may answer again.
@@ -44,3 +44,4 @@ The association has one measure of success: people who find someone. #83 asked f
 ## History
 
 - 2026-10-21: written with #83's build, on the maintainer's decisions of that day.
+- 2026-11-04 (#581, the maintainer's yes to the table of that day, rows S81, S86 and S87): §1, in place: the screen no longer says where the break and the deletion are, as §1 had it do, since both are on the screen just left, Your account. §1's rule does not change. Its lines are "Your answer is shown to nobody, and it is counted without your name." and "Nothing changes in the app." §7's button has no line under it.

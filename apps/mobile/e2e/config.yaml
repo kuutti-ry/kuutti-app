@@ -44,7 +44,7 @@ executionOrder:
     - Feedback sent from Settings is thanked, the kind chosen in words
     - The language choice in Settings changes the app's language at once
     - The photo descriptions setting shows them under the photos and chooses what they tell
-    - The decision buttons setting places Like and Pass for either hand, and one-handed
+    - The Like and Pass setting places them for either hand, and one-handed
     - The session, the theme and the language survive closing and reopening the app
     - A passcode set in Settings locks the app at a cold start and back from the background, and the bank is the way out
     - A sign-in link not asked for is refused without touching the session, and every refusal is said in its own words
