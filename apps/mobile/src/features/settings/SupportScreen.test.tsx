@@ -234,19 +234,18 @@ describe("the support page (#510)", () => {
   );
 
   it.each([
-    ["a common phone", 393, 1, true],
-    ["the narrowest width of two columns", 380, 1, true],
-    ["just under it, an iPhone SE", 375, 1, false],
-    ["a narrow phone", 320, 1, false],
-    ["a large text size", 393, 1.3, false],
-    ["the largest text size", 430, 2, false],
-  ])("lays the services out for %s", async (_size, width, fontScale, twoColumns) => {
+    ["an Android phone", 411, 1],
+    ["a common iPhone", 393, 1],
+    ["a narrow phone", 320, 1],
+    ["a tablet", 800, 1],
+    ["the largest text size", 430, 2],
+  ])("stacks the services one under another on %s", async (_size, width, fontScale) => {
     atSize(width, fontScale);
     await renderWithTheme(<SupportScreen />);
-    expect(screen.getByTestId("support-grid").props.className.includes("flex-row")).toBe(
-      twoColumns,
-    );
-    expect(JSON.stringify(screen.toJSON()).includes("basis-[48%]")).toBe(twoColumns);
+    const list = screen.getByTestId("support-list");
+    expect(list.props.className).not.toMatch(/flex-row|flex-wrap/);
+    expect(list.props.children).toHaveLength(4);
+    expect(JSON.stringify(screen.toJSON())).not.toMatch(/basis-/);
   });
 
   it("keeps the logos from a screen reader: the names say the same in words", async () => {
