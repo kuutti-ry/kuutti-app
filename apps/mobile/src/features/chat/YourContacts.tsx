@@ -129,7 +129,8 @@ export function YourContacts({ onStored }: { onStored?: (kept: readonly ContactK
  * are right. An emptied field takes nothing away: the kept one comes back,
  * and Remove is the way. A keep or a removal counts with the messages of a
  * minute (#103), and one past them, or a failure, keeps the words with a way
- * to try again. One request at a time; an answer leaves alone what was typed
+ * to try again: Try again while the field holds words it can send, Remove for
+ * a removal. One request at a time; an answer leaves alone what was typed
  * after it was asked. Leaving Settings with a change not yet sent sends it
  * on the way out.
  */
@@ -181,6 +182,9 @@ function ContactCard({
   const kept = formOf(words, region);
   const form = kept !== null && !REFUSED.has(kept as Notice) ? kept : null;
   const refused = notice !== null && REFUSED.has(notice);
+  // What leaving the field would send, and so all that Try again can do: after a
+  // removal that failed the field holds what is kept, and Remove is the way again.
+  const sendable = form !== null && form !== stored;
   // Typed and not kept: words that are no contact of the kind, or a right one
   // the API did not take (a failure, the minute's messages). A right one not
   // sent yet goes on the way out, and needs no word.
@@ -389,7 +393,7 @@ function ContactCard({
               <Said words={answerWords} refused={REFUSED.has(said.notice)} answer={said.answer} />
             </View>
           </View>
-          {(said.notice === "pace" || said.notice === "failed") && (
+          {(said.notice === "pace" || said.notice === "failed") && sendable && (
             <Button
               variant="outline"
               className="self-start"

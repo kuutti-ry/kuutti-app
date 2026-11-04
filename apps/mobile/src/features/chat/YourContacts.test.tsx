@@ -103,6 +103,34 @@ const show = async () => {
   await renderWithTheme(<YourContacts />);
   await screen.findByText(/Nobody sees them/);
 };
+const FAILED = "Nothing changed. Check your connection and try again.";
+const PACE = "That was a lot in a short time. Wait a moment and try again.";
+/** How a write fails, as a test's name says it, with what the card then says. */
+type Failure = { how: string; answer: () => Response | Error; words: string };
+const SERVER_ERROR: Failure = {
+  how: "answers 500",
+  answer: () => refusal("internal_error", 500),
+  words: FAILED,
+};
+const PAST_THE_MINUTE: Failure = {
+  how: "is past the minute's messages",
+  answer: () => refusal("message_budget_exceeded", 429),
+  words: PACE,
+};
+const NO_CONNECTION: Failure = {
+  how: "finds no connection",
+  answer: () => new TypeError("Network request failed"),
+  words: FAILED,
+};
+const noTryAgain = () => expect(screen.queryByRole("button", { name: "Try again" })).toBeNull();
+/** The contacts' routes with the first write answered by `answer`, and those after it as usual. */
+const firstWrite = (stored: Partial<Record<ContactKind, string>>, answer: Response | Error) =>
+  contactsApi(stored, [
+    json({
+      contacts: Object.entries(stored).map(([kind, value]) => ({ kind, value, updatedAt: AT })),
+    }),
+    answer,
+  ]);
 
 beforeEach(async () => {
   (useLocales as jest.Mock).mockReturnValue([{ languageTag: "en-US" }]);
@@ -419,7 +447,6 @@ describe("Ways to reach you", () => {
   });
 
   it("says a keep or a removal past the messages of a minute as the share dialog does, keeping the piece and the words", async () => {
-    const PACE = "That was a lot in a short time. Wait a moment and try again.";
     const { server, writes } = contactsApi({ telegram: "aino_k" }, [
       json({ contacts: [{ kind: "telegram", value: "aino_k", updatedAt: AT }] }),
       refusal("message_budget_exceeded", 429),
@@ -480,6 +507,148 @@ describe("Ways to reach you", () => {
     expect(told().queued).not.toContain(REMOVED);
     expect(field("Your phone number").props.value).toBe("40 1234567");
     expect(button("Remove your phone number")).toBeTruthy();
+  });
+
+  // Each kind's kept piece, read back from its field, is the piece itself: nothing to send.
+  it.each<{ failure: Failure; name: string; kind: ContactKind; stored: string }>([
+    { failure: SERVER_ERROR, name: "phone number", kind: "phone", stored: "+358401234567" },
+    { failure: PAST_THE_MINUTE, name: "WhatsApp number", kind: "whatsapp", stored: "+46701234567" },
+    { failure: NO_CONNECTION, name: "Telegram username", kind: "telegram", stored: "aino_k" },
+    { failure: SERVER_ERROR, name: "Instagram username", kind: "instagram", stored: "aino.k" },
+    { failure: PAST_THE_MINUTE, name: "Snapchat username", kind: "snapchat", stored: "aino-k" },
+  ])(
+    "draws no Try again after a removal that $failure.how, of the $name kept, and Remove sends it again",
+    async ({ failure: { answer, words }, name, kind, stored }) => {
+      const { server, writes } = firstWrite({ [kind]: stored }, answer());
+      await show();
+      const before = field(`Your ${name}`).props.value;
+      await press(`Remove your ${name}`);
+      expect(screen.getByText(words)).toBeTruthy();
+      noTryAgain();
+      expect(field(`Your ${name}`).props.value).toBe(before);
+      expect(disabled(`Remove your ${name}`)).toBe(false);
+      expect(server[kind]).toBe(stored);
+      noProblems();
+      await press(`Remove your ${name}`);
+      const removal = { method: "DELETE", path: `/contacts/${kind}`, body: null };
+      expect(writes()).toEqual([removal, removal]);
+      expect(server[kind]).toBeUndefined();
+      expect(screen.queryByText(words)).toBeNull();
+      expect(field(`Your ${name}`).props.value).toBe("");
+      expect(screen.queryByRole("button", { name: `Remove your ${name}` })).toBeNull();
+    },
+  );
+
+  it.each<{
+    failure: Failure;
+    name: string;
+    kind: ContactKind;
+    stored?: string;
+    typed: string;
+    sent: string;
+    shown: string;
+  }>([
+    {
+      failure: SERVER_ERROR,
+      name: "Telegram username",
+      kind: "telegram",
+      typed: "@aino_k2",
+      sent: "aino_k2",
+      shown: "aino_k2",
+    },
+    {
+      failure: PAST_THE_MINUTE,
+      name: "phone number",
+      kind: "phone",
+      stored: "+358401234567",
+      typed: "040 765 4321",
+      sent: "+358407654321",
+      shown: "40 7654321",
+    },
+    {
+      failure: NO_CONNECTION,
+      name: "Instagram username",
+      kind: "instagram",
+      stored: "aino.k",
+      typed: "@Aino.K2",
+      sent: "aino.k2",
+      shown: "aino.k2",
+    },
+  ])(
+    "keeps Try again after a save that $failure.how, of the $name, and it sends the words again",
+    async ({ failure: { answer, words }, name, kind, stored, typed, sent, shown }) => {
+      const { server, writes } = firstWrite(stored ? { [kind]: stored } : {}, answer());
+      await show();
+      await type(`Your ${name}`, typed);
+      await leave(`Your ${name}`);
+      expect(screen.getByText(words)).toBeTruthy();
+      expect(field(`Your ${name}`).props.value).toBe(typed);
+      expect(server[kind]).toBe(stored);
+      noProblems();
+      await press("Try again");
+      const save = { method: "PUT", path: `/contacts/${kind}`, body: { value: sent } };
+      expect(writes()).toEqual([save, save]);
+      expect(server[kind]).toBe(sent);
+      expect(field(`Your ${name}`).props.value).toBe(shown);
+      expect(screen.getByText("Saved.")).toBeTruthy();
+      expect(screen.queryByText(words)).toBeNull();
+      noTryAgain();
+    },
+  );
+
+  it.each<[string, string | undefined, string]>([
+    ["back at the one kept", "aino_k", "aino_k"],
+    ["back at the one kept, written with its @", "aino_k", "@aino_k"],
+    ["emptied, with one kept", "aino_k", ""],
+    ["emptied, with none kept", undefined, ""],
+    ["holding words that are refused, with one kept", "aino_k", "aino"],
+    ["holding words that are refused, with none kept", undefined, "aino"],
+  ])(
+    "takes a failed save's Try again away from a field %s, and brings it back for words it can send",
+    async (_what, stored, typed) => {
+      const { writes } = firstWrite(stored ? { telegram: stored } : {}, SERVER_ERROR.answer());
+      await show();
+      await type("Your Telegram username", "aino_k2");
+      await leave("Your Telegram username");
+      expect(button("Try again")).toBeTruthy();
+      await type("Your Telegram username", typed);
+      noTryAgain();
+      expect(writes()).toHaveLength(1);
+      await type("Your Telegram username", "aino_k3");
+      await press("Try again");
+      expect(writes()).toEqual([
+        { method: "PUT", path: "/contacts/telegram", body: { value: "aino_k2" } },
+        { method: "PUT", path: "/contacts/telegram", body: { value: "aino_k3" } },
+      ]);
+    },
+  );
+
+  it("draws no Try again after a removal that failed with its field emptied first, and Remove still takes it away", async () => {
+    const { server, writes } = firstWrite({ telegram: "aino_k" }, SERVER_ERROR.answer());
+    await show();
+    // The keyboard still up: a tap on Remove counts without leaving the field.
+    await type("Your Telegram username", "");
+    await press("Remove your Telegram username");
+    expect(screen.getByText(FAILED)).toBeTruthy();
+    noTryAgain();
+    await press("Remove your Telegram username");
+    expect(writes().map((call) => call.method)).toEqual(["DELETE", "DELETE"]);
+    expect(server.telegram).toBeUndefined();
+  });
+
+  it("keeps Try again after a removal that failed with other words in the field, and it sends those words, as leaving the field would", async () => {
+    const { server, writes } = firstWrite({ telegram: "aino_k" }, SERVER_ERROR.answer());
+    await show();
+    await type("Your Telegram username", "aino_k2");
+    await press("Remove your Telegram username");
+    expect(screen.getByText(FAILED)).toBeTruthy();
+    await press("Try again");
+    expect(writes()).toEqual([
+      { method: "DELETE", path: "/contacts/telegram", body: null },
+      { method: "PUT", path: "/contacts/telegram", body: { value: "aino_k2" } },
+    ]);
+    expect(server.telegram).toBe("aino_k2");
+    expect(button("Remove your Telegram username")).toBeTruthy();
   });
 
   it("sends one request at a time, holds Remove and the code meanwhile, and leaves alone what was typed after it", async () => {
