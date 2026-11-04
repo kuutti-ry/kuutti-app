@@ -8,7 +8,7 @@ test("a report is opened, its pointed photo shown, and dismissed through its con
   page,
 }) => {
   await signInAsModerator(page, "/reports");
-  await expect(page.getByText("1 report waits.")).toBeVisible();
+  await expect(page.getByText("1 waiting", { exact: true })).toBeVisible();
   // One link per report, named by its reason, its source and when it was filed.
   await page.getByRole("link", { name: /^Harassment, from a conversation · Filed / }).click();
   await expect(page.getByRole("heading", { level: 2, name: /^Report / })).toBeVisible();
@@ -29,6 +29,17 @@ test("a report is opened, its pointed photo shown, and dismissed through its con
     .poll(() => picture.evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth > 0))
     .toBe(true);
 
+  // A sanction's step here says what more applying one does. Cancelled, it sends nothing, and the
+  // report still waits to be dismissed.
+  await page
+    .getByRole("group", { name: "Act on the reported person" })
+    .getByRole("button", { name: "Warn" })
+    .click();
+  const warn = page.getByRole("dialog", { name: "Warn this person" });
+  await expect(warn).toContainText("Applying one also closes this report as acted on");
+  await warn.getByRole("button", { name: "Cancel" }).click();
+  await expect(warn).toBeHidden();
+
   await page.getByRole("button", { name: "Dismiss", exact: true }).click();
   const step = page.getByRole("dialog", { name: "Dismiss the report" });
   await expect(step).toContainText(
@@ -39,5 +50,9 @@ test("a report is opened, its pointed photo shown, and dismissed through its con
   await expect(page.getByText("Report dismissed.")).toBeVisible();
 
   await page.getByRole("link", { name: "Back to the reports" }).click();
-  await expect(page.getByText("Nothing waits.")).toBeVisible();
+  await expect(page.getByText("Nothing waiting", { exact: true })).toBeVisible();
+
+  // Decided reports are behind the filter, whose name is only heard now (#581), and counted.
+  await page.getByRole("group", { name: "Show" }).getByRole("radio", { name: "Decided" }).check();
+  await expect(page.getByText(/^\d+ decided$/)).toBeVisible();
 });

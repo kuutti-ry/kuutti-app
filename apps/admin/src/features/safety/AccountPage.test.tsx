@@ -218,7 +218,9 @@ describe("the way to a person's page", () => {
   it("refuses what is not an account id, asking nothing, and the words go when the field changes", async () => {
     const calls = fetchMock([]);
     show("/accounts");
-    expect(screen.getByRole("heading", { level: 2, name: "A person's page" })).toBeInTheDocument();
+    const heading = screen.getByRole("heading", { level: 2, name: "A person" });
+    // The whole screen: its field and its button say what it takes (#581).
+    expect(heading.closest("section")?.textContent).toBe("A personAccount idOpen the page");
     const field = screen.getByLabelText("Account id");
     for (const typed of ["", "Aino", `${ID}0`, ID.replace(/-/g, "")]) {
       fireEvent.change(field, { target: { value: typed } });
@@ -228,7 +230,7 @@ describe("the way to a person's page", () => {
     }
     fireEvent.change(field, { target: { value: ID.slice(0, 8) } });
     expect(screen.queryByRole("alert")).toBeNull();
-    expect(screen.getByRole("heading", { level: 2, name: "A person's page" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 2, name: "A person" })).toBeInTheDocument();
     expect(calls).toHaveLength(0);
   });
 
@@ -266,7 +268,7 @@ describe("a person's page", () => {
     ];
     fetchMock([pageOf(page({ audit })), sanctionsOf(sanctions)]);
     show();
-    const table = await screen.findByRole("table", { name: "Newest first, at most fifty" });
+    const table = await screen.findByRole("table", { name: "At most fifty" });
     const [cells] = within(table)
       .getAllByRole("row")
       .slice(1)
@@ -322,7 +324,7 @@ describe("a person's page", () => {
     expect(termValue("smoking")).toBe("never");
 
     // The photos: state, the reason a rejection named, the upload's time; no picture yet.
-    const photos = screen.getAllByRole("button", { name: "Show the photo" });
+    const photos = screen.getAllByRole("button", { name: "Show photo" });
     expect(photos).toHaveLength(2);
     const [approved, rejected] = photos.map((button) => button.closest("li"));
     expect(approved).toHaveTextContent(`approved · ${when(UPLOADED)}`);
@@ -351,7 +353,9 @@ describe("a person's page", () => {
     expect(idea).not.toHaveTextContent("handled");
 
     // What staff did and saw: a captioned table, the actor by the start of their id, the detail as JSON.
-    const audit = screen.getByRole("table", { name: "Newest first, at most fifty" });
+    // The caption is drawn: past fifty rows nothing else says that older ones exist (#581).
+    const audit = screen.getByRole("table", { name: "At most fifty" });
+    expect(within(audit).getByText("At most fifty")).not.toHaveClass("sr-only");
     expect(
       within(audit)
         .getAllByRole("columnheader")
@@ -392,7 +396,7 @@ describe("a person's page", () => {
     expect(screen.queryByText("Suspension")).toBeNull();
     // Nor the actions: an erased account's page shows nothing more (#306).
     expect(screen.queryByRole("group", { name: "Actions on this person" })).toBeNull();
-    expect(screen.queryByRole("button", { name: "Show the photo" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Show photo" })).toBeNull();
     expect(screen.queryByText("None.")).toBeNull();
     expect(screen.queryByRole("table")).toBeNull();
     expect(asked(calls)).toEqual([`GET /admin/accounts/${ID}`]);
@@ -485,13 +489,15 @@ describe("a person's page", () => {
     ]) {
       fetchMock([pageOf(page()), on(`/admin/accounts/${ID}/sanctions`, sanctionsAnswer)]);
       show();
-      expect(await screen.findByRole("alert")).toHaveTextContent(
-        "The sanctions could not be loaded.",
-      );
+      const alert = await screen.findByRole("alert");
+      expect(alert).toHaveTextContent(/^Could not be loaded\.$/);
       expect(screen.getAllByRole("alert")).toHaveLength(1);
-      expect(screen.queryByText("The page could not be loaded.")).toBeNull();
+      // Of what: the heading right above says so (#581).
+      expect(
+        screen.getByRole("heading", { level: 3, name: "Sanctions" }).parentElement,
+      ).toContainElement(alert);
       expect(termValue("Name")).toBe("Aino");
-      expect(screen.getAllByRole("button", { name: "Show the photo" })).toHaveLength(2);
+      expect(screen.getAllByRole("button", { name: "Show photo" })).toHaveLength(2);
       expect(screen.getByText(/The map froze\./)).toBeInTheDocument();
       expect(screen.getByRole("table")).toBeInTheDocument();
       cleanup();
@@ -525,9 +531,11 @@ describe("a person's page", () => {
       vi.spyOn(console, "error").mockImplementation(() => undefined);
       const calls = fetchMock([on(`/admin/accounts/${ID}`, answer)]);
       show();
-      expect(await screen.findByRole("alert")).toHaveTextContent("The page could not be loaded.");
+      expect(await screen.findByRole("alert")).toHaveTextContent(/^Could not be loaded\.$/);
       expect(screen.queryByText("Loading the page…")).toBeNull();
       expect(screen.queryByText("No account has this id.")).toBeNull();
+      // Under the page's own heading, with no section of it standing.
+      expect(screen.queryByRole("heading", { level: 3 })).toBeNull();
       expect(asked(calls)).toEqual([`GET /admin/accounts/${ID}`]);
       cleanup();
       vi.unstubAllGlobals();
@@ -541,7 +549,6 @@ describe("a person's page", () => {
     expect(screen.getByRole("heading", { level: 2, name: "Account 6f1c1c4e" })).toBeInTheDocument();
     expect(screen.queryByRole("alert")).toBeNull();
     expect(screen.queryByText("No account has this id.")).toBeNull();
-    expect(screen.queryByText("The page could not be loaded.")).toBeNull();
     expect(asked(calls)).toEqual([`GET /admin/accounts/${ID}`]);
   });
 
@@ -549,7 +556,7 @@ describe("a person's page", () => {
     const logged = vi.spyOn(console, "error").mockImplementation(() => undefined);
     fetchMock([pageOf({ ...page(), state: "frozen" }), sanctionsOf(sanctions)]);
     show();
-    expect(await screen.findByRole("alert")).toHaveTextContent("The page could not be loaded.");
+    expect(await screen.findByRole("alert")).toHaveTextContent(/^Could not be loaded\.$/);
     expect(screen.queryByText("Aino")).toBeNull();
     expect(logged).toHaveBeenCalledWith("account page load failed", expect.anything());
     expect(String(logged.mock.calls[0]?.[1])).not.toContain("Aino");
@@ -557,10 +564,10 @@ describe("a person's page", () => {
 });
 
 describe("a photo on a person's page", () => {
-  it("is asked for only when the moderator presses Show the photo, one photo at a time", async () => {
+  it("is asked for only when the moderator presses Show photo, one photo at a time", async () => {
     const calls = fetchMock([pageOf(page()), sanctionsOf([]), cardOf(1, card(1))]);
     show();
-    const [first, second] = await screen.findAllByRole("button", { name: "Show the photo" });
+    const [first, second] = await screen.findAllByRole("button", { name: "Show photo" });
     if (!first || !second) throw new Error("no buttons");
     expect(asked(calls).filter((call) => call.endsWith("/card"))).toEqual([]);
     fireEvent.click(first);
@@ -573,7 +580,7 @@ describe("a photo on a person's page", () => {
       `GET /admin/photos/${photoId(1)}/card`,
     ]);
     // The other photo still waits to be asked for.
-    expect(screen.getAllByRole("button", { name: "Show the photo" })).toHaveLength(1);
+    expect(screen.getAllByRole("button", { name: "Show photo" })).toHaveLength(1);
     expect(screen.getAllByRole("img")).toHaveLength(1);
   });
 
@@ -581,14 +588,14 @@ describe("a photo on a person's page", () => {
     let answer = (): Response => failure(500, "internal_error");
     fetchMock([pageOf(page()), sanctionsOf([]), cardOf(2, () => answer())]);
     show();
-    const buttons = await screen.findAllByRole("button", { name: "Show the photo" });
+    const buttons = await screen.findAllByRole("button", { name: "Show photo" });
     fireEvent.click(buttons[1] as HTMLElement);
     expect(await screen.findByRole("alert")).toHaveTextContent("The photo could not be shown.");
     expect(screen.queryByRole("img")).toBeNull();
-    expect(screen.getAllByRole("button", { name: "Show the photo" })).toHaveLength(2);
+    expect(screen.getAllByRole("button", { name: "Show photo" })).toHaveLength(2);
 
     answer = card(2);
-    fireEvent.click(screen.getAllByRole("button", { name: "Show the photo" })[1] as HTMLElement);
+    fireEvent.click(screen.getAllByRole("button", { name: "Show photo" })[1] as HTMLElement);
     expect(await screen.findByRole("img", { name: shownPhoto("rejected") })).toHaveAttribute(
       "src",
       cardUrl(2),
@@ -603,17 +610,17 @@ describe("a photo on a person's page", () => {
       cardOf(1, () => failure(403, "admin_forbidden")),
     ]);
     show();
-    const [first] = await screen.findAllByRole("button", { name: "Show the photo" });
+    const [first] = await screen.findAllByRole("button", { name: "Show photo" });
     fireEvent.click(first as HTMLElement);
     await waitFor(() =>
       expect(asked(calls).filter((call) => call.endsWith("/card"))).toHaveLength(1),
     );
     await waitFor(() =>
-      expect(screen.getAllByRole("button", { name: "Show the photo" })[0]).toBeEnabled(),
+      expect(screen.getAllByRole("button", { name: "Show photo" })[0]).toBeEnabled(),
     );
     expect(screen.queryByRole("alert")).toBeNull();
     expect(screen.queryByRole("img")).toBeNull();
-    expect(screen.getAllByRole("button", { name: "Show the photo" })).toHaveLength(2);
+    expect(screen.getAllByRole("button", { name: "Show photo" })).toHaveLength(2);
   });
 
   it("asks once for a photo pressed twice before its answer: one look, one photo.view row", async () => {
@@ -630,7 +637,7 @@ describe("a photo on a person's page", () => {
       ),
     ]);
     show();
-    const [first] = await screen.findAllByRole("button", { name: "Show the photo" });
+    const [first] = await screen.findAllByRole("button", { name: "Show photo" });
     if (!first) throw new Error("no button");
     fireEvent.click(first);
     fireEvent.click(first);
@@ -651,7 +658,7 @@ describe("a photo on a person's page", () => {
   it("says the photo could not be shown when the answer is outside the contract", async () => {
     fetchMock([pageOf(page()), sanctionsOf([]), cardOf(1, () => json({ url: "not a url" }))]);
     show();
-    const [first] = await screen.findAllByRole("button", { name: "Show the photo" });
+    const [first] = await screen.findAllByRole("button", { name: "Show photo" });
     fireEvent.click(first as HTMLElement);
     expect(await screen.findByRole("alert")).toHaveTextContent("The photo could not be shown.");
     expect(screen.queryByRole("img")).toBeNull();
@@ -666,7 +673,7 @@ describe("a photo on a person's page", () => {
       }),
     ]);
     show();
-    const [first] = await screen.findAllByRole("button", { name: "Show the photo" });
+    const [first] = await screen.findAllByRole("button", { name: "Show photo" });
     fireEvent.click(first as HTMLElement);
     expect(await screen.findByRole("alert")).toHaveTextContent("The photo could not be shown.");
     expect(screen.queryByRole("img")).toBeNull();
@@ -679,7 +686,7 @@ describe("a photo on a person's page", () => {
 describe("taking a photo down on a person's page", () => {
   const STEP = "Take down this photo";
   const REASON = "Reason the person is told";
-  const DONE = "Taken down. Nobody else is given the photo from now on.";
+  const DONE = "Taken down.";
   const decisionOf =
     (n: number, answer: (req: Request) => Promise<Response> | Response): Handler =>
     (req) =>
@@ -743,7 +750,7 @@ describe("taking a photo down on a person's page", () => {
   it.each(["pending", "queued", "rejected"])("is not offered beside a %s photo", async (state) => {
     fetchMock([pageOf(page({ photos: [photo(1, state)] })), sanctionsOf([])]);
     show();
-    await screen.findByRole("button", { name: "Show the photo" });
+    await screen.findByRole("button", { name: "Show photo" });
     expect(screen.queryByRole("button", { name: "Take down…" })).toBeNull();
   });
 
@@ -763,8 +770,10 @@ describe("taking a photo down on a person's page", () => {
     ]);
     show();
     const step = await openStep();
-    expect(step).toHaveTextContent("Nobody else is given this photo from now on");
-    expect(step).toHaveTextContent("it is not a sanction");
+    // The effect in words (ADR-006 §2), the same picture coming back through the check among them.
+    expect(step).toHaveTextContent(
+      "Nobody else is given this photo from now on. The person keeps it in their own list with the reason you choose, and cannot appeal. Nothing is deleted, and it is not a sanction. Should they upload the same picture again, the automatic check looks at it, not a person.",
+    );
     // No reason is preset (#250): the step waits for one chosen on purpose.
     const select = within(step).getByRole("combobox", { name: REASON });
     expect(select).toHaveValue("");
@@ -793,7 +802,7 @@ describe("taking a photo down on a person's page", () => {
     const done = await screen.findByText(DONE);
     await waitFor(() => expect(done).toHaveFocus());
     await waitFor(() => expect(screen.queryByRole("button", { name: "Take down…" })).toBeNull());
-    const [first] = screen.getAllByRole("button", { name: "Show the photo" });
+    const [first] = screen.getAllByRole("button", { name: "Show photo" });
     expect(first?.closest("li")).toHaveTextContent(`rejected · other · ${when(UPLOADED)}`);
     expect(asked(calls)).toEqual([
       `GET /admin/accounts/${ID}`,

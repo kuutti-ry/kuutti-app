@@ -1,4 +1,4 @@
-import { formatTime, type PlainMessageKey } from "@kuutti/i18n";
+import type { PlainMessageKey } from "@kuutti/i18n";
 import { useT } from "@kuutti/i18n/react";
 import type { ModeratorRole } from "@kuutti/schema";
 import {
@@ -151,7 +151,7 @@ const SCREENS: readonly Screen[] = [
 ];
 
 export function App() {
-  const { t, locale } = useT();
+  const { t } = useT();
   const session = useStaffSession();
   const screens =
     session.status === "signed-in"
@@ -175,10 +175,7 @@ export function App() {
         {session.status === "signed-in" && (
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
             <p className="text-sm text-muted-foreground">
-              {t("admin.session.role", { role: session.session.role })} ·{" "}
-              {t("admin.session.expires", {
-                time: formatTime(locale, new Date(session.session.expiresAt)),
-              })}
+              {t("admin.session.role", { role: session.session.role })}
             </p>
             <Button variant="outline" onClick={() => void session.signOut()}>
               <LogOut aria-hidden="true" />

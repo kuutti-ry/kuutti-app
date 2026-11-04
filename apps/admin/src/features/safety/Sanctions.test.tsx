@@ -157,8 +157,8 @@ function show(role: ModeratorRole | null = "moderator") {
 }
 
 const ACTIONS = "Actions on this person";
-const NOTE = "Note: what happened, in a few words";
-const ENDS = "Suspended until the start of this day";
+const NOTE = "Note";
+const ENDS = "Suspended until";
 const TEXT = "Spam links in every chat";
 const REASONS = [
   "Choose a reason",
@@ -169,7 +169,7 @@ const REASONS = [
   "Scraping",
   "Other",
 ];
-const MODERATOR_ACTIONS = ["Warn", "Hide from others (shadow ban)", "Suspend until a day"];
+const MODERATOR_ACTIONS = ["Warn", "Shadow ban", "Suspend"];
 
 const actions = () => screen.findByRole("group", { name: ACTIONS });
 /** The sanctions' own status line: the photos above them have theirs (#477). */
@@ -214,7 +214,7 @@ const STEP_ROUTE: Record<Step, (item: SanctionEntry) => string> = {
   lift: liftRoute,
   review: reviewRoute,
 };
-const ACTION_NAME = { warn: "Warn", suspend: "Suspend until a day", ban: "Ban" } as const;
+const ACTION_NAME = { warn: "Warn", suspend: "Suspend", ban: "Ban" } as const;
 
 /** Opens a step and fills it in, ready to send: its opener, the dialog, and the button that sends. */
 async function ready(step: Step, item: SanctionEntry = OPEN) {
@@ -253,7 +253,7 @@ describe("the actions on a person", () => {
   it.each<[string, ModeratorRole | null]>([
     ["a moderator", "moderator"],
     ["a page outside the shell, with no role", null],
-  ])("are warn, hide and suspend for %s, with no ban", async (_who, role) => {
+  ])("are warn, shadow ban and suspend for %s, with no ban", async (_who, role) => {
     fetchMock([thePage(), listOf([])]);
     show(role);
     expect(buttonsIn(await actions())).toEqual(MODERATOR_ACTIONS);
@@ -264,6 +264,12 @@ describe("the actions on a person", () => {
     fetchMock([thePage(), listOf([])]);
     show("admin");
     expect(buttonsIn(await actions())).toEqual([...MODERATOR_ACTIONS, "Ban"]);
+  });
+
+  it("keep their group's name for a screen reader alone: the heading Sanctions stands right above them (#581)", async () => {
+    fetchMock([thePage(), listOf([])]);
+    show();
+    expect(within(await actions()).getByText(ACTIONS)).toHaveClass("sr-only");
   });
 
   it.each([
@@ -282,7 +288,7 @@ describe("the actions on a person", () => {
     {
       kind: "shadow_ban",
       role: "moderator",
-      button: "Hide from others (shadow ban)",
+      button: "Shadow ban",
       title: "Hide this person from others",
       effect:
         "Hides the person from everyone else at once, without telling them: they see no change.",
@@ -295,7 +301,7 @@ describe("the actions on a person", () => {
     {
       kind: "suspend",
       role: "moderator",
-      button: "Suspend until a day",
+      button: "Suspend",
       title: "Suspend this person",
       effect:
         "Ends every session now and refuses the bank login until the start of the chosen day in Finland, when the night lifts it.",
@@ -410,7 +416,7 @@ describe("the actions on a person", () => {
       vi.setSystemTime(now);
       fetchMock([thePage(), listOf([])]);
       show();
-      const { dialog } = press("Suspend until a day", await actions());
+      const { dialog } = press("Suspend", await actions());
       const day = within(dialog).getByLabelText(ENDS);
       expect(day).toHaveAttribute("min", min);
       expect(day).toHaveAttribute("max", max);
@@ -771,14 +777,14 @@ describe("the sanctions' history", () => {
     expect(lines(await rowOf(BY_KUUTTI.note))).toEqual([
       `Shadow ban · Scraping · ${when(APPLIED)}`,
       BY_KUUTTI.note,
-      "Applied by: Kuutti itself, by no person",
+      "Applied by: Kuutti itself",
     ]);
     // The night lifted the suspension: no person did.
     expect(lines(await rowOf(ENDED.note))).toEqual([
       `Suspension · Misrepresentation · ${when(APPLIED)} · until: ${when(UNTIL)}`,
       ENDED.note,
       "Applied by: a1b2c3d4, moderator",
-      `Lifted: ${when(UNTIL)}. Who: Kuutti itself, by no person`,
+      `Lifted: ${when(UNTIL)}. Who: Kuutti itself`,
     ]);
     expect(lines(await rowOf(KEPT.note))).toEqual([
       `Warning · Commercial use · ${when(APPLIED)}`,
@@ -824,27 +830,16 @@ describe("the sanctions' history", () => {
     }
   });
 
-  const SIGNS_IN =
-    "The person may sign in again, unless something else still open stops them. No session comes back: they sign in anew.";
+  const SIGNS_IN = "The person may sign in again, unless something else still open stops them.";
+  const SEEN_AGAIN = "Others see the person again, unless something else still open hides them.";
+  const MARKED_LIFTED = "The warning is marked lifted. Nothing else changes for the person.";
+  const WARNED = entry(30, { kind: "warn", endsAt: null, note: "A warning to lift" });
+  const HIDDEN = entry(31, { kind: "shadow_ban", endsAt: null, note: "Hidden for a while" });
   it.each<[string, ModeratorRole, SanctionEntry, string, string, string]>([
     ["a suspension", "moderator", SUSPENDED, "Lift: Suspension", "Lifted: Suspension.", SIGNS_IN],
     ["a ban", "admin", OPEN_BAN, "Lift: Ban", "Lifted: Ban.", SIGNS_IN],
-    [
-      "a warning",
-      "moderator",
-      entry(30, { kind: "warn", endsAt: null, note: "A warning to lift" }),
-      "Lift: Warning",
-      "Lifted: Warning.",
-      "The warning is marked lifted. Nothing else changes for the person.",
-    ],
-    [
-      "a shadow ban",
-      "moderator",
-      entry(31, { kind: "shadow_ban", endsAt: null, note: "Hidden for a while" }),
-      "Lift: Shadow ban",
-      "Lifted: Shadow ban.",
-      "Others see the person again, unless something else still open hides them. Their sessions are not touched.",
-    ],
+    ["a warning", "moderator", WARNED, "Lift: Warning", "Lifted: Warning.", MARKED_LIFTED],
+    ["a shadow ban", "moderator", HIDDEN, "Lift: Shadow ban", "Lifted: Shadow ban.", SEEN_AGAIN],
   ])(
     "lifts %s on its own route after a confirm step, saying what the lift does, then shows who lifted it",
     async (_what, role, item, title, done, effect) => {
@@ -920,11 +915,6 @@ describe("the sanctions' history", () => {
       show(role);
       const { dialog } = press("Look at it again", await rowOf(item.note));
       expect(screen.getByRole("dialog", { name: title })).toBe(dialog);
-      expect(
-        within(dialog).getByText(
-          "A second member of staff's look: a note, and keep it or lift it. Whoever applied it cannot.",
-        ),
-      ).toBeInTheDocument();
       const note = within(dialog).getByRole("textbox", { name: "Your note" });
       expect(note).toHaveFocus();
       expect(note).toHaveAccessibleDescription("Characters: 0/500");
@@ -969,7 +959,32 @@ describe("the sanctions' history", () => {
     },
   );
 
-  it("offers no Lift it when looking again at a sanction already lifted", async () => {
+  it.each<[string, ModeratorRole, SanctionEntry, string]>([
+    ["a warning", "moderator", WARNED, MARKED_LIFTED],
+    ["a shadow ban", "moderator", HIDDEN, SEEN_AGAIN],
+    ["a suspension", "moderator", SUSPENDED, SIGNS_IN],
+    ["a ban", "admin", OPEN_BAN, SIGNS_IN],
+  ])(
+    "says beside Lift it what lifting %s does, tied to that choice, and explains the step no further (#581)",
+    async (_what, role, item, effect) => {
+      fetchMock([thePage(), listOf([item])]);
+      show(role);
+      const { dialog } = press("Look at it again", await rowOf(item.note));
+      expect(within(dialog).getByRole("radio", { name: "Lift it" })).toHaveAccessibleDescription(
+        effect,
+      );
+      expect(
+        within(dialog).getByRole("radio", { name: "Keep it" }),
+      ).not.toHaveAccessibleDescription();
+      // The title, the note, the two choices and this line are the step: nothing above them says it again.
+      expect(dialog.querySelector("form")?.firstElementChild).toHaveTextContent(/^Your note/);
+      expect(within(dialog).getByText(effect).closest("fieldset")).toBe(
+        within(dialog).getByRole("group", { name: "Decision" }),
+      );
+    },
+  );
+
+  it("offers no Lift it when looking again at a sanction already lifted, and no word of what one does", async () => {
     fetchMock([thePage(), listOf([ENDED])]);
     show();
     const { dialog } = press("Look at it again", await rowOf(ENDED.note));
@@ -980,6 +995,7 @@ describe("the sanctions' history", () => {
         .map((radio) => radio.closest("label")?.textContent),
     ).toEqual(["Keep it"]);
     expect(within(dialog).queryByRole("radio", { name: "Lift it" })).toBeNull();
+    expect(dialog).not.toHaveTextContent(SIGNS_IN);
   });
 
   it("keeps the rest of the page and the actions when the list's answer is outside the contract", async () => {
@@ -987,10 +1003,12 @@ describe("the sanctions' history", () => {
     // An API a version behind the panel: sanctions without the roles now.
     fetchMock([thePage(), on("GET", LIST, () => json({ items: [answerOf(OPEN)] }))]);
     show();
-    expect((await screen.findByRole("alert")).textContent).toBe(
-      "The sanctions could not be loaded.",
-    );
-    expect(screen.queryByText("The page could not be loaded.")).toBeNull();
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toBe("Could not be loaded.");
+    // Of what: the heading right above says so, and the page stands around it (#581).
+    expect(
+      screen.getByRole("heading", { level: 3, name: "Sanctions" }).parentElement,
+    ).toContainElement(alert);
     expect(buttonsIn(await actions())).toEqual(MODERATOR_ACTIONS);
   });
 
@@ -1030,9 +1048,7 @@ describe("the sanctions' history", () => {
       on("POST", LIST, () => json(answerOf(added), 201)),
     ]);
     show();
-    expect(await screen.findByRole("alert")).toHaveTextContent(
-      "The sanctions could not be loaded.",
-    );
+    expect(await screen.findByRole("alert")).toHaveTextContent(/^Could not be loaded\.$/);
     expect(buttonsIn(await actions())).toEqual(MODERATOR_ACTIONS);
     expect(screen.queryByRole("list")).toBeNull();
     const { send } = await ready("warn");

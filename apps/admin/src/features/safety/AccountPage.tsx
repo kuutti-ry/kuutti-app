@@ -60,7 +60,6 @@ export function AccountLookup() {
   return (
     <section aria-labelledby="lookup-title" className="space-y-6">
       <ScreenTitle id="lookup-title">{t("admin.account.lookupTitle")}</ScreenTitle>
-      <p className="max-w-prose text-muted-foreground">{t("admin.account.lookupExplain")}</p>
       <Card className="max-w-2xl">
         <CardContent>
           <form className="grid gap-4" onSubmit={open}>
@@ -171,7 +170,7 @@ export function AccountPage() {
       <section aria-labelledby="account-title" className="space-y-6">
         <ScreenTitle id="account-title">{title}</ScreenTitle>
         {state.kind === "loading" && <Loading>{t("admin.account.loading")}</Loading>}
-        {state.kind === "error" && <Alert>{t("admin.account.error")}</Alert>}
+        {state.kind === "error" && <Alert>{t("admin.loadFailed")}</Alert>}
         {state.kind === "missing" && (
           <p className="text-muted-foreground">{t("admin.account.missing")}</p>
         )}
@@ -411,7 +410,7 @@ function PersonPhoto({
             onClick={() => void show()}
           >
             <Image aria-hidden="true" />
-            {t("admin.account.showPhoto")}
+            {t("admin.showPhoto")}
           </Button>
         </>
       )}

@@ -44,11 +44,11 @@ export function FeedbackList() {
         </Button>
       </div>
       {state.kind === "loading" && <Loading>{t("admin.feedback.loading")}</Loading>}
-      {state.kind === "error" && <Alert>{t("admin.feedback.error")}</Alert>}
+      {state.kind === "error" && <Alert>{t("admin.loadFailed")}</Alert>}
       {state.kind === "ready" && (
         <>
           <p aria-live="polite" className="text-muted-foreground">
-            {t("admin.feedback.total", { total: state.total })}
+            {t("admin.queue.total", { total: state.total })}
           </p>
           <ul className="grid gap-4">
             {state.items.map((item) => (
@@ -107,9 +107,11 @@ function FeedbackRow({ item, onHandled }: { item: FeedbackItem; onHandled: () =>
               platform: item.platform,
               locale: item.locale,
               time: formatDateTime(locale, new Date(item.createdAt)),
-              account: item.accountId.slice(0, 8),
             })}{" "}
-            · <Link to={`/accounts/${item.accountId}`}>{t("admin.account.pageLink")}</Link>
+            ·{" "}
+            <Link className="target" to={`/accounts/${item.accountId}`}>
+              {t("admin.queue.account", { account: item.accountId.slice(0, 8) })}
+            </Link>
           </p>
           <div className="flex flex-wrap items-center gap-3 border-t pt-3">
             {state === "failed" && <Alert>{t("admin.feedback.handleFailed")}</Alert>}

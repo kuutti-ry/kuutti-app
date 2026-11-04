@@ -1,3 +1,4 @@
+import { formatDateTime } from "@kuutti/i18n";
 import { I18nProvider } from "@kuutti/i18n/react";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes, useParams } from "react-router";
@@ -77,14 +78,15 @@ describe("the feedback list", () => {
       handledOk,
     ]);
     show();
-    expect(await screen.findByText("7 waiting.")).toBeTruthy();
+    expect(await screen.findByText("7 waiting")).toHaveAttribute("aria-live", "polite");
     const headings = screen.getAllByRole("heading", { level: 3 }).map((h) => h.textContent);
     expect(headings).toEqual(["Bug", "Praise"]);
     expect(screen.getByText("A few lines, number 1.")).toBeTruthy();
-    // The sender by the start of the account id, then the link to their page (#306).
-    expect(
-      screen.getByText(/Version 0\.22\.0, android, sv · .* · account 6f1c1c4e ·$/),
-    ).toHaveTextContent(/· account 6f1c1c4e · The person's page$/);
+    // The build and the time, then the sender by the start of the account id, itself the link to their page (#306, #581).
+    const sent = formatDateTime("en", new Date(item(2).createdAt));
+    expect(screen.getByText(/^Version 0\.22\.0, android, sv/).textContent).toBe(
+      `Version 0.22.0, android, sv · ${sent} · Account 6f1c1c4e`,
+    );
     expect(calls[0]?.headers.get("authorization")).toBe(`Bearer ${"t".repeat(43)}`);
 
     const [first] = screen.getAllByRole("button", { name: "Mark as handled" });
@@ -93,7 +95,7 @@ describe("the feedback list", () => {
     await waitFor(() => expect(screen.getByText("Handled.")).toBeTruthy());
     const marked = calls.find((c) => c.method === "POST");
     expect(marked && path(marked)).toBe(`/admin/feedback/${item(1).id}/handled`);
-    expect(screen.getByText("6 waiting.")).toBeTruthy();
+    expect(screen.getByText("6 waiting")).toBeTruthy();
     expect(screen.queryByText("A few lines, number 1.")).toBeNull();
     expect(screen.getByText("A few lines, number 2.")).toBeTruthy();
   });
@@ -107,9 +109,9 @@ describe("the feedback list", () => {
           : null,
     ]);
     show();
-    expect(await screen.findByText("Nothing waiting.")).toBeTruthy();
+    expect(await screen.findByText("Nothing waiting")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
-    expect(await screen.findByText("1 waiting.")).toBeTruthy();
+    expect(await screen.findByText("1 waiting")).toBeTruthy();
     expect(screen.getByText("A few lines, number 3.")).toBeTruthy();
   });
 
@@ -121,7 +123,7 @@ describe("the feedback list", () => {
           : null,
     ]);
     show();
-    expect(await screen.findByRole("alert")).toHaveTextContent("The feedback could not be loaded.");
+    expect(await screen.findByRole("alert")).toHaveTextContent(/^Could not be loaded\.$/);
     cleanup();
 
     fetchMock([
@@ -182,12 +184,15 @@ describe("the feedback list", () => {
         </MemoryRouter>
       </I18nProvider>,
     );
-    const links = await screen.findAllByRole("link", { name: "The person's page" });
-    expect(links.map((link) => link.getAttribute("href"))).toEqual([
-      `/accounts/${item(1).accountId}`,
-      `/accounts/${other}`,
-    ]);
-    fireEvent.click(links[1] as HTMLElement);
+    const first = await screen.findByRole("link", { name: "Account 6f1c1c4e" });
+    const second = screen.getByRole("link", { name: "Account 7a2d2d5f" });
+    expect(first).toHaveAttribute("href", `/accounts/${item(1).accountId}`);
+    expect(second).toHaveAttribute("href", `/accounts/${other}`);
+    // One link on a row, a 44 px target: its own name is all the row says of the sender (#581).
+    expect(first).toHaveClass("target");
+    expect(second).toHaveClass("target");
+    expect(screen.getAllByRole("link")).toHaveLength(2);
+    fireEvent.click(second);
     expect(await screen.findByRole("status")).toHaveTextContent(other);
     expect(screen.queryByText("A few lines, number 2.")).toBeNull();
   });

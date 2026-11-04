@@ -107,6 +107,7 @@ async function fetched(app: App, who: SignedIn, photoId: string, variant = "card
 type SanctionRow = {
   kind: string;
   reason: string;
+  note: string;
   created_by: string | null;
   rule: string | null;
   rule_count: number | null;
@@ -116,16 +117,24 @@ type SanctionRow = {
 async function sanctionsOf(db: Queryable, accountId: string): Promise<SanctionRow[]> {
   return (
     await db.query<SanctionRow>(
-      `SELECT kind, reason, created_by, rule, rule_count, lifted_at FROM sanction
+      `SELECT kind, reason, note, created_by, rule, rule_count, lifted_at FROM sanction
         WHERE account_id = $1 ORDER BY created_at, id`,
       [accountId],
     )
   ).rows;
 }
 
+/** Staff's words on a rule's ban: which rule applied it and no more, since by the time anybody reads them a moderator may have confirmed it (#581). */
+const RULE_NOTE: Record<string, string> = {
+  photo_fetches: "Applied by the automatic rule on other people's photos fetched within the window",
+  cards_served: "Applied by the automatic rule on cards served within the window",
+  round_reads: "Applied by the automatic rule on reads of the round within the window",
+};
+
 const byRule = (rule: string, count: number) => ({
   kind: "shadow_ban",
   reason: "scraping",
+  note: RULE_NOTE[rule],
   created_by: null,
   rule,
   rule_count: count,

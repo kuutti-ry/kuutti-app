@@ -45,3 +45,4 @@ The association has one measure of success: people who find someone. #83 asked f
 
 - 2026-10-21: written with #83's build, on the maintainer's decisions of that day.
 - 2026-11-04 (#581, the maintainer's yes to the table of that day, rows S81, S86 and S87): §1, in place: the screen no longer says where the break and the deletion are, as §1 had it do, since both are on the screen just left, Your account. §1's rule does not change. Its lines are "Your answer is shown to nobody, and it is counted without your name." and "Nothing changes in the app." §7's button has no line under it.
+- 2026-11-04 (#581, the maintainer's yes to the table of that day, row M13): §6's card on the panel's front page is its heading and its table, with no note between them. A reader is no longer told there that the count names nobody and outlives an erasure; §3 holds it unsaid: the table's catch, accepted with it.

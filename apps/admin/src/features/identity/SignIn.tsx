@@ -36,7 +36,6 @@ export function SignIn() {
           <h2 id="sign-in-title" className="text-2xl font-semibold tracking-tight">
             {t("admin.signIn.title")}
           </h2>
-          <p className="text-muted-foreground">{t("admin.signIn.explain")}</p>
           {error && <Alert>{t(ERRORS.get(error) ?? "admin.signIn.error.generic")}</Alert>}
           <Button
             className="w-full"
