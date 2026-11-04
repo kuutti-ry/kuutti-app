@@ -1,7 +1,7 @@
 import { Image } from "expo-image";
 import ExternalLink from "lucide-react-native/icons/external-link";
 import Phone from "lucide-react-native/icons/phone";
-import { useWindowDimensions, View } from "react-native";
+import { View } from "react-native";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Icon } from "@/components/ui/icon";
@@ -19,9 +19,6 @@ import {
   telOf,
 } from "./support-lines";
 
-/** The width, at the phone's text size, from which a column holds the longest name unbroken. */
-const TWO_COLUMNS_FROM = 380;
-
 const FILL = { width: "100%", height: "100%" } as const;
 
 /**
@@ -29,11 +26,11 @@ const FILL = { width: "100%", height: "100%" } as const;
  * since the logos are made for a light page; its name, what it is for and its
  * hours in words, so the logo is decoration; the number and the site.
  */
-function Tile({ line, className }: { line: SupportLine; className?: string }) {
+function Tile({ line }: { line: SupportLine }) {
   const { t, locale } = useT();
   const name = t(line.name);
   return (
-    <Card className={`gap-0 overflow-hidden py-0 ${className ?? ""}`}>
+    <Card className="gap-0 overflow-hidden py-0">
       <View className="h-24 border-b border-border bg-logo-plate p-3">
         <Image
           testID="support-logo"
@@ -43,14 +40,13 @@ function Tile({ line, className }: { line: SupportLine; className?: string }) {
           {...DECORATIVE}
         />
       </View>
-      <View className="flex-1 gap-2 p-3">
+      <View className="gap-2 p-3">
         <Text variant="title" role="heading" aria-level="2">
           {name}
         </Text>
         <Text>{t(line.about)}</Text>
         <Text variant="muted">{t(line.hours)}</Text>
-        {/* At the tile's foot, so the two tiles of a row end level. */}
-        <View className="mt-auto gap-1 pt-1">
+        <View className="gap-1 pt-1">
           {numbersOf(line, locale).map(({ number, language }) => (
             <View key={number} className="gap-1">
               {language && <Text variant="muted">{t(language)}</Text>}
@@ -83,15 +79,13 @@ function Tile({ line, className }: { line: SupportLine; className?: string }) {
 
 /**
  * Where to turn when it is hard (#510): mental and emotional support, not
- * help with the app. Four services in a grid of two columns, one on a narrow
- * phone or at a large text size, and 112 above them for danger. The page is
- * static: it asks nothing of the API and needs no session, and no crash report
- * names it (lib/sentry.ts), since who opens it is nobody's business.
+ * help with the app. Four services one under another, since side by side they
+ * were squeezed (the maintainer, 04/11/2026), and 112 above them for danger. The
+ * page is static: it asks nothing of the API and needs no session, and no crash
+ * report names it (lib/sentry.ts), since who opens it is nobody's business.
  */
 export function SupportScreen() {
   const { t } = useT();
-  const { width, fontScale } = useWindowDimensions();
-  const twoColumns = width / fontScale >= TWO_COLUMNS_FROM;
   return (
     <SettingsPage title={t("settings.support.label")}>
       <Text>{t("support.intro")}</Text>
@@ -103,9 +97,9 @@ export function SupportScreen() {
         <Icon as={Phone} size={16} />
         <Text className="shrink">{t("support.emergency")}</Text>
       </Button>
-      <View testID="support-grid" className={twoColumns ? "flex-row flex-wrap gap-3" : "gap-3"}>
+      <View testID="support-list" className="gap-3">
         {SUPPORT_LINES.map((line) => (
-          <Tile key={line.id} line={line} className={twoColumns ? "grow basis-[48%]" : undefined} />
+          <Tile key={line.id} line={line} />
         ))}
       </View>
       <Text variant="muted">{t("support.independent")}</Text>
