@@ -1,6 +1,7 @@
 import { act, fireEvent, screen, waitFor, within } from "@testing-library/react-native";
 import { useLocales } from "expo-localization";
 import type * as React from "react";
+import { AccessibilityInfo } from "react-native";
 import { saveSession } from "@/lib/session";
 import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
 import { expectPinnedHeader } from "@/test/layout";
@@ -228,6 +229,8 @@ describe("SeekScreen", () => {
     const count = screen.getByText("0/2");
     expect(count.parent).toBe(heading.parent);
     expect(screen.getByRole("button", { name: ABOUT }).parent).toBe(heading.parent);
+    // 44 pt with or without the button, so the rows do not jump when the read lands.
+    expect(heading.parent?.props.className).toMatch(/\bmin-h-touch\b/);
     expect(heading.parent?.props.className).toMatch(/\bflex-row\b/);
   });
 
@@ -276,7 +279,7 @@ describe("SeekScreen", () => {
 
     it("opens the shared dialog with the heading and the line, the limit read from the API", async () => {
       await shown();
-      expect(screen.container.queryAll((node) => node.props.role === "dialog")).toEqual([]);
+      expect(screen.container.queryAll((node) => node.props.role === "dialog")).toHaveLength(0);
       await press(about());
       const [dialog] = screen.container.queryAll(
         (node) => typeof node.type === "string" && node.props.role === "dialog",
@@ -285,6 +288,15 @@ describe("SeekScreen", () => {
       expect(within(dialog).getByRole("heading", { name: "Deal-breakers" })).toBeTruthy();
       expect(within(dialog).getByText(BEHIND_THE_I)).toBeTruthy();
       expect(pressables(screen.toJSON() as HostNode).flatMap((n) => a11yProblems(n))).toEqual([]);
+    });
+
+    it("takes the focus to its title as it opens: the button that opened it is under the scrim", async () => {
+      await shown();
+      const focused = AccessibilityInfo.sendAccessibilityEvent as jest.Mock;
+      focused.mockClear();
+      await press(about());
+      expect(focused).toHaveBeenCalledTimes(1);
+      expect(focused).toHaveBeenCalledWith(expect.anything(), "focus");
     });
 
     it("shuts with its labelled close, and comes back on the next press", async () => {
@@ -343,7 +355,7 @@ describe("SeekScreen", () => {
     ["two stored the other way round", ["non_binary", "woman"], "Women, Non-binary people"],
     ["all three", ["woman", "man", "non_binary"], "Anyone"],
     ["all three stored in another order", ["non_binary", "woman", "man"], "Anyone"],
-  ])("says whom in the chips' order, Anyone for all three: %s", async (_what, seeks, words) => {
+  ])("says whom in the rows' order, Anyone for all three: %s", async (_what, seeks, words) => {
     await opened({ seeks });
     expectAnswer(WHOM, words);
   });
@@ -620,7 +632,7 @@ describe("SeekScreen", () => {
         ages: ["Minkä ikäisiä?", "Nuorin 25, vanhin 40"],
         intent: ["Mitä etsit täältä?", "Jotain pitkäaikaista"],
         heading: "Ehdottomat rajat",
-        count: "1/2 käytössä",
+        count: "Käytössä 1, enintään 2",
         about: "Tietoa ehdottomista rajoista",
         line: "Enintään 2. Vain siitä, mihin vastasit itse, ja molempiin suuntiin: sinun rajasi koskevat muita, heidän rajansa sinua.",
         close: "Sulje",

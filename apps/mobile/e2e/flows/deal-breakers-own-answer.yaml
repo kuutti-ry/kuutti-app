@@ -1,7 +1,7 @@
 # A deal-breaker only on what the person answered themselves (#149, the
 # disclose-to-filter rule): a filter on what one will not say about oneself
 # is the one-sidedness the design document targets. Of the six fields Noa
-# answered only the languages, so the other five say to share hers first, and
+# answered only the languages, so the other five say to share theirs first, and
 # such a row opens the question itself, with no screen between, and comes back
 # (#551, #581). A typed address to one still holds one line and one Answer it,
 # which opens that field's screen. The distance, a seventh row, asks nothing:
@@ -18,7 +18,7 @@ name: A deal-breaker is offered only on what the person answered, and a row that
     visible: "These work both ways.*|Nämä toimivat molempiin suuntiin.*|De här gäller åt båda håll.*"
     timeout: 15000
 - waitForAnimationToEnd
-# Under whom, the ages and what she is here for: Smoking in the middle has Kids and the languages in view.
+# Under whom, the ages and what one is here for: Smoking in the middle has Kids and the languages in view.
 - scrollUntilVisible:
     element: "(Smoking|Tupakointi|Rökning)(, .*)?"
     direction: DOWN
@@ -34,7 +34,7 @@ name: A deal-breaker is offered only on what the person answered, and a row that
     timeout: 60000
 - assertVisible: "((Distance|Etäisyys|Avstånd), )?(Everyone|Kaikki|Alla)"
 
-# Her languages are open: Everyone chosen, and what is fine to choose. The
+# Noa's languages are open: Everyone chosen, and what is fine to choose. The
 # languages are a long list, so chips, which say they are chosen as selected.
 - scrollUntilVisible:
     element: "(Languages|Kielet|Språk)(, .*)?"
@@ -55,8 +55,8 @@ name: A deal-breaker is offered only on what the person answered, and a row that
     timeout: 15000
 - waitForAnimationToEnd
 
-# Her kids are not: the row opens the question itself, and its arrow comes back
-# with nothing saved, so the row still says to share hers first.
+# Noa's kids are not: the row opens the question itself, and its arrow comes back
+# with nothing saved, so the row still says Share yours first.
 - scrollUntilVisible:
     element: "(Kids|Lapset|Barn)(, .*)?"
     direction: UP

@@ -19,7 +19,7 @@ name: A section saves on going back, the card shows what it saved, and a hidden 
 - waitForAnimationToEnd
 
 # The questions: called that in every language, a row with no line under it, and
-# on its screen her two answers, each with its button, and what is left to add (#581).
+# on its screen Sanna's two answers, each with its button, and what is left to add (#581).
 - assertNotVisible: "Up to three questions, answered in your own words|Enintään kolme kysymystä, omin sanoin vastattuna|Upp till tre frågor, besvarade med egna ord"
 - tapOn: "(Questions|Kysymykset|Frågor)(, .*)?"
 - extendedWaitUntil:

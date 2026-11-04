@@ -504,7 +504,7 @@ profile.text.hint:
 profile.number.unset:
   en: "No answer yet"
   description: "Shown in a number stepper while the field has no value (#148)."
-  fi: "Ei vielä vastausta"
+  fi: "Ei vielä"
   sv: "Inget svar ännu"
   machine: { fi: true, sv: true }
 
@@ -609,7 +609,7 @@ profile.dealBreakers.explain:
 profile.dealBreakers.count:
   en: "{filters, number} of {max, number} in use"
   description: "What a screen reader hears for the count beside the deal-breakers' heading on What you seek, drawn as profile.progress.short (#581): {filters} is how many stand, paused ones among them, and {max} how many a person may have."
-  fi: "{filters, number}/{max, number} käytössä"
+  fi: "Käytössä {filters, number}, enintään {max, number}"
   sv: "{filters, number} av {max, number} används"
   machine: { fi: true, sv: true }
 

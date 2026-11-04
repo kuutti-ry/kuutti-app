@@ -289,6 +289,26 @@ describe("CardPreviewScreen", () => {
     expect(screen.queryByText("Loading your card…")).toBeNull();
   });
 
+  it("tries again on request when the card could not be loaded, and shows it then", async () => {
+    let failing = true;
+    serveCard({ complete: true, missing: [] });
+    const answers = globalThis.fetch;
+    globalThis.fetch = jest.fn(async (input: Request | string, init?: RequestInit) =>
+      failing
+        ? json({ error: { code: "internal_error", message: "x", requestId: "r" } }, 500)
+        : answers(input, init),
+    ) as unknown as typeof fetch;
+    await show();
+    await waitFor(() => expect(screen.getByText("Your card could not be loaded.")).toBeTruthy());
+    failing = false;
+    await act(async () => {
+      fireEvent.press(screen.getByRole("button", { name: "Try again" }));
+      await settle();
+    });
+    await waitFor(() => expect(screen.getByText("Aino, 36")).toBeTruthy());
+    expect(screen.queryByText("Your card could not be loaded.")).toBeNull();
+  });
+
   it("shows no checklist for a complete card", async () => {
     serveCard({ complete: true, missing: [] });
     await show();

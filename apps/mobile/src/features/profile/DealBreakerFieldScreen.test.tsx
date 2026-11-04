@@ -12,6 +12,14 @@ import { DealBreakerFieldScreen } from "./DealBreakerFieldScreen";
 // fine, as whole-width rows unless the list is long (#581), saved on leaving as
 // one field of the whole set the API takes.
 
+/** The names of the radio groups on the screen, each a plain view that a role query would leave out. */
+const radioGroups = () =>
+  screen.container
+    .queryAll(
+      (node) => typeof node.type === "string" && node.props.accessibilityRole === "radiogroup",
+    )
+    .map((node) => String(node.props.accessibilityLabel));
+
 const settle = () => new Promise<void>((resolve) => setTimeout(resolve, 10));
 const show = async (ui: React.ReactElement) => {
   let view: Awaited<ReturnType<typeof renderWithTheme>> | undefined;
@@ -161,7 +169,6 @@ const ANSWER = "Answer it";
 const FAILED = "It could not be saved. Try again.";
 const LOAD_FAILED = "Your profile could not be loaded.";
 const THE_QUESTION = "Leave without saving?";
-
 const LOADING = "Loading your profile…";
 
 const button = (name: string) => screen.getByRole("button", { name });
@@ -182,11 +189,10 @@ const controls = () =>
 /** Every text on the screen, in order. */
 const drawn = () => screen.queryAllByText(/./).map((node) => node.props.children);
 /**
- * What is said to a screen reader from now on, on either platform: the mock
+ * What is said to a screen reader from now on, whichever way it goes: the mock
  * outlives a test, with what earlier ones said. Words no line carries (#581).
  */
-const hearing = (os: "ios" | "android" = "ios") => {
-  jest.replaceProperty(Platform, "OS", os);
+const hearing = () => {
   const queued = jest.spyOn(AccessibilityInfo, "announceForAccessibilityWithOptions").mockClear();
   const plain = jest.spyOn(AccessibilityInfo, "announceForAccessibility").mockClear();
   return () => [...queued.mock.calls, ...plain.mock.calls].map(([words]) => words);
@@ -266,7 +272,7 @@ describe("DealBreakerFieldScreen", () => {
       await opened("smoking");
       expect(screen.getAllByRole("checkbox")).toHaveLength(6);
       expect(screen.queryByRole("radio")).toBeNull();
-      expect(screen.queryByRole("radiogroup")).toBeNull();
+      expect(radioGroups()).toEqual([]);
       expect(parent("Never")?.props.className).not.toMatch(/\bflex-row\b/);
       expect(parent(EVERYONE)).toBe(parent("Never"));
       checkA11y();
@@ -293,7 +299,7 @@ describe("DealBreakerFieldScreen", () => {
       await opened("languages");
       expect(screen.queryByRole("radio")).toBeNull();
       expect(screen.queryByRole("checkbox")).toBeNull();
-      expect(screen.queryByRole("radiogroup")).toBeNull();
+      expect(radioGroups()).toEqual([]);
       expect(
         screen.getByRole("button", { name: EVERYONE }).props.accessibilityState?.selected,
       ).toBe(true);
@@ -395,6 +401,22 @@ describe("DealBreakerFieldScreen", () => {
       await press(answer("Never"));
       await press(answer("Quitting"));
       expect(said()).toEqual([AGAIN]);
+    });
+
+    it.each([
+      ["fi-FI", "Ei koskaan", "Takaisin kohtaan Kaikki."],
+      ["sv-FI", "Aldrig", "Tillbaka till Alla."],
+    ])("is said in %s", async (tag, never, words) => {
+      (useLocales as jest.Mock).mockReturnValue([{ languageTag: tag }]);
+      try {
+        const said = hearing();
+        await opened("smoking");
+        await press(answer(never));
+        await press(answer(never));
+        expect(said()).toEqual([words]);
+      } finally {
+        (useLocales as jest.Mock).mockReturnValue([{ languageTag: "en-US" }]);
+      }
     });
 
     it("says nothing while another answer stays", async () => {
@@ -584,6 +606,26 @@ describe("DealBreakerFieldScreen", () => {
       expect(screen.getByText("That is 1 already.")).toBeTruthy();
       await press(answer(EVERYONE));
       expect(screen.queryByText("That is 1 already.")).toBeNull();
+    });
+
+    it("says the refusal no more once a held answer is taken back, the last place gone meanwhile", async () => {
+      const { server, view } = await opened("hasKids", {
+        refusal: () => envelope("internal_error", 500),
+      });
+      await press(answer("No kids"));
+      await leaveAndGo(view);
+      // Meanwhile another phone took the last place the number allows.
+      server.dealBreakers = [smoking];
+      server.max = 1;
+      server.refusal = null;
+      await show(<DealBreakerFieldScreen field="hasKids" />);
+      await waitFor(() => expect(screen.getByText(THE_QUESTION)).toBeTruthy());
+      await press(button("Keep editing"));
+      await press(answer("Kids at home"));
+      expect(screen.getByText("That is 1 already.")).toBeTruthy();
+      await press(answer("No kids"));
+      expect(screen.queryByText("That is 1 already.")).toBeNull();
+      expect(chosen(EVERYONE)).toBe(true);
     });
 
     it("never counts the second answer of a new one", async () => {

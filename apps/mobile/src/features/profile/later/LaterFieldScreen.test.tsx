@@ -9,6 +9,14 @@ import { expectPinnedHeader } from "@/test/layout";
 import { renderWithTheme, underProviders } from "@/test/render";
 import { LaterFieldScreen, laterProgress, screenOpen } from "./LaterFieldScreen";
 
+/** The names of the radio groups on the screen, each a plain view that a role query would leave out. */
+const radioGroups = () =>
+  screen.container
+    .queryAll(
+      (node) => typeof node.type === "string" && node.props.accessibilityRole === "radiogroup",
+    )
+    .map((node) => String(node.props.accessibilityLabel));
+
 const { __router: router, __navigation: navigation } = jest.requireMock("expo-router") as {
   __router: { push: jest.Mock; replace: jest.Mock; back: jest.Mock; dismissTo: jest.Mock };
   __navigation: {
@@ -296,7 +304,7 @@ describe("LaterFieldScreen", () => {
       await show(<LaterFieldScreen field="pets" />);
       await waitFor(() => expect(answer("Dog")).toBeTruthy());
       expect(screen.getAllByRole("checkbox")).toHaveLength(5);
-      expect(screen.queryByRole("radiogroup")).toBeNull();
+      expect(radioGroups()).toEqual([]);
       checkA11y();
     });
 
@@ -500,34 +508,51 @@ describe("LaterFieldScreen", () => {
     expect(router.push).not.toHaveBeenCalled();
   });
 
-  it.each([
-    ["ios", "announceForAccessibilityWithOptions", [["Saving…", { queue: true }]]],
-    ["android", "announceForAccessibility", [["Saving…"]]],
-  ] as const)(
-    "says it is saving aloud on %s, with no line that pushes the buttons down, once for a press (#581)",
-    async (os, call, heard) => {
-      jest.replaceProperty(Platform, "OS", os);
-      const said = jest.spyOn(AccessibilityInfo, call).mockClear();
-      refusingSaves(null);
+  describe("what it says as it saves (#581)", () => {
+    afterEach(() => jest.restoreAllMocks());
+
+    it.each([
+      ["ios", "announceForAccessibilityWithOptions", [["Saving…", { queue: true }]]],
+      ["android", "announceForAccessibility", [["Saving…"]]],
+    ] as const)(
+      "says it is saving aloud on %s, with no line that pushes the buttons down, once for a press",
+      async (os, call, heard) => {
+        jest.replaceProperty(Platform, "OS", os);
+        const said = jest.spyOn(AccessibilityInfo, call).mockClear();
+        const server = refusingSaves(null);
+        await show(<LaterFieldScreen field="smoking" />);
+        await waitFor(() => expect(answer("Never")).toBeTruthy());
+        await press(answer("Never"));
+        expect(said).not.toHaveBeenCalled();
+        await press(screen.getByRole("button", { name: "Save and continue" }));
+        expect(said.mock.calls).toEqual(heard);
+        expect(screen.queryByText("Saving…")).toBeNull();
+        // Answered, as the next test's read waits for a save on its way.
+        await act(async () => {
+          server.answer(
+            json({
+              profile: {
+                ...named({ smoking: "never" }),
+                specialCategoryConsent: null,
+                updatedAt: "2026-10-08T10:00:00.000Z",
+              },
+              completeness: { complete: false, missing: ["photos"] },
+              home: null,
+            }),
+          );
+          await settle();
+        });
+      },
+    );
+
+    it("says nothing on Ask me later, which saves nothing", async () => {
+      const said = jest.spyOn(AccessibilityInfo, "announceForAccessibilityWithOptions").mockClear();
+      fakeApi(named({}));
       await show(<LaterFieldScreen field="smoking" />);
       await waitFor(() => expect(answer("Never")).toBeTruthy());
-      await press(answer("Never"));
+      await press(screen.getByRole("button", { name: "Ask me later" }));
       expect(said).not.toHaveBeenCalled();
-      await press(screen.getByRole("button", { name: "Save and continue" }));
-      expect(said.mock.calls).toEqual(heard);
-      expect(screen.queryByText("Saving…")).toBeNull();
-      jest.restoreAllMocks();
-    },
-  );
-
-  it("says nothing on Ask me later, which saves nothing (#581)", async () => {
-    const said = jest.spyOn(AccessibilityInfo, "announceForAccessibilityWithOptions").mockClear();
-    fakeApi(named({}));
-    await show(<LaterFieldScreen field="smoking" />);
-    await waitFor(() => expect(answer("Never")).toBeTruthy());
-    await press(screen.getByRole("button", { name: "Ask me later" }));
-    expect(said).not.toHaveBeenCalled();
-    jest.restoreAllMocks();
+    });
   });
 
   it("holds both buttons while it saves", async () => {

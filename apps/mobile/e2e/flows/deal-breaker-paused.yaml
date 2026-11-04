@@ -77,7 +77,7 @@ name: Taking one's own answer back pauses the deal-breaker on it, and answering 
 - extendedWaitUntil:
     visible: "Fine with me|Sopii minulle|Okej för mig"
     timeout: 15000
-# The screen reads her answers again as it comes back, a breath after it shows.
+# The screen reads the answers again as it comes back, a breath after it shows.
 - extendedWaitUntil:
     notVisible: "Paused until you answer it yourself\\.|Tauolla, kunnes vastaat siihen itse\\.|Pausad tills du själv svarar på det\\."
     timeout: 15000

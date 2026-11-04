@@ -42,7 +42,7 @@ name: What you seek lists whom, the ages, why and the deal-breakers, and each ch
 
 # Beside the heading how many are in use, drawn as 0/7 and heard in words, which
 # is all Maestro reads of it on iOS; the sentence is behind the (i), not over the rows.
-- assertVisible: "0/7|0 of 7 in use|0/7 käytössä|0 av 7 används"
+- assertVisible: "0/7|0 of 7 in use|Käytössä 0, enintään 7|0 av 7 används"
 - assertNotVisible: "Up to 7\\. .*|Enintään 7\\. .*|Högst 7\\. .*"
 - tapOn: "About deal-breakers|Tietoa ehdottomista rajoista|Om absoluta gränser"
 - extendedWaitUntil:

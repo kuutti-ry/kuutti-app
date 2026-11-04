@@ -17,13 +17,13 @@ name: A deal-breaker starts on Everyone, says what it accepts on its row, and go
     visible: "These work both ways.*|Nämä toimivat molempiin suuntiin.*|De här gäller åt båda håll.*"
     timeout: 15000
 - waitForAnimationToEnd
-# Under whom, the ages and what she is here for.
+# Under whom, the ages and what one is here for.
 - scrollUntilVisible:
     element: "Deal-breakers|Ehdottomat rajat|Absoluta gränser"
     direction: DOWN
     centerElement: true
     timeout: 60000
-- assertVisible: "0/7|0 of 7 in use|0/7 käytössä|0 av 7 används"
+- assertVisible: "0/7|0 of 7 in use|Käytössä 0, enintään 7|0 av 7 används"
 - scrollUntilVisible:
     element: "(Kids|Lapset|Barn)(, .*)?"
     direction: DOWN
@@ -63,7 +63,7 @@ name: A deal-breaker starts on Everyone, says what it accepts on its row, and go
 - extendedWaitUntil:
     visible: "((Kids|Lapset|Barn), )?(No kids, Kids at home|Ei lapsia, Lapset asuvat kotona|Inga barn, Barn som bor hemma)"
     timeout: 15000
-- assertVisible: "1/7|1 of 7 in use|1/7 käytössä|1 av 7 används"
+- assertVisible: "1/7|1 of 7 in use|Käytössä 1, enintään 7|1 av 7 används"
 - waitForAnimationToEnd
 
 # Opened again: what was saved. Everyone takes it off, and the row says Everyone.
@@ -81,4 +81,4 @@ name: A deal-breaker starts on Everyone, says what it accepts on its row, and go
     timeout: 15000
 - waitForAnimationToEnd
 - assertNotVisible: "((Kids|Lapset|Barn), )?(No kids, Kids at home|Ei lapsia, Lapset asuvat kotona|Inga barn, Barn som bor hemma)"
-- assertVisible: "0/7|0 of 7 in use|0/7 käytössä|0 av 7 används"
+- assertVisible: "0/7|0 of 7 in use|Käytössä 0, enintään 7|0 av 7 används"

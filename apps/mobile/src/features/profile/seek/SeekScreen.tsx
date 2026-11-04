@@ -2,7 +2,7 @@ import { GENDERS } from "@kuutti/schema";
 import { useFocusEffect, useRouter } from "expo-router";
 import Info from "lucide-react-native/icons/info";
 import { useCallback, useRef, useState } from "react";
-import { ScrollView, View } from "react-native";
+import { AccessibilityInfo, ScrollView, type Text as TextNode, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LoadFailed } from "@/components/LoadFailed";
 import { RowGroup } from "@/components/RowGroup";
@@ -50,6 +50,10 @@ export function SeekScreen() {
   const { reload } = seeking;
   const [dealBreakers, readDealBreakers] = useDealBreakers();
   const [aboutDealBreakers, setAboutDealBreakers] = useState(false);
+  // The title as the (i)'s dialog opens: the button that opened it is under the scrim.
+  const focusTitle = useCallback((node: TextNode | null) => {
+    if (node) AccessibilityInfo.sendAccessibilityEvent(node, "focus");
+  }, []);
   // The first focus is the mount, which the hook reads already.
   const shown = useRef(false);
   useFocusEffect(
@@ -137,7 +141,7 @@ export function SeekScreen() {
         />
         <View className="gap-3">
           {/* A 44 pt row around a line of text: the margins keep the heading with its rows. */}
-          <View className="-my-2 flex-row items-center gap-2">
+          <View className="-my-2 min-h-touch flex-row items-center gap-2">
             <Text variant="large" role="heading" aria-level="2" className="shrink">
               {t("profile.dealBreakers.title")}
             </Text>
@@ -176,7 +180,7 @@ export function SeekScreen() {
         <Dialog open={aboutDealBreakers} onOpenChange={setAboutDealBreakers}>
           <DialogContent closeLabel={t("profile.dealBreakers.aboutClose")}>
             <DialogHeader>
-              <DialogTitle>{t("profile.dealBreakers.title")}</DialogTitle>
+              <DialogTitle ref={focusTitle}>{t("profile.dealBreakers.title")}</DialogTitle>
               <DialogDescription>
                 {t("profile.dealBreakers.explain", { max: dealBreakers.max })}
               </DialogDescription>

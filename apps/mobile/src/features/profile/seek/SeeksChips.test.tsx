@@ -8,6 +8,14 @@ import { SeeksChips } from "./SeeksChips";
 // what a press adds and takes away, by what it saves, from an answer it was
 // given; this has the rows with no answer yet, their role and their words.
 
+/** The names of the radio groups on the screen, each a plain view that a role query would leave out. */
+const radioGroups = () =>
+  screen.container
+    .queryAll(
+      (node) => typeof node.type === "string" && node.props.accessibilityRole === "radiogroup",
+    )
+    .map((node) => String(node.props.accessibilityLabel));
+
 const row = (name: string) => screen.getByRole("checkbox", { name: new RegExp(`^(✓ )?${name}$`) });
 const checked = (name: string) => row(name).props.accessibilityState?.checked;
 
@@ -23,7 +31,7 @@ describe("SeeksChips", () => {
     await renderWithTheme(<SeeksChips chosen={["man"]} onChange={() => {}} />);
     expect(screen.getAllByRole("checkbox")).toHaveLength(4);
     expect(screen.queryByRole("radio")).toBeNull();
-    expect(screen.queryByRole("radiogroup")).toBeNull();
+    expect(radioGroups()).toEqual([]);
     expect(checked("Men")).toBe(true);
     expect(screen.getByText("✓ Men")).toBeTruthy();
     expect(screen.queryByText("Men")).toBeNull();

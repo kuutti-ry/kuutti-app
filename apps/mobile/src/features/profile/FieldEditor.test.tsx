@@ -1,4 +1,9 @@
-import type { HiddenField, ProfileFieldKey, ProfileFields } from "@kuutti/schema";
+import {
+  type HiddenField,
+  PROFILE_FIELDS,
+  type ProfileFieldKey,
+  type ProfileFields,
+} from "@kuutti/schema";
 import { fireEvent, screen } from "@testing-library/react-native";
 import { useLocales } from "expo-localization";
 import { useState } from "react";
@@ -11,6 +16,14 @@ import { FieldEditor, optionTextKey, toggled, visibleOptions } from "./FieldEdit
 // a setting as a switch, choices as chips that say whether they are chosen, or
 // as whole-width rows where it is what its screen asks (#581), a short text, a
 // number as a stepper, and a search over a long list.
+
+/** The names of the radio groups on the screen, each a plain view that a role query would leave out. */
+const radioGroups = () =>
+  screen.container
+    .queryAll(
+      (node) => typeof node.type === "string" && node.props.accessibilityRole === "radiogroup",
+    )
+    .map((node) => String(node.props.accessibilityLabel));
 
 /** The draft the editor works on, as the screens hold it; `fields` is what it holds now, `patches` every update it asked for. */
 let fields: ProfileFields = {};
@@ -279,7 +292,7 @@ describe("FieldEditor: what its screen asks, a short list (#581)", () => {
   it("draws several answers as whole-width checkboxes, with no group that says one goes", async () => {
     await showAlone("pets");
     expect(screen.queryByRole("radio")).toBeNull();
-    expect(screen.queryByRole("radiogroup")).toBeNull();
+    expect(radioGroups()).toEqual([]);
     expect(screen.getAllByRole("checkbox")).toHaveLength(5);
     await fireEvent.press(checkbox("Dog"));
     await fireEvent.press(checkbox("Cat"));
@@ -313,6 +326,31 @@ describe("FieldEditor: what its screen asks, a short list (#581)", () => {
     expect(screen.getAllByRole("radio")).toHaveLength(7);
   });
 
+  // No field has eight options or nine today: the rule is the maintainer's "up to 8", so it stands here.
+  describe("the limit, on a list of its own length", () => {
+    const listOf = (length: number) =>
+      jest.replaceProperty(
+        PROFILE_FIELDS.smoking,
+        "options",
+        Array.from({ length }, (_, i) => `option${i}`) as never,
+      );
+    afterEach(() => jest.restoreAllMocks());
+
+    it("draws eight as rows", async () => {
+      listOf(8);
+      await showAlone("smoking");
+      expect(screen.getAllByRole("radio")).toHaveLength(8);
+      expect(screen.queryAllByRole("button")).toEqual([]);
+    });
+
+    it("draws nine as chips", async () => {
+      listOf(9);
+      await showAlone("smoking");
+      expect(screen.queryAllByRole("radio")).toEqual([]);
+      expect(screen.getAllByRole("button")).toHaveLength(9);
+    });
+  });
+
   it.each([
     ["the parties", "politics", "Greens"],
     ["the stances", "religion", "Agnostic"],
@@ -324,7 +362,7 @@ describe("FieldEditor: what its screen asks, a short list (#581)", () => {
       await showAlone(key);
       expect(screen.queryByRole("radio")).toBeNull();
       expect(screen.queryByRole("checkbox")).toBeNull();
-      expect(screen.queryByRole("radiogroup")).toBeNull();
+      expect(radioGroups()).toEqual([]);
       expect(screen.getByRole("button", { name: word })).toBeTruthy();
     },
   );
@@ -341,7 +379,7 @@ describe("FieldEditor: what its screen asks, a short list (#581)", () => {
   it("keeps chips for one field of a section's several, however short its list", async () => {
     await show("smoking");
     expect(screen.queryByRole("radio")).toBeNull();
-    expect(screen.queryByRole("radiogroup")).toBeNull();
+    expect(radioGroups()).toEqual([]);
     expect(screen.getByRole("button", { name: "Never" })).toBeTruthy();
   });
 

@@ -73,7 +73,7 @@ describe("Stepper", () => {
     expect(rootClass()).not.toMatch(/\bflex-1\b/);
   });
 
-  it("stands its minus and plus 24 pt from the number, the maintainer's of 04/11/2026 (#581)", async () => {
+  it("stands its minus and plus well clear of the number (#581)", async () => {
     await show();
     const minus = screen.getByRole("button", { name: "One centimetre less" });
     const number = screen.getByText("170 cm");

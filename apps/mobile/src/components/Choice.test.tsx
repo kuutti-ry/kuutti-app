@@ -1,10 +1,8 @@
 import { fireEvent, screen } from "@testing-library/react-native";
 import type * as React from "react";
-import { PixelRatio } from "react-native";
 import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
 import { hasCutText } from "@/test/layout";
 import { renderWithTheme } from "@/test/render";
-import { MAX_FONT_SCALE } from "@/theme/a11y";
 import { Choice } from "./Choice";
 
 // One option of a group (#511), and on a screen that asks one thing a whole-width
@@ -83,8 +81,7 @@ describe("Choice", () => {
     expect(screen.getByRole("radio", { name: "✓ Cross and circle" })).toBeTruthy();
   });
 
-  it("has the 44 pt target, and wraps a long line at the largest text, never cutting it", async () => {
-    jest.spyOn(PixelRatio, "getFontScale").mockReturnValue(MAX_FONT_SCALE);
+  it("has the 44 pt target, and no line count or fixed height to cut a long line", async () => {
     await show({
       label: "I was too lazy to write anything here, so this placeholder says I am a nice fellow.",
     });

@@ -127,7 +127,7 @@ export function PhotosScreen({ progress }: { progress?: { step: number; total: n
   const countSaid = useRef<string | null>(null);
   useEffect(() => {
     if (count === null) return;
-    if (countSaid.current !== null && countSaid.current !== count) sayAloud(count);
+    if (countSaid.current !== null) sayAloud(count);
     countSaid.current = count;
   }, [count]);
 
