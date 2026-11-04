@@ -7914,7 +7914,7 @@ account.email.saved:
 
 account.email.removed:
   en: "Removed."
-  description: "Said to a screen reader when the address is removed, never drawn (#385, #581): the field empties, Remove goes and the row's value changes. An agent's word: the table's row S28 calls Saved. the wrong word for a removal."
+  description: "Said to a screen reader when the address is removed, never drawn (#385, #581): the field empties, Remove goes and the row's value changes. An agent's word, which the maintainer kept (04/11/2026): the table's row S28 calls Saved. the wrong word for a removal."
   fi: "Poistettu."
   sv: "Borttagen."
   machine: { fi: true, sv: true }
