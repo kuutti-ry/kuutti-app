@@ -8,7 +8,9 @@ import { renderWithTheme } from "@/test/render";
 import { SeekScreen } from "./SeekScreen";
 
 // What a person seeks, as a list of its own (#542): each row its answer under
-// onboarding's own question, heard once, and nothing edited here.
+// onboarding's own question, heard once, and nothing edited here. Beside the
+// deal-breakers' heading how many are in use, and the app's one (i) (#581); the
+// rows' own words and where each goes are DealBreakerRows.test.tsx's.
 
 const settle = () => new Promise<void>((resolve) => setTimeout(resolve, 10));
 const show = (ui: React.ReactElement) =>
@@ -45,6 +47,8 @@ type Server = {
   failing: boolean;
   /** The deal-breakers alone cannot be read. */
   noDealBreakers: boolean;
+  /** How many deal-breakers a person may hold. */
+  max: number;
   /** Every read waits for this. */
   wait: Promise<void>;
 };
@@ -58,6 +62,7 @@ function fakeApi(start: Partial<Server> = {}) {
     dealBreakers: [],
     failing: false,
     noDealBreakers: false,
+    max: 2,
     wait: Promise.resolve(),
     ...start,
   };
@@ -91,7 +96,7 @@ function fakeApi(start: Partial<Server> = {}) {
     if (path === "/preferences/deal-breakers" && request.method === "GET") {
       reads.dealBreakers += 1;
       if (server.failing || server.noDealBreakers) return broken();
-      return json({ dealBreakers: server.dealBreakers, max: 2 });
+      return json({ dealBreakers: server.dealBreakers, max: server.max });
     }
     return json({ error: { code: "not_found", message: "no", requestId: "r" } }, 404);
   }) as unknown as typeof fetch;
@@ -103,11 +108,22 @@ const { __router: router, __focus: focus } = jest.requireMock("expo-router") as 
   __focus: () => void;
 };
 
+const ABOUT = "About deal-breakers";
 const WHOM = "Whom are you looking for?";
 const AGES = "What ages?";
 const INTENT = "What are you here for?";
 const SMOKING = "Smoking";
 const KIDS = "Kids";
+/** Every question a deal-breaker asks of the person answered: each row opens its own screen. */
+const ANSWERED = {
+  intent: "long_term",
+  monogamy: "monogamous",
+  hasKids: "no",
+  wantsKids: "want",
+  smoking: "never",
+  languages: ["fi"],
+  height: 170,
+};
 const DEAL_BREAKER_ROWS = [
   "Relationship structure",
   KIDS,
@@ -134,6 +150,10 @@ const opened = async (start?: Partial<Server>) => {
   await waitFor(() => expect(row(WHOM)).toBeTruthy());
   return api;
 };
+
+/** The line behind the (i), and over nothing else. */
+const BEHIND_THE_I =
+  "Up to 2. Only on what you answered yourself, and both ways: yours apply to others, theirs to you.";
 
 /** Comes back to the list, as a screen handing back does. */
 const handBack = () =>
@@ -187,20 +207,117 @@ describe("SeekScreen", () => {
       WHOM,
       AGES,
       INTENT,
+      ABOUT,
       ...DEAL_BREAKER_ROWS,
     ]);
   });
 
-  it("puts the deal-breakers under a heading of their own, with the line on what they ask", async () => {
+  it("puts the deal-breakers under a heading of their own, how many are in use beside it, the line on what they ask behind the (i)", async () => {
     await opened();
     await waitFor(() => expect(heard(SMOKING)).toBeDefined());
     const heading = screen.getByRole("heading", { name: "Deal-breakers" });
     expect(heading.props["aria-level"]).toBe("2");
-    expect(screen.getByText(/^Up to 2\. Only on what you answered yourself/)).toBeTruthy();
+    expect(screen.queryByText(BEHIND_THE_I)).toBeNull();
     const flat = JSON.stringify(screen.toJSON());
-    expect(flat.indexOf(INTENT)).toBeLessThan(flat.indexOf('"Deal-breakers"'));
-    expect(flat.indexOf('"Deal-breakers"')).toBeLessThan(flat.indexOf("Up to 2"));
-    expect(flat.indexOf("Up to 2")).toBeLessThan(flat.indexOf(DEAL_BREAKER_ROWS[0] as string));
+    const places = [INTENT, '"Deal-breakers"', '"0/2"', ABOUT, DEAL_BREAKER_ROWS[0] as string].map(
+      (word) => flat.indexOf(word),
+    );
+    expect(places).not.toContain(-1);
+    expect(places).toEqual([...places].sort((a, b) => a - b));
+    // All three in one row: a 44 pt one, by the (i).
+    const count = screen.getByText("0/2");
+    expect(count.parent).toBe(heading.parent);
+    expect(screen.getByRole("button", { name: ABOUT }).parent).toBe(heading.parent);
+    expect(heading.parent?.props.className).toMatch(/\bflex-row\b/);
+  });
+
+  describe("how many are in use (#581)", () => {
+    it.each([
+      ["none", [], "0/2", "0 of 2 in use"],
+      ["one", [dealBreaker("smoking", ["never"])], "1/2", "1 of 2 in use"],
+      [
+        "a paused one among them: it stands, and counts against the number",
+        [dealBreaker("smoking", ["never"]), dealBreaker("hasKids", ["no"], true)],
+        "2/2",
+        "2 of 2 in use",
+      ],
+    ])("counts %s, drawn short and heard in words", async (_what, dealBreakers, drawn, words) => {
+      await opened({ dealBreakers });
+      await waitFor(() => expect(screen.getByText(drawn)).toBeTruthy());
+      expect(screen.getByText(drawn).props.accessibilityLabel).toBe(words);
+    });
+
+    it("follows a screen handing back", async () => {
+      const { server } = await opened();
+      await waitFor(() => expect(screen.getByText("0/2")).toBeTruthy());
+      server.dealBreakers = [dealBreaker("smoking", ["never"])];
+      await handBack();
+      await waitFor(() => expect(screen.getByText("1/2")).toBeTruthy());
+      expect(screen.queryByText("0/2")).toBeNull();
+    });
+  });
+
+  describe("the (i) beside the heading, the maintainer's one (#581)", () => {
+    const about = () => screen.getByRole("button", { name: ABOUT });
+    const shown = async () => {
+      await opened();
+      await waitFor(() => expect(about()).toBeTruthy());
+    };
+
+    it("is a labelled button with a 44 pt target, an icon a screen reader does not hear", async () => {
+      await shown();
+      const problems = pressables(screen.toJSON() as HostNode).flatMap((node) =>
+        a11yProblems(node),
+      );
+      expect(problems).toEqual([]);
+      expect(about().props.className).toMatch(/\bmin-h-touch\b/);
+      expect(within(about()).queryAllByText(/./)).toEqual([]);
+    });
+
+    it("opens the shared dialog with the heading and the line, the limit read from the API", async () => {
+      await shown();
+      expect(screen.container.queryAll((node) => node.props.role === "dialog")).toEqual([]);
+      await press(about());
+      const [dialog] = screen.container.queryAll(
+        (node) => typeof node.type === "string" && node.props.role === "dialog",
+      );
+      if (!dialog) throw new Error("no dialog");
+      expect(within(dialog).getByRole("heading", { name: "Deal-breakers" })).toBeTruthy();
+      expect(within(dialog).getByText(BEHIND_THE_I)).toBeTruthy();
+      expect(pressables(screen.toJSON() as HostNode).flatMap((n) => a11yProblems(n))).toEqual([]);
+    });
+
+    it("shuts with its labelled close, and comes back on the next press", async () => {
+      await shown();
+      await press(about());
+      await press(screen.getByRole("button", { name: "Close" }));
+      expect(screen.queryByText(BEHIND_THE_I)).toBeNull();
+      await press(about());
+      expect(screen.getByText(BEHIND_THE_I)).toBeTruthy();
+    });
+
+    it("says the limit the API read, whatever it is", async () => {
+      const { server } = fakeApi();
+      server.max = 5;
+      await show(<SeekScreen />);
+      await waitFor(() => expect(about()).toBeTruthy());
+      await press(about());
+      expect(screen.getByText(/^Up to 5\. Only on what you answered yourself/)).toBeTruthy();
+    });
+
+    it("goes when the deal-breakers cannot be vouched for, with the count, and comes back with them", async () => {
+      const { server } = await opened();
+      await waitFor(() => expect(about()).toBeTruthy());
+      server.noDealBreakers = true;
+      await handBack();
+      await waitFor(() => expect(screen.queryByRole("button", { name: ABOUT })).toBeNull());
+      expect(screen.queryByText("0/2")).toBeNull();
+      expect(screen.getByRole("heading", { name: "Deal-breakers" })).toBeTruthy();
+      server.noDealBreakers = false;
+      await handBack();
+      await waitFor(() => expect(about()).toBeTruthy());
+      expect(screen.getByText("0/2")).toBeTruthy();
+    });
   });
 
   it("draws each answer under its title and has it heard once, as the value", async () => {
@@ -215,7 +332,8 @@ describe("SeekScreen", () => {
   it("has every control labelled, a button and a full target", async () => {
     await opened();
     const found = pressables(screen.toJSON() as HostNode);
-    expect(found).toHaveLength(4 + DEAL_BREAKER_ROWS.length);
+    // The back arrow, the three questions and the (i), and the rows.
+    expect(found).toHaveLength(5 + DEAL_BREAKER_ROWS.length);
     expect(found.flatMap((node) => a11yProblems(node))).toEqual([]);
   });
 
@@ -283,14 +401,17 @@ describe("SeekScreen", () => {
       expect(row(title).props.accessibilityHint).toBeUndefined();
     }
     expect(screen.queryByText("Everyone")).toBeNull();
-    expect(screen.queryByText(/^Up to/)).toBeNull();
+    // No count and no (i): nothing is known that they could say.
+    expect(screen.queryByText(/^\d+\/\d+$/)).toBeNull();
+    expect(screen.queryByRole("button", { name: ABOUT })).toBeNull();
     expect(screen.queryByText("Your profile could not be loaded.")).toBeNull();
     await press(row(SMOKING));
     expect(router.push).toHaveBeenCalledWith("/profile/deal-breakers/smoking");
   });
 
   it("opens each row's own screen, and goes back with its back button", async () => {
-    await opened();
+    await opened({ fields: ANSWERED });
+    await waitFor(() => expect(heard(SMOKING)).toBe("Everyone"));
     for (const title of [WHOM, AGES, INTENT, ...DEAL_BREAKER_ROWS]) await press(row(title));
     expect(router.push.mock.calls.map(([path]) => path)).toEqual([
       "/profile/seek/whom",
@@ -307,6 +428,39 @@ describe("SeekScreen", () => {
     expect(router.back).not.toHaveBeenCalled();
     await press(row("Back"));
     expect(router.back).toHaveBeenCalledTimes(1);
+  });
+
+  it("opens the question itself from a row that says Share yours first, whose screen would only say it again (#581)", async () => {
+    await opened({
+      fields: { intent: "long_term", smoking: "never" },
+      dealBreakers: [dealBreaker("hasKids", ["no"], true)],
+    });
+    await waitFor(() => expect(heard(SMOKING)).toBe("Everyone"));
+    expectAnswer("Kids in the future", "Share yours first");
+    await press(row("Kids in the future"));
+    await press(row("Relationship structure"));
+    expect(router.push.mock.calls.map(([path]) => path)).toEqual([
+      { pathname: "/profile/later/[field]", params: { field: "wantsKids", once: "1" } },
+      { pathname: "/profile/section/[id]", params: { id: "relationship", once: "1" } },
+    ]);
+    router.push.mockClear();
+    // A paused one keeps its screen, and the distance asks for no answer.
+    await press(row(KIDS));
+    await press(row("Distance"));
+    expect(router.push.mock.calls.map(([path]) => path)).toEqual([
+      "/profile/deal-breakers/hasKids",
+      "/profile/deal-breakers/distance",
+    ]);
+  });
+
+  it("the row says Everyone once that answer is given and the question hands back, and opens its own screen", async () => {
+    const { server } = await opened({ fields: { intent: "long_term" } });
+    await waitFor(() => expect(heard(SMOKING)).toBe("Share yours first"));
+    server.fields = { intent: "long_term", smoking: "never" };
+    await handBack();
+    await waitFor(() => expect(heard(SMOKING)).toBe("Everyone"));
+    await press(row(SMOKING));
+    expect(router.push).toHaveBeenLastCalledWith("/profile/deal-breakers/smoking");
   });
 
   it("reads everything once as it opens, and again each time a screen hands back", async () => {
@@ -466,6 +620,10 @@ describe("SeekScreen", () => {
         ages: ["Minkä ikäisiä?", "Nuorin 25, vanhin 40"],
         intent: ["Mitä etsit täältä?", "Jotain pitkäaikaista"],
         heading: "Ehdottomat rajat",
+        count: "1/2 käytössä",
+        about: "Tietoa ehdottomista rajoista",
+        line: "Enintään 2. Vain siitä, mihin vastasit itse, ja molempiin suuntiin: sinun rajasi koskevat muita, heidän rajansa sinua.",
+        close: "Sulje",
         paused: ["Tupakointi", "Tauolla, kunnes vastaat siihen itse."],
       },
     ],
@@ -480,6 +638,10 @@ describe("SeekScreen", () => {
         ages: ["Vilka åldrar?", "Yngsta 25, äldsta 40"],
         intent: ["Vad är du här för?", "Något långvarigt"],
         heading: "Absoluta gränser",
+        count: "1 av 2 används",
+        about: "Om absoluta gränser",
+        line: "Högst 2. Bara om det du själv svarat på, och åt båda hållen: dina gäller andra, deras gäller dig.",
+        close: "Stäng",
         paused: ["Rökning", "Pausad tills du själv svarar på det."],
       },
     ],
@@ -497,6 +659,12 @@ describe("SeekScreen", () => {
       for (const [title, answer] of [words.whom, words.ages, words.intent, words.paused]) {
         expectAnswer(title, answer);
       }
+      expect(screen.getByText("1/2").props.accessibilityLabel).toBe(words.count);
+      expect(screen.queryByText(words.line)).toBeNull();
+      await press(row(words.about));
+      expect(screen.getByText(words.line)).toBeTruthy();
+      await press(row(words.close));
+      expect(screen.queryByText(words.line)).toBeNull();
     });
   });
 

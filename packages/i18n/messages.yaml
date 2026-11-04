@@ -151,13 +151,6 @@ profile.section.photos.title:
   sv: "Foton"
   machine: { fi: true, sv: true }
 
-profile.section.photos.summary:
-  en: "What others see first on your card"
-  description: "Second line of the photos row on the profile list (#239): what the photos screen holds; a screen reader hears it as the row's hint."
-  fi: "Mitä muut näkevät kortillasi ensimmäisenä"
-  sv: "Det andra ser först på ditt kort"
-  machine: { fi: true, sv: true }
-
 profile.section.basics.title:
   en: "The basics"
   description: "Title of the basics section of the profile (#227): its row on the profile list and its screen's heading."
@@ -167,23 +160,16 @@ profile.section.basics.title:
 
 profile.section.basics.summary:
   en: "Name, a few words about you, height and languages"
-  description: "Second line of the basics section's row on the profile list (#227): what the section holds; a screen reader hears it as the row's hint."
+  description: "What a screen reader hears as the hint of the basics section's row on the profile list (#227, #581): what the section holds. Never drawn: the title says enough to the eye."
   fi: "Nimi, muutama sana itsestäsi, pituus ja kielet"
   sv: "Namn, några ord om dig, längd och språk"
   machine: { fi: true, sv: true }
 
 profile.section.prompts.title:
-  en: "Prompts"
-  description: "Title of the prompts section of the profile (#227): its row on the profile list and its screen's heading."
+  en: "Questions"
+  description: "Title of the prompts section of the profile (#227): its row on the profile list and its screen's heading. Its count says up to three (#581)."
   fi: "Kysymykset"
   sv: "Frågor"
-  machine: { fi: true, sv: true }
-
-profile.section.prompts.summary:
-  en: "Up to three questions, answered in your own words"
-  description: "Second line of the prompts section's row on the profile list (#227): what the section holds; a screen reader hears it as the row's hint."
-  fi: "Enintään kolme kysymystä, omin sanoin vastattuna"
-  sv: "Upp till tre frågor, besvarade med egna ord"
   machine: { fi: true, sv: true }
 
 profile.section.relationship.title:
@@ -195,7 +181,7 @@ profile.section.relationship.title:
 
 profile.section.relationship.summary:
   en: "Relationship structure and kids"
-  description: "Second line of the relationship section's row on the profile list (#227): what the section holds, what one is here for having moved to What you seek (#542); a screen reader hears it as the row's hint."
+  description: "What a screen reader hears as the hint of the relationship section's row on the profile list (#227, #581): what the section holds. Never drawn: the title says enough to the eye."
   fi: "Suhteen muoto ja lapset"
   sv: "Relationsform och barn"
   machine: { fi: true, sv: true }
@@ -209,7 +195,7 @@ profile.section.work.title:
 
 profile.section.work.summary:
   en: "Education, field, work and job title"
-  description: "Second line of the work section's row on the profile list (#227): what the section holds; a screen reader hears it as the row's hint."
+  description: "What a screen reader hears as the hint of the work section's row on the profile list (#227, #581): what the section holds. Never drawn: the title says enough to the eye."
   fi: "Koulutus, ala, työ ja tehtävänimike"
   sv: "Utbildning, bransch, arbete och yrkestitel"
   machine: { fi: true, sv: true }
@@ -223,7 +209,7 @@ profile.section.lifestyle.title:
 
 profile.section.lifestyle.summary:
   en: "Smoking, nicotine, drinking, drugs, exercise and pets"
-  description: "Second line of the lifestyle section's row on the profile list (#227): what the section holds; a screen reader hears it as the row's hint."
+  description: "What a screen reader hears as the hint of the lifestyle section's row on the profile list (#227, #581): what the section holds. Never drawn: the title says enough to the eye."
   fi: "Tupakointi, nikotiini, alkoholi, huumeet, liikunta ja lemmikit"
   sv: "Rökning, nikotin, alkohol, droger, motion och husdjur"
   machine: { fi: true, sv: true }
@@ -237,7 +223,7 @@ profile.section.hobbies.title:
 
 profile.section.hobbies.summary:
   en: "Things you like doing, as many as you like"
-  description: "Second line of the hobbies section's row on the profile list (#227): what the section holds; a screen reader hears it as the row's hint. No cap since #239."
+  description: "What a screen reader hears as the hint of the hobbies section's row on the profile list (#227, #581): what the section holds. Never drawn: the title says enough to the eye. No cap since #239."
   fi: "Asioita, joita teet mielelläsi, niin monta kuin haluat"
   sv: "Saker du gärna gör, så många du vill"
   machine: { fi: true, sv: true }
@@ -251,14 +237,14 @@ profile.section.beliefs.title:
 
 profile.section.beliefs.summary:
   en: "Parties you could vote for, religion and star sign"
-  description: "Second line of the beliefs section's row on the profile list (#227): what the section holds; a screen reader hears it as the row's hint."
+  description: "What a screen reader hears as the hint of the beliefs section's row on the profile list (#227, #581): what the section holds. Never drawn: the title says enough to the eye."
   fi: "Puolueet, joita voisit äänestää, uskonto ja horoskooppimerkki"
   sv: "Partier du kunde rösta på, religion och stjärntecken"
   machine: { fi: true, sv: true }
 
 profile.saving:
   en: "Saving…"
-  description: "Shown on a profile section while PUT /profile is in flight, on leaving it (#227)."
+  description: "Said to a screen reader as the home or a later question saves, never drawn (#581): the buttons go read-only for that breath, and a line would push them down."
   fi: "Tallennetaan…"
   sv: "Sparar…"
   machine: { fi: true, sv: true }
@@ -312,25 +298,11 @@ profile.displayName.label:
   sv: "Namn på ditt kort"
   machine: { fi: true, sv: true }
 
-profile.displayName.hint:
-  en: "How you want to be called, up to {max, number} characters."
-  description: "Hint under the display name field; {max} is the character cap."
-  fi: "Millä nimellä haluat tulla kutsutuksi, enintään {max, number} merkkiä."
-  sv: "Vad du vill bli kallad, högst {max, number} tecken."
-  machine: { fi: true, sv: true }
-
 profile.bio.label:
   en: "About you"
   description: "Label of the bio field."
   fi: "Sinusta"
   sv: "Om dig"
-  machine: { fi: true, sv: true }
-
-profile.bio.hint:
-  en: "{min, number} characters or more count as a bio; or pick a ready line below, or answer two prompts instead."
-  description: "Hint under the bio field; {min} is the length that counts for completeness. A ready line counts too (#239)."
-  fi: "Vähintään {min, number} merkkiä lasketaan esittelyksi; tai valitse valmis rivi alta tai vastaa kahteen kysymykseen."
-  sv: "{min, number} tecken eller fler räknas som en presentation; eller välj en färdig rad nedan eller svara på två frågor i stället."
   machine: { fi: true, sv: true }
 
 profile.bio.orPreset:
@@ -523,10 +495,10 @@ profile.field.zodiac:
   machine: { fi: true, sv: true }
 
 profile.text.hint:
-  en: "Without the employer's name, and up to {max, number} characters."
-  description: "Hint under the registry's one free-text field, the job title: the editor's instruction, which the label no longer carries (#223), and the length. A second text field would split this per field."
-  fi: "Ilman työnantajan nimeä, enintään {max, number} merkkiä."
-  sv: "Utan arbetsgivarens namn, högst {max, number} tecken."
+  en: "Without the employer's name"
+  description: "Hint under the registry's one free-text field, the job title: the editor's instruction, which the label no longer carries (#223), and which nothing else enforces. The field stops at its length by itself (#581). A second text field would split this per field."
+  fi: "Ilman työnantajan nimeä"
+  sv: "Utan arbetsgivarens namn"
   machine: { fi: true, sv: true }
 
 profile.number.unset:
@@ -615,35 +587,56 @@ profile.hide.never:
 
 profile.dealBreakers.title:
   en: "Deal-breakers"
-  description: "Heading of the deal-breakers' rows on What you seek, and the title of the same rows opened from the e-mail screen (#149, #551)."
+  description: "Heading of the deal-breakers' rows on What you seek, and the title of the dialog behind its (i) (#149, #551, #581)."
   fi: "Ehdottomat rajat"
   sv: "Absoluta gränser"
   machine: { fi: true, sv: true }
 
 profile.dealBreakers.back:
   en: "Back"
-  description: "Screen-reader label of the back arrow of the deal-breakers' rows opened from the e-mail screen, and of a deal-breaker's own screen: back to where it was opened, which going back saves (#551)."
+  description: "Screen-reader label of the back arrow of a deal-breaker's own screen: back to What you seek, which going back saves (#551)."
   fi: "Takaisin"
   sv: "Tillbaka"
   machine: { fi: true, sv: true }
 
 profile.dealBreakers.explain:
   en: "Up to {max, number}. Only on what you answered yourself, and both ways: yours apply to others, theirs to you."
-  description: "Line over the deal-breakers' rows (#149, #551, the disclose-to-filter rule)."
+  description: "Behind the (i) beside the deal-breakers' heading on What you seek (#149, #551, the disclose-to-filter rule), in the shared dialog: the maintainer's one exception to no info buttons (04/11/2026). Never for what protects a person."
   fi: "Enintään {max, number}. Vain siitä, mihin vastasit itse, ja molempiin suuntiin: sinun rajasi koskevat muita, heidän rajansa sinua."
   sv: "Högst {max, number}. Bara om det du själv svarat på, och åt båda hållen: dina gäller andra, deras gäller dig."
   machine: { fi: true, sv: true }
 
+profile.dealBreakers.count:
+  en: "{filters, number} of {max, number} in use"
+  description: "What a screen reader hears for the count beside the deal-breakers' heading on What you seek, drawn as profile.progress.short (#581): {filters} is how many stand, paused ones among them, and {max} how many a person may have."
+  fi: "{filters, number}/{max, number} käytössä"
+  sv: "{filters, number} av {max, number} används"
+  machine: { fi: true, sv: true }
+
+profile.dealBreakers.about:
+  en: "About deal-breakers"
+  description: "Screen-reader label of the (i) beside the deal-breakers' heading on What you seek, which opens the dialog with profile.dealBreakers.explain (#581)."
+  fi: "Tietoa ehdottomista rajoista"
+  sv: "Om absoluta gränser"
+  machine: { fi: true, sv: true }
+
+profile.dealBreakers.aboutClose:
+  en: "Close"
+  description: "Screen-reader label of the close control of the dialog behind the deal-breakers' (i) (#581)."
+  fi: "Sulje"
+  sv: "Stäng"
+  machine: { fi: true, sv: true }
+
 profile.dealBreakers.gated:
   en: "To filter on this, share yours first."
-  description: "On a deal-breaker's screen while the person has not answered its field: a deal-breaker needs the own answer (#149). Also what a save refused for the same reason says."
+  description: "On a deal-breaker's screen once a paused filter was taken off, or from a typed address: a deal-breaker needs the own answer (#149), and a row saying Share yours first opens the question itself (#581). Also what a save refused for the same reason says."
   fi: "Suodattaaksesi tällä kerro ensin omasi."
   sv: "För att filtrera på det här, dela ditt eget först."
   machine: { fi: true, sv: true }
 
 profile.dealBreakers.answer:
   en: "Answer it"
-  description: "Button under the line of a gated or paused deal-breaker, which opens the field's screen and comes back (#149, #542)."
+  description: "Button under the line of a paused deal-breaker, or of one taken off while paused, which opens the field's screen and comes back (#149, #542, #581)."
   fi: "Vastaa"
   sv: "Svara"
   machine: { fi: true, sv: true }
@@ -657,7 +650,7 @@ profile.dealBreakers.accept:
 
 profile.dealBreakers.everyone:
   en: "Everyone"
-  description: "First button of a deal-breaker's screen, and a row's value on What you seek: no filter on the field (#508, #551). Short: it shares a line with the options."
+  description: "First choice of a deal-breaker's screen, and a row's value on What you seek: no filter on the field (#508, #551). Short: on the languages' screen it shares a line with the options."
   fi: "Kaikki"
   sv: "Alla"
   machine: { fi: true, sv: true }
@@ -683,16 +676,9 @@ profile.dealBreakers.limit:
   sv: "Det är redan {max, number}."
   machine: { fi: true, sv: true }
 
-profile.dealBreakers.open:
-  en: "Your deal-breakers"
-  description: "Button on the e-mail screen that opens the deal-breakers' rows (#149, #239, #551)."
-  fi: "Ehdottomat rajasi"
-  sv: "Dina absoluta gränser"
-  machine: { fi: true, sv: true }
-
 profile.dealBreakers.shareFirst:
   en: "Share yours first"
-  description: "A deal-breaker's row on What you seek while the person has not answered its field and it holds no filter (#551): short, a value under the row's title."
+  description: "A deal-breaker's row on What you seek while the person has not answered its field and it holds no filter (#551): short, a value under the row's title. A press opens the question itself (#581)."
   fi: "Kerro ensin omasi"
   sv: "Dela ditt eget först"
   machine: { fi: true, sv: true }
@@ -704,16 +690,9 @@ profile.dealBreakers.more:
   sv: "{answers} och {more, plural, one {# till} other {# till}}"
   machine: { fi: true, sv: true }
 
-profile.dealBreakers.field.explain:
-  en: "It works both ways: it also decides who sees you."
-  description: "Line at the top of a deal-breaker's own screen (#551): every filter holds both ways. It names no moment, and no count of whom a choice leaves."
-  fi: "Tämä toimii molempiin suuntiin: se ratkaisee myös, ketkä näkevät sinut."
-  sv: "Det här gäller åt båda håll: det avgör också vilka som ser dig."
-  machine: { fi: true, sv: true }
-
 profile.dealBreakers.everyoneAgain:
   en: "Back to Everyone."
-  description: "Said on a deal-breaker's screen when the person takes back the last accepted answer (#551): Everyone is chosen again by itself, which a screen reader would not otherwise hear. 'Everyone' is the button's word, profile.dealBreakers.everyone."
+  description: "Said to a screen reader on a deal-breaker's screen when the person takes back the last accepted answer, or takes a paused filter off (#551), never drawn (#581): Everyone fills again by itself, and paused the answers go, which a screen reader would not otherwise hear. 'Everyone' is the button's word, profile.dealBreakers.everyone."
   fi: "Takaisin kohtaan Kaikki."
   sv: "Tillbaka till Alla."
   machine: { fi: true, sv: true }
@@ -774,13 +753,6 @@ profile.seek.title:
   sv: "Vad du söker"
   machine: { fi: true, sv: true }
 
-profile.seek.summary:
-  en: "Whom, what ages, what you are here for and your deal-breakers"
-  description: "Second line of the row on the profile that opens What you seek (#542, #551): what the list holds, never an answer; a screen reader hears it as the row's hint."
-  fi: "Ketä, minkä ikäisiä, mitä etsit täältä ja ehdottomat rajasi"
-  sv: "Vem, vilka åldrar, vad du är här för och dina absoluta gränser"
-  machine: { fi: true, sv: true }
-
 profile.seek.back:
   en: "Back to what you seek"
   description: "Screen-reader label of the back arrow of the screens What you seek opens (#542); going back saves the screen."
@@ -795,25 +767,11 @@ profile.seek.explain:
   sv: "De här gäller åt båda håll: de avgör vilka du ser och vilka som ser dig. Samtal du redan har förblir som de är."
   machine: { fi: true, sv: true }
 
-profile.seek.whom.explain:
-  en: "Pick everyone you want to see. It also decides who sees you."
-  description: "Lead text of the screen that changes whom one seeks (#542). Not the seeks step's text, whose 'ever' a change does not keep while today's cards stand."
-  fi: "Valitse kaikki, joita haluat nähdä. Se ratkaisee myös, ketkä näkevät sinut."
-  sv: "Välj alla du vill se. Det avgör också vilka som ser dig."
-  machine: { fi: true, sv: true }
-
 profile.seek.whom.keepOne:
   en: "Keep at least one."
   description: "Said when the person presses the only gender they seek (#542): it stays chosen, since whom one seeks takes one to three."
   fi: "Pidä ainakin yksi."
   sv: "Behåll minst en."
-  machine: { fi: true, sv: true }
-
-profile.seek.ages.explain:
-  en: "Between {min, number} and {max, number}. It also decides who sees you."
-  description: "Lead text of the screen that changes the age window (#542); {min} and {max} are the bounds."
-  fi: "Väliltä {min, number}–{max, number}. Se ratkaisee myös, ketkä näkevät sinut."
-  sv: "Mellan {min, number} och {max, number}. Det avgör också vilka som ser dig."
   machine: { fi: true, sv: true }
 
 profile.seek.ages.summary:
@@ -831,10 +789,10 @@ profile.seek.failed:
   machine: { fi: true, sv: true }
 
 profile.seek.intent.explain:
-  en: "This also decides who sees you: people who want the same thing. Open to either covers long-term and casual."
-  description: "Lead text of the screen that changes what one is here for (#542). Not the intent step's text, which says it can be changed later; the second sentence names the option Open to either."
-  fi: "Tämä ratkaisee myös, ketkä näkevät sinut: ne, jotka haluavat samaa. Avoin kummallekin kattaa pitkäaikaisen ja rennon."
-  sv: "Det här avgör också vilka som ser dig: de som vill samma sak. Öppen för båda omfattar långvarigt och avslappnat."
+  en: "This also decides who sees you: people who want the same thing."
+  description: "Lead text of the screen that changes what one is here for (#542, #581): the both-ways words beside this one-field section. Not the intent step's text, which says it can be changed later."
+  fi: "Tämä ratkaisee myös, ketkä näkevät sinut: ne, jotka haluavat samaa."
+  sv: "Det här avgör också vilka som ser dig: de som vill samma sak."
   machine: { fi: true, sv: true }
 
 profile.gender.title:
@@ -845,10 +803,10 @@ profile.gender.title:
   machine: { fi: true, sv: true }
 
 profile.gender.explain:
-  en: "This is on your card, so a change reaches everybody who can see you. After a change, the next one is possible only after a waiting time."
-  description: "Lead of the gender screen (#552): a change shows on the card, and the limit is said before it can bite (the maintainer, 01/11/2026), in the neutral words of errors.change_too_soon and with no number."
-  fi: "Tämä näkyy kortillasi, joten muutos näkyy kaikille, jotka näkevät sinut. Muutoksen jälkeen seuraava on mahdollinen vasta odotusajan jälkeen."
-  sv: "Det här visas på ditt kort, så en ändring når alla som kan se dig. Efter en ändring är nästa möjlig först efter en väntetid."
+  en: "This is on your card. After a change, the next one is possible only after a waiting time."
+  description: "Lead of the gender screen (#552, #581): it cannot be hidden from the card, and the limit is said before it can bite (the maintainer, 01/11/2026), in the neutral words of errors.change_too_soon and with no number."
+  fi: "Tämä näkyy kortillasi. Muutoksen jälkeen seuraava on mahdollinen vasta odotusajan jälkeen."
+  sv: "Det här visas på ditt kort. Efter en ändring är nästa möjlig först efter en väntetid."
   machine: { fi: true, sv: true }
 
 profile.gender.waiting:
@@ -888,9 +846,16 @@ profile.place.back:
 
 profile.place.explain:
   en: "Your postal code tells Kuutti how far people are. Others see a town or your area by name, never the digits."
-  description: "Explanation over the postal code field, in onboarding's home step and on the home screen (#514, ADR-061 §2, §3). True and short: it must not say Kuutti keeps no postal code, since a large area's code is kept."
+  description: "Explanation over the postal code field in onboarding's home step (#514, ADR-061 §2, §3). True and short: it must not say Kuutti keeps no postal code, since a large area's code is kept. The home screen says only the second sentence, profile.place.othersSee (#581)."
   fi: "Postinumerosi kertoo Kuutille, kuinka kaukana ihmiset ovat. Muut näkevät kaupungin tai alueesi nimen, eivät koskaan numeroita."
   sv: "Ditt postnummer berättar för Kuutti hur långt bort folk är. Andra ser en stad eller ditt område med namn, aldrig siffrorna."
+  machine: { fi: true, sv: true }
+
+profile.place.othersSee:
+  en: "Others see a town or your area by name, never the digits."
+  description: "Over the home screen (#581, ADR-061 §3): the digits are typed again here, sometimes because someone moved away from someone, and nothing else on the screen says they stay back. The second sentence of profile.place.explain, which onboarding keeps whole."
+  fi: "Muut näkevät kaupungin tai alueesi nimen, eivät koskaan numeroita."
+  sv: "Andra ser en stad eller ditt område med namn, aldrig siffrorna."
   machine: { fi: true, sv: true }
 
 profile.place.code:
@@ -909,42 +874,35 @@ profile.place.row:
 
 profile.place.matches:
   en: "{areas, plural, one {# area matches.} other {# areas match.}}"
-  description: "Said under the postal code field as it is typed (#514): how many areas are listed under it, at most eight, all there are."
+  description: "Said to a screen reader as the postal code is typed (#514), never drawn (#581): how many areas are listed under the field, at most eight, all there are."
   fi: "{areas, plural, one {# alue sopii.} other {# aluetta sopii.}}"
   sv: "{areas, plural, one {# område passar.} other {# områden passar.}}"
   machine: { fi: true, sv: true }
 
 profile.place.more:
   en: "The first {areas, number} areas. More digits narrow them."
-  description: "Said under the postal code field when more areas match than the list shows (#514): {areas} is how many it shows."
+  description: "Said to a screen reader when more areas match than the list shows (#514), never drawn (#581): {areas} is how many it shows."
   fi: "Ensimmäiset {areas, number} aluetta. Lisää numeroita tarkentaa listaa."
   sv: "De första {areas, number} områdena. Fler siffror begränsar listan."
   machine: { fi: true, sv: true }
 
 profile.place.choice:
   en: "What should your card show?"
-  description: "Heading of the step after the postal code, and of the same part of the home screen (#514, ADR-061 §3): the nearest town or the area's name."
+  description: "Heading over the town and the area where there is a choice, on the step after the postal code and on the home screen (#514, ADR-061 §3, #581): the filled one says what the card shows. Where there is none, profile.place.onCard stands in its place."
   fi: "Mitä korttisi näyttää?"
   sv: "Vad ska ditt kort visa?"
   machine: { fi: true, sv: true }
 
-profile.place.nearestTown:
-  en: "Your card shows the nearest town."
-  description: "Said in place of the choice where there is no area to show instead, or the area bears the town's name (#514, ADR-061 §3)."
-  fi: "Korttisi näyttää lähimmän kaupungin."
-  sv: "Ditt kort visar närmaste stad."
-  machine: { fi: true, sv: true }
-
 profile.place.onCard:
   en: "On your card: {place}"
-  description: "What the person's card says of their home, always in sight under the choice (#514, ADR-061 §3). {place} is a place's name, after a colon so nothing is inflected."
+  description: "What the person's card says of their home, where there is no choice to make: in place of profile.place.choice and in its role, as the step's heading (#514, ADR-061 §3, #581). {place} is a place's name, after a colon so nothing is inflected."
   fi: "Kortillasi: {place}"
   sv: "På ditt kort: {place}"
   machine: { fi: true, sv: true }
 
 profile.place.saved:
   en: "Saved."
-  description: "Said after a new home, or what the card shows, was saved (#514)."
+  description: "Said to a screen reader after a new home, or what the card shows, was saved (#514), never drawn (#581): the filled button moves, or the field empties and the buttons show the new town."
   fi: "Tallennettu."
   sv: "Sparat."
   machine: { fi: true, sv: true }
@@ -972,7 +930,7 @@ profile.later.back:
 
 profile.later.backOnce:
   en: "Back to your deal-breakers"
-  description: "Screen-reader label of the back arrow of a later question or a section opened from the deal-breakers' Answer it, which goes back there (#542)."
+  description: "Screen-reader label of the back arrow of a later question or a section opened from a deal-breaker's row or its Answer it, which goes back there (#542, #581)."
   fi: "Takaisin ehdottomiin rajoihisi"
   sv: "Tillbaka till dina absoluta gränser"
   machine: { fi: true, sv: true }
@@ -985,10 +943,10 @@ profile.later.progress:
   machine: { fi: true, sv: true }
 
 profile.later.explain:
-  en: "One question at a time, each optional. Skip what you like; every answer is on your card only when you give it."
-  description: "Explanation on the first later screen (#148)."
-  fi: "Yksi kysymys kerrallaan, jokainen vapaaehtoinen. Ohita mitä haluat; vastaus näkyy kortillasi vain, jos annat sen."
-  sv: "En fråga i taget, var och en frivillig. Hoppa över vad du vill; ett svar syns på ditt kort bara om du ger det."
+  en: "Every answer is on your card only when you give it."
+  description: "On the first later screen (#148, #581): the only word, before an answer is given, that a card shows what is answered. It can stand over a question that never reaches a card, which says so itself (profile.hide.never)."
+  fi: "Jokainen vastaus näkyy kortillasi vain, jos annat sen."
+  sv: "Varje svar syns på ditt kort bara om du ger det."
   machine: { fi: true, sv: true }
 
 profile.later.skip:
@@ -2728,7 +2686,7 @@ profile.prompt.ask_me:
   machine: { fi: true, sv: true }
 
 profile.prompts.label:
-  en: "Prompts"
+  en: "Questions"
   description: "Heading of the prompts in onboarding's step for words of your own; the profile's prompts section has the section's title instead (#239)."
   fi: "Kysymykset"
   sv: "Frågor"
@@ -2736,7 +2694,7 @@ profile.prompts.label:
 
 profile.progress.short:
   en: "{answered, number}/{total, number}"
-  description: "How much of a part of the profile is answered, as a count (#239): on a row of the profile list and over the prompts. A screen reader hears profile.progress.answered instead."
+  description: "How much of a part of the profile is answered, as a count (#239): on a row of the profile list, over the questions and, of how many may stand, beside the deal-breakers' heading (#581). A screen reader hears profile.progress.answered or profile.dealBreakers.count instead."
   fi: "{answered, number}/{total, number}"
   sv: "{answered, number}/{total, number}"
   machine: { fi: true, sv: true }
@@ -2764,28 +2722,28 @@ profile.progress.done:
 
 profile.prompts.answer:
   en: "Your answer to: {prompt}"
-  description: "Accessibility label of a prompt's answer field; {prompt} is the prompt text."
+  description: "Accessibility label of a question's answer field; {prompt} is the question's text."
   fi: "Vastauksesi kysymykseen: {prompt}"
   sv: "Ditt svar på: {prompt}"
   machine: { fi: true, sv: true }
 
 profile.prompts.remove:
-  en: "Remove the prompt: {prompt}"
-  description: "Accessibility label of the remove button of one prompt."
+  en: "Remove the question: {prompt}"
+  description: "Accessibility label of the remove button of one question."
   fi: "Poista kysymys: {prompt}"
   sv: "Ta bort frågan: {prompt}"
   machine: { fi: true, sv: true }
 
 profile.prompts.removeButton:
   en: "Remove"
-  description: "Visible text of the button that removes a prompt; its accessibility label names the prompt."
+  description: "Visible text of the button that removes a question; its accessibility label names the question."
   fi: "Poista"
   sv: "Ta bort"
   machine: { fi: true, sv: true }
 
 profile.prompts.pick:
-  en: "Add a prompt"
-  description: "Heading of the list of prompts still available."
+  en: "Add a question"
+  description: "Heading of the list of questions still available."
   fi: "Lisää kysymys"
   sv: "Lägg till en fråga"
   machine: { fi: true, sv: true }
@@ -2812,24 +2770,24 @@ profile.completeness.photos:
   machine: { fi: true, sv: true }
 
 profile.completeness.bio_or_prompts:
-  en: "A bio of {min, number} characters, a ready line, or two answered prompts"
-  description: "Checklist line for the bio-or-prompts rule; {min} is the bio length. A ready line counts too (#239)."
+  en: "A bio of {min, number} characters, a ready line, or two answered questions"
+  description: "Checklist line for the bio-or-questions rule; {min} is the bio length. A ready line counts too (#239). With the bio's hint gone this is where the length is said in The basics (#581)."
   fi: "Vähintään {min, number} merkin esittely, valmis rivi tai kaksi vastattua kysymystä"
   sv: "En presentation på {min, number} tecken, en färdig rad eller två besvarade frågor"
   machine: { fi: true, sv: true }
 
 profile.completeness.seeks:
-  en: "Whom you are looking for (set in onboarding)"
-  description: "Missing item that onboarding (#46) sets."
-  fi: "Ketä etsit (asetetaan aloituksessa)"
-  sv: "Vem du söker (anges i introduktionen)"
+  en: "Whom you are looking for"
+  description: "Missing item that onboarding (#46) sets: nobody without it reaches the profile, so it names no way to fix it (#581)."
+  fi: "Ketä etsit"
+  sv: "Vem du söker"
   machine: { fi: true, sv: true }
 
 profile.completeness.age_window:
-  en: "Your age window (set in onboarding)"
-  description: "Missing item that onboarding (#46) sets."
-  fi: "Ikähaarukkasi (asetetaan aloituksessa)"
-  sv: "Ditt åldersspann (anges i introduktionen)"
+  en: "Your age window"
+  description: "Missing item that onboarding (#46) sets: nobody without it reaches the profile, so it names no way to fix it (#581)."
+  fi: "Ikähaarukkasi"
+  sv: "Ditt åldersspann"
   machine: { fi: true, sv: true }
 
 profile.tip.title:
@@ -2932,16 +2890,9 @@ profile.card.title:
 
 profile.card.explain:
   en: "This is what others see."
-  description: "Lead text of the card preview."
+  description: "Lead text of the card preview, on a complete card only (#581): on an incomplete one nobody else sees it, and the list above says what it lacks."
   fi: "Tämän muut näkevät."
   sv: "Det här ser andra."
-  machine: { fi: true, sv: true }
-
-profile.card.empty:
-  en: "Save your profile first, then come back here."
-  description: "Card preview before the first save."
-  fi: "Tallenna profiilisi ensin ja tule sitten takaisin."
-  sv: "Spara din profil först och kom sedan tillbaka."
   machine: { fi: true, sv: true }
 
 profile.card.loading:
@@ -4549,7 +4500,7 @@ onboarding.prompts.title:
   machine: { fi: true, sv: true }
 
 onboarding.prompts.explain:
-  en: "Answer two prompts, write a bio of at least {min, number} characters, or pick a ready line. Your card leads with a photo and one answer."
+  en: "Answer two questions, write a bio of at least {min, number} characters, or pick a ready line. Your card leads with a photo and one answer."
   description: "Explanation under the prompts step's heading (#146, ADR-009 §4); a ready line finishes the step too (#239)."
   fi: "Vastaa kahteen kysymykseen, kirjoita vähintään {min, number} merkin esittely tai valitse valmis rivi. Korttisi alkaa kuvalla ja yhdellä vastauksella."
   sv: "Svara på två frågor, skriv en presentation på minst {min, number} tecken eller välj en färdig rad. Ditt kort inleds med en bild och ett svar."
@@ -4570,24 +4521,17 @@ photos.title:
   machine: { fi: true, sv: true }
 
 photos.explain:
-  en: "Up to {max, plural, one {# photo} other {# photos}}. Hold a photo and drag it to change the order. The first one others can see is your main photo. A new photo is checked before anyone else sees it."
-  description: Photos screen, the paragraph under the heading. {max} is max_photos from the API. The order is changed by holding a tile and dragging it (#179). The main photo is the first approved one, the one the card leads with (ADR-009 §4, #239).
-  fi: "Enintään {max, plural, one {# kuva} other {# kuvaa}}. Vaihda järjestystä pitämällä kuvaa painettuna ja vetämällä se uuteen paikkaan. Ensimmäinen, jonka muut voivat nähdä, on pääkuvasi. Uusi kuva tarkistetaan, ennen kuin kukaan muu näkee sen."
-  sv: "Högst {max, plural, one {# foto} other {# foton}}. Håll ett foto nedtryckt och dra det för att ändra ordningen. Det första som andra kan se är ditt huvudfoto. Ett nytt foto granskas innan någon annan ser det."
+  en: "Hold a photo and drag it to change the order. A new photo is checked before anyone else sees it."
+  description: "Photos screen, the paragraph under the heading: the two things the screen cannot show (#581). The order is changed by holding a tile and dragging it (#179)."
+  fi: "Vaihda järjestystä pitämällä kuvaa painettuna ja vetämällä se uuteen paikkaan. Uusi kuva tarkistetaan, ennen kuin kukaan muu näkee sen."
+  sv: "Håll ett foto nedtryckt och dra det för att ändra ordningen. Ett nytt foto granskas innan någon annan ser det."
   machine: { fi: true, sv: true }
 
 photos.count:
   en: "{photos, plural, one {# photo} other {# photos}}, at most {max, number}"
-  description: Photos screen, how many photos there are and the allowed number. Both are plain numbers after a comma, so no language inflects them.
+  description: "Photos screen, how many photos there are and the allowed number. Drawn only at the limit, beside the Add a photo that stopped; below it only said to a screen reader as the count changes (#581). Both are plain numbers after a comma, so no language inflects them."
   fi: "{photos, plural, one {# kuva} other {# kuvaa}}, enintään {max, number}"
   sv: "{photos, plural, one {# foto} other {# foton}}, högst {max, number}"
-  machine: { fi: true, sv: true }
-
-photos.empty:
-  en: No photos yet.
-  description: Photos screen, when the account has no photos.
-  fi: Ei vielä kuvia.
-  sv: Inga foton ännu.
   machine: { fi: true, sv: true }
 
 photos.add:
@@ -4604,20 +4548,6 @@ photos.done:
   sv: Klar
   machine: { fi: true, sv: true }
 
-photos.picking:
-  en: Choosing a photo…
-  description: Photos screen, while the phone's picker is open.
-  fi: Valitaan kuvaa…
-  sv: Väljer foto…
-  machine: { fi: true, sv: true }
-
-photos.preparing:
-  en: Preparing the photo…
-  description: Photos screen, while the picked photo is checked and resized on the phone, before anything is sent.
-  fi: Valmistellaan kuvaa…
-  sv: Förbereder fotot…
-  machine: { fi: true, sv: true }
-
 photos.uploading:
   en: "Uploading… {percent, number} %"
   description: Photos screen, upload progress. {percent} is a whole number 0 to 100.
@@ -4626,29 +4556,15 @@ photos.uploading:
   machine: { fi: true, sv: true }
 
 photos.state.pending:
-  en: Waiting for review
-  description: Photos screen, badge on a photo that moderation has not looked at yet; only the owner sees the photo.
-  fi: Odottaa tarkistusta
-  sv: Väntar på granskning
-  machine: { fi: true, sv: true }
-
-photos.state.queued:
-  en: Being reviewed
-  description: Photos screen, badge on a photo a person is reviewing.
-  fi: Tarkistuksessa
-  sv: Granskas
-  machine: { fi: true, sv: true }
-
-photos.state.approved:
-  en: Visible to others
-  description: Photos screen, badge on a photo that passed moderation.
-  fi: Näkyy muille
-  sv: Syns för andra
+  en: "In review"
+  description: "Photos screen, the words under the hourglass on a photo waiting for the check or for a person, both states alike (the maintainer, 04/11/2026); only the owner sees the photo."
+  fi: "Tarkistuksessa"
+  sv: "Under granskning"
   machine: { fi: true, sv: true }
 
 photos.state.rejected:
   en: Not accepted
-  description: Photos screen, badge on a photo moderation refused; the reason arrives with the moderation feature.
+  description: Photos screen, the words under a refused photo that came with no reason; with one, the reason stands in their place.
   fi: Ei hyväksytty
   sv: Inte godkänt
   machine: { fi: true, sv: true }
@@ -4878,10 +4794,10 @@ photos.rejected.no_person:
   machine: { fi: true, sv: true }
 
 photos.rejected.several_people:
-  en: Not accepted. A profile photo shows you alone, so nobody else appears on Kuutti without asking.
+  en: "Not accepted. A profile photo shows you alone."
   description: Photos screen, rejected because several people are in the picture.
-  fi: Ei hyväksytty. Profiilikuvassa olet yksin, jotta kukaan muu ei päädy Kuuttiin kysymättä.
-  sv: Inte godkänt. På en profilbild är du ensam, så att ingen annan hamnar på Kuutti utan att bli tillfrågad.
+  fi: "Ei hyväksytty. Profiilikuvassa olet yksin."
+  sv: "Inte godkänt. På en profilbild är du ensam."
   machine: { fi: true, sv: true }
 
 photos.rejected.minor:
@@ -5057,13 +4973,6 @@ photos.caption.title:
   description: "Photos screen, title of the dialog that lists the lines to pick from. {position} counts from 1."
   fi: "Kuvateksti kuvalle {position, number}"
   sv: "En bildtext för foto {position, number}"
-  machine: { fi: true, sv: true }
-
-photos.caption.explain:
-  en: "One line under the photo, shown to others in their own language."
-  description: "Photos screen, the caption dialog's one sentence of explanation."
-  fi: "Yksi rivi kuvan alla, näkyy muille heidän omalla kielellään."
-  sv: "En rad under fotot, som andra ser på sitt eget språk."
   machine: { fi: true, sv: true }
 
 photos.caption.failed:

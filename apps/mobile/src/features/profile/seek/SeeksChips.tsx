@@ -1,11 +1,11 @@
 import { GENDERS, type Gender } from "@kuutti/schema";
 import { View } from "react-native";
+import { Choice } from "@/components/Choice";
 import { useT } from "@/lib/locale";
 import { useHapticTap } from "@/theme/haptics";
-import { Chip } from "../FieldEditor";
 import { seeksKey } from "../keys";
 
-/** Whom one seeks as chips, with Anyone for all three: the seeks step's and What you seek's (#146, #542). */
+/** Whom one seeks as whole-width rows (#581), with Anyone for all three: the seeks step's and What you seek's (#146, #542). */
 export function SeeksChips({
   chosen,
   onChange,
@@ -16,12 +16,13 @@ export function SeeksChips({
   const { t } = useT();
   const tap = useHapticTap();
   return (
-    <View className="flex-row flex-wrap gap-2">
+    <View className="gap-2">
       {GENDERS.map((option) => (
-        <Chip
+        <Choice
           key={option}
           label={t(seeksKey(option))}
-          selected={chosen.includes(option)}
+          chosen={chosen.includes(option)}
+          several
           onPress={() => {
             tap();
             onChange(
@@ -30,9 +31,10 @@ export function SeeksChips({
           }}
         />
       ))}
-      <Chip
+      <Choice
         label={t("onboarding.seeks.anyone")}
-        selected={chosen.length === GENDERS.length}
+        chosen={chosen.length === GENDERS.length}
+        several
         onPress={() => {
           tap();
           onChange([...GENDERS]);

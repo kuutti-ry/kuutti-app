@@ -44,7 +44,7 @@ name: A photo with a caption reaches the other person, small in the thread and f
     env:
       BUTTON: "Add photo|Lisää kuva|Lägg till foto"
       INDEX: 0
-      COUNT: "Photo attached\\. The words in the field go under it\\.|Kuva liitetty\\. Kentän sanat tulevat sen alle\\.|Foto bifogat\\. Orden i fältet hamnar under det\\."
+      LANDED: "Photo attached\\. The words in the field go under it\\.|Kuva liitetty\\. Kentän sanat tulevat sen alle\\.|Foto bifogat\\. Orden i fältet hamnar under det\\."
 # The keyboard stays up (README): Send is above it, on the composer.
 - tapOn: "(Message|Viesti|Meddelande)( .*)?"
 - inputText: ${output.caption}

@@ -11,11 +11,32 @@ name: A section saves on going back, the card shows what it saved, and a hidden 
 - extendedWaitUntil:
     visible: "(The basics|Perustiedot|Grunderna)(, .*)?"
     timeout: 15000
-# A row is one button named by its title; the line under it is its hint, which
-# Maestro does not read as text, and how far it is filled its value, which
-# Android joins to the name after a comma (#239).
+# A row is one button named by its title, and how far it is filled its value,
+# which Android joins to the name after a comma (#239). What it holds is its
+# hint, which Maestro does not read as text, and is not drawn either (#581).
 - assertVisible: "(Relationship and kids|Parisuhde ja lapset|Relation och barn)(, .*)?"
+- assertNotVisible: "Relationship structure and kids|Suhteen muoto ja lapset|Relationsform och barn"
 - waitForAnimationToEnd
+
+# The questions: called that in every language, a row with no line under it, and
+# on its screen her two answers, each with its button, and what is left to add (#581).
+- assertNotVisible: "Up to three questions, answered in your own words|Enintään kolme kysymystä, omin sanoin vastattuna|Upp till tre frågor, besvarade med egna ord"
+- tapOn: "(Questions|Kysymykset|Frågor)(, .*)?"
+- extendedWaitUntil:
+    visible: "Remove the question: .*|Poista kysymys: .*|Ta bort frågan: .*"
+    timeout: 15000
+- waitForAnimationToEnd
+- scrollUntilVisible:
+    element: "Add a question|Lisää kysymys|Lägg till en fråga"
+    direction: DOWN
+    centerElement: true
+    timeout: 60000
+- tapOn: "Back to your profile|Takaisin profiiliisi|Tillbaka till din profil"
+- extendedWaitUntil:
+    visible: "(The basics|Perustiedot|Grunderna)(, .*)?"
+    timeout: 15000
+- waitForAnimationToEnd
+
 - tapOn: "(Lifestyle|Elämäntavat|Livsstil)(, .*)?"
 - extendedWaitUntil:
     visible: "Smoking|Tupakointi|Rökning"

@@ -54,6 +54,33 @@ describe("RowGroup", () => {
     );
   });
 
+  it("says a hint to a screen reader and draws none, where the title says enough to the eye (#581)", async () => {
+    await renderWithTheme(
+      <RowGroup
+        rows={[
+          { key: "a", title: "The basics", hint: "Name and height", onPress: () => {} },
+          {
+            key: "b",
+            title: "Theme",
+            hint: "Light, dark or the phone's",
+            summary: "Dark",
+            value: "Dark",
+            onPress: () => {},
+          },
+        ]}
+      />,
+    );
+    const basics = screen.getByRole("button", { name: "The basics" });
+    expect(basics.props.accessibilityHint).toBe("Name and height");
+    expect(screen.queryByText("Name and height")).toBeNull();
+    expect(screen.queryByText("Name and height", { includeHiddenElements: true })).toBeNull();
+    // The hint is the hint, whatever is drawn under the title beside it.
+    const theme = screen.getByRole("button", { name: "Theme" });
+    expect(theme.props.accessibilityHint).toBe("Light, dark or the phone's");
+    expect(screen.getByText("Dark")).toBeTruthy();
+    expect(theme.props.accessibilityValue).toEqual({ text: "Dark" });
+  });
+
   describe("a row that holds its panel (#511)", () => {
     const toggle = jest.fn();
     const rows = (expanded: boolean, extra: Partial<Row> = {}): Row[] => [

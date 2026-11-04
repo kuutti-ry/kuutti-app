@@ -1,7 +1,9 @@
-# Deal-breakers as rows (#551, TD-16, features/matching/preferences.feature): a
-# row each, saying what it holds and opening a small screen in the same shape for
-# all. Everyone comes first, which is having none; taking back the last answer
-# returns to it, said in words; going back saves. At most deal_breakers_max (7),
+# Deal-breakers as rows on What you seek (#551, #581, TD-16,
+# features/matching/preferences.feature): a row each, saying what it holds and
+# opening a small screen in the same shape for all, with how many are in use
+# beside their heading. Everyone comes first, which is having none; taking back
+# the last answer returns to it, which fills by itself, said to a screen reader
+# and not drawn; going back saves. At most deal_breakers_max (7),
 # one per field the person answered themselves and the distance, so at seven the
 # limit refuses nobody: that refusal is the screen's test and the API's, with a
 # lower number. Sanna answered all six fields and has none set; the flow takes
@@ -10,71 +12,73 @@ appId: fi.kuutti.app
 name: A deal-breaker starts on Everyone, says what it accepts on its row, and going back saves it
 ---
 - runFlow: ../common/sign-in.yaml
-- openLink: kuutti://profile/deal-breakers
+- openLink: kuutti://profile/seek
 - extendedWaitUntil:
-    visible: "Up to 7\\. Only on what you answered yourself.*|Enintään 7\\. Vain siitä, mihin vastasit itse.*|Högst 7\\. Bara om det du själv svarat på.*"
+    visible: "These work both ways.*|Nämä toimivat molempiin suuntiin.*|De här gäller åt båda håll.*"
     timeout: 15000
 - waitForAnimationToEnd
+# Under whom, the ages and what she is here for.
+- scrollUntilVisible:
+    element: "Deal-breakers|Ehdottomat rajat|Absoluta gränser"
+    direction: DOWN
+    centerElement: true
+    timeout: 60000
+- assertVisible: "0/7|0 of 7 in use|0/7 käytössä|0 av 7 används"
+- scrollUntilVisible:
+    element: "(Kids|Lapset|Barn)(, .*)?"
+    direction: DOWN
+    centerElement: true
+    timeout: 60000
 - assertNotVisible: "((Smoking|Tupakointi|Rökning), )?(Share yours first|Kerro ensin omasi|Dela ditt eget först)"
 - assertVisible: "((Kids|Lapset|Barn), )?(Everyone|Kaikki|Alla)"
 - assertNotVisible: "Save the deal-breakers|Tallenna rajat|Spara gränserna"
 
-# A row opens its own screen: Everyone chosen, and nothing to switch on.
+# A row opens its own screen: Everyone chosen, nothing to switch on, and no line
+# saying again what What you seek says at its top (#581).
 - tapOn: "(Kids|Lapset|Barn)(, .*)?"
 - extendedWaitUntil:
-    visible:
-      text: "Everyone|Kaikki|Alla"
-      selected: true
+    visible: "✓ Everyone|✓ Kaikki|✓ Alla"
     timeout: 15000
 - waitForAnimationToEnd
-- assertVisible: "It works both ways.*|Tämä toimii molempiin suuntiin.*|Det här gäller åt båda håll.*"
+- assertNotVisible: "It works both ways: it also decides who sees you\\.|Tämä toimii molempiin suuntiin: se ratkaisee myös, ketkä näkevät sinut\\.|Det här gäller åt båda håll: det avgör också vilka som ser dig\\."
 - assertVisible: "Fine with me|Sopii minulle|Okej för mig"
 - assertNotVisible: "Also people who did not answer|Myös ne, jotka eivät vastanneet|Även de som inte svarade"
 
-# An answer takes Everyone off and brings the switch; taking it back returns, in words.
+# An answer takes Everyone off and brings the switch; taking it back returns:
+# Everyone fills by itself, and its words are heard and not drawn (#581).
 - tapOn: "No kids|Ei lapsia|Inga barn"
-- assertVisible:
-    text: "No kids|Ei lapsia|Inga barn"
-    selected: true
-- assertVisible:
-    text: "Everyone|Kaikki|Alla"
-    selected: false
+- assertVisible: "✓ No kids|✓ Ei lapsia|✓ Inga barn"
+- assertVisible: "Everyone|Kaikki|Alla"
 - assertVisible: "Also people who did not answer|Myös ne, jotka eivät vastanneet|Även de som inte svarade"
-- tapOn: "No kids|Ei lapsia|Inga barn"
-- assertVisible:
-    text: "Everyone|Kaikki|Alla"
-    selected: true
-- assertVisible: "Back to Everyone\\.|Takaisin kohtaan Kaikki\\.|Tillbaka till Alla\\."
+- tapOn: "✓ No kids|✓ Ei lapsia|✓ Inga barn"
+- assertVisible: "✓ Everyone|✓ Kaikki|✓ Alla"
+- assertNotVisible: "Back to Everyone\\.|Takaisin kohtaan Kaikki\\.|Tillbaka till Alla\\."
 - assertNotVisible: "Also people who did not answer|Myös ne, jotka eivät vastanneet|Även de som inte svarade"
 
-# Two answers, in the words of somebody else's: going back saves them, and the row says them.
+# Two answers, in the words of somebody else's: going back saves them, the row
+# says them, and the heading counts one in use.
 - tapOn: "No kids|Ei lapsia|Inga barn"
 - tapOn: "Kids at home|Lapset asuvat kotona|Barn som bor hemma"
-- assertNotVisible: "Back to Everyone\\.|Takaisin kohtaan Kaikki\\.|Tillbaka till Alla\\."
 - tapOn: "Back|Takaisin|Tillbaka"
 - extendedWaitUntil:
     visible: "((Kids|Lapset|Barn), )?(No kids, Kids at home|Ei lapsia, Lapset asuvat kotona|Inga barn, Barn som bor hemma)"
     timeout: 15000
+- assertVisible: "1/7|1 of 7 in use|1/7 käytössä|1 av 7 används"
 - waitForAnimationToEnd
 
 # Opened again: what was saved. Everyone takes it off, and the row says Everyone.
 - tapOn: "(Kids|Lapset|Barn)(, .*)?"
 - extendedWaitUntil:
-    visible:
-      text: "Kids at home|Lapset asuvat kotona|Barn som bor hemma"
-      selected: true
+    visible: "✓ Kids at home|✓ Lapset asuvat kotona|✓ Barn som bor hemma"
     timeout: 15000
 - waitForAnimationToEnd
-- assertVisible:
-    text: "No kids|Ei lapsia|Inga barn"
-    selected: true
+- assertVisible: "✓ No kids|✓ Ei lapsia|✓ Inga barn"
 - tapOn: "Everyone|Kaikki|Alla"
-- assertVisible:
-    text: "Kids at home|Lapset asuvat kotona|Barn som bor hemma"
-    selected: false
+- assertVisible: "Kids at home|Lapset asuvat kotona|Barn som bor hemma"
 - tapOn: "Back|Takaisin|Tillbaka"
 - extendedWaitUntil:
     visible: "((Kids|Lapset|Barn), )?(Everyone|Kaikki|Alla)"
     timeout: 15000
 - waitForAnimationToEnd
 - assertNotVisible: "((Kids|Lapset|Barn), )?(No kids, Kids at home|Ei lapsia, Lapset asuvat kotona|Inga barn, Barn som bor hemma)"
+- assertVisible: "0/7|0 of 7 in use|0/7 käytössä|0 av 7 används"

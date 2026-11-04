@@ -95,7 +95,7 @@ type ButtonProps = Omit<
   "children" | "accessibilityLabel" | "accessibilityRole" | "role" | "style"
 > & {
   /** A button unless it is one option of a group (the dev settings' theme choice). */
-  accessibilityRole?: "button" | "radio" | "tab" | "link";
+  accessibilityRole?: "button" | "radio" | "checkbox" | "tab" | "link";
 } & React.RefAttributes<React.ComponentRef<typeof Pressable>> &
   VariantProps<typeof buttonVariants> &
   ButtonContent & { style?: StyleProp<ViewStyle> };

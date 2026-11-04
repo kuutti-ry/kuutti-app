@@ -3,9 +3,10 @@ import type { Photo, PhotoRejectionReason, PhotoState } from "@kuutti/schema";
 import { useRouter } from "expo-router";
 import Hourglass from "lucide-react-native/icons/hourglass";
 import Trash from "lucide-react-native/icons/trash";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Animated, Pressable, ScrollView, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { sayAloud } from "@/components/Notice";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/card";
 import {
@@ -31,13 +32,6 @@ import { PhotoTip } from "./tips";
 import { useDragOrder } from "./useDragOrder";
 import { type PhotosNotice, usePhotos } from "./usePhotos";
 
-const STATE_TEXT: Record<PhotoState, PlainMessageKey> = {
-  pending: "photos.state.pending",
-  queued: "photos.state.queued",
-  approved: "photos.state.approved",
-  rejected: "photos.state.rejected",
-};
-
 /** A rejected photo says why, in words from a list (#49): a moderator's choice, the check's (#206), or the night's (#376); never a label name. */
 const REJECTED_TEXT: Record<PhotoRejectionReason, PlainMessageKey> = {
   nudity: "photos.rejected.nudity",
@@ -50,15 +44,12 @@ const REJECTED_TEXT: Record<PhotoRejectionReason, PlainMessageKey> = {
   not_reviewed: "photos.rejected.not_reviewed",
 };
 
-/** Waiting for the check or a person (#376): the tile is dimmed under an hourglass, and its words say which. */
+/** Waiting for the check or a person (#376): the tile is dimmed under an hourglass, and the same words say so for both (#581). */
 const inReview = (state: PhotoState) => state === "pending" || state === "queued";
 
-function stateText(photo: Photo, t: ReturnType<typeof useT>["t"]): string {
-  if (photo.state === "rejected" && photo.rejectionReason) {
-    return t(REJECTED_TEXT[photo.rejectionReason]);
-  }
-  return t(STATE_TEXT[photo.state]);
-}
+/** A refused photo says why where it can; one that is through says nothing, the silence being the word for it (#581). */
+const refusalText = (photo: Photo, t: ReturnType<typeof useT>["t"]): string =>
+  t(photo.rejectionReason ? REJECTED_TEXT[photo.rejectionReason] : "photos.state.rejected");
 
 /**
  * The API's refusals the screen has its own words for; a Map so a code like
@@ -102,9 +93,12 @@ const TILE_ACTIONS: ReadonlyArray<{ name: string; key: PlainMessageKey }> = [
  * (#179), the same moves as accessibility actions on every tile; each has a
  * button to remove it after a confirmation. Tapping a photo opens the zoom
  * screen, the one place the full variant is requested. A new photo goes
- * through the on-device check and the pre-resize before the upload, with its
- * progress in words. Opened from onboarding, it says that step's "Step x of
- * n" as every other step does (#146).
+ * through the on-device check and the pre-resize before the upload, whose
+ * progress is in words. The count is drawn only at the limit, where Add a photo
+ * stops and needs a reason; below it the grid shows the count, and each change
+ * of it is said to a screen reader, the one word that a photo landed (#581).
+ * Opened from onboarding, it says that step's "Step x of n" as every other
+ * step does (#146).
  */
 export function PhotosScreen({ progress }: { progress?: { step: number; total: number } }) {
   const { t } = useT();
@@ -129,6 +123,13 @@ export function PhotosScreen({ progress }: { progress?: { step: number; total: n
   const mainId = list?.photos.find((photo) => photo.state === "approved")?.id;
   const busy = photos.busy.kind !== "idle";
   const atMax = list !== null && total >= list.maxPhotos;
+  const count = list && t("photos.count", { photos: total, max: list.maxPhotos });
+  const countSaid = useRef<string | null>(null);
+  useEffect(() => {
+    if (count === null) return;
+    if (countSaid.current !== null && countSaid.current !== count) sayAloud(count);
+    countSaid.current = count;
+  }, [count]);
 
   const drag = useDragOrder({
     count: total,
@@ -144,13 +145,9 @@ export function PhotosScreen({ progress }: { progress?: { step: number; total: n
   };
 
   const busyText =
-    photos.busy.kind === "picking"
-      ? t("photos.picking")
-      : photos.busy.kind === "preparing"
-        ? t("photos.preparing")
-        : photos.busy.kind === "uploading"
-          ? t("photos.uploading", { percent: photos.busy.percent })
-          : null;
+    photos.busy.kind === "uploading"
+      ? t("photos.uploading", { percent: photos.busy.percent })
+      : null;
 
   return (
     <SafeAreaView className="flex-1 bg-background">
@@ -166,12 +163,7 @@ export function PhotosScreen({ progress }: { progress?: { step: number; total: n
             {t("onboarding.progress", progress)}
           </Text>
         )}
-        {list && <Text>{t("photos.explain", { max: list.maxPhotos })}</Text>}
-        {list && (
-          <Text variant="muted" accessibilityLiveRegion="polite">
-            {t("photos.count", { photos: total, max: list.maxPhotos })}
-          </Text>
-        )}
+        {list && <Text>{t("photos.explain")}</Text>}
 
         {photos.notice && (
           <Card>
@@ -193,8 +185,6 @@ export function PhotosScreen({ progress }: { progress?: { step: number; total: n
         {list && (
           <PhotoTip tips={list.tips} fishSpecies={list.fishSpecies} mainId={mainId ?? null} />
         )}
-
-        {list && total === 0 && <Text variant="muted">{t("photos.empty")}</Text>}
 
         <View className="flex-row flex-wrap gap-3">
           {list?.photos.map((photo, index) => {
@@ -281,21 +271,24 @@ export function PhotosScreen({ progress }: { progress?: { step: number; total: n
                         </View>
                       )}
                     </Pressable>
-                    <View className="gap-0.5">
-                      {photo.id === mainId && <Text variant="small">{t("photos.main")}</Text>}
-                      {inReview(photo.state) ? (
-                        <View className="flex-row items-center gap-1">
-                          <Icon as={Hourglass} size={16} />
-                          {/* Wraps beside the icon at the largest text sizes, never clipped. */}
-                          <Text variant="small" className="shrink">
-                            {stateText(photo, t)}
-                          </Text>
-                        </View>
-                      ) : (
-                        <Text variant="muted">{stateText(photo, t)}</Text>
-                      )}
-                      {words && <PhotoDescriptionText text={words} />}
-                    </View>
+                    {(photo.id === mainId || photo.state !== "approved" || words !== null) && (
+                      <View className="gap-0.5">
+                        {photo.id === mainId && <Text variant="small">{t("photos.main")}</Text>}
+                        {inReview(photo.state) && (
+                          <View className="flex-row items-center gap-1">
+                            <Icon as={Hourglass} size={16} />
+                            {/* Wraps beside the icon at the largest text sizes, never clipped. */}
+                            <Text variant="small" className="shrink">
+                              {t("photos.state.pending")}
+                            </Text>
+                          </View>
+                        )}
+                        {photo.state === "rejected" && (
+                          <Text variant="muted">{refusalText(photo, t)}</Text>
+                        )}
+                        {words && <PhotoDescriptionText text={words} />}
+                      </View>
+                    )}
                     {/* The owner's line under the photo (#296): the button says the line, or asks for one. */}
                     <Button
                       variant="outline"
@@ -351,6 +344,8 @@ export function PhotosScreen({ progress }: { progress?: { step: number; total: n
           </Card>
         )}
 
+        {/* Why Add a photo stops, beside it. */}
+        {atMax && <Text variant="muted">{count}</Text>}
         <Button
           accessibilityLabel={t("photos.add")}
           disabled={busy || atMax || photos.status !== "ready"}

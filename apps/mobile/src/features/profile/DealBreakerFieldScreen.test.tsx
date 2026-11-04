@@ -9,7 +9,8 @@ import { renderWithTheme } from "@/test/render";
 import { DealBreakerFieldScreen } from "./DealBreakerFieldScreen";
 
 // One deal-breaker on a screen of its own (#551): Everyone first, then what is
-// fine, saved on leaving as one field of the whole set the API takes.
+// fine, as whole-width rows unless the list is long (#581), saved on leaving as
+// one field of the whole set the API takes.
 
 const settle = () => new Promise<void>((resolve) => setTimeout(resolve, 10));
 const show = async (ui: React.ReactElement) => {
@@ -151,7 +152,6 @@ const backInFront = () =>
     await settle();
   });
 
-const EXPLAIN = "It works both ways: it also decides who sees you.";
 const EVERYONE = "Everyone";
 const UNKNOWN = "Also people who did not answer";
 const AGAIN = "Back to Everyone.";
@@ -162,15 +162,35 @@ const FAILED = "It could not be saved. Try again.";
 const LOAD_FAILED = "Your profile could not be loaded.";
 const THE_QUESTION = "Leave without saving?";
 
+const LOADING = "Loading your profile…";
+
 const button = (name: string) => screen.getByRole("button", { name });
+/** A chip of the long list: the languages, whose chosen one says so in its state. */
 const selected = (name: string) => button(name).props.accessibilityState?.selected;
-const disabled = (name: string) => button(name).props.accessibilityState?.disabled;
+/** An answer of a short list by its word, chosen or not: the chosen one's name carries its mark. */
+const answer = (name: string) =>
+  screen.getByRole(/^(checkbox|radio)$/, { name: new RegExp(`^(✓ )?${name}$`) });
+const chosen = (name: string) => answer(name).props.accessibilityState?.checked;
+const disabled = (name: string) => answer(name).props.accessibilityState?.disabled;
 const unknownSwitch = () => screen.getByLabelText(UNKNOWN);
-const buttons = () =>
+/** Everything to press, in order, by what a screen reader names it. */
+const controls = () =>
   screen
-    .getAllByRole("button")
+    .getAllByRole(/^(button|checkbox|radio)$/)
     .map((node) => node.props.accessibilityLabel ?? within(node))
     .filter(Boolean);
+/** Every text on the screen, in order. */
+const drawn = () => screen.queryAllByText(/./).map((node) => node.props.children);
+/**
+ * What is said to a screen reader from now on, on either platform: the mock
+ * outlives a test, with what earlier ones said. Words no line carries (#581).
+ */
+const hearing = (os: "ios" | "android" = "ios") => {
+  jest.replaceProperty(Platform, "OS", os);
+  const queued = jest.spyOn(AccessibilityInfo, "announceForAccessibilityWithOptions").mockClear();
+  const plain = jest.spyOn(AccessibilityInfo, "announceForAccessibility").mockClear();
+  return () => [...queued.mock.calls, ...plain.mock.calls].map(([words]) => words);
+};
 /** A plain text button labels itself: its words are its one child's. */
 function within(node: { props: { children?: unknown } }): unknown {
   const words: string[] = [];
@@ -194,7 +214,7 @@ const checkA11y = () => {
 const opened = async (field: string, start?: Partial<Server>) => {
   const api = fakeApi(start);
   const view = await show(<DealBreakerFieldScreen field={field} />);
-  await waitFor(() => expect(screen.getByText(EXPLAIN)).toBeTruthy());
+  await waitFor(() => expect(screen.queryByText(LOADING)).toBeNull());
   return { ...api, view };
 };
 
@@ -224,18 +244,88 @@ describe("DealBreakerFieldScreen", () => {
     expect(router.back).toHaveBeenCalledTimes(1);
   });
 
-  it("says that it works both ways, and counts nobody", async () => {
+  it("has no line of its own: What you seek's says it works both ways, and it counts nobody (#581)", async () => {
     await opened("smoking");
-    expect(screen.getByText(EXPLAIN)).toBeTruthy();
+    expect(drawn()).toEqual([
+      "Smoking",
+      "Fine with me",
+      "✓ Everyone",
+      "Never",
+      "Sometimes",
+      "Regularly",
+      "Quitting",
+      "Vaping",
+    ]);
     expect(JSON.stringify(screen.toJSON())).not.toMatch(/\b\d+ (people|more)\b/);
+  });
+
+  describe("what it draws the answers as (#581)", () => {
+    const parent = (name: string) => answer(name).parent;
+
+    it("a list that takes several as whole-width checkboxes, one after another, with no group that says one goes", async () => {
+      await opened("smoking");
+      expect(screen.getAllByRole("checkbox")).toHaveLength(6);
+      expect(screen.queryByRole("radio")).toBeNull();
+      expect(screen.queryByRole("radiogroup")).toBeNull();
+      expect(parent("Never")?.props.className).not.toMatch(/\bflex-row\b/);
+      expect(parent(EVERYONE)).toBe(parent("Never"));
+      checkA11y();
+    });
+
+    it.each([
+      ["height", "Taller than me"],
+      ["distance", "Close"],
+    ])(
+      "%s, which takes one, as radios in a group named by the line above them",
+      async (field, word) => {
+        await opened(field);
+        expect(screen.queryByRole("checkbox")).toBeNull();
+        expect(screen.getAllByRole("radio").length).toBeGreaterThan(1);
+        const group = screen.getByLabelText("Fine with me");
+        expect(group.props.accessibilityRole).toBe("radiogroup");
+        expect(group.props.className).not.toMatch(/\bflex-row\b/);
+        expect(parent(word)).toBe(group);
+        checkA11y();
+      },
+    );
+
+    it("the languages as chips, the long list keeping its search", async () => {
+      await opened("languages");
+      expect(screen.queryByRole("radio")).toBeNull();
+      expect(screen.queryByRole("checkbox")).toBeNull();
+      expect(screen.queryByRole("radiogroup")).toBeNull();
+      expect(
+        screen.getByRole("button", { name: EVERYONE }).props.accessibilityState?.selected,
+      ).toBe(true);
+      expect(screen.getByRole("button", { name: "Finnish" }).parent?.props.className).toMatch(
+        /\bflex-row\b/,
+      );
+      expect(screen.getByLabelText("Search")).toBeTruthy();
+      checkA11y();
+    });
+
+    it.each([
+      ["fi-FI", "Sopii minulle"],
+      ["sv-FI", "Okej för mig"],
+    ])("a group named in %s, as the line above it is", async (tag, line) => {
+      (useLocales as jest.Mock).mockReturnValue([{ languageTag: tag }]);
+      try {
+        fakeApi();
+        await show(<DealBreakerFieldScreen field="height" />);
+        await waitFor(() => expect(screen.getByText(line)).toBeTruthy());
+        expect(screen.getByLabelText(line).props.accessibilityRole).toBe("radiogroup");
+      } finally {
+        (useLocales as jest.Mock).mockReturnValue([{ languageTag: "en-US" }]);
+      }
+    });
   });
 
   it("opens on Everyone, the answers after it in the registry's order, with no switch", async () => {
     await opened("smoking");
-    expect(selected(EVERYONE)).toBe(true);
-    expect(buttons()).toEqual([
+    expect(chosen(EVERYONE)).toBe(true);
+    expect(controls()).toEqual([
       "Back",
-      EVERYONE,
+      `✓ ${EVERYONE}`,
       "Never",
       "Sometimes",
       "Regularly",
@@ -243,7 +333,7 @@ describe("DealBreakerFieldScreen", () => {
       "Vaping",
     ]);
     for (const name of ["Never", "Sometimes", "Regularly", "Quitting", "Vaping"]) {
-      expect(selected(name)).toBe(false);
+      expect(chosen(name)).toBe(false);
     }
     expect(screen.getByText("Fine with me")).toBeTruthy();
     expect(screen.queryByRole("switch")).toBeNull();
@@ -255,75 +345,87 @@ describe("DealBreakerFieldScreen", () => {
 
   it("takes answers, which takes Everyone off, and the switch comes on by default (ADR-042 §8)", async () => {
     await opened("smoking");
-    await press(button("Never"));
-    await press(button("Quitting"));
-    expect(selected(EVERYONE)).toBe(false);
-    expect(selected("Never")).toBe(true);
-    expect(selected("Quitting")).toBe(true);
-    expect(selected("Regularly")).toBe(false);
+    await press(answer("Never"));
+    await press(answer("Quitting"));
+    expect(chosen(EVERYONE)).toBe(false);
+    expect(chosen("Never")).toBe(true);
+    expect(chosen("Quitting")).toBe(true);
+    expect(chosen("Regularly")).toBe(false);
     expect(unknownSwitch().props.accessibilityState?.checked).toBe(true);
     expect(unknownSwitch().props.accessibilityState?.disabled).toBe(false);
-    expect(screen.queryByText(AGAIN)).toBeNull();
     checkA11y();
   });
 
   describe("the last answer taken back", () => {
-    it("returns to Everyone, the switch going with it, and says so politely", async () => {
+    it("returns to Everyone, the switch going with it, with no line for it: Everyone fills by itself (#581)", async () => {
       await opened("smoking");
-      await press(button("Never"));
-      await press(button("Never"));
-      expect(selected(EVERYONE)).toBe(true);
-      expect(selected("Never")).toBe(false);
+      await press(answer("Never"));
+      await press(answer("Never"));
+      expect(chosen(EVERYONE)).toBe(true);
+      expect(chosen("Never")).toBe(false);
       expect(screen.queryByRole("switch")).toBeNull();
-      expect(screen.getByText(AGAIN).props.accessibilityLiveRegion).toBe("polite");
+      expect(screen.queryByText(AGAIN)).toBeNull();
     });
 
-    it("is said aloud on iOS, which has no live region", async () => {
+    it("is said aloud on iOS, queued behind the row's own name", async () => {
       jest.replaceProperty(Platform, "OS", "ios");
       const said = jest.spyOn(AccessibilityInfo, "announceForAccessibilityWithOptions");
       said.mockClear();
       await opened("smoking");
-      await press(button("Never"));
+      await press(answer("Never"));
       expect(said).not.toHaveBeenCalled();
-      await press(button("Never"));
+      await press(answer("Never"));
       expect(said.mock.calls).toEqual([[AGAIN, { queue: true }]]);
     });
 
-    it("is said no more once another answer is chosen", async () => {
+    it("is told to TalkBack too, with no line for a live region to read", async () => {
+      jest.replaceProperty(Platform, "OS", "android");
+      const said = jest.spyOn(AccessibilityInfo, "announceForAccessibility").mockClear();
       await opened("smoking");
-      await press(button("Never"));
-      await press(button("Never"));
-      await press(button("Quitting"));
-      expect(screen.queryByText(AGAIN)).toBeNull();
+      await press(answer("Never"));
+      expect(said).not.toHaveBeenCalled();
+      await press(answer("Never"));
+      expect(said.mock.calls).toEqual([[AGAIN]]);
+    });
+
+    it("is said once, and not again as another answer is chosen", async () => {
+      const said = hearing();
+      await opened("smoking");
+      await press(answer("Never"));
+      await press(answer("Never"));
+      await press(answer("Quitting"));
+      expect(said()).toEqual([AGAIN]);
     });
 
     it("says nothing while another answer stays", async () => {
+      const said = hearing();
       await opened("smoking");
-      await press(button("Never"));
-      await press(button("Quitting"));
-      await press(button("Never"));
-      expect(screen.queryByText(AGAIN)).toBeNull();
-      expect(selected(EVERYONE)).toBe(false);
-      expect(selected("Quitting")).toBe(true);
+      await press(answer("Never"));
+      await press(answer("Quitting"));
+      await press(answer("Never"));
+      expect(said()).toEqual([]);
+      expect(chosen(EVERYONE)).toBe(false);
+      expect(chosen("Quitting")).toBe(true);
     });
   });
 
   it("takes every answer off on Everyone, which it needs no word for: the press is on it", async () => {
+    const said = hearing();
     await opened("smoking", {
       dealBreakers: [{ ...smoking, accept: ["never", "quitting"] }],
     });
-    await press(button(EVERYONE));
-    expect(selected(EVERYONE)).toBe(true);
-    expect(selected("Never")).toBe(false);
-    expect(selected("Quitting")).toBe(false);
+    await press(answer(EVERYONE));
+    expect(chosen(EVERYONE)).toBe(true);
+    expect(chosen("Never")).toBe(false);
+    expect(chosen("Quitting")).toBe(false);
     expect(screen.queryByRole("switch")).toBeNull();
-    expect(screen.queryByText(AGAIN)).toBeNull();
+    expect(said()).toEqual([]);
   });
 
   it("stays on Everyone when Everyone is pressed again", async () => {
     const { puts } = await opened("smoking");
-    await press(button(EVERYONE));
-    expect(selected(EVERYONE)).toBe(true);
+    await press(answer(EVERYONE));
+    expect(chosen(EVERYONE)).toBe(true);
     await leave();
     expect(puts).toEqual([]);
   });
@@ -331,8 +433,8 @@ describe("DealBreakerFieldScreen", () => {
   describe("saving on leaving", () => {
     it("sends its one field beside the others as they stand, once, and nothing before it", async () => {
       const { puts } = await opened("smoking", { dealBreakers: [kids] });
-      await press(button("Never"));
-      await press(button("Quitting"));
+      await press(answer("Never"));
+      await press(answer("Quitting"));
       expect(puts).toEqual([]);
       await leave();
       expect(puts).toEqual([
@@ -344,7 +446,7 @@ describe("DealBreakerFieldScreen", () => {
 
     it("reads the set when the save goes: another screen's change is kept", async () => {
       const { server, puts } = await opened("smoking");
-      await press(button("Never"));
+      await press(answer("Never"));
       server.dealBreakers = [taller];
       await leave();
       expect(puts).toEqual([
@@ -354,7 +456,7 @@ describe("DealBreakerFieldScreen", () => {
 
     it("takes it off with Everyone, the others kept", async () => {
       const { puts } = await opened("smoking", { dealBreakers: [smoking, kids] });
-      await press(button(EVERYONE));
+      await press(answer(EVERYONE));
       await leave();
       expect(puts).toEqual([[kids]]);
     });
@@ -364,7 +466,7 @@ describe("DealBreakerFieldScreen", () => {
         fields: { ...ANSWERED, smoking: undefined },
         dealBreakers: [smoking],
       });
-      await press(button("No kids"));
+      await press(answer("No kids"));
       await leave();
       expect(puts).toEqual([[smoking, { field: "hasKids", accept: ["no"], includeUnknown: true }]]);
     });
@@ -386,7 +488,7 @@ describe("DealBreakerFieldScreen", () => {
       const { puts } = await opened("smoking", {
         dealBreakers: [{ ...smoking, includeUnknown: true }],
       });
-      for (const name of presses) await press(button(name));
+      for (const name of presses) await press(answer(name));
       expect((await leave()).preventDefault).not.toHaveBeenCalled();
       expect(puts).toEqual([]);
     });
@@ -395,27 +497,27 @@ describe("DealBreakerFieldScreen", () => {
       const { puts } = await opened("smoking", {
         dealBreakers: [{ ...smoking, accept: ["quitting", "never"], includeUnknown: true }],
       });
-      await press(button("Quitting"));
-      await press(button("Quitting"));
+      await press(answer("Quitting"));
+      await press(answer("Quitting"));
       await leave();
       expect(puts).toEqual([]);
     });
 
     it("sends nothing for the switch moved and the answers taken back: Everyone has no switch", async () => {
       const { puts } = await opened("smoking");
-      await press(button("Never"));
+      await press(answer("Never"));
       await press(unknownSwitch());
-      await press(button("Never"));
+      await press(answer("Never"));
       await leave();
       expect(puts).toEqual([]);
     });
 
     it("keeps the switch moved when answers are taken back and given on the same visit", async () => {
       const { puts } = await opened("smoking");
-      await press(button("Never"));
+      await press(answer("Never"));
       await press(unknownSwitch());
-      await press(button("Never"));
-      await press(button("Quitting"));
+      await press(answer("Never"));
+      await press(answer("Quitting"));
       await leave();
       expect(puts).toEqual([[{ field: "smoking", accept: ["quitting"], includeUnknown: false }]]);
     });
@@ -427,12 +529,12 @@ describe("DealBreakerFieldScreen", () => {
       const said = jest.spyOn(AccessibilityInfo, "announceForAccessibilityWithOptions");
       said.mockClear();
       const { puts } = await opened("hasKids", { dealBreakers: [smoking], max: 1 });
-      await press(button("No kids"));
+      await press(answer("No kids"));
       const words = "That is 1 already.";
       expect(screen.getByText(words).props.accessibilityLiveRegion).toBe("assertive");
-      expect(selected(EVERYONE)).toBe(true);
-      expect(selected("No kids")).toBe(false);
-      await press(button("No kids"));
+      expect(chosen(EVERYONE)).toBe(true);
+      expect(chosen("No kids")).toBe(false);
+      await press(answer("No kids"));
       expect(said.mock.calls).toEqual([
         [words, { queue: true }],
         [words, { queue: true }],
@@ -443,14 +545,14 @@ describe("DealBreakerFieldScreen", () => {
 
     it("refuses a first relation and a first band as one more", async () => {
       await opened("height", { dealBreakers: [smoking], max: 1 });
-      await press(button("Taller than me"));
+      await press(answer("Taller than me"));
       expect(screen.getByText("That is 1 already.")).toBeTruthy();
-      expect(selected(EVERYONE)).toBe(true);
+      expect(chosen(EVERYONE)).toBe(true);
     });
 
     it("takes the last one the number allows", async () => {
       const { puts } = await opened("hasKids", { dealBreakers: [smoking], max: 2 });
-      await press(button("No kids"));
+      await press(answer("No kids"));
       expect(screen.queryByText("That is 2 already.")).toBeNull();
       await leave();
       expect(puts).toEqual([[smoking, { field: "hasKids", accept: ["no"], includeUnknown: true }]]);
@@ -458,52 +560,52 @@ describe("DealBreakerFieldScreen", () => {
 
     it("lets one held past a lowered number change, and come back after Everyone", async () => {
       const { puts } = await opened("smoking", { dealBreakers: [smoking, kids, taller], max: 1 });
-      await press(button("Quitting"));
+      await press(answer("Quitting"));
       expect(screen.queryByText("That is 1 already.")).toBeNull();
-      await press(button(EVERYONE));
-      await press(button("Never"));
+      await press(answer(EVERYONE));
+      await press(answer("Never"));
       expect(screen.queryByText("That is 1 already.")).toBeNull();
-      expect(selected("Never")).toBe(true);
-      await press(button("Vaping"));
+      expect(chosen("Never")).toBe(true);
+      await press(answer("Vaping"));
       await leave();
       expect(puts).toEqual([[kids, taller, { ...smoking, accept: ["never", "vaping"] }]]);
     });
 
     it("lets one held past a lowered number go", async () => {
       const { puts } = await opened("smoking", { dealBreakers: [smoking, kids, taller], max: 1 });
-      await press(button(EVERYONE));
+      await press(answer(EVERYONE));
       await leave();
       expect(puts).toEqual([[kids, taller]]);
     });
 
     it("says the refusal no more once the next press does anything", async () => {
       await opened("hasKids", { dealBreakers: [smoking], max: 1 });
-      await press(button("No kids"));
+      await press(answer("No kids"));
       expect(screen.getByText("That is 1 already.")).toBeTruthy();
-      await press(button(EVERYONE));
+      await press(answer(EVERYONE));
       expect(screen.queryByText("That is 1 already.")).toBeNull();
     });
 
     it("never counts the second answer of a new one", async () => {
       await opened("smoking", { dealBreakers: [kids], max: 2 });
-      await press(button("Never"));
-      await press(button("Quitting"));
+      await press(answer("Never"));
+      await press(answer("Quitting"));
       expect(screen.queryByText("That is 2 already.")).toBeNull();
-      expect(selected("Quitting")).toBe(true);
+      expect(chosen("Quitting")).toBe(true);
     });
   });
 
   describe("height (#508)", () => {
     it("has its three relations after Everyone, under the same heading", async () => {
       await opened("height");
-      expect(buttons()).toEqual([
+      expect(controls()).toEqual([
         "Back",
-        EVERYONE,
+        `✓ ${EVERYONE}`,
         "Taller than me",
         "My height or taller",
         "Shorter than me",
       ]);
-      expect(selected(EVERYONE)).toBe(true);
+      expect(chosen(EVERYONE)).toBe(true);
       expect(screen.getByText("Fine with me")).toBeTruthy();
       expect(screen.queryByRole("switch")).toBeNull();
       checkA11y();
@@ -511,21 +613,22 @@ describe("DealBreakerFieldScreen", () => {
 
     it("takes one relation at a time, and sends it", async () => {
       const { puts } = await opened("height");
-      await press(button("Taller than me"));
-      await press(button("Shorter than me"));
-      expect(selected("Taller than me")).toBe(false);
-      expect(selected("Shorter than me")).toBe(true);
-      expect(selected(EVERYONE)).toBe(false);
+      await press(answer("Taller than me"));
+      await press(answer("Shorter than me"));
+      expect(chosen("Taller than me")).toBe(false);
+      expect(chosen("Shorter than me")).toBe(true);
+      expect(chosen(EVERYONE)).toBe(false);
       expect(unknownSwitch().props.accessibilityState?.checked).toBe(true);
       await leave();
       expect(puts).toEqual([[{ field: "height", accept: ["shorter"], includeUnknown: true }]]);
     });
 
     it("returns to Everyone when its relation is pressed again, and says so", async () => {
+      const said = hearing();
       const { puts } = await opened("height", { dealBreakers: [taller] });
-      await press(button("Taller than me"));
-      expect(selected(EVERYONE)).toBe(true);
-      expect(screen.getByText(AGAIN)).toBeTruthy();
+      await press(answer("Taller than me"));
+      expect(chosen(EVERYONE)).toBe(true);
+      expect(said()).toEqual([AGAIN]);
       await leave();
       expect(puts).toEqual([[]]);
     });
@@ -534,9 +637,9 @@ describe("DealBreakerFieldScreen", () => {
       const { puts } = await opened("height", {
         dealBreakers: [{ field: "height", accept: ["at_least_mine"], includeUnknown: false }],
       });
-      expect(selected("My height or taller")).toBe(true);
+      expect(chosen("My height or taller")).toBe(true);
       expect(unknownSwitch().props.accessibilityState?.checked).toBe(false);
-      await press(button("Taller than me"));
+      await press(answer("Taller than me"));
       await leave();
       expect(puts).toEqual([[{ field: "height", accept: ["taller"], includeUnknown: false }]]);
     });
@@ -547,8 +650,8 @@ describe("DealBreakerFieldScreen", () => {
 
     it("has three bands after Everyone, Far being no filter, and nothing on those who did not answer", async () => {
       await opened("distance");
-      expect(buttons()).toEqual(["Back", EVERYONE, "Nearby", "Close", "Around"]);
-      expect(selected(EVERYONE)).toBe(true);
+      expect(controls()).toEqual(["Back", `✓ ${EVERYONE}`, "Nearby", "Close", "Around"]);
+      expect(chosen(EVERYONE)).toBe(true);
       checkA11y();
     });
 
@@ -556,23 +659,23 @@ describe("DealBreakerFieldScreen", () => {
       await opened("distance", { fields: {} });
       expect(screen.queryByText(GATED)).toBeNull();
       expect(screen.queryByRole("button", { name: ANSWER })).toBeNull();
-      await press(button("Close"));
-      expect(selected("Close")).toBe(true);
+      await press(answer("Close"));
+      expect(chosen("Close")).toBe(true);
     });
 
     it("is never paused, whatever the person has not answered", async () => {
       await opened("distance", { fields: {}, dealBreakers: [nearby] });
       expect(screen.queryByText(PAUSED)).toBeNull();
-      expect(selected("Nearby")).toBe(true);
+      expect(chosen("Nearby")).toBe(true);
       expect(disabled("Nearby")).toBe(false);
     });
 
     it("takes a band with the nearer ones, one button chosen, and sends them as a list", async () => {
       const { puts } = await opened("distance");
-      await press(button("Close"));
-      expect(selected("Close")).toBe(true);
-      expect(selected("Nearby")).toBe(false);
-      expect(selected("Around")).toBe(false);
+      await press(answer("Close"));
+      expect(chosen("Close")).toBe(true);
+      expect(chosen("Nearby")).toBe(false);
+      expect(chosen("Around")).toBe(false);
       // Nothing on those who did not answer, once it is on either: everybody has a home.
       expect(screen.queryByRole("switch")).toBeNull();
       await leave();
@@ -587,10 +690,10 @@ describe("DealBreakerFieldScreen", () => {
       ["every band a filter takes", ["nearby", "close", "around"], "Around"],
       ["a list in another order", ["close", "nearby"], "Close"],
       ["a list with a gap", ["nearby", "around"], "Around"],
-    ])("shows %s by its farthest band", async (_what, accept, chosen) => {
+    ])("shows %s by its farthest band", async (_what, accept, farthest) => {
       await opened("distance", { dealBreakers: [{ ...nearby, accept }] });
       for (const name of ["Nearby", "Close", "Around"]) {
-        expect(selected(name)).toBe(name === chosen);
+        expect(chosen(name)).toBe(name === farthest);
       }
     });
 
@@ -598,15 +701,15 @@ describe("DealBreakerFieldScreen", () => {
       const { puts } = await opened("distance", {
         dealBreakers: [{ ...nearby, accept: ["nearby", "close"] }],
       });
-      await press(button("Close"));
-      expect(selected(EVERYONE)).toBe(true);
+      await press(answer("Close"));
+      expect(chosen(EVERYONE)).toBe(true);
       await leave();
       expect(puts).toEqual([[]]);
     });
 
     it("comes off on Everyone", async () => {
       const { puts } = await opened("distance", { dealBreakers: [nearby] });
-      await press(button(EVERYONE));
+      await press(answer(EVERYONE));
       await leave();
       expect(puts).toEqual([[]]);
     });
@@ -663,6 +766,8 @@ describe("DealBreakerFieldScreen", () => {
     });
   });
 
+  // A row that says Share yours first opens the question itself (DealBreakerRows.test.tsx):
+  // only a typed address, or a paused filter taken off, comes here (#581).
   describe("with the person's own answer missing", () => {
     it.each([
       [
@@ -683,7 +788,7 @@ describe("DealBreakerFieldScreen", () => {
     ])("%s", async (_what, field, path) => {
       const { puts } = await opened(field, { fields: {} });
       expect(screen.getByText(GATED)).toBeTruthy();
-      expect(buttons()).toEqual(["Back", ANSWER]);
+      expect(controls()).toEqual(["Back", ANSWER]);
       expect(screen.queryByText("Fine with me")).toBeNull();
       expect(screen.queryByRole("switch")).toBeNull();
       checkA11y();
@@ -706,13 +811,13 @@ describe("DealBreakerFieldScreen", () => {
       const { puts } = await paused();
       expect(screen.getByText(PAUSED)).toBeTruthy();
       expect(screen.queryByText(GATED)).toBeNull();
-      expect(buttons()).toEqual(["Back", ANSWER, EVERYONE, "Never", "Quitting"]);
+      expect(controls()).toEqual(["Back", ANSWER, EVERYONE, "✓ Never", "✓ Quitting"]);
       for (const name of ["Never", "Quitting"]) {
-        expect(selected(name)).toBe(true);
+        expect(chosen(name)).toBe(true);
         expect(disabled(name)).toBe(true);
       }
       expect(disabled(EVERYONE)).toBe(false);
-      expect(selected(EVERYONE)).toBe(false);
+      expect(chosen(EVERYONE)).toBe(false);
       expect(unknownSwitch().props.accessibilityState).toMatchObject({
         checked: false,
         disabled: true,
@@ -729,9 +834,9 @@ describe("DealBreakerFieldScreen", () => {
 
     it("changes nothing on a press of what is drawn read-only", async () => {
       const { puts } = await paused();
-      await press(button("Never"));
+      await press(answer("Never"));
       await press(unknownSwitch());
-      expect(selected("Never")).toBe(true);
+      expect(chosen("Never")).toBe(true);
       expect(unknownSwitch().props.accessibilityState?.checked).toBe(false);
       await leave();
       expect(puts).toEqual([]);
@@ -742,7 +847,7 @@ describe("DealBreakerFieldScreen", () => {
         fields: {},
         dealBreakers: [{ field: "languages", accept: ["fi", "de"], includeUnknown: true }],
       });
-      expect(buttons()).toEqual(["Back", ANSWER, EVERYONE, "Finnish", "German"]);
+      expect(controls()).toEqual(["Back", ANSWER, EVERYONE, "Finnish", "German"]);
       expect(screen.queryByLabelText("Search")).toBeNull();
       expect(unknownSwitch().props.accessibilityState).toMatchObject({
         checked: true,
@@ -751,12 +856,14 @@ describe("DealBreakerFieldScreen", () => {
     });
 
     it("comes off on Everyone: the line changes, it is said, and leaving sends the rest", async () => {
+      const said = hearing();
       const { puts } = await paused();
-      await press(button(EVERYONE));
+      await press(answer(EVERYONE));
       expect(screen.queryByText(PAUSED)).toBeNull();
       expect(screen.getByText(GATED)).toBeTruthy();
-      expect(screen.getByText(AGAIN)).toBeTruthy();
-      expect(buttons()).toEqual(["Back", ANSWER]);
+      expect(said()).toEqual([AGAIN]);
+      expect(screen.queryByText(AGAIN)).toBeNull();
+      expect(controls()).toEqual(["Back", ANSWER]);
       await leave();
       expect(puts).toEqual([[]]);
     });
@@ -774,8 +881,8 @@ describe("DealBreakerFieldScreen", () => {
       await backInFront();
       expect(screen.queryByText(GATED)).toBeNull();
       expect(screen.queryByRole("button", { name: ANSWER })).toBeNull();
-      expect(selected(EVERYONE)).toBe(true);
-      expect(button("No kids")).toBeTruthy();
+      expect(chosen(EVERYONE)).toBe(true);
+      expect(answer("No kids")).toBeTruthy();
       expect(reads.filter((path) => path === "/profile")).toHaveLength(2);
       // The deal-breakers are this screen's own to hold while it is open.
       expect(reads.filter((path) => path === "/preferences/deal-breakers")).toHaveLength(1);
@@ -790,9 +897,9 @@ describe("DealBreakerFieldScreen", () => {
       server.fields = { smoking: "never" };
       await backInFront();
       expect(screen.queryByText(PAUSED)).toBeNull();
-      expect(selected("Never")).toBe(true);
+      expect(chosen("Never")).toBe(true);
       expect(disabled("Never")).toBe(false);
-      expect(button("Quitting")).toBeTruthy();
+      expect(answer("Quitting")).toBeTruthy();
       expect(unknownSwitch().props.accessibilityState?.disabled).toBe(false);
       await leave();
       expect(puts).toEqual([]);
@@ -806,11 +913,11 @@ describe("DealBreakerFieldScreen", () => {
 
     it("takes nothing away when the read on the way back fails, and the next read counts", async () => {
       const { server } = await opened("smoking");
-      await press(button("Never"));
+      await press(answer("Never"));
       server.noProfile = true;
       await backInFront();
       expect(screen.queryByText(LOAD_FAILED)).toBeNull();
-      expect(selected("Never")).toBe(true);
+      expect(chosen("Never")).toBe(true);
       server.noProfile = false;
       server.fields = {};
       await backInFront();
@@ -824,7 +931,7 @@ describe("DealBreakerFieldScreen", () => {
       const { server, puts, view } = await opened("smoking", {
         refusal: () => envelope(code, status),
       });
-      await press(button("Never"));
+      await press(answer("Never"));
       await leaveAndGo(view);
       expect(router.push).toHaveBeenCalledWith("/profile/deal-breakers/smoking");
       const again = await show(<DealBreakerFieldScreen field="smoking" />);
@@ -834,7 +941,7 @@ describe("DealBreakerFieldScreen", () => {
 
     it("brings the change back and says it could not be saved, and goes on the word", async () => {
       const { puts } = await refused("internal_error", 500);
-      expect(selected("Never")).toBe(true);
+      expect(chosen("Never")).toBe(true);
       expect(screen.getByText(FAILED)).toBeTruthy();
       await press(button("Leave without saving"));
       expect(screen.queryByText(THE_QUESTION)).toBeNull();
@@ -860,7 +967,7 @@ describe("DealBreakerFieldScreen", () => {
       await press(button("Keep editing"));
       expect(screen.queryByText(THE_QUESTION)).toBeNull();
       expect(router.back).not.toHaveBeenCalled();
-      await press(button("Quitting"));
+      await press(answer("Quitting"));
       await leaveAndGo(again);
       const saved = { field: "smoking", includeUnknown: true };
       expect(puts).toEqual([
@@ -878,8 +985,8 @@ describe("DealBreakerFieldScreen", () => {
       try {
         fakeApi({ refusal: () => envelope("internal_error", 500) });
         const view = await show(<DealBreakerFieldScreen field="smoking" />);
-        await waitFor(() => expect(button(everyone)).toBeTruthy());
-        await press(button(never));
+        await waitFor(() => expect(answer(everyone)).toBeTruthy());
+        await press(answer(never));
         await leaveAndGo(view);
         await show(<DealBreakerFieldScreen field="smoking" />);
         await waitFor(() => expect(screen.getByText(failed)).toBeTruthy());
@@ -891,7 +998,7 @@ describe("DealBreakerFieldScreen", () => {
     describe("with its read lost too", () => {
       const broughtBack = async () => {
         const { server, puts, view } = await opened("smoking");
-        await press(button("Never"));
+        await press(answer("Never"));
         server.offline = true;
         await leaveAndGo(view);
         // The save reads the set first, so what the network lost never became a PUT.
@@ -905,10 +1012,10 @@ describe("DealBreakerFieldScreen", () => {
         const { server, puts, again } = await broughtBack();
         await press(button("Keep editing"));
         expect(screen.queryByText(LOAD_FAILED)).toBeNull();
-        expect(selected("Never")).toBe(true);
+        expect(chosen("Never")).toBe(true);
         // Nothing known of the own answer, so nothing is held back: the draft can be changed.
         expect(disabled("Never")).toBe(false);
-        expect(button("Quitting")).toBeTruthy();
+        expect(answer("Quitting")).toBeTruthy();
         server.offline = false;
         await leaveAndGo(again);
         expect(puts).toEqual([[{ field: "smoking", accept: ["never"], includeUnknown: true }]]);
@@ -917,13 +1024,13 @@ describe("DealBreakerFieldScreen", () => {
 
       it("tries taking one off again, with nothing read to compare Everyone with", async () => {
         const { server, puts, view } = await opened("smoking", { dealBreakers: [smoking] });
-        await press(button(EVERYONE));
+        await press(answer(EVERYONE));
         server.offline = true;
         await leaveAndGo(view);
         const again = await show(<DealBreakerFieldScreen field="smoking" />);
         await waitFor(() => expect(screen.getByText(THE_QUESTION)).toBeTruthy());
         await press(button("Keep editing"));
-        expect(selected(EVERYONE)).toBe(true);
+        expect(chosen(EVERYONE)).toBe(true);
         server.offline = false;
         await leaveAndGo(again);
         expect(puts).toEqual([[]]);
@@ -944,10 +1051,8 @@ describe("DealBreakerFieldScreen", () => {
     it("says it is loading until both reads are in, in a live region, and leaving sends nothing", async () => {
       const { puts } = fakeApi({ wait: new Promise(() => {}) });
       await show(<DealBreakerFieldScreen field="smoking" />);
-      expect(screen.getByText("Loading your profile…").props.accessibilityLiveRegion).toBe(
-        "polite",
-      );
-      expect(screen.queryByRole("button", { name: EVERYONE })).toBeNull();
+      expect(screen.getByText(LOADING).props.accessibilityLiveRegion).toBe("polite");
+      expect(screen.queryByRole("checkbox")).toBeNull();
       await leave();
       expect(puts).toEqual([]);
     });
@@ -962,12 +1067,12 @@ describe("DealBreakerFieldScreen", () => {
       expect(
         screen.getByText("Kuutti's server had a problem. Try again in a moment."),
       ).toBeTruthy();
-      expect(screen.queryByRole("button", { name: EVERYONE })).toBeNull();
+      expect(screen.queryByRole("checkbox")).toBeNull();
       checkA11y();
       server.failing = false;
       server.noProfile = false;
       await press(button("Try again"));
-      await waitFor(() => expect(button(EVERYONE)).toBeTruthy());
+      await waitFor(() => expect(answer(EVERYONE)).toBeTruthy());
       expect(screen.queryByText(LOAD_FAILED)).toBeNull();
     });
 
@@ -975,18 +1080,18 @@ describe("DealBreakerFieldScreen", () => {
       const { server } = fakeApi({ failing: true });
       await show(<DealBreakerFieldScreen field="smoking" />);
       await waitFor(() => expect(screen.getByText(LOAD_FAILED)).toBeTruthy());
-      let answer: (() => void) | undefined;
+      let release: (() => void) | undefined;
       server.wait = new Promise((resolve) => {
-        answer = resolve;
+        release = resolve;
       });
       server.failing = false;
       await press(button("Try again"));
-      expect(screen.getByText("Loading your profile…")).toBeTruthy();
+      expect(screen.getByText(LOADING)).toBeTruthy();
       await act(async () => {
-        answer?.();
+        release?.();
         await settle();
       });
-      await waitFor(() => expect(button(EVERYONE)).toBeTruthy());
+      await waitFor(() => expect(answer(EVERYONE)).toBeTruthy());
     });
 
     it.each([
@@ -997,9 +1102,10 @@ describe("DealBreakerFieldScreen", () => {
     ])("goes to the list from %s, showing nothing and saving nothing", async (_what, field) => {
       const { puts } = fakeApi();
       await show(<DealBreakerFieldScreen field={field} />);
-      expect(router.replace).toHaveBeenCalledWith("/profile/deal-breakers");
-      expect(screen.queryByText(EXPLAIN)).toBeNull();
-      expect(screen.queryByRole("button")).toBeNull();
+      // What you seek holds the rows: an address of the deal-breakers alone leads nowhere (#581).
+      expect(router.replace).toHaveBeenCalledWith("/profile/seek");
+      expect(drawn()).toEqual([]);
+      expect(screen.queryAllByRole(/^(button|checkbox|radio)$/)).toEqual([]);
       await leave();
       expect(puts).toEqual([]);
     });
@@ -1013,13 +1119,12 @@ describe("DealBreakerFieldScreen", () => {
       ["monogamy", ["Monogamous", "Non-monogamous"]],
     ])("say of %s what somebody else's answer is", async (field, words) => {
       await opened(field);
-      expect(buttons()).toEqual(["Back", EVERYONE, ...words]);
+      expect(controls()).toEqual(["Back", `✓ ${EVERYONE}`, ...words]);
     });
 
     it.each([
       [
         "fi-FI",
-        "Tämä toimii molempiin suuntiin: se ratkaisee myös, ketkä näkevät sinut.",
         [
           ["smoking", "Tupakointi", "Kaikki", "Ei koskaan"],
           ["hasKids", "Lapset", "Kaikki", "Lapset asuvat muualla"],
@@ -1028,23 +1133,22 @@ describe("DealBreakerFieldScreen", () => {
       ],
       [
         "sv-FI",
-        "Det här gäller åt båda håll: det avgör också vilka som ser dig.",
         [
           ["smoking", "Rökning", "Alla", "Aldrig"],
           ["hasKids", "Barn", "Alla", "Barn som bor annanstans"],
           ["wantsKids", "Barn i framtiden", "Alla", "Vill ha barn"],
         ],
       ],
-    ])("speak %s", async (tag, explain, rows) => {
+    ])("speak %s", async (tag, rows) => {
       (useLocales as jest.Mock).mockReturnValue([{ languageTag: tag }]);
       try {
         for (const [field, title, everyone, option] of rows as string[][]) {
           fakeApi();
           const view = await show(<DealBreakerFieldScreen field={field as string} />);
-          await waitFor(() => expect(screen.getByText(explain as string)).toBeTruthy());
+          await waitFor(() => expect(answer(everyone as string)).toBeTruthy());
           expectPinnedHeader(title as string, tag === "fi-FI" ? "Takaisin" : "Tillbaka");
-          expect(button(everyone as string)).toBeTruthy();
-          expect(button(option as string)).toBeTruthy();
+          expect(answer(everyone as string)).toBeTruthy();
+          expect(answer(option as string)).toBeTruthy();
           await act(async () => {
             view.unmount();
             await settle();

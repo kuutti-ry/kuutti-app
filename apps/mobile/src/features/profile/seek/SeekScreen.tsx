@@ -1,11 +1,21 @@
 import { GENDERS } from "@kuutti/schema";
 import { useFocusEffect, useRouter } from "expo-router";
-import { useCallback, useRef } from "react";
+import Info from "lucide-react-native/icons/info";
+import { useCallback, useRef, useState } from "react";
 import { ScrollView, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LoadFailed } from "@/components/LoadFailed";
 import { RowGroup } from "@/components/RowGroup";
 import { ScreenHeader } from "@/components/ScreenHeader";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Icon } from "@/components/ui/icon";
 import { Text } from "@/components/ui/text";
 import { useT } from "@/lib/locale";
 import { useHapticTap } from "@/theme/haptics";
@@ -25,9 +35,12 @@ export const SEEK_PATH = "/profile/seek" as const;
  * onboarding's own questions, then a row per deal-breaker under a heading
  * (#551), so the list reflects what a person has shared. Every answer is a
  * filter both ways, which the line at the top says, naming no moment: a change
- * works on the next read (ADR-062 §8). Reached from the profile and from the
- * queue's end (§11), not Home, so its way back names neither. The list reads
- * everything again when a screen hands back.
+ * works on the next read (ADR-062 §8). Beside the heading how many of the
+ * deal-breakers are in use, and the app's one (i), the maintainer's exception of
+ * 04/11/2026: the limit and what a deal-breaker asks of the person, behind a
+ * tap in the shared dialog. An (i) never holds what protects a person. Reached
+ * from the profile and from the queue's end (§11), not Home, so its way back
+ * names neither. The list reads everything again when a screen hands back.
  */
 export function SeekScreen() {
   const { t } = useT();
@@ -36,6 +49,7 @@ export function SeekScreen() {
   const seeking = useSeeking();
   const { reload } = seeking;
   const [dealBreakers, readDealBreakers] = useDealBreakers();
+  const [aboutDealBreakers, setAboutDealBreakers] = useState(false);
   // The first focus is the mount, which the hook reads already.
   const shown = useRef(false);
   useFocusEffect(
@@ -122,12 +136,54 @@ export function SeekScreen() {
           ]}
         />
         <View className="gap-3">
-          <Text variant="large" role="heading" aria-level="2">
-            {t("profile.dealBreakers.title")}
-          </Text>
+          {/* A 44 pt row around a line of text: the margins keep the heading with its rows. */}
+          <View className="-my-2 flex-row items-center gap-2">
+            <Text variant="large" role="heading" aria-level="2" className="shrink">
+              {t("profile.dealBreakers.title")}
+            </Text>
+            {dealBreakers && (
+              <>
+                <Text
+                  variant="muted"
+                  accessibilityLabel={t("profile.dealBreakers.count", {
+                    filters: dealBreakers.dealBreakers.length,
+                    max: dealBreakers.max,
+                  })}
+                >
+                  {t("profile.progress.short", {
+                    answered: dealBreakers.dealBreakers.length,
+                    total: dealBreakers.max,
+                  })}
+                </Text>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  accessibilityLabel={t("profile.dealBreakers.about")}
+                  onPress={() => {
+                    tap();
+                    setAboutDealBreakers(true);
+                  }}
+                >
+                  <Icon as={Info} />
+                </Button>
+              </>
+            )}
+          </View>
           <DealBreakerRows response={dealBreakers} own={fields} />
         </View>
       </ScrollView>
+      {dealBreakers && (
+        <Dialog open={aboutDealBreakers} onOpenChange={setAboutDealBreakers}>
+          <DialogContent closeLabel={t("profile.dealBreakers.aboutClose")}>
+            <DialogHeader>
+              <DialogTitle>{t("profile.dealBreakers.title")}</DialogTitle>
+              <DialogDescription>
+                {t("profile.dealBreakers.explain", { max: dealBreakers.max })}
+              </DialogDescription>
+            </DialogHeader>
+          </DialogContent>
+        </Dialog>
+      )}
     </SafeAreaView>
   );
 }

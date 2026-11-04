@@ -2,6 +2,7 @@ import type { PlainMessageKey } from "@kuutti/i18n";
 import * as Sentry from "@sentry/react-native";
 import { useEffect, useState } from "react";
 import { AccessibilityInfo, AppState, Linking, Platform, View } from "react-native";
+import { Choice } from "@/components/Choice";
 import { sayAloud } from "@/components/Notice";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -10,7 +11,6 @@ import { Text } from "@/components/ui/text";
 import { GRACE_MINUTES, PasscodeField, useLock } from "@/features/identity";
 import { useT } from "@/lib/locale";
 import { useHapticTap } from "@/theme/haptics";
-import { Choice } from "./Choice";
 
 /** Said aloud on iOS; Android's live region below says it already. */
 function announce(words: string) {

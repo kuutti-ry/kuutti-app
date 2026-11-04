@@ -1,5 +1,6 @@
 import type { HiddenField, ProfileFieldKey, ProfileFields } from "@kuutti/schema";
 import { fireEvent, screen } from "@testing-library/react-native";
+import { useLocales } from "expo-localization";
 import { useState } from "react";
 import { AccessibilityInfo } from "react-native";
 import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
@@ -7,8 +8,9 @@ import { renderWithTheme } from "@/test/render";
 import { FieldEditor, optionTextKey, toggled, visibleOptions } from "./FieldEditor";
 
 // One field of the registry as the person answers it (#47, #148, ADR-019):
-// a setting as a switch, choices as chips that say whether they are chosen,
-// a short text, a number as a stepper, and a search over a long list.
+// a setting as a switch, choices as chips that say whether they are chosen, or
+// as whole-width rows where it is what its screen asks (#581), a short text, a
+// number as a stepper, and a search over a long list.
 
 /** The draft the editor works on, as the screens hold it; `fields` is what it holds now, `patches` every update it asked for. */
 let fields: ProfileFields = {};
@@ -18,10 +20,12 @@ function Harness({
   field,
   initial,
   hidden,
+  alone,
 }: {
   field: ProfileFieldKey;
   initial: ProfileFields;
   hidden?: HiddenField[];
+  alone?: boolean;
 }) {
   const [draft, setDraft] = useState<{ fields: ProfileFields; hiddenFields?: HiddenField[] }>({
     fields: initial,
@@ -33,6 +37,7 @@ function Harness({
     <FieldEditor
       field={field}
       draft={draft}
+      alone={alone}
       update={(patch) => {
         patches.push(patch);
         setDraft((previous) => ({ ...previous, ...patch }));
@@ -42,6 +47,8 @@ function Harness({
 }
 const show = (field: ProfileFieldKey, initial: ProfileFields = {}, hidden?: HiddenField[]) =>
   renderWithTheme(<Harness field={field} initial={initial} hidden={hidden} />);
+const showAlone = (field: ProfileFieldKey, initial: ProfileFields = {}, hidden?: HiddenField[]) =>
+  renderWithTheme(<Harness field={field} initial={initial} hidden={hidden} alone />);
 const chosen = (name: string) =>
   screen.getByRole("button", { name }).props.accessibilityState?.selected;
 
@@ -217,6 +224,151 @@ describe("FieldEditor: one choice", () => {
       expect(chosen(name)).toBe(false);
     },
   );
+});
+
+describe("FieldEditor: what its screen asks, a short list (#581)", () => {
+  /** A row by its word, chosen or not: the chosen one's name carries its mark. */
+  const marked = (name: string) => new RegExp(`^(✓ )?${name}$`);
+  const radio = (name: string) => screen.getByRole("radio", { name: marked(name) });
+  const checkbox = (name: string) => screen.getByRole("checkbox", { name: marked(name) });
+  const checked = (row: ReturnType<typeof radio>) => row.props.accessibilityState?.checked;
+
+  it("draws one answer as whole-width radios, one after another, in a group the field names", async () => {
+    await showAlone("smoking", { smoking: "never" });
+    const group = screen.getByLabelText("Smoking");
+    expect(group.props.accessibilityRole).toBe("radiogroup");
+    expect(group.props.className).not.toMatch(/\bflex-row\b/);
+    expect(screen.getAllByRole("radio").map((row) => row.props.accessibilityLabel)).toEqual([
+      "✓ Never",
+      "Sometimes",
+      "Regularly",
+      "Quitting",
+      "Vaping",
+    ]);
+    expect(screen.getByText("✓ Never")).toBeTruthy();
+    // The answers are no chips beside it, and the title's Hide stays a button.
+    expect(screen.queryByRole("button", { name: /Never/ })).toBeNull();
+    expect(screen.getByRole("button", { name: "Hide from your card: Smoking" })).toBeTruthy();
+    expect(pressables(screen.toJSON() as HostNode).flatMap((n) => a11yProblems(n))).toEqual([]);
+  });
+
+  it("chooses an answer, changes it, and clears it when the chosen one is pressed again", async () => {
+    await showAlone("smoking");
+    await fireEvent.press(radio("Never"));
+    expect(fields).toEqual({ smoking: "never" });
+    expect(checked(radio("Never"))).toBe(true);
+    await fireEvent.press(radio("Sometimes"));
+    expect(fields).toEqual({ smoking: "sometimes" });
+    expect(checked(radio("Never"))).toBe(false);
+    expect(checked(radio("Sometimes"))).toBe(true);
+    await fireEvent.press(radio("Sometimes"));
+    expect(fields).toEqual({});
+    expect(checked(radio("Sometimes"))).toBe(false);
+  });
+
+  it("keeps a hard answer chosen when pressed again, asking for no update (#542)", async () => {
+    await showAlone("intent", { intent: "casual" });
+    await fireEvent.press(radio("Something casual"));
+    expect(checked(radio("Something casual"))).toBe(true);
+    expect(fields).toEqual({ intent: "casual" });
+    expect(patches).toEqual([]);
+    await fireEvent.press(radio("Something long-term"));
+    expect(fields).toEqual({ intent: "long_term" });
+  });
+
+  it("draws several answers as whole-width checkboxes, with no group that says one goes", async () => {
+    await showAlone("pets");
+    expect(screen.queryByRole("radio")).toBeNull();
+    expect(screen.queryByRole("radiogroup")).toBeNull();
+    expect(screen.getAllByRole("checkbox")).toHaveLength(5);
+    await fireEvent.press(checkbox("Dog"));
+    await fireEvent.press(checkbox("Cat"));
+    expect(fields).toEqual({ pets: ["dog", "cat"] });
+    expect(checked(checkbox("Dog"))).toBe(true);
+    expect(checked(checkbox("Cat"))).toBe(true);
+    await fireEvent.press(checkbox("Dog"));
+    await fireEvent.press(checkbox("Cat"));
+    expect(fields).toEqual({});
+    expect(pressables(screen.toJSON() as HostNode).flatMap((n) => a11yProblems(n))).toEqual([]);
+  });
+
+  it("lets an answer that stands alone replace the rest, and give way to any other (#239)", async () => {
+    await showAlone("nicotine", { nicotine: ["snus", "pouches"] } as ProfileFields);
+    await fireEvent.press(checkbox("No snus or pouches"));
+    expect(fields).toEqual({ nicotine: ["none"] });
+    expect(checked(checkbox("Snus"))).toBe(false);
+    await fireEvent.press(checkbox("Snus"));
+    expect(fields).toEqual({ nicotine: ["snus"] });
+    expect(checked(checkbox("No snus or pouches"))).toBe(false);
+  });
+
+  it("names the rows by the same adaptive words as the chips: more children once there are kids", async () => {
+    await showAlone("wantsKids", { hasKids: "yes_with_me" } as ProfileFields);
+    expect(radio("Want more")).toBeTruthy();
+    expect(screen.queryByRole("radio", { name: "Want kids" })).toBeNull();
+  });
+
+  it("takes a list as long as the identity label's as rows", async () => {
+    await showAlone("identityLabel");
+    expect(screen.getAllByRole("radio")).toHaveLength(7);
+  });
+
+  it.each([
+    ["the parties", "politics", "Greens"],
+    ["the stances", "religion", "Agnostic"],
+    ["the star signs", "zodiac", "Corgi"],
+    ["the fields", "field", "Other"],
+  ] as const)(
+    "keeps chips over a longer list, %s: rows would not fit",
+    async (_what, key, word) => {
+      await showAlone(key);
+      expect(screen.queryByRole("radio")).toBeNull();
+      expect(screen.queryByRole("checkbox")).toBeNull();
+      expect(screen.queryByRole("radiogroup")).toBeNull();
+      expect(screen.getByRole("button", { name: word })).toBeTruthy();
+    },
+  );
+
+  it("keeps chips and the search over the languages and the hobbies", async () => {
+    await showAlone("languages");
+    expect(screen.getByLabelText("Search")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Finnish" })).toBeTruthy();
+    await showAlone("hobbies");
+    expect(screen.getByRole("button", { name: "Yoga" })).toBeTruthy();
+    expect(screen.queryByRole("checkbox")).toBeNull();
+  });
+
+  it("keeps chips for one field of a section's several, however short its list", async () => {
+    await show("smoking");
+    expect(screen.queryByRole("radio")).toBeNull();
+    expect(screen.queryByRole("radiogroup")).toBeNull();
+    expect(screen.getByRole("button", { name: "Never" })).toBeTruthy();
+  });
+
+  it("leaves a number, a short text and a setting as they are", async () => {
+    await showAlone("height", { height: 170 } as ProfileFields);
+    expect(screen.getByRole("button", { name: "One more" })).toBeTruthy();
+    await showAlone("occupationTitle");
+    expect(screen.getByLabelText("Job title")).toBeTruthy();
+    await showAlone("hideFromField");
+    expect(screen.getByRole("switch", { name: "Hide me from people in my field" })).toBeTruthy();
+    expect(screen.queryByRole("radio")).toBeNull();
+    expect(screen.queryByRole("checkbox")).toBeNull();
+  });
+
+  it.each([
+    ["fi-FI", "Tupakointi", "En koskaan"],
+    ["sv-FI", "Rökning", "Aldrig"],
+  ])("names the group and its rows in %s", async (tag, title, never) => {
+    (useLocales as jest.Mock).mockReturnValue([{ languageTag: tag }]);
+    try {
+      await showAlone("smoking");
+      expect(screen.getByLabelText(title).props.accessibilityRole).toBe("radiogroup");
+      expect(radio(never)).toBeTruthy();
+    } finally {
+      (useLocales as jest.Mock).mockReturnValue([{ languageTag: "en-US" }]);
+    }
+  });
 });
 
 describe("FieldEditor: one hard choice (#542)", () => {
@@ -462,15 +614,30 @@ describe("toggled", () => {
 });
 
 describe("FieldEditor: a short text", () => {
-  it("keeps what is typed, says the limit, and drops the field when emptied", async () => {
+  it("keeps what is typed, says what to leave out, stops at its length itself, and drops the field when emptied", async () => {
     await show("occupationTitle");
     const input = screen.getByLabelText("Job title");
     expect(input.props.value).toBe("");
-    expect(screen.getByText("Without the employer's name, and up to 40 characters.")).toBeTruthy();
+    // The maintainer's rule, which only these words carry; the field stops at 40 by itself (#581).
+    expect(screen.getByText("Without the employer's name")).toBeTruthy();
+    expect(input.props.maxLength).toBe(40);
     await fireEvent.changeText(input, "Architect");
     expect(fields).toEqual({ occupationTitle: "Architect" });
     await fireEvent.changeText(input, "");
     expect(fields).toEqual({});
+  });
+
+  it.each([
+    ["fi-FI", "Ilman työnantajan nimeä"],
+    ["sv-FI", "Utan arbetsgivarens namn"],
+  ])("says what to leave out in %s, with no length", async (tag, words) => {
+    (useLocales as jest.Mock).mockReturnValue([{ languageTag: tag }]);
+    try {
+      await show("occupationTitle");
+      expect(screen.getByText(words)).toBeTruthy();
+    } finally {
+      (useLocales as jest.Mock).mockReturnValue([{ languageTag: "en-US" }]);
+    }
   });
 
   it("shows an empty box for a stored value that is not text", async () => {
@@ -493,6 +660,13 @@ describe("FieldEditor: a number", () => {
     expect(screen.getByText("176 cm")).toBeTruthy();
     await fireEvent.press(screen.getByRole("button", { name: "Clear the answer" }));
     expect(fields).toEqual({});
+  });
+
+  it("has Clear the answer as an outlined button, only with an answer to clear (#581)", async () => {
+    await show("height", { height: 170 } as ProfileFields);
+    const clear = screen.getByRole("button", { name: "Clear the answer" });
+    expect(clear.props.className).toMatch(/\bborder-input\b/);
+    expect(pressables(screen.toJSON() as HostNode).flatMap((n) => a11yProblems(n))).toEqual([]);
   });
 
   it("names the field once: its own label, not the stepper's again (#238)", async () => {
