@@ -5,7 +5,6 @@ import CodeXml from "lucide-react-native/icons/code-xml";
 import Contact from "lucide-react-native/icons/contact";
 import Download from "lucide-react-native/icons/download";
 import FileLock from "lucide-react-native/icons/file-lock";
-import FlaskConical from "lucide-react-native/icons/flask-conical";
 import Hand from "lucide-react-native/icons/hand";
 import HeartHandshake from "lucide-react-native/icons/heart-handshake";
 import Info from "lucide-react-native/icons/info";
@@ -35,7 +34,6 @@ export const ROW_ICONS: Record<string, LucideIcon> = {
   email: Mail,
   contacts: Contact,
   lock: Lock,
-  research: FlaskConical,
   special_category: Shield,
   export: Download,
   support: HeartHandshake,

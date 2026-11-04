@@ -110,7 +110,7 @@ type LocalAnswers = {
  * and the welcome step is the fallback (ADR-010 §15); a friend's invitation
  * code once, before the name, never required (#107); then the name, the
  * gender, whom one seeks, the intent, the age window, the home, the photos,
- * the prompts. Research is asked before the bank and kept in Settings.
+ * the prompts. Research is not asked (#545, ADR-010 §19).
  * A step of the contract this screen has no question for is "stuck".
  */
 function nextStep(status: OnboardingStatus, local: LocalAnswers): Step {
@@ -478,7 +478,7 @@ export function OnboardingScreen() {
                       disabled={busy || specialConsented}
                       onCheckedChange={(on) => {
                         tap();
-                        // Recorded as soon as it is given; Settings withdraws it, as it does the research opt-in.
+                        // Recorded as soon as it is given; Settings withdraws it.
                         if (on && !specialConsented) {
                           void step(() =>
                             giveConsent(

@@ -16,7 +16,12 @@ import { useSession } from "./session";
 
 export type ConsentState = "loading" | "unavailable" | "on" | "off" | "outdated";
 
-const bundledVersion = (kind: WithdrawableConsentKind): string => CONSENT_VERSIONS[kind] ?? "";
+// shortcut: no switch gives or withdraws research until there is a researcher (#545, ADR-010 §19),
+// though the API keeps the kind. R3 Research (#194) widens this to WithdrawableConsentKind, and the
+// compiler names each table below to fill; Settings' row comes back with it.
+type SwitchedKind = Exclude<WithdrawableConsentKind, "research">;
+
+const bundledVersion = (kind: SwitchedKind): string => CONSENT_VERSIONS[kind] ?? "";
 
 /**
  * A withdrawable consent as the API holds it (#46, #146, ADR-010 §4): on when
@@ -24,7 +29,7 @@ const bundledVersion = (kind: WithdrawableConsentKind): string => CONSENT_VERSIO
  * outdated when the wording built into this app is older than the API's: no
  * consent for a text this app never showed.
  */
-function stateOf(kind: WithdrawableConsentKind, consents: ConsentsResponse): ConsentState {
+function stateOf(kind: SwitchedKind, consents: ConsentsResponse): ConsentState {
   const current = consents.currentVersions[kind];
   if (bundledVersion(kind) !== current) return "outdated";
   const active = consents.consents.some(
@@ -33,8 +38,7 @@ function stateOf(kind: WithdrawableConsentKind, consents: ConsentsResponse): Con
   return active ? "on" : "off";
 }
 
-const statesOf = (consents: ConsentsResponse): Record<WithdrawableConsentKind, ConsentState> => ({
-  research: stateOf("research", consents),
+const statesOf = (consents: ConsentsResponse): Record<SwitchedKind, ConsentState> => ({
   special_category: stateOf("special_category", consents),
 });
 
@@ -45,7 +49,7 @@ const statesOf = (consents: ConsentsResponse): Record<WithdrawableConsentKind, C
  * it again (ADR-019 §4).
  */
 function useConsentSwitch(
-  kind: WithdrawableConsentKind,
+  kind: SwitchedKind,
   signedIn: boolean,
   locale: string,
   onStored?: (consents: ConsentsResponse) => void,
@@ -97,15 +101,12 @@ function useConsentSwitch(
 }
 
 const LABEL = {
-  research: "account.research.label",
   special_category: "account.specialCategory.label",
 } as const;
 const EXPLAIN = {
-  research: "account.research.explain",
   special_category: "account.specialCategory.explain",
 } as const;
 const FAILED = {
-  research: "account.research.failed",
   special_category: "account.specialCategory.failed",
 } as const;
 
@@ -122,7 +123,7 @@ export function ConsentSwitch({
   kind,
   onStored,
 }: {
-  kind: WithdrawableConsentKind;
+  kind: SwitchedKind;
   onStored?: (consents: ConsentsResponse) => void;
 }) {
   const { t, locale } = useT();
@@ -177,20 +178,19 @@ export function ConsentSwitch({
 }
 
 /**
- * Both consents' states, for the rows of the settings list that hold them
+ * The consents' states, for the rows of the settings list that hold them
  * (#287, #511): read once, and again whenever the list is back in front;
  * `stored` takes what a switch under a row stored, so the row says it at
  * once. "loading" before a person signs in and while the read is on its way,
  * "unavailable" when it failed.
  */
 export function useConsentStates(): {
-  states: Record<WithdrawableConsentKind, ConsentState>;
+  states: Record<SwitchedKind, ConsentState>;
   stored: (consents: ConsentsResponse) => void;
 } {
   const session = useSession();
   const signedIn = session.status === "signed-in";
-  const [states, setStates] = useState<Record<WithdrawableConsentKind, ConsentState>>({
-    research: "loading",
+  const [states, setStates] = useState<Record<SwitchedKind, ConsentState>>({
     special_category: "loading",
   });
   useFocusEffect(
@@ -199,7 +199,7 @@ export function useConsentStates(): {
       let live = true;
       fetchConsents().then(
         (consents) => live && setStates(statesOf(consents)),
-        () => live && setStates({ research: "unavailable", special_category: "unavailable" }),
+        () => live && setStates({ special_category: "unavailable" }),
       );
       return () => {
         live = false;

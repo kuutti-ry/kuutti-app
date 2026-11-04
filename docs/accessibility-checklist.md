@@ -49,12 +49,11 @@ A cell holds the date (dd/mm/yyyy) and the walker's name; a check that failed is
 
 ### Signing in
 
-The screens before the bank (#418, ADR-010 §15) show on a phone that has not recorded the current versions of the terms and the privacy summary: on its first sign-in, or after a wording changed. Android forgets the versions when the app's storage is cleared, but iOS keeps them in the Keychain through a reinstall, so on an iPhone they are walked the first time they show.
+The screen before the bank (#418, ADR-010 §15) shows on a phone that has not recorded the current versions of the terms and the privacy summary: on its first sign-in, or after a wording changed. Android forgets the versions when the app's storage is cleared, but iOS keeps them in the Keychain through a reinstall, so on an iPhone it is walked the first time it shows.
 
 | screen or step | route | listen for in particular | iOS, VoiceOver | Android, TalkBack |
 |---|---|---|---|---|
-| Before you sign in: the norms and the consents (#418) | `/` (Aino, on a phone's first sign-in) | Before you sign in a header; the four lines on how Kuutti does things; the explanation; outside Finnish the line that the Finnish text counts; the terms and privacy cards, each title, summary and version link in order; I'm in, and I accept both named; no bank button anywhere before it | | |
-| Before you sign in: research (#418) | `/`, after accepting both | the screen read from its top, the header first; the research card with its version link; the line that it can be changed later; the line that either answer goes on to the sign-in with the bank; Yes, I take part and Not now named, neither heard as selected; after either, the bank button | | |
+| Before you sign in: the norms and the consents (#418) | `/` (Aino, on a phone's first sign-in) | Before you sign in a header; the four lines on how Kuutti does things; the explanation; outside Finnish the line that the Finnish text counts; the terms and privacy cards, each title, summary and version link in order; I'm in, and I accept both named; no bank button anywhere before it; after it, the bank button, with no research question on the way (#545) | | |
 | Start, signed out | `/` | the loading line said; the title a header; the explanation; Sign in with your bank, straight away on a phone that has recorded the current versions | | |
 | Back from the bank | `/auth?code=…` | the system browser and the bank's pages are not ours, so the walk resumes at the return; opening, signing in and done said as they change | | |
 | Refused | `/auth?error=…` (Tapio, Ilona, Lauri, Venla) | the card's title and its sentence, with the date where there is one; Sign in with your bank named, as these four's refusals last (#466); Try again named instead after one that may pass, such as a cancel at the bank | | |
@@ -79,7 +78,7 @@ The screens before the bank (#418, ADR-010 §15) show on a phone that has not re
 | Home | `/onboarding` | the question and the explanation read; the postal code field named, the number pad, nothing focused until it is tapped; how many areas match said aloud on both platforms as the digits go in, with no such line drawn; that the code cannot be found drawn and said; each area a named button, its code a digit at a time and its name; at the largest text every row reachable above the keyboard; a refused save said | | |
 | What the card shows | `/onboarding`, after the home | still step 6; where an area is kept, What should your card show? a header, then the town and the area as whole-width rows, a radio group of that name, the chosen one heard as selected; where none is, or the area bears the town's name, On your card and the place a header in the question's place, and no choice; Continue | | |
 | Photos | `/onboarding` | one button to the photos screen (Photos, below), and back to this step | | |
-| A few words | `/onboarding` | the bio field, no line under it; Or pick a line instead read, then heard as the name of the radio group of ready lines, each a whole-width row, whole at the largest text; Questions read, each question picked under Add a question and answered; the save heard as dimmed until the words count; then the done line, and home, with no research step (#418: it is asked before the bank, and Settings keeps it) | | |
+| A few words | `/onboarding` | the bio field, no line under it; Or pick a line instead read, then heard as the name of the radio group of ready lines, each a whole-width row, whole at the largest text; Questions read, each question picked under Add a question and answered; the save heard as dimmed until the words count; then the done line, and home, with no research step (#545: it is not asked) | | |
 
 ### Home
 
@@ -206,7 +205,6 @@ Sanna; Helmi and Noa where it says.
 | Language | `/settings`, under its row (#511) | each language by its name, the flag silent, the chosen one said; the screen in the new language at once | | |
 | Photo descriptions (#296) | `/settings`, under its row (#511) | the line that the description is automatic and can be wrong; Show under photos and the three parts as switches, each on or off, no line under them | | |
 | Like and Pass (#82, #581) | `/settings`, under its row (#511) | Which hand heard as a radio group, Right hand and Left hand, the chosen one heard as selected; One-handed a switch, no line under it; Button style read over the three choices, then heard as their radio group's name (#520), Kuutti, Cross and circle in words, never the two marks' names, and A and B, the chosen one heard as selected, no line under them; the row in Settings heard by that title, with the hand, and one-handed when on | | |
-| Research | `/settings`, under its row (#511) | the explanation; the switch, on or off; loading and a failed read said | | |
 | Sensitive answers | `/settings`, under its row (#511) | the switch; withdrawn, onboarding asks whom one seeks again (Noa) | | |
 | Terms of use | `/settings`, under its row (#511) | no value on the row; the summary and the link to the full text, which names the version, in order | | |
 | Privacy | `/settings`, under its row (#511) | as the terms | | |

@@ -7,7 +7,7 @@
 # accepting it leads home. On a fresh phone bank-login.yaml accepts them before
 # the bank, they land right after the exchange, and no welcome step comes.
 # CI takes the first way: an earlier flow of the same job has signed in on its
-# phone. Research is asked before the bank, never after it, so home follows.
+# phone. Research is not asked (#545), so home follows.
 # Her profile is finished (four approved photos, two prompts), so home does
 # not say it lacks anything. One run per `pnpm demo:reset`: afterwards she has
 # accepted the current wording.
@@ -44,7 +44,7 @@ name: A person who accepted an older wording of the terms is asked for the curre
       - tapOn: "I'm in, and I accept both|Olen mukana ja hyväksyn molemmat|Jag är med och godkänner båda"
 
 # Home either way, nothing else asked: the name, the gender, whom she seeks
-# and the rest stand, and research is no step of onboarding.
+# and the rest stand.
 - extendedWaitUntil:
     visible: "People on Kuutti|Ihmiset Kuutissa|Människor på Kuutti"
     timeout: 15000

@@ -3650,14 +3650,14 @@ signIn.paused.title:
 
 signIn.agreements.title:
   en: "Before you sign in"
-  description: "Heading of the screens before the bank login (#418, ADR-010 §15): first the norms with the terms and the privacy summary, which must be accepted before the bank button can be reached; then the research question, which never blocks."
+  description: "Heading of the screen before the bank login (#418, ADR-010 §15): the norms with the terms and the privacy summary, which must be accepted before the bank button can be reached."
   fi: "Ennen kuin kirjaudut"
   sv: "Innan du loggar in"
   machine: { fi: true, sv: true }
 
 signIn.agreements.research:
   en: "Either answer takes you on to the sign-in with your bank."
-  description: "Before the bank login, under the research question (#418): a yes and a no both lead on to the sign-in, and a no costs nothing (GDPR art. 7(4))."
+  description: "Not shown until there is a researcher (#545, ADR-010 §19). Before the bank login, under the research question (#418): a yes and a no both lead on to the sign-in, and a no costs nothing (GDPR art. 7(4))."
   fi: "Kumpi tahansa vastaus vie sinut eteenpäin kirjautumaan pankkitunnuksilla."
   sv: "Vilket svar du än ger går du vidare till inloggningen med din bank."
   machine: { fi: true, sv: true }
@@ -4298,28 +4298,28 @@ onboarding.consents.outdatedApp:
 
 onboarding.research.title:
   en: "Help us learn how matching works"
-  description: "Research opt-in heading, on the screen before the bank login (#418, ADR-010 §15); Settings keeps the switch."
+  description: "Not shown until there is a researcher (#545, ADR-010 §19). Research opt-in heading, on the screen before the bank login (#418, ADR-010 §15); Settings keeps the switch."
   fi: "Auta meitä oppimaan, miten yhdistäminen toimii"
   sv: "Hjälp oss lära hur matchningen fungerar"
   machine: { fi: true, sv: true }
 
 onboarding.research.yes:
   en: "Yes, I take part"
-  description: "Before the bank login (#418): the research yes, recorded right after the sign-in; then on to the bank."
+  description: "Not shown until there is a researcher (#545, ADR-010 §19). Before the bank login (#418): the research yes, recorded right after the sign-in; then on to the bank."
   fi: "Kyllä, osallistun"
   sv: "Ja, jag deltar"
   machine: { fi: true, sv: true }
 
 onboarding.research.no:
   en: "Not now"
-  description: "Before the bank login (#418): the research no, which records nothing and withdraws nothing; then on to the bank."
+  description: "Not shown until there is a researcher (#545, ADR-010 §19). Before the bank login (#418): the research no, which records nothing and withdraws nothing; then on to the bank."
   fi: "Ei nyt"
   sv: "Inte nu"
   machine: { fi: true, sv: true }
 
 onboarding.research.later:
   en: "You can change this later, at any time."
-  description: "Under the research choice."
+  description: "Not shown until there is a researcher (#545, ADR-010 §19). Under the research choice."
   fi: "Voit muuttaa tätä myöhemmin, milloin tahansa."
   sv: "Du kan ändra det här senare, när som helst."
   machine: { fi: true, sv: true }
@@ -7739,21 +7739,21 @@ account.foundThem.thanks:
 
 account.research.label:
   en: "Take part in research"
-  description: "Label of the research opt-in switch on its screen in Settings (#46, #287): on when the active research consent names the current wording."
+  description: "Not shown until there is a researcher (#545, ADR-010 §19). Label of the research opt-in switch on its screen in Settings (#46, #287): on when the active research consent names the current wording."
   fi: "Osallistu tutkimukseen"
   sv: "Delta i forskningen"
   machine: { fi: true, sv: true }
 
 account.research.explain:
   en: "Anonymised events about how you use Kuutti, under a separate research identifier. You can change this at any time."
-  description: "Line under the research switch."
+  description: "Not shown until there is a researcher (#545, ADR-010 §19). Line under the research switch."
   fi: "Anonymisoituja tapahtumia Kuutin käytöstäsi erillisellä tutkimustunnisteella. Voit muuttaa tätä milloin tahansa."
   sv: "Anonymiserade händelser om hur du använder Kuutti, under ett separat forskningsid. Du kan ändra det här när som helst."
   machine: { fi: true, sv: true }
 
 account.research.failed:
   en: "The research choice could not be saved. Try again."
-  description: "Notice when giving or withdrawing the research consent failed."
+  description: "Not shown until there is a researcher (#545, ADR-010 §19). Notice when giving or withdrawing the research consent failed."
   fi: "Tutkimusvalintaa ei voitu tallentaa. Yritä uudelleen."
   sv: "Forskningsvalet kunde inte sparas. Försök igen."
   machine: { fi: true, sv: true }
@@ -10498,7 +10498,7 @@ safety.report.failed:
 
 settings.research.title:
   en: "Research"
-  description: "Settings, title of the research consent's row and of the screen with its switch (#287)."
+  description: "Not shown until there is a researcher (#545, ADR-010 §19). Settings, title of the research consent's row and of the screen with its switch (#287)."
   fi: "Tutkimus"
   sv: "Forskning"
   machine: { fi: true, sv: true }

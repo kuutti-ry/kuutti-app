@@ -10,13 +10,14 @@ Feature: Onboarding and consents
   same flow and keep it incomplete until done (#46, #146, ADR-010). The home,
   and the pond its write sets, are features/pond/home.feature's (ADR-061).
 
-  The app asks the four norms, the terms, the privacy summary and research
-  before the bank login (#418, ADR-010 §15). With no account yet, it holds
-  the answers in memory and posts them through the same route right after
-  the exchange, and a phone that recorded the current wordings goes straight
-  to the bank. Onboarding's welcome step is the fallback for consents missing
-  after the sign-in, and onboarding asks nothing about research; Settings
-  keeps its switch.
+  The app asks the four norms, the terms and the privacy summary before the
+  bank login (#418, ADR-010 §15). With no account yet, it holds the answers in
+  memory and posts them through the same route right after the exchange, and
+  a phone that recorded the current wordings goes straight to the bank.
+  Onboarding's welcome step is the fallback for consents missing after the
+  sign-in. Until there is a researcher the app asks nothing about research,
+  before the bank, in onboarding or in Settings (#545, ADR-010 §19); the API
+  keeps the opt-in's routes, which the scenarios here hold, for R3 Research.
 
   Scenario: A consent counts only for the current version of its wording
     Given the terms have a current consent version
@@ -86,23 +87,18 @@ Feature: Onboarding and consents
     Given a phone that has not recorded the current versions of the terms and the privacy summary
     When the sign-in screen opens
     Then the norms, the terms and the privacy summary stand where the bank button would be
-    And the bank button shows only once both are accepted and the research question is answered
+    And the bank button shows only once both are accepted
 
-  Scenario: Research before the bank is a yes or a no, and either goes on to the bank
-    Given the person accepted the terms and the privacy summary before the bank
-    When they answer the research question with a yes, or with a no
-    Then neither answer was chosen beforehand, and either is held with the versions shown and goes on to the bank
+  Scenario: Nothing is asked about research before the bank
+    Given a phone that has not recorded the current versions of the terms and the privacy summary
+    When the person accepts both
+    Then the bank button shows at once, and no research question stood on the way
 
   Scenario: The answers given before the bank become consent rows right after the exchange
-    Given the person accepted both and said yes to research before the bank
+    Given the person accepted both before the bank
     When the bank login's code is exchanged
-    Then the terms, the privacy summary and research are posted for the versions shown before the app goes home
+    Then the terms and the privacy summary are posted for the versions shown before the app goes home, and nothing about research, so a research consent the account already has stays
     And the phone remembers the versions it recorded
-
-  Scenario: A no to research before the bank posts nothing about research
-    Given the person accepted both and said no to research before the bank
-    When the bank login's code is exchanged
-    Then the terms and the privacy summary are posted and nothing about research, so a research consent the account already has stays
 
   Scenario: A phone that recorded the current wordings goes straight to the bank
     Given this phone recorded the current versions of the terms and the privacy summary after an earlier sign-in
@@ -119,3 +115,8 @@ Feature: Onboarding and consents
     Given an account with no research consent whose only open step is the prompts or a bio
     When it saves a bio
     Then onboarding goes home and asks nothing about research
+
+  Scenario: Settings has no research switch, whatever the account said before
+    Given an account that said yes to research before the question went, and one that never answered
+    When Settings opens
+    Then no row or switch names research, and nothing is given or withdrawn
