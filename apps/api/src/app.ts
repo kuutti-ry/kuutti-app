@@ -291,7 +291,7 @@ export function createApp(deps: Deps) {
         }),
     ),
   );
-  // ...and what changes in them, live over one socket (#349, ADR-031 §5).
+  // ...and what changes in them, live over one socket (#349, ADR-031 §9).
   app.route(
     "/",
     chatSocketRoutes({

@@ -116,7 +116,7 @@ describe("scheduleNightly", () => {
     vi.useRealTimers();
   });
 
-  it("runs the jobs at the next 04:00 in Helsinki, then every 24 hours, until it is stopped", async () => {
+  it("runs the jobs at the next 04:00 in Helsinki, then at 04:00 each night, until it is stopped", async () => {
     // 03:00 in Helsinki (summer time): the first run is an hour away.
     vi.useFakeTimers({ now: new Date("2026-07-01T00:00:00Z") });
     const { logger, lines } = await captureLogger();

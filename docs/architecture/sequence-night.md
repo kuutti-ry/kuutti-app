@@ -180,5 +180,4 @@ sequenceDiagram
 ## Open
 
 - **One job held back in production, the maintainer's to lift.** `research-export` waits for ADR-029's ninety days, a `shortcut:` line in `boot.ts`.
-- **"Every 24 hours".** The comment at the top of `jobs/nightly.ts` says one timer to the next 04:00, then every 24 hours. The code arms the timer again for the next 04:00 after each run, so on the nights summer time begins or ends the wait is 23 or 25 hours. Drawn as the code: 04:00 in Helsinki, every night.
 - **Whether staging's export succeeds tonight.** `infra/README.md` says staging's `research-export` fails every night with AccessDenied until `modules/research` is applied; whether it has been applied is not in the repository.

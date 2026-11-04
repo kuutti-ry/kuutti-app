@@ -134,13 +134,13 @@ Code inside each app is organised by slice, never by layer (`.claude/rules/layou
 | Slice | API, `apps/api/src/` | Phone app, `apps/mobile/src/features/` | Admin panel, `apps/admin/src/features/` | Spec, `features/` | The layout rules' matrix |
 |---|---|---|---|---|---|
 | identity | yes | yes | yes: staff sign-in | yes | heavy, thin, auth only |
-| profile | yes | yes | no directory | no | medium, heavy, read |
+| profile | yes | yes | no directory | no | medium, heavy, none |
 | media | yes | yes | yes: the photo queue | yes | heavy, medium, queue |
 | pond | yes | yes | yes: the switch that opens matching | yes | medium, thin, switch |
 | matching | yes | yes | no directory | yes | heavy, heavy, none |
-| chat | yes | yes | no directory | yes | heavy, heavy, snapshots |
+| chat | yes | yes | no directory | yes | heavy, heavy, none |
 | safety | yes | yes | yes: the overview, reports, accounts, sanctions, automatic bans, feedback, staff, the audit log, matching_config | yes | medium, thin, heavy |
-| research | yes | a README only | no directory | no | medium, none, read |
+| research | yes | a README only | no directory | no | medium, none, none |
 | rewards | yes | yes | no directory | no | light, light, none |
 | notifications | yes | yes | no directory | no | light, light, none |
 
@@ -208,7 +208,4 @@ flowchart LR
 
 ## Open
 
-- **The admin panel's slices.** The layout rules' matrix gives the admin panel profile "read", chat "snapshots" and research "read", and `apps/admin/src/features` has none of the three. What exists of them is in safety's screens (the report page shows a conversation's frozen copy), and a researcher has no screen (`apps/admin/src/app.tsx`, "until #194"). Part 3 draws the directories; whether the matrix or the panel's layout changes is the maintainer's.
-- **The RPC style.** `.claude/rules/api.md` still calls the style across the boundary an open decision; ADR-003 is accepted and CLAUDE.md lists it as settled. Drawn as ADR-003.
-- **The web preview's bank.** `.claude/rules/mobile.md` says the web preview runs against the mock IdP and seed data; `apps/api/src/lib/config.ts` says no mock bank is deployed beside a preview and its login answers `auth_unavailable`. Drawn neither way: the web target's box says previews only.
 - **An eleventh name in the boundary.** `biome.json`'s patterns also guard a slice named `smoke`, and no directory of that name exists. Not drawn.

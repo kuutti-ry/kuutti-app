@@ -19,7 +19,7 @@ import { archiveSilentConversations } from "./archive.ts";
 import { startChatListener } from "./listen.ts";
 import { createLive, type Live, type Schedule } from "./live.ts";
 
-// features/chat/live.feature (#349, ADR-031 §5): the socket on a real
+// features/chat/live.feature (#349, ADR-031 §9): the socket on a real
 // server over a database of its own, the listener on Postgres's channel, `ws`
 // clients. Committed rows, since a notification arrives only on commit.
 // Nothing sleeps: a frame is awaited as an event, the socket's timers are a

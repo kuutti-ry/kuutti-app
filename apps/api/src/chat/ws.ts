@@ -16,7 +16,7 @@ import type { Logger } from "../lib/logger.ts";
 import type { Live } from "./live.ts";
 import type { LiveSocket } from "./presence.ts";
 
-// The chat's socket (#349, ADR-031 §5): GET /ws, one per signed-in app in
+// The chat's socket (#349, ADR-031 §9): GET /ws, one per signed-in app in
 // front. It authenticates by its first frame, `auth { token }`, so the token
 // never sits in a URL and the web preview, which cannot set headers on a
 // WebSocket, runs the same code. Every frame both ways is the contract's

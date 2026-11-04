@@ -13,7 +13,7 @@ import {
 } from "@/lib/session";
 import { messageWithKnownDescription } from "./known";
 
-// The chat's socket (#349, ADR-031 §5): one connection at a time, which says
+// The chat's socket (#349, ADR-031 §9): one connection at a time, which says
 // what changed; writing stays on the HTTP routes. The access token goes in
 // the first frame, never in the URL.
 

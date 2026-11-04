@@ -188,7 +188,7 @@ flowchart TB
 - **The research copy's infrastructure.** `infra/modules/research` is on `main` and composed by staging, which merging applies, but the checklist's researcher line stays unticked until the maintainer has applied it and the first night's write has shown that S3 honours the write-once condition, and ADR-029's Status calls the infra half a pull request the maintainer applies. Drawn as on `main`; not confirmed as applied.
 - **#198** is the issue #397 names for CloudFront-only ingress. The repository names the switch (`cloudfront_only_ingress`, ADR-005 §7) but no issue number.
 - **Rule 6.** The checklist's line for rule 6 (every user-data query scoped by the session's `account_id`) is still unticked; steps 5 and 23 draw what the code does.
-- **Session tokens.** The checklist's line "stored hashed, compared in constant time" is unticked. The code stores SHA-256 hashes and finds a token by its hash in the database (step 5), not by a constant-time compare in the API.
+- **Session tokens.** The checklist's line for them is still unticked; steps 5 and 13 draw what the code does.
 - **Rule 8's words** say no CORS. The code answers the panel's origin on staging and a preview's own web origin on a preview; the checklist also allows the public site, which staging's list does not name.
 - **Rekognition and AWS's use of content.** AWS may use what its AI services are sent to improve them unless the account opts out; the opt-out waits for the association's organisation (ADR-006 §1).
 - **The hop from CloudFront to the box** crosses the public internet over HTTPS until the ingress switch (the checklist's TLS line, unticked).

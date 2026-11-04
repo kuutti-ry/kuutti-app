@@ -10673,7 +10673,7 @@ support.line.finnish:
 
 support.site:
   en: "Website"
-  description: "Support page (#510), the link to a service's own site, on a tile. Space is tight."
+  description: "Support page (#510), the link to a service's own site, on a tile."
   fi: "Verkkosivut"
   sv: "Webbplats"
   machine: { fi: true, sv: true }
