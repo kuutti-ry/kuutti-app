@@ -37,7 +37,6 @@ executionOrder:
     - The home changes by a new postal code, the card says the name chosen, and digits are never shown back
     - Home says how many people are on Kuutti and the gate in words, and the wrench names the API
     - A malformed e-mail is refused in words, a valid one is saved, and it can be removed
-    - The research switch in Settings records the opt-in and withdraws it again
     - The messages switch in Settings, Notifications, goes off, is kept on the server, and goes on again
     - An invitation made in Settings shows its code once, is shared, and is withdrawn after asking
     - Download my data hands the person's file over

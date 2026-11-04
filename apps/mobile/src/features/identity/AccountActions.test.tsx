@@ -102,7 +102,7 @@ describe("AccountActions", () => {
     expect(drawn()).toEqual(["I found someone", "Take a break", "Delete my account"]);
     // The export is a row of its own now (#511), and the consents the app's settings (#170).
     expect(screen.queryByRole("button", { name: "Download my data" })).toBeNull();
-    expect(screen.queryByLabelText("Take part in research")).toBeNull();
+    expect(screen.queryByLabelText("Store my sensitive answers")).toBeNull();
   });
 
   it("holds the copy of one's data as its one button, with no line (#511, #581)", async () => {
@@ -236,7 +236,7 @@ describe("AccountActions", () => {
           ? new Response(null, { status: 204 })
           : null,
     ]);
-    // The card reads the consents on mount (the research switch); only writes count here.
+    // Only writes count here.
     const calls = {
       get length() {
         return requests.filter((r) => r.method !== "GET").length;

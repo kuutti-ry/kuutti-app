@@ -1,5 +1,4 @@
 import { realLocale } from "@kuutti/i18n";
-import { useEffect, useRef, useState } from "react";
 import { ScrollView, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Button } from "@/components/ui/button";
@@ -49,80 +48,34 @@ export function NormsAndConsents() {
   );
 }
 
+// shortcut: nothing is asked about research until there is a researcher (#545, ADR-010 §19).
+// R3 Research (#194) brings the question back after the button below, as §15 describes it.
 /**
- * The screens before the bank login (#418, ADR-010 §15). First the norms with
- * the terms and the privacy summary, which a person must accept to go on: the
- * bank button cannot be reached before. Then the research question, a yes or
- * a no with nothing chosen beforehand and neither drawn stronger, where either
- * answer goes on to the bank and a no costs nothing (GDPR art. 7(4)). The
- * answers are handed back to wait for the exchange; nothing is sent from here,
- * since no account exists yet.
+ * The screen before the bank login (#418, ADR-010 §15): the norms with the
+ * terms and the privacy summary, which a person must accept to go on, so the
+ * bank button cannot be reached before. The answers are handed back to wait for
+ * the exchange; nothing is sent from here, since no account exists yet.
  */
 export function BeforeSignIn({ onAgreed }: { onAgreed: (agreements: Agreements) => void }) {
   const { t, locale } = useT();
   const tap = useHapticTap();
-  const [step, setStep] = useState<"consents" | "research">("consents");
-  // The research step starts at its top, not where the long first one was left.
-  const scroll = useRef<ScrollView>(null);
-  useEffect(() => {
-    if (step === "research") scroll.current?.scrollTo({ y: 0, animated: false });
-  }, [step]);
-
   return (
     <SafeAreaView className="flex-1 bg-background">
-      <ScrollView ref={scroll} contentContainerClassName="flex-grow gap-6 p-6">
+      <ScrollView contentContainerClassName="flex-grow gap-6 p-6">
         <Text variant="h1" accessibilityRole="header">
           {t("signIn.agreements.title")}
         </Text>
-        {step === "consents" ? (
-          <View className="gap-4">
-            <NormsAndConsents />
-            <Button
-              onPress={() => {
-                tap();
-                setStep("research");
-              }}
-            >
-              {t("onboarding.welcome.accept")}
-            </Button>
-          </View>
-        ) : (
-          <View className="gap-4">
-            <Text variant="h2">{t("onboarding.research.title")}</Text>
-            {realLocale(locale) !== "fi" && (
-              <Text variant="muted">{t("onboarding.consents.binding")}</Text>
-            )}
-            <Card>
-              <CardHeader>
-                <CardTitle>{t("legal.research.title")}</CardTitle>
-              </CardHeader>
-              <CardContent className="gap-2">
-                <Text>{t("legal.research.summary")}</Text>
-                <LegalTextLink kind="research" />
-              </CardContent>
-            </Card>
-            <Text variant="muted">{t("onboarding.research.later")}</Text>
-            <Text>{t("signIn.agreements.research")}</Text>
-            <Button
-              variant="outline"
-              onPress={() => {
-                tap();
-                onAgreed(agreementsOf(locale, true));
-              }}
-            >
-              {t("onboarding.research.yes")}
-            </Button>
-            <Button
-              variant="outline"
-              onPress={() => {
-                tap();
-                onAgreed(agreementsOf(locale, false));
-              }}
-            >
-              {t("onboarding.research.no")}
-            </Button>
-          </View>
-        )}
+        <View className="gap-4">
+          <NormsAndConsents />
+          <Button
+            onPress={() => {
+              tap();
+              onAgreed(agreementsOf(locale));
+            }}
+          >
+            {t("onboarding.welcome.accept")}
+          </Button>
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
