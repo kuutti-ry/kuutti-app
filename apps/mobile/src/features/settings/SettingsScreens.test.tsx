@@ -195,20 +195,12 @@ describe("the legal texts under their rows", () => {
   });
 });
 
-describe("the consents' rows", () => {
-  it("hold the research consent's switch with its words for a person", async () => {
-    await saveSession(tokens);
-    await settingsWith("research", tokens.sessionId);
-    expect(await screen.findByRole("switch", { name: "Take part in research" })).toBeTruthy();
-    expect(screen.queryByText("Store my sensitive answers")).toBeNull();
-    noProblems();
-  });
-
-  it("hold the sensitive answers' switch alone", async () => {
+describe("the consent's row", () => {
+  it("holds the sensitive answers' switch with its words for a person", async () => {
     await saveSession(tokens);
     await settingsWith("special_category", tokens.sessionId);
     expect(await screen.findByRole("switch", { name: "Store my sensitive answers" })).toBeTruthy();
-    expect(screen.queryByText("Take part in research")).toBeNull();
+    noProblems();
   });
 });
 

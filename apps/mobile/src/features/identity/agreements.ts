@@ -3,19 +3,17 @@ import { readPreference, writePreference } from "@/lib/preferences";
 import { consentLocale, giveConsent } from "./onboarding/client";
 
 /**
- * What a person answered on the screens before the bank login (#418,
+ * What a person answered on the screen before the bank login (#418,
  * ADR-010 §15): the versions of the terms and the privacy summary they
- * accepted, the research wording's version on a yes, and the language the
- * texts were shown in. Before the exchange there is no account to bind a
- * row to, so the answers wait in this process's memory and become rows right
- * after it. Lost with the process (Android may end it while the browser is
- * open), they are asked again on onboarding's welcome step.
+ * accepted, and the language the texts were shown in. Before the exchange
+ * there is no account to bind a row to, so the answers wait in this process's
+ * memory and become rows right after it. Lost with the process (Android may
+ * end it while the browser is open), they are asked again on onboarding's
+ * welcome step.
  */
 export type Agreements = {
   terms: string;
   privacy: string;
-  /** The research wording's version on a yes; null on a no, which records and withdraws nothing. */
-  research: string | null;
   locale: "fi" | "sv" | "en";
 };
 
@@ -42,11 +40,10 @@ function fresh(): Agreements | null {
 }
 
 /** The answers as this app's own wordings name them: the versions built in are what the person read (ADR-010 §4). */
-export function agreementsOf(locale: string, research: boolean): Agreements {
+export function agreementsOf(locale: string): Agreements {
   return {
     terms: CONSENT_VERSIONS.terms ?? "",
     privacy: CONSENT_VERSIONS.privacy ?? "",
-    research: research ? (CONSENT_VERSIONS.research ?? "") : null,
     locale: consentLocale(locale),
   };
 }
@@ -129,12 +126,10 @@ export function rememberAgreed(): Promise<void> {
 
 /**
  * The answers become rows right after the exchange, through the same route
- * the welcome step uses: the API records a consent it already has once, and
- * a no posts nothing, so an account that says yes to research keeps it
+ * the welcome step uses: the API records a consent it already has once
  * (#418, proposal 3). A refusal (an app older than the API's wording, the
  * day's cap, no network) is left to the welcome step, which asks for the
- * terms and the privacy summary again; a research yes that did not land is
- * Settings' switch to give.
+ * terms and the privacy summary again.
  */
 export async function recordAgreements(agreements: Agreements): Promise<void> {
   try {
@@ -143,8 +138,5 @@ export async function recordAgreements(agreements: Agreements): Promise<void> {
     await rememberAgreed();
   } catch {
     // The welcome step asks again.
-  }
-  if (agreements.research !== null) {
-    await giveConsent("research", agreements.research, agreements.locale).catch(() => undefined);
   }
 }

@@ -3,8 +3,8 @@
 # the name; the gender, and the label only after non-binary; whom one seeks,
 # which waits for the article 9 consent on the same screen; the intent; the
 # ages as two steppers around the person's own age; the home, a postal code
-# and what the card shows of it (#514); three photos; a bio; home. The norms with both texts, and
-# research, come before the bank (#418, ADR-010 §15): on a fresh phone
+# and what the card shows of it (#514); three photos; a bio; home. The norms with both texts
+# come before the bank (#418, ADR-010 §15): on a fresh phone
 # bank-login.yaml accepts them there; on a phone that recorded them at an
 # earlier sign-in, the welcome step asks Onni for the texts, counting no step
 # (welcome-step.yaml). Then a friend's invitation code, offered once, with no
@@ -197,7 +197,7 @@ name: A registered person is taken through onboarding one question per screen, a
     timeout: 60000
 - tapOn: "Save and continue|Tallenna ja jatka|Spara och fortsätt"
 
-# Home straight after the bio: research was asked before the bank. The one
+# Home straight after the bio: research is not asked (#545). The one
 # pond's counter; the photos wait in the local queue, so matching waits for them.
 - extendedWaitUntil:
     visible: "People on Kuutti|Ihmiset Kuutissa|Människor på Kuutti"

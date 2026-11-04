@@ -1059,7 +1059,7 @@ describe("OnboardingScreen", () => {
     expect(screen.queryByText("Help us learn how matching works")).toBeNull();
     expect(screen.queryByRole("button", { name: "Yes, I take part" })).toBeNull();
     expect(screen.getByText("All set. The home screen shows what comes next.")).toBeTruthy();
-    // The words are the last thing saved; research is the screens before the bank's, and Settings'.
+    // The words are the last thing saved, and nothing asks about research (#545).
     expect(calls.filter((c) => c.method !== "GET").map((c) => c.path)).toEqual(["/profile"]);
     expect(server.consents.some((c) => c.kind === "research")).toBe(false);
   });

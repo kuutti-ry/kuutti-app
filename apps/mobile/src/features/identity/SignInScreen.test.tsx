@@ -648,10 +648,9 @@ describe("SignInScreen: the screens before the bank (#418, ADR-010 §15)", () =>
   }
   const posted = (calls: Call[]) => calls.filter((call) => call.path === "/consents");
 
-  /** Through both screens before the bank, answering research as asked. */
-  async function agree(research: "Yes, I take part" | "Not now") {
+  /** Through the screen before the bank. */
+  async function agree() {
     await fireEvent.press(await screen.findByRole("button", { name: "I'm in, and I accept both" }));
-    await fireEvent.press(screen.getByRole("button", { name: research }));
     return screen.findByRole("button", { name: "Sign in with your bank" });
   }
 
@@ -689,18 +688,8 @@ describe("SignInScreen: the screens before the bank (#418, ADR-010 §15)", () =>
     expect(screen.queryByRole("button", { name: "Sign in with your bank" })).toBeNull();
 
     await fireEvent.press(screen.getByRole("button", { name: "I'm in, and I accept both" }));
-    // Accepted, but the research question stands between them and the bank.
-    expect(screen.getByText("Help us learn how matching works")).toBeTruthy();
-    expect(screen.queryByRole("button", { name: "Sign in with your bank" })).toBeNull();
-
-    await fireEvent.press(screen.getByRole("button", { name: "Not now" }));
     expect(await screen.findByRole("heading", { name: "Sign in" })).toBeTruthy();
-    expect(heldAgreements()).toEqual({
-      terms: TERMS,
-      privacy: PRIVACY,
-      research: null,
-      locale: "en",
-    });
+    expect(heldAgreements()).toEqual({ terms: TERMS, privacy: PRIVACY, locale: "en" });
     const found = pressables(screen.toJSON() as HostNode);
     expect(found).toHaveLength(1);
     expect(found.flatMap((node) => a11yProblems(node))).toEqual([]);
@@ -708,6 +697,27 @@ describe("SignInScreen: the screens before the bank (#418, ADR-010 §15)", () =>
     expect(lastStart(openURL).url).toBe(`${apiBaseUrl()}/auth/start?platform=ios&locale=en`);
     // Nothing is sent before there is an account to bind it to.
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("Nothing is asked about research before the bank", async () => {
+    const nothingOfResearch = () => {
+      for (const words of [
+        "Help us learn how matching works",
+        "Research",
+        "Yes, I take part",
+        "Not now",
+      ]) {
+        expect(screen.queryByText(words)).toBeNull();
+      }
+    };
+    await renderWithTheme(<SignInScreen />);
+    expect(await screen.findByRole("heading", { name: "Before you sign in" })).toBeTruthy();
+    nothingOfResearch();
+    // One press and the bank button is there: no step on the way.
+    await fireEvent.press(screen.getByRole("button", { name: "I'm in, and I accept both" }));
+    expect(await screen.findByRole("button", { name: "Sign in with your bank" })).toBeTruthy();
+    nothingOfResearch();
+    expect(heldAgreements()).not.toHaveProperty("research");
   });
 
   it("shows no button while the phone is asked whether it agreed before, then the screens before the bank", async () => {
@@ -776,7 +786,7 @@ describe("SignInScreen: the screens before the bank (#418, ADR-010 §15)", () =>
   });
 
   it("goes straight to the bank with the answers held from this run, without asking the phone", async () => {
-    holdAgreements({ terms: TERMS, privacy: PRIVACY, research: null, locale: "en" });
+    holdAgreements({ terms: TERMS, privacy: PRIVACY, locale: "en" });
     await renderWithTheme(<SignInScreen />);
     expect(screen.getByRole("button", { name: "Sign in with your bank" })).toBeTruthy();
     expect(
@@ -787,23 +797,17 @@ describe("SignInScreen: the screens before the bank (#418, ADR-010 §15)", () =>
   it("The answers given before the bank become consent rows right after the exchange", async () => {
     const { calls, order } = serve();
     const view = await renderWithTheme(<SignInScreen />);
-    await agree("Yes, I take part");
+    await agree();
     await throughTheBank(view);
     await waitFor(() => expect(router.replace).toHaveBeenCalledWith("/"));
     // In order, all before the screen goes home: onboarding then finds them given.
-    expect(order).toEqual([
-      "exchange",
-      "consent terms",
-      "consent privacy",
-      "consent research",
-      "replace /",
-    ]);
+    // Nothing about research, so a research consent the account already has stays.
+    expect(order).toEqual(["exchange", "consent terms", "consent privacy", "replace /"]);
     // Bound to the account the exchange made, in the language the texts were shown in.
     expect(posted(calls)).toEqual(
       [
         ["terms", TERMS],
         ["privacy", PRIVACY],
-        ["research", RESEARCH],
       ].map(([kind, version]) => ({
         path: "/consents",
         kind,
@@ -818,17 +822,6 @@ describe("SignInScreen: the screens before the bank (#418, ADR-010 §15)", () =>
     expect(heldAgreements()).toBeNull();
   });
 
-  it("A no to research before the bank posts nothing about research", async () => {
-    const { calls, order } = serve();
-    const view = await renderWithTheme(<SignInScreen />);
-    await agree("Not now");
-    await throughTheBank(view);
-    await waitFor(() => expect(router.replace).toHaveBeenCalledWith("/"));
-    expect(order).toEqual(["exchange", "consent terms", "consent privacy", "replace /"]);
-    expect(posted(calls).map((call) => call.kind)).toEqual(["terms", "privacy"]);
-    expect(store.has(AGREED)).toBe(true);
-  });
-
   it("names the language the texts were shown in on a Finnish phone", async () => {
     (useLocales as jest.Mock).mockReturnValue([{ languageTag: "fi-FI" }]);
     try {
@@ -837,7 +830,6 @@ describe("SignInScreen: the screens before the bank (#418, ADR-010 §15)", () =>
       await fireEvent.press(
         await screen.findByRole("button", { name: "Olen mukana ja hyväksyn molemmat" }),
       );
-      await fireEvent.press(screen.getByRole("button", { name: "Kyllä, osallistun" }));
       const openURL = jest.spyOn(Linking, "openURL").mockResolvedValue(true);
       await fireEvent.press(
         await screen.findByRole("button", { name: "Kirjaudu pankkitunnuksilla" }),
@@ -849,7 +841,6 @@ describe("SignInScreen: the screens before the bank (#418, ADR-010 §15)", () =>
       expect(posted(calls).map((call) => [call.kind, call.locale])).toEqual([
         ["terms", "fi"],
         ["privacy", "fi"],
-        ["research", "fi"],
       ]);
     } finally {
       (useLocales as jest.Mock).mockReturnValue([{ languageTag: "en-US" }]);
@@ -872,12 +863,12 @@ describe("SignInScreen: the screens before the bank (#418, ADR-010 §15)", () =>
     async (_how, failing) => {
       const { calls, order } = serve({ consent: failing });
       const view = await renderWithTheme(<SignInScreen />);
-      await agree("Yes, I take part");
+      await agree();
       await throughTheBank(view);
       await waitFor(() => expect(router.replace).toHaveBeenCalledWith("/"));
-      // The terms did not land, so the privacy summary waits; research is tried on its own.
-      expect(order).toEqual(["exchange", "consent terms", "consent research", "replace /"]);
-      expect(posted(calls)).toHaveLength(2);
+      // The terms did not land, so the privacy summary waits.
+      expect(order).toEqual(["exchange", "consent terms", "replace /"]);
+      expect(posted(calls)).toHaveLength(1);
       expect(currentSession()?.sessionId).toBe(tokens.sessionId);
       expect(screen.queryByText("Something went wrong. Try again.")).toBeNull();
       // Not remembered: the next sign-in on this phone asks again, as the welcome step does now.
@@ -894,7 +885,7 @@ describe("SignInScreen: the screens before the bank (#418, ADR-010 §15)", () =>
           : consentsAnswer(),
     });
     const view = await renderWithTheme(<SignInScreen />);
-    await agree("Not now");
+    await agree();
     await throughTheBank(view);
     await waitFor(() => expect(router.replace).toHaveBeenCalledWith("/"));
     expect(order).toEqual(["exchange", "consent terms", "consent privacy", "replace /"]);
@@ -912,14 +903,14 @@ describe("SignInScreen: the screens before the bank (#418, ADR-010 §15)", () =>
       },
     });
     const view = await renderWithTheme(<SignInScreen />);
-    await agree("Yes, I take part");
+    await agree();
     await throughTheBank(view);
     expect(await screen.findByText(/already used or has expired/)).toBeTruthy();
     expect(posted(calls)).toEqual([]);
     // Whoever tries again answers again: nobody inherits a refused attempt's answers.
     await fireEvent.press(await screen.findByRole("button", { name: "Try again" }));
     expect(await screen.findByText("Before you sign in")).toBeTruthy();
-    await agree("Not now");
+    await agree();
     await throughTheBank(view, "d".repeat(43));
     await waitFor(() => expect(router.replace).toHaveBeenCalledWith("/"));
     expect(order).toEqual([
@@ -934,7 +925,7 @@ describe("SignInScreen: the screens before the bank (#418, ADR-010 §15)", () =>
   it("asks again when a second bank attempt starts on answers carried into the first", async () => {
     const openURL = jest.spyOn(Linking, "openURL").mockResolvedValue(true);
     await renderWithTheme(<SignInScreen />);
-    await agree("Yes, I take part");
+    await agree();
     await pressStart(openURL);
     // Back from a browser left without an answer; whoever taps now may be somebody else.
     await fireEvent.press(screen.getByRole("button", { name: "Sign in with your bank" }));
@@ -950,7 +941,7 @@ describe("SignInScreen: the screens before the bank (#418, ADR-010 §15)", () =>
       return { remove: jest.fn() } as never;
     });
     await renderWithTheme(<SignInScreen />);
-    await agree("Yes, I take part");
+    await agree();
     await act(async () => {
       for (const listener of listeners) listener("inactive");
     });
@@ -966,7 +957,7 @@ describe("SignInScreen: the screens before the bank (#418, ADR-010 §15)", () =>
     const openURL = jest.spyOn(Linking, "openURL").mockResolvedValue(true);
     await renderWithTheme(<SignInScreen />);
     const now = Date.now();
-    await agree("Not now");
+    await agree();
     jest.spyOn(Date, "now").mockReturnValue(now + 11 * 60 * 1000);
     await fireEvent.press(screen.getByRole("button", { name: "Sign in with your bank" }));
     expect(await screen.findByText("Before you sign in")).toBeTruthy();
@@ -976,7 +967,7 @@ describe("SignInScreen: the screens before the bank (#418, ADR-010 §15)", () =>
   it("posts nothing for an exchange of another attempt than the one the answers went with", async () => {
     const { calls } = serve();
     const view = await renderWithTheme(<SignInScreen />);
-    await agree("Yes, I take part");
+    await agree();
     const openURL = jest.spyOn(Linking, "openURL").mockResolvedValue(true);
     await pressStart(openURL);
     // Another attempt's mark, as if started elsewhere since: its code is exchanged, the answers are not its.
@@ -988,7 +979,7 @@ describe("SignInScreen: the screens before the bank (#418, ADR-010 §15)", () =>
 
   it("drops the answers when a refusal comes back through the link", async () => {
     const view = await renderWithTheme(<SignInScreen />);
-    await agree("Yes, I take part");
+    await agree();
     await view.rerender(underProviders(<SignInScreen error="auth_cancelled" />));
     expect(await screen.findByText("Sign-in did not complete")).toBeTruthy();
     await fireEvent.press(await screen.findByRole("button", { name: "Try again" }));
@@ -1010,7 +1001,7 @@ describe("SignInScreen: the screens before the bank (#418, ADR-010 §15)", () =>
       expect(await screen.findByRole("heading", { name: "Before you sign in" })).toBeTruthy();
       expect(openURL).not.toHaveBeenCalled();
       // Answered, the bank is one press away, with the refusal put behind.
-      await agree("Not now");
+      await agree();
       expect(screen.queryByText("Sign-in did not complete")).toBeNull();
       await pressStart(openURL);
     },

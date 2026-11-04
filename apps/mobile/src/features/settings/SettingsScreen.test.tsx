@@ -68,7 +68,7 @@ const press = (element: ReturnType<typeof screen.getByRole>) =>
 
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
-/** Research given for the app's wording; the sensitive answers' wording newer than the app's. */
+/** A research yes from before #545, which no row says; the sensitive answers' wording newer than the app's. */
 const consentsAnswer = {
   consents: [
     {
@@ -170,7 +170,7 @@ describe("the settings screen", () => {
     expect(screen.queryByRole("button", { name: "Logging out" })).toBeNull();
     expect(screen.queryByRole("button", { name: "A copy of your data" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Lock" })).toBeNull();
-    expect(screen.queryByRole("button", { name: "Research" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Sensitive answers" })).toBeNull();
     expect(screen.queryByRole("button", { name: "E-mail" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Ways to reach you" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Notifications" })).toBeNull();
@@ -214,7 +214,6 @@ describe("the settings screen", () => {
       "Ways to reach you",
       "Privacy and security",
       "Lock",
-      "Research",
       "Sensitive answers",
       "A copy of your data",
       "Community",
@@ -326,7 +325,6 @@ describe("the settings screen", () => {
       ["E-mail", () => screen.queryByLabelText("E-mail address")],
       ["Ways to reach you", () => screen.queryByLabelText("Your Instagram username")],
       ["Lock", () => screen.queryByRole("button", { name: "Set a passcode" })],
-      ["Research", () => screen.queryByRole("switch", { name: "Take part in research" })],
       [
         "Sensitive answers",
         () => screen.queryByRole("switch", { name: "Store my sensitive answers" }),
@@ -502,40 +500,79 @@ describe("the settings screen", () => {
     expect(row("Kieli")).toBeTruthy();
   });
 
-  it("says whether each consent is on, or that the app needs an update to change it", async () => {
+  it("says that the app needs an update to change a consent of a newer wording", async () => {
     await saveSession(tokens);
     await renderWithTheme(<SettingsScreen />);
     await screen.findByRole("button", { name: "Your account" });
-    expect(row("Research").props.accessibilityValue).toEqual({ text: "On, closed" });
-    expect(row("Research").props.accessibilityHint).toBeUndefined();
     expect(row("Sensitive answers").props.accessibilityValue).toEqual({
       text: "Update the app to change it, closed",
     });
+    expect(row("Sensitive answers").props.accessibilityHint).toBeUndefined();
   });
 
-  it("says a consent's new state on its row as soon as the switch under it stores it (#511)", async () => {
-    let research: unknown[] = consentsAnswer.consents;
+  it("says a consent's state on its row, and the new one as soon as the switch under it stores it (#511)", async () => {
+    const given = {
+      kind: "special_category",
+      version: CONSENT_VERSIONS.special_category,
+      locale: "en",
+      givenAt: "2026-09-26T10:00:00.000Z",
+      withdrawnAt: null as string | null,
+    };
+    const currentVersions = {
+      ...consentsAnswer.currentVersions,
+      special_category: CONSENT_VERSIONS.special_category,
+    };
+    let consents = [given];
     globalThis.fetch = jest.fn(async (input: Request | string) => {
       const request = input instanceof Request ? input : new Request(input);
       const url = new URL(request.url);
-      if (request.method === "DELETE" && url.pathname === "/consents/research") {
-        research = [{ ...consentsAnswer.consents[0], withdrawnAt: "2026-10-29T10:00:00.000Z" }];
+      if (request.method === "DELETE" && url.pathname === "/consents/special_category") {
+        consents = [{ ...given, withdrawnAt: "2026-10-29T10:00:00.000Z" }];
       }
-      if (url.pathname.startsWith("/consents"))
-        return json({ ...consentsAnswer, consents: research });
+      if (url.pathname.startsWith("/consents")) return json({ consents, currentVersions });
       return json({ error: { code: "not_found", message: "no", requestId: "r" } }, 404);
     }) as unknown as typeof fetch;
     await saveSession(tokens);
     await renderWithTheme(<SettingsScreen />);
     await screen.findByRole("button", { name: "Your account" });
-    await press(row("Research"));
-    await press(await screen.findByRole("switch", { name: "Take part in research" }));
+    expect(row("Sensitive answers").props.accessibilityValue).toEqual({ text: "On, closed" });
+    await press(row("Sensitive answers"));
+    await press(await screen.findByRole("switch", { name: "Store my sensitive answers" }));
     await waitFor(() =>
-      expect(row("Research").props.accessibilityValue).toEqual({ text: "Off, open" }),
+      expect(row("Sensitive answers").props.accessibilityValue).toEqual({ text: "Off, open" }),
     );
     expect(
-      screen.getByRole("switch", { name: "Take part in research" }).props.accessibilityState,
+      screen.getByRole("switch", { name: "Store my sensitive answers" }).props.accessibilityState,
     ).toMatchObject({ checked: false });
+  });
+
+  it("Settings has no research switch, whatever the account said before", async () => {
+    const nothingOfResearch = () => {
+      expect(JSON.stringify(screen.toJSON())).not.toMatch(/research/i);
+    };
+    await saveSession(tokens);
+    // The list's rows closed, then the one that holds a consent open: the account said yes
+    // before #545 in this answer, and in the next it never answered.
+    for (const consents of [consentsAnswer.consents, []]) {
+      const written: string[] = [];
+      globalThis.fetch = jest.fn(async (input: Request | string) => {
+        const request = input instanceof Request ? input : new Request(input);
+        const url = new URL(request.url);
+        if (request.method !== "GET") written.push(`${request.method} ${url.pathname}`);
+        if (url.pathname === "/consents") return json({ ...consentsAnswer, consents });
+        return json({ error: { code: "not_found", message: "no", requestId: "r" } }, 404);
+      }) as unknown as typeof fetch;
+      rememberOpenRow(null, null);
+      const view = await renderWithTheme(<SettingsScreen />);
+      await screen.findByRole("button", { name: "Your account" });
+      nothingOfResearch();
+      await press(row("Sensitive answers"));
+      await screen.findByRole("switch", { name: "Store my sensitive answers" });
+      nothingOfResearch();
+      // Reading the list gives nothing and withdraws nothing.
+      expect(written).toEqual([]);
+      await view.unmount();
+    }
   });
 
   it("says what the e-mail, the contacts, the notifications and the invitations hold, as their rows' values (#511)", async () => {
@@ -819,7 +856,6 @@ describe("the settings screen", () => {
     await saveSession(tokens);
     await renderWithTheme(<SettingsScreen />);
     await screen.findByRole("button", { name: "Your account" });
-    expect(row("Research").props.accessibilityValue).toEqual({ text: "Off, closed" });
     expect(row("Sensitive answers").props.accessibilityValue).toEqual({ text: "Off, closed" });
   });
 
@@ -830,13 +866,10 @@ describe("the settings screen", () => {
     await saveSession(tokens);
     await renderWithTheme(<SettingsScreen />);
     await screen.findByRole("button", { name: "Your account" });
-    expect(row("Research").props.accessibilityValue?.text).toBe("closed");
     expect(row("Sensitive answers").props.accessibilityValue?.text).toBe("closed");
-    // Scoped to the consents' rows: the lock's row says its own state beside them.
-    for (const name of ["Research", "Sensitive answers"]) {
-      expect(within(row(name)).queryByText("On")).toBeNull();
-      expect(within(row(name)).queryByText("Off")).toBeNull();
-    }
+    // Scoped to the consent's row: the lock's row says its own state beside it.
+    expect(within(row("Sensitive answers")).queryByText("On")).toBeNull();
+    expect(within(row("Sensitive answers")).queryByText("Off")).toBeNull();
   });
 
   it("names the version alone, never the build's commit, and a question mark when the build names none", async () => {

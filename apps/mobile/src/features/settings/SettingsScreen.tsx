@@ -1,5 +1,4 @@
 import { LOCALE_NAMES } from "@kuutti/i18n";
-import type { WithdrawableConsentKind } from "@kuutti/schema";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import CircleAlert from "lucide-react-native/icons/circle-alert";
 import { createContext, type ReactNode, useCallback, useContext, useState } from "react";
@@ -46,7 +45,6 @@ import { ThemeChoices } from "./ThemeChoices";
 
 /** The title of a consent's row (#287): the settings' own words, in every language. */
 const CONSENT_TITLE = {
-  research: "settings.research.title",
   special_category: "settings.sensitive.title",
 } as const;
 
@@ -197,7 +195,7 @@ export function SettingsScreen() {
         : state === "outdated"
           ? t("settings.state.outdated")
           : undefined;
-  const consentRow = (kind: WithdrawableConsentKind): Row => {
+  const consentRow = (kind: keyof typeof CONSENT_TITLE): Row => {
     const words = consentWords(consents.states[kind]);
     return {
       ...holding(kind, <ConsentSwitch kind={kind} onStored={consents.stored} />),
@@ -295,9 +293,9 @@ export function SettingsScreen() {
                     value: lockWords,
                   },
                 ]),
-                // The two withdrawable consents, each saying whether it is on; nothing signed out.
+                // The consent saying whether it is on; nothing signed out. Research has no row
+                // until there is a researcher (#545): the shortcut in ConsentSwitches.tsx.
                 ...only(signedIn, [
-                  consentRow("research"),
                   consentRow("special_category"),
                   {
                     ...holding("export", <ExportData />),
