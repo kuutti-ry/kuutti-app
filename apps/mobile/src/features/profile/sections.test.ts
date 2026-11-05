@@ -4,8 +4,8 @@ import {
   LISTED_SECTIONS,
   PROFILE_SECTIONS,
   type SectionItem,
+  sectionHintKey,
   sectionOf,
-  sectionSummaryKey,
   sectionTitleKey,
 } from "./sections";
 
@@ -55,14 +55,29 @@ describe("sectionTitleKey", () => {
   });
 
   it.each(["en", "fi", "sv"] as const)(
-    "has words in %s for every title, and every row's summary",
+    "has words in %s for every title, and every row's hint",
     (locale) => {
       const t = typedT(createI18n({ locale }));
       const keys = [
         ...PROFILE_SECTIONS.map(({ id }) => sectionTitleKey(id)),
-        ...LISTED_SECTIONS.map(({ id }) => sectionSummaryKey(id)),
+        ...LISTED_SECTIONS.flatMap(({ id }) => sectionHintKey(id) ?? []),
       ];
       for (const key of keys) expect(t(key)).not.toBe(key);
     },
   );
+});
+
+describe("sectionHintKey", () => {
+  it("names what a section holds for a screen reader, each by its own words (#581)", () => {
+    const hints = LISTED_SECTIONS.map(({ id }) => [id, sectionHintKey(id)]);
+    expect(hints).toEqual([
+      ["basics", "profile.section.basics.summary"],
+      ["prompts", undefined],
+      ["relationship", "profile.section.relationship.summary"],
+      ["work", "profile.section.work.summary"],
+      ["lifestyle", "profile.section.lifestyle.summary"],
+      ["hobbies", "profile.section.hobbies.summary"],
+      ["beliefs", "profile.section.beliefs.summary"],
+    ]);
+  });
 });

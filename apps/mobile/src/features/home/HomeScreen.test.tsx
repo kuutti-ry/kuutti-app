@@ -132,13 +132,13 @@ describe("HomeScreen", () => {
     expect(screen.queryByText("People on Kuutti")).toBeNull();
   });
 
-  it("leaves the photos, the later questions and the deal-breakers to the profile, which holds them (#239)", async () => {
+  it("leaves the photos, the later questions and what one seeks to the profile, which holds them (#239, ADR-062 §11)", async () => {
     await renderWithTheme(<HomeScreen />);
     expect(await screen.findByRole("button", { name: "Your profile" })).toBeTruthy();
     for (const name of [
       "Your photos",
       "Fill in the rest when you have a moment",
-      "Your deal-breakers",
+      "What you seek",
     ]) {
       expect(screen.queryByRole("button", { name })).toBeNull();
     }

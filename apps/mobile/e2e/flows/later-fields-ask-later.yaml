@@ -2,7 +2,8 @@
 # (#239) opens the first field not yet answered and walks the unanswered ones in the
 # sheet's order, one question per screen, each optional; "Ask me later" moves
 # on and writes nothing, so the count of answered fields stays. After the
-# last field comes the way to stay in touch (the e-mail) and the deal-breakers. Sanna
+# last field comes the way to stay in touch (the e-mail), which no longer leads
+# to the deal-breakers: they are What you seek's (#581). Sanna
 # has answered ten of the sixteen fields, but her smoking screen is open
 # while other nicotine is unanswered (#239), so nine screens are done; read
 # only.
@@ -25,9 +26,14 @@ name: Fill in the rest walks the unanswered fields in order, and Ask me later wr
     visible: "When you have a moment|Kun sinulla on hetki|När du har en stund"
     timeout: 15000
 - assertVisible: "9 of 16 answered|9 / 16 vastattu|9 av 16 besvarade"
-- assertVisible: "One question at a time, each optional\\..*|Yksi kysymys kerrallaan, jokainen vapaaehtoinen\\..*|En fråga i taget, var och en frivillig\\..*"
-# Her smoking is answered; other nicotine, asked with it, is not.
-- assertVisible: "Other nicotine|Muu nikotiini|Annat nikotin"
+# The first question says the one thing the screen cannot: the card (#581).
+- assertVisible: "Every answer is on your card only when you give it\\.|Jokainen vastaus näkyy kortillasi vain, jos annat sen\\.|Varje svar syns på ditt kort bara om du ger det\\."
+# Her smoking is answered; other nicotine, asked with it, is not, under smoking's whole-width rows.
+- scrollUntilVisible:
+    element: "Other nicotine|Muu nikotiini|Annat nikotin"
+    direction: DOWN
+    centerElement: true
+    timeout: 60000
 - scrollUntilVisible:
     element: "Ask me later|Kysy myöhemmin|Fråga mig senare"
     direction: DOWN
@@ -69,7 +75,7 @@ name: Fill in the rest walks the unanswered fields in order, and Ask me later wr
 - extendedWaitUntil:
     visible: "A way to stay in touch|Tapa pitää yhteyttä|Ett sätt att hålla kontakten"
     timeout: 15000
-- assertVisible: "Your deal-breakers|Ehdottomat rajasi|Dina absoluta gränser"
+- assertNotVisible: "Your deal-breakers|Ehdottomat rajasi|Dina absoluta gränser"
 - openLink: kuutti://profile/later/drugsAttitude
 - extendedWaitUntil:
     visible: "9 of 16 answered|9 / 16 vastattu|9 av 16 besvarade"

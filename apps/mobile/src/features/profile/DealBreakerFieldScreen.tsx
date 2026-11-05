@@ -3,15 +3,15 @@ import {
   type DealBreakersResponse,
   DISTANCE_FILTER_BANDS,
   dealBreakerOptions,
-  LATER_FIELD_ORDER,
   PROFILE_FIELDS,
 } from "@kuutti/schema";
 import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ScrollView, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { Choice } from "@/components/Choice";
 import { LoadFailed } from "@/components/LoadFailed";
-import { Notice } from "@/components/Notice";
+import { Notice, sayAloud } from "@/components/Notice";
 import { ScreenHeader } from "@/components/ScreenHeader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,12 +22,11 @@ import { useT } from "@/lib/locale";
 import { useHapticTap } from "@/theme/haptics";
 import { ConfirmLeaveDialog } from "./ConfirmLeave";
 import { type DealBreakerFilter, fetchDealBreakers, saveDealBreaker } from "./client";
-import { DEAL_BREAKERS_PATH, dealBreakerPath, isOpenToFilter } from "./DealBreakerRows";
+import { dealBreakerPath, isOpenToFilter, ownAnswerPath } from "./DealBreakerRows";
 import { profileErrorText } from "./errorText";
-import { Chip, SEARCHABLE_FROM, visibleOptions } from "./FieldEditor";
+import { Chip, ROWS_UP_TO, SEARCHABLE_FROM, visibleOptions } from "./FieldEditor";
 import { fieldLabelKey, filterOptionKey } from "./keys";
-import { laterAnswerPath } from "./later/LaterFieldScreen";
-import { sectionAnswerPath, sectionOf } from "./sections";
+import { SEEK_PATH } from "./seek/SeekScreen";
 import { type ProfileNotice, useProfile } from "./useProfile";
 import { useRefusedDraft, useSaveOnLeave } from "./useSaveOnLeave";
 
@@ -72,14 +71,17 @@ const shownFirstOf = (field: DealBreakerField): number | undefined => {
 /**
  * One deal-breaker on a screen of its own (#551), saved on leaving as What you
  * seek's other screens are. Everyone comes first, which is having none, then
- * the answers that are fine: taking back the last one returns to Everyone, so
- * no filter can stand empty and no switch turns one on. The disclose-to-filter
- * rule (#149, TD-16) says itself here: with the own answer missing, a new filter
- * is one line and the way to that answer, which comes back here; a filter
- * already set is paused, its answers drawn read-only, since the API refuses a
- * change to it, and Everyone still takes it off. The distance asks nothing of
- * the kind, since everybody has a home (ADR-061 §7). What the answer leaves is
- * never counted (#502).
+ * the answers that are fine, as whole-width rows unless the list is long (#581):
+ * taking back the last one returns to Everyone, which fills by itself and is
+ * said to a screen reader, so no filter can stand empty and no switch turns one
+ * on. The disclose-to-filter rule (#149, TD-16) says itself here: a filter
+ * already set whose own answer is missing is paused, its answers drawn
+ * read-only, since the API refuses a change to it, with the way to that answer,
+ * which comes back here. Everyone still takes it off, and then the line says a
+ * new filter asks for that answer first, as it does for a typed address: a
+ * row with no filter opens the question itself (DealBreakerRows). The distance
+ * asks nothing of the kind, since everybody has a home (ADR-061 §7). What the
+ * answer leaves is never counted (#502).
  */
 export function DealBreakerFieldScreen({ field: key }: { field: string }) {
   const { t } = useT();
@@ -96,13 +98,12 @@ export function DealBreakerFieldScreen({ field: key }: { field: string }) {
   const [search, setSearch] = useState("");
   // An option once pressed stays in view on this visit, accepted or not, as in the field editor (#239).
   const [seen, setSeen] = useState<readonly string[]>([]);
-  const [said, setSaid] = useState<{ words: string; refused: boolean; answer: number } | null>(
-    null,
-  );
+  // How many times an answer was pressed past the limit: each is said, and any other choice ends them.
+  const [refused, setRefused] = useState(0);
 
   // Anything that is not a deal-breaker goes to the list: a typed address, an old link.
   useEffect(() => {
-    if (!field) router.replace(DEAL_BREAKERS_PATH);
+    if (!field) router.replace(SEEK_PATH);
   }, [field, router]);
 
   const load = useCallback(async () => {
@@ -185,17 +186,15 @@ export function DealBreakerFieldScreen({ field: key }: { field: string }) {
   const options = dealBreakerOptions(field);
   const change = (next: Partial<DealBreakerFilter>) =>
     setDraft({ accept, includeUnknown, ...next });
-  const say = (words: string, refused: boolean) =>
-    setSaid((was) => ({ words, refused, answer: (was?.answer ?? 0) + 1 }));
   const choose = (option: string) => {
     tap();
     const chosen = isChosen(field, option, accept);
     // Only a new field counts against the limit, as on the API: one stored may change, and come back after Everyone.
     if (!chosen && !stored && response && response.dealBreakers.length >= response.max) {
-      say(t("profile.dealBreakers.limit", { max: response.max }), true);
+      setRefused((times) => times + 1);
       return;
     }
-    setSaid(null);
+    setRefused(0);
     setSeen((was) => [...was, option]);
     const next = takesOne(field)
       ? chosen
@@ -204,9 +203,30 @@ export function DealBreakerFieldScreen({ field: key }: { field: string }) {
       : chosen
         ? accept.filter((o) => o !== option)
         : [...accept, option];
-    if (next.length === 0) say(t("profile.dealBreakers.everyoneAgain"), false);
+    if (next.length === 0) sayAloud(t("profile.dealBreakers.everyoneAgain"));
     change({ accept: next });
   };
+  // A short list stands as whole-width rows (FieldEditor's ROWS_UP_TO), the languages as chips.
+  const rows = options.length <= ROWS_UP_TO;
+  const drawn = (
+    id: string,
+    label: string,
+    chosen: boolean,
+    disabled: boolean,
+    onPress: () => void,
+  ) =>
+    rows ? (
+      <Choice
+        key={id}
+        label={label}
+        chosen={chosen}
+        several={!takesOne(field)}
+        disabled={disabled}
+        onPress={onPress}
+      />
+    ) : (
+      <Chip key={id} label={label} selected={chosen} disabled={disabled} onPress={onPress} />
+    );
 
   return (
     <SafeAreaView className="flex-1 bg-background">
@@ -219,8 +239,6 @@ export function DealBreakerFieldScreen({ field: key }: { field: string }) {
         contentContainerClassName="flex-grow gap-6 p-6"
         keyboardShouldPersistTaps="handled"
       >
-        <Text>{t("profile.dealBreakers.field.explain")}</Text>
-
         {/* The disclose-to-filter rule, at the moment it matters: the field's own screen is one tap away. */}
         {!answered && field !== "distance" && (
           <View className="gap-2">
@@ -229,16 +247,7 @@ export function DealBreakerFieldScreen({ field: key }: { field: string }) {
               variant="outline"
               onPress={() => {
                 tap();
-                // A field of the later screens opens its own; the rest (monogamy) is
-                // answered in the section that holds it (10/10/2026: "Answer it" on
-                // relationship structure opened the first unanswered later field
-                // instead; #239: not the list again, on top of the one below). Either
-                // way the answer comes back here (#542).
-                router.push(
-                  (LATER_FIELD_ORDER as readonly string[]).includes(field)
-                    ? laterAnswerPath(field)
-                    : sectionAnswerPath(sectionOf(field)),
-                );
+                router.push(ownAnswerPath(field));
               }}
             >
               {t("profile.dealBreakers.answer")}
@@ -258,35 +267,39 @@ export function DealBreakerFieldScreen({ field: key }: { field: string }) {
                 onChangeText={setSearch}
               />
             )}
-            <View className="flex-row flex-wrap gap-2">
-              <Chip
-                label={t("profile.dealBreakers.everyone")}
-                selected={!on}
-                onPress={() => {
-                  tap();
-                  // Paused, the answers go and the line above them changes, with nothing left in focus.
-                  if (on && !answered) say(t("profile.dealBreakers.everyoneAgain"), false);
-                  else setSaid(null);
-                  change({ accept: [] });
-                }}
-              />
+            <View
+              accessibilityRole={rows && takesOne(field) ? "radiogroup" : undefined}
+              accessibilityLabel={
+                rows && takesOne(field) ? t("profile.dealBreakers.accept") : undefined
+              }
+              className={rows ? "gap-2" : "flex-row flex-wrap gap-2"}
+            >
+              {drawn("everyone", t("profile.dealBreakers.everyone"), !on, false, () => {
+                tap();
+                // Paused, the answers go and the line above them changes, with nothing left in focus.
+                if (on && !answered) sayAloud(t("profile.dealBreakers.everyoneAgain"));
+                setRefused(0);
+                change({ accept: [] });
+              })}
               {/* Paused, only what stands: every answer drawn alike read-only would not say which. */}
               {(answered
                 ? visibleOptions(options, shownFirstOf(field), [...accept, ...seen], search, textOf)
                 : options.filter((option) => isChosen(field, option, accept))
-              ).map((option) => (
-                <Chip
-                  key={option}
-                  label={textOf(option)}
-                  selected={isChosen(field, option, accept)}
-                  disabled={!answered}
-                  onPress={() => choose(option)}
-                />
-              ))}
+              ).map((option) =>
+                drawn(option, textOf(option), isChosen(field, option, accept), !answered, () =>
+                  choose(option),
+                ),
+              )}
             </View>
           </View>
         )}
-        {said && <Notice words={said.words} refused={said.refused} answer={said.answer} />}
+        {refused > 0 && response && (
+          <Notice
+            words={t("profile.dealBreakers.limit", { max: response.max })}
+            refused
+            answer={refused}
+          />
+        )}
 
         {on && field !== "distance" && (
           <View className="flex-row items-center justify-between gap-3">

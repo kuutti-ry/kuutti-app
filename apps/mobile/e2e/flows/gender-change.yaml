@@ -19,30 +19,33 @@ name: The gender changes on its own screen, offers a word after non-binary, and 
 - waitForAnimationToEnd
 - tapOn: "(Gender|Sukupuoli|Kön)(, .*)?"
 - extendedWaitUntil:
-    visible: "This is on your card.*|Tämä näkyy kortillasi.*|Det här visas på ditt kort.*"
+    visible: "This is on your card\\. After a change, the next one is possible only after a waiting time\\.|Tämä näkyy kortillasi\\. Muutoksen jälkeen seuraava on mahdollinen vasta odotusajan jälkeen\\.|Det här visas på ditt kort\\. Efter en ändring är nästa möjlig först efter en väntetid\\."
     timeout: 15000
 - waitForAnimationToEnd
-- assertVisible:
-    text: "Man|Mies"
-    selected: true
+- assertVisible: "✓ Man|✓ Mies"
 - assertNotVisible: "A word for it, if you like|Sana sille, jos haluat|Ett ord för det, om du vill"
 
-# Non-binary offers a word for it, and going back keeps both.
+# Non-binary offers a word for it, seven whole-width rows under the three of the
+# gender, and going back keeps both.
 - tapOn: "Non-binary|Muunsukupuolinen|Icke-binär"
 - extendedWaitUntil:
     visible: "A word for it, if you like|Sana sille, jos haluat|Ett ord för det, om du vill"
     timeout: 15000
+- scrollUntilVisible:
+    element: "Genderqueer"
+    direction: DOWN
+    centerElement: true
+    timeout: 60000
 - tapOn: "Genderqueer"
-- assertVisible:
-    text: "Genderqueer"
-    selected: true
+- assertVisible: "✓ Genderqueer"
 - tapOn: "Back to your profile|Takaisin profiiliisi|Tillbaka till din profil"
 - extendedWaitUntil:
     visible: "(The basics|Perustiedot|Grunderna)(, .*)?"
     timeout: 15000
 - waitForAnimationToEnd
 
-# The word is the profile's now: Basics holds it, where it can be changed.
+# The word is the profile's now: Basics holds it, where it can be changed. A
+# section of several fields, so a chip, which says it is chosen as selected.
 - tapOn: "(The basics|Perustiedot|Grunderna)(, .*)?"
 - extendedWaitUntil:
     visible:
@@ -62,12 +65,8 @@ name: The gender changes on its own screen, offers a word after non-binary, and 
     visible: "You changed this recently\\. .*|Muutit tätä äskettäin\\. .*|Du ändrade det här nyligen\\. .*"
     timeout: 15000
 - waitForAnimationToEnd
-- assertVisible:
-    text: "Non-binary|Muunsukupuolinen|Icke-binär"
-    selected: true
+- assertVisible: "✓ Non-binary|✓ Muunsukupuolinen|✓ Icke-binär"
 - assertNotVisible: "A word for it, if you like|Sana sille, jos haluat|Ett ord för det, om du vill"
 - tapOn: "Woman|Nainen|Kvinna"
-- assertVisible:
-    text: "Non-binary|Muunsukupuolinen|Icke-binär"
-    selected: true
+- assertVisible: "✓ Non-binary|✓ Muunsukupuolinen|✓ Icke-binär"
 - assertVisible: "You changed this recently\\. .*|Muutit tätä äskettäin\\. .*|Du ändrade det här nyligen\\. .*"

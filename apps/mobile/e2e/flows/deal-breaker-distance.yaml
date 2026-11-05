@@ -9,34 +9,22 @@ name: Distance takes a band of its four buttons, kept by going back, and Everyon
 - runFlow: ../common/sign-in.yaml
 - openLink: kuutti://profile/deal-breakers/distance
 - extendedWaitUntil:
-    visible:
-      text: "Everyone|Kaikki|Alla"
-      selected: true
+    visible: "✓ Everyone|✓ Kaikki|✓ Alla"
     timeout: 15000
 - waitForAnimationToEnd
 - assertVisible: "Distance|Etäisyys|Avstånd"
-- assertVisible:
-    text: "Nearby|Lähellä|I närheten"
-    selected: false
+- assertVisible: "Nearby|Lähellä|I närheten"
 - assertNotVisible: "Far|Kauempana|Längre bort"
 - assertNotVisible: "Also people who did not answer|Myös ne, jotka eivät vastanneet|Även de som inte svarade"
 
 # One button at a time: the second replaces the first, and nothing asks after
 # those who did not answer, since nobody lacks a home.
 - tapOn: "Close|Melko lähellä|Ganska nära"
-- assertVisible:
-    text: "Close|Melko lähellä|Ganska nära"
-    selected: true
+- assertVisible: "✓ Close|✓ Melko lähellä|✓ Ganska nära"
 - tapOn: "Around|Samoilla seuduilla|I trakten"
-- assertVisible:
-    text: "Around|Samoilla seuduilla|I trakten"
-    selected: true
-- assertVisible:
-    text: "Close|Melko lähellä|Ganska nära"
-    selected: false
-- assertVisible:
-    text: "Everyone|Kaikki|Alla"
-    selected: false
+- assertVisible: "✓ Around|✓ Samoilla seuduilla|✓ I trakten"
+- assertVisible: "Close|Melko lähellä|Ganska nära"
+- assertVisible: "Everyone|Kaikki|Alla"
 - assertNotVisible: "Also people who did not answer|Myös ne, jotka eivät vastanneet|Även de som inte svarade"
 
 # Kept by going back: it is there when the screen opens again.
@@ -46,24 +34,18 @@ name: Distance takes a band of its four buttons, kept by going back, and Everyon
     timeout: 15000
 - openLink: kuutti://profile/deal-breakers/distance
 - extendedWaitUntil:
-    visible:
-      text: "Around|Samoilla seuduilla|I trakten"
-      selected: true
+    visible: "✓ Around|✓ Samoilla seuduilla|✓ I trakten"
     timeout: 15000
 - waitForAnimationToEnd
 
 # Everyone takes it off, and going back, she is back as she began.
 - tapOn: "Everyone|Kaikki|Alla"
-- assertVisible:
-    text: "Everyone|Kaikki|Alla"
-    selected: true
+- assertVisible: "✓ Everyone|✓ Kaikki|✓ Alla"
 - tapOn: "Back|Takaisin|Tillbaka"
 - extendedWaitUntil:
     notVisible: "Fine with me|Sopii minulle|Okej för mig"
     timeout: 15000
 - openLink: kuutti://profile/deal-breakers/distance
 - extendedWaitUntil:
-    visible:
-      text: "Everyone|Kaikki|Alla"
-      selected: true
+    visible: "✓ Everyone|✓ Kaikki|✓ Alla"
     timeout: 15000

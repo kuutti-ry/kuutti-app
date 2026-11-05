@@ -1,16 +1,18 @@
-import { BIO_MAX, BIO_MIN_FOR_COMPLETENESS, BIO_PRESETS, type ProfileUpdate } from "@kuutti/schema";
+import { BIO_MAX, BIO_PRESETS, type ProfileUpdate } from "@kuutti/schema";
 import { View } from "react-native";
+import { Choice } from "@/components/Choice";
 import { Input } from "@/components/ui/input";
 import { Text } from "@/components/ui/text";
 import { useT } from "@/lib/locale";
 import { useHapticTap } from "@/theme/haptics";
-import { Chip } from "./FieldEditor";
 import { presetKey } from "./keys";
 
 /**
  * The bio, or a ready line in its place (#47): typing clears the line, a line
  * clears the bio. Either counts for completeness (#239), so the basics
- * section and onboarding's step for words of one's own (#146) share it.
+ * section and onboarding's step for words of one's own (#146) share it. A ready
+ * line is a sentence, so each is a whole-width row, which wraps (the maintainer,
+ * 04/11/2026); as chips they ran off the screen.
  */
 export function BioEditor({
   draft,
@@ -39,14 +41,17 @@ export function BioEditor({
           })
         }
       />
-      <Text variant="muted">{t("profile.bio.hint", { min: BIO_MIN_FOR_COMPLETENESS })}</Text>
       <Text variant="small">{t("profile.bio.orPreset")}</Text>
-      <View className="flex-row flex-wrap gap-2">
+      <View
+        accessibilityRole="radiogroup"
+        accessibilityLabel={t("profile.bio.orPreset")}
+        className="gap-2"
+      >
         {BIO_PRESETS.map((preset) => (
-          <Chip
+          <Choice
             key={preset}
             label={t(presetKey(preset))}
-            selected={draft.bioPreset === preset}
+            chosen={draft.bioPreset === preset}
             onPress={() => {
               tap();
               update(

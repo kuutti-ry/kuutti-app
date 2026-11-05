@@ -5,8 +5,6 @@ export { CardPreviewScreen } from "./CardPreviewScreen";
 export { ConfirmLeaveDialog, holdLinkWhileUnsaved, useConfirmLeave } from "./ConfirmLeave";
 export { saveGender, saveHome, savePreferences } from "./client";
 export { DealBreakerFieldScreen } from "./DealBreakerFieldScreen";
-export { DEAL_BREAKERS_PATH } from "./DealBreakerRows";
-export { DealBreakersScreen } from "./DealBreakersScreen";
 export { profileErrorText } from "./errorText";
 export { GenderChips, IdentityLabelChips } from "./gender/GenderChips";
 export { GenderScreen } from "./gender/GenderScreen";

@@ -97,7 +97,7 @@ type LocalAnswers = {
   /**
    * The seeks step started from a stored answer, and only Continue ends it:
    * to the API the consent alone answers the step, which would go with a
-   * change on the chips unsaved.
+   * change of its answer unsaved.
    */
   seeksHeld: boolean;
 };
@@ -543,30 +543,27 @@ export function OnboardingScreen() {
           <View className="gap-4">
             <Text variant="h2">{t("onboarding.age.title")}</Text>
             <Text>{t("onboarding.age.explain", { min: AGE_MIN, max: AGE_MAX })}</Text>
-            <View className="flex-row gap-3">
-              <Stepper
-                className="flex-1"
-                label={t("onboarding.age.youngest")}
-                value={ages.min}
-                shown={t("onboarding.age.years", { years: ages.min })}
-                downLabel={t("onboarding.age.youngestDown")}
-                upLabel={t("onboarding.age.youngestUp")}
-                canDown={ages.min > AGE_MIN}
-                canUp={ages.min < ages.max}
-                onChange={(min) => setAges({ ...ages, min })}
-              />
-              <Stepper
-                className="flex-1"
-                label={t("onboarding.age.oldest")}
-                value={ages.max}
-                shown={t("onboarding.age.years", { years: ages.max })}
-                downLabel={t("onboarding.age.oldestDown")}
-                upLabel={t("onboarding.age.oldestUp")}
-                canDown={ages.max > ages.min}
-                canUp={ages.max < AGE_MAX}
-                onChange={(max) => setAges({ ...ages, max })}
-              />
-            </View>
+            {/* One above the other, as on What you seek: side by side, with the minus and the plus further from the number, they overflow a small phone (#581). */}
+            <Stepper
+              label={t("onboarding.age.youngest")}
+              value={ages.min}
+              shown={t("onboarding.age.years", { years: ages.min })}
+              downLabel={t("onboarding.age.youngestDown")}
+              upLabel={t("onboarding.age.youngestUp")}
+              canDown={ages.min > AGE_MIN}
+              canUp={ages.min < ages.max}
+              onChange={(min) => setAges({ ...ages, min })}
+            />
+            <Stepper
+              label={t("onboarding.age.oldest")}
+              value={ages.max}
+              shown={t("onboarding.age.years", { years: ages.max })}
+              downLabel={t("onboarding.age.oldestDown")}
+              upLabel={t("onboarding.age.oldestUp")}
+              canDown={ages.max > ages.min}
+              canUp={ages.max < AGE_MAX}
+              onChange={(max) => setAges({ ...ages, max })}
+            />
             <Button
               disabled={busy}
               onPress={() => {
@@ -594,8 +591,8 @@ export function OnboardingScreen() {
         {/* Local, as the identity label is: an app closed here leaves the town, and the profile's row still offers this. */}
         {current === "homeShown" && homeShown && (
           <View className="gap-4">
-            <Text variant="h2">{t("profile.place.choice")}</Text>
             <PlaceChoice
+              heading="h2"
               home={homeShown}
               busy={busy}
               onChoose={(showArea) => void saveHomeStep({ showArea })}
