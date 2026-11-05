@@ -33,13 +33,17 @@ name: A label chosen after non-binary shows on the card after the gender
 - extendedWaitUntil:
     visible: "A word for it, if you like|Sana sille, jos haluat|Ett ord för det, om du vill"
     timeout: 15000
+# Under the label's seven whole-width rows (#581), near the screen's bottom edge.
+- scrollUntilVisible:
+    element: "Continue|Jatka|Fortsätt"
+    direction: DOWN
+    centerElement: true
+    timeout: 60000
 - assertVisible:
     text: "Continue|Jatka|Fortsätt"
     enabled: false
 - tapOn: "Genderqueer"
-- assertVisible:
-    text: "Genderqueer"
-    selected: true
+- assertVisible: "✓ Genderqueer"
 - tapOn: "Continue|Jatka|Fortsätt"
 - extendedWaitUntil:
     visible: "Whom are you looking for\\?|Ketä etsit\\?|Vem söker du\\?"

@@ -41,7 +41,6 @@ name: Home says how many people are on Kuutti and the gate in words, and the wre
     element: ".*\\d+ percent are looking for everyone.*|.*\\d+ prosenttia etsii kaikkia.*|.*\\d+ procent söker alla.*"
     direction: DOWN
     timeout: 60000
-- assertNotVisible: "Your deal-breakers|Ehdottomat rajasi|Dina absoluta gränser"
 - assertNotVisible: "Fill in the rest when you have a moment|Täydennä loput, kun sinulla on hetki|Fyll i resten när du har en stund"
 
 - openLink: kuutti://tech

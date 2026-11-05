@@ -531,7 +531,6 @@ export function ConversationScreen({ id }: { id: string }) {
   // erasure has its own line, drawn in a live region, which iOS does not have.
   const state = detail?.state;
   const closedHow = detail?.closedHow;
-  // biome-ignore lint/correctness/useExhaustiveDependencies: view is here to run this again after the read that follows a focus.
   useEffect(() => {
     if (state === undefined || acting || !focused.current) return;
     if (state === "closed" && hadComposer.current) {

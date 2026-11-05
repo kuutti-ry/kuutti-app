@@ -46,7 +46,7 @@ name: A photo with a caption reaches the other person, small in the thread and f
     env:
       BUTTON: "Add photo|Lisää kuva|Lägg till foto"
       INDEX: 0
-      COUNT: "Remove photo|Poista kuva|Ta bort foto"
+      LANDED: "Remove photo|Poista kuva|Ta bort foto"
 - assertNotVisible: "Photo attached\\.|Kuva liitetty\\.|Foto bifogat\\."
 # The keyboard stays up (README): Send is above it, on the composer.
 - tapOn: "(Message|Viesti|Meddelande)( .*)?"

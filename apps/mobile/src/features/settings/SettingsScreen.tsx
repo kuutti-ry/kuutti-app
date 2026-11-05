@@ -29,7 +29,6 @@ import { RevealProvider } from "@/lib/reveal";
 import { UnsavedRow } from "@/lib/unsaved";
 import { useHapticTap } from "@/theme/haptics";
 import { useTheme } from "@/theme/ThemeProvider";
-import { SCHEMES } from "./Choice";
 import { DecisionButtonChoices } from "./DecisionButtonChoices";
 import { DeviceActions } from "./DeviceActions";
 import { FeedbackForm } from "./FeedbackForm";
@@ -41,7 +40,7 @@ import { PhotoDescriptionChoices } from "./PhotoDescriptionChoices";
 import { ROW_ICONS } from "./row-icons";
 import { SettingsPage, useReveal } from "./SettingsPage";
 import { SourcePanel } from "./SourcePanel";
-import { ThemeChoices } from "./ThemeChoices";
+import { SCHEMES, ThemeChoices } from "./ThemeChoices";
 
 /** The title of a consent's row (#287): the settings' own words, in every language. */
 const CONSENT_TITLE = {

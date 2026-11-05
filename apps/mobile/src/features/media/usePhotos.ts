@@ -14,8 +14,8 @@ import { pickPrepared } from "./pick";
 
 type PhotosBusy =
   | { kind: "idle" }
+  /** The phone's picker, then the check and the resize on the phone: nothing to say until the upload (#581). */
   | { kind: "picking" }
-  | { kind: "preparing" }
   | { kind: "uploading"; percent: number }
   | { kind: "removing"; id: string }
   | { kind: "appealing"; id: string }
@@ -103,7 +103,7 @@ export function usePhotos() {
   const add = useCallback(async () => {
     update({ busy: { kind: "picking" }, notice: null });
     try {
-      const picked = await pickPrepared(() => update({ busy: { kind: "preparing" } }));
+      const picked = await pickPrepared();
       if (picked.kind === "cancelled") return update({ busy: { kind: "idle" } });
       if (picked.kind === "denied") {
         return update({ busy: { kind: "idle" }, notice: { kind: "permission" } });

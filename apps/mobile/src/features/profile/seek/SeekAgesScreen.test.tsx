@@ -167,9 +167,15 @@ describe("SeekAgesScreen", () => {
     expect(router.back).toHaveBeenCalledTimes(1);
   });
 
-  it("leads with the bounds and says that the answer also decides who sees the person", async () => {
+  it("has no line over the steppers: they stop at the bounds themselves, and the list says the rest (#581)", async () => {
     await opened();
-    expect(screen.getByText("Between 18 and 99. It also decides who sees you.")).toBeTruthy();
+    expect(screen.queryAllByText(/./).map((node) => node.props.children)).toEqual([
+      "What ages?",
+      "Youngest",
+      "25",
+      "Oldest",
+      "40",
+    ]);
   });
 
   it("starts from the stored window, each number under its own name, said as it changes", async () => {
@@ -496,7 +502,6 @@ describe("SeekAgesScreen", () => {
       "fi-FI",
       "Minkä ikäisiä?",
       "Takaisin siihen, mitä etsit",
-      "Väliltä 18–99. Se ratkaisee myös, ketkä näkevät sinut.",
       ["Nuorin", "Vanhin"],
       [
         "Nuorin, vuotta nuorempi",
@@ -509,7 +514,6 @@ describe("SeekAgesScreen", () => {
       "sv-FI",
       "Vilka åldrar?",
       "Tillbaka till vad du söker",
-      "Mellan 18 och 99. Det avgör också vilka som ser dig.",
       ["Yngsta", "Äldsta"],
       [
         "Yngsta, ett år yngre",
@@ -518,12 +522,12 @@ describe("SeekAgesScreen", () => {
         "Äldsta, ett år äldre",
       ],
     ],
-  ])("speaks %s", async (tag, title, back, lead, ends, steps) => {
+  ])("speaks %s", async (tag, title, back, ends, steps) => {
     (useLocales as jest.Mock).mockReturnValue([{ languageTag: tag }]);
     try {
       fakeApi();
       await show(<SeekAgesScreen />);
-      await waitFor(() => expect(screen.getByText(lead)).toBeTruthy());
+      await waitFor(() => expect(button(steps[0] as string)).toBeTruthy());
       expectPinnedHeader(title, back);
       for (const end of ends) expect(screen.getByText(end)).toBeTruthy();
       for (const step of steps) expect(button(step)).toBeTruthy();

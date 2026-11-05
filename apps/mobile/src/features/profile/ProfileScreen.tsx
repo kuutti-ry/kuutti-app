@@ -18,31 +18,23 @@ import { fetchOwnGender } from "./client";
 import { GENDER_PATH } from "./gender/GenderScreen";
 import { completenessText, genderKey, shownPlaceName } from "./keys";
 import { FIRST_LATER_FIELD, laterPath, laterProgress } from "./later/LaterFieldScreen";
-import { type MarkStyle, ProgressMark, progressWords } from "./ProgressMark";
+import { ProgressMark, progressWords } from "./ProgressMark";
 import { isDone, type Progress, photoProgress, sectionProgress } from "./progress";
-import { LISTED_SECTIONS, sectionPath, sectionSummaryKey, sectionTitleKey } from "./sections";
+import { LISTED_SECTIONS, sectionHintKey, sectionPath, sectionTitleKey } from "./sections";
 import { SEEK_PATH } from "./seek/SeekScreen";
 import { useProfile } from "./useProfile";
-
-/**
- * Both marks side by side until the maintainer picks one (#239): a ring on
- * every other row, the count on the rest. The one he keeps stays, and this
- * alternation goes with the other.
- */
-const markStyle = (index: number): MarkStyle => (index % 2 === 0 ? "ring" : "count");
 
 /** A row of the profile's list with how far its part is filled: the mark drawn, the words heard. */
 function filled(
   t: ReturnType<typeof useT>["t"],
   row: Row,
-  index: number,
   progress: Progress | null | undefined,
   words?: string,
 ): Row {
   if (!progress) return row;
   return {
     ...row,
-    mark: <ProgressMark progress={progress} style={markStyle(index)} />,
+    mark: <ProgressMark progress={progress} />,
     value: words ?? progressWords(t, progress),
   };
 }
@@ -85,7 +77,8 @@ function useOwnGenderRow(): [Gender | null, () => void] {
  * while something is missing, #239), then the
  * profile's parts, each with how far it is filled: the photos, the home
  * (ADR-061) and the gender (#552), which are never unfilled and carry their
- * answer instead, the sections (each its own screen that saves on leaving), What you seek
+ * answer instead, the sections (each its own screen that saves on leaving,
+ * and what it holds heard as the row's hint, never drawn, #581), What you seek
  * (#542) and, while a later question is unanswered, the later screens (#148). Nothing is
  * edited here, so there is nothing to save; the list reads the profile and
  * the photos again when a screen hands back, and the marks follow.
@@ -182,10 +175,8 @@ export function ProfileScreen() {
               {
                 key: "photos",
                 title: t("profile.section.photos.title"),
-                summary: t("profile.section.photos.summary"),
                 onPress: open("/photos"),
               },
-              0,
               photos,
               // The photos are approved, not answered: their own words for a screen reader.
               photos && !isDone(photos) ? t("profile.progress.photos", photos) : undefined,
@@ -203,19 +194,19 @@ export function ProfileScreen() {
               value: genderWord,
               onPress: open(GENDER_PATH),
             },
-            ...LISTED_SECTIONS.map((section, index) =>
-              filled(
+            ...LISTED_SECTIONS.map((section) => {
+              const hint = sectionHintKey(section.id);
+              return filled(
                 t,
                 {
                   key: section.id,
                   title: t(sectionTitleKey(section.id)),
-                  summary: t(sectionSummaryKey(section.id)),
+                  hint: hint && t(hint),
                   onPress: open(sectionPath(section.id)),
                 },
-                index + 1,
                 sectionProgress(section, profile.saved),
-              ),
-            ),
+              );
+            }),
           ]}
         />
         <RowGroup
@@ -223,7 +214,6 @@ export function ProfileScreen() {
             {
               key: "seek",
               title: t("profile.seek.title"),
-              summary: t("profile.seek.summary"),
               onPress: open(SEEK_PATH),
             },
             // An invitation only while something is left to ask (#239).

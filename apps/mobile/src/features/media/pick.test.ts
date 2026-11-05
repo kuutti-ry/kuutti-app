@@ -84,26 +84,22 @@ describe("preparing for upload", () => {
 describe("the chain before an upload (#48, #350)", () => {
   afterEach(() => setLocalCheck(null));
 
-  it("picks, checks and resizes, saying when the picture is being prepared", async () => {
+  it("picks, checks and resizes", async () => {
     launch.mockResolvedValueOnce({
       canceled: false,
       assets: [{ uri: "file:///a.heic", width: 4032, height: 3024 }],
     });
-    const preparing = jest.fn();
-    expect(await pickPrepared(preparing)).toEqual({
+    expect(await pickPrepared()).toEqual({
       kind: "picked",
       photo: { uri: "file:///a.heic#resized", width: 1600, height: 1067, mimeType: "image/jpeg" },
     });
-    expect(preparing).toHaveBeenCalledTimes(1);
   });
 
   it("hands back a cancel and a denied library as they came, preparing nothing", async () => {
-    const preparing = jest.fn();
     launch.mockResolvedValueOnce({ canceled: true, assets: null });
-    expect(await pickPrepared(preparing)).toEqual({ kind: "cancelled" });
+    expect(await pickPrepared()).toEqual({ kind: "cancelled" });
     launch.mockRejectedValueOnce(new Error("Missing permission"));
     expect(await pickPrepared()).toEqual({ kind: "denied" });
-    expect(preparing).not.toHaveBeenCalled();
     expect(ImageManipulator.manipulate).not.toHaveBeenCalled();
   });
 

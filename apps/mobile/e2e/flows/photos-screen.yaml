@@ -1,6 +1,8 @@
-# The photos screen (#48, #138): the count against the limit, the first photo
-# the main one, each photo's state in words, the removal as a labelled button;
-# a photo opens full size and back, and removing one asks first. The order is
+# The photos screen (#48, #138): the first photo others can see the main one,
+# a state in words only where a photo waits or was refused, the removal as a
+# labelled button; a photo opens full size and back, and removing one asks first.
+# A photo that is through says nothing, and below the limit the count is said to
+# a screen reader and not drawn (#581), so what the eye has is the tiles. The order is
 # changed by holding a tile and dragging it (#179), which Maestro has no
 # gesture for (a swipe moves at once, a long press does not drag), and the
 # same moves are the tile's accessibility actions, out of its reach too; the
@@ -13,11 +15,13 @@ name: A photo opens full size and back, and removing one asks first
 - runFlow: ../common/sign-in.yaml
 - openLink: kuutti://photos
 - extendedWaitUntil:
-    visible: "5 photos, at most 6|5 kuvaa, enintään 6|5 foton, högst 6"
+    visible: "Main photo|Pääkuva|Huvudfoto"
     timeout: 15000
 - waitForAnimationToEnd
-- assertVisible: "Main photo|Pääkuva|Huvudfoto"
-- assertVisible: "Visible to others|Näkyy muille|Syns för andra"
+- assertVisible: "Hold a photo and drag it to change the order\\. A new photo is checked before anyone else sees it\\.|Vaihda järjestystä pitämällä kuvaa painettuna ja vetämällä se uuteen paikkaan\\. Uusi kuva tarkistetaan, ennen kuin kukaan muu näkee sen\\.|Håll ett foto nedtryckt och dra det för att ändra ordningen\\. Ett nytt foto granskas innan någon annan ser det\\."
+- assertNotVisible: "Visible to others|Näkyy muille|Syns för andra"
+- assertNotVisible: "In review|Tarkistuksessa|Under granskning"
+- assertNotVisible: "5 photos, at most 6|5 kuvaa, enintään 6|5 foton, högst 6"
 
 - tapOn: "Open photo 1|Avaa kuva 1|Öppna foto 1"
 - extendedWaitUntil:
@@ -27,7 +31,7 @@ name: A photo opens full size and back, and removing one asks first
 - tapOn: "Back to your photos|Takaisin kuviisi|Tillbaka till dina foton"
 
 - extendedWaitUntil:
-    visible: "5 photos, at most 6|5 kuvaa, enintään 6|5 foton, högst 6"
+    visible: "Main photo|Pääkuva|Huvudfoto"
     timeout: 15000
 
 # The caption button says its value after its label on Android (the README's
@@ -47,8 +51,11 @@ name: A photo opens full size and back, and removing one asks first
     timeout: 15000
 - tapOn: "No caption|Ei kuvatekstiä|Ingen bildtext"
 - extendedWaitUntil:
-    visible: "Add a caption|Lisää kuvateksti|Lägg till en bildtext"
+    notVisible: "A caption for photo 1|Kuvateksti kuvalle 1|En bildtext för foto 1"
     timeout: 15000
+# The button's own text on Android; iOS reads the button by its label and value,
+# so what it finds there is the value.
+- assertVisible: "Add a caption|Lisää kuvateksti|Lägg till en bildtext|No caption|Ei kuvatekstiä|Ingen bildtext"
 - assertNotVisible: "An old favourite|Vanha suosikki|En gammal favorit"
 
 - tapOn:
@@ -59,4 +66,4 @@ name: A photo opens full size and back, and removing one asks first
     timeout: 15000
 - tapOn: "Keep it|Säilytä|Behåll"
 - assertNotVisible: "Remove this photo\\?|Poistetaanko tämä kuva\\?|Ta bort det här fotot\\?"
-- assertVisible: "5 photos, at most 6|5 kuvaa, enintään 6|5 foton, högst 6"
+- assertVisible: "Open photo 1|Avaa kuva 1|Öppna foto 1"
