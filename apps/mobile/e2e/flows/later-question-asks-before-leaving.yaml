@@ -27,9 +27,10 @@ name: A later question left unsaved asks first, on the arrow and on a link from 
     visible: "Leave without saving\\?|Poistutaanko tallentamatta\\?|Lämna utan att spara\\?"
     timeout: 15000
 - tapOn: "Leave without saving|Poistu tallentamatta|Lämna utan att spara"
-# Home's top: with matching open (ADR-060) the card and the push offer put the profile's button below the fold.
+# Home, by the profile's button under the gate's card: the card of how many
+# people are on Kuutti comes last (#581), and may lie below the fold.
 - extendedWaitUntil:
-    visible: "People on Kuutti|Ihmiset Kuutissa|Människor på Kuutti"
+    visible: "See people|Katso ihmisiä|Se människor"
     timeout: 15000
 
 # Nothing of it is stored: its words without the tick.

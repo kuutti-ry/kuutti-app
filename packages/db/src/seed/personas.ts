@@ -22,8 +22,8 @@ import { checkCharacter } from "@kuutti-ry/tunnistus-oidc/hetu";
  * the report's flow (#351), each pair with a conversation of its own so that
  * no flow changes what another reads; and the round's cast (#379): Iida, as
  * whom the round's flow signs in, and the four people of her round, Henna,
- * Katja, Minna and Riikka, who are cards and nothing more: no flow and no
- * demo signs in as them; and Ritva, What you seek's (#542), whose answers that
+ * Katja, Minna and Riikka, who are cards and nothing more: no demo signs in as them,
+ * and of the flows only `short-pool`, as Riikka; and Ritva, What you seek's (#542), whose answers that
  * flow changes and puts back, which no other flow reads. Every test user of the bed whose code the
  * product's parser accepts is a persona already (docs/vendors/telia.md 1.4),
  * so nobody signs in as them on staging (the maintainer's choices of
@@ -74,7 +74,7 @@ export type DemoPersona = {
   born: FixedBirth | RelativeBirth;
   /** 900 to 999: artificial, not given to a person by the population register. */
   individual: number;
-  /** `cards`: people a round shows and nobody signs in as (#379); off the page's list of names. */
+  /** `cards`: people a round shows, whom a demo does not sign in as (#379); off the page's list of names. */
   group: "walkthrough" | "history" | "ages" | "cards";
   /** What the persona is for, shown under the name. */
   note: string;

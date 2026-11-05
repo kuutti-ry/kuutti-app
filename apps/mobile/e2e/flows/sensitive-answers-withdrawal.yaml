@@ -76,9 +76,10 @@ name: Withdrawing the sensitive-answers consent asks whom one seeks again with t
     timeout: 60000
 - tapOn: "Continue|Jatka|Fortsätt"
 
-# Not the ages: the window stayed. Straight home.
+# Not the ages: the window stayed. Straight home: the gate's sentence, which the
+# profile's screen of the same title does not have.
 - extendedWaitUntil:
-    visible: "People on Kuutti|Ihmiset Kuutissa|Människor på Kuutti"
+    visible: "Matching opens for finished profiles\\. Yours still lacks something\\.|Seuranhaku avautuu valmiille profiileille\\. Sinun profiilistasi puuttuu vielä jotakin\\.|Matchningen öppnar för färdiga profiler\\. I din saknas ännu något\\."
     timeout: 15000
 - assertNotVisible: "What ages\\?|Minkä ikäisiä\\?|Vilka åldrar\\?"
 - openLink: kuutti://settings

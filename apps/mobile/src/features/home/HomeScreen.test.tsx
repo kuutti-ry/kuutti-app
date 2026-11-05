@@ -206,10 +206,87 @@ describe("HomeScreen", () => {
     });
     await renderWithTheme(<HomeScreen />);
     expect(await screen.findByText(heading)).toBeTruthy();
-    const card = screen.getByLabelText("Matching");
+    // The matching card: the least that holds its sentence and See people.
+    let card = screen.getByText("Matching is open for you.");
+    while (within(card).queryByRole("button", { name: "See people" }) === null && card.parent) {
+      card = card.parent;
+    }
+    expect(within(card).queryByText("People on Kuutti")).toBeNull();
     expect(within(card).getByRole("button", { name: "See people" })).toBeTruthy();
     expect(within(card).getByRole("button", { name: "Allow notifications" })).toBeTruthy();
     expect(within(card).getByRole("button", { name: "No thanks" })).toBeTruthy();
+  });
+
+  describe("the order of the screen (#581)", () => {
+    /** Everything the screen draws, in the order it is read. */
+    const said = (node: HostNode | string = screen.toJSON() as HostNode): string[] =>
+      typeof node === "string" ? [node] : (node.children ?? []).flatMap((child) => said(child));
+    const COUNTER = "People on Kuutti";
+    const star = {
+      id: "7a1c1c4e-9a8e-4a0b-9c3a-0c8d1e2f3a01",
+      name: "Katja",
+      age: 44,
+      photo: null,
+    };
+    const warned = {
+      id: "00000000-0000-4000-8000-000000000001",
+      kind: "warning",
+      at: "2026-10-18T09:00:00.000Z",
+      readAt: null,
+      reason: "harassment",
+    };
+    const answering = (state: GateResponse["state"], notices: unknown[] = []) =>
+      (globalThis.fetch as jest.Mock).mockImplementation(async (input: Request | string) => {
+        const url = new URL(input instanceof Request ? input.url : input);
+        if (url.pathname === "/ponds/counter") return json(counter);
+        if (url.pathname === "/gate") return json({ state });
+        if (url.pathname === "/stars") return json({ items: [star] });
+        if (url.pathname === "/notices") return json({ notices });
+        return json({ error: { code: "not_found" } }, 404);
+      });
+
+    it("has what there is to do first and how many are on Kuutti last, once matching is open", async () => {
+      answering("open");
+      await renderWithTheme(<HomeScreen />);
+      await screen.findByRole("button", { name: "Starred" });
+      await screen.findByText(COUNTER);
+      // Each way on before the counter, the offer of notifications inside the gate card.
+      const order = [
+        "Matching is open for you.",
+        "See people",
+        "Starred",
+        "Shall Kuutti tell you?",
+        "Your profile",
+        "Conversations",
+        COUNTER,
+      ];
+      expect(said().filter((word) => order.includes(word))).toEqual(order);
+    });
+
+    it.each([
+      ["closed", "Your profile is finished. Matching has not opened yet."],
+      ["incomplete", "Matching opens for finished profiles. Yours still lacks something."],
+    ] as const)("keeps the order with matching %s", async (state, sentence) => {
+      answering(state);
+      await renderWithTheme(<HomeScreen />);
+      await screen.findByText(sentence);
+      await screen.findByText(COUNTER);
+      const shown = said().filter((word) =>
+        [sentence, "Your profile", "Conversations", COUNTER].includes(word),
+      );
+      expect(shown).toEqual([sentence, "Your profile", "Conversations", COUNTER]);
+    });
+
+    it("keeps an unread notice above everything, as what must reach the person first", async () => {
+      answering("open", [warned]);
+      await renderWithTheme(<HomeScreen />);
+      await screen.findByRole("heading", { name: "Notices" });
+      await screen.findByRole("button", { name: "See people" });
+      await screen.findByText(COUNTER);
+      const words = said();
+      expect(words.indexOf("Notices")).toBeLessThan(words.indexOf("Matching is open for you."));
+      expect(words.indexOf("Matching is open for you.")).toBeLessThan(words.indexOf(COUNTER));
+    });
   });
 
   it("says that it is checking while the status is in flight", async () => {

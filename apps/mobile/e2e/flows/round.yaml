@@ -139,7 +139,7 @@ name: The queue shows one card at a time, liking back makes a match, Later and U
     index: 0
 - tapOn: "Send report|Lähetä ilmoitus|Skicka anmälan"
 - extendedWaitUntil:
-    visible: "Thank you\\. A moderator will look at it, and you will not see each other again\\.|Kiitos\\. Moderaattori katsoo ilmoituksen, eikä teitä näytetä enää toisillenne\\.|Tack\\. En moderator tittar på anmälan, och ni ser inte varandra igen\\."
+    visible: "Thank you\\. A moderator will look at it\\.|Kiitos\\. Moderaattori katsoo ilmoituksen\\.|Tack\\. En moderator tittar på anmälan\\."
     timeout: 15000
 - tapOn: "Done|Valmis|Klar"
 # The last card takes Iida's fish of the week.

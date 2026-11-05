@@ -37,7 +37,7 @@ appId: fi.kuutti.app
 # apart, so that screen comes this way too, and finds no row there.
 - runFlow:
     when:
-      visible: "People on Kuutti|Ihmiset Kuutissa|Människor på Kuutti|Step \\d+ of \\d+|Vaihe \\d+ / \\d+|Steg \\d+ av \\d+|Did a friend invite you\\?|Kutsuiko ystävä sinut\\?|Bjöd en vän in dig\\?|How we do things here|Näin täällä toimitaan|Så här gör vi här"
+      visible: "Your profile|Profiilisi|Din profil|Step \\d+ of \\d+|Vaihe \\d+ / \\d+|Steg \\d+ av \\d+|Did a friend invite you\\?|Kutsuiko ystävä sinut\\?|Bjöd en vän in dig\\?|How we do things here|Näin täällä toimitaan|Så här gör vi här"
     commands:
       # Logging out opens under its row (#511), by a link that names it rather
       # than a scroll to it: a swipe through Settings could pass over its row

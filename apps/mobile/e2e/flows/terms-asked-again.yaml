@@ -19,7 +19,7 @@ name: A person who accepted an older wording of the terms is asked for the curre
     env:
       PERSONA: Kerttu Åkerlund
 - extendedWaitUntil:
-    visible: "How we do things here|Näin täällä toimitaan|Så här gör vi här|People on Kuutti|Ihmiset Kuutissa|Människor på Kuutti"
+    visible: "How we do things here|Näin täällä toimitaan|Så här gör vi här|Your profile|Profiilisi|Din profil"
     timeout: 15000
 # The welcome step, on a phone that remembered: asked as `notVisible`, in half
 # a second, and accepted behind a flag the condition clears (README).
@@ -48,6 +48,6 @@ name: A person who accepted an older wording of the terms is asked for the curre
 # Home either way, nothing else asked: the name, the gender, whom she seeks
 # and the rest stand.
 - extendedWaitUntil:
-    visible: "People on Kuutti|Ihmiset Kuutissa|Människor på Kuutti"
+    visible: "Your profile|Profiilisi|Din profil"
     timeout: 15000
 - assertNotVisible: "Matching opens for finished profiles\\. Yours still lacks something\\.|Seuranhaku avautuu valmiille profiileille\\. Sinun profiilistasi puuttuu vielä jotakin\\.|Matchningen öppnar för färdiga profiler\\. I din saknas ännu något\\."

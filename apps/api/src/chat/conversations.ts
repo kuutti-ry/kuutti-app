@@ -249,7 +249,7 @@ export async function closeConversationsOf(
 
 /**
  * An unmatch (#351): the caller ends the conversation for both, blocking
- * nobody. Both read it as ended, "This conversation has ended", with nothing
+ * nobody. Both read it as ended, "Conversation ended", with nothing
  * saying who ended it or how, and both may still report it for
  * report_after_close_days. What either shared there ends with it (#103); the
  * other person is told by the socket (#349, migration 0055's trigger). One

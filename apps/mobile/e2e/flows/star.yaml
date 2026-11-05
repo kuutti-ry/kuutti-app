@@ -29,7 +29,7 @@ name: A star on a card brings the person to a Starred list only they see, and ta
 # exposes its label alone (README), and the label names the person.
 - tapOn: "(Star|Tähti|Stjärna): Henna"
 - extendedWaitUntil:
-    visible: "Only you can see your stars\\. Nobody is told\\.|Vain sinä näet tähtesi\\. Kenellekään ei kerrota\\.|Bara du ser dina stjärnor\\. Ingen får veta\\."
+    visible: "Only you can see your stars\\.|Vain sinä näet tähtesi\\.|Bara du ser dina stjärnor\\."
     timeout: 15000
 - assertVisible: "Henna, \\d+"
 # Home now has the way to the list, by its word and no count.
@@ -40,10 +40,12 @@ name: A star on a card brings the person to a Starred list only they see, and ta
     centerElement: true
     timeout: 60000
 - tapOn: "Starred|Tähdellä merkityt|Stjärnmärkta"
+# The rows stand under the title alone: the first star said who sees it (#581).
+# A row opens the card as it stands: Iida has not answered Henna's like.
 - extendedWaitUntil:
-    visible: "Only you can see this list\\. A like or a pass takes the star off\\.|Vain sinä näet tämän listan\\. Tykkäys tai ohitus poistaa tähden\\.|Bara du ser den här listan\\. Ett gillande eller en överhoppning tar bort stjärnan\\."
+    visible: "Henna, \\d+"
     timeout: 15000
-# A row opens the card as it stands: she has not answered Henna's like.
+- waitForAnimationToEnd
 - tapOn: "Henna, \\d+"
 - extendedWaitUntil:
     visible: "Liked you|Tykkäsi sinusta|Gillade dig"
@@ -56,7 +58,7 @@ name: A star on a card brings the person to a Starred list only they see, and ta
     timeout: 15000
 - tapOn: "(Take the star off|Poista tähti|Ta bort stjärnan): Henna"
 - extendedWaitUntil:
-    visible: "Nobody here right now\\. A star on a card brings that person here\\.|Täällä ei ole nyt ketään\\. Kortin tähti tuo ihmisen tänne\\.|Ingen här just nu\\. En stjärna på ett kort tar personen hit\\."
+    visible: "Nobody here right now\\.|Täällä ei ole nyt ketään\\.|Ingen här just nu\\."
     timeout: 15000
 - tapOn: "Back to home|Takaisin alkuun|Tillbaka till start"
 # Home as it was: something going is waited for (README).

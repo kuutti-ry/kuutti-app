@@ -22,9 +22,10 @@ import { useHapticTap } from "@/theme/haptics";
 const MARK = require("../../../assets/logo-mark.png");
 
 /**
- * The home screen of a signed-in person (#143): how many people have completed
- * their profiles and whether matching is open, the way to the profile (which holds the photos, the
- * deal-breakers and the later questions, #239), and the settings. The
+ * The home screen of a signed-in person (#143): whether matching is open and the
+ * way to the people, the way to the profile (which holds the photos, the
+ * deal-breakers and the later questions, #239), the conversations, how many
+ * people have completed their profiles last (#54, #581), and the settings. The
  * technical view (the API, the commits, a test error) is one tap away outside
  * production and absent in the store's build. An account that has not
  * finished onboarding (#46) is sent there first; until the status is known
@@ -94,11 +95,10 @@ export function HomeScreen() {
           <View className="w-full max-w-md gap-4">
             {/* What must reach the person even without a push, unread, first (#176). */}
             <Notices />
-            {/* How many people have completed their profiles (#54, #581), and whether matching is open for the person
-                (#500); once it is, the way to the queue (#379), the way to the people
-                the person starred while there are any (#575), and the one offer of
-                notifications, since now there is something to tell (#102, ADR-055 §9). */}
-            <PondCard />
+            {/* Whether matching is open for the person (#500); once it is, the way to the
+                queue (#379), the way to the people the person starred while there are any
+                (#575), and the one offer of notifications, since now there is something to
+                tell (#102, ADR-055 §9). */}
             <GateCard
               whenOpen={
                 <>
@@ -120,6 +120,8 @@ export function HomeScreen() {
             </Button>
             {/* The conversations a match opens, with what is unread (#348). */}
             <ChatsButton />
+            {/* How many people are on Kuutti (#54): last, under the things to do (#581). */}
+            <PondCard />
           </View>
         )}
       </ScrollView>

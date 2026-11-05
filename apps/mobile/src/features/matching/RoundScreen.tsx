@@ -4,7 +4,7 @@ import { useFocusEffect, useRouter } from "expo-router";
 import Fish from "lucide-react-native/icons/fish";
 import Star from "lucide-react-native/icons/star";
 import Undo2 from "lucide-react-native/icons/undo-2";
-import { type ReactNode, useCallback, useRef, useState } from "react";
+import { type ReactNode, type Ref, useCallback, useRef, useState } from "react";
 import {
   AccessibilityInfo,
   ScrollView,
@@ -27,12 +27,15 @@ import { DECISION_ICONS, type DecisionIcons } from "./faceButtons";
 import { ShortPool } from "./ShortPool";
 import { type RoundCard, useRound } from "./useRound";
 
-/** Why a card is in the round, in words (TD-12): the label every card carries, never a score. */
-const REASON: Readonly<Record<RoundReason, PlainMessageKey>> = {
+/**
+ * Why a card is in the round, in words (TD-12): the label every card carries,
+ * never a score. A relaxed card says the deal-breaker it came in by instead,
+ * which the database holds it to (round_entries' check, #581).
+ */
+const REASON: Readonly<Record<Exclude<RoundReason, "relaxed">, PlainMessageKey>> = {
   matches_filters: "round.reason.matches_filters",
   liked_you: "round.reason.liked_you",
   seen_before: "round.reason.seen_before",
-  relaxed: "round.reason.relaxed",
   fish: "round.reason.fish",
 };
 
@@ -89,8 +92,9 @@ const WORDLESS_UNDO_FONT_SCALE = 1.3;
  * screen is that one card, and what comes after it is the way back to the list.
  *
  * As a card, the end or a match takes the place of what had the focus, the
- * screen reader is taken to its first line; a notice is spoken where it
- * appears, under the header, in sight however far the card was scrolled.
+ * screen reader is taken to its first line, and from a card of the Starred list
+ * that is gone, to the way back (#581); a notice is spoken where it appears,
+ * under the header, in sight however far the card was scrolled.
  */
 export function RoundScreen({ star }: { star?: string }) {
   const { t } = useT();
@@ -118,7 +122,7 @@ export function RoundScreen({ star }: { star?: string }) {
   );
 
   // Stable, so it runs as a line mounts rather than on every render.
-  const focus = useCallback((node: TextNode | null) => {
+  const focus = useCallback((node: TextNode | View | null) => {
     if (node) AccessibilityInfo.sendAccessibilityEvent(node, "focus");
   }, []);
   const words =
@@ -179,8 +183,9 @@ export function RoundScreen({ star }: { star?: string }) {
       <Text>{t(starred ? "round.star.on" : "round.star")}</Text>
     </Button>
   );
-  const backToStars = (
+  const backToStars = (ref?: Ref<View>) => (
     <Button
+      ref={ref}
       variant="outline"
       onPress={() => {
         tap();
@@ -226,7 +231,7 @@ export function RoundScreen({ star }: { star?: string }) {
             <Text ref={focus} accessibilityLiveRegion="polite">
               {t("round.gone")}
             </Text>
-            {backToStars}
+            {backToStars()}
           </>
         )}
         {entries === null && <Text ref={focus}>{t("round.none")}</Text>}
@@ -235,7 +240,6 @@ export function RoundScreen({ star }: { star?: string }) {
             <Text ref={focus} variant="h2" accessibilityLiveRegion="polite">
               {t("round.match.title")}
             </Text>
-            <Text>{t("round.match.body")}</Text>
             <Button
               onPress={() => {
                 tap();
@@ -246,7 +250,7 @@ export function RoundScreen({ star }: { star?: string }) {
               {t("round.match.open")}
             </Button>
             {star ? (
-              backToStars
+              backToStars()
             ) : (
               <Button
                 variant="outline"
@@ -272,7 +276,7 @@ export function RoundScreen({ star }: { star?: string }) {
                   ? t("round.reason.relaxedField", {
                       field: t(fieldLabelKey(current.entry.relaxedField)),
                     })
-                  : t(REASON[current.entry.reason])}
+                  : t(REASON[current.entry.reason as Exclude<RoundReason, "relaxed">])}
               </Text>
               {!placement.oneHanded && starToggle}
             </View>
@@ -323,13 +327,14 @@ export function RoundScreen({ star }: { star?: string }) {
             )}
           </View>
         )}
+        {/* A card of the Starred list, decided or blocked: the way back is all that stands, and the reader is taken to it (#581). */}
+        {star &&
+          match === null &&
+          !entry &&
+          entries &&
+          view.status === "ready" &&
+          backToStars(focus)}
         {/* The queue's end (ADR-062 §11): the line the reader is taken to, what may be relaxed for today (#99, ADR-042), and the same way into What you seek for everybody. */}
-        {star && match === null && !entry && entries && view.status === "ready" && (
-          <>
-            <Text ref={focus}>{t("stars.card.done")}</Text>
-            {backToStars}
-          </>
-        )}
         {!star && match === null && !entry && entries && view.status === "ready" && (
           <>
             <Text ref={focus}>{t("round.done")}</Text>

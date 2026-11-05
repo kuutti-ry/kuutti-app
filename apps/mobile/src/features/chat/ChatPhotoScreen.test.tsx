@@ -279,10 +279,10 @@ const POINTS = "The report points the moderators to this photo.";
 const COPY =
   "The moderators get a copy of this whole conversation, your own messages and photos included, and keep it for twelve months.";
 const ENDS =
-  "A report also blocks them, for good, and ends this conversation for both of you: you will not see each other here again, even if either of you deletes their account. A block cannot be undone. They are not told.";
+  "The conversation ends for both of you, and you will not see each other here again, even if either of you deletes their account and comes back. A block cannot be undone. They are not told who reported them.";
 const BLOCKS =
-  "A report also blocks them, for good: you will not see each other here again, even if either of you deletes their account. A block cannot be undone. They are not told.";
-const THANKS = "Thank you. A moderator will look at it, and you will not see each other again.";
+  "You will not see each other here again, even if either of you deletes their account and comes back. A block cannot be undone. They are not told who reported them.";
+const THANKS = "Thank you. A moderator will look at it.";
 const REPORT = `/conversations/${CONVERSATION}/report`;
 /** The report step's lines, in the order they are read. */
 const reportLines = () =>

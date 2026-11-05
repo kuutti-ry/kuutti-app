@@ -1,5 +1,5 @@
 import type { ConversationList, ConversationSummary } from "@kuutti/schema";
-import { act, fireEvent, screen, userEvent } from "@testing-library/react-native";
+import { act, fireEvent, screen, userEvent, within } from "@testing-library/react-native";
 import { useLocales } from "expo-localization";
 import * as SecureStore from "expo-secure-store";
 import { AccessibilityInfo, AppState, PixelRatio, Platform, StyleSheet } from "react-native";
@@ -45,6 +45,10 @@ const json = (body: unknown, status = 200) =>
 const settle = () => act(() => new Promise<void>((resolve) => setTimeout(resolve, 20)));
 const noProblems = () =>
   expect(pressables(screen.toJSON() as HostNode).flatMap((node) => a11yProblems(node))).toEqual([]);
+/** The words on the screen in the order a screen reader meets them. */
+const inOrder = (node: HostNode | string): string[] =>
+  typeof node === "string" ? [node] : (node.children ?? []).flatMap(inOrder);
+const words = () => inOrder(screen.toJSON() as HostNode);
 
 const OLD = "2026-01-05T10:00:00.000Z";
 const NOW = new Date().toISOString();
@@ -153,16 +157,13 @@ describe("the list of conversations", () => {
     expect(await screen.findByRole("heading", { name: "Your turn: 2" })).toBeTruthy();
     expectPinnedHeader("Conversations", "Back");
     expect(screen.getByRole("heading", { name: "Archived" })).toBeTruthy();
-    expect(
-      screen.getByText(
-        "A conversation quiet for a week moves here, and so does one that has ended. Writing in a quiet one brings it back.",
-      ),
-    ).toBeTruthy();
+    // No line under the heading: the rows and what opening one says tell why (#581).
+    expect(words()[words().indexOf("Archived") + 1]).toBe("Deleted user");
     const today = timeOf("en", NOW);
     const old = dayOf("en", OLD);
     for (const name of [
       `Sanna, 31, 2 unread messages, Nähdäänkö huomenna?, ${today}`,
-      "Mikko, 29, No messages yet",
+      "Mikko, 29",
       `Deleted user, This person deleted their account., ${old}`,
       `Conversation ended, You: Kiitos, ${old}`,
       `Olli, 35, 1 unread message, You: Moi, ${old}`,
@@ -187,15 +188,15 @@ describe("the list of conversations", () => {
     api(() => json(LIST));
     leaveNotice("reported");
     await renderWithTheme(<ConversationsScreen />);
-    const words = "Thank you. A moderator will look at it, and you will not see each other again.";
-    expect(await screen.findByText(words)).toBeTruthy();
+    const thanks = "Thank you. A moderator will look at it.";
+    expect(await screen.findByText(thanks)).toBeTruthy();
     expect(screen.getByTestId("notice").props.accessibilityLiveRegion).toBe("polite");
-    expect(announce.mock.calls).toEqual([[words]]);
+    expect(announce.mock.calls).toEqual([[thanks]]);
     // Back again with nothing left to say: the words are gone.
     await act(async () => focus());
-    expect(screen.queryByText(words)).toBeNull();
+    expect(screen.queryByText(thanks)).toBeNull();
     for (const [outcome, said] of [
-      ["blocked", "Blocked. You will not see each other again."],
+      ["blocked", "Blocked."],
       ["unmatched", "The conversation has ended."],
       ["gone", "That conversation is no longer available."],
     ] as const) {
@@ -258,18 +259,63 @@ describe("the list of conversations", () => {
     }
   });
 
-  it("says there is nothing yet", async () => {
+  it.each([
+    ["en-US", "Conversations", "No conversations yet."],
+    ["fi-FI", "Keskustelut", "Ei vielä keskusteluja."],
+    ["sv-FI", "Samtal", "Inga samtal än."],
+  ])("says there is nothing yet, and nothing more: %s", async (languageTag, title, empty) => {
+    (useLocales as jest.Mock).mockReturnValue([{ languageTag }]);
     api(() => json({ open: [], archived: [], yourTurn: COUNT(0) }));
     await renderWithTheme(<ConversationsScreen />);
-    expect(
-      await screen.findByText(
-        "No conversations yet. A conversation opens here when you match with someone.",
-      ),
-    ).toBeTruthy();
-    expect(screen.queryAllByRole("heading").map((node) => node.props.children)).toEqual([
-      "Conversations",
-    ]);
+    expect(await screen.findByText(empty)).toBeTruthy();
+    expect(words()).toEqual([title, empty]);
+    expect(screen.queryAllByRole("heading").map((node) => node.props.children)).toEqual([title]);
   });
+
+  it.each<[string, Partial<ConversationSummary>, string, string[]]>([
+    ["on the person's turn", {}, "Mikko, 29", ["Mikko, 29"]],
+    ["on the other's turn", { yourTurn: false }, "Mikko, 29", ["Mikko, 29"]],
+    ["archived", { state: "archived", yourTurn: false }, "Mikko, 29", ["Mikko, 29"]],
+    [
+      "ended",
+      { state: "closed", closedHow: "unmatch", counterpart: null, yourTurn: false },
+      "Conversation ended",
+      ["Conversation ended"],
+    ],
+    // An erasure still says it, with or without a message.
+    [
+      "left by a deleted account",
+      { state: "closed", closedHow: "erasure", counterpart: { deleted: true }, yourTurn: false },
+      "Deleted user, This person deleted their account.",
+      ["Deleted user", "This person deleted their account."],
+    ],
+  ])(
+    "draws and says no second line for a row with no message, %s, the group above saying whose move it is (#581)",
+    async (_what, over, name, lines) => {
+      const row = summary(ID(2), {
+        counterpart: { deleted: false, name: "Mikko", age: 29, thumb: null },
+        lastMessage: null,
+        unread: 0,
+        ...over,
+      });
+      const open = row.state === "open";
+      api(() =>
+        json({
+          open: open ? [row] : [],
+          archived: open ? [] : [row],
+          yourTurn: COUNT(row.yourTurn ? 1 : 0),
+        }),
+      );
+      await renderWithTheme(<ConversationsScreen />);
+      const found = await screen.findByRole("button", { name });
+      expect(
+        within(found)
+          .getAllByText(/./)
+          .map((node) => node.props.children),
+      ).toEqual(lines);
+      noProblems();
+    },
+  );
 
   it("says why it did not load, and reads again on Try again", async () => {
     api(
@@ -332,11 +378,6 @@ describe("whose turn it is (ADR-062 §5)", () => {
       unread: 0,
       yourTurn: false,
     });
-  /** The words on the screen in the order a screen reader meets them. */
-  const inOrder = (node: HostNode | string): string[] =>
-    typeof node === "string" ? [node] : (node.children ?? []).flatMap(inOrder);
-  const words = () => inOrder(screen.toJSON() as HostNode);
-
   it("groups the open ones by turn, the person's first with how many, each as the API ordered it", async () => {
     api(() =>
       json({
@@ -385,7 +426,7 @@ describe("whose turn it is (ADR-062 §5)", () => {
     expect(await screen.findByRole("heading", { name: "Archived" })).toBeTruthy();
     expect(screen.queryByRole("heading", { name: /^Your turn/ })).toBeNull();
     expect(screen.queryByRole("heading", { name: "Their turn" })).toBeNull();
-    expect(screen.queryByText(/waiting for your answer/)).toBeNull();
+    expect(screen.queryByText(/You can't like anyone new/)).toBeNull();
   });
 
   it("keeps the count through a look back, which signs no thumb", async () => {
@@ -414,8 +455,8 @@ describe("whose turn it is (ADR-062 §5)", () => {
   });
 
   describe("the banner", () => {
-    const WORDS = (waiting: number, limit = 8) =>
-      `${waiting} ${waiting === 1 ? "conversation is" : "conversations are"} waiting for your answer. You can't like anyone new while ${limit} ${limit === 1 ? "is" : "are"} waiting.`;
+    const WORDS = (limit = 8) =>
+      `You can't like anyone new while ${limit} ${limit === 1 ? "conversation is" : "conversations are"} waiting.`;
     const counted = (yourTurn: { waiting: number; limit: number; warning: number }) => () =>
       json({ open: [mine(1, "Bea")], archived: [], yourTurn });
 
@@ -439,22 +480,23 @@ describe("whose turn it is (ADR-062 §5)", () => {
       api(counted(count));
       await renderWithTheme(<ConversationsScreen />);
       await screen.findByRole("heading", { name: `Your turn: ${count.waiting}` });
-      expect(screen.queryByText(WORDS(count.waiting, count.limit)) !== null).toBe(shown);
+      expect(screen.queryByText(WORDS(count.limit)) !== null).toBe(shown);
     });
 
     it("stands at the top of the list, above the groups, in plain words and a live region", async () => {
       api(counted({ waiting: 6, limit: 8, warning: 6 }));
       await renderWithTheme(<ConversationsScreen />);
-      const line = await screen.findByText(WORDS(6));
+      const line = await screen.findByText(WORDS());
       expect(line.props.accessibilityLiveRegion).toBe("polite");
-      expect(words().indexOf(WORDS(6))).toBeLessThan(words().indexOf("Your turn: 6"));
+      // How many wait is the heading's, right under it: the banner names the limit alone (#581).
+      expect(words().indexOf("Your turn: 6")).toBe(words().indexOf(WORDS()) + 1);
     });
 
     it("holds at the largest text: nothing cut, its height the words'", async () => {
       jest.spyOn(PixelRatio, "getFontScale").mockReturnValue(MAX_FONT_SCALE);
       api(counted({ waiting: 6, limit: 8, warning: 6 }));
       await renderWithTheme(<ConversationsScreen />);
-      const line = await screen.findByText(WORDS(6));
+      const line = await screen.findByText(WORDS());
       expect(line.props.numberOfLines).toBeUndefined();
       expect(StyleSheet.flatten(line.props.style)?.height).toBeUndefined();
       const box = screen.getByTestId("turn-warning");
@@ -463,7 +505,7 @@ describe("whose turn it is (ADR-062 §5)", () => {
       noProblems();
     });
 
-    it("is told to VoiceOver as it appears and when its number moves, not again on a look back", async () => {
+    it("is told to VoiceOver as it appears, not on a look back or as the count waiting moves, and again when it comes back or its limit moves (#581)", async () => {
       jest.replaceProperty(Platform, "OS", "ios");
       const announce = AccessibilityInfo.announceForAccessibility as jest.Mock;
       announce.mockClear();
@@ -471,15 +513,29 @@ describe("whose turn it is (ADR-062 §5)", () => {
         counted({ waiting: 6, limit: 8, warning: 6 }),
         counted({ waiting: 6, limit: 8, warning: 6 }),
         counted({ waiting: 7, limit: 8, warning: 6 }),
+        counted({ waiting: 5, limit: 8, warning: 6 }),
+        counted({ waiting: 6, limit: 8, warning: 6 }),
+        counted({ waiting: 6, limit: 7, warning: 6 }),
       );
       await renderWithTheme(<ConversationsScreen />);
-      await screen.findByText(WORDS(6));
+      await screen.findByText(WORDS());
       await act(async () => focus());
       await settle();
-      expect(announce.mock.calls).toEqual([[WORDS(6)]]);
+      expect(announce.mock.calls).toEqual([[WORDS()]]);
+      await act(async () => focus());
+      await screen.findByRole("heading", { name: "Your turn: 7" });
+      expect(announce.mock.calls).toEqual([[WORDS()]]);
+      // Under the warning it goes, and said nothing as it went.
+      await act(async () => focus());
+      await screen.findByRole("heading", { name: "Your turn: 5" });
+      expect(screen.queryByText(WORDS())).toBeNull();
+      expect(announce.mock.calls).toEqual([[WORDS()]]);
+      await act(async () => focus());
+      await screen.findByText(WORDS());
+      expect(announce.mock.calls).toEqual([[WORDS()], [WORDS()]]);
       await act(async () => focus());
       await screen.findByText(WORDS(7));
-      expect(announce.mock.calls).toEqual([[WORDS(6)], [WORDS(7)]]);
+      expect(announce.mock.calls).toEqual([[WORDS()], [WORDS()], [WORDS(7)]]);
     });
 
     it("leaves the telling to the live region on Android", async () => {
@@ -488,22 +544,26 @@ describe("whose turn it is (ADR-062 §5)", () => {
       announce.mockClear();
       api(counted({ waiting: 6, limit: 8, warning: 6 }));
       await renderWithTheme(<ConversationsScreen />);
-      await screen.findByText(WORDS(6));
+      await screen.findByText(WORDS());
       expect(announce).not.toHaveBeenCalled();
     });
 
     it.each([
-      [
-        "fi",
-        "6 keskustelua odottaa vastaustasi. Et voi tykätä kenestäkään uudesta, kun 8 odottaa.",
-      ],
-      ["sv", "6 samtal väntar på ditt svar. Du kan inte gilla någon ny medan 8 väntar."],
-    ])("says it in %s", async (languageTag, words) => {
-      (useLocales as jest.Mock).mockReturnValue([{ languageTag }]);
-      api(counted({ waiting: 6, limit: 8, warning: 6 }));
-      await renderWithTheme(<ConversationsScreen />);
-      expect(await screen.findByText(words)).toBeTruthy();
-    });
+      ["en", 8, WORDS(8)],
+      ["en", 1, WORDS(1)],
+      ["fi", 8, "Et voi tykätä kenestäkään uudesta, kun 8 keskustelua odottaa."],
+      ["fi", 1, "Et voi tykätä kenestäkään uudesta, kun 1 keskustelu odottaa."],
+      ["sv", 8, "Du kan inte gilla någon ny medan 8 samtal väntar."],
+      ["sv", 1, "Du kan inte gilla någon ny medan 1 samtal väntar."],
+    ])(
+      "says it in %s at a limit of %i, naming what it counts",
+      async (languageTag, limit, said) => {
+        (useLocales as jest.Mock).mockReturnValue([{ languageTag }]);
+        api(counted({ waiting: limit, limit, warning: 1 }));
+        await renderWithTheme(<ConversationsScreen />);
+        expect(await screen.findByText(said)).toBeTruthy();
+      },
+    );
   });
 
   it("moves a row and the count as a line comes over the socket, and the banner with them", async () => {
@@ -544,12 +604,14 @@ describe("whose turn it is (ADR-062 §5)", () => {
     await act(async () => ws.receive(line(ID(2), 3, "theirs")));
     expect(screen.getByRole("heading", { name: "Your turn: 6" })).toBeTruthy();
     expect(screen.queryByRole("heading", { name: "Their turn" })).toBeNull();
-    expect(screen.getByText(/^6 conversations are waiting for your answer/)).toBeTruthy();
+    expect(
+      screen.getByText(/^You can't like anyone new while 8 conversations are waiting/),
+    ).toBeTruthy();
     // A line from the person: it is the other's turn again, and the banner goes.
     await act(async () => ws.receive(line(ID(1), 4, "mine")));
     expect(screen.getByRole("heading", { name: "Your turn: 5" })).toBeTruthy();
     expect(screen.getByRole("heading", { name: "Their turn" })).toBeTruthy();
-    expect(screen.queryByText(/waiting for your answer/)).toBeNull();
+    expect(screen.queryByText(/You can't like anyone new/)).toBeNull();
     // All of it without a read.
     expect(asked).toHaveLength(1);
   });

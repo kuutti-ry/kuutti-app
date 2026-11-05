@@ -4,7 +4,7 @@ Local stand-in for the Telia ID Broker (Finnish Trust Network): [navikt/mock-oau
 
 - Discovery: `http://127.0.0.1:8080/ftn/.well-known/openid-configuration`
 - Any `client_id` and `client_secret` are accepted. `redirect_uri` is not validated.
-- The login page is ours (`login.html`, `loginPagePath` in `config.json`): a button for each of the twenty-five personas (the twenty-one one signs in as also in a short list at the top, for the flows; the four people of Iida's round are cards nobody signs in as, and only below) and, below them, a form for anybody else.
+- The login page is ours (`login.html`, `loginPagePath` in `config.json`): a button for each of the twenty-five personas (the twenty-one one signs in as also in a short list at the top, for the flows; the four people of Iida's round are cards a demo does not sign in as (the `short-pool` flow signs in as Riikka), and only below) and, below them, a form for anybody else.
 
 ## The personas
 

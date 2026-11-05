@@ -51,7 +51,7 @@ name: Taking a break signs the person out everywhere, and the next bank login br
 - stopApp
 - runFlow: ../common/open-app.yaml
 - assertVisible: "Sign in with your bank|Kirjaudu pankkitunnuksilla|Logga in med din bank"
-- assertNotVisible: "People on Kuutti|Ihmiset Kuutissa|Människor på Kuutti"
+- assertNotVisible: "Your profile|Profiilisi|Din profil"
 # The next bank login: everything as it was, which for her is the photos step.
 - runFlow:
     file: ../common/sign-in.yaml
