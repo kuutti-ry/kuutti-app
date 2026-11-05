@@ -18,8 +18,6 @@ import {
  */
 type AuthOutcome = AuthExchangeResponse["outcome"];
 
-export type SignedOutNotice = "paused" | "lock";
-
 export type SessionState =
   | { status: "loading" }
   /**
@@ -27,7 +25,7 @@ export type SessionState =
    * break began on this device (#170), "lock" right after the app's lock
    * signed it out (#418).
    */
-  | { status: "signed-out"; notice?: SignedOutNotice }
+  | { status: "signed-out"; notice?: "paused" | "lock" }
   | { status: "signed-in"; sessionId: string; outcome?: AuthOutcome };
 
 /** The export as the API answers it (#237): a zip, named by the API, nothing about the person in the name. */
