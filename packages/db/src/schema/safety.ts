@@ -181,8 +181,8 @@ export const sanction = pgTable(
  * a person is shown to a person (rule 7). Between the two identities, not the
  * accounts, so it holds for a later account of either; final, with no list
  * and no unblock. Nothing reads it but the filters: the pool's count
- * (`inEachOthersPool`), and `blocked_between(a, b)`, the database function of
- * migration 0051 that the card and the photo reads ask. Kept through the
+ * (`inEachOthersPool`), and `blocked_between(a, b)`, the database function
+ * that the card and the photo reads ask. Kept through the
  * erasure of either person, as long as the identities (TD-7's kept side);
  * the export lists the person's own blocks by date, never whom.
  */

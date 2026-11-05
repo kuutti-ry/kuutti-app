@@ -23,7 +23,7 @@ import { listPhotoTipInputs } from "./repo.ts";
  * fish.
  */
 
-/** matching_config keys the tips rule reads; values live in the seed / migrations 0028 and 0029. */
+/** matching_config keys the tips rule reads; values live in the seed and the migrations. */
 const TIP_THRESHOLD_KEYS = {
   mirrorConfidenceMin: "photo_tip_mirror_confidence_min",
   bathroomConfidenceMin: "photo_tip_bathroom_confidence_min",

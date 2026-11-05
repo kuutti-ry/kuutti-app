@@ -938,7 +938,7 @@ export async function participantsOf(
  * The blocker's side of each conversation between the accounts of two
  * identities: whom a block between them turns the conversation gone for.
  * The blocked side is told by the close's own notification, never by the
- * block's (ADR-030 §6, migration 0063). The listener reads this after the
+ * block's (ADR-030 §6). The listener reads this after the
  * commit, and the blocked person's erasure may have cut their link by then:
  * a conversation of the blocker's whose other side is unlinked and whose
  * close is the blocker's own block counts too, so the blocker's phones still
@@ -1035,7 +1035,7 @@ export async function listContacts(db: Queryable, accountId: string): Promise<Co
 
 /**
  * Keeps the caller's piece of that kind, the one stored before replaced
- * (migration 0059 announces a shared one's change). `updated_at` is when the
+ * (the `contact_notify` trigger announces a shared one's change). `updated_at` is when the
  * value last changed: the same value kept again leaves it, so it changes
  * nothing that SHARE_VISIBLE reads under a shadow ban.
  */

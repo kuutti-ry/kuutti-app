@@ -163,7 +163,7 @@ describe("the reward of matching_config", () => {
     expect(codes(InvitationReward, value)).toEqual(["invalid_type"]);
   });
 
-  it("refuses the shape of fish and likes that the versions before migration 0105 hold", () => {
+  it("refuses the shape of fish and likes, from when an invitation earned likes (#503)", () => {
     expect(codes(InvitationReward, { fish: 1, likes: 0 })).toEqual([
       "invalid_type",
       "invalid_type",

@@ -154,7 +154,7 @@ export async function isAccountLive(db: Queryable, accountId: string): Promise<b
  * shadow-banned, suspended, banned or paused owner's photos stop for everyone
  * at once and come back with a lift (ADR-024 §6, the card's rule of ADR-009
  * §6). A block between the two, set by either, stops them for good (#84,
- * ADR-030 §2): `blocked_between` of migration 0051. Another account's photo
+ * ADR-030 §2): `blocked_between`. Another account's photo
  * never in the full size (ADR-056 §3): the app asks for it only of one's own,
  * so it is what a script would take that the app does not. Both branches
  * carry the caller's account id (rule 6); there is no third.

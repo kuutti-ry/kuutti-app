@@ -1,1 +1,0 @@
-ALTER TYPE "public"."contact_kind" ADD VALUE 'snapchat';

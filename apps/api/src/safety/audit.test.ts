@@ -5,7 +5,7 @@ import { type TestContext, test } from "../test/harness.ts";
 import { auditBoundary, recordAudit } from "./audit.ts";
 
 // features/safety/audit.feature: the row says who, what, subject, when; and
-// the trigger of migration 0006 keeps it that way against the application role,
+// the table's trigger keeps it that way against the application role,
 // which is the role these tests run as.
 
 describe("audit log", () => {

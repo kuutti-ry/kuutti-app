@@ -89,7 +89,7 @@ From the schema (`packages/db/src/schema/`). "Erasure" is the person deleting th
 | Feedback the person sent, in their words | `feedback` | until erasure |
 | The photo check's notes | `photo_check_note` | twelve months, or erasure |
 | Research: the mapping to a random `research_id` while the research consent lasts; events keyed by that id, never by account | `research_subject`, `events` | the mapping until withdrawal or erasure; events 90 days (ADR-011 §6) |
-| What staff did or saw about the account | `audit_log` | five years by rule (`.claude/rules/db.md`), survives erasure. Nothing prunes it yet and the table refuses deletes (migration 0006), so rows are kept longer |
+| What staff did or saw about the account | `audit_log` | five years by rule (`.claude/rules/db.md`), survives erasure. Nothing prunes it yet and the table's trigger refuses deletes, so rows are kept longer |
 | The API's log line per request: account id, request id, method, route, status, duration; never a client address. Every container on the box logs to the same group, Traefik and Dokploy included (`infra/modules/compute/templates/user_data.sh.tpl`) | CloudWatch `/kuutti/prod/api` | 30 days |
 | Dokploy's state: `/etc/dokploy` on the box (Traefik's configuration among it) and its nightly copy | the box's disk; the backup bucket under `dokploy-backup/prod/` | the copies 90 days (`infra/bootstrap/main.tf`). Whether they hold an access log is open (below) |
 | Login attempts in flight | `auth_request` | ten minutes, swept nightly |

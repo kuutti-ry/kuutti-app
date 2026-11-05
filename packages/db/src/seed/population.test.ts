@@ -813,7 +813,7 @@ describe("writing the population", () => {
         await expect(writePopulation(pool, [{ ...person, home: null }], VERSIONS)).rejects.toThrow(
           "demo-0001 has no home: generatePopulation needs the places",
         );
-        // Migration 0027's pond is there, with or without a seed; another is not: nothing is written, not even the identity.
+        // The migrations' pond is there, with or without a seed; another is not: nothing is written, not even the identity.
         await expect(
           writePopulation(pool, [{ ...person, pond: "nowhere" }], VERSIONS),
         ).rejects.toThrow("no pond nowhere in this database");

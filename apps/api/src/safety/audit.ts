@@ -3,8 +3,8 @@ import type { Queryable } from "@kuutti/db";
 // The audit log (TD-5, security checklist "Moderator actions, disclosure
 // requests, and photo views by staff write to the immutable audit table").
 // One row per thing a member of staff did or saw, keyed by their identity
-// (never an account); the table refuses UPDATE and DELETE by trigger
-// (migration 0006), so a row written here is a row kept for five years
+// (never an account); the table refuses UPDATE and DELETE by trigger,
+// so a row written here is a row kept for five years
 // (rules/db.md). `detail` is a small closed structure, never text a person
 // typed.
 

@@ -78,7 +78,7 @@ export const notice = pgTable(
       "notice_warning_check",
       sql`(${table.kind} = 'warning') = (${table.sanctionId} IS NOT NULL)`,
     ),
-    // Named by the old kind, as 0056 and 0060 do: Postgres refuses an enum
+    // Named by the old kind: Postgres refuses an enum
     // value in the transaction that adds it, and the migrator applies every
     // pending migration in one. With these kinds this is "an invitation's
     // notice, and only it, points at its invitation"; a kind that points at
@@ -95,7 +95,7 @@ export const pushPlatform = pgEnum("push_platform", ["ios", "android"]);
 /**
  * A signed-in device's Expo push token (#102, ADR-055 §2): one per session,
  * and a token belongs to one session. It goes when its session ends: a
- * revocation deletes it (migration 0082's trigger), a deleted session takes
+ * revocation deletes it (the `session_revoked_push_token` trigger), a deleted session takes
  * it by the cascade, and erasure deletes the account's. `locale` is the
  * language the phone registered in, which its pushes are worded in. The token
  * names an installation of the app to Expo, Apple and Google, nothing about

@@ -8,6 +8,7 @@ paths:
 Consult `https://orm.drizzle.team/llms.txt` for API specifics.
 
 - The schema is TypeScript in this package. Migrations come from `drizzle-kit generate`, are committed as SQL, reviewed as SQL, and never hand-edited. One migration per change. What the schema DSL cannot express (a trigger, a function, a versioned data row) goes through `drizzle-kit generate --custom --name <what>`: the tool creates the numbered file and the journal entry, the SQL inside is written for it, cited in an ADR, and reviewed like any other; a generated file is never edited afterwards. The API entrypoint applies them under an advisory lock; a manual RDS snapshot precedes a release-tag migration.
+- The chain before `0000_baseline` and `0001_baseline_sql` was folded into them once, while no real person's row existed anywhere (ADR-065). Once one exists, it is never folded again.
 - Naming: snake_case tables and columns, `timestamptz` for every timestamp with an `_at` suffix, uuid primary keys unless there is a stated reason.
 - `identity` and `account` are separate tables from the first migration. Standing and bans live on `identity`. `ponds` holds one row, the country, with the switch that opens matching (ADR-061 §8).
 - Never add a column for: hetu, legal sex, full date of birth, name from the bank, message text in `events`, email in `events`.

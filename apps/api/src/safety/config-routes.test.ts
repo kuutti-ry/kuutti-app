@@ -125,12 +125,8 @@ describe("GET /admin/config", () => {
     expect(items.map((i) => i.key)).toEqual(rows.map((r) => r.key));
     expect(items.find((i) => i.key === "deal_breakers_max")).toMatchObject({
       value: 7,
-      version: 3,
-      versions: [
-        { version: 3, value: 7, createdBy: "migration:0097", reason: null },
-        { version: 2, value: 6, createdBy: "migration:0092", reason: null },
-        { version: 1, value: 2, createdBy: "migration:0024", reason: null },
-      ],
+      version: 1,
+      versions: [{ version: 1, value: 7, createdBy: "migration:0001", reason: null }],
     });
     expect(items.find((i) => i.key === "photo_fetches_per_day")?.value).toEqual({
       thumb: 600,
@@ -150,28 +146,21 @@ describe("GET /admin/config", () => {
     ).toBe(200);
     const { items } = ConfigList.parse(await (await list(api, staff.headers)).json());
     const likes = items.find((i) => i.key === "like_budget_balanced");
-    expect(likes).toMatchObject({ value: 8, version: 3 });
+    expect(likes).toMatchObject({ value: 8, version: 2 });
     expect(likes?.versions).toEqual([
       {
-        version: 3,
+        version: 2,
         value: 8,
         validFrom: T.toISOString(),
         createdBy: staff.identityId,
         reason: REASON,
       },
-      // The first cut's ten (#98, ADR-036), a migration's version.
-      {
-        version: 2,
-        value: 10,
-        validFrom: expect.any(String),
-        createdBy: "migration:0070",
-        reason: null,
-      },
+      // The first cut's ten (#98, ADR-036), as the migrations write it.
       {
         version: 1,
-        value: 12,
+        value: 10,
         validFrom: expect.any(String),
-        createdBy: "migration:0007",
+        createdBy: "migration:0001",
         reason: null,
       },
     ]);
@@ -192,7 +181,7 @@ describe("POST /admin/config/{key}", () => {
     // The answer is the row this change wrote; the list has the history.
     expect(ConfigChange.parse(await response.json())).toEqual({
       key: "exposure_cards_per_day",
-      version: 3,
+      version: 2,
       value: 45,
       validFrom: T.toISOString(),
       createdBy: staff.identityId,
@@ -202,9 +191,8 @@ describe("POST /admin/config/{key}", () => {
       (k) => k.key === "exposure_cards_per_day",
     );
     expect(listed?.versions.map((v) => [v.version, v.value, v.createdBy, v.reason])).toEqual([
-      [3, 45, staff.identityId, REASON],
-      [2, 0, "migration:0104", null],
-      [1, 60, "migration:0010", null],
+      [2, 45, staff.identityId, REASON],
+      [1, 0, "migration:0001", null],
     ]);
 
     const lines = api.logs().filter((l) => l.msg === "config changed");
@@ -212,7 +200,7 @@ describe("POST /admin/config/{key}", () => {
     expect(lines[0]).toMatchObject({
       staffIdentityId: staff.identityId,
       key: "exposure_cards_per_day",
-      version: 3,
+      version: 2,
     });
     expect(lines[0]).not.toHaveProperty("reason");
     expect(JSON.stringify(api.logs())).not.toContain(MARK);
@@ -227,7 +215,7 @@ describe("POST /admin/config/{key}", () => {
     for (const [key, value, version] of [
       ["config_routes_word", "another", 2],
       ["config_routes_flag", false, 2],
-      ["photo_fetches_per_day", { full: 30, card: 300, thumb: 600 }, 3],
+      ["photo_fetches_per_day", { full: 30, card: 300, thumb: 600 }, 2],
     ] as const) {
       const response = await change(api, staff.headers, key, { value, reason: REASON });
       expect(response.status, key).toBe(200);
@@ -425,8 +413,8 @@ describe("POST /admin/config/{key}", () => {
   }) => {
     const first = await admin(ctx);
     const second = await admin(ctx);
-    // The second admin's change commits after the first has read version 2
-    // and before it writes: both want version 3.
+    // The second admin's change commits after the first has read version 1
+    // and before it writes: both want version 2.
     const db = interleaved(
       ctx.client,
       /FROM matching_config WHERE key = \$1 ORDER BY version DESC LIMIT 1/,
@@ -453,9 +441,8 @@ describe("POST /admin/config/{key}", () => {
       "SELECT version, value, created_by FROM matching_config WHERE key = 'pass_cooldown_days' ORDER BY version",
     );
     expect(rows).toEqual([
-      { version: 1, value: 90, created_by: "migration:0007" },
-      { version: 2, value: 30, created_by: "migration:0104" },
-      { version: 3, value: 60, created_by: second.identityId },
+      { version: 1, value: 30, created_by: "migration:0001" },
+      { version: 2, value: 60, created_by: second.identityId },
     ]);
     const audit = await ctx.client.query<{ actor_identity_id: string }>(
       "SELECT actor_identity_id FROM audit_log WHERE action = 'config.change'",
@@ -498,7 +485,7 @@ describe("POST /admin/config/{key}", () => {
     expect(listed?.versions.map((v) => [v.version, v.value, v.createdBy])).toEqual([
       [3, 5, second.identityId],
       [2, 6, first.identityId],
-      [1, 7, "migration:0007"],
+      [1, 7, "migration:0001"],
     ]);
     expect(raced.logs().find((l) => l.msg === "config changed")).toMatchObject({
       staffIdentityId: first.identityId,

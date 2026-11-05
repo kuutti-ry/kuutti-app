@@ -283,8 +283,7 @@ const HEIGHT_MAX_CM = 260;
  * before the name (#213, ADR-019 §3); the list is refreshed after the
  * election of April 2027. "None of them" is an answer of its own, after the
  * parties and without a logo, and it stands alone (#239). The coffee party
- * left the list on the maintainer's word (#239); migration 0037 took it out
- * of stored answers.
+ * left the list on the maintainer's word (#239).
  */
 export const POLITICS_OPTIONS = [
   "kesk",

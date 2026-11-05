@@ -1,1 +1,0 @@
-CREATE INDEX "card_shown_photo_idx" ON "card_shown" USING btree ("photo_id");

@@ -114,8 +114,7 @@ export async function signInAs(
 /**
  * matching_config values a test needs, inside its transaction (rolled back
  * with it): each the key's next version, as the panel writes one, so it is
- * the value read whatever version a migration left last (0088's second
- * version of the photo rule, #513).
+ * the value read whatever version a migration left last.
  */
 export async function withMatchingConfig(
   db: Queryable,
