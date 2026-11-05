@@ -51,18 +51,12 @@ const DAY_MS = 24 * HOUR_MS;
 
 /** Staff's words on the sanction, fixed per rule: what applied it, never what it counted. */
 const RULE_NOTE: Record<SanctionRule, string> = {
-  reports:
-    "Applied by the automatic rule on reports by different people; a moderator confirms or reverses it.",
-  first_messages:
-    "Applied by the automatic rule on first messages within the window; a moderator confirms or reverses it.",
-  same_first_message:
-    "Applied by the automatic rule on the same first message to several people; a moderator confirms or reverses it.",
-  photo_fetches:
-    "Applied by the automatic rule on other people's photos fetched within the window; a moderator confirms or reverses it.",
-  cards_served:
-    "Applied by the automatic rule on cards served within the window; a moderator confirms or reverses it.",
-  round_reads:
-    "Applied by the automatic rule on reads of the round within the window; a moderator confirms or reverses it.",
+  reports: "Applied by the automatic rule on reports by different people",
+  first_messages: "Applied by the automatic rule on first messages within the window",
+  same_first_message: "Applied by the automatic rule on the same first message to several people",
+  photo_fetches: "Applied by the automatic rule on other people's photos fetched within the window",
+  cards_served: "Applied by the automatic rule on cards served within the window",
+  round_reads: "Applied by the automatic rule on reads of the round within the window",
 };
 
 /** The reason on the sanction: the velocity rules' is scraping (the maintainer, 21/10/2026), the others' other. */

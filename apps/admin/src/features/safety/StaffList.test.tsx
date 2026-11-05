@@ -83,17 +83,17 @@ afterEach(() => {
 });
 
 describe("the staff list", () => {
-  it("is busy while it loads, and says where roles are granted", async () => {
+  it("is busy while it loads, then is a table named by the screen's heading, which only reads and counts nobody (#581)", async () => {
     fetchMock([staffOf()]);
     show();
     expect(screen.getByText("Loading the staff…")).toHaveAttribute("aria-busy", "true");
-    expect(
-      screen.getByText(
-        "Roles are granted and revoked by the maintainer's moderator tool, not here.",
-      ),
-    ).toBeInTheDocument();
-    await screen.findByRole("table");
+    const table = await screen.findByRole("table", { name: "Staff" });
     expect(screen.queryByText("Loading the staff…")).toBeNull();
+    expect(cells(table)).toEqual([]);
+    // The whole screen: its heading, Refresh and the table's columns.
+    expect(table.closest("section")?.textContent).toBe(
+      "StaffRefreshIdentityRoleGrantedByLast sign-in",
+    );
   });
 
   it("lists every member with role, grant, granter and last sign-in, Never for one who has not signed in", async () => {
@@ -109,8 +109,7 @@ describe("the staff list", () => {
       ),
     ]);
     show();
-    const table = await screen.findByRole("table");
-    expect(within(table).getByText("3 members of staff")).toBeInTheDocument();
+    const table = await screen.findByRole("table", { name: "Staff" });
     expect(
       within(table)
         .getAllByRole("columnheader")
@@ -141,20 +140,6 @@ describe("the staff list", () => {
     ]);
     expect(calls).toHaveLength(1);
     expect(calls[0]?.headers.get("authorization")).toBe(`Bearer ${"t".repeat(43)}`);
-  });
-
-  it("counts one member in the singular, and none as zero", async () => {
-    fetchMock([staffOf(member(ADMIN, { role: "admin" }))]);
-    show();
-    expect(await screen.findByText("1 member of staff")).toBeInTheDocument();
-    cleanup();
-    vi.unstubAllGlobals();
-
-    fetchMock([staffOf()]);
-    show();
-    const table = await screen.findByRole("table");
-    expect(within(table).getByText("0 members of staff")).toBeInTheDocument();
-    expect(cells(table)).toEqual([]);
   });
 
   it("asks again on refresh and shows what is true now", async () => {
@@ -195,7 +180,7 @@ describe("the staff list", () => {
       const logged = vi.spyOn(console, "error").mockImplementation(() => undefined);
       fetchMock([answer(respond)]);
       show();
-      expect(await screen.findByRole("alert")).toHaveTextContent("The staff could not be loaded.");
+      expect(await screen.findByRole("alert")).toHaveTextContent(/^Could not be loaded\.$/);
       expect(screen.queryByText("Loading the staff…")).toBeNull();
       expect(screen.queryByRole("table")).toBeNull();
       if (logs) expect(logged).toHaveBeenCalledWith("staff load failed", expect.anything());

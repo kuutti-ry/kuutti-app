@@ -108,7 +108,7 @@ describe("selects and fallbacks", () => {
     "fall back from %s to the English of an English-only key",
     (locale) => {
       expect(tIn(locale)("admin.queue.total", { total: 0 })).toBe("Nothing waiting");
-      expect(tIn(locale)("admin.queue.total", { total: 3 })).toBe("3 photos waiting");
+      expect(tIn(locale)("admin.queue.total", { total: 3 })).toBe("3 waiting");
     },
   );
 

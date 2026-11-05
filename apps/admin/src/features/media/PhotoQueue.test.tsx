@@ -1,5 +1,5 @@
 import { I18nProvider } from "@kuutti/i18n/react";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes, useParams } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { i18n } from "../../i18n.ts";
@@ -87,7 +87,8 @@ describe("PhotoQueue", () => {
       cardUrls,
     ]);
     show();
-    expect(await screen.findByText("2 photos waiting")).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { level: 2, name: "Photos" })).toBeInTheDocument();
+    expect(await screen.findByText("2 waiting")).toHaveAttribute("aria-live", "polite");
     expect(await screen.findAllByRole("img", { name: "Photo under review" })).toHaveLength(2);
     expect(screen.getByText("Suggestive (71 %)")).toBeInTheDocument();
     expect(screen.getByText("No face found")).toBeInTheDocument();
@@ -181,7 +182,7 @@ describe("PhotoQueue", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Approve" }));
     await waitFor(() => expect(screen.getByRole("button", { name: "Approve" })).toBeEnabled());
     expect(screen.queryByRole("alert")).toBeNull();
-    expect(screen.getByText("1 photo waiting")).toBeInTheDocument();
+    expect(screen.getByText("1 waiting")).toBeInTheDocument();
   });
 
   it("says when a decision was not saved and when the queue cannot load", async () => {
@@ -208,7 +209,7 @@ describe("PhotoQueue", () => {
           : null,
     ]);
     show();
-    expect(await screen.findByRole("alert")).toHaveTextContent("The queue could not be loaded.");
+    expect(await screen.findByRole("alert")).toHaveTextContent(/^Could not be loaded\.$/);
     cleanup();
     vi.unstubAllGlobals();
     // A network failure rejects the request outright: still the error state, not loading forever.
@@ -219,7 +220,7 @@ describe("PhotoQueue", () => {
       }),
     );
     show();
-    expect(await screen.findByRole("alert")).toHaveTextContent("The queue could not be loaded.");
+    expect(await screen.findByRole("alert")).toHaveTextContent(/^Could not be loaded\.$/);
   });
 
   it("says a decision was not saved when the network fails, and lets the moderator try again", async () => {
@@ -270,10 +271,10 @@ describe("PhotoQueue", () => {
       cardUrls,
     ]);
     show();
-    expect(await screen.findByText("2 photos waiting")).toBeInTheDocument();
+    expect(await screen.findByText("2 waiting")).toBeInTheDocument();
     total = 1;
     fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
-    expect(await screen.findByText("1 photo waiting")).toBeInTheDocument();
+    expect(await screen.findByText("1 waiting")).toBeInTheDocument();
     expect(calls.filter((c) => path(c) === "/admin/photos/queue")).toHaveLength(2);
     expect(new URL(calls[0]?.url ?? "").searchParams.get("limit")).toBe("20");
     await waitFor(() => expect(screen.getAllByRole("button", { name: "Approve" })).toHaveLength(1));
@@ -331,7 +332,7 @@ describe("PhotoQueue", () => {
     expect(card?.signal.aborted).toBe(true);
   });
 
-  it("says the check found no moderation label when a face was found and nothing else", async () => {
+  it("lets the face count stand alone when the check found no label (#581)", async () => {
     fetchMock([
       (req) =>
         path(req) === "/admin/photos/queue"
@@ -340,12 +341,13 @@ describe("PhotoQueue", () => {
       cardUrls,
     ]);
     show();
-    expect(await screen.findByText("2 faces found")).toBeInTheDocument();
-    expect(screen.getByText("The automatic check found no moderation label.")).toBeInTheDocument();
-    // The owner is named by the first part of the pseudonymous id only; the whole id is the link's (#306).
-    const caption = screen.getByText(/Account 6f1c1c4e ·$/);
-    expect(caption).toHaveTextContent(/· Account 6f1c1c4e · The person's page$/);
-    expect(caption).not.toHaveTextContent(item(1).accountId);
+    const heading = await screen.findByRole("heading", {
+      level: 3,
+      name: "What the automatic check saw",
+    });
+    const saw = heading.parentElement as HTMLElement;
+    expect(saw.textContent).toBe("What the automatic check saw2 faces found");
+    expect(within(saw).queryByRole("list")).toBeNull();
   });
 
   it("offers every rejection reason, and holds both buttons while a decision is saving", async () => {
@@ -412,7 +414,7 @@ describe("PhotoQueue", () => {
     answerDecision?.(json({ photoId: item(1).photoId, state: "approved", rejectionReason: null }));
     await waitFor(() => expect(answerQueue).toBeDefined());
     answerQueue?.(json({ items: [item(2)], total: 1 }));
-    expect(await screen.findByText("1 photo waiting")).toBeInTheDocument();
+    expect(await screen.findByText("1 waiting")).toBeInTheDocument();
     expect(screen.queryByText("Nothing waiting")).toBeNull();
   });
 
@@ -425,31 +427,29 @@ describe("PhotoQueue", () => {
       cardUrls,
     ]);
     show();
-    expect(
-      await screen.findByText(
-        "Hidden until you choose to look. The check saw something sensitive.",
-      ),
-    ).toBeInTheDocument();
+    expect(await screen.findByText("The check saw something sensitive.")).toBeInTheDocument();
     expect(screen.queryByRole("img")).toBeNull();
     // No signed URL, so no audit row of a view that did not happen.
     expect(calls.filter((req) => path(req).endsWith("/card"))).toHaveLength(0);
-    fireEvent.click(screen.getByRole("button", { name: "Show the picture" }));
+    fireEvent.click(screen.getByRole("button", { name: "Show photo" }));
     expect(await screen.findByRole("img")).toBeInTheDocument();
     expect(calls.filter((req) => path(req).endsWith("/card"))).toHaveLength(1);
   });
 
-  it("says when the owner asked a person to look", async () => {
+  it("says Appealed on a photo its owner appealed, and on no other (#581)", async () => {
     fetchMock([
       (req) =>
         req.method === "GET" && path(req) === "/admin/photos/queue"
-          ? json({ items: [item(1, { appealed: true })], total: 1 })
+          ? json({ items: [item(1, { appealed: true }), item(2)], total: 2 })
           : null,
       cardUrls,
     ]);
     show();
-    expect(
-      await screen.findByText("The owner asked a person to look at the automatic rejection."),
-    ).toBeInTheDocument();
+    const [appealed, other] = (await screen.findAllByRole("button", { name: "Approve" })).map(
+      (button) => button.closest("li") as HTMLElement,
+    );
+    expect(within(appealed as HTMLElement).getByText("Appealed")).toBeInTheDocument();
+    expect(within(other as HTMLElement).queryByText("Appealed")).toBeNull();
   });
 
   it("links each item to its owner's page by the whole account id, and the link opens it (#306)", async () => {
@@ -474,13 +474,21 @@ describe("PhotoQueue", () => {
         </MemoryRouter>
       </I18nProvider>,
     );
-    const links = await screen.findAllByRole("link", { name: "The person's page" });
-    expect(links.map((link) => link.getAttribute("href"))).toEqual([
-      `/accounts/${item(1).accountId}`,
-      `/accounts/${other}`,
-    ]);
-    fireEvent.click(links[1] as HTMLElement);
+    const first = await screen.findByRole("link", { name: "Account 6f1c1c4e" });
+    const second = screen.getByRole("link", { name: "Account 7a2d2d5f" });
+    expect(first).toHaveAttribute("href", `/accounts/${item(1).accountId}`);
+    expect(second).toHaveAttribute("href", `/accounts/${other}`);
+    // One link under a photo, a 44 px target: its own name is all the line says of the owner (#581).
+    expect(first).toHaveClass("target");
+    expect(second).toHaveClass("target");
+    expect(screen.getAllByRole("link")).toHaveLength(2);
+    // The owner is named by the first part of the pseudonymous id only; the whole id is the link's (#306).
+    const caption = first.closest("figcaption");
+    expect(caption).toHaveTextContent(/^Uploaded .*Account 6f1c1c4e$/);
+    expect(caption).not.toHaveTextContent("·");
+    expect(caption).not.toHaveTextContent(item(1).accountId);
+    fireEvent.click(second);
     expect(await screen.findByRole("status")).toHaveTextContent(other);
-    expect(screen.queryByText("2 photos waiting")).toBeNull();
+    expect(screen.queryByText("2 waiting")).toBeNull();
   });
 });

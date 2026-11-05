@@ -62,7 +62,8 @@ export function ReportQueue() {
     <section aria-labelledby="reports-title" className="space-y-6">
       <ScreenTitle id="reports-title">{t("admin.reports.title")}</ScreenTitle>
       <fieldset>
-        <legend className="mb-2 text-sm font-medium">{t("admin.reports.show")}</legend>
+        {/* The two choices say what they choose between; a screen reader keeps the group's name. */}
+        <legend className="sr-only">{t("admin.reports.show")}</legend>
         {/* A segmented choice whose dot says which, not its colour. */}
         <div className="inline-flex flex-wrap gap-1 rounded-lg border bg-card p-1">
           {(["open", "closed"] as const).map((value) => (
@@ -101,11 +102,11 @@ function ReportList({ state }: { state: State }) {
       <div className="flex flex-wrap items-center justify-between gap-3">
         {page.kind === "ready" && (
           <p aria-live="polite" className="text-muted-foreground">
-            {t(state === "open" ? "admin.reports.total.open" : "admin.reports.total.closed", {
+            {t(state === "open" ? "admin.queue.total" : "admin.reports.total.closed", {
               total: page.total,
             })}
             {page.items.length < page.total && (
-              <> {t("admin.reports.shown", { shown: String(page.items.length) })}</>
+              <> · {t("admin.reports.shown", { shown: String(page.items.length) })}</>
             )}
           </p>
         )}
@@ -115,7 +116,7 @@ function ReportList({ state }: { state: State }) {
         </Button>
       </div>
       {page.kind === "loading" && <Loading>{t("admin.reports.loading")}</Loading>}
-      {page.kind === "error" && <Alert>{t("admin.reports.error")}</Alert>}
+      {page.kind === "error" && <Alert>{t("admin.loadFailed")}</Alert>}
       {page.kind === "ready" && (
         <ul className="grid gap-4">
           {groupsOf(page.items).map((group) => (
