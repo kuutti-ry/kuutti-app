@@ -46,7 +46,9 @@ name: Home says how many people have completed their profiles and the gate in wo
 # The bar is one element, read as a screen reader hears it. The percentages under
 # it are drawn inside that element, so only Android reads them as text of their
 # own (as contact-share.yaml's shared line), each with its word, never the colour
-# alone.
+# alone. Android gives an element the bounds it has in sight, so the bar counts as
+# whole from its first line of pixels, and the last percentage is scrolled to by
+# itself (CI, 05/11/2026, with the card at the foot of a Home that holds the offer).
 - scrollUntilVisible:
     element: ".*\\d+ percent are looking for everyone.*|.*\\d+ prosenttia etsii kaikkia.*|.*\\d+ procent söker alla.*"
     direction: DOWN
@@ -55,6 +57,10 @@ name: Home says how many people have completed their profiles and the gate in wo
     when:
       platform: Android
     commands:
+      - scrollUntilVisible:
+          element: "\\d+ % women|\\d+ % naisia|\\d+ % kvinnor"
+          direction: DOWN
+          timeout: 60000
       - assertVisible: "\\d+ % men|\\d+ % miehiä|\\d+ % män"
       - assertVisible: "\\d+ % everyone|\\d+ % kaikkia|\\d+ % alla"
       - assertVisible: "\\d+ % women|\\d+ % naisia|\\d+ % kvinnor"

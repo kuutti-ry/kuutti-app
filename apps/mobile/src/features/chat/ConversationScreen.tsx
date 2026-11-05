@@ -706,7 +706,15 @@ function Conversation({
       className="flex-1"
       contentContainerClassName="gap-3 p-4"
       keyboardShouldPersistTaps="handled"
-      onContentSizeChange={() => scroll.current?.scrollToEnd({ animated: false })}
+      onContentSizeChange={() => {
+        const toEnd = () => scroll.current?.scrollToEnd({ animated: false });
+        toEnd();
+        // Android sends this as React commits the new size, and runs a view command
+        // ahead of the mount still waiting: under load the scroll stops at the old end,
+        // with the new message under the fold (CI, 05/11/2026). By the next frame the
+        // mount has gone first (ReactChoreographer: DISPATCH_UI, then the timers).
+        requestAnimationFrame(toEnd);
+      }}
     >
       {more && first && (
         <Button variant="ghost" onPress={() => onEarlier(first.seq)}>

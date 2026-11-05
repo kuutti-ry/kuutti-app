@@ -3,7 +3,14 @@ import { act, fireEvent, screen, userEvent, waitFor } from "@testing-library/rea
 import * as ImagePicker from "expo-image-picker";
 import { useLocales } from "expo-localization";
 import * as SecureStore from "expo-secure-store";
-import { AccessibilityInfo, AppState, Clipboard, Linking, Platform } from "react-native";
+import {
+  AccessibilityInfo,
+  AppState,
+  Clipboard,
+  Linking,
+  Platform,
+  ScrollView,
+} from "react-native";
 import { pickPrepared } from "@/features/media";
 import { clearSession, saveSession } from "@/lib/session";
 import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
@@ -394,13 +401,30 @@ describe("one conversation", () => {
       ]),
     );
     noProblems();
-    // A new size of the list keeps the newest in sight.
-    const scroll = screen.getByTestId("messages");
+    await press("Back");
+    expect(router.back).toHaveBeenCalled();
+  });
+
+  it("keeps the newest in sight as the list grows, and once more a frame later, when the new size has reached the screen", async () => {
+    conversation(detail(), [[message(1, "theirs", "Moi", DAY_1)]]);
+    await renderWithTheme(<ConversationScreen id={ID} />);
+    const scroll = await screen.findByTestId("messages");
+    // Frames held back until the test runs them, so the two scrolls can be told apart.
+    const frames: FrameRequestCallback[] = [];
+    jest.spyOn(globalThis, "requestAnimationFrame").mockImplementation((run) => {
+      frames.push(run);
+      return frames.length;
+    });
+    const toEnd = jest.spyOn(ScrollView.prototype, "scrollToEnd");
+    toEnd.mockClear();
     await act(async () => {
       fireEvent(scroll, "contentSizeChange", 390, 2000);
     });
-    await press("Back");
-    expect(router.back).toHaveBeenCalled();
+    expect(toEnd).toHaveBeenCalledTimes(1);
+    expect(toEnd).toHaveBeenLastCalledWith({ animated: false });
+    for (const run of frames.splice(0)) run(0);
+    expect(toEnd).toHaveBeenCalledTimes(2);
+    expect(toEnd).toHaveBeenLastCalledWith({ animated: false });
   });
 
   it("shows a message at once as sending, swaps it for the answer, and leaves the composer empty", async () => {
