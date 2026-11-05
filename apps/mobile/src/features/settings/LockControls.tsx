@@ -1,7 +1,7 @@
 import type { PlainMessageKey } from "@kuutti/i18n";
 import * as Sentry from "@sentry/react-native";
 import { useEffect, useState } from "react";
-import { AccessibilityInfo, AppState, Linking, Platform, View } from "react-native";
+import { AccessibilityInfo, AppState, Keyboard, Linking, Platform, View } from "react-native";
 import { Choice } from "@/components/Choice";
 import { sayAloud } from "@/components/Notice";
 import { Button } from "@/components/ui/button";
@@ -38,6 +38,12 @@ function PasscodeSetup({
   const [first, setFirst] = useState<string | null>(null);
   const [typed, setTyped] = useState("");
   const [mismatch, setMismatch] = useState(false);
+  // The field goes with this step. Android can leave its keyboard up with nothing
+  // to type into, over what comes next, unless it is closed while the field stands.
+  const leave = (then: () => void) => {
+    Keyboard.dismiss();
+    then();
+  };
   return (
     <View className="gap-4">
       <PasscodeField
@@ -53,7 +59,7 @@ function PasscodeSetup({
             setFirst(code);
             setMismatch(false);
           } else if (code === first) {
-            onDone(code);
+            leave(() => onDone(code));
           } else {
             setFirst(null);
             setMismatch(true);
@@ -62,7 +68,7 @@ function PasscodeSetup({
         }}
       />
       {mismatch && <Text accessibilityLiveRegion="assertive">{t("lock.passcode.mismatch")}</Text>}
-      <Button variant="outline" onPress={onCancel}>
+      <Button variant="outline" onPress={() => leave(onCancel)}>
         {t("lock.passcode.cancel")}
       </Button>
     </View>
