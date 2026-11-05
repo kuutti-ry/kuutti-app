@@ -534,6 +534,24 @@ describe("migrate", () => {
     });
   });
 
+  it("refuses a TRUNCATE of events while no partition stands to refuse it itself (ADR-011)", async () => {
+    // Each partition carries its own guard from the boot (ensureEventPartitions), and a
+    // TRUNCATE of the parent fires the partitions' too; before the first, only the parent's stands.
+    await withTemporaryDatabase(async (url) => {
+      const pool = createPool({ connectionString: url, max: 1 });
+      try {
+        await migrate(pool, MIGRATIONS);
+        const partitions = await pool.query(
+          "SELECT count(*) AS n FROM pg_inherits WHERE inhparent = 'events'::regclass",
+        );
+        expect(partitions.rows).toEqual([{ n: "0" }]);
+        await expect(pool.query("TRUNCATE events")).rejects.toMatchObject({ code: "42501" });
+      } finally {
+        await pool.end();
+      }
+    });
+  });
+
   it("is a no-op the second time", async () => {
     await withTemporaryDatabase(async (url) => {
       const pool = createPool({ connectionString: url, max: 2 });
