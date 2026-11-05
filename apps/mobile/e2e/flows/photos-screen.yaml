@@ -51,8 +51,11 @@ name: A photo opens full size and back, and removing one asks first
     timeout: 15000
 - tapOn: "No caption|Ei kuvatekstiä|Ingen bildtext"
 - extendedWaitUntil:
-    visible: "Add a caption|Lisää kuvateksti|Lägg till en bildtext"
+    notVisible: "A caption for photo 1|Kuvateksti kuvalle 1|En bildtext för foto 1"
     timeout: 15000
+# The button's own text on Android; iOS reads the button by its label and value,
+# so what it finds there is the value.
+- assertVisible: "Add a caption|Lisää kuvateksti|Lägg till en bildtext|No caption|Ei kuvatekstiä|Ingen bildtext"
 - assertNotVisible: "An old favourite|Vanha suosikki|En gammal favorit"
 
 - tapOn:

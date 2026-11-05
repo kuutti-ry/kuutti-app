@@ -3,7 +3,7 @@ import * as ImagePicker from "expo-image-picker";
 import { useLocales } from "expo-localization";
 import * as SecureStore from "expo-secure-store";
 import type * as React from "react";
-import { AccessibilityInfo, Platform } from "react-native";
+import { AccessibilityInfo, Dimensions, Platform } from "react-native";
 import { saveSession } from "@/lib/session";
 import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
 import { renderWithTheme } from "@/test/render";
@@ -543,6 +543,28 @@ describe("PhotosScreen", () => {
     await show(<PhotosScreen />);
     const add = await screen.findByRole("button", { name: "Add a photo" });
     expect(add.props.accessibilityState?.disabled).toBe(true);
+  });
+
+  describe("at a large text size (#581)", () => {
+    afterEach(() => jest.restoreAllMocks());
+
+    it.each([
+      ["the default size", 1, "w-[47%]"],
+      ["just under the line", 1.29, "w-[47%]"],
+      ["the line", 1.3, "w-full"],
+      ["the largest", 2, "w-full"],
+    ])(
+      "sets its tiles at %s, so that a caption's word never breaks",
+      async (_size, fontScale, width) => {
+        jest
+          .spyOn(Dimensions, "get")
+          .mockReturnValue({ width: 393, height: 852, scale: 3, fontScale });
+        fetchMock([answersList(approvedList(3)), answersUrls]);
+        await show(<PhotosScreen />);
+        await screen.findByRole("button", { name: "Caption of photo 1" });
+        expect(screen.getByTestId("photo-tile-1").props.className).toBe(width);
+      },
+    );
   });
 
   describe("how many there are (#581)", () => {

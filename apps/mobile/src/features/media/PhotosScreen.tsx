@@ -4,7 +4,7 @@ import { useRouter } from "expo-router";
 import Hourglass from "lucide-react-native/icons/hourglass";
 import Trash from "lucide-react-native/icons/trash";
 import { useEffect, useRef, useState } from "react";
-import { Animated, Pressable, ScrollView, View } from "react-native";
+import { Animated, Pressable, ScrollView, useWindowDimensions, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { sayAloud } from "@/components/Notice";
 import { Button } from "@/components/ui/button";
@@ -87,6 +87,9 @@ const TILE_ACTIONS: ReadonlyArray<{ name: string; key: PlainMessageKey }> = [
   { name: "makeMain", key: "photos.makeMain" },
 ];
 
+/** From here half a phone's width breaks a caption's longest word in the middle ("kuvateksti", at 390 pt and less). */
+const ONE_COLUMN_FONT_SCALE = 1.3;
+
 /**
  * The person's photos (#48, rules/mobile.md Images): a grid of thumbs,
  * reordered by holding a tile and dragging it, the first slot the main photo
@@ -121,6 +124,7 @@ export function PhotosScreen({ progress }: { progress?: { step: number; total: n
   // owner's order, as the card and the tips read it (ADR-009 §4). The first
   // tile while it is still in review is not it (#239).
   const mainId = list?.photos.find((photo) => photo.state === "approved")?.id;
+  const { fontScale } = useWindowDimensions();
   const busy = photos.busy.kind !== "idle";
   const atMax = list !== null && total >= list.maxPhotos;
   const count = list && t("photos.count", { photos: total, max: list.maxPhotos });
@@ -196,7 +200,7 @@ export function PhotosScreen({ progress }: { progress?: { step: number; total: n
               // a screen reader to land on; the tile inside is the control.
               <View
                 key={photo.id}
-                className="w-[47%]"
+                className={fontScale >= ONE_COLUMN_FONT_SCALE ? "w-full" : "w-[47%]"}
                 style={{ zIndex: tile.zIndex }}
                 onLayout={tile.onLayout}
                 accessible={false}
