@@ -1,16 +1,17 @@
 # The return link of the bank login (#36, #45): a link this phone did not ask
 # for is refused without touching the session (the login-CSRF guard), a link
-# to no screen goes home rather than to Expo's unmatched route, and every
-# refusal the API can send back is said in its own words, a crafted code as
-# the generic line. Most codes no persona produces (no cancel at the mock
-# bank, no suspended persona), so they are opened as links. Sanna; read only.
+# to no screen goes home rather than to Expo's unmatched route, a refusal with
+# a fact of its own says it, and one that only did not work, a crafted code too,
+# has the card's title alone (#581). Most codes no persona produces (no cancel
+# at the mock bank, no suspended persona), so they are opened as links. Sanna;
+# read only.
 appId: fi.kuutti.app
-name: A sign-in link not asked for is refused without touching the session, and every refusal is said in its own words
+name: A sign-in link not asked for is refused without touching the session, and a refusal has words only for a fact of its own
 ---
 - runFlow: ../common/sign-in.yaml
 - openLink: kuutti://auth?code=forged
 - extendedWaitUntil:
-    visible: "This sign-in link was not requested from this phone\\. Start the sign-in here, with the button\\.|Tätä kirjautumislinkkiä ei pyydetty tältä puhelimelta\\. Aloita kirjautuminen tästä painikkeella\\.|Den här inloggningslänken begärdes inte från den här telefonen\\. Starta inloggningen här med knappen\\."
+    visible: "This sign-in link was not requested from this phone\\.|Tätä kirjautumislinkkiä ei pyydetty tältä puhelimelta\\.|Den här inloggningslänken begärdes inte från den här telefonen\\."
     timeout: 15000
 # Still signed in: Logging out is a row only with a session (#581).
 - openLink: kuutti://settings
@@ -33,7 +34,10 @@ name: A sign-in link not asked for is refused without touching the session, and 
 
 # Signed out, each refusal by its code. Under one that lasts the button is the
 # sign-in, under any other Try again (#466); it comes a moment after the words,
-# so the button that should be there is asked for first.
+# so the button that should be there is asked for first. A link gone stale or a
+# failure on the way only did not work: the card's title alone says so (#581).
+# Each of those follows a refusal with words, whose going says the link was
+# answered, since nothing else on the screen need change.
 - runFlow: ../common/sign-out.yaml
 - openLink: kuutti://auth?error=auth_suspended
 - extendedWaitUntil:
@@ -42,6 +46,13 @@ name: A sign-in link not asked for is refused without touching the session, and 
 - assertVisible: "Sign-in did not complete|Kirjautuminen ei onnistunut|Inloggningen slutfördes inte"
 - assertVisible: "Sign in with your bank|Kirjaudu pankkitunnuksilla|Logga in med din bank"
 - assertNotVisible: "Try again|Yritä uudelleen|Försök igen"
+- openLink: kuutti://auth?error=auth_state_mismatch
+- extendedWaitUntil:
+    notVisible: "This account is suspended for now\\.|Tämä tili on toistaiseksi jäädytetty\\.|Det här kontot är tills vidare avstängt\\."
+    timeout: 15000
+- assertVisible: "Sign-in did not complete|Kirjautuminen ei onnistunut|Inloggningen slutfördes inte"
+- assertVisible: "Try again|Yritä uudelleen|Försök igen"
+- assertNotVisible: "Sign in with your bank|Kirjaudu pankkitunnuksilla|Logga in med din bank"
 # A suspension with its day (#307, ADR-024 §5): the start of 9.11.2026 in
 # Finland, winter time, still the 8th in UTC, so the day is Finland's in every
 # zone the phone could be in.
@@ -49,24 +60,25 @@ name: A sign-in link not asked for is refused without touching the session, and 
 - extendedWaitUntil:
     visible: "This account is suspended\\. You can sign in again from: 9\\.11\\.2026|Tämä tili on jäädytetty\\. Voit kirjautua taas sisään alkaen: 9\\.11\\.2026|Det här kontot är avstängt\\. Du kan logga in igen från och med: 9\\.11\\.2026"
     timeout: 15000
+- openLink: kuutti://auth?error=auth_code_used
+- extendedWaitUntil:
+    notVisible: "This account is suspended\\. You can sign in again from: 9\\.11\\.2026|Tämä tili on jäädytetty\\. Voit kirjautua taas sisään alkaen: 9\\.11\\.2026|Det här kontot är avstängt\\. Du kan logga in igen från och med: 9\\.11\\.2026"
+    timeout: 15000
+- assertVisible: "Sign-in did not complete|Kirjautuminen ei onnistunut|Inloggningen slutfördes inte"
+- assertVisible: "Try again|Yritä uudelleen|Försök igen"
+# Backed out at the bank: what the eye cannot see, that nothing stayed (#581).
 - openLink: kuutti://auth?error=auth_cancelled
 - extendedWaitUntil:
-    visible: "You cancelled the sign-in at your bank\\. Nothing was saved\\.|Peruutit kirjautumisen pankissasi\\. Mitään ei tallennettu\\.|Du avbröt inloggningen hos din bank\\. Inget sparades\\."
+    visible: "Nothing was saved\\.|Mitään ei tallennettu\\.|Inget sparades\\."
     timeout: 15000
 - assertVisible: "Try again|Yritä uudelleen|Försök igen"
 - assertNotVisible: "Sign in with your bank|Kirjaudu pankkitunnuksilla|Logga in med din bank"
-- openLink: kuutti://auth?error=auth_state_mismatch
-- extendedWaitUntil:
-    visible: "That sign-in attempt is unknown or has expired\\. Start again\\.|Tätä kirjautumisyritystä ei tunnisteta tai se on vanhentunut\\. Aloita alusta\\.|Det här inloggningsförsöket är okänt eller har gått ut\\. Börja om\\."
-    timeout: 15000
-- openLink: kuutti://auth?error=auth_code_used
-- extendedWaitUntil:
-    visible: "That sign-in link was already used or has expired\\. Start again\\.|Tämä kirjautumislinkki on jo käytetty tai vanhentunut\\. Aloita alusta\\.|Den här inloggningslänken har redan använts eller gått ut\\. Börja om\\."
-    timeout: 15000
 - openLink: kuutti://auth?error=auth_provider_error
 - extendedWaitUntil:
-    visible: "The identification service did not complete the sign-in\\. Try again in a moment\\.|Tunnistuspalvelu ei saanut kirjautumista valmiiksi\\. Yritä hetken kuluttua uudelleen\\.|Identifieringstjänsten slutförde inte inloggningen\\. Försök igen om en stund\\."
+    notVisible: "Nothing was saved\\.|Mitään ei tallennettu\\.|Inget sparades\\."
     timeout: 15000
+- assertVisible: "Sign-in did not complete|Kirjautuminen ei onnistunut|Inloggningen slutfördes inte"
+- assertVisible: "Try again|Yritä uudelleen|Försök igen"
 # Midday UTC, so the same day in every zone the phone could be in.
 - openLink: kuutti://auth?error=auth_cooldown&until=2026-11-09T12:00:00.000Z
 - extendedWaitUntil:
@@ -77,5 +89,7 @@ name: A sign-in link not asked for is refused without touching the session, and 
 # A code the app does not know, named like a property every object has.
 - openLink: kuutti://auth?error=toString
 - extendedWaitUntil:
-    visible: "Something went wrong\\. Try again\\.|Jokin meni pieleen\\. Yritä uudelleen\\.|Något gick fel\\. Försök igen\\."
+    notVisible: ".*9\\.11\\.2026.*|.*11/9/2026.*|.*2026-11-09.*"
     timeout: 15000
+- assertVisible: "Sign-in did not complete|Kirjautuminen ei onnistunut|Inloggningen slutfördes inte"
+- assertVisible: "Try again|Yritä uudelleen|Försök igen"

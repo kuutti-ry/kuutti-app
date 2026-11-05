@@ -8,24 +8,25 @@ The personas and their banks: `services/mock-idp/README.md`. Locally every perso
 
 Aino Virtanen is a newcomer: Kuutti has never seen her.
 
-1. Open the app. The first screen is the sign-in: "Kuutti verifies every account through a Finnish bank. Your bank confirms who you are; Kuutti keeps only your year and month of birth and a code that cannot be turned back into you." One button, "Sign in with your bank".
+1. Open the app. On a phone's first sign-in the first screen is "How we do things here": two norms and the two consents, terms and privacy, with their version, and one tap (ADR-010 §15). Then the sign-in: its title and one button, "Sign in with your bank".
 2. Tap it. The system browser opens the bank chooser. Locally: the mock bank's page, tap **Aino Virtanen**. On staging: Telia's chooser, choose **Nordea**, user `DEMOUSER2`, confirm on the bank's test page.
-3. The bank sends the browser back; the app receives its one-time code and shows the session. Say what happened: the code was parsed, the age checked, the HMAC derived, the code discarded; nothing of the bank's name for her is kept (rule 1 and 3).
+3. The bank sends the browser back; the app receives its one-time code, says Signing you in…, and goes on to the first open step. Say what happened: the code was parsed, the age checked, the HMAC derived, the code discarded; nothing of the bank's name for her is kept (rule 1 and 3).
 
 ## Scene 2: Onboarding (3 min)
 
 The steps in the order the sheet asks them (ADR-010, #146), one screen each, "Continue" at the bottom and the progress above.
 
-1. Welcome: how Kuutti does things, and the two consents, terms and privacy, with their version. One tap.
-2. Name: what the card will call her. Type "Aino".
-3. Gender: self-declared; the identity label is offered after a non-binary answer only. Choose a woman.
-4. Whom she seeks: one to three; under it the line "I consent to Kuutti storing whom I seek" (the article 9 consent, ADR-019 §4). Choose men.
-5. Intent: long-term, casual, or open to either.
-6. Age window: buttons, not a number field, around her own age.
-7. "Where do you live?": "Your postal code tells Kuutti how far people are. Others see a town or your area by name, never the digits." Type five digits; the names under the field come from a list on the phone, so a half-typed home never reaches the server. Then "What should your card show?": the town or, where her area is large enough to keep, the area, which she may choose. Where none is, "On your card:" and the town stand in the question's place. Say what happened: what is kept is a place of at least three thousand people, and the home changes whenever she likes (ADR-061).
-8. Photos: "Add photos", at least three. From the camera roll: three or more of her five pictures (the runbook put them there). Each goes through the pipeline: resized, EXIF stripped, three variants, a blurhash, the check. Locally the check queues everything, so the grid shows them "In review"; on staging Rekognition approves a face within seconds.
-9. "A few words": two questions of twelve, or a bio of fifty characters.
-10. Done. Writing the home also set the pond, of which there is one, the whole country; there is no pond step.
+1. Welcome, only on a phone that went straight to the bank, having recorded the consents at an earlier sign-in: the same "How we do things here". One tap.
+2. "Did a friend invite you?": a field for a friend's code, and "Skip". Skip it; the step does not count in the progress.
+3. Name: what the card will call her. Type "Aino".
+4. Gender: self-declared; the identity label is offered after a non-binary answer only. Choose a woman.
+5. Whom she seeks: one to three; under it the line "I consent to Kuutti storing whom I seek" (the article 9 consent, ADR-019 §4). Choose men.
+6. Intent: long-term, casual, or open to either.
+7. Age window: buttons, not a number field, around her own age.
+8. "Where do you live?": "Your postal code tells Kuutti how far people are. Others see a town or your area by name, never the digits." Type five digits; the names under the field come from a list on the phone, so a half-typed home never reaches the server. Then "What should your card show?": the town or, where her area is large enough to keep, the area, which she may choose. Where none is, "On your card:" and the town stand in the question's place. Say what happened: what is kept is a place of at least three thousand people, and the home changes whenever she likes (ADR-061).
+9. "Two photos of you": the grid on the step itself, "Add a photo" at least twice, then "Continue". From the camera roll: two or more of Aino's five pictures (the runbook put them there). Each goes through the pipeline: resized, EXIF stripped, three variants, a blurhash, the check. Locally the check queues everything, so the grid shows them "In review"; on staging Rekognition approves a face within seconds.
+10. "A few words": two questions of twelve, or a bio of fifty characters.
+11. The home screen comes at once. Writing the postal code also set the pond, of which there is one, the whole country; there is no pond step.
 
 The account is active once the four matching answers and the two consents are there (ADR-010 §6); the profile steps may be finished later.
 

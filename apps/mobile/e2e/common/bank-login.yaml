@@ -11,7 +11,7 @@ appId: fi.kuutti.app
 # "Try again" (#466), or on a phone that has not recorded the current wordings
 # the screens before the bank (#418, ADR-010 §15) where the button would be.
 - extendedWaitUntil:
-    visible: "Sign in with your bank|Kirjaudu pankkitunnuksilla|Logga in med din bank|Try again|Yritä uudelleen|Försök igen|Before you sign in|Ennen kuin kirjaudut|Innan du loggar in|I'm in, and I accept both|Olen mukana ja hyväksyn molemmat|Jag är med och godkänner båda"
+    visible: "Sign in with your bank|Kirjaudu pankkitunnuksilla|Logga in med din bank|Try again|Yritä uudelleen|Försök igen|How we do things here|Näin täällä toimitaan|Så här gör vi här|I'm in, and I accept both|Olen mukana ja hyväksyn molemmat|Jag är med och godkänner båda"
     timeout: 15000
 # The screens before the bank when they come (before-sign-in.yaml), at the
 # top of each try. Then the button: a tap that lands while the screen still
@@ -31,7 +31,7 @@ appId: fi.kuutti.app
           commands:
             - tapOn: "Sign in with your bank|Kirjaudu pankkitunnuksilla|Logga in med din bank|Try again|Yritä uudelleen|Försök igen"
       - extendedWaitUntil:
-          visible: "Mock bank|Continue|Jatka|Fortsätt|Use without an account|Accept & continue|Don't allow|No thanks|Before you sign in|Ennen kuin kirjaudut|Innan du loggar in|I'm in, and I accept both|Olen mukana ja hyväksyn molemmat|Jag är med och godkänner båda"
+          visible: "Mock bank|Continue|Jatka|Fortsätt|Use without an account|Accept & continue|Don't allow|No thanks|How we do things here|Näin täällä toimitaan|Så här gör vi här|I'm in, and I accept both|Olen mukana ja hyväksyn molemmat|Jag är med och godkänner båda"
           timeout: 20000
       - runFlow: before-sign-in.yaml
       - runFlow:
@@ -89,6 +89,8 @@ appId: fi.kuutti.app
           direction: DOWN
           centerElement: true
           timeout: 60000
+# Back in the app: a refusal, home, or an onboarding step, known by its number
+# or by the heading of the two that count none (#581).
 - waitForAnimationToEnd
 - retry:
     maxRetries: 2
@@ -99,7 +101,7 @@ appId: fi.kuutti.app
           commands:
             - tapOn: ".*${PERSONA}.*"
       - extendedWaitUntil:
-          visible: "Open|Avaa|Öppna|Sign-in did not complete|Kirjautuminen ei onnistunut|Inloggningen slutfördes inte|Your profile|Profiilisi|Din profil|Welcome to Kuutti|Tervetuloa Kuuttiin|Välkommen till Kuutti"
+          visible: "Open|Avaa|Öppna|Sign-in did not complete|Kirjautuminen ei onnistunut|Inloggningen slutfördes inte|Your profile|Profiilisi|Din profil|Step \\d+ of \\d+|Vaihe \\d+ / \\d+|Steg \\d+ av \\d+|Did a friend invite you\\?|Kutsuiko ystävä sinut\\?|Bjöd en vän in dig\\?|How we do things here|Näin täällä toimitaan|Så här gör vi här"
           timeout: 20000
 # Only iOS asks: on Android the question would cost its 7 s on every sign-in.
 - runFlow:

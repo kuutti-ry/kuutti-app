@@ -64,7 +64,7 @@ name: What you seek lists whom, the ages, why and the deal-breakers, and each ch
     visible: "✓ Men|✓ Miehiä|✓ Män"
     timeout: 15000
 - waitForAnimationToEnd
-- assertNotVisible: "Pick everyone you want to see\\. .*|Valitse kaikki, joita haluat nähdä\\. .*|Välj alla du vill se\\. .*"
+- assertNotVisible: "Nobody outside your choice is ever shown to you.*|Ketään valintasi ulkopuolelta ei koskaan näytetä sinulle.*|Ingen utanför ditt val visas någonsin för dig.*"
 - tapOn: "✓ Men|✓ Miehiä|✓ Män"
 - assertVisible: "Keep at least one\\.|Pidä ainakin yksi\\.|Behåll minst en\\."
 - assertVisible: "✓ Men|✓ Miehiä|✓ Män"
@@ -97,7 +97,6 @@ name: What you seek lists whom, the ages, why and the deal-breakers, and each ch
     visible: "60"
     timeout: 15000
 - assertVisible: "72"
-- assertNotVisible: "Between 18 and 99\\. .*|Väliltä 18–99\\. .*|Mellan 18 och 99\\. .*"
 - waitForAnimationToEnd
 - tapOn: "Youngest, one year older|Nuorin, vuotta vanhempi|Yngsta, ett år äldre"
 - assertVisible: "61"

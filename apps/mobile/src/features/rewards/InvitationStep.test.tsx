@@ -5,15 +5,13 @@ import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
 import { renderWithTheme } from "@/test/render";
 import { InvitationStep } from "./InvitationStep";
 
-// Onboarding's optional step after the welcome (#107): what a code earns the
-// person while it earns them anything (#503), the field and Skip; after a code
-// that worked, that it is in, and Continue; either way the step is done, in the
-// phone's language.
+// Onboarding's optional step after the welcome (#107): its question for a
+// heading (#581), what a code earns the person while it earns them anything
+// (#503), the field and Skip; after a code that worked, that it is in, and
+// Continue; either way the step is done, in the phone's language.
 
 const ONE_EACH = { inviterFish: 1, friendFish: 1 };
 const EARNS = "The code earns you a fish and your friend a fish once your profile is complete.";
-const EXPLAIN =
-  "If a friend gave you an invitation code, type it here. You can also skip this and type it later in Settings, until your profile is complete.";
 /** Every text on the screen, in order. */
 const drawn = () => screen.queryAllByText(/./).map((node) => node.props.children);
 const token = (seed: string) => (seed + "x".repeat(43)).slice(0, 43);
@@ -44,20 +42,24 @@ describe("InvitationStep", () => {
   it("offers the field and Skip, and Skip is done with the step", async () => {
     const onDone = jest.fn();
     await renderWithTheme(<InvitationStep reward={ONE_EACH} onDone={onDone} />);
-    expect(screen.getByRole("heading", { name: "Did a friend invite you?" })).toBeTruthy();
-    expect(screen.getByText(EXPLAIN)).toBeTruthy();
+    const heading = screen.getByRole("heading", { name: "Did a friend invite you?" });
+    expect(heading.props.accessibilityRole).toBe("header");
+    expect(heading.props["aria-level"]).toBe("1");
     expect(screen.getByLabelText("Invitation code")).toBeTruthy();
     noProblems();
     await press("Skip");
     expect(onDone).toHaveBeenCalledTimes(1);
   });
 
-  it("says what a code earns between the explanation and the field", async () => {
+  it("says what a code earns between the heading and the field, and points nowhere else (#581)", async () => {
     await renderWithTheme(<InvitationStep reward={ONE_EACH} onDone={jest.fn()} />);
-    const flat = JSON.stringify(screen.toJSON());
-    expect(flat.indexOf("If a friend gave you")).toBeGreaterThan(-1);
-    expect(flat.indexOf("If a friend gave you")).toBeLessThan(flat.indexOf(EARNS));
-    expect(flat.indexOf(EARNS)).toBeLessThan(flat.indexOf("Use the code"));
+    expect(drawn()).toEqual([
+      "Did a friend invite you?",
+      EARNS,
+      "Invitation code",
+      "Use the code",
+      "Skip",
+    ]);
   });
 
   it.each([
@@ -103,7 +105,6 @@ describe("InvitationStep", () => {
       expect(screen.getByLabelText("Invitation code")).toBeTruthy();
       expect(drawn()).toEqual([
         "Did a friend invite you?",
-        EXPLAIN,
         "Invitation code",
         "Use the code",
         "Skip",

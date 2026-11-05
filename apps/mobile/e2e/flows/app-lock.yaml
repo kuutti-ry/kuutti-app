@@ -109,4 +109,5 @@ name: A passcode set in Settings locks the app at a cold start and back from the
 - extendedWaitUntil:
     visible: "Signed out by the lock|Lukitus kirjasi sinut ulos|Låset loggade ut dig"
     timeout: 15000
+- assertVisible: "Nothing on your account changed\\. The lock is off until you turn it on again in Settings\\.|Tilillesi ei muuttunut mitään\\. Lukitus on pois päältä, kunnes otat sen taas käyttöön asetuksista\\.|Ingenting ändrades på ditt konto\\. Låset är av tills du slår på det igen i inställningarna\\."
 - assertVisible: "Sign in with your bank|Kirjaudu pankkitunnuksilla|Logga in med din bank"

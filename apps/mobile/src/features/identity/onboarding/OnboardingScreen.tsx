@@ -5,7 +5,6 @@ import {
   BIO_MIN_FOR_COMPLETENESS,
   bioOrPromptsComplete,
   type ConsentKind,
-  DISPLAY_NAME_MAX,
   type Gender,
   type HomeSummary,
   type HomeUpdate,
@@ -18,18 +17,20 @@ import { useRouter } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import { type ScrollView, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { Choice } from "@/components/Choice";
 import { KeyboardScrollView } from "@/components/KeyboardScrollView";
 import { LoadFailed } from "@/components/LoadFailed";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Stepper } from "@/components/ui/stepper";
 import { Switch } from "@/components/ui/switch";
 import { Text } from "@/components/ui/text";
+import { PhotosScreen } from "@/features/media";
 import {
   BioEditor,
   GenderChips,
   IdentityLabelChips,
+  NameEditor,
   optionKey,
   PlaceChoice,
   PlacePicker,
@@ -100,6 +101,12 @@ type LocalAnswers = {
    * change of its answer unsaved.
    */
   seeksHeld: boolean;
+  /**
+   * The photos step is open, and only its Continue ends it: to the API two
+   * photos answer the step, and coming back from a photo's own screen reads the
+   * status again, which would move on from under somebody still choosing (#581).
+   */
+  photosHeld: boolean;
 };
 
 /**
@@ -127,7 +134,7 @@ function nextStep(status: OnboardingStatus, local: LocalAnswers): Step {
   if (missing.has("age_window")) return "age";
   if (missing.has("home")) return "home";
   if (local.homeShown) return "homeShown";
-  if (missing.has("photos")) return "photos";
+  if (missing.has("photos") || local.photosHeld) return "photos";
   if (missing.has("prompts_or_bio")) return "prompts";
   if (missing.size > 0) return "stuck";
   return "done";
@@ -151,34 +158,15 @@ export function defaultAgeWindow(age: number): { min: number; max: number } {
   };
 }
 
-function Chip({
-  label,
-  selected,
-  onPress,
-}: {
-  label: string;
-  selected: boolean;
-  onPress: () => void;
-}) {
-  return (
-    <Button
-      variant={selected ? "default" : "outline"}
-      accessibilityState={{ selected }}
-      onPress={onPress}
-    >
-      {label}
-    </Button>
-  );
-}
-
 /**
  * The first minutes after the bank login (#46, #146, ADR-010): one question
- * per screen in the field sheet's order, every answer a button, the consents
- * shown as the exact version the person accepts when they are asked again,
- * the article 9 consent on the screen that collects whom one seeks.
- * The API decides what is still missing; this screen asks the next thing and
- * leaves when nothing is. The profile's own draft carries the name, the
- * label, the intent and the prompts (#47).
+ * per screen in the field sheet's order, the question its heading (#581), every
+ * answer a button, the consents shown as the exact version the person accepts
+ * when they are asked again, the article 9 consent on the screen that collects
+ * whom one seeks, the photos step the photos screen itself. The API decides what
+ * is still missing; this screen asks the next thing and leaves when nothing is.
+ * The profile's own draft carries the name, the label, the intent and the
+ * prompts (#47).
  */
 export function OnboardingScreen() {
   const { t, locale } = useT();
@@ -190,13 +178,14 @@ export function OnboardingScreen() {
   const [invitationReward, setInvitationReward] = useState<InvitationReward | null>(null);
   const [seeks, setSeeks] = useState<Gender[] | null>(null);
   const [seeksHeld, setSeeksHeld] = useState(false);
+  const [photosHeld, setPhotosHeld] = useState(false);
   const [labelPending, setLabelPending] = useState(false);
   const [homeShown, setHomeShown] = useState<HomeSummary | null>(null);
   const [gender, setGender] = useState<Gender | null>(null);
   const [ages, setAges] = useState<{ min: number; max: number } | null>(null);
   const current: Step | null =
     state.status === "ready"
-      ? nextStep(state.onboarding, { invitation, labelPending, homeShown, seeksHeld })
+      ? nextStep(state.onboarding, { invitation, labelPending, homeShown, seeksHeld, photosHeld })
       : null;
   // Whether a code may still be typed, asked once the consents are given,
   // which the API's answer needs (ADR-044 §6): offered if so, and otherwise,
@@ -232,6 +221,10 @@ export function OnboardingScreen() {
     setSeeks(storedSeeks ?? []);
     setSeeksHeld(storedSeeks !== null);
   }, [current, seeks, storedSeeks]);
+  // Reached once, by the status: from here on the step stands until its Continue.
+  useEffect(() => {
+    if (current === "photos") setPhotosHeld(true);
+  }, [current]);
   const age = state.status === "ready" ? state.onboarding.age : null;
   // From when a refused change of gender is possible (#147).
   const changeFrom = state.status === "ready" ? state.onboarding.nextChange.gender : null;
@@ -272,7 +265,12 @@ export function OnboardingScreen() {
             : profileErrorText(profile.notice, t);
   useSpokenOnIos(failure);
 
-  if (state.status === "loading" || profile.status === "loading") {
+  if (
+    state.status === "loading" ||
+    profile.status === "loading" ||
+    // The invitation's own heading comes only with the answer that offers it.
+    (current === "invitation" && !(invitation === "offered" && invitationReward))
+  ) {
     return (
       <SafeAreaView className="flex-1 bg-background">
         <View className="flex-1 items-center justify-center p-6">
@@ -310,9 +308,28 @@ export function OnboardingScreen() {
       </SafeAreaView>
     );
   }
+  // Home takes over at once (the effect above), and says what comes next.
+  if (current === "done") return <SafeAreaView className="flex-1 bg-background" />;
   const { onboarding } = state;
   const { draft, update } = profile;
   const position = STEPS.indexOf(NUMBERED_AS[current] ?? current) + 1;
+  if (current === "photos") {
+    return (
+      <PhotosScreen
+        step={{
+          position,
+          total: STEPS.length,
+          reading: busy,
+          onContinue: async () => {
+            const read = await step(async () => undefined);
+            // Only an answer that no longer lists photos ends the step: a photo refused meanwhile
+            // keeps it, and the hold with it, so the next status read moves nobody on.
+            if (read && !read.missing.includes("photos")) setPhotosHeld(false);
+          },
+        }}
+      />
+    );
+  }
   const chosenSeeks = seeks ?? [];
   const specialConsented =
     onboarding.consents.specialCategory === bundledVersion("special_category");
@@ -322,11 +339,8 @@ export function OnboardingScreen() {
   return (
     <SafeAreaView className="flex-1 bg-background">
       {/* The home's list lies under its field: a scroll reaches it past the keyboard. */}
-      <KeyboardScrollView ref={scroll} contentContainerClassName="flex-grow gap-6 p-6">
-        <Text variant="h1" accessibilityRole="header">
-          {t("onboarding.title")}
-        </Text>
-        {current !== "done" && current !== "welcome" && current !== "invitation" && (
+      <KeyboardScrollView ref={scroll} contentContainerClassName="flex-grow gap-4 p-6">
+        {current !== "welcome" && current !== "invitation" && (
           <Text variant="muted" accessibilityLiveRegion="polite">
             {t("onboarding.progress", { step: position, total: STEPS.length })}
           </Text>
@@ -365,24 +379,16 @@ export function OnboardingScreen() {
           </View>
         )}
 
-        {current === "invitation" &&
-          (invitation === "offered" && invitationReward ? (
-            <InvitationStep reward={invitationReward} onDone={() => setInvitation("done")} />
-          ) : (
-            <Text accessibilityLiveRegion="polite">{t("onboarding.loading")}</Text>
-          ))}
+        {current === "invitation" && invitationReward && (
+          <InvitationStep reward={invitationReward} onDone={() => setInvitation("done")} />
+        )}
 
         {current === "name" && (
           <View className="gap-4">
-            <Text variant="h2">{t("onboarding.name.title")}</Text>
-            <Text>{t("onboarding.name.explain")}</Text>
-            <Input
-              accessibilityLabel={t("profile.displayName.label")}
-              value={draft.displayName}
-              maxLength={DISPLAY_NAME_MAX}
-              autoCapitalize="words"
-              onChangeText={(displayName) => update({ displayName })}
-            />
+            <Text variant="h1" accessibilityRole="header">
+              {t("onboarding.name.title")}
+            </Text>
+            <NameEditor draft={draft} update={update} />
             <Button
               disabled={busy || profile.saving || draft.displayName.trim().length === 0}
               onPress={() => {
@@ -397,7 +403,9 @@ export function OnboardingScreen() {
 
         {current === "gender" && (
           <View className="gap-4">
-            <Text variant="h2">{t("onboarding.gender.title")}</Text>
+            <Text variant="h1" accessibilityRole="header">
+              {t("onboarding.gender.title")}
+            </Text>
             <Text>{t("onboarding.gender.explain")}</Text>
             <GenderChips chosen={gender} onChoose={setGender} />
             <Button
@@ -417,7 +425,9 @@ export function OnboardingScreen() {
 
         {current === "identityLabel" && (
           <View className="gap-4">
-            <Text variant="h2">{t("onboarding.identityLabel.title")}</Text>
+            <Text variant="h1" accessibilityRole="header">
+              {t("onboarding.identityLabel.title")}
+            </Text>
             <Text>{t("onboarding.identityLabel.explain")}</Text>
             <IdentityLabelChips
               chosen={draft.fields.identityLabel}
@@ -449,7 +459,9 @@ export function OnboardingScreen() {
 
         {current === "seeks" && (
           <View className="gap-4">
-            <Text variant="h2">{t("onboarding.seeks.title")}</Text>
+            <Text variant="h1" accessibilityRole="header">
+              {t("onboarding.seeks.title")}
+            </Text>
             <Text>{t("onboarding.seeks.explain")}</Text>
             <SeeksChips chosen={chosenSeeks} onChange={setSeeks} />
             {/* Article 9: the consent on the screen that collects the answer (ADR-019 §4). */}
@@ -512,14 +524,20 @@ export function OnboardingScreen() {
 
         {current === "intent" && (
           <View className="gap-4">
-            <Text variant="h2">{t("onboarding.intent.title")}</Text>
+            <Text variant="h1" accessibilityRole="header">
+              {t("onboarding.intent.title")}
+            </Text>
             <Text>{t("onboarding.intent.explain")}</Text>
-            <View className="flex-row flex-wrap gap-2">
+            <View
+              accessibilityRole="radiogroup"
+              accessibilityLabel={t("onboarding.intent.title")}
+              className="gap-2"
+            >
               {PROFILE_FIELDS.intent.options.map((option) => (
-                <Chip
+                <Choice
                   key={option}
                   label={t(optionKey("intent", option))}
-                  selected={draft.fields.intent === option}
+                  chosen={draft.fields.intent === option}
                   onPress={() => {
                     tap();
                     setField("intent", option);
@@ -541,8 +559,9 @@ export function OnboardingScreen() {
 
         {current === "age" && ages && (
           <View className="gap-4">
-            <Text variant="h2">{t("onboarding.age.title")}</Text>
-            <Text>{t("onboarding.age.explain", { min: AGE_MIN, max: AGE_MAX })}</Text>
+            <Text variant="h1" accessibilityRole="header">
+              {t("onboarding.age.title")}
+            </Text>
             {/* One above the other, as on What you seek: side by side, with the minus and the plus further from the number, they overflow a small phone (#581). */}
             <Stepper
               label={t("onboarding.age.youngest")}
@@ -578,7 +597,9 @@ export function OnboardingScreen() {
 
         {current === "home" && (
           <View className="gap-4">
-            <Text variant="h2">{t("onboarding.home.title")}</Text>
+            <Text variant="h1" accessibilityRole="header">
+              {t("onboarding.home.title")}
+            </Text>
             <Text>{t("profile.place.explain")}</Text>
             <PlacePicker
               busy={busy}
@@ -592,7 +613,7 @@ export function OnboardingScreen() {
         {current === "homeShown" && homeShown && (
           <View className="gap-4">
             <PlaceChoice
-              heading="h2"
+              heading="h1"
               home={homeShown}
               busy={busy}
               onChoose={(showArea) => void saveHomeStep({ showArea })}
@@ -610,28 +631,11 @@ export function OnboardingScreen() {
           </View>
         )}
 
-        {current === "photos" && (
-          <View className="gap-4">
-            <Text variant="h2">{t("onboarding.photos.title")}</Text>
-            <Text>{t("onboarding.photos.explain")}</Text>
-            <Button
-              onPress={() => {
-                tap();
-                // The photos screen says this step too, as every other step does (#146).
-                router.push({
-                  pathname: "/photos",
-                  params: { step: String(position), total: String(STEPS.length) },
-                });
-              }}
-            >
-              {t("onboarding.photos.open")}
-            </Button>
-          </View>
-        )}
-
         {current === "prompts" && (
           <View className="gap-4">
-            <Text variant="h2">{t("onboarding.prompts.title")}</Text>
+            <Text variant="h1" accessibilityRole="header">
+              {t("onboarding.prompts.title")}
+            </Text>
             <Text>{t("onboarding.prompts.explain", { min: BIO_MIN_FOR_COMPLETENESS })}</Text>
             {/* The bio or a ready line, as in the basics: either finishes this step (#239). */}
             <BioEditor draft={draft} update={update} />
@@ -657,8 +661,6 @@ export function OnboardingScreen() {
             </Button>
           </View>
         )}
-
-        {current === "done" && <Text accessibilityLiveRegion="polite">{t("onboarding.done")}</Text>}
       </KeyboardScrollView>
     </SafeAreaView>
   );

@@ -79,7 +79,7 @@ describe("useOnboarding", () => {
   it("runs a step, is busy meanwhile, then reads the status again", async () => {
     const { result } = await ready();
     let finish: (() => void) | undefined;
-    let running: Promise<void> | undefined;
+    let running: Promise<unknown> | undefined;
     await act(async () => {
       running = result.current.step(
         () =>
