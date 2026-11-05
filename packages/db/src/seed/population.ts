@@ -28,9 +28,9 @@ import { BIOS, type Language, NAMES, OCCUPATION_TITLES, PROMPT_ANSWERS } from ".
  * anybody: the generator and its word lists are all there is.
  *
  * It is made to cross the product's thresholds, not only to fill screens:
- * from enough people up, the one pond shows the counter's split. The shares
- * are exact counts, not draws, so the thresholds are crossed by construction
- * and not by luck; what is drawn is who gets which age, name and words, and,
+ * from enough people up, the one pond shows the counter's number and its bar
+ * (`BAR_PEOPLE`), by construction and not by luck. The gender shares are exact
+ * counts, not draws; what is drawn is who gets which age, name and words, and,
  * from the list the API holds, where they live.
  *
  * Pure: no clock, no database. Every date derives from the epoch.
@@ -59,15 +59,14 @@ export type PondPlan = {
 
 /**
  * Who lives where, and why: the data dictionary of docs/demo/population.md in
- * code. One pond, the whole country (ADR-061 §8): it has to show everything at
- * once, so from enough people up every counter cell is at k.
+ * code. One pond, the whole country (ADR-061 §8).
  */
 export const POND_PLANS: readonly PondPlan[] = [
   {
     slug: "suomi",
     people: { share: 1 },
     genders: { woman: 0.32, man: 0.62, non_binary: 0.06 },
-    why: "from 174 people up every gender cell is at ten or more, so the counter shows the split",
+    why: "the whole country, so everybody who onboarded is here",
   },
 ];
 
@@ -475,23 +474,7 @@ export function plannedPonds(size: number): Record<string, PondSummary> {
   return ponds;
 }
 
-export type Thresholds = { counterK: number };
-
-/**
- * What a population of this size does not show, in words; empty when it shows
- * everything it is there for. The shares cross the thresholds by construction
- * only when the pond is large enough, which it is from 174 people up.
- */
-export function uncrossed(ponds: Record<string, PondSummary>, t: Thresholds): string[] {
-  const missing: string[] = [];
-  const pond = ponds.suomi;
-  if (!pond || [pond.woman, pond.man, pond.non_binary].some((n) => n < t.counterK)) {
-    missing.push("the pond has a cell under the counter's k, so it shows no split");
-  }
-  return missing;
-}
-
-/** People per pond and gender: what the thresholds are checked against. */
+/** People per pond and gender. */
 export function summarise(people: readonly SyntheticPerson[]): Record<string, PondSummary> {
   const ponds: Record<string, PondSummary> = {};
   for (const person of people) {

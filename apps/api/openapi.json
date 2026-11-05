@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Kuutti API",
-    "version": "0.103.0",
+    "version": "0.104.0",
     "description": "Free, non-commercial dating app for Finland. Every account is verified through a Finnish bank. Source: AGPL-3.0 with App Store exception."
   },
   "components": {
@@ -6480,23 +6480,10 @@
             "nullable": true,
             "format": "date"
           },
-          "verified": {
+          "finished": {
             "type": "integer",
             "nullable": true,
             "minimum": 10
-          },
-          "split": {
-            "$ref": "#/components/schemas/PondCounterSplit"
-          },
-          "finishing": {
-            "type": "integer",
-            "nullable": true,
-            "minimum": 0,
-            "not": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 9
-            }
           },
           "seeks": {
             "$ref": "#/components/schemas/PondSeeks"
@@ -6505,34 +6492,8 @@
         "required": [
           "pond",
           "day",
-          "verified",
-          "split",
-          "finishing",
+          "finished",
           "seeks"
-        ],
-        "additionalProperties": false
-      },
-      "PondCounterSplit": {
-        "type": "object",
-        "nullable": true,
-        "properties": {
-          "woman": {
-            "type": "integer",
-            "minimum": 10
-          },
-          "man": {
-            "type": "integer",
-            "minimum": 10
-          },
-          "nonBinary": {
-            "type": "integer",
-            "minimum": 10
-          }
-        },
-        "required": [
-          "woman",
-          "man",
-          "nonBinary"
         ],
         "additionalProperties": false
       },
@@ -12806,7 +12767,7 @@
     "/ponds/counter": {
       "get": {
         "summary": "The pond counter",
-        "description": "Per pond: bank-verified people with the pond as theirs, their split by self-declared gender, and how many are finishing their profile. A number is published only where at least k people stand behind it (k is in the answer), the split only when every cell is at least k, and a pond's numbers move only once at least k people have come or gone since they were last said. Counted once a day. No session needed. With one, the answer is the caller's and is not cached, and the caller's own pond also says whom its people seek: whole percentages of three bands of finished profiles, those who seek men, those who seek both women and men, and those who seek women, null until every band holds at least k people.",
+        "description": "Per pond: how many bank-verified people with the pond as theirs have completed their profiles. The number is published only where at least k people stand behind it (k is in the answer), and it moves only once at least k people have come or gone since it was last said. Counted once a day. No session needed. With one, the answer is the caller's and is not cached, and the caller's own pond also says whom its people seek: percentages in steps of five of three bands of finished profiles, those who seek men, those who seek both women and men, and those who seek women, null until every band holds at least k people.",
         "security": [
           {},
           {

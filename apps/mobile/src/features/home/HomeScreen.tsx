@@ -22,8 +22,8 @@ import { useHapticTap } from "@/theme/haptics";
 const MARK = require("../../../assets/logo-mark.png");
 
 /**
- * The home screen of a signed-in person (#143): how many people are on Kuutti
- * and whether matching is open, the way to the profile (which holds the photos, the
+ * The home screen of a signed-in person (#143): how many people have completed
+ * their profiles and whether matching is open, the way to the profile (which holds the photos, the
  * deal-breakers and the later questions, #239), and the settings. The
  * technical view (the API, the commits, a test error) is one tap away outside
  * production and absent in the store's build. An account that has not
@@ -94,7 +94,7 @@ export function HomeScreen() {
           <View className="w-full max-w-md gap-4">
             {/* What must reach the person even without a push, unread, first (#176). */}
             <Notices />
-            {/* How many people are on Kuutti (#54), and whether matching is open for the person
+            {/* How many people have completed their profiles (#54, #581), and whether matching is open for the person
                 (#500); once it is, the way to the queue (#379), the way to the people
                 the person starred while there are any (#575), and the one offer of
                 notifications, since now there is something to tell (#102, ADR-055 §9). */}
