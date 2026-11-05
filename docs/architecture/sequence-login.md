@@ -103,7 +103,7 @@ sequenceDiagram
 19. The API stores the SHA-256 of a new one-time code, 32 random bytes, on the attempt, with 60 seconds to live, and logs one line: the level, the method and the outcome, nothing of the person.
 20. The browser is sent to `kuutti://auth?code=…`: part 3.
 21. A refusal after the claim spends the attempt, so a replay is refused too, and a banned, suspended or cooldown refusal is counted on the identity.
-22. The browser is sent to `kuutti://auth?error=` with the refusal's code (`auth_state_mismatch`, `auth_cancelled`, `auth_provider_error`, `auth_under_18`, `auth_banned`, `auth_suspended`, `auth_cooldown`), and `&until=` for a cooldown and for a suspension with an end day. The app has a text for each.
+22. The browser is sent to `kuutti://auth?error=` with the refusal's code (`auth_state_mismatch`, `auth_cancelled`, `auth_provider_error`, `auth_under_18`, `auth_banned`, `auth_suspended`, `auth_cooldown`), and `&until=` for a cooldown and for a suspension with an end day. The app says each on its card: `auth_state_mismatch` and `auth_provider_error` by the card's title alone, over Try again, since nobody acts on which of them it was, and the others with a sentence of their own (#581).
 
 ## Part 3: back in the app
 

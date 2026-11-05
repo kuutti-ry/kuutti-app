@@ -18,6 +18,18 @@ const { __router: router } = jest.requireMock("expo-router") as {
   __router: { push: jest.Mock; replace: jest.Mock; setParams: jest.Mock };
 };
 
+/** Every text on the screen, in order. */
+const drawn = () => screen.queryAllByText(/./).map((node) => node.props.children as unknown);
+/** The screen with nothing to say: its title and its button, no line between them (#581). */
+const READY = ["Sign in", "Sign in with your bank"];
+/** The card of a refusal with no fact of its own: its title and Try again say it all (#581). */
+const REFUSED = "Sign-in did not complete";
+const BARE_REFUSAL = ["Sign in", REFUSED, "Try again"];
+const NOT_REQUESTED = "This sign-in link was not requested from this phone.";
+const UNDER_18 = "Kuutti is for adults. You are welcome once you are 18.";
+/** The heading of the screen before the bank. */
+const NORMS = "How we do things here";
+
 const CODE = "c".repeat(43);
 // Any well-formed verifier of the attempt (ADR-027): 64 lowercase hex characters.
 const VERIFIER = "5a1e".repeat(16);
@@ -77,14 +89,24 @@ beforeEach(async () => {
 });
 afterEach(() => jest.restoreAllMocks());
 
+/** The screen as the provider shows it once the lock's way out was taken (#418). */
+function Leaving() {
+  const { status, signOut } = useSession();
+  React.useEffect(() => {
+    if (status === "signed-in") void signOut("lock");
+  }, [status, signOut]);
+  return <SignInScreen />;
+}
+
 describe("SignInScreen", () => {
   // The bank half of the sign-in, on a phone past the screens before it.
   beforeEach(remember);
 
-  it("has a heading, an explanation and one labelled button, with no accessibility problems", async () => {
+  it("has a heading and one labelled button, nothing to read between them, with no accessibility problems (#581)", async () => {
     await renderWithTheme(<SignInScreen />);
     expect(await screen.findByRole("heading", { name: "Sign in" })).toBeTruthy();
-    expect(screen.getByText(/Kuutti verifies every account through a Finnish bank/)).toBeTruthy();
+    expect(await screen.findByRole("button", { name: "Sign in with your bank" })).toBeTruthy();
+    expect(drawn()).toEqual(READY);
     const found = pressables(screen.toJSON() as HostNode);
     expect(found).toHaveLength(1);
     expect(found.flatMap((node) => a11yProblems(node))).toEqual([]);
@@ -130,27 +152,18 @@ describe("SignInScreen", () => {
     await renderWithTheme(<LoggingOut />);
     await waitFor(() => expect(currentSession()).toBeNull());
     expect(await screen.findByRole("button", { name: "Sign in with your bank" })).toBeTruthy();
-    expect(screen.queryByText("Your account is on a break")).toBeNull();
-    expect(screen.queryByText("Signed out by the lock")).toBeNull();
+    expect(drawn()).toEqual(READY);
   });
 
   it("says the lock signed this phone out, that the lock is off now, and the way back", async () => {
     await saveSession(tokens);
     fetchMock.mockResolvedValueOnce(new Response(null, { status: 204 }));
-    // The screen as the provider shows it once the lock's way out was taken (#418).
-    function Leaving() {
-      const { status, signOut } = useSession();
-      React.useEffect(() => {
-        if (status === "signed-in") void signOut("lock");
-      }, [status, signOut]);
-      return <SignInScreen />;
-    }
     await renderWithTheme(<Leaving />);
     expect(await screen.findByText("Signed out by the lock")).toBeTruthy();
     expect(screen.getByLabelText("Signed out by the lock")).toBeTruthy();
     expect(
       screen.getByText(
-        "Sign in with your bank to come back. Nothing on your account changed. The lock is off until you turn it on again in Settings.",
+        "Nothing on your account changed. The lock is off until you turn it on again in Settings.",
       ),
     ).toBeTruthy();
     expect(screen.queryByText("Your account is on a break")).toBeNull();
@@ -162,6 +175,30 @@ describe("SignInScreen", () => {
     );
   });
 
+  it.each([
+    [
+      "fi-FI",
+      "Lukitus kirjasi sinut ulos",
+      "Tilillesi ei muuttunut mitään. Lukitus on pois päältä, kunnes otat sen taas käyttöön asetuksista.",
+    ],
+    [
+      "sv-FI",
+      "Låset loggade ut dig",
+      "Ingenting ändrades på ditt konto. Låset är av tills du slår på det igen i inställningarna.",
+    ],
+  ])("says what the lock left behind on a %s phone (#581)", async (languageTag, title, body) => {
+    (useLocales as jest.Mock).mockReturnValue([{ languageTag }]);
+    try {
+      await saveSession(tokens);
+      fetchMock.mockResolvedValueOnce(new Response(null, { status: 204 }));
+      await renderWithTheme(<Leaving />);
+      expect(await screen.findByText(title)).toBeTruthy();
+      expect(screen.getByText(body)).toBeTruthy();
+    } finally {
+      (useLocales as jest.Mock).mockReturnValue([{ languageTag: "en-US" }]);
+    }
+  });
+
   it("opens the system browser at the API's /auth/start for this platform", async () => {
     const openURL = jest.spyOn(Linking, "openURL").mockResolvedValue(true);
     await renderWithTheme(<SignInScreen />);
@@ -170,7 +207,8 @@ describe("SignInScreen", () => {
       url: `${apiBaseUrl()}/auth/start?platform=ios&locale=en`,
       challenge: expect.stringMatching(HEX_64),
     });
-    expect(await screen.findByText(/Your bank opens in the browser/)).toBeTruthy();
+    // The browser covers the screen as it opens: no line goes stale under it, and the button is there on the way back (#581).
+    expect(drawn()).toEqual(READY);
   });
 
   it("starts with the SHA-256 of a fresh verifier each time, and exchanges the code with the latest one", async () => {
@@ -194,7 +232,7 @@ describe("SignInScreen", () => {
     expect(currentSession()?.sessionId).toBe(tokens.sessionId);
   });
 
-  it("shows the words for a used code when the API refuses the code for its verifier", async () => {
+  it("says the sign-in did not complete when the API refuses the code for its verifier", async () => {
     // The API binds each code to its attempt's challenge: here the code came
     // back from the first of two starts, so the latest verifier does not fit.
     const openURL = jest.spyOn(Linking, "openURL").mockResolvedValue(true);
@@ -210,8 +248,8 @@ describe("SignInScreen", () => {
     });
 
     await view.rerender(underProviders(<SignInScreen code={CODE} />));
-    expect(await screen.findByText(/already used or has expired/)).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Try again" })).toBeTruthy();
+    expect(await screen.findByRole("button", { name: "Try again" })).toBeTruthy();
+    expect(drawn()).toEqual(BARE_REFUSAL);
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(currentSession()).toBeNull();
     expect(router.replace).not.toHaveBeenCalled();
@@ -227,11 +265,14 @@ describe("SignInScreen", () => {
     expect(JSON.parse(await sent.text())).toEqual({ code: CODE, verifier: VERIFIER });
     expect(currentSession()?.sessionId).toBe(tokens.sessionId);
     expect(screen.queryByRole("button")).toBeNull();
+    // What stands until home takes over, and a screen reader hears it: nothing says it is done (#581).
+    expect(drawn()).toEqual(["Sign in", "Signing you in…"]);
+    expect(screen.getByText("Signing you in…").props.accessibilityLiveRegion).toBe("polite");
   });
 
   it("refuses a code for a login this phone did not start", async () => {
     await renderWithTheme(<SignInScreen code={CODE} />);
-    expect(await screen.findByText(/was not requested from this phone/)).toBeTruthy();
+    expect(await screen.findByText(NOT_REQUESTED)).toBeTruthy();
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
@@ -240,7 +281,7 @@ describe("SignInScreen", () => {
     const { outcome: _outcome, ...stored } = tokens;
     await saveSession(stored);
     await renderWithTheme(<SignInScreen code={CODE} />);
-    expect(await screen.findByText(/was not requested from this phone/)).toBeTruthy();
+    expect(await screen.findByText(NOT_REQUESTED)).toBeTruthy();
     expect(fetchMock).not.toHaveBeenCalled();
     expect(currentSession()?.sessionId).toBe(tokens.sessionId); // untouched
   });
@@ -248,18 +289,18 @@ describe("SignInScreen", () => {
   it("forgets a login it started after ten minutes", async () => {
     await markLoginStarted(VERIFIER, Date.now() - 11 * 60 * 1000);
     await renderWithTheme(<SignInScreen code={CODE} />);
-    expect(await screen.findByText(/was not requested from this phone/)).toBeTruthy();
+    expect(await screen.findByText(NOT_REQUESTED)).toBeTruthy();
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it("shows a used code as such and offers to start again", async () => {
+  it("says a used code did not complete the sign-in, the card's title alone, and offers to start again (#581)", async () => {
     await markLoginStarted(VERIFIER);
     fetchMock.mockResolvedValueOnce(
       json({ error: { code: "auth_code_used", message: "x", requestId: "r" } }, 401),
     );
     await renderWithTheme(<SignInScreen code={CODE} />);
-    expect(await screen.findByText(/already used or has expired/)).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Try again" })).toBeTruthy();
+    expect(await screen.findByRole("button", { name: "Try again" })).toBeTruthy();
+    expect(drawn()).toEqual(BARE_REFUSAL);
     expect(currentSession()).toBeNull();
   });
 
@@ -301,48 +342,105 @@ describe("SignInScreen", () => {
       ),
     ).toBeTruthy();
     expect(screen.getByRole("button", { name: "Try again" })).toBeTruthy();
-    expect(screen.queryByText("Something went wrong. Try again.")).toBeNull();
     expect(currentSession()).toBeNull();
     expect(router.replace).not.toHaveBeenCalled();
   });
 
   it("shows the refusal the deep link carried", async () => {
     await renderWithTheme(<SignInScreen error="auth_under_18" />);
-    expect(
-      await screen.findByText("Kuutti is for adults. You are welcome once you are 18."),
-    ).toBeTruthy();
+    expect(await screen.findByText(UNDER_18)).toBeTruthy();
     expect(screen.getByRole("button", { name: "Sign in with your bank" })).toBeTruthy();
   });
 
   it("shows a refusal that arrives while the screen is shown, after another try", async () => {
     jest.spyOn(Linking, "openURL").mockResolvedValue(true);
     const view = await renderWithTheme(<SignInScreen error="auth_under_18" />);
-    expect(
-      await screen.findByText("Kuutti is for adults. You are welcome once you are 18."),
-    ).toBeTruthy();
+    expect(await screen.findByText(UNDER_18)).toBeTruthy();
 
-    // Another try: the bank opens, and what the last link said is put away.
+    // Another try: the bank opens, the refusal goes with it, and what the last link said is put away.
     await fireEvent.press(screen.getByRole("button", { name: "Sign in with your bank" }));
-    expect(await screen.findByText(/Your bank opens in the browser/)).toBeTruthy();
+    await waitFor(() => expect(drawn()).toEqual(READY));
     expect(router.setParams).toHaveBeenCalledWith({
       code: undefined,
       error: undefined,
       until: undefined,
     });
     await view.rerender(underProviders(<SignInScreen />));
-    expect(screen.getByText(/Your bank opens in the browser/)).toBeTruthy();
+    expect(drawn()).toEqual(READY);
 
     // The link comes back to the same screen with another refusal.
     await view.rerender(underProviders(<SignInScreen error="auth_banned" />));
     expect(await screen.findByText("This person may not use Kuutti.")).toBeTruthy();
-    expect(screen.queryByText(/Your bank opens in the browser/)).toBeNull();
 
     // And with the same one again, after one more try.
     await fireEvent.press(screen.getByRole("button", { name: "Sign in with your bank" }));
     await view.rerender(underProviders(<SignInScreen />));
-    expect(await screen.findByText(/Your bank opens in the browser/)).toBeTruthy();
+    await waitFor(() => expect(drawn()).toEqual(READY));
     await view.rerender(underProviders(<SignInScreen error="auth_banned" />));
     expect(await screen.findByText("This person may not use Kuutti.")).toBeTruthy();
+  });
+
+  describe("the refusals with no fact of their own (#581)", () => {
+    it.each([
+      ["auth_code_used"],
+      ["auth_state_mismatch"],
+      ["auth_provider_error"],
+      ["generic"],
+      ["something_else"],
+      // A crafted link: a prototype member is a code like any other, and finds nothing.
+      ["toString"],
+      ["constructor"],
+      ["__proto__"],
+    ])("draws the card's title alone over Try again for %s", async (error) => {
+      await renderWithTheme(<SignInScreen error={error} />);
+      expect(await screen.findByRole("button", { name: "Try again" })).toBeTruthy();
+      expect(drawn()).toEqual(BARE_REFUSAL);
+      // Its label is the card's, for a screen reader to land on, and no code is ever said.
+      expect(screen.getByLabelText(REFUSED)).toBeTruthy();
+      const found = pressables(screen.toJSON() as HostNode);
+      expect(found).toHaveLength(1);
+      expect(found.flatMap((node) => a11yProblems(node))).toEqual([]);
+    });
+
+    it.each([
+      ["fi-FI", "Kirjaudu sisään", "Kirjautuminen ei onnistunut", "Yritä uudelleen"],
+      ["sv-FI", "Logga in", "Inloggningen slutfördes inte", "Försök igen"],
+    ])("says it in the language of a %s phone", async (languageTag, ...words) => {
+      (useLocales as jest.Mock).mockReturnValue([{ languageTag }]);
+      try {
+        await renderWithTheme(<SignInScreen error="auth_code_used" />);
+        expect(await screen.findByRole("button", { name: words[2] })).toBeTruthy();
+        expect(drawn()).toEqual(words);
+      } finally {
+        (useLocales as jest.Mock).mockReturnValue([{ languageTag: "en-US" }]);
+      }
+    });
+  });
+
+  describe("the refusals that keep a line, cut to the fact (#581)", () => {
+    it.each([
+      ["auth_cancelled", "en-US", "Nothing was saved."],
+      ["auth_cancelled", "fi-FI", "Mitään ei tallennettu."],
+      ["auth_cancelled", "sv-FI", "Inget sparades."],
+      ["unexpected_link", "en-US", NOT_REQUESTED],
+      ["unexpected_link", "fi-FI", "Tätä kirjautumislinkkiä ei pyydetty tältä puhelimelta."],
+      [
+        "unexpected_link",
+        "sv-FI",
+        "Den här inloggningslänken begärdes inte från den här telefonen.",
+      ],
+    ])("says %s on a %s phone in the one line, under the title", async (error, tag, line) => {
+      (useLocales as jest.Mock).mockReturnValue([{ languageTag: tag }]);
+      try {
+        await renderWithTheme(<SignInScreen error={error} />);
+        expect(await screen.findByText(line)).toBeTruthy();
+        // The title, that line, and Try again: the second sentence was the button's.
+        expect(drawn()).toHaveLength(4);
+        expect(drawn()[2]).toBe(line);
+      } finally {
+        (useLocales as jest.Mock).mockReturnValue([{ languageTag: "en-US" }]);
+      }
+    });
   });
 
   it("shows the cooldown with its date in the app's locale", async () => {
@@ -406,8 +504,7 @@ describe("SignInScreen", () => {
       expect(await screen.findByRole("button", { name: "Sign in with your bank" })).toBeTruthy();
       await pressStart(openURL);
       expect(lastStart(openURL).url).toBe(`${apiBaseUrl()}/auth/start?platform=ios&locale=en`);
-      expect(await screen.findByText(/Your bank opens in the browser/)).toBeTruthy();
-      expect(screen.queryByText(/The earliest day for a new one/)).toBeNull();
+      await waitFor(() => expect(drawn()).toEqual(READY));
     });
 
     it.each([
@@ -510,20 +607,10 @@ describe("SignInScreen", () => {
       expect(await screen.findByText(/There is no bank sign-in here/)).toBeTruthy();
       expect(screen.queryByRole("button")).toBeNull();
       // The web preview keeps nothing of this phone's store: no screens before a bank it cannot reach.
-      expect(screen.queryByText("Before you sign in")).toBeNull();
+      expect(screen.queryByText(NORMS)).toBeNull();
     } finally {
       os.restore();
     }
-  });
-
-  it("shows the generic text for a code it has no words for", async () => {
-    await renderWithTheme(<SignInScreen error="something_else" />);
-    expect(await screen.findByText("Something went wrong. Try again.")).toBeTruthy();
-  });
-
-  it("treats a prototype member name in the link as a code it has no words for", async () => {
-    await renderWithTheme(<SignInScreen error="toString" />);
-    expect(await screen.findByText("Something went wrong. Try again.")).toBeTruthy();
   });
 
   it("marks the login as started, with its verifier, when the button is pressed", async () => {
@@ -541,11 +628,12 @@ describe("SignInScreen", () => {
     expect(await takeLoginStarted()).toBeNull(); // once
   });
 
-  it("says something went wrong when the exchange fails without a word from the API", async () => {
+  it("says the sign-in did not complete when the exchange fails without a word from the API", async () => {
     await markLoginStarted(VERIFIER);
     fetchMock.mockRejectedValueOnce(new TypeError("Network request failed"));
     await renderWithTheme(<SignInScreen code={CODE} />);
-    expect(await screen.findByText("Something went wrong. Try again.")).toBeTruthy();
+    expect(await screen.findByRole("button", { name: "Try again" })).toBeTruthy();
+    expect(drawn()).toEqual(BARE_REFUSAL);
     expect(currentSession()).toBeNull();
   });
 
@@ -580,13 +668,13 @@ describe("SignInScreen", () => {
     }
   });
 
-  it("says something went wrong when the browser cannot be opened, and offers to try again", async () => {
+  it("says the sign-in did not complete when the browser cannot be opened, and offers to try again", async () => {
     const openURL = jest.spyOn(Linking, "openURL").mockRejectedValue(new Error("no browser"));
     try {
       await renderWithTheme(<SignInScreen />);
       await fireEvent.press(screen.getByRole("button", { name: "Sign in with your bank" }));
-      expect(await screen.findByText("Something went wrong. Try again.")).toBeTruthy();
-      expect(screen.getByRole("button", { name: "Try again" })).toBeTruthy();
+      expect(await screen.findByRole("button", { name: "Try again" })).toBeTruthy();
+      expect(drawn()).toEqual(BARE_REFUSAL);
     } finally {
       openURL.mockRestore();
     }
@@ -682,8 +770,7 @@ describe("SignInScreen: the screens before the bank (#418, ADR-010 §15)", () =>
   it("The bank button is reached only after the terms and the privacy summary are accepted", async () => {
     const openURL = jest.spyOn(Linking, "openURL").mockResolvedValue(true);
     await renderWithTheme(<SignInScreen />);
-    expect(await screen.findByRole("heading", { name: "Before you sign in" })).toBeTruthy();
-    expect(screen.getByText("How we do things here")).toBeTruthy();
+    expect(await screen.findByRole("heading", { name: NORMS })).toBeTruthy();
     expect(screen.queryByRole("heading", { name: "Sign in" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Sign in with your bank" })).toBeNull();
 
@@ -711,7 +798,7 @@ describe("SignInScreen: the screens before the bank (#418, ADR-010 §15)", () =>
       }
     };
     await renderWithTheme(<SignInScreen />);
-    expect(await screen.findByRole("heading", { name: "Before you sign in" })).toBeTruthy();
+    expect(await screen.findByRole("heading", { name: NORMS })).toBeTruthy();
     nothingOfResearch();
     // One press and the bank button is there: no step on the way.
     await fireEvent.press(screen.getByRole("button", { name: "I'm in, and I accept both" }));
@@ -725,11 +812,10 @@ describe("SignInScreen: the screens before the bank (#418, ADR-010 §15)", () =>
     try {
       await renderWithTheme(<SignInScreen />);
       expect(await screen.findByRole("heading", { name: "Sign in" })).toBeTruthy();
-      expect(screen.getByText(/Kuutti verifies every account through a Finnish bank/)).toBeTruthy();
+      expect(drawn()).toEqual(["Sign in"]);
       expect(screen.queryByRole("button")).toBeNull();
-      expect(screen.queryByText("Before you sign in")).toBeNull();
       await read.answer(null);
-      expect(await screen.findByRole("heading", { name: "Before you sign in" })).toBeTruthy();
+      expect(await screen.findByRole("heading", { name: NORMS })).toBeTruthy();
     } finally {
       read.restore();
     }
@@ -743,7 +829,7 @@ describe("SignInScreen: the screens before the bank (#418, ADR-010 §15)", () =>
       expect(screen.queryByRole("button")).toBeNull();
       await read.answer(JSON.stringify({ terms: TERMS, privacy: PRIVACY }));
       expect(await screen.findByRole("button", { name: "Sign in with your bank" })).toBeTruthy();
-      expect(screen.queryByText("Before you sign in")).toBeNull();
+      expect(screen.queryByText(NORMS)).toBeNull();
     } finally {
       read.restore();
     }
@@ -769,8 +855,7 @@ describe("SignInScreen: the screens before the bank (#418, ADR-010 §15)", () =>
     await markLoginStarted(VERIFIER);
     const view = await renderWithTheme(<SignInScreen />);
     expect(await screen.findByRole("button", { name: "Sign in with your bank" })).toBeTruthy();
-    expect(screen.queryByText("Before you sign in")).toBeNull();
-    expect(screen.queryByText("How we do things here")).toBeNull();
+    expect(screen.queryByText(NORMS)).toBeNull();
     await throughTheBank(view);
     await waitFor(() => expect(router.replace).toHaveBeenCalledWith("/"));
     // The held answers are what becomes rows, not the phone's memory: none were given here.
@@ -781,7 +866,7 @@ describe("SignInScreen: the screens before the bank (#418, ADR-010 §15)", () =>
   it("sees the screens before the bank again on a phone that recorded an older wording", async () => {
     store.set(AGREED, JSON.stringify({ terms: "2025-01-draft-1", privacy: PRIVACY }));
     await renderWithTheme(<SignInScreen />);
-    expect(await screen.findByRole("heading", { name: "Before you sign in" })).toBeTruthy();
+    expect(await screen.findByRole("heading", { name: NORMS })).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Sign in with your bank" })).toBeNull();
   });
 
@@ -870,7 +955,7 @@ describe("SignInScreen: the screens before the bank (#418, ADR-010 §15)", () =>
       expect(order).toEqual(["exchange", "consent terms", "replace /"]);
       expect(posted(calls)).toHaveLength(1);
       expect(currentSession()?.sessionId).toBe(tokens.sessionId);
-      expect(screen.queryByText("Something went wrong. Try again.")).toBeNull();
+      expect(screen.queryByText(REFUSED)).toBeNull();
       // Not remembered: the next sign-in on this phone asks again, as the welcome step does now.
       expect(store.has(AGREED)).toBe(false);
       expect(heldAgreements()).toBeNull();
@@ -905,11 +990,11 @@ describe("SignInScreen: the screens before the bank (#418, ADR-010 §15)", () =>
     const view = await renderWithTheme(<SignInScreen />);
     await agree();
     await throughTheBank(view);
-    expect(await screen.findByText(/already used or has expired/)).toBeTruthy();
+    expect(await screen.findByText(REFUSED)).toBeTruthy();
     expect(posted(calls)).toEqual([]);
     // Whoever tries again answers again: nobody inherits a refused attempt's answers.
     await fireEvent.press(await screen.findByRole("button", { name: "Try again" }));
-    expect(await screen.findByText("Before you sign in")).toBeTruthy();
+    expect(await screen.findByText(NORMS)).toBeTruthy();
     await agree();
     await throughTheBank(view, "d".repeat(43));
     await waitFor(() => expect(router.replace).toHaveBeenCalledWith("/"));
@@ -929,7 +1014,7 @@ describe("SignInScreen: the screens before the bank (#418, ADR-010 §15)", () =>
     await pressStart(openURL);
     // Back from a browser left without an answer; whoever taps now may be somebody else.
     await fireEvent.press(screen.getByRole("button", { name: "Sign in with your bank" }));
-    expect(await screen.findByText("Before you sign in")).toBeTruthy();
+    expect(await screen.findByText(NORMS)).toBeTruthy();
     expect(openURL).toHaveBeenCalledTimes(1);
     expect(heldAgreements()).toBeNull();
   });
@@ -949,7 +1034,7 @@ describe("SignInScreen: the screens before the bank (#418, ADR-010 §15)", () =>
     await act(async () => {
       for (const listener of listeners) listener("background");
     });
-    expect(await screen.findByText("Before you sign in")).toBeTruthy();
+    expect(await screen.findByText(NORMS)).toBeTruthy();
     expect(heldAgreements()).toBeNull();
   });
 
@@ -960,7 +1045,7 @@ describe("SignInScreen: the screens before the bank (#418, ADR-010 §15)", () =>
     await agree();
     jest.spyOn(Date, "now").mockReturnValue(now + 11 * 60 * 1000);
     await fireEvent.press(screen.getByRole("button", { name: "Sign in with your bank" }));
-    expect(await screen.findByText("Before you sign in")).toBeTruthy();
+    expect(await screen.findByText(NORMS)).toBeTruthy();
     expect(openURL).not.toHaveBeenCalled();
   });
 
@@ -983,7 +1068,7 @@ describe("SignInScreen: the screens before the bank (#418, ADR-010 §15)", () =>
     await view.rerender(underProviders(<SignInScreen error="auth_cancelled" />));
     expect(await screen.findByText("Sign-in did not complete")).toBeTruthy();
     await fireEvent.press(await screen.findByRole("button", { name: "Try again" }));
-    expect(await screen.findByText("Before you sign in")).toBeTruthy();
+    expect(await screen.findByText(NORMS)).toBeTruthy();
   });
 
   it.each([
@@ -998,7 +1083,7 @@ describe("SignInScreen: the screens before the bank (#418, ADR-010 §15)", () =>
       const button = await screen.findByRole("button", { name });
       expect(pressables(screen.toJSON() as HostNode)).toHaveLength(1);
       await fireEvent.press(button);
-      expect(await screen.findByRole("heading", { name: "Before you sign in" })).toBeTruthy();
+      expect(await screen.findByRole("heading", { name: NORMS })).toBeTruthy();
       expect(openURL).not.toHaveBeenCalled();
       // Answered, the bank is one press away, with the refusal put behind.
       await agree();
@@ -1016,7 +1101,7 @@ describe("SignInScreen: the screens before the bank (#418, ADR-010 §15)", () =>
     await waitFor(() => expect(router.replace).toHaveBeenCalledWith("/"));
     expect(order).toEqual(["exchange", "replace /"]);
     expect(posted(calls)).toEqual([]);
-    expect(screen.queryByText("Before you sign in")).toBeNull();
+    expect(screen.queryByText(NORMS)).toBeNull();
     expect(store.has(AGREED)).toBe(false);
   });
 });
