@@ -4,6 +4,7 @@ import { useEffect, useRef } from "react";
 import { ScrollView, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LoadFailed } from "@/components/LoadFailed";
+import { sayAloud } from "@/components/Notice";
 import { ScreenHeader } from "@/components/ScreenHeader";
 import { Button } from "@/components/ui/button";
 import { Text } from "@/components/ui/text";
@@ -64,8 +65,8 @@ export function laterProgress(fields: Record<string, unknown>): {
  * whole document and moves on. The article 9 fields carry no note on their
  * consent: Settings is the one place for it (#239). The last screen leads to
  * the optional e-mail, which is the account's. Opened for one answer (`once`,
- * the deal-breakers' "Answer it"), either button and the arrow go back to the
- * screen that opened it (#542).
+ * from a deal-breaker's row or its "Answer it"), either button and the arrow go
+ * back to the screen that opened it (#542).
  */
 export function LaterFieldScreen({ field, once = false }: { field: string; once?: boolean }) {
   const { t } = useT();
@@ -108,7 +109,7 @@ export function LaterFieldScreen({ field, once = false }: { field: string; once?
     return (
       <SafeAreaView className="flex-1 bg-background">
         <View className="flex-1 items-center justify-center p-6">
-          <Text accessibilityLiveRegion="polite">{t("profile.loading")}</Text>
+          <Text accessibilityLiveRegion="polite">{t("load.loading")}</Text>
         </View>
       </SafeAreaView>
     );
@@ -117,11 +118,7 @@ export function LaterFieldScreen({ field, once = false }: { field: string; once?
     return (
       <SafeAreaView className="flex-1 bg-background">
         <View className="flex-1 items-center justify-center gap-4 p-6">
-          <LoadFailed
-            headline={t("profile.failed")}
-            error={profile.error}
-            onRetry={() => void profile.reload()}
-          />
+          <LoadFailed error={profile.error} onRetry={() => void profile.reload()} />
         </View>
       </SafeAreaView>
     );
@@ -163,17 +160,18 @@ export function LaterFieldScreen({ field, once = false }: { field: string; once?
           <Text>{t("profile.later.explain")}</Text>
         )}
 
-        <FieldEditor field={key} draft={draft} update={update} />
-        {companion && <FieldEditor field={companion} draft={draft} update={update} />}
+        <FieldEditor field={key} draft={draft} update={update} alone />
+        {companion && <FieldEditor field={companion} draft={draft} update={update} alone />}
 
         {profile.notice?.kind === "error" && (
           <Text accessibilityLiveRegion="assertive">{profileErrorText(profile.notice, t)}</Text>
         )}
-        {profile.saving && <Text accessibilityLiveRegion="polite">{t("profile.saving")}</Text>}
         <Button
           disabled={profile.saving}
           onPress={() => {
             tap();
+            // The buttons go read-only for that breath: heard, not drawn (#581).
+            sayAloud(t("profile.saving"));
             void profile.save().then((refusal) => {
               if (!refusal && here.current) moveOn();
             });

@@ -15,8 +15,11 @@ import type { TranslationContext, TranslationItem, Translator } from "./translat
  * for a native reviewer to approve (rules/i18n.md).
  */
 
-export const MODEL = "claude-opus-5";
+export const MODEL = "claude-opus-5-5";
 const MAX_TOKENS = 16000;
+// Opus 5.5 thinks at "medium" unless told otherwise; "high" is the level
+// Opus 5 translated at by default.
+const EFFORT = "high";
 // fallbacks: "default" re-runs a request the model's classifiers decline on
 // the model Anthropic recommends for that case, in the same call. The Batches
 // API refuses it, so batch requests go without.
@@ -125,7 +128,7 @@ export function anthropicTranslator(options: TranslatorOptions = {}): Translator
       fallbacks: "default",
       system: systemBlocks(locale, context),
       messages: [{ role: "user", content: userContent(items, context) }],
-      output_config: { format: zodOutputFormat(Output) },
+      output_config: { effort: EFFORT, format: zodOutputFormat(Output) },
     });
     // The fallback leaves its mark in the usage iterations (the model id alone may be a snapshot name).
     const fellBack = (response.usage.iterations ?? []).some(
@@ -193,7 +196,7 @@ export async function submitBatch(
           thinking: { type: "adaptive" as const },
           system: systemBlocks(chunk.locale, chunk.context),
           messages: [{ role: "user" as const, content: userContent(chunk.items, chunk.context) }],
-          output_config: { format: zodOutputFormat(Output) },
+          output_config: { effort: EFFORT, format: zodOutputFormat(Output) },
         },
       };
     }),

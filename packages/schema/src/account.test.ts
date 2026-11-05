@@ -166,7 +166,7 @@ function anExport(): Record<string, unknown> {
         slug: "suomi",
         name: "Suomi",
       },
-      home: { place: "Kallio", shownOnCard: "Helsinki", movedAt: null },
+      home: { place: "Kallio", shownOnCard: "Helsinki" },
       stateChangedAt: null,
       genderChangedAt: null,
       email: null,
@@ -262,7 +262,6 @@ function anExport(): Record<string, unknown> {
     contacts: [{ kind: "phone", value: "+358401234567", updatedAt: at }],
     notifications: {
       choices: [
-        { kind: "round", enabled: true },
         { kind: "message", enabled: false },
         { kind: "match", enabled: true },
         { kind: "moderation", enabled: true },
@@ -298,6 +297,7 @@ function anExport(): Record<string, unknown> {
               decision: "like",
               decisionInWords: "Liked",
               decidedAt: at,
+              secondPass: false,
               distance: "close",
               distanceInWords: "Close",
             },
@@ -305,6 +305,8 @@ function anExport(): Record<string, unknown> {
         },
       ],
     },
+    // When each star was put (#575), never on whom.
+    stars: { about: "Your stars", items: [{ at }] },
     // The invitations made and used, and what they earned (#107), never a code or whom.
     invitations: {
       made: [{ createdAt: at, state: "counted", countedAt: at }],
@@ -368,20 +370,13 @@ describe("the account export", () => {
       copy.account = { ...(copy.account as object), home: value };
       return copy;
     };
-    expect(AccountExport.parse(anExport()).account.home).toEqual({
-      place: "Kallio",
-      shownOnCard: "Helsinki",
-      movedAt: null,
-    });
+    const kept = { place: "Kallio", shownOnCard: "Helsinki" };
+    expect(AccountExport.parse(anExport()).account.home).toEqual(kept);
     expect(AccountExport.safeParse(home({ place: "Kallio" })).success).toBe(false);
-    const moved = { place: "Kallio", shownOnCard: "Helsinki", movedAt: at };
-    expect(AccountExport.safeParse(home(moved)).success).toBe(true);
-    expect(AccountExport.safeParse(home({ ...moved, movedAt: "yesterday" })).success).toBe(false);
-    expect(AccountExport.safeParse(home({ ...moved, movedAt: undefined })).success).toBe(false);
     expect(AccountExport.safeParse(home("00530")).success).toBe(false);
     const long = "n".repeat(81);
-    expect(AccountExport.safeParse(home({ ...moved, place: long })).success).toBe(false);
-    expect(AccountExport.safeParse(home({ ...moved, shownOnCard: long })).success).toBe(false);
+    expect(AccountExport.safeParse(home({ ...kept, place: long })).success).toBe(false);
+    expect(AccountExport.safeParse(home({ ...kept, shownOnCard: long })).success).toBe(false);
     expect(AccountExport.safeParse(home(undefined)).success).toBe(false);
   });
 

@@ -106,7 +106,7 @@ describe("useSeeking", () => {
     const { result } = await ready();
     expect(result.current).toMatchObject({
       status: "ready",
-      seeking: { seeks: ["woman"], ageWindow: AGES, intent: "long_term" },
+      seeking: { seeks: ["woman"], ageWindow: AGES, fields: { intent: "long_term" } },
     });
     expect(router.dismissTo).not.toHaveBeenCalled();
   });
@@ -115,7 +115,7 @@ describe("useSeeking", () => {
     serve({ profile: () => json(profile(stored({ fields: {} }))) });
     const { result } = await ready();
     expect(result.current.status).toBe("ready");
-    expect(result.current).toMatchObject({ seeking: { intent: undefined } });
+    expect(result.current).toMatchObject({ seeking: { fields: {} } });
     expect(router.dismissTo).not.toHaveBeenCalled();
   });
 
@@ -205,7 +205,7 @@ describe("useSeeking", () => {
     await act(() => result.current.reload());
     expect(result.current).toMatchObject({
       status: "ready",
-      seeking: { seeks: ["man"], ageWindow: { min: 30, max: 50 }, intent: "casual" },
+      seeking: { seeks: ["man"], ageWindow: { min: 30, max: 50 }, fields: { intent: "casual" } },
     });
   });
 

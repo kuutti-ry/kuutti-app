@@ -8,12 +8,11 @@ test("a moderator approves one photo and rejects another for a reason, and the c
   page,
 }) => {
   await signInAsModerator(page, "/photos");
-  const total = page.getByText(/^(\d+ photos? waiting|Nothing waiting)$/);
+  const total = page.getByText(/^(\d+ waiting|Nothing waiting)$/);
   await expect(total).toHaveText(/waiting$/);
   const before = Number((await total.textContent())?.match(/^\d+/)?.[0] ?? 0);
   expect(before, "the stories leave at least two photos in review").toBeGreaterThanOrEqual(2);
-  const waiting = (n: number) =>
-    n === 0 ? "Nothing waiting" : n === 1 ? "1 photo waiting" : `${n} photos waiting`;
+  const waiting = (n: number) => (n === 0 ? "Nothing waiting" : `${n} waiting`);
 
   const items = page.getByRole("main").getByRole("list").first().locator(":scope > li");
   const first = items.nth(0);

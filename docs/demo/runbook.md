@@ -7,10 +7,10 @@ How a demo is prepared and checked, locally and on staging (#144). The story its
 ### Locally (the simulator, the mock bank)
 
 1. `pnpm env:up`: the database, the S3 stand-in, the mock bank, the API, Metro.
-2. `pnpm demo:assets`: the release of pictures into `~/.cache/kuutti-demo-photos/v2`, verified. Without it nobody has a photo and the storyboard's photo scenes do not work.
-3. `pnpm demo:reset`: everybody forgotten through the erasure path, then the nineteen stories through the API's own routes, with their pictures (Sanna 5, Noa 2 + the queue's 4, Kerttu 4, and the round's cast: Iida 3, Henna, Katja, Minna and Riikka 2 each, from release v3; the faces approved locally but Noa's second, the negatives queued), the stories' conversations, then the counter counted and the ponds opened, then Iida's round (#379). Her round is the Finnish day's on which the reset ran, so for scene 5 the reset is run again on the morning of (below).
+2. `pnpm demo:assets`: the release of pictures into `~/.cache/kuutti-demo-photos/v3`, verified. Without it nobody has a photo and the storyboard's photo scenes do not work.
+3. `pnpm demo:reset`: everybody forgotten through the erasure path, then the nineteen stories through the API's own routes, with their pictures (Sanna 5, Noa 2 + the queue's 4, Kerttu 4, and the round's cast: Iida 3, Henna, Katja, Minna and Riikka 2 each, from release v3; the faces approved locally but Noa's second, the negatives queued), the stories' conversations, then the counter counted and the ponds opened, then Iida's day (#379). A card nobody displayed is new again the next day, so scene 5 holds from this reset; a rehearsal of it is reset again (below).
 4. `pnpm demo:population -- --photos`: three hundred people in the one pond, each with a home somewhere in Finland (`population.md`), with faces of the pool by seed; the counter counted anew and the ponds opened.
-5. Aino's camera roll: `xcrun simctl addmedia booted ~/.cache/kuutti-demo-photos/v2/faces/aino/*.jpg` (the simulator must be booted). On a device, AirDrop the five files.
+5. Aino's camera roll: `xcrun simctl addmedia booted ~/.cache/kuutti-demo-photos/v3/faces/aino/*.jpg` (the simulator must be booted). On a device, AirDrop the five files.
 6. `pnpm dev:mobile` and open the dev client on the simulator; the tech config screen (the wrench on the home screen) shows the API it talks to.
 7. The admin panel: `pnpm dev:admin` at `http://localhost:5173`; the moderator is a persona that was given the role after its first login: `pnpm --filter @kuutti/db moderator -- grant <hetu_hmac> moderator --by "<your name>"`, the hash from the API's log line of that login (`infra/README.md`, Staff). Use Mikael: a moderator persona is spared by the reset, so never one with a story.
 
@@ -29,15 +29,15 @@ Steps 2 and 3 are also what give staging its homes after a deploy that brought t
 
 ## The morning of
 
-Locally, first `pnpm demo:reset` again, on the day of the demo: Iida's round (scene 5) is built for the day the reset runs, and on a later day it is Henna alone (`storyboard.md`). The reset leaves the population and the camera roll as they are; with Mikael the moderator (step 7), it names him as spared and exits with an error, after doing the rest. On staging scene 5 is not shown, and nothing is run again.
+Locally, `pnpm demo:reset` again if anybody went through scene 5 since the last one: a card looked at on an earlier day comes back labelled "Seen before", and a decision holds (`storyboard.md`). The reset leaves the population and the camera roll as they are; with Mikael the moderator (step 7), it names him as spared and exits with an error, after doing the rest. On staging scene 5 is not shown, and nothing is run again.
 
 | check | locally | on staging |
 |---|---|---|
 | the API answers | `curl -s localhost:3000/health` | `curl -s https://api.staging.kuutti.app/health`: the commit is `main`'s |
 | the build | the dev client opens Metro | the tech config screen: channel `staging`, the API above, the runtime's fingerprint matches the installed build |
-| the counter | `curl -s localhost:3000/ponds/counter`: Suomi with a total and a split | the same against staging |
+| the counter | `curl -s localhost:3000/ponds/counter`: Suomi with its number, `finished` | the same against staging |
 | matching | sign in as Sanna: "Matching is open for you." | the same, through Nordea `DEMOUSER4` |
-| the round | sign in as Iida, Today's round: Henna first, "Liked you" and Nearby, and three more nearest first, Katja Close, Minna Around and Riikka Far (with a population whose pool has faces, which v2 does not give, women of it may come among them, in the order of their bands); look, decide nothing (a decision is final, or until midnight). Henna alone: the reset ran on another day, so reset again. No Today's round on home: the reset did not reach the round; read its log (a cache of a release older than v3 stops it at Iida, step 2) | none: scene 5 runs locally only |
+| the queue | sign in as Iida, See people: Henna first, "Liked you" and Nearby, and three more nearest first, Katja Close, Minna Around and Riikka Far (with a population whose pool has faces, which v2 does not give, women of it may come among them, in the order of their bands); look, decide nothing (a decision stands until midnight, and a match or a report for good). "Seen before" on a card, or fewer people: somebody went through it on an earlier day, so reset again. No See people on home: the reset did not reach the day; read its log (a cache of a release older than v3 stops it at Iida, step 2) | none: scene 5 runs locally only |
 | the queue | the panel lists Noa's four negatives and her second face | empty: the check decides Noa's pictures itself (her faces and the EXIF one approved, the landscape, the text and the group picture rejected with their reasons) |
 | the refusals | Tapio refused as banned, Ilona with the date | the same, through OP and Aktia |
 | the camera roll | the five pictures are there | the same |
@@ -47,7 +47,7 @@ Anything wrong: run the reset again (locally two seconds; on staging under a min
 
 ## After the demo
 
-- `pnpm demo:reset` locally, the reset in the container on staging: the stories are told anew and Aino is a newcomer again. Her deleted account (scene 8) is inside its waiting time until the reset; and Iida's round (scene 5), once decided, is hers again only after it, for the day it runs.
+- `pnpm demo:reset` locally, the reset in the container on staging: the stories are told anew and Aino is a newcomer again. Her deleted account (scene 8) is inside its waiting time until the reset; and Iida's queue (scene 5), once decided, is hers again only after it.
 - The recordings stay with the team: they show generated faces, which are private (`photo-prompts.md`); none in a screenshot that leaves the team or in a store listing.
 - What the run found wrong is an issue of its own.
 

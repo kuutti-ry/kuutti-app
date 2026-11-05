@@ -331,6 +331,5 @@ flowchart TB
 - Production (#25) runs without bank identification (ADR-049) and without swap (ADR-046). Until the next tag is applied it is the `t4g.small` of 2026-10-24, and its `admin-app-url` names `https://admin.kuutti.app`, a host not created yet.
 - SES (#196): the account is in SES's sandbox until the maintainer asks AWS for production access, so production as well delivers only to verified identities, the addresses of `kuutti.app` among them.
 - A preview runs a pull request's code on the staging box with the staging role, which can read every `/kuutti/staging/` parameter; the preview drops the secrets from its memory in code, and write access is that trust (ADR-004 §3; `infra/README.md`, Previews, Trust).
-- `infra/modules/network/variables.tf` says the VPC's "four subnets are carved from it"; the module makes three, as `infra/README.md` says. The view draws the module's three.
 - `infra/README.md` (Previews) still calls the native lane "dormant until `expo-updates` is configured"; `apps/mobile/app.json` has configured it, and `preview.yml` publishes when the lane's check passes.
 - Dokploy versus Kamal is open (CLAUDE.md, Decisions); Dokploy's configuration is the one part of the box outside code.

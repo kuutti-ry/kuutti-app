@@ -87,7 +87,7 @@ export function viaServices(context: ServicesContext): HistoryWriter {
       }
     },
     async home(accountId, postalCode) {
-      await saveHome({ db, logger, now }, accountId, { postalCode });
+      await saveHome({ db, logger }, accountId, { postalCode });
     },
     async profile(accountId, update) {
       await saveProfile({ db, logger, now, readPreferences }, accountId, update);

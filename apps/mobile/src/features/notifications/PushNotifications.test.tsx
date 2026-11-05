@@ -13,7 +13,7 @@ import { PushNotifications } from "./PushNotifications";
 // token registered at the start while signed in, on a new token, on a
 // change of the app's language and as the app comes back to the front, once
 // when nothing changed, and never while signed out; the phone's list cleared
-// on a sign-out; a tap opening the conversations or today's round once,
+// on a sign-out; a tap opening the conversations once,
 // waiting under the lock, and nothing for a tap the app cannot read, an
 // action that is not the tap, a tap while signed out or one whose lock was
 // left through the bank; and none of it on the web target.
@@ -316,14 +316,13 @@ describe("a tap on a push", () => {
   });
 
   it.each([
-    ["a message", { kind: "message" }, "/chats"],
-    ["a match", { kind: "match" }, "/chats"],
-    ["the round", { kind: "round" }, "/round"],
-  ])("on %s opens what it is about, once", async (_, data, path) => {
+    ["a message", { kind: "message" }],
+    ["a match", { kind: "match" }],
+  ])("on %s opens the conversations, once", async (_, data) => {
     await renderWithTheme(<PushNotifications />);
     await settle();
     await act(async () => phone.__respond(tap(data)));
-    await waitFor(() => expect(router.push).toHaveBeenCalledWith(path));
+    await waitFor(() => expect(router.push).toHaveBeenCalledWith("/chats"));
     expect(notifications.clearLastNotificationResponse).toHaveBeenCalledTimes(1);
     // Signed out and in again, nothing opens a second time.
     await act(async () => {
@@ -348,7 +347,9 @@ describe("a tap on a push", () => {
     ["a kind the app does not know", { kind: "promotion" }],
     // No push names its conversation any more (the maintainer's of 25/10/2026).
     ["a conversation", { kind: "message", conversationId: CONVERSATION }],
-    ["a word too many", { kind: "round", name: "Henna" }],
+    ["a word too many", { kind: "match", name: "Henna" }],
+    // Still in a phone's list after the round's push went (ADR-062 §12): the app has no such kind.
+    ["the round's old kind", { kind: "round" }],
     ["no data at all", undefined],
   ])("opens nothing for a push with %s, and lets it go", async (_, data) => {
     await renderWithTheme(<PushNotifications />);
@@ -362,7 +363,7 @@ describe("a tap on a push", () => {
   it("opens nothing for an action that is not the tap itself", async () => {
     await renderWithTheme(<PushNotifications />);
     await settle();
-    await act(async () => phone.__respond(tap({ kind: "round" }, "dismiss")));
+    await act(async () => phone.__respond(tap({ kind: "message" }, "dismiss")));
     await settle();
     expect(router.push).not.toHaveBeenCalled();
     expect(notifications.clearLastNotificationResponse).toHaveBeenCalledTimes(1);
@@ -416,14 +417,14 @@ describe("a tap on a push under the lock", () => {
     await turnLockOn();
     // The app gone; the push tapped starts it again.
     await view.rerender(<View />);
-    phone.__respond(tap({ kind: "round" }));
+    phone.__respond(tap({ kind: "match" }));
     await view.rerender(underProviders(<PushNotifications />));
     await settle();
     expect(screen.getByLabelText(PASSCODE)).toBeTruthy();
     expect(router.push).not.toHaveBeenCalled();
 
     await unlock();
-    expect(router.push).toHaveBeenCalledWith("/round");
+    expect(router.push).toHaveBeenCalledWith("/chats");
     expect(router.push).toHaveBeenCalledTimes(1);
   });
 
@@ -450,8 +451,8 @@ describe("a tap on a push under the lock", () => {
   it("opens at once while the lock is on and open", async () => {
     await renderWithTheme(<WithLock />);
     await turnLockOn();
-    await act(async () => phone.__respond(tap({ kind: "round" })));
-    await waitFor(() => expect(router.push).toHaveBeenCalledWith("/round"));
+    await act(async () => phone.__respond(tap({ kind: "message" })));
+    await waitFor(() => expect(router.push).toHaveBeenCalledWith("/chats"));
   });
 });
 
@@ -460,7 +461,7 @@ describe("the web target", () => {
     jest.replaceProperty(Platform, "OS", "web");
     const seen = api();
     await signIn();
-    phone.__respond(tap({ kind: "round" }));
+    phone.__respond(tap({ kind: "message" }));
     // Bare: on the web it reads nothing, not even the session.
     await render(<PushNotifications />);
     await settle();

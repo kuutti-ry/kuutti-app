@@ -158,7 +158,7 @@ const Env = z.object({
   // starts, with an IPv6 client counted by its /56 (ADR-026 §4-5); SSM
   // sign-in-rate-limit-per-minute.
   SIGN_IN_RATE_LIMIT_PER_MINUTE: z.coerce.number().int().min(1).optional(),
-  // The chat's socket (#349, ADR-031 §5): open sockets per account (the next
+  // The chat's socket (#349, ADR-031 §9): open sockets per account (the next
   // closes the oldest), the first frame's deadline, the ping's interval and
   // the pong's wait. Operational settings, not product rules, so not
   // matching_config; SSM ws-sockets-per-account and so on.

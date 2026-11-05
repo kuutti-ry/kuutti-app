@@ -10,7 +10,6 @@ import { Loading } from "../../components/ui/spinner.tsx";
 import {
   Table,
   TableBody,
-  TableCaption,
   TableCell,
   TableHead,
   TableHeader,
@@ -44,14 +43,12 @@ export function StaffList() {
           {t("admin.staff.refresh")}
         </Button>
       </div>
-      <p className="max-w-prose text-muted-foreground">{t("admin.staff.explain")}</p>
-      {state.kind === "loading" && <Loading>{t("admin.staff.loading")}</Loading>}
-      {state.kind === "error" && <Alert>{t("admin.staff.error")}</Alert>}
+      {state.kind === "loading" && <Loading>{t("load.loading")}</Loading>}
+      {state.kind === "error" && <Alert>{t("admin.loadFailed")}</Alert>}
       {state.kind === "ready" && (
         <Card>
           <CardContent>
-            <Table>
-              <TableCaption>{t("admin.staff.caption", { total: state.total })}</TableCaption>
+            <Table aria-labelledby="staff-title">
               <TableHeader>
                 <TableRow>
                   <TableHead scope="col">{t("admin.staff.col.identity")}</TableHead>

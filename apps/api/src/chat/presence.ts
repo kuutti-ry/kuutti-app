@@ -1,7 +1,7 @@
 import type { FrameErrorCode, ServerFrame } from "@kuutti/schema";
 
 /**
- * The open sockets of the process, by account (#349, ADR-031 §5): in memory,
+ * The open sockets of the process, by account (#349, ADR-031 §9): in memory,
  * never a table (#101), so a restart costs this map and nothing else, and the
  * reconnects rebuild it. #102 asks it whether somebody has a live socket.
  */

@@ -44,7 +44,7 @@ const bytesOf = (file: Uint8Array | undefined) => (file ? Array.from(file) : und
 const exportFile = () => jest.fn(async () => ({ name: ZIP_NAME, bytes: ZIP }));
 const exportRequests = (requests: Request[]) =>
   requests.filter((r) => new URL(r.url).pathname === "/account/export");
-const SAVED = "Done. The file is where you chose.";
+const SAVED = "Done.";
 // Said aloud through the shared Notice, queued behind what is being said (#511).
 const announced = () =>
   (AccessibilityInfo.announceForAccessibilityWithOptions as jest.Mock).mock.calls.map(
@@ -68,6 +68,8 @@ function fetchMock(handlers: Array<(req: Request) => Response | null>) {
   return calls;
 }
 const settle = () => act(() => new Promise<void>((resolve) => setTimeout(resolve, 10)));
+/** Every text on the screen, in order. */
+const drawn = () => screen.queryAllByText(/./).map((node) => node.props.children);
 const show = async (ui: React.ReactElement) => {
   await act(async () => {
     renderWithTheme(ui);
@@ -84,7 +86,7 @@ afterEach(async () => {
 });
 
 describe("AccountActions", () => {
-  it("shows its three labelled buttons, each with what it does, the deletion last, and nothing pressable is unlabelled or too small", async () => {
+  it("shows its three labelled buttons and no line, the deletion last, and nothing pressable is unlabelled or too small (#581)", async () => {
     fetchMock([]);
     await show(<AccountActions />);
     // Its row carries the title (#287, #511): the panel does not repeat it.
@@ -96,24 +98,17 @@ describe("AccountActions", () => {
       "Delete my account",
     ]);
     expect(found.flatMap((node) => a11yProblems(node))).toEqual([]);
-    expect(screen.getByText("Changes nothing else.")).toBeTruthy();
-    expect(screen.getByText("You are hidden and logged out. Nothing is deleted.")).toBeTruthy();
-    expect(
-      screen.getByText(/^Your account goes for good\. A new one is possible after 30 days\.$/),
-    ).toBeTruthy();
+    // Each press only opens what says the rest: the deletion's question says the 30 days.
+    expect(drawn()).toEqual(["I found someone", "Take a break", "Delete my account"]);
     // The export is a row of its own now (#511), and the consents the app's settings (#170).
     expect(screen.queryByRole("button", { name: "Download my data" })).toBeNull();
-    expect(screen.queryByLabelText("Take part in research")).toBeNull();
+    expect(screen.queryByLabelText("Store my sensitive answers")).toBeNull();
   });
 
-  it("says what the copy of one's data is, beside its one button (#511)", async () => {
+  it("holds the copy of one's data as its one button, with no line (#511, #581)", async () => {
     fetchMock([]);
     await show(<ExportData />);
-    expect(
-      screen.getByText(
-        "A file with everything Kuutti holds about you, and nothing about anyone else.",
-      ),
-    ).toBeTruthy();
+    expect(drawn()).toEqual(["Download my data"]);
     const found = pressables(screen.toJSON() as HostNode);
     expect(found.map((node) => node.props.accessibilityLabel)).toEqual(["Download my data"]);
     expect(found.flatMap((node) => a11yProblems(node))).toEqual([]);
@@ -160,7 +155,7 @@ describe("AccountActions", () => {
     expect(calls[0]?.headers.get("authorization")).toBe(`Bearer ${session.accessToken}`);
   });
 
-  it("says the file went where the person chose once the sheet shares it, aloud on iOS (#465)", async () => {
+  it("says Done once the sheet shares the file, and no more, aloud on iOS (#465, #581)", async () => {
     fetchMock([(req) => (new URL(req.url).pathname === "/account/export" ? zip() : null)]);
     const share = jest.fn(async () => ({ action: "sharedAction" as const }));
     await show(<ExportData share={share as never} />);
@@ -183,7 +178,7 @@ describe("AccountActions", () => {
     await waitFor(() => expect(share).toHaveBeenCalled());
     await settle();
     expect(screen.queryByText(SAVED)).toBeNull();
-    expect(screen.queryByText("The download did not work. Try again.")).toBeNull();
+    expect(screen.queryByText("That did not go through. Try again.")).toBeNull();
     expect(screen.queryByText("Preparing your data…")).toBeNull();
     expect(announced()).toEqual([]);
     expect(cache.has(`file:///cache/${ZIP_NAME}`)).toBe(false);
@@ -196,7 +191,7 @@ describe("AccountActions", () => {
     });
     await show(<ExportData share={share as never} />);
     await fireEvent.press(screen.getByRole("button", { name: "Download my data" }));
-    expect(await screen.findByText("The download did not work. Try again.")).toBeTruthy();
+    expect(await screen.findByText("That did not go through. Try again.")).toBeTruthy();
     expect(cache.has(`file:///cache/${ZIP_NAME}`)).toBe(false);
   });
 
@@ -211,12 +206,10 @@ describe("AccountActions", () => {
     await show(<ExportData share={share as never} />);
     await fireEvent.press(screen.getByRole("button", { name: "Download my data" }));
     expect(
-      await screen.findByText(
-        "That is enough copies for today. You can download your data again after midnight.",
-      ),
+      await screen.findByText("That is enough for today. You can try again after midnight."),
     ).toBeTruthy();
     expect(share).not.toHaveBeenCalled();
-    expect(screen.queryByText("The download did not work. Try again.")).toBeNull();
+    expect(screen.queryByText("That did not go through. Try again.")).toBeNull();
   });
 
   it("says so when the export fails", async () => {
@@ -228,9 +221,9 @@ describe("AccountActions", () => {
     ]);
     await show(<ExportData share={jest.fn() as never} />);
     await fireEvent.press(screen.getByRole("button", { name: "Download my data" }));
-    const line = await screen.findByText("The download did not work. Try again.");
+    const line = await screen.findByText("That did not go through. Try again.");
     expect(line.props.accessibilityLiveRegion).toBe("assertive");
-    expect(announced()).toEqual(["The download did not work. Try again."]);
+    expect(announced()).toEqual(["That did not go through. Try again."]);
     expect(screen.queryByText(SAVED)).toBeNull();
   });
 
@@ -241,7 +234,7 @@ describe("AccountActions", () => {
           ? new Response(null, { status: 204 })
           : null,
     ]);
-    // The card reads the consents on mount (the research switch); only writes count here.
+    // Only writes count here.
     const calls = {
       get length() {
         return requests.filter((r) => r.method !== "GET").length;
@@ -267,13 +260,7 @@ describe("AccountActions", () => {
     expect(JSON.parse(await (calls.at(0) as Request).text())).toEqual({ confirm: true });
     await waitFor(() => expect(currentSession()).toBeNull());
     // Signed out: the card is gone with the session.
-    await waitFor(() =>
-      expect(
-        screen.queryByText(
-          "A file with everything Kuutti holds about you, and nothing about anyone else.",
-        ),
-      ).toBeNull(),
-    );
+    await waitFor(() => expect(drawn()).toEqual([]));
   });
 
   it("keeps the session when the deletion fails and says so", async () => {
@@ -329,11 +316,7 @@ describe("AccountActions", () => {
     await clearSession();
     fetchMock([]);
     await show(<AccountActions />);
-    expect(
-      screen.queryByText(
-        "A file with everything Kuutti holds about you, and nothing about anyone else.",
-      ),
-    ).toBeNull();
+    expect(drawn()).toEqual([]);
   });
 });
 
@@ -365,7 +348,7 @@ describe("ExportData on Android", () => {
     expect(exportRequests(requests)).toHaveLength(0);
     expect(cache.size).toBe(0);
     expect(screen.queryByText(SAVED)).toBeNull();
-    expect(screen.queryByText("The download did not work. Try again.")).toBeNull();
+    expect(screen.queryByText("That did not go through. Try again.")).toBeNull();
     expect(screen.queryByText("Preparing your data…")).toBeNull();
   });
 
@@ -397,7 +380,7 @@ describe("ExportData on Android", () => {
     expect(exportRequests(requests)).toHaveLength(1);
   });
 
-  it("fetches once the folder is chosen, writes the zip there and says so (#465)", async () => {
+  it("fetches once the folder is chosen, writes the zip there and says Done (#465, #581)", async () => {
     const requests = fetchMock([
       (req) => (new URL(req.url).pathname === "/account/export" ? zip() : null),
     ]);
@@ -424,9 +407,7 @@ describe("ExportData on Android", () => {
     await show(<ExportData />);
     await fireEvent.press(screen.getByRole("button", { name: "Download my data" }));
     expect(
-      await screen.findByText(
-        "That is enough copies for today. You can download your data again after midnight.",
-      ),
+      await screen.findByText("That is enough for today. You can try again after midnight."),
     ).toBeTruthy();
     expect(cache.size).toBe(0);
     expect(screen.queryByText(SAVED)).toBeNull();

@@ -4,7 +4,7 @@ import { act, fireEvent, screen, waitFor, within } from "@testing-library/react-
 import { useLocales } from "expo-localization";
 import * as SecureStore from "expo-secure-store";
 import { DeviceEventEmitter, Linking, Platform, StyleSheet } from "react-native";
-import { clearSession, saveSession } from "@/lib/session";
+import { clearSession, currentSession, saveSession } from "@/lib/session";
 import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
 import { expectPinnedHeader } from "@/test/layout";
 import { renderWithTheme } from "@/test/render";
@@ -56,6 +56,8 @@ const tokens = {
   refreshExpiresAt: "2030-04-01T00:00:00.000Z",
 };
 const settle = () => act(() => new Promise<void>((resolve) => setTimeout(resolve, 20)));
+/** Every text on the screen, in order. */
+const drawn = () => screen.queryAllByText(/./).map((node) => node.props.children);
 const noProblems = () =>
   expect(pressables(screen.toJSON() as HostNode).flatMap((node) => a11yProblems(node))).toEqual([]);
 /** Settings with the row named open, as the app left it in the session given (#511); signed out by default. */
@@ -80,10 +82,10 @@ beforeEach(async () => {
       return json({
         canInvite: true,
         redeemable: false,
-        reward: { fish: 1, likes: 0 },
+        reward: { inviterFish: 1, friendFish: 1 },
         open: [],
         counted: 0,
-        earned: { fish: 0, likes: 0 },
+        earned: { fish: 0 },
       });
     }
     if (url.pathname === "/consents") {
@@ -193,20 +195,12 @@ describe("the legal texts under their rows", () => {
   });
 });
 
-describe("the consents' rows", () => {
-  it("hold the research consent's switch with its words for a person", async () => {
-    await saveSession(tokens);
-    await settingsWith("research", tokens.sessionId);
-    expect(await screen.findByRole("switch", { name: "Take part in research" })).toBeTruthy();
-    expect(screen.queryByText("Store my sensitive answers")).toBeNull();
-    noProblems();
-  });
-
-  it("hold the sensitive answers' switch alone", async () => {
+describe("the consent's row", () => {
+  it("holds the sensitive answers' switch with its words for a person", async () => {
     await saveSession(tokens);
     await settingsWith("special_category", tokens.sessionId);
     expect(await screen.findByRole("switch", { name: "Store my sensitive answers" })).toBeTruthy();
-    expect(screen.queryByText("Take part in research")).toBeNull();
+    noProblems();
   });
 });
 
@@ -576,7 +570,7 @@ describe("this device, under its row", () => {
     await renderWithTheme(<DeviceActions />);
     noProblems();
     await fireEvent.press(await screen.findByRole("button", { name: "Log out" }));
-    expect(await screen.findByText("No session on this device.")).toBeTruthy();
+    await waitFor(() => expect(currentSession()).toBeNull());
   });
 
   it("asks before logging out everywhere, says a logout the API did not take, and then logs out", async () => {
@@ -603,10 +597,8 @@ describe("this device, under its row", () => {
     const logoutsSent = () =>
       sent.mock.calls.filter(([input]) => path(input) === "/auth/logout-all");
     await renderWithTheme(<DeviceActions />);
-    expect(screen.getByText("This phone only. You log in again with your bank.")).toBeTruthy();
-    expect(
-      screen.getByText("Every phone logged in as you, this one too: for a lost or lent phone."),
-    ).toBeTruthy();
+    // No line under Log out; the one remedy for a phone in somebody else's hands is named (#581).
+    expect(drawn()).toEqual(["Log out", "Log out everywhere", "For a lost or lent phone."]);
     // Both outlined: red is the deletion's alone.
     for (const name of ["Log out", "Log out everywhere"]) {
       expect(screen.getByRole("button", { name }).props.className).not.toMatch(/destructive/);
@@ -642,14 +634,15 @@ describe("this device, under its row", () => {
     expect(screen.queryByText("Log out on every phone?")).toBeNull();
     expect(logoutsSent()).toHaveLength(2);
     await act(async () => answer());
-    expect(await screen.findByText("No session on this device.")).toBeTruthy();
+    await waitFor(() => expect(currentSession()).toBeNull());
   });
 
-  it("says there is no session on a signed-out device, whose list has the row all the same", async () => {
+  it("has no row on a signed-out device, left open or not, and no section of its own (#581)", async () => {
     await settingsWith("device");
     await settle();
-    expect(screen.getByText("No session on this device.")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Logging out" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Log out" })).toBeNull();
+    expect(screen.queryByRole("heading", { name: "Account" })).toBeNull();
   });
 });
 
@@ -693,13 +686,11 @@ describe("the account's rows", () => {
   it("hold the notification choices and the phone's own permission for a person (#176, #102)", async () => {
     await saveSession(tokens);
     await settingsWith("notifications", tokens.sessionId);
+    expect(await screen.findByRole("button", { name: "Allow notifications" })).toBeTruthy();
     expect(
       screen.getByText(
-        "What you choose here decides what Kuutti tells your phones. A notification says only that there is something, never what or from whom. Each kind is on until you switch it off.",
+        "A notification says that there is a new message or a new match, never what it says or from whom.",
       ),
-    ).toBeTruthy();
-    expect(
-      await screen.findByText("This phone has not been asked yet whether Kuutti may notify it."),
     ).toBeTruthy();
     noProblems();
   });
@@ -707,7 +698,7 @@ describe("the account's rows", () => {
   it("hold the invitations for a person (#107)", async () => {
     await saveSession(tokens);
     await settingsWith("invitations", tokens.sessionId);
-    expect(await screen.findByRole("button", { name: "Make an invitation" })).toBeTruthy();
+    expect(await screen.findByRole("button", { name: "Create an invitation" })).toBeTruthy();
     noProblems();
   });
 

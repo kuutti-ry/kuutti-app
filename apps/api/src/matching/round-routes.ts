@@ -19,24 +19,25 @@ import type { AppEnv } from "../lib/env.ts";
 import { AppError } from "../lib/errors.ts";
 import { type OwnFieldsReader, readDealBreakers } from "./deal-breakers.ts";
 import {
-  type BuildToday,
   type CardOf,
   decide,
   type Matches,
   markSeen,
+  type Queue,
   type RoundDeps,
   readAdded,
+  readQueue,
   readRelaxations,
-  readTodaysRound,
   relax,
   type ShortPool,
   undoRelaxation,
 } from "./rounds.ts";
 
-// Today's round for the app (#96, ADR-034): read it, report a card seen,
-// like or pass a card. The day is in the path of every write, so a phone
-// holding a round past midnight is refused (round_expired) and never decides
-// the next day's card at the same place. No route takes another person's id.
+// The queue for the app (#96, #502, ADR-034, ADR-062): read the next cards,
+// report a card seen, like, pass or skip a card. The day is in the path of every
+// write, so a phone holding a card past midnight is refused (round_expired) and
+// never decides the next day's card at the same place. No route takes another
+// person's id.
 
 const errorContent = (description: string) => ({
   description,
@@ -46,7 +47,7 @@ const json = <T>(schema: T) => ({ content: { "application/json": { schema } } })
 const bearer = { security: [{ session: [] }] };
 const unauthenticated = errorContent("unauthenticated, session_expired or session_revoked.");
 const noCard = errorContent(
-  "not_found: no round today, no card at that place, a card that can no longer be shown, or a day not begun.",
+  "not_found: no round today, no card at that place, a card that can no longer be shown (a block, a sanction, or for a like a filter of either side), or a day not begun.",
 );
 const expired = errorContent("round_expired: the day named has ended; nothing was written.");
 
@@ -60,12 +61,12 @@ function retryAfterOf(error: unknown): number | undefined {
 const todayRoute = createRoute({
   method: "get",
   path: "/rounds/today",
-  summary: "Today's round",
+  summary: "The next cards of the queue",
   description:
-    "The Finnish day and its cards in order, each with why it is there, how far its person lives as it stood when the entry was written, and the caller's own decision. The first read of a day builds the caller's round once their matching has opened; entries null while they have none, an empty list for a round with nobody to show. A card that cannot be shown now is left out. fishToSend says whether the fish's budget lets the caller send one today, one of matching_config fish_budget in the calendar week (fish_window_days counted from a Monday) or an earned one, never how many. likesLeft says how many of the day's likes the caller has left, from matching_config like_budget_balanced down to zero, by the count that refuses a like. Serving a card writes the shown record and counts against matching_config exposure_cards_per_day (ADR-008).",
+    "The Finnish day and the next cards to go through, at most ten, in order: likes waiting, then new people, then people coming back. Each says why it is there and how far its person lives as it stood when the entry was written. With nothing left to go through a read adds the next people; entries null while the caller's matching has not opened, an empty list at the queue's end. A card that cannot be shown now, a filter of either side included, is left out. fishToSend says whether the fish's budget lets the caller send one today, one of matching_config fish_budget in the calendar week (fish_window_days counted from a Monday) or an earned one, never how many. likesLeft says how many of the day's likes the caller has left, from matching_config like_budget_balanced down to zero, by the count that refuses a like. yourTurn says how many conversations wait on the caller's answer. Serving a card writes the shown record and counts against matching_config exposure_cards_per_day, where that is not 0 (ADR-008, ADR-062).",
   ...bearer,
   responses: {
-    200: { description: "Today's round.", ...json(RoundResponse) },
+    200: { description: "The next cards.", ...json(RoundResponse) },
     401: unauthenticated,
     429: errorContent(
       "card_budget_exceeded: the day's cards are used up; Retry-After is the wait until the day rolls.",
@@ -93,9 +94,9 @@ const seenRoute = createRoute({
 const decisionRoute = createRoute({
   method: "put",
   path: "/rounds/{day}/entries/{position}/decision",
-  summary: "Like or pass a card",
+  summary: "Like, pass or skip a card",
   description:
-    "Recorded, or replacing the day's earlier decision on the card; the same decision again writes nothing. A day that has ended answers round_expired. A like counts against the day's matching_config like_budget_balanced, except one on a liked_you or fish card; a pass never does. A like of somebody whose like of the caller stands is a match: the answer names its conversation, and that like is final. A fish is a like with a mark, matching_config fish_budget of them in each fish_window_days counted from a Monday, the calendar week; on a liked_you or fish card it is a like. Past either budget, a like or a fish the caller's invitations earned is used by itself, left out of the counts after, and given back when the decision changes the same day. The answer's fishToSend and likesLeft are the round's after this decision.",
+    "Recorded, or replacing the day's earlier decision on the card; the same decision again writes nothing. A day that has ended answers round_expired. A skip moves on, spends nothing and answers no like; the card returns another day. A like counts against the day's matching_config like_budget_balanced, a like back on a liked_you or fish card too; a pass or a skip never does. A new like or fish answers your_turn_limit with matching_config your_turn_limit conversations waiting on the caller, and not_found where either side's filters no longer let the two meet. A like of somebody whose like of the caller stands is a match: the answer names its conversation, and that like is final. A fish is a like with a mark, matching_config fish_budget of them in each fish_window_days counted from a Monday, the calendar week; on a liked_you or fish card it is a like. Past the fish's budget, a fish invitations earned the caller is used by itself, left out of the count after, and given back when the decision changes the same day. The answer's fishToSend, likesLeft and yourTurn are the queue's after this decision.",
   ...bearer,
   request: {
     params: RoundEntryParams,
@@ -104,17 +105,17 @@ const decisionRoute = createRoute({
   responses: {
     200: {
       description:
-        "Recorded, with the conversation the card's like is part of, or null for a pass and a like that made no match.",
+        "Recorded, with the conversation the card's like is part of, or null for a pass, a skip and a like that made no match.",
       ...json(RoundDecisionAnswer),
     },
     400: errorContent("Validation failed."),
     401: unauthenticated,
     404: noCard,
     409: errorContent(
-      "round_expired: the day named has ended; match_made: the card's like made a match and stays. Nothing was written.",
+      "round_expired: the day named has ended; match_made: the card's like made a match and stays; your_turn_limit: too many conversations wait on the caller's answer. Nothing was written.",
     ),
     429: errorContent(
-      "like_budget_exceeded: the day's likes are used up and no earned like is left, Retry-After the wait until the day rolls; fish_budget_exceeded: matching_config fish_budget fish were sent within the period and no earned fish is left, Retry-After the wait until the midnight that begins the next period, a Monday's. Nothing was written.",
+      "like_budget_exceeded: the day's likes are used up, Retry-After the wait until the day rolls; fish_budget_exceeded: matching_config fish_budget fish were sent within the period and no earned fish is left, Retry-After the wait until the midnight that begins the next period, a Monday's. Nothing was written.",
     ),
   },
 });
@@ -124,7 +125,7 @@ const relaxationsRoute = createRoute({
   path: "/rounds/{day}/relaxations",
   summary: "What today's round may relax, and what is relaxed",
   description:
-    "For a short round (fewer ordered places than matching_config round_size, the liked-you and fish places aside), every deal-breaker of the caller's that is not paused and not relaxed today, each way it can be relaxed for the day: unanswered (let through those who did not answer its field) and aside (set it aside), each listed only when it would add somebody today, with more: how much it widens the caller's pool, rounded down to a step of matching_config pond_counter_k. Counted on asking. Also the relaxations in force today. Never another filter (ADR-042).",
+    "Once no new person is left in the queue, every deal-breaker of the caller's that is not paused and not relaxed today, each way it can be relaxed for the day: unanswered (let through those who did not answer its field) and aside (set it aside), each listed only when it would add somebody today, with more: how much it widens the caller's pool, rounded down to a step of matching_config pond_counter_k. Counted on asking. Also the relaxations in force today. Never another filter (ADR-042).",
   ...bearer,
   request: { params: RoundDayParams },
   responses: {
@@ -141,7 +142,7 @@ const relaxRoute = createRoute({
   path: "/rounds/{day}/relaxations",
   summary: "Relax a deal-breaker for today",
   description:
-    "One of the caller's own deal-breakers loosened for the day only: the people it lets in today are added after the round's last place, as many as the room left (round_size less the ordered places), new people first, reason relaxed with the field. Tomorrow's round is built from the filters as stored. The answer is the cards added, served as the round's read serves them (ADR-008).",
+    "One of the caller's own deal-breakers loosened for the day only: the people it lets in today join the queue, new people first, reason relaxed with the field. Tomorrow's queue reads the filters as stored. The answer is the first cards added, at most ten, served as a read serves them (ADR-008); the next read goes on to the rest.",
   ...bearer,
   request: { params: RoundDayParams, body: { required: true, ...json(Relaxation) } },
   responses: {
@@ -189,7 +190,7 @@ export function roundRoutes(
   deps: Deps,
   requireSession: MiddlewareHandler<AppEnv>,
   cardOf: CardOf,
-  buildToday: BuildToday,
+  queue: Queue,
   matches: Matches,
   read: (accountId: string) => Promise<void>,
   shortPool: ShortPool,
@@ -221,12 +222,7 @@ export function roundRoutes(
     const { accountId } = callerOf(c);
     try {
       const dealBreakers = await filtering(accountId);
-      let round = await readTodaysRound(rounds(), accountId, cardOf, dealBreakers);
-      // Nobody built the day's round yet: matching opened during the day, or
-      // the night has not come. The first read builds it (#95, ADR-035 §5).
-      if (round.entries === null && (await buildToday(accountId))) {
-        round = await readTodaysRound(rounds(), accountId, cardOf, dealBreakers);
-      }
+      const round = await readQueue(rounds(), matches, queue, accountId, cardOf, dealBreakers);
       await read(accountId);
       return c.json(round, 200);
     } catch (error) {
@@ -246,16 +242,13 @@ export function roundRoutes(
     const { day, position } = c.req.valid("param");
     const { decision } = c.req.valid("json");
     try {
-      const { match, fishToSend, likesLeft } = await decide(rounds(), matches, {
+      const { match, ...budgets } = await decide(rounds(), matches, queue, {
         accountId: callerOf(c).accountId,
         day,
         position,
         decision,
       });
-      return c.json(
-        { match: match ? { conversationId: match } : null, fishToSend, likesLeft },
-        200,
-      );
+      return c.json({ match: match ? { conversationId: match } : null, ...budgets }, 200);
     } catch (error) {
       const wait = retryAfterOf(error);
       if (wait !== undefined) c.header("Retry-After", String(wait));
@@ -283,6 +276,7 @@ export function roundRoutes(
     try {
       const entries = await readAdded(
         rounds(),
+        queue,
         accountId,
         day,
         positions,

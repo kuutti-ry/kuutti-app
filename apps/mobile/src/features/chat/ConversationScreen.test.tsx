@@ -3,10 +3,18 @@ import { act, fireEvent, screen, userEvent, waitFor } from "@testing-library/rea
 import * as ImagePicker from "expo-image-picker";
 import { useLocales } from "expo-localization";
 import * as SecureStore from "expo-secure-store";
-import { AccessibilityInfo, AppState, Clipboard, Linking, Platform } from "react-native";
+import {
+  AccessibilityInfo,
+  AppState,
+  Clipboard,
+  Linking,
+  Platform,
+  ScrollView,
+} from "react-native";
 import { pickPrepared } from "@/features/media";
 import { clearSession, saveSession } from "@/lib/session";
 import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
+import { FAILED_TO_LOAD } from "@/test/failed";
 import { expectPinnedHeader } from "@/test/layout";
 import { renderWithTheme } from "@/test/render";
 import { FakeWebSocket } from "@/test/websocket";
@@ -17,7 +25,7 @@ import { ChatLiveProvider } from "./store";
 import { dayOf, timeOf } from "./time";
 
 // One conversation (#348): the header, the messages by day with who, when and
-// what, "Read", the read mark, the composer with its count, Send, the
+// what, "Read", the read mark, the composer, Send, the
 // optimistic row, the refusals in words with the words kept, the resend with
 // the same id, the archived banner, the closed states, earlier messages, and
 // the reads on focus; live (#349): what the socket brings, marked read only
@@ -94,6 +102,7 @@ const detail = (over: Partial<ConversationDetail> = {}): ConversationDetail => (
   counterpart: { deleted: false, name: "Sanna", age: 31, thumb: null },
   lastMessage: null,
   unread: 0,
+  yourTurn: true,
   limits: { maxLength: 30 },
   counterpartReadUpTo: 0,
   contacts: { mine: [], theirs: [] },
@@ -141,11 +150,20 @@ const sourceOf = (testID: string) =>
       source?: Array<{ uri?: string; cacheKey?: string }>;
     }
   ).source?.[0];
-const ATTACHED = "Photo attached. The words in the field go under it.";
+const ATTACHED = "Photo attached.";
+const ENDED = "This conversation has ended.";
+const LEFT = "This person deleted their account.";
+const SUPPORT = "Support when it's hard";
 /** The plain-text rule's refusal, with the way through it (#103). */
 const CONTACT_DETAILS =
   "A message cannot carry an e-mail address, a link, a phone number or a social media handle. To give your number or a username, keep it in Settings, under Ways to reach you, and share it from the top of the conversation.";
-const attached = () => screen.queryByText(ATTACHED);
+/** The picture above the field: with Remove photo beside it, all that shows a photo is attached (#581). */
+const attached = () => screen.queryByTestId("photo-attached", { includeHiddenElements: true });
+/** What a screen reader is told with no line drawn, queued behind what is being said on iOS (sayAloud, #581). */
+const heard = () =>
+  (AccessibilityInfo.announceForAccessibilityWithOptions as jest.Mock).mock.calls.map(
+    ([words]) => words,
+  );
 
 /** An upload the test answers itself, so the sending row can be seen on the way. */
 class SteppedXhr extends FakeXhr {
@@ -333,6 +351,8 @@ beforeEach(async () => {
   store.clear();
   router.back.mockReset();
   (useLocales as jest.Mock).mockReturnValue([{ languageTag: "en-US" }]);
+  (AccessibilityInfo.announceForAccessibilityWithOptions as jest.Mock).mockClear();
+  (AccessibilityInfo.announceForAccessibility as jest.Mock).mockClear();
   ids = [
     "11111111-1111-4111-8111-111111111111",
     "22222222-2222-4222-8222-222222222222",
@@ -374,7 +394,6 @@ describe("one conversation", () => {
     // "Read" under the second, the last of A's that B has read; once.
     expect(screen.getAllByText("Read")).toHaveLength(1);
     expect(screen.queryByRole("button", { name: "Earlier messages" })).toBeNull();
-    expect(screen.getByText("30 characters left")).toBeTruthy();
     expect(sendButton().props.accessibilityState?.disabled).toBe(true);
     await waitFor(() =>
       expect(calls.filter((c) => c.path.endsWith("/read"))).toEqual([
@@ -382,13 +401,30 @@ describe("one conversation", () => {
       ]),
     );
     noProblems();
-    // A new size of the list keeps the newest in sight.
-    const scroll = screen.getByTestId("messages");
+    await press("Back");
+    expect(router.back).toHaveBeenCalled();
+  });
+
+  it("keeps the newest in sight as the list grows, and once more a frame later, when the new size has reached the screen", async () => {
+    conversation(detail(), [[message(1, "theirs", "Moi", DAY_1)]]);
+    await renderWithTheme(<ConversationScreen id={ID} />);
+    const scroll = await screen.findByTestId("messages");
+    // Frames held back until the test runs them, so the two scrolls can be told apart.
+    const frames: FrameRequestCallback[] = [];
+    jest.spyOn(globalThis, "requestAnimationFrame").mockImplementation((run) => {
+      frames.push(run);
+      return frames.length;
+    });
+    const toEnd = jest.spyOn(ScrollView.prototype, "scrollToEnd");
+    toEnd.mockClear();
     await act(async () => {
       fireEvent(scroll, "contentSizeChange", 390, 2000);
     });
-    await press("Back");
-    expect(router.back).toHaveBeenCalled();
+    expect(toEnd).toHaveBeenCalledTimes(1);
+    expect(toEnd).toHaveBeenLastCalledWith({ animated: false });
+    for (const run of frames.splice(0)) run(0);
+    expect(toEnd).toHaveBeenCalledTimes(2);
+    expect(toEnd).toHaveBeenLastCalledWith({ animated: false });
   });
 
   it("shows a message at once as sending, swaps it for the answer, and leaves the composer empty", async () => {
@@ -404,7 +440,6 @@ describe("one conversation", () => {
     await renderWithTheme(<ConversationScreen id={ID} />);
     await screen.findByLabelText("Message");
     await type("  Nähdään!  ");
-    expect(screen.getByText("22 characters left")).toBeTruthy();
     expect(sendButton().props.accessibilityState?.disabled).toBe(false);
     await userEvent.setup().press(sendButton());
     expect(screen.getByText("Sending…")).toBeTruthy();
@@ -484,7 +519,9 @@ describe("one conversation", () => {
     let closed = false;
     api((call) => {
       if (call.method === "GET" && call.path === `/conversations/${ID}`) {
-        return json(closed ? detail({ state: "closed", closedHow: "unmatch" }) : detail());
+        return json(
+          closed ? detail({ state: "closed", closedHow: "unmatch", counterpart: null }) : detail(),
+        );
       }
       if (call.method === "GET") return json({ messages: [] });
       closed = true;
@@ -496,24 +533,58 @@ describe("one conversation", () => {
     await userEvent.setup().press(sendButton());
     await settle();
     expect(
-      screen.getByText("This conversation has ended, so the message was not sent."),
-    ).toBeTruthy();
-    expect(screen.getByText("This conversation has ended.")).toBeTruthy();
+      screen.getByText("This conversation has ended, so the message was not sent.").props
+        .accessibilityLiveRegion,
+    ).toBe("assertive");
+    // The heading says it and the composer goes; a screen reader is told, with no line drawn.
+    expectPinnedHeader("Conversation ended", "Back");
+    expect(screen.queryByText(ENDED)).toBeNull();
+    expect(heard()).toEqual([ENDED]);
     expect(screen.queryByLabelText("Message")).toBeNull();
   });
 
-  it("counts down and stops Send past the longest message", async () => {
-    conversation(detail({ limits: { maxLength: 5 } }), [[]]);
+  it("counts nothing beside Send, and past the longest message says so in a line and stops Send (#581)", async () => {
+    const TOO_LONG = "The message is too long. Make it shorter and send it again.";
+    const calls = conversation(detail({ limits: { maxLength: 5 } }), [[]]);
     await renderWithTheme(<ConversationScreen id={ID} />);
     await screen.findByLabelText("Message");
+    const off = () => sendButton().props.accessibilityState?.disabled;
+    /** What stands in Send's row: Send alone at its end, the line before it past the longest. */
+    const row = () => sendButton().parent;
+    /** The figures on the screen: the age in the heading, and no count of anything. */
+    const figures = () => screen.queryAllByText(/\d/).map((node) => node.props.children);
+    expect(off()).toBe(true);
+    expect(row()?.children).toHaveLength(1);
+    expect(row()?.props.className).toMatch(/\bjustify-end\b/);
+    // At the longest, no line and no number: nobody near it is told how near.
     await type("12345");
-    expect(screen.getByText("0 characters left")).toBeTruthy();
-    expect(sendButton().props.accessibilityState?.disabled).toBe(false);
+    expect(off()).toBe(false);
+    expect(row()?.children).toHaveLength(1);
+    expect(figures()).toEqual(["Sanna, 31"]);
+    // One past it.
     await type("123456");
-    expect(
-      screen.getByText("The message is too long. Make it shorter and send it again."),
-    ).toBeTruthy();
-    expect(sendButton().props.accessibilityState?.disabled).toBe(true);
+    expect(off()).toBe(true);
+    expect(row()?.children).toHaveLength(2);
+    // The one word that Send has stopped: said where it appears, on iOS too.
+    expect(screen.getByText(TOO_LONG).props.accessibilityLiveRegion).toBe("assertive");
+    expect(heard()).toEqual([TOO_LONG]);
+    expect(figures()).toEqual(["Sanna, 31"]);
+    await userEvent.setup().press(sendButton());
+    expect(calls.filter((c) => c.method === "POST" && c.path.endsWith("/messages"))).toEqual([]);
+    // The spaces around the words are no part of it, and a character is a character.
+    await type("  12345  ");
+    expect(off()).toBe(false);
+    expect(screen.queryByText(TOO_LONG)).toBeNull();
+    await type("😀😀😀😀😀");
+    expect(off()).toBe(false);
+    await type("😀😀😀😀😀😀");
+    expect(off()).toBe(true);
+    expect(screen.getByText(TOO_LONG)).toBeTruthy();
+    // Shortened, the line goes.
+    await type("Hei");
+    expect(off()).toBe(false);
+    expect(screen.queryByText(TOO_LONG)).toBeNull();
+    expect(row()?.children).toHaveLength(1);
   });
 
   it("says that writing brings an archived conversation back, and leaves the archive when it does", async () => {
@@ -538,7 +609,9 @@ describe("one conversation", () => {
       [[message(1, "theirs", "Moi", DAY_1)]],
     );
     await renderWithTheme(<ConversationScreen id={ID} />);
-    expect(await screen.findByText("This person deleted their account.")).toBeTruthy();
+    const line = await screen.findByText("This person deleted their account.");
+    expect(line.props.accessibilityLiveRegion).toBe("polite");
+    expect(screen.queryByText(ENDED)).toBeNull();
     expectPinnedHeader("Deleted user", "Back");
     expect(said("Deleted user", DAY_1, "Moi")).toBeTruthy();
     expect(screen.queryByLabelText("Message")).toBeNull();
@@ -546,22 +619,27 @@ describe("one conversation", () => {
     noProblems();
   });
 
-  it.each<[string, Partial<ConversationDetail>, string]>([
-    ["ended", { closedHow: "unmatch", counterpart: null }, "This conversation has ended."],
+  it.each<[string, Partial<ConversationDetail>, string, string | null]>([
+    // The heading says it, so the link stands alone in the composer's place (#581).
+    ["ended", { closedHow: "unmatch", counterpart: null }, "Conversation ended", null],
     [
       "left by a deleted account",
       { closedHow: "erasure", counterpart: { deleted: true } },
+      "Deleted user",
       "This person deleted their account.",
     ],
   ])(
     "offers the support page in a conversation %s, however it ended (#510)",
-    async (_how, closed, words) => {
+    async (_how, closed, title, line) => {
       conversation(detail({ state: "closed", ...closed }), [[message(1, "theirs", "Moi", DAY_1)]]);
       await renderWithTheme(<ConversationScreen id={ID} />);
-      expect(await screen.findByText(words)).toBeTruthy();
+      const link = await screen.findByRole("link", { name: SUPPORT });
+      expectPinnedHeader(title, "Back");
+      expect(screen.queryByText(ENDED)).toBeNull();
+      if (line) expect(screen.getByText(line)).toBeTruthy();
       noProblems();
       await act(async () => {
-        fireEvent.press(screen.getByRole("link", { name: "Support when it's hard" }));
+        fireEvent.press(link);
       });
       expect(router.push).toHaveBeenCalledWith("/settings/support");
     },
@@ -571,7 +649,7 @@ describe("one conversation", () => {
     conversation(detail(), [[message(1, "theirs", "Moi", DAY_1)]]);
     await renderWithTheme(<ConversationScreen id={ID} />);
     expect(await screen.findByLabelText("Message")).toBeTruthy();
-    expect(screen.queryByRole("link", { name: "Support when it's hard" })).toBeNull();
+    expect(screen.queryByRole("link", { name: SUPPORT })).toBeNull();
   });
 
   it("heads an ended conversation Conversation ended, names nobody, and offers Report in More while the window holds (#351)", async () => {
@@ -579,8 +657,9 @@ describe("one conversation", () => {
       [message(2, "mine", "Kiitos", DAY_1_LATER), message(1, "theirs", "Moi", DAY_1)],
     ]);
     await renderWithTheme(<ConversationScreen id={ID} />);
-    expect(await screen.findByText("This conversation has ended.")).toBeTruthy();
+    expect(await screen.findByRole("heading", { name: "Conversation ended" })).toBeTruthy();
     expectPinnedHeader("Conversation ended", "Back");
+    expect(screen.queryByText(ENDED)).toBeNull();
     expect(said("The other person", DAY_1, "Moi")).toBeTruthy();
     expect(said("You", DAY_1_LATER, "Kiitos")).toBeTruthy();
     expect(screen.queryByLabelText("Message")).toBeNull();
@@ -597,7 +676,7 @@ describe("one conversation", () => {
       [[message(1, "theirs", "Moi", DAY_1)]],
     );
     await renderWithTheme(<ConversationScreen id={ID} />);
-    expect(await screen.findByText("This conversation has ended.")).toBeTruthy();
+    expect(await screen.findByRole("heading", { name: "Conversation ended" })).toBeTruthy();
     expect(screen.queryByRole("button", { name: "More" })).toBeNull();
   });
 
@@ -743,7 +822,7 @@ describe("one conversation", () => {
       return ok(input, init);
     }) as unknown as typeof fetch;
     await renderWithTheme(<ConversationScreen id={ID} />);
-    expect(await screen.findByText("The conversation could not be loaded.")).toBeTruthy();
+    expect(await screen.findByText(FAILED_TO_LOAD)).toBeTruthy();
     await press("Try again");
     expect(said("Sanna", DAY_1, "Moi")).toBeTruthy();
   });
@@ -751,13 +830,24 @@ describe("one conversation", () => {
 
 describe("contacts in a conversation (#103)", () => {
   const BODY =
-    "Sanna sees what you share at once, at the top of this conversation. You can stop sharing at any time, but what Sanna already wrote down stays with them.";
+    "Sanna sees what you share at once. You can stop sharing at any time, but what Sanna already wrote down stays with them.";
+  const SHARED = "Shared. Sanna sees it now.";
+  const STOPPED = "No longer shared here.";
+  const LIMITED = "That was a lot in a short time. Wait a moment and try again.";
   const announced = () =>
     (AccessibilityInfo.announceForAccessibility as jest.Mock).mock.calls.map(([words]) => words);
   /** The labels of everything a finger can press: a value never stands in one. */
   const pressedLabels = () =>
     pressables(screen.toJSON() as HostNode).map((node) => String(node.props.accessibilityLabel));
   const shareOffered = () => screen.queryByRole("button", { name: "Share contact" }) !== null;
+  /** The words of a tree, in the order they are read. */
+  const wordsIn = (node: HostNode | string): string[] =>
+    typeof node === "string" ? [node] : (node.children ?? []).flatMap(wordsIn);
+  /** What the dialog draws from its sentence on, so that a line nobody asked for is seen. */
+  const fromTheSentence = () => {
+    const all = wordsIn(screen.toJSON() as HostNode);
+    return all.slice(all.indexOf(BODY));
+  };
 
   beforeEach(() => {
     (AccessibilityInfo.announceForAccessibility as jest.Mock).mockClear();
@@ -804,19 +894,22 @@ describe("contacts in a conversation (#103)", () => {
     expect(screen.getByText(BODY)).toBeTruthy();
     expect(screen.getByText("Phone: +358401234567")).toBeTruthy();
     expect(screen.getByText("Instagram: aino.k")).toBeTruthy();
-    expect(screen.queryByText("Shared in this conversation")).toBeNull();
     noProblems();
     await press("Share your Instagram");
     const sharing = () => calls.filter((c) => c.path.includes("/contacts/"));
     expect(sharing()).toEqual([
       { method: "POST", path: `/conversations/${ID}/contacts/instagram`, query: "", body: null },
     ]);
-    expect(screen.getByText("Shared in this conversation")).toBeTruthy();
-    expect(screen.getByText("Shared. Sanna sees it now.").props.accessibilityLiveRegion).toBe(
-      "polite",
-    );
+    // The button turns, which is the state in words, with no line under it and none after it (#581).
     expect(screen.getByRole("button", { name: "Stop sharing your Instagram" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Share your phone number" })).toBeTruthy();
+    expect(fromTheSentence()).toEqual([
+      BODY,
+      "Phone: +358401234567",
+      "Share",
+      "Instagram: aino.k",
+      "Stop sharing",
+    ]);
     expect(pressedLabels().filter((label) => /aino|358/.test(label))).toEqual([]);
     noProblems();
     await press("Stop sharing your Instagram");
@@ -826,16 +919,37 @@ describe("contacts in a conversation (#103)", () => {
       query: "",
       body: null,
     });
-    expect(screen.getByText("No longer shared here.")).toBeTruthy();
-    expect(screen.queryByText("Shared in this conversation")).toBeNull();
+    expect(fromTheSentence()).toEqual([
+      BODY,
+      "Phone: +358401234567",
+      "Share",
+      "Instagram: aino.k",
+      "Share",
+    ]);
     expect(screen.getByRole("button", { name: "Share your Instagram" })).toBeTruthy();
+    // A screen reader is told, as no line has a live region to speak through.
+    expect(announced()).toEqual([SHARED, STOPPED]);
+    expect(heard()).toEqual([]);
+  });
+
+  it("takes a refusal back at the next press and as the dialog closes", async () => {
+    const refused = [refusal("message_budget_exceeded", 429)];
+    contactsApi(detail({ contacts: { mine: [INSTAGRAM], theirs: [] } }), refused);
+    await renderWithTheme(<ConversationScreen id={ID} />);
+    await screen.findByLabelText("Message");
+    await press("Share contact");
+    await press("Share your Instagram");
+    expect(screen.getByText(LIMITED)).toBeTruthy();
+    await press("Share your Instagram");
+    expect(screen.queryByText(LIMITED)).toBeNull();
+    refused.push(refusal("message_budget_exceeded", 429));
+    await press("Stop sharing your Instagram");
+    expect(screen.getByText(LIMITED)).toBeTruthy();
     // What was said belongs to that time the dialog was open.
     await press("Close");
     expect(screen.queryByText("Share a contact")).toBeNull();
     await press("Share contact");
-    expect(screen.queryByText("No longer shared here.")).toBeNull();
-    // Android reads its live regions; nothing is announced.
-    expect(announced()).toEqual([]);
+    expect(screen.queryByText(LIMITED)).toBeNull();
   });
 
   it("brings an archived conversation back with a share, as a message does", async () => {
@@ -859,12 +973,63 @@ describe("contacts in a conversation (#103)", () => {
     await press("Share your Instagram");
     await press("Share your Instagram");
     await press("Stop sharing your Instagram");
-    expect(announced()).toEqual([
-      "That was a lot in a short time. Wait a moment and try again.",
-      "Shared. Sanna sees it now.",
-      "No longer shared here.",
-    ]);
+    // The refusal is drawn, and told at once; the outcomes are heard alone, queued behind the press.
+    expect(announced()).toEqual([LIMITED]);
+    expect(heard()).toEqual([SHARED, STOPPED]);
+    expect(screen.queryByText(SHARED)).toBeNull();
+    expect(screen.queryByText(STOPPED)).toBeNull();
   });
+
+  it("leaves a refusal to its live region on Android, and tells what no line says", async () => {
+    jest.replaceProperty(Platform, "OS", "android");
+    contactsApi(detail({ contacts: { mine: [INSTAGRAM], theirs: [] } }), [
+      refusal("message_budget_exceeded", 429),
+    ]);
+    await renderWithTheme(<ConversationScreen id={ID} />);
+    await screen.findByLabelText("Message");
+    await press("Share contact");
+    await press("Share your Instagram");
+    expect(screen.getByText(LIMITED).props.accessibilityLiveRegion).toBe("assertive");
+    expect(announced()).toEqual([]);
+    await press("Share your Instagram");
+    expect(announced()).toEqual([SHARED]);
+  });
+
+  it.each([
+    [
+      "fi-FI",
+      "Viesti",
+      "Jaa yhteystieto",
+      "Jaa: Instagram",
+      "Lopeta jakaminen: Instagram",
+      "Sanna näkee jakamasi heti. Voit lopettaa jakamisen milloin tahansa, mutta minkä Sanna on jo kirjoittanut muistiin, jää hänelle.",
+      "Jaettu. Sanna näkee sen nyt.",
+      "Ei enää jaettu tässä.",
+    ],
+    [
+      "sv-FI",
+      "Meddelande",
+      "Dela kontaktuppgift",
+      "Dela: Instagram",
+      "Sluta dela: Instagram",
+      "Sanna ser det du delar direkt. Du kan sluta dela när som helst, men det som Sanna redan har skrivit ner finns kvar.",
+      "Delat. Sanna ser det nu.",
+      "Delas inte längre här.",
+    ],
+  ])(
+    "says the dialog's sentence in %s, and tells a share and a stop in the same language (#581)",
+    async (languageTag, field, open, share, stop, body, shared, stopped) => {
+      (useLocales as jest.Mock).mockReturnValue([{ languageTag }]);
+      contactsApi(detail({ contacts: { mine: [INSTAGRAM], theirs: [] } }));
+      await renderWithTheme(<ConversationScreen id={ID} />);
+      await screen.findByLabelText(field);
+      await press(open);
+      expect(screen.getByText(body)).toBeTruthy();
+      await press(share);
+      await press(stop);
+      expect(heard()).toEqual([shared, stopped]);
+    },
+  );
 
   it("says each refusal in the dialog, and reads the conversation again when the refusal says it is out of date", async () => {
     const { calls, detailReads, set } = contactsApi(
@@ -889,9 +1054,7 @@ describe("contacts in a conversation (#103)", () => {
     expect(screen.getByRole("button", { name: "Share your Instagram" })).toBeTruthy();
     for (let i = 0; i < 2; i += 1) {
       await press("Share your Instagram");
-      expect(
-        screen.getByText("Nothing changed. Check your connection and try again."),
-      ).toBeTruthy();
+      expect(screen.getByText("That did not go through. Try again.")).toBeTruthy();
     }
     expect(detailReads()).toBe(before);
     // Removed on another phone meanwhile: said, read again, and gone from the dialog and the header.
@@ -923,10 +1086,12 @@ describe("contacts in a conversation (#103)", () => {
     await press("Share your Instagram");
     expect(screen.getByText("This conversation has ended, so nothing was shared.")).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Share your Instagram" })).toBeNull();
-    // Once in the dialog, once instead of the composer.
-    expect(screen.getAllByText("This conversation has ended.")).toHaveLength(2);
+    // In the dialog, where the buttons have gone and no heading says why; not instead of the composer.
+    expect(screen.getAllByText(ENDED)).toHaveLength(1);
     expect(screen.queryByLabelText("Message")).toBeNull();
     expect(shareOffered()).toBe(false);
+    // Told once: the line in the dialog has no live region to speak through.
+    expect(heard()).toEqual([ENDED]);
   });
 
   it("says a conversation gone when a share finds it gone", async () => {
@@ -953,13 +1118,36 @@ describe("contacts in a conversation (#103)", () => {
     await press("Close");
     await answer();
     expect(announced()).toEqual([]);
+    expect(heard()).toEqual([]);
     await press("Share contact");
-    expect(screen.getByText("Shared in this conversation")).toBeTruthy();
-    expect(screen.queryByText("Shared. Sanna sees it now.")).toBeNull();
-    // Open, it says the next one.
+    expect(screen.getByRole("button", { name: "Stop sharing your Instagram" })).toBeTruthy();
+    expect(heard()).toEqual([]);
+    // Open, it tells the next one.
     await press("Stop sharing your Instagram");
-    expect(screen.getByText("No longer shared here.")).toBeTruthy();
-    expect(announced()).toEqual(["No longer shared here."]);
+    expect(heard()).toEqual([STOPPED]);
+  });
+
+  it("says nothing of a refusal that came after the dialog closed, and still reads again what it says is out of date", async () => {
+    jest.replaceProperty(Platform, "OS", "ios");
+    const { detailReads, hold, set } = contactsApi(
+      detail({ contacts: { mine: [INSTAGRAM], theirs: [] } }),
+      [refusal("contact_not_stored", 409)],
+    );
+    await renderWithTheme(<ConversationScreen id={ID} />);
+    await screen.findByLabelText("Message");
+    await press("Share contact");
+    const answer = hold("share");
+    await press("Share your Instagram");
+    await press("Close");
+    set(detail({ contacts: { mine: [], theirs: [] } }));
+    const before = detailReads();
+    await answer();
+    expect(announced()).toEqual([]);
+    expect(
+      screen.queryByText("Save this contact under Settings, Ways to reach you, first."),
+    ).toBeNull();
+    expect(detailReads()).toBe(before + 1);
+    expect(shareOffered()).toBe(false);
   });
 
   it.each([
@@ -1127,7 +1315,8 @@ describe("one conversation, live over the socket", () => {
       state: "closed",
       closedHow: "unmatch",
     });
-    expect(screen.getByText("This conversation has ended.")).toBeTruthy();
+    expectPinnedHeader("Conversation ended", "Back");
+    expect(screen.queryByText(ENDED)).toBeNull();
     expect(screen.queryByLabelText("Message")).toBeNull();
     expect(screen.queryByText(ONLINE)).toBeNull();
     await frame({ type: "conversation", conversationId: ID, state: "gone", closedHow: null });
@@ -1578,14 +1767,14 @@ describe("one conversation, live over the socket", () => {
       </ChatLiveProvider>,
     );
     await waitFor(() => expect(FakeWebSocket.instances).toHaveLength(1));
-    expect(await screen.findByText("The conversation could not be loaded.")).toBeTruthy();
+    expect(await screen.findByText(FAILED_TO_LOAD)).toBeTruthy();
     fails = false;
     await ready();
     await frame({ type: "contacts", conversationId: ID });
     await settle();
     expect([contactsReads(), detailReads()]).toEqual([2, 0]);
     // Read, but not shown over the failure: the messages were never read.
-    expect(screen.getByText("The conversation could not be loaded.")).toBeTruthy();
+    expect(screen.getByText(FAILED_TO_LOAD)).toBeTruthy();
     expect(screen.queryByText("Instagram: ville.k")).toBeNull();
     await press("Try again");
     expect(said("Sanna", DAY_1, "Moi")).toBeTruthy();
@@ -1604,7 +1793,7 @@ describe("one conversation, live over the socket", () => {
     await ready();
     await settle();
     await press("Share contact");
-    expect(screen.getByText("Shared in this conversation")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Stop sharing your Instagram" })).toBeTruthy();
     await frame({
       type: "conversation",
       conversationId: ID,
@@ -1612,9 +1801,217 @@ describe("one conversation, live over the socket", () => {
       closedHow: "unmatch",
     });
     expect(screen.queryByRole("button", { name: "Share contact" })).toBeNull();
-    expect(screen.queryByText("Shared in this conversation")).toBeNull();
     expect(screen.queryByRole("button", { name: "Stop sharing your Instagram" })).toBeNull();
-    expect(screen.getAllByText("This conversation has ended.")).toHaveLength(2);
+    // In the dialog alone: behind it the heading says it.
+    expect(screen.getAllByText(ENDED)).toHaveLength(1);
+    expect(heard()).toEqual([ENDED]);
+  });
+
+  describe("an end while on the screen (#581)", () => {
+    const CLOSED = {
+      type: "conversation",
+      conversationId: ID,
+      state: "closed",
+      closedHow: "unmatch",
+    };
+    const REPORT = "Report and block";
+    const onTheScreen = async (shown: ConversationDetail = detail()) => {
+      await live(shown, [[message(1, "theirs", "Moi", DAY_1)]]);
+      await screen.findByLabelText("Message");
+      await ready();
+    };
+
+    it.each<[string, "ios" | "android", Partial<ConversationDetail>, string[], string[]]>([
+      ["iOS, queued", "ios", {}, [ENDED], []],
+      ["Android, with the plain call", "android", {}, [], [ENDED]],
+      ["iOS, from an archived conversation", "ios", { state: "archived" }, [ENDED], []],
+    ])(
+      "is told once to a screen reader on %s, with no line drawn, the heading saying it",
+      async (_where, os, over, queued, plain) => {
+        jest.replaceProperty(Platform, "OS", os);
+        await onTheScreen(detail(over));
+        await frame(CLOSED);
+        await settle();
+        expectPinnedHeader("Conversation ended", "Back");
+        expect(screen.queryByText(ENDED)).toBeNull();
+        expect(screen.queryByLabelText("Message")).toBeNull();
+        expect(screen.getByRole("link", { name: SUPPORT })).toBeTruthy();
+        noProblems();
+        expect(heard()).toEqual(queued);
+        expect(announced()).toEqual(plain);
+        // Not again on a look back, on a new frame, or on what the read after it brings.
+        await act(async () => focus());
+        await settle();
+        await frame(CLOSED);
+        await settle();
+        expect(heard()).toEqual(queued);
+        expect(announced()).toEqual(plain);
+      },
+    );
+
+    it.each([
+      ["fi-FI", "Viesti", "Keskustelu päättynyt", "Takaisin", "Tämä keskustelu on päättynyt."],
+      [
+        "sv-FI",
+        "Meddelande",
+        "Samtalet har avslutats",
+        "Tillbaka",
+        "Det här samtalet har avslutats.",
+      ],
+    ])(
+      "is told in %s, its heading drawn in the same language",
+      async (languageTag, field, title, back, words) => {
+        (useLocales as jest.Mock).mockReturnValue([{ languageTag }]);
+        await live(detail(), [[message(1, "theirs", "Moi", DAY_1)]]);
+        await screen.findByLabelText(field);
+        await ready();
+        await frame(CLOSED);
+        await settle();
+        expectPinnedHeader(title, back);
+        expect(heard()).toEqual([words]);
+        expect(screen.queryByText(words)).toBeNull();
+      },
+    );
+
+    it("is told when a read finds it, the screen in front", async () => {
+      const { set } = contactsApi(detail());
+      await renderWithTheme(<ConversationScreen id={ID} />);
+      await screen.findByLabelText("Message");
+      expect(heard()).toEqual([]);
+      set(detail({ state: "closed", closedHow: "unmatch", counterpart: null }));
+      await act(async () => focus());
+      await settle();
+      expectPinnedHeader("Conversation ended", "Back");
+      expect(heard()).toEqual([ENDED]);
+    });
+
+    it.each<[string, Partial<ConversationDetail>]>([
+      ["ended", { state: "closed", closedHow: "unmatch", counterpart: null }],
+      [
+        "left by a deleted account",
+        { state: "closed", closedHow: "erasure", counterpart: { deleted: true } },
+      ],
+    ])("is told nothing on opening a conversation already %s", async (_how, over) => {
+      await live(detail(over), [[message(1, "theirs", "Moi", DAY_1)]]);
+      await screen.findByRole("link", { name: SUPPORT });
+      await ready();
+      await act(async () => focus());
+      await settle();
+      expect(heard()).toEqual([]);
+      expect(announced()).toEqual([]);
+    });
+
+    it("waits behind the dialog of More, and is told once as it closes", async () => {
+      await onTheScreen();
+      await press("More");
+      await frame(CLOSED);
+      await settle();
+      expect(heard()).toEqual([]);
+      await press("Cancel");
+      await settle();
+      expect(heard()).toEqual([ENDED]);
+      expectPinnedHeader("Conversation ended", "Back");
+      expect(screen.getByRole("button", { name: "More" })).toBeTruthy();
+      await press("More");
+      expect(screen.getByRole("button", { name: REPORT })).toBeTruthy();
+      expect(heard()).toEqual([ENDED]);
+    });
+
+    it("waits while another screen is over it, and is told once on coming back", async () => {
+      await onTheScreen();
+      await act(async () => blur());
+      await frame(CLOSED);
+      await settle();
+      expect(heard()).toEqual([]);
+      await act(async () => focus());
+      await settle();
+      expect(heard()).toEqual([ENDED]);
+      expectPinnedHeader("Conversation ended", "Back");
+    });
+
+    it("is told nothing of another conversation's end, or of a conversation gone, whose line speaks for itself", async () => {
+      await onTheScreen();
+      await frame({ ...CLOSED, conversationId: "3f9a2c1e-5b7d-4f01-8a2b-1c3d4e5f6a71" });
+      await settle();
+      expect(screen.getByLabelText("Message")).toBeTruthy();
+      expect(heard()).toEqual([]);
+      await frame({ type: "conversation", conversationId: ID, state: "gone", closedHow: null });
+      expect(screen.getByText("This conversation is no longer available.")).toBeTruthy();
+      expect(heard()).toEqual([]);
+    });
+
+    it("names nobody from the frame on, even if the read after it fails", async () => {
+      await onTheScreen();
+      globalThis.fetch = jest.fn(async () => {
+        throw new TypeError("Network request failed");
+      }) as unknown as typeof fetch;
+      await frame(CLOSED);
+      await settle();
+      expectPinnedHeader("Conversation ended", "Back");
+      expect(said("The other person", DAY_1, "Moi")).toBeTruthy();
+      expect(screen.queryByText(/Sanna/)).toBeNull();
+      expect(screen.getByRole("link", { name: SUPPORT })).toBeTruthy();
+    });
+
+    it("is told nothing of an end the person brought about behind the dialog: the list says it", async () => {
+      await onTheScreen();
+      const answered = globalThis.fetch;
+      globalThis.fetch = jest.fn(async (input: Request | string, init?: RequestInit) => {
+        const request = input instanceof Request ? input : new Request(input, init);
+        return new URL(request.url).pathname === `/conversations/${ID}/unmatch`
+          ? new Response(null, { status: 204 })
+          : answered(input, init);
+      }) as unknown as typeof fetch;
+      await press("More");
+      await press("End conversation");
+      // Its own frame may come before the answer.
+      await frame(CLOSED);
+      await settle();
+      await press("End conversation");
+      await settle();
+      expect(takeNotice()).toBe("unmatched");
+      expect(heard()).toEqual([]);
+    });
+
+    it("leaves an erasure's line to its live region on Android", async () => {
+      jest.replaceProperty(Platform, "OS", "android");
+      await onTheScreen();
+      await frame({ ...CLOSED, closedHow: "erasure" });
+      await settle();
+      expect(screen.getByText(LEFT).props.accessibilityLiveRegion).toBe("polite");
+      expect(heard()).toEqual([]);
+      expect(announced()).toEqual([]);
+    });
+
+    it("keeps the name when the socket says the person left, until a read says Deleted user, their leaving drawn in a live region and said once on iOS, which has none", async () => {
+      const { set } = contactsApi(detail(), [], { newest: [message(1, "theirs", "Moi", DAY_1)] });
+      await renderWithTheme(
+        <ChatLiveProvider>
+          <ConversationScreen id={ID} />
+        </ChatLiveProvider>,
+      );
+      await waitFor(() => expect(FakeWebSocket.instances).toHaveLength(1));
+      await screen.findByLabelText("Message");
+      await ready();
+      await settle();
+      const answering = globalThis.fetch;
+      globalThis.fetch = jest.fn(async () => {
+        throw new TypeError("Network request failed");
+      }) as unknown as typeof fetch;
+      await frame({ ...CLOSED, closedHow: "erasure" });
+      await settle();
+      expectPinnedHeader("Sanna, 31", "Back");
+      const line = screen.getByText(LEFT);
+      expect(line.props.accessibilityLiveRegion).toBe("polite");
+      expect(screen.queryByLabelText("Message")).toBeNull();
+      expect(heard()).toEqual([LEFT]);
+      globalThis.fetch = answering;
+      set(detail({ state: "closed", closedHow: "erasure", counterpart: { deleted: true } }));
+      await act(async () => focus());
+      await settle();
+      expectPinnedHeader("Deleted user", "Back");
+      expect(heard()).toEqual([LEFT]);
+    });
   });
 
   describe("the contacts read alone, and the newest detail kept (#103)", () => {
@@ -1746,7 +2143,7 @@ describe("one conversation, live over the socket", () => {
       set(detail({ contacts: VILLE_SHARES }));
       await ready();
       await settle();
-      expect(screen.getByText("Loading the conversation…")).toBeTruthy();
+      expect(screen.getByText("Loading…")).toBeTruthy();
       await page();
       expect(screen.getByLabelText("Message")).toBeTruthy();
       expect(screen.getByText("Instagram: ville.k")).toBeTruthy();
@@ -1788,15 +2185,20 @@ describe("one conversation, live over the socket", () => {
       expect(screen.queryByText("Instagram: ville.k")).toBeNull();
       await older();
       expect(screen.queryByText("Instagram: ville.k")).toBeNull();
-      // Begun before the person shared: the share's answer is newer.
+      // Begun before the person shared: the share's answer is newer. The read that answer asks
+      // for waits too, or it would land behind the older one and put right what that took away.
       const before = hold("contacts");
+      const after = hold("contacts");
       await contactsFrame();
       await settle();
       await press("Share contact");
       await press("Share your Instagram");
-      expect(screen.getByText("Shared in this conversation")).toBeTruthy();
+      const stop = () => screen.getByRole("button", { name: "Stop sharing your Instagram" });
+      expect(stop()).toBeTruthy();
       await before();
-      expect(screen.getByText("Shared in this conversation")).toBeTruthy();
+      expect(stop()).toBeTruthy();
+      await after();
+      expect(stop()).toBeTruthy();
     });
 
     it.each<["share" | "stop", "the answer" | "her frame's read"]>([
@@ -1838,11 +2240,9 @@ describe("one conversation, live over the socket", () => {
         // fresher: a read after it brings hers.
         expect(contactsReads()).toBe(reads + 2);
         expect(screen.getByText("Instagram: ville.k")).toBeTruthy();
-        expect(
-          screen.getByText(
-            what === "share" ? "Shared. Sanna sees it now." : "No longer shared here.",
-          ),
-        ).toBeTruthy();
+        expect(heard()).toEqual([
+          what === "share" ? "Shared. Sanna sees it now." : "No longer shared here.",
+        ]);
         expect(
           screen.getByRole("button", {
             name: wasShared ? "Share your Instagram" : "Stop sharing your Instagram",
@@ -1876,7 +2276,11 @@ describe("a photo in a conversation (#350)", () => {
     noProblems();
     picks();
     await press("Add photo");
-    expect(attached()?.props.accessibilityLiveRegion).toBe("polite");
+    // The picture and Remove photo show it; a screen reader is told, with no line drawn (#581).
+    expect(attached()).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Remove photo" })).toBeTruthy();
+    expect(screen.queryByText(ATTACHED)).toBeNull();
+    expect(heard()).toEqual([ATTACHED]);
     expect(sourceOf("photo-attached")?.uri).toBe("file:///roll/1.jpg#resized");
     // A photo goes without words.
     expect(sendButton().props.accessibilityState?.disabled).toBe(false);
@@ -2043,6 +2447,8 @@ describe("a photo in a conversation (#350)", () => {
     expect(screen.getByText(FAILED)).toBeTruthy();
     expect(composer().props.value).toBe("Hei");
     expect(attached()).toBeTruthy();
+    // Put back, not picked: the failure's line says what happened, and nothing more is told.
+    expect(heard()).toEqual([ATTACHED]);
     await userEvent.setup().press(sendButton());
     expect(fieldsOf(1)).toEqual(fieldsOf(0));
     await act(async () =>
@@ -2091,6 +2497,43 @@ describe("a photo in a conversation (#350)", () => {
     expect(screen.getByText("The photo could not be read. Try another picture.")).toBeTruthy();
     expect(attached()).toBeNull();
     expect(FakeXhr.sent).toEqual([]);
+    // Nothing attached, nothing told.
+    expect(heard()).toEqual([]);
+  });
+
+  it.each<["ios" | "android", string[], string[]]>([
+    ["ios", [ATTACHED], []],
+    ["android", [], [ATTACHED]],
+  ])(
+    "tells a screen reader on %s that a photo was picked, once, and nothing as it is taken off (#581)",
+    async (os, queued, plain) => {
+      jest.replaceProperty(Platform, "OS", os);
+      conversation(detail(), [[]]);
+      await renderWithTheme(<ConversationScreen id={ID} />);
+      await screen.findByLabelText("Message");
+      picks();
+      await press("Add photo");
+      const announced = (AccessibilityInfo.announceForAccessibility as jest.Mock).mock.calls;
+      expect(heard()).toEqual(queued);
+      expect(announced.map(([words]) => words)).toEqual(plain);
+      await press("Remove photo");
+      expect(heard()).toEqual(queued);
+      expect(announced.map(([words]) => words)).toEqual(plain);
+    },
+  );
+
+  it.each([
+    ["fi-FI", "Viesti", "Lisää kuva", "Kuva liitetty."],
+    ["sv-FI", "Meddelande", "Lägg till foto", "Foto bifogat."],
+  ])("tells a picked photo in %s (#581)", async (languageTag, field, add, words) => {
+    (useLocales as jest.Mock).mockReturnValue([{ languageTag }]);
+    conversation(detail(), [[]]);
+    await renderWithTheme(<ConversationScreen id={ID} />);
+    await screen.findByLabelText(field);
+    picks();
+    await press(add);
+    expect(heard()).toEqual([words]);
+    expect(screen.queryByText(words)).toBeNull();
   });
 
   it("shows a photo three ways: the thumb with its caption and description, Photo removed, and the blurhash until it is read again for its URLs", async () => {
@@ -2463,7 +2906,7 @@ describe("a conversation's More (#351)", () => {
     const ended = detail({ state: "closed", closedHow: "unmatch", counterpart: null });
     const { detailReads, set } = moreApi(ended, () => refusal("report_window_closed", 409));
     await renderWithTheme(<ConversationScreen id={ID} />);
-    await screen.findByText("This conversation has ended.");
+    await screen.findByRole("heading", { name: "Conversation ended" });
     await press("More");
     await press("Report and block");
     await radio("Something else");
@@ -2477,7 +2920,7 @@ describe("a conversation's More (#351)", () => {
     await press("Cancel");
     expect(screen.queryByText("This conversation can no longer be reported.")).toBeNull();
     expect(screen.queryByRole("button", { name: "More" })).toBeNull();
-    expect(screen.getByText("This conversation has ended.")).toBeTruthy();
+    expectPinnedHeader("Conversation ended", "Back");
     expect(router.dismissTo).not.toHaveBeenCalled();
   });
 });

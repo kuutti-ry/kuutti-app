@@ -4,35 +4,36 @@ import {
   type DealBreakerField,
   type DistanceBand,
   type ProfileCard,
+  QUEUE_PAGE,
   type Relaxation,
   type RelaxationOffer,
   type RelaxationsResponse,
-  ROUND_ENTRIES_MAX,
+  ROUND_POSITION_MAX,
   type RoundChoice,
   type RoundDecision,
   type RoundEntry,
-  type RoundOrdering,
   type RoundReason,
   type RoundResponse,
   sinceSeenBand,
 } from "@kuutti/schema";
 import { AppError } from "../lib/errors.ts";
-import { finnishDay } from "../lib/finnish-day.ts";
+import { addDays, finnishDay } from "../lib/finnish-day.ts";
 import type { Logger } from "../lib/logger.ts";
 import { matchingConfigNumber } from "../lib/matching-config.ts";
 import { dayWindow, secondsUntil } from "../media/index.ts";
 import { track } from "../research/index.ts";
 import { earnedFishWaiting, entriesPaidBy, releaseEarned, spendEarned } from "../rewards/index.ts";
 
-// Today's round (#96, TD-11, TD-12, ADR-034): what one person is shown on one
-// Finnish calendar day, each card with why it is there, when the phone
-// reported it seen, and the person's own decision, which may change until the
-// day ends (the maintainer, 19/10/2026). Every statement names the caller's
-// own round (rule 6), and every one that writes asks, in itself, that the
-// candidate is still live and that no block stands between the two (ADR-030
-// §2): a block that commits meanwhile leaves nothing written. Raw parameterised
-// SQL through Queryable, as the other slices: the round row's lock, the
-// stored decision and the predicate all sit in the statements that write.
+// The queue and the day's log of it, the round (#96, #502, TD-11, TD-12,
+// ADR-034, ADR-062): what one person goes through on one Finnish calendar day,
+// each card with why it is there, when the phone reported it seen, and the
+// person's own decision, which may change until the day ends (the maintainer,
+// 19/10/2026). Every statement names the caller's own round (rule 6), and every
+// one that writes asks, in itself, that the candidate is still live and that no
+// block stands between the two (ADR-030 §2): a block that commits meanwhile
+// leaves nothing written. Raw parameterised SQL through Queryable, as the other
+// slices: the round row's lock, the stored decision and the predicate all sit
+// in the statements that write.
 
 export type RoundDeps = { db: Queryable; logger: Logger; now: () => Date };
 
@@ -43,22 +44,38 @@ export type CardOf = (
 ) => Promise<ProfileCard | null>;
 
 /**
- * Builds the person's round for today when they have none and their matching
- * has opened, and says whether a round for today stands now, whoever wrote
- * it: the round builder's (#95, ADR-035), which reads across slices and lives
- * with the jobs, handed in by app.ts.
+ * What the queue reads across slices, the round builder's (#95, #502, ADR-062),
+ * which lives with the jobs, handed in by app.ts. `fill` adds the next people
+ * to the day's log, opening it when the person's matching is open, and says
+ * whether it added anybody. `fits` says which of these people are in each
+ * other's pool with the person now, both ways (§8), in the caller's
+ * transaction when there is one.
  */
-export type BuildToday = (accountId: string) => Promise<boolean>;
+export type Queue = {
+  fill: (accountId: string) => Promise<boolean>;
+  fits: (
+    db: Queryable,
+    accountId: string,
+    candidateIds: readonly string[],
+  ) => Promise<ReadonlySet<string>>;
+};
 
 /**
  * What the chat slice keeps of a match (#100, ADR-031: the conversation is
- * its record), handed in by app.ts as the card builder is: whether two
- * people have a conversation, and the opening of one in the caller's
- * transaction.
+ * its record), handed in by app.ts as the card builder is: the conversation two
+ * people can write in, or one they opened since `since` (ADR-062 §7), the
+ * opening of one in the caller's transaction, and how many conversations are
+ * on a person's turn (§5).
  */
 export type Matches = {
-  between: (db: Queryable, accountId: string, otherAccountId: string) => Promise<string | null>;
+  between: (
+    db: Queryable,
+    accountId: string,
+    otherAccountId: string,
+    since: Date,
+  ) => Promise<string | null>;
   open: (tx: Queryable, input: { first: string; second: string; at: Date }) => Promise<string>;
+  yourTurn: (db: Queryable, accountId: string) => Promise<number>;
   /**
    * After a match committed: the push to the person whose earlier like it met
    * (#102, ADR-055 §5), the notifications slice's, handed in by app.ts. It
@@ -80,28 +97,44 @@ const PAIR_LOCK = `SELECT pg_advisory_xact_lock(
 
 const LIKE_EXPIRY_KEY = "like_expiry_days";
 
+/** Conversations on a person's turn at which they can make no new match (ADR-062 §5); 0 is off. */
+const YOUR_TURN_LIMIT_KEY = "your_turn_limit";
+
+/** How many times one read goes on past an empty page: what was added fits as it is written, so a second empty page is a card refused meanwhile, and more would be a loop. */
+const FILL_TRIES = 3;
+
 /** An entry `e` of round `r` whose candidate can still be shown to the round's owner. */
-const SERVABLE = `EXISTS (SELECT 1 FROM account c WHERE c.id = e.candidate_id AND c.state = 'active')
+export const SERVABLE = `EXISTS (SELECT 1 FROM account c WHERE c.id = e.candidate_id AND c.state = 'active')
   AND NOT blocked_between(r.account_id, e.candidate_id)`;
 
-const notFound = () => new AppError(404, "not_found", "No such card in today's round");
+/**
+ * The highest place a round `r` ever gave: `last_position`, or the highest entry
+ * of a round written before it was kept. A place an undo freed stays given
+ * (ADR-042 §5).
+ */
+const PLACES = `greatest(r.last_position,
+           coalesce((SELECT max(e.position) FROM round_entries e WHERE e.round_id = r.id), 0))::int`;
+
+export const notFound = () => new AppError(404, "not_found", "No such card in today's round");
+
+/** The round's owner's own star on an entry `e`'s person, for `entriesOf` (#575, ADR-064). */
+export const STAR_OF_ENTRY = `(SELECT s.id FROM star s
+      WHERE s.account_id = r.account_id AND s.candidate_id = e.candidate_id) AS star`;
 
 /**
  * The day's likes (#98's first cut, the maintainer's of 20/10/2026): one
- * budget for everybody, whatever their pond's contest (TD-14's two budgets
- * wait for the research partner). A like on the card of somebody who liked
- * the person answers a like rather than sending one, and is free; a pass is
- * never counted. Past the budget a like an invitation earned is used by
- * itself (#107, ADR-044 §8, ADR-036 §5), and the likes it paid for are left
- * out of the count.
+ * budget for everybody. A like spends one wherever it goes, and a like back
+ * too (#503, the maintainer's of 30/10/2026, ADR-036 §3), so one limit bounds
+ * what a person proposes and what they answer; a pass is never counted.
  */
 const LIKE_BUDGET_KEY = "like_budget_balanced";
-const FREE_LIKES: readonly RoundReason[] = ["liked_you", "fish"];
+
+/** The cards whose like answers somebody's: a fish on one is a like (ADR-039 §2). */
+const ANSWERS_A_LIKE: readonly RoundReason[] = ["liked_you", "fish"];
 
 /**
- * The person's likes of the day against the budget, those a free card took or
- * an earned like paid for left out: one count for the refusal and for the
- * number the round says (#524), so the two never disagree.
+ * The person's likes of the day against the budget: one count for the refusal
+ * and for the number the round says (#524), so the two never disagree.
  */
 async function likesSent(
   db: Queryable,
@@ -112,9 +145,8 @@ async function likesSent(
   const { rows } = await db.query<{ n: number }>(
     `SELECT count(*)::int AS n
        FROM round_entries e JOIN rounds r ON r.id = e.round_id
-      WHERE r.account_id = $1 AND r.day = $2 AND e.decision = 'like'
-        AND e.reason <> ALL($3::round_reason[]) AND e.id <> ALL($4::uuid[])`,
-    [accountId, today, FREE_LIKES, await entriesPaidBy(db, accountId, "like")],
+      WHERE r.account_id = $1 AND r.day = $2 AND e.decision = 'like'`,
+    [accountId, today],
   );
   return { sent: rows[0]?.n ?? 0, budget };
 }
@@ -124,9 +156,6 @@ async function likesSent(
  * budget down to zero, a shadow-banned person's the same way.
  */
 async function likesLeftOf(db: Queryable, accountId: string, today: string): Promise<number> {
-  // shortcut: an earned like is not in the number, so somebody holding one reads
-  // zero while their next like still goes. Nobody holds one while
-  // invitation_reward earns no likes; #503 settles what the number counts.
   const { sent, budget } = await likesSent(db, accountId, today);
   return Math.max(0, budget - sent);
 }
@@ -145,13 +174,6 @@ async function likesLeftOf(db: Queryable, accountId: string, today: string): Pro
  */
 const FISH_BUDGET_KEY = "fish_budget";
 const FISH_WINDOW_KEY = "fish_window_days";
-
-/** A Finnish day `days` after another, both as YYYY-MM-DD. */
-function addDays(day: string, days: number): string {
-  const at = new Date(`${day}T12:00:00Z`);
-  at.setUTCDate(at.getUTCDate() + days);
-  return at.toISOString().slice(0, 10);
-}
 
 /** A Monday, from which the fish's periods are counted. */
 const FISH_PERIODS_FROM = Date.parse("1970-01-05");
@@ -178,7 +200,7 @@ async function fishSent(
     `SELECT count(*)::int AS n
        FROM round_entries e JOIN rounds r ON r.id = e.round_id
       WHERE r.account_id = $1 AND e.fish AND r.day >= $2::date AND e.id <> ALL($3::uuid[])`,
-    [accountId, from, await entriesPaidBy(db, accountId, "fish")],
+    [accountId, from, await entriesPaidBy(db, accountId)],
   );
   return { sent: rows[0]?.n ?? 0, budget, next: addDays(from, window) };
 }
@@ -194,15 +216,17 @@ async function fishToSendOf(db: Queryable, accountId: string, today: string): Pr
   return sent < budget || (await earnedFishWaiting(db, accountId));
 }
 
-/** What the round and each decision's answer say of the person's own budgets, one read for both. */
-async function budgetsOf(
+/** What the round and each decision's answer say of the person's own budgets and turn, one read for both. */
+export async function budgetsOf(
   db: Queryable,
+  matches: Pick<Matches, "yourTurn">,
   accountId: string,
   today: string,
-): Promise<{ fishToSend: boolean; likesLeft: number }> {
+): Promise<{ fishToSend: boolean; likesLeft: number; yourTurn: number }> {
   return {
     fishToSend: await fishToSendOf(db, accountId, today),
     likesLeft: await likesLeftOf(db, accountId, today),
+    yourTurn: await matches.yourTurn(db, accountId),
   };
 }
 
@@ -210,83 +234,105 @@ async function budgetsOf(
 const choiceOf = (decision: RoundDecision | null, fish: boolean): RoundChoice | null =>
   decision === "like" && fish ? "fish" : decision;
 
+/** Somebody the queue adds to the day's log, with why, and how far they live as measured now (ADR-061 §5). */
+export type Place = {
+  candidateId: string;
+  reason: RoundReason;
+  distance: DistanceBand;
+  /** On a `relaxed` place: every relaxation of the day it needs, the one that names its label first (ADR-042 §5). */
+  relaxedWith?: readonly string[];
+};
+
 /**
- * A new round, the round builder's (#95) one writer: the round and its
- * entries in one transaction, then `round_built`. A round already built for
- * the account and day is left as it was (null). Places start at 1; a
- * candidate is never the owner and never twice in one round. Each statement
- * asks for itself, holding the rows FOR SHARE, that the owner is still
+ * The queue's one writer (#95, #502, ADR-062 §1): the day's log, opened if this
+ * is the day's first read, and these places after the highest it ever gave.
+ * Under the round's lock; somebody a read beside this one added first is not
+ * added twice. Opening the day also deletes what earlier days queued and never
+ * showed (§2). A candidate is never the owner and never twice in one day. Each
+ * statement asks for itself, holding the rows FOR SHARE, that the owner is still
  * active or shadow-banned (not paused, sanctioned or erased) and that each
- * candidate is still active with no block between the two: the builder reads
- * the pool before it writes, and a pause, a sanction, an erasure or a block
- * in between must not leave a row that outlives it. A candidate dropped so
- * leaves its place empty, as the read does. Each entry is written with the
- * band its builder measured: frozen there, so that moving home and reading the
- * card again says nothing new (ADR-061 §5).
+ * candidate is still active with no block between the two: the builder reads the
+ * pool before it writes, and a pause, a sanction, an erasure or a block in
+ * between must not leave a row that outlives it. A candidate dropped so leaves
+ * its place empty, as the read does. Null with no owner to write for; otherwise
+ * how many places it wrote.
  */
-export async function saveRound(
+export async function addPlaces(
   deps: RoundDeps,
-  input: {
-    accountId: string;
-    day: string;
-    /** How the places no rule forces were ordered, for `round_built` (#95). */
-    ordering: RoundOrdering;
-    entries: { candidateId: string; reason: RoundReason; distance: DistanceBand }[];
-  },
-): Promise<{ roundId: string } | null> {
-  if (input.entries.some((entry) => entry.candidateId === input.accountId)) {
-    throw new Error("saveRound: a person is never a card in their own round");
+  input: { accountId: string; day: string; places: readonly Place[] },
+): Promise<number | null> {
+  if (input.places.some((place) => place.candidateId === input.accountId)) {
+    throw new Error("addPlaces: a person is never a card in their own round");
   }
-  const builtAt = deps.now();
-  const saved = await transaction(deps.db, async (tx) => {
-    const { rows } = await tx.query<{ id: string }>(
-      `INSERT INTO rounds (account_id, day, built_at, last_position)
-       SELECT id, $2, $3, $4 FROM account WHERE id = $1 AND state IN ('active', 'shadow_banned') FOR SHARE
-       ON CONFLICT (account_id, day) DO NOTHING RETURNING id`,
-      // The places are the entries' order: the highest a dropped candidate leaves empty is still given.
-      [input.accountId, input.day, builtAt, input.entries.length],
+  return transaction(deps.db, async (tx) => {
+    const owner = await tx.query(
+      "SELECT 1 FROM account WHERE id = $1 AND state IN ('active', 'shadow_banned') FOR SHARE",
+      [input.accountId],
     );
-    const id = rows[0]?.id;
-    if (!id) return null;
-    if (input.entries.length > 0) {
-      const written = await tx.query<{ reason: RoundReason }>(
-        `INSERT INTO round_entries (round_id, position, candidate_id, reason, distance)
-         SELECT $1, e.ordinality, e.candidate, e.reason::round_reason, e.distance::distance_band
-           FROM unnest($2::uuid[], $3::text[], $5::text[])
-                WITH ORDINALITY AS e(candidate, reason, distance, ordinality)
-           JOIN account c ON c.id = e.candidate
-          WHERE c.state = 'active' AND NOT blocked_between($4, e.candidate)
+    if (owner.rows.length === 0) return null;
+    const opened = await tx.query(
+      `INSERT INTO rounds (account_id, day, built_at) VALUES ($1, $2, $3)
+       ON CONFLICT (account_id, day) DO NOTHING`,
+      [input.accountId, input.day, deps.now()],
+    );
+    const round = await tx.query<{ id: string; last: number }>(
+      `SELECT r.id, ${PLACES} AS last FROM rounds r
+        WHERE r.account_id = $1 AND r.day = $2 FOR UPDATE OF r`,
+      [input.accountId, input.day],
+    );
+    const stands = round.rows[0];
+    if (!stands) throw new Error("addPlaces: the day's round is not there");
+    const written = await tx.query<{ position: number }>(
+      `INSERT INTO round_entries
+         (round_id, position, candidate_id, reason, distance, relaxed_field, relaxed_with)
+       SELECT $1, $5 + e.ordinality, e.candidate, e.reason::round_reason,
+              e.distance::distance_band, nullif(split_part(e.relaxed, ',', 1), ''),
+              string_to_array(e.relaxed, ',')
+         FROM unnest($2::uuid[], $3::text[], $6::text[], $7::text[])
+              WITH ORDINALITY AS e(candidate, reason, distance, relaxed, ordinality)
+         JOIN account c ON c.id = e.candidate
+        WHERE c.state = 'active' AND NOT blocked_between($4, e.candidate)
+          AND NOT EXISTS (SELECT 1 FROM round_entries x
+                           WHERE x.round_id = $1 AND x.candidate_id = e.candidate)
           FOR SHARE OF c
-         RETURNING reason`,
-        [
-          id,
-          input.entries.map((e) => e.candidateId),
-          input.entries.map((e) => e.reason),
-          input.accountId,
-          input.entries.map((e) => e.distance),
-        ],
+       RETURNING position`,
+      [
+        stands.id,
+        input.places.map((place) => place.candidateId),
+        input.places.map((place) => place.reason),
+        input.accountId,
+        stands.last,
+        input.places.map((place) => place.distance),
+        // Field keys hold no comma: each place's relaxations as one text.
+        input.places.map((place) => (place.relaxedWith ?? []).join(",")),
+      ],
+    );
+    const added = written.rows.length;
+    if (added > 0) {
+      // The places are the list's order: the highest a dropped candidate leaves empty is still given.
+      await tx.query(
+        `UPDATE rounds SET completed_at = NULL, last_position = $3
+          WHERE id = $1 AND account_id = $2`,
+        [stands.id, input.accountId, stands.last + input.places.length],
       );
-      return { id, reasons: written.rows.map((row) => row.reason) };
     }
-    return { id, reasons: [] };
+    // After the people above are held: an erasure holds the person, then deletes
+    // their entries, so an entry of somebody also in today's places, deleted first,
+    // would leave each waiting for the other.
+    if (opened.rowCount === 1) {
+      await tx.query(
+        `DELETE FROM round_entries e USING rounds r
+          WHERE r.id = e.round_id AND r.account_id = $1 AND r.day < $2::date
+            AND e.seen_at IS NULL AND e.decision IS NULL`,
+        [input.accountId, input.day],
+      );
+    }
+    return added;
   });
-  if (!saved) return null;
-  // What was written, a dropped candidate left out.
-  const count = (reason: RoundReason) => saved.reasons.filter((r) => r === reason).length;
-  await track({ ...deps, now: () => builtAt }, input.accountId, "round_built", {
-    ordering: input.ordering,
-    size: saved.reasons.length,
-    matchesFilters: count("matches_filters"),
-    likedYou: count("liked_you"),
-    seenBefore: count("seen_before"),
-    relaxed: count("relaxed"),
-    fish: count("fish"),
-  });
-  return { roundId: saved.id };
 }
 
 /** A row of a round's entry as the read takes it. */
-type EntryRow = {
+export type EntryRow = {
   position: number | null;
   candidate_id: string | null;
   reason: RoundReason | null;
@@ -294,20 +340,21 @@ type EntryRow = {
   fish: boolean | null;
   relaxed_field: DealBreakerField | null;
   distance: DistanceBand | null;
+  star: string | null;
 };
 
 /**
- * The entries' cards in order, each through the card builder, which writes
- * the shown record and counts the day's cards (ADR-008); a card it refuses (a
- * block either way, a sanction, a profile no longer complete) is left out.
- * Each says which of the person's own deal-breakers, not paused, its card
- * says nothing on (ADR-042 §8): the card leaves out an unanswered field and a
- * hidden one alike, so the label never tells them apart (#515). Distance is no
- * card field and everybody has a home, so no card is ever without it
- * (ADR-061 §7). The band is the one written with the entry, never computed
- * here (§5).
+ * The entries' cards in order, at most a page of them, each through the card
+ * builder, which writes the shown record and counts the day's cards (ADR-008);
+ * a card it refuses (a block either way, a sanction, a profile no longer
+ * complete) is left out. Each says which of the person's own deal-breakers, not
+ * paused, its card says nothing on (ADR-042 §8): the card leaves out an
+ * unanswered field and a hidden one alike, so the label never tells them apart
+ * (#515). Distance is no card field and everybody has a home, so no card is ever
+ * without it (ADR-061 §7). The band is the one written with the entry, never
+ * computed here (§5).
  */
-async function entriesOf(
+export async function entriesOf(
   accountId: string,
   rows: readonly EntryRow[],
   cardOf: CardOf,
@@ -315,6 +362,7 @@ async function entriesOf(
 ): Promise<RoundEntry[]> {
   const entries: RoundEntry[] = [];
   for (const row of rows) {
+    if (entries.length === QUEUE_PAGE) break;
     if (row.position === null || row.candidate_id === null || row.reason === null) continue;
     const card = await cardOf(accountId, row.candidate_id);
     if (!card) continue;
@@ -324,6 +372,7 @@ async function entriesOf(
       decision: choiceOf(row.decision, row.fish === true),
       card,
       distance: row.distance,
+      star: row.star,
       ...(row.relaxed_field ? { relaxedField: row.relaxed_field } : {}),
       notAnswered: dealBreakers.flatMap(({ field }) =>
         field === "distance" || card.fields[field] !== undefined ? [] : [field],
@@ -334,38 +383,79 @@ async function entriesOf(
 }
 
 /**
- * Today's round as the person opens it: its cards in order (`entriesOf`).
- * Null entries before the round is built. The first read that finds the
- * round stamps `opened_at`. `dealBreakers` are the person's own, not paused.
+ * The next cards of the day's log (`entriesOf`), those undecided that fit now,
+ * both ways (ADR-062 §8): one that does not stays in the log, left out while it
+ * does not fit. A shadow-banned person's liked-you and fish cards wait for the
+ * lift, those queued before the ban too (ADR-037 §7): a like back would make no
+ * match, and so tell them of it (ADR-024 §7). A starred card comes through the list
+ * alone, unless somebody's like waits on it, which a star does not touch (ADR-064
+ * §4). Null with no log for the day. The first read that finds the round stamps
+ * `opened_at`.
  */
-export async function readTodaysRound(
+async function nextCards(
   deps: RoundDeps,
+  queue: Pick<Queue, "fits">,
   accountId: string,
+  day: string,
   cardOf: CardOf,
-  dealBreakers: readonly DealBreaker[] = [],
-): Promise<RoundResponse> {
-  const at = deps.now();
-  const day = finnishDay(at);
+  dealBreakers: readonly DealBreaker[],
+): Promise<RoundEntry[] | null> {
   const { rows } = await deps.db.query<EntryRow & { id: string }>(
     `SELECT r.id, e.position, e.candidate_id, e.reason, e.decision, e.fish, e.relaxed_field,
-            e.distance
-       FROM rounds r LEFT JOIN round_entries e ON e.round_id = r.id
+            e.distance, ${STAR_OF_ENTRY}
+       FROM rounds r JOIN account me ON me.id = r.account_id
+       LEFT JOIN round_entries e ON e.round_id = r.id AND e.decision IS NULL
+        AND NOT (me.state = 'shadow_banned' AND e.reason IN ('liked_you', 'fish'))
+        AND (e.reason IN ('liked_you', 'fish') OR NOT EXISTS (
+              SELECT 1 FROM star s
+               WHERE s.account_id = r.account_id AND s.candidate_id = e.candidate_id))
       WHERE r.account_id = $1 AND r.day = $2
       ORDER BY e.position`,
     [accountId, day],
   );
-  const budgets = await budgetsOf(deps.db, accountId, day);
   const round = rows[0];
-  if (!round) return { day, entries: null, ...budgets };
+  if (!round) return null;
   await deps.db.query(
     "UPDATE rounds SET opened_at = $3 WHERE id = $1 AND account_id = $2 AND opened_at IS NULL",
-    [round.id, accountId, at],
+    [round.id, accountId, deps.now()],
   );
-  return { day, entries: await entriesOf(accountId, rows, cardOf, dealBreakers), ...budgets };
+  const queued = rows.flatMap((row) => (row.candidate_id ? [row.candidate_id] : []));
+  if (queued.length === 0) return [];
+  const fitting = await queue.fits(deps.db, accountId, queued);
+  return entriesOf(
+    accountId,
+    rows.filter((row) => row.candidate_id !== null && fitting.has(row.candidate_id)),
+    cardOf,
+    dealBreakers,
+  );
+}
+
+/**
+ * The queue as the person reads it (ADR-062 §1): the next cards of the day's
+ * log and, with none left, the next people added to it first. Null entries
+ * while the person's matching has not opened, an empty list at the queue's end.
+ * `dealBreakers` are the person's own, not paused.
+ */
+export async function readQueue(
+  deps: RoundDeps,
+  matches: Pick<Matches, "yourTurn">,
+  queue: Queue,
+  accountId: string,
+  cardOf: CardOf,
+  dealBreakers: readonly DealBreaker[] = [],
+): Promise<RoundResponse> {
+  const day = finnishDay(deps.now());
+  let entries = await nextCards(deps, queue, accountId, day, cardOf, dealBreakers);
+  for (let tries = 0; !entries?.length && tries < FILL_TRIES; tries += 1) {
+    const added = await queue.fill(accountId);
+    entries = await nextCards(deps, queue, accountId, day, cardOf, dealBreakers);
+    if (!added) break;
+  }
+  return { day, entries, ...(await budgetsOf(deps.db, matches, accountId, day)) };
 }
 
 /** The day named, checked against today before anything is read: an ended day's round answers round_expired, a later one is nobody's yet. */
-function todayOrRefuse(deps: RoundDeps, day: string): { at: Date; today: string } {
+export function todayOrRefuse(deps: RoundDeps, day: string): { at: Date; today: string } {
   const at = deps.now();
   const today = finnishDay(at);
   if (day < today) {
@@ -411,11 +501,18 @@ export async function markSeen(
 }
 
 /**
- * A like or a pass on today's card, changeable until the day ends: under the
- * round row's lock, which serialises the person's day across devices and
- * which the day's likes are counted under. The same decision again writes
- * nothing; a changed one emits its event with `revised`. The round is
- * complete once nothing that can still be shown is undecided.
+ * A like, a pass or a skip on today's card, changeable until the day ends:
+ * under the round row's lock, which serialises the person's day across devices
+ * and which the day's likes are counted under. The same decision again writes
+ * nothing; a changed like or pass emits its event with `revised`, and a skip
+ * emits none. The round is complete once nothing that can still be shown is
+ * undecided.
+ *
+ * A new like asks two things, in this order (ADR-062 §5, §8): the conversations
+ * on the person's turn, before anything is read of the other person, so that
+ * the refusal says nothing of them; and that the two fit now, both ways, with
+ * the 404 of a card that can no longer be shown. Neither asks a pass or a skip,
+ * so a like can always be taken back.
  *
  * A like of somebody whose like of the person stands, within
  * `like_expiry_days`, is a match (#100, ADR-038): the conversation is opened
@@ -425,20 +522,21 @@ export async function markSeen(
  * may still be taken back until midnight. No match is made while the person
  * is shadow-banned, nor with a block between the two.
  *
- * A like or a fish past its budget spends a unit the person's invitations
- * earned, in this transaction, and a change of it gives the unit back (#107,
- * ADR-044 §8); the reward table is the rewards slice's, reached through its
- * index.ts. The answer says whether a fish can still go today (#475) and how
+ * A fish past its budget spends one an invitation earned the person, in this
+ * transaction, and a change of it gives the unit back (#107, ADR-044 §8); the
+ * reward table is the rewards slice's, reached through its index.ts. The
+ * answer says whether a fish can still go today (#475) and how
  * many likes are left (#524), which the decision moves, read in this
  * transaction after the write.
  */
 export async function decide(
   deps: RoundDeps,
   matches: Matches,
+  queue: Pick<Queue, "fits">,
   input: { accountId: string; day: string; position: number; decision: RoundChoice },
-): Promise<{ match: string | null; fishToSend: boolean; likesLeft: number }> {
+): Promise<{ match: string | null; fishToSend: boolean; likesLeft: number; yourTurn: number }> {
   const { at, today } = todayOrRefuse(deps, input.day);
-  const decision: RoundDecision = input.decision === "pass" ? "pass" : "like";
+  const decision: RoundDecision = input.decision === "fish" ? "like" : input.decision;
   const written = await transaction(deps.db, async (tx) => {
     // The two accounts first, shared and in id order, before any row of a
     // round: erasure and a sanction take an account FOR UPDATE before they
@@ -480,35 +578,38 @@ export async function decide(
     const entry = found.rows[0];
     if (!entry) throw notFound();
     // A fish on a card that answers a like is a like (ADR-039 §2).
-    const fish = input.decision === "fish" && !FREE_LIKES.includes(entry.reason);
+    const fish = input.decision === "fish" && !ANSWERS_A_LIKE.includes(entry.reason);
     await tx.query(PAIR_LOCK, [input.accountId, entry.candidate_id]);
-    const standing = await matches.between(tx, input.accountId, entry.candidate_id);
+    const standing = await matches.between(
+      tx,
+      input.accountId,
+      entry.candidate_id,
+      dayWindow(at).start,
+    );
     if (entry.decision === decision && entry.fish === fish) {
       return {
         match: decision === "like" ? standing : null,
-        ...(await budgetsOf(tx, input.accountId, today)),
+        ...(await budgetsOf(tx, matches, input.accountId, today)),
         decided: null,
       };
     }
     if (standing && entry.decision === "like") {
       throw new AppError(409, "match_made", "This like made a match and stays");
     }
+    if (decision === "like" && entry.decision !== "like") {
+      const limit = await matchingConfigNumber(tx, YOUR_TURN_LIMIT_KEY);
+      if (limit > 0 && (await matches.yourTurn(tx, input.accountId)) >= limit) {
+        throw new AppError(409, "your_turn_limit", "Conversations are waiting for an answer");
+      }
+      const fitting = await queue.fits(tx, input.accountId, [entry.candidate_id]);
+      if (!fitting.has(entry.candidate_id)) throw notFound();
+    }
     // Counted under the round's lock from the day's standing decisions, so a
     // like taken back gives its place back and two devices cannot both pass
     // the count; the refusal writes nothing. A like made a fish was counted.
-    // A like an earned like paid for is not counted; past the budget the like
-    // takes the oldest one left, and is refused only with none.
-    if (decision === "like" && entry.decision !== "like" && !FREE_LIKES.includes(entry.reason)) {
+    if (decision === "like" && entry.decision !== "like") {
       const count = await likesSent(tx, input.accountId, today);
-      if (
-        count.sent >= count.budget &&
-        !(await spendEarned(tx, {
-          accountId: input.accountId,
-          kind: "like",
-          entryId: entry.id,
-          at,
-        }))
-      ) {
+      if (count.sent >= count.budget) {
         throw new AppError(429, "like_budget_exceeded", "The day's likes are used up", {
           retryAfterSeconds: secondsUntil(dayWindow(at).end, at),
         });
@@ -521,12 +622,7 @@ export async function decide(
       const count = await fishSent(tx, input.accountId, today);
       if (
         count.sent >= count.budget &&
-        !(await spendEarned(tx, {
-          accountId: input.accountId,
-          kind: "fish",
-          entryId: entry.id,
-          at,
-        }))
+        !(await spendEarned(tx, { accountId: input.accountId, entryId: entry.id, at }))
       ) {
         const back = dayWindow(new Date(`${count.next}T12:00:00Z`)).start;
         throw new AppError(429, "fish_budget_exceeded", "The period's fish are sent", {
@@ -534,25 +630,31 @@ export async function decide(
         });
       }
     }
-    // What a changed like used is given back (ADR-044 §8): a pass gives back
-    // every unit the card's like or fish took, a fish made a like its fish's;
-    // a like made a fish keeps its like's.
-    if (entry.decision === "like" && (decision === "pass" || (entry.fish && !fish))) {
-      await releaseEarned(tx, {
-        accountId: input.accountId,
-        entryId: entry.id,
-        kinds: decision === "pass" ? ["like", "fish"] : ["fish"],
-      });
+    // What a fish took is given back when it is a fish no more (ADR-044 §8).
+    if (entry.fish && !fish) {
+      await releaseEarned(tx, { accountId: input.accountId, entryId: entry.id });
     }
+    // The mark that holds a year (ADR-062 §6), read from the person's own earlier
+    // days: the same day's pass changed back and forth is one pass.
+    const secondPass =
+      decision === "pass" && (await passedBefore(tx, input.accountId, entry.candidate_id, roundId));
     // The predicate again where it writes: a block or an erasure that
     // committed since the read leaves nothing written.
     const updated = await tx.query(
-      `UPDATE round_entries e SET decision = $4, decided_at = $5, fish = $6
+      `UPDATE round_entries e SET decision = $4, decided_at = $5, fish = $6, second_pass = $7
          FROM rounds r
         WHERE r.id = e.round_id AND r.id = $1 AND r.account_id = $2 AND e.id = $3 AND ${SERVABLE}`,
-      [roundId, input.accountId, entry.id, decision, at, fish],
+      [roundId, input.accountId, entry.id, decision, at, fish, secondPass],
     );
     if (updated.rowCount !== 1) throw notFound();
+    // A like or a pass takes the star off (ADR-064 §3), so the list holds only the
+    // undecided; here, so that one refused or rolled back leaves it. A skip decides nothing.
+    if (decision !== "skip") {
+      await tx.query("DELETE FROM star WHERE account_id = $1 AND candidate_id = $2", [
+        input.accountId,
+        entry.candidate_id,
+      ]);
+    }
     await tx.query(
       `UPDATE rounds r SET completed_at = $3
         WHERE r.id = $1 AND r.account_id = $2 AND r.completed_at IS NULL
@@ -562,9 +664,11 @@ export async function decide(
     );
     let match = decision === "like" ? standing : null;
     let opened = false;
-    if (decision === "like" && !standing) {
-      // The other's like of the person, still standing and not expired, today's
-      // included: under the pair's lock it is committed or it is not there.
+    if (decision === "like" && entry.decision !== "like" && !standing) {
+      // A new like alone: one made a fish or back was asked neither the limit nor
+      // the filters above. The other's like of the person, still standing and not
+      // expired, today's included: under the pair's lock it is committed or it is
+      // not there.
       const mutual = await tx.query(
         `SELECT 1 FROM round_entries e JOIN rounds r ON r.id = e.round_id
           WHERE r.account_id = $1 AND e.candidate_id = $2 AND e.decision = 'like'
@@ -592,7 +696,7 @@ export async function decide(
       match,
       // After this decision's write, under the round's lock: the answer says
       // what it left, and is known before any push of the match starts (ADR-055 §5).
-      ...(await budgetsOf(tx, input.accountId, today)),
+      ...(await budgetsOf(tx, matches, input.accountId, today)),
       decided: {
         reason: entry.reason,
         seenAt: entry.seen_at,
@@ -614,7 +718,7 @@ export async function decide(
     };
     if (decision === "like") {
       await track({ ...deps, now }, input.accountId, "like", { ...props, fish: decided.fish });
-    } else {
+    } else if (decision === "pass") {
       await track({ ...deps, now }, input.accountId, "pass", props);
     }
     if (decided.opened) {
@@ -624,48 +728,36 @@ export async function decide(
       matches.made?.({ accountId: decided.candidateId });
     }
   }
-  return { match: written.match, fishToSend: written.fishToSend, likesLeft: written.likesLeft };
+  return {
+    match: written.match,
+    fishToSend: written.fishToSend,
+    likesLeft: written.likesLeft,
+    yourTurn: written.yourTurn,
+  };
 }
 
-/**
- * The people whose round for `day` was built and not yet opened, with a card
- * that can still be shown: whom the round's push tells (#102, ADR-055 §6).
- * An empty round has no card; one opened was read already. Nobody who opened
- * no round in the last `idleDays` days: the push is for those who use the
- * app, and somebody who never opened one counts from their first (the
- * maintainer's of 25/10/2026). A shadow-banned owner's round is told as
- * anybody's: the builder builds it, and a ban tells nobody anything (ADR-024
- * §7). Read across accounts by the push's job, as the builder writes across
- * them.
- */
-export async function unopenedRoundsOf(
-  db: Queryable,
-  day: string,
-  idleDays: number,
-): Promise<string[]> {
-  const { rows } = await db.query<{ account_id: string }>(
-    `SELECT r.account_id FROM rounds r
-      WHERE r.day = $1 AND r.opened_at IS NULL
-        AND EXISTS (SELECT 1 FROM account o WHERE o.id = r.account_id
-                      AND o.state IN ('active', 'shadow_banned'))
-        AND EXISTS (SELECT 1 FROM round_entries e WHERE e.round_id = r.id AND ${SERVABLE})
-        AND COALESCE(
-              (SELECT max(p.day) FROM rounds p
-                WHERE p.account_id = r.account_id AND p.opened_at IS NOT NULL),
-              (SELECT min(p.day) FROM rounds p WHERE p.account_id = r.account_id)
-            ) >= $1::date - $2::int
-      ORDER BY r.account_id`,
-    [day, idleDays],
+/** Whether the person passed this somebody on another day, as far as the kept year remembers (ADR-062 §6). */
+async function passedBefore(
+  tx: Queryable,
+  accountId: string,
+  candidateId: string,
+  roundId: string,
+): Promise<boolean> {
+  const { rows } = await tx.query(
+    `SELECT 1 FROM round_entries e JOIN rounds r ON r.id = e.round_id
+      WHERE r.account_id = $1 AND e.candidate_id = $2 AND e.decision = 'pass' AND r.id <> $3
+      LIMIT 1`,
+    [accountId, candidateId, roundId],
   );
-  return rows.map((row) => row.account_id);
+  return rows.length > 0;
 }
 
 /**
  * The short pool's side that reads across slices (#99, ADR-042 §4, §5): the
  * round builder's, which lives with the jobs and reads the pond as it does,
- * handed in by app.ts. `offers` is what a short round may relax today, null
- * with no round today; `candidates` whom a relaxation lets in today, in the
- * order they would come, null for one the offers would not list.
+ * handed in by app.ts. `offers` is what the queue may relax today, null with no
+ * round today; `candidates` whom a relaxation lets in today, in the order they
+ * would come, null for one the offers would not list.
  */
 /** Somebody a relaxation lets in, with the day's other relaxations their filters still need (ADR-042 §5) and how far they live, written with the card (ADR-061 §5). */
 export type RelaxedCandidate = {
@@ -687,47 +779,24 @@ export type ShortPool = {
 };
 
 /**
- * The places of a round `r`: the highest it ever gave (`last_position`, or the
- * highest entry of a round written before it was kept), and of those the
- * ordered ones, every place but the liked-you and fish places, which nothing
- * undoes. A place an undo freed stays given (ADR-042 §5), so a day's round
- * holds at most `round_size` ordered people, as ADR-041's bound on a day's
- * cards reads it.
- */
-const PLACES = `greatest(r.last_position,
-           coalesce((SELECT max(e.position) FROM round_entries e WHERE e.round_id = r.id), 0))::int`;
-const GIVEN = `(${PLACES} - (SELECT count(*) FROM round_entries e
-                 WHERE e.round_id = r.id AND e.reason = ANY($3::round_reason[]))::int)`;
-
-/**
- * Today's relaxations of the person's round (ADR-042 §3), the highest place it
- * gave, how many ordered places it gave, and whether the person moved home
- * since it was built (ADR-061 §5); null with no round for the day.
+ * Today's relaxations of the person's round (ADR-042 §3) and the highest place
+ * it gave; null with no round for the day.
  */
 export async function relaxationsOf(
   db: Queryable,
   accountId: string,
   day: string,
-): Promise<{ last: number; given: number; relaxed: Relaxation[]; moved: boolean } | null> {
-  const { rows } = await db.query<{
-    last: number;
-    given: number;
-    relaxed: Relaxation[];
-    moved: boolean;
-  }>(
-    `SELECT ${PLACES} AS last, ${GIVEN} AS given,
+): Promise<{ last: number; relaxed: Relaxation[] } | null> {
+  const { rows } = await db.query<{ last: number; relaxed: Relaxation[] }>(
+    `SELECT ${PLACES} AS last,
             coalesce((SELECT json_agg(json_build_object('field', x.field, 'kind', x.kind)
                                       ORDER BY x.field)
-                        FROM round_relaxation x WHERE x.round_id = r.id), '[]') AS relaxed,
-            EXISTS (SELECT 1 FROM account a
-                     WHERE a.id = r.account_id AND a.home_moved_at > r.built_at) AS moved
+                        FROM round_relaxation x WHERE x.round_id = r.id), '[]') AS relaxed
        FROM rounds r WHERE r.account_id = $1 AND r.day = $2`,
-    [accountId, day, FREE_LIKES],
+    [accountId, day],
   );
   return rows[0] ?? null;
 }
-
-const ROUND_SIZE_KEY = "round_size";
 
 /** The same relaxations, whatever their order. */
 const sameRelaxations = (a: readonly Relaxation[], b: readonly Relaxation[]) => {
@@ -736,14 +805,13 @@ const sameRelaxations = (a: readonly Relaxation[], b: readonly Relaxation[]) => 
 };
 
 /**
- * A relaxation tapped (ADR-042 §5): recorded on today's round, and the people
- * it lets in added after the highest place the round ever gave
- * (`last_position`, so a place an undo freed never names somebody else), as
- * many as the room left (`round_size` less the ordered places the round ever
- * gave, so an undo gives no room back), in the order given, reason `relaxed`
- * with the field, and with the relaxations of the day each needs (`relaxed_with`,
- * the tapped one first), so undoing one of them takes the card back and a
- * like waives them all. Under the round's
+ * A relaxation tapped (ADR-042 §5, ADR-062 §10): recorded on today's round, and
+ * the first of the people it lets in added after the highest place the round
+ * ever gave (`last_position`, so a place an undo freed never names somebody
+ * else), a page of them, in the order given, reason `relaxed` with the field,
+ * and with the relaxations of the day each needs (`relaxed_with`, the tapped one
+ * first), so undoing one of them takes the card back and a like waives them all;
+ * the queue goes on to the rest once those are read. Under the round's
  * lock, after the owner's account shared as a decision takes it; the day's
  * relaxations are held to those the candidates were counted under (`basis`),
  * so one undone or made meanwhile refuses the write, 409
@@ -786,13 +854,12 @@ export async function appendRelaxed(
       "INSERT INTO round_relaxation (round_id, field, kind, created_at) VALUES ($1, $2, $3, $4)",
       [roundId, input.relaxation.field, input.relaxation.kind, deps.now()],
     );
-    const size = await matchingConfigNumber(tx, ROUND_SIZE_KEY);
-    const placed = await tx.query<{ last: number; given: number }>(
-      `SELECT ${PLACES} AS last, ${GIVEN} AS given FROM rounds r WHERE r.id = $1 AND r.account_id = $2`,
-      [roundId, input.accountId, FREE_LIKES],
+    const placed = await tx.query<{ last: number }>(
+      `SELECT ${PLACES} AS last FROM rounds r WHERE r.id = $1 AND r.account_id = $2`,
+      [roundId, input.accountId],
     );
-    const { last = 0, given = 0 } = placed.rows[0] ?? {};
-    const room = Math.min(size - given, ROUND_ENTRIES_MAX - last);
+    const last = placed.rows[0]?.last ?? 0;
+    const room = Math.min(QUEUE_PAGE, ROUND_POSITION_MAX - last);
     if (room <= 0 || input.candidates.length === 0) return [];
     const taken = await tx.query<{ candidate: string }>(
       `SELECT e.candidate FROM unnest($1::uuid[]) WITH ORDINALITY AS e(candidate, ordinality)
@@ -917,9 +984,14 @@ export async function relax(
   return appendRelaxed(deps, { ...input, day: today, ...found });
 }
 
-/** The cards at these places of today's round, as the read gives them (`entriesOf`), for the answer of a relaxation. */
+/**
+ * The cards at these places of today's round, as the read gives them
+ * (`entriesOf`), for the answer of a relaxation, those that fit now: somebody may
+ * have narrowed their filters since the pool was walked (ADR-062 §8).
+ */
 export async function readAdded(
   deps: RoundDeps,
+  queue: Pick<Queue, "fits">,
   accountId: string,
   day: string,
   positions: readonly number[],
@@ -928,13 +1000,32 @@ export async function readAdded(
 ): Promise<RoundEntry[]> {
   if (positions.length === 0) return [];
   const { rows } = await deps.db.query<EntryRow>(
-    `SELECT e.position, e.candidate_id, e.reason, e.decision, e.fish, e.relaxed_field, e.distance
+    `SELECT e.position, e.candidate_id, e.reason, e.decision, e.fish, e.relaxed_field, e.distance,
+            ${STAR_OF_ENTRY}
        FROM round_entries e JOIN rounds r ON r.id = e.round_id
       WHERE r.account_id = $1 AND r.day = $2 AND e.position = ANY($3::smallint[])
       ORDER BY e.position`,
     [accountId, day, positions],
   );
-  return entriesOf(accountId, rows, cardOf, dealBreakers);
+  const added = rows.flatMap((row) => (row.candidate_id ? [row.candidate_id] : []));
+  const fitting = await queue.fits(deps.db, accountId, added);
+  return entriesOf(
+    accountId,
+    rows.filter((row) => row.candidate_id !== null && fitting.has(row.candidate_id)),
+    cardOf,
+    dealBreakers,
+  );
+}
+
+/** How long a round and its entries are kept (ADR-062 §13, the maintainer's of 01/11/2026): the longest clock of the ladder reads them this far back. */
+const ROUND_RETENTION_DAYS = 365;
+
+/** The night's prune: rounds past the kept year, their entries and relaxations with them. */
+export async function pruneRounds(db: Queryable, at: Date): Promise<number> {
+  const { rowCount } = await db.query("DELETE FROM rounds WHERE day < $1::date", [
+    addDays(finnishDay(at), -ROUND_RETENTION_DAYS),
+  ]);
+  return rowCount ?? 0;
 }
 
 /**
@@ -967,6 +1058,7 @@ export type OwnRound = {
     seenAt: Date | null;
     decision: RoundChoice | null;
     decidedAt: Date | null;
+    secondPass: boolean;
     distance: DistanceBand | null;
   }[];
 };
@@ -997,11 +1089,12 @@ export async function exportRounds(
     seen_at: Date | null;
     decision: RoundDecision | null;
     fish: boolean;
+    second_pass: boolean;
     decided_at: Date | null;
     distance: DistanceBand | null;
   }>(
-    `SELECT e.round_id, e.position, e.reason, e.relaxed_field, e.seen_at, e.decision, e.fish, e.decided_at,
-            e.distance
+    `SELECT e.round_id, e.position, e.reason, e.relaxed_field, e.seen_at, e.decision, e.fish,
+            e.second_pass, e.decided_at, e.distance
        FROM round_entries e JOIN rounds r ON r.id = e.round_id
       WHERE r.account_id = $1 AND r.id = ANY($2::uuid[])
       ORDER BY e.position`,
@@ -1040,6 +1133,7 @@ export async function exportRounds(
         seenAt: entry.seen_at,
         decision: choiceOf(entry.decision, entry.fish),
         decidedAt: entry.decided_at,
+        secondPass: entry.second_pass,
         distance: entry.distance,
       })),
   }));

@@ -11,9 +11,9 @@ import { rememberOpenRow } from "./open-rows";
 import { SettingsScreen } from "./SettingsScreen";
 
 // The settings as one list of sections (#287, #511): each row names a
-// setting and says what is chosen in it; a setting chosen in place opens
-// under its row and closes again, the rest open their screens; the account's
-// rows need a person.
+// setting and says what is chosen in it, or while it holds nothing what to do
+// (#581); a setting chosen in place opens under its row and closes again, the
+// rest open their screens; the account's rows need a person.
 
 // NativeWind's colour-scheme setter needs its compiled stylesheet, which the
 // test runner has none of: the provider's call is seen, not applied.
@@ -68,7 +68,7 @@ const press = (element: ReturnType<typeof screen.getByRole>) =>
 
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
-/** Research given for the app's wording; the sensitive answers' wording newer than the app's. */
+/** A research yes from before #545, which no row says; the sensitive answers' wording newer than the app's. */
 const consentsAnswer = {
   consents: [
     {
@@ -88,7 +88,6 @@ const consentsAnswer = {
 };
 
 const CHOICES = [
-  { kind: "round", enabled: true },
   { kind: "message", enabled: true },
   { kind: "match", enabled: true },
   { kind: "moderation", enabled: true },
@@ -96,10 +95,10 @@ const CHOICES = [
 const INVITATIONS = {
   canInvite: true,
   redeemable: false,
-  reward: { fish: 1, likes: 0 },
+  reward: { inviterFish: 1, friendFish: 1 },
   open: [{ id: "8c1e6d2a-6a43-4c55-9d0b-3f1a2b3c4d5e", createdAt: "2026-10-28T10:00:00.000Z" }],
   counted: 0,
-  earned: { fish: 0, likes: 0 },
+  earned: { fish: 0 },
 };
 const HEALTH = {
   status: "ok",
@@ -156,22 +155,22 @@ describe("the settings screen", () => {
     expect(router.back).toHaveBeenCalledTimes(1);
   });
 
-  it("lists the sections for a signed-out device, logging out among them, with no accessibility problems", async () => {
+  it("lists the sections for a signed-out device, with no accessibility problems", async () => {
     await renderWithTheme(<SettingsScreen />);
-    const headings = ["Appearance and language", "About Kuutti", "Account"];
+    const headings = ["Appearance and language", "About Kuutti"];
     for (const name of headings) expect(screen.getByRole("heading", { name })).toBeTruthy();
-    // A section with no row for a device without a person is not drawn (#511).
-    for (const name of ["Notifications and contacts", "Privacy and security"]) {
+    // A section with no row for a device without a person is not drawn (#511), the account's too (#581).
+    for (const name of ["Notifications and contacts", "Privacy and security", "Account"]) {
       expect(screen.queryByRole("heading", { name })).toBeNull();
     }
     // Community stays for its one row a device without a person keeps (#510).
     expect(row("Support when it's hard")).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Invitations" })).toBeNull();
-    // Logging out says there is no session; the rest of the account needs a person.
-    expect(row("Logging out")).toBeTruthy();
+    // Logging out needs a person, as the rest of the account does (#581).
+    expect(screen.queryByRole("button", { name: "Logging out" })).toBeNull();
     expect(screen.queryByRole("button", { name: "A copy of your data" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Lock" })).toBeNull();
-    expect(screen.queryByRole("button", { name: "Research" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Sensitive answers" })).toBeNull();
     expect(screen.queryByRole("button", { name: "E-mail" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Ways to reach you" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Notifications" })).toBeNull();
@@ -182,7 +181,7 @@ describe("the settings screen", () => {
       "Theme",
       "Language",
       "Photo descriptions",
-      "Decision buttons",
+      "Like and Pass",
       "Terms of use",
       "Privacy",
       "Source code",
@@ -190,10 +189,8 @@ describe("the settings screen", () => {
     ]) {
       expect(row(name)).toBeTruthy();
     }
-    // The version opens nothing: a fact, read with its number and its build.
-    expect(screen.getByLabelText("Version").props.accessibilityValue).toEqual({
-      text: "0.19.0, Build abc1234",
-    });
+    // The version opens nothing: a fact, read with its number alone.
+    expect(screen.getByLabelText("Version").props.accessibilityValue).toEqual({ text: "0.19.0" });
     expect(screen.queryByRole("button", { name: "Version" })).toBeNull();
     expect(pressables(screen.toJSON() as HostNode).flatMap((node) => a11yProblems(node))).toEqual(
       [],
@@ -210,14 +207,13 @@ describe("the settings screen", () => {
       "Language",
       "Theme",
       "Photo descriptions",
-      "Decision buttons",
+      "Like and Pass",
       "Notifications and contacts",
       "Notifications",
       "E-mail",
       "Ways to reach you",
       "Privacy and security",
       "Lock",
-      "Research",
       "Sensitive answers",
       "A copy of your data",
       "Community",
@@ -248,19 +244,33 @@ describe("the settings screen", () => {
       "Your account",
       "Source code",
       "A copy of your data",
+      "Terms of use",
+      "Privacy",
     ]) {
       expect([name, row(name).props.accessibilityHint]).toEqual([name, undefined]);
       // A row with no value is heard with its state alone.
       expect([name, row(name).props.accessibilityValue?.text]).toEqual([name, "closed"]);
     }
-    // The rows with a value keep it under the title: the theme, the language, a version, the count.
+    // The rows with a value keep it under the title: the theme, the language.
     expect(row("Theme").props.accessibilityValue?.text).toBe("Same as the phone, closed");
     expect(row("Language").props.accessibilityValue?.text).toBe("Same as the phone, closed");
     // The lock's state is its value, heard once: not again as a hint.
     expect(row("Lock").props.accessibilityValue).toEqual({ text: "Off, closed" });
     expect(row("Lock").props.accessibilityHint).toBeUndefined();
-    expect(row("Terms of use").props.accessibilityHint).toMatch(/^Version /);
-    expect(row("Licences").props.accessibilityHint).toMatch(/packages this build is made of$/);
+  });
+
+  it("draws no second line under the version, the legal texts and the licences (#581)", async () => {
+    await renderWithTheme(<SettingsScreen />);
+    const lines = (element: ReturnType<typeof screen.getByRole>) =>
+      within(element)
+        .getAllByText(/./)
+        .map((node) => node.props.children);
+    expect(lines(screen.getByLabelText("Version"))).toEqual(["Version", "0.19.0"]);
+    for (const name of ["Terms of use", "Privacy", "Licences"]) {
+      expect(lines(row(name))).toEqual([name]);
+      expect([name, row(name).props.accessibilityHint]).toEqual([name, undefined]);
+    }
+    expect(row("Licences").props.accessibilityValue?.text).toBeUndefined();
   });
 
   it("says the defaults under the theme and the language rows", async () => {
@@ -281,7 +291,7 @@ describe("the settings screen", () => {
 
   it("opens a page for support when it's hard, signed in or not (#510)", async () => {
     await renderWithTheme(<SettingsScreen />);
-    await screen.findByRole("button", { name: "Logging out" });
+    await screen.findByRole("button", { name: "Support when it's hard" });
     expect(row("Support when it's hard").props.accessibilityValue?.text).toBeUndefined();
     await press(row("Support when it's hard"));
     expect(router.push).toHaveBeenCalledTimes(1);
@@ -310,18 +320,17 @@ describe("the settings screen", () => {
       ["Language", () => screen.queryByRole("radio", { name: "Svenska" })],
       ["Theme", () => screen.queryByRole("switch", { name: "High contrast" })],
       ["Photo descriptions", () => screen.queryByRole("switch", { name: "Show under photos" })],
-      ["Decision buttons", () => screen.queryByRole("radio", { name: "Left hand" })],
-      ["Notifications", () => screen.queryByText(/^What you choose here decides/)],
-      ["E-mail", () => screen.queryByRole("button", { name: "Send a confirmation code" })],
+      ["Like and Pass", () => screen.queryByRole("radio", { name: "Left hand" })],
+      ["Notifications", () => screen.queryByText(/^A notification says that/)],
+      ["E-mail", () => screen.queryByLabelText("E-mail address")],
       ["Ways to reach you", () => screen.queryByLabelText("Your Instagram username")],
       ["Lock", () => screen.queryByRole("button", { name: "Set a passcode" })],
-      ["Research", () => screen.queryByRole("switch", { name: "Take part in research" })],
       [
         "Sensitive answers",
         () => screen.queryByRole("switch", { name: "Store my sensitive answers" }),
       ],
       ["A copy of your data", () => screen.queryByRole("button", { name: "Download my data" })],
-      ["Invitations", () => screen.queryByRole("button", { name: "Make an invitation" })],
+      ["Invitations", () => screen.queryByRole("button", { name: "Create an invitation" })],
       ["Give feedback", () => screen.queryByRole("radio", { name: "A bug" })],
       ["Terms of use", () => screen.queryByText(/^DRAFT: Kuutti is a free dating service/)],
       ["Privacy", () => screen.queryByText(/^DRAFT: Kuutti stores your year and month/)],
@@ -430,15 +439,16 @@ describe("the settings screen", () => {
     expect(expanded("Theme")).toBe(true);
   });
 
-  it("keeps Logging out open through the logout, saying so, and the next session finds every row closed (#511)", async () => {
+  it("takes Logging out and the Account section away with the logout, and the next session finds every row closed (#511, #581)", async () => {
     const wait = () => act(() => new Promise<void>((resolve) => setTimeout(resolve, 20)));
     await saveSession(tokens);
     await renderWithTheme(<SettingsScreen />);
     await wait();
     await press(row("Logging out"));
     await press(screen.getByRole("button", { name: "Log out" }));
-    expect(await screen.findByText("No session on this device.")).toBeTruthy();
-    expect(expanded("Logging out")).toBe(true);
+    await waitFor(() => expect(screen.queryByRole("button", { name: "Logging out" })).toBeNull());
+    expect(screen.queryByRole("heading", { name: "Account" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Log out" })).toBeNull();
     // Somebody logs in on the phone.
     await saveSession({ ...tokens, sessionId: "0b2a7d4e-5c1f-4e8a-9d3b-7f6e5d4c3b2a" });
     await renderWithTheme(<SettingsScreen />);
@@ -490,40 +500,79 @@ describe("the settings screen", () => {
     expect(row("Kieli")).toBeTruthy();
   });
 
-  it("says whether each consent is on, or that the app needs an update to change it", async () => {
+  it("says that the app needs an update to change a consent of a newer wording", async () => {
     await saveSession(tokens);
     await renderWithTheme(<SettingsScreen />);
     await screen.findByRole("button", { name: "Your account" });
-    expect(row("Research").props.accessibilityValue).toEqual({ text: "On, closed" });
-    expect(row("Research").props.accessibilityHint).toBeUndefined();
     expect(row("Sensitive answers").props.accessibilityValue).toEqual({
       text: "Update the app to change it, closed",
     });
+    expect(row("Sensitive answers").props.accessibilityHint).toBeUndefined();
   });
 
-  it("says a consent's new state on its row as soon as the switch under it stores it (#511)", async () => {
-    let research: unknown[] = consentsAnswer.consents;
+  it("says a consent's state on its row, and the new one as soon as the switch under it stores it (#511)", async () => {
+    const given = {
+      kind: "special_category",
+      version: CONSENT_VERSIONS.special_category,
+      locale: "en",
+      givenAt: "2026-09-26T10:00:00.000Z",
+      withdrawnAt: null as string | null,
+    };
+    const currentVersions = {
+      ...consentsAnswer.currentVersions,
+      special_category: CONSENT_VERSIONS.special_category,
+    };
+    let consents = [given];
     globalThis.fetch = jest.fn(async (input: Request | string) => {
       const request = input instanceof Request ? input : new Request(input);
       const url = new URL(request.url);
-      if (request.method === "DELETE" && url.pathname === "/consents/research") {
-        research = [{ ...consentsAnswer.consents[0], withdrawnAt: "2026-10-29T10:00:00.000Z" }];
+      if (request.method === "DELETE" && url.pathname === "/consents/special_category") {
+        consents = [{ ...given, withdrawnAt: "2026-10-29T10:00:00.000Z" }];
       }
-      if (url.pathname.startsWith("/consents"))
-        return json({ ...consentsAnswer, consents: research });
+      if (url.pathname.startsWith("/consents")) return json({ consents, currentVersions });
       return json({ error: { code: "not_found", message: "no", requestId: "r" } }, 404);
     }) as unknown as typeof fetch;
     await saveSession(tokens);
     await renderWithTheme(<SettingsScreen />);
     await screen.findByRole("button", { name: "Your account" });
-    await press(row("Research"));
-    await press(await screen.findByRole("switch", { name: "Take part in research" }));
+    expect(row("Sensitive answers").props.accessibilityValue).toEqual({ text: "On, closed" });
+    await press(row("Sensitive answers"));
+    await press(await screen.findByRole("switch", { name: "Store my sensitive answers" }));
     await waitFor(() =>
-      expect(row("Research").props.accessibilityValue).toEqual({ text: "Off, open" }),
+      expect(row("Sensitive answers").props.accessibilityValue).toEqual({ text: "Off, open" }),
     );
     expect(
-      screen.getByRole("switch", { name: "Take part in research" }).props.accessibilityState,
+      screen.getByRole("switch", { name: "Store my sensitive answers" }).props.accessibilityState,
     ).toMatchObject({ checked: false });
+  });
+
+  it("Settings has no research switch, whatever the account said before", async () => {
+    const nothingOfResearch = () => {
+      expect(JSON.stringify(screen.toJSON())).not.toMatch(/research/i);
+    };
+    await saveSession(tokens);
+    // The list's rows closed, then the one that holds a consent open: the account said yes
+    // before #545 in this answer, and in the next it never answered.
+    for (const consents of [consentsAnswer.consents, []]) {
+      const written: string[] = [];
+      globalThis.fetch = jest.fn(async (input: Request | string) => {
+        const request = input instanceof Request ? input : new Request(input);
+        const url = new URL(request.url);
+        if (request.method !== "GET") written.push(`${request.method} ${url.pathname}`);
+        if (url.pathname === "/consents") return json({ ...consentsAnswer, consents });
+        return json({ error: { code: "not_found", message: "no", requestId: "r" } }, 404);
+      }) as unknown as typeof fetch;
+      rememberOpenRow(null, null);
+      const view = await renderWithTheme(<SettingsScreen />);
+      await screen.findByRole("button", { name: "Your account" });
+      nothingOfResearch();
+      await press(row("Sensitive answers"));
+      await screen.findByRole("switch", { name: "Store my sensitive answers" });
+      nothingOfResearch();
+      // Reading the list gives nothing and withdraws nothing.
+      expect(written).toEqual([]);
+      await view.unmount();
+    }
   });
 
   it("says what the e-mail, the contacts, the notifications and the invitations hold, as their rows' values (#511)", async () => {
@@ -536,7 +585,7 @@ describe("the settings screen", () => {
       }),
     );
     expect(row("Ways to reach you").props.accessibilityValue).toEqual({
-      text: "None kept, closed",
+      text: "Add a way to reach you, closed",
     });
     expect(row("Notifications").props.accessibilityValue).toEqual({ text: "All on, closed" });
     expect(row("Invitations").props.accessibilityValue).toEqual({
@@ -545,7 +594,7 @@ describe("the settings screen", () => {
     // The value is the second line, heard once: not again as a hint.
     const lines: Array<[string, string]> = [
       ["E-mail", "aino@example.fi, not confirmed yet"],
-      ["Ways to reach you", "None kept"],
+      ["Ways to reach you", "Add a way to reach you"],
       ["Notifications", "All on"],
       ["Invitations", "One waiting to be used"],
     ];
@@ -553,6 +602,165 @@ describe("the settings screen", () => {
       expect([name, row(name).props.accessibilityHint]).toEqual([name, undefined]);
       expect(within(row(name)).getByText(line)).toBeTruthy();
     }
+  });
+
+  describe("a row that holds nothing says what to do, and a filled one still its value (#581)", () => {
+    type Held = {
+      email?: { email: string | null; confirmed: boolean; codeExpiresAt: null };
+      contacts?: string[];
+      invitations?: Partial<typeof INVITATIONS>;
+    };
+    /** The default answers, but for what the three rows hold. */
+    const holding = ({ email, contacts, invitations }: Held) => {
+      const answers = globalThis.fetch;
+      globalThis.fetch = jest.fn(async (input: Request | string, init?: RequestInit) => {
+        const url = new URL(input instanceof Request ? input.url : input);
+        if (url.pathname === "/account/email" && email) return json(email);
+        if (url.pathname === "/contacts" && contacts) {
+          return json({
+            contacts: contacts.map((kind) => ({
+              kind,
+              value: "aino_k",
+              updatedAt: "2026-10-29T10:00:00.000Z",
+            })),
+          });
+        }
+        if (url.pathname === "/invitations" && invitations) {
+          return json({ ...INVITATIONS, ...invitations });
+        }
+        return answers(input, init);
+      }) as unknown as typeof fetch;
+    };
+    const NO_EMAIL = { email: null, confirmed: false, codeExpiresAt: null };
+    const marks = (name: string) =>
+      within(row(name)).queryAllByTestId("row-alert", { includeHiddenElements: true });
+
+    it.each<[string, string, Array<[string, string]>]>([
+      [
+        "en-US",
+        "closed",
+        [
+          ["E-mail", "Add your e-mail"],
+          ["Ways to reach you", "Add a way to reach you"],
+          ["Invitations", "Create an invitation"],
+        ],
+      ],
+      [
+        "fi-FI",
+        "kiinni",
+        [
+          ["Sähköposti", "Lisää sähköpostisi"],
+          ["Mistä sinut tavoittaa", "Lisää, mistä sinut tavoittaa"],
+          ["Kutsut", "Tee kutsu"],
+        ],
+      ],
+      [
+        "sv-FI",
+        "stängd",
+        [
+          ["E-post", "Lägg till din e-post"],
+          ["Hur man når dig", "Lägg till hur man når dig"],
+          ["Inbjudningar", "Skapa en inbjudan"],
+        ],
+      ],
+    ])("in %s, as the row's second line and its value", async (tag, closed, rows) => {
+      deviceLanguage(tag);
+      holding({ email: NO_EMAIL, contacts: [], invitations: { open: [] } });
+      await saveSession(tokens);
+      await renderWithTheme(<SettingsScreen />);
+      for (const [name, words] of rows) {
+        await waitFor(() => expect(within(row(name)).getByText(words)).toBeTruthy());
+        expect(row(name).props.accessibilityValue).toEqual({ text: `${words}, ${closed}` });
+        // Heard once, as the value: not again as a hint.
+        expect(row(name).props.accessibilityHint).toBeUndefined();
+        // Nothing is wrong with a row that holds nothing: no mark.
+        expect(marks(name)).toHaveLength(0);
+      }
+    });
+
+    it.each<[string, Held, string, string, number]>([
+      [
+        "a confirmed address",
+        { email: { email: "aino@example.fi", confirmed: true, codeExpiresAt: null } },
+        "E-mail",
+        "aino@example.fi",
+        0,
+      ],
+      [
+        "an address waiting for its code, marked",
+        { email: { email: "aino@example.fi", confirmed: false, codeExpiresAt: null } },
+        "E-mail",
+        "aino@example.fi, not confirmed yet",
+        1,
+      ],
+      ["one way kept", { contacts: ["instagram"] }, "Ways to reach you", "Instagram", 0],
+      [
+        "two ways kept",
+        { contacts: ["instagram", "telegram"] },
+        "Ways to reach you",
+        "Telegram, Instagram",
+        0,
+      ],
+      [
+        "an invitation waiting",
+        { invitations: { open: INVITATIONS.open } },
+        "Invitations",
+        "One waiting to be used",
+        0,
+      ],
+      [
+        "two invitations waiting",
+        {
+          invitations: {
+            open: [
+              ...INVITATIONS.open,
+              { id: "8c1e6d2a-6a43-4c55-9d0b-3f1a2b3c4d5f", createdAt: "2026-10-29T10:00:00.000Z" },
+            ],
+          },
+        },
+        "Invitations",
+        "2 waiting to be used",
+        0,
+      ],
+    ])("%s", async (_what, held, name, words, marked) => {
+      holding(held);
+      await saveSession(tokens);
+      await renderWithTheme(<SettingsScreen />);
+      await waitFor(() => expect(within(row(name)).getByText(words)).toBeTruthy());
+      expect(row(name).props.accessibilityValue).toEqual({ text: `${words}, closed` });
+      expect(marks(name).length > 0).toBe(marked > 0);
+    });
+
+    it("says no invitation's call to action to somebody who may not invite yet", async () => {
+      holding({ invitations: { canInvite: false, open: [] } });
+      await saveSession(tokens);
+      await renderWithTheme(<SettingsScreen />);
+      await screen.findByRole("button", { name: "Your account" });
+      await act(() => new Promise<void>((resolve) => setTimeout(resolve, 20)));
+      expect(row("Invitations").props.accessibilityValue).toEqual({ text: "closed" });
+      expect(within(row("Invitations")).queryByText("Create an invitation")).toBeNull();
+    });
+
+    it("goes back to what to do once a panel takes the last one away", async () => {
+      holding({ contacts: ["instagram"] });
+      const answers = globalThis.fetch;
+      globalThis.fetch = jest.fn(async (input: Request | string, init?: RequestInit) => {
+        const request = input instanceof Request ? input : new Request(input, init);
+        return request.method === "DELETE"
+          ? new Response(null, { status: 204 })
+          : answers(input, init);
+      }) as unknown as typeof fetch;
+      await saveSession(tokens);
+      await renderWithTheme(<SettingsScreen />);
+      await screen.findByRole("button", { name: "Your account" });
+      await press(row("Ways to reach you"));
+      await press(await screen.findByRole("button", { name: "Remove your Instagram username" }));
+      await waitFor(() =>
+        expect(row("Ways to reach you").props.accessibilityValue).toEqual({
+          text: "Add a way to reach you, open",
+        }),
+      );
+    });
   });
 
   it("follows what a panel stores in its row's value at once (#511)", async () => {
@@ -580,7 +788,7 @@ describe("the settings screen", () => {
     await press(row("Notifications"));
     await press(await screen.findByRole("switch", { name: "Messages" }));
     await waitFor(() =>
-      expect(row("Notifications").props.accessibilityValue).toEqual({ text: "3 on, 1 off, open" }),
+      expect(row("Notifications").props.accessibilityValue).toEqual({ text: "2 on, 1 off, open" }),
     );
     await press(row("Ways to reach you"));
     await act(async () => {
@@ -648,7 +856,6 @@ describe("the settings screen", () => {
     await saveSession(tokens);
     await renderWithTheme(<SettingsScreen />);
     await screen.findByRole("button", { name: "Your account" });
-    expect(row("Research").props.accessibilityValue).toEqual({ text: "Off, closed" });
     expect(row("Sensitive answers").props.accessibilityValue).toEqual({ text: "Off, closed" });
   });
 
@@ -659,20 +866,19 @@ describe("the settings screen", () => {
     await saveSession(tokens);
     await renderWithTheme(<SettingsScreen />);
     await screen.findByRole("button", { name: "Your account" });
-    expect(row("Research").props.accessibilityValue?.text).toBe("closed");
     expect(row("Sensitive answers").props.accessibilityValue?.text).toBe("closed");
-    // Scoped to the consents' rows: the lock's row says its own state beside them.
-    for (const name of ["Research", "Sensitive answers"]) {
-      expect(within(row(name)).queryByText("On")).toBeNull();
-      expect(within(row(name)).queryByText("Off")).toBeNull();
-    }
+    // Scoped to the consent's row: the lock's row says its own state beside it.
+    expect(within(row("Sensitive answers")).queryByText("On")).toBeNull();
+    expect(within(row("Sensitive answers")).queryByText("Off")).toBeNull();
   });
 
-  it("names the version without a build, and a question mark when the build names none", async () => {
+  it("names the version alone, never the build's commit, and a question mark when the build names none", async () => {
+    await renderWithTheme(<SettingsScreen />);
+    expect(screen.getByLabelText("Version").props.accessibilityValue).toEqual({ text: "0.19.0" });
+    expect(screen.queryByText(/abc1234/)).toBeNull();
     mockBuild.mockReturnValue({ version: null, commit: null });
     await renderWithTheme(<SettingsScreen />);
     expect(screen.getByLabelText("Version").props.accessibilityValue).toEqual({ text: "?" });
-    expect(screen.queryByText(/^Build /)).toBeNull();
   });
 
   it("says the chosen theme and language as the rows' values", async () => {
@@ -692,9 +898,9 @@ describe("the settings screen", () => {
     expect(await screen.findByText("Shown under the photos")).toBeTruthy();
   });
 
-  it("says the hand the decision buttons are placed for, and one-handed, as the row's value (#82)", async () => {
+  it("says the hand Like and Pass are placed for, and one-handed, as the row's value (#82)", async () => {
     await renderWithTheme(<SettingsScreen />);
-    expect(row("Decision buttons").props.accessibilityValue).toEqual({
+    expect(row("Like and Pass").props.accessibilityValue).toEqual({
       text: "Right hand, closed",
     });
     store.set(
@@ -703,10 +909,22 @@ describe("the settings screen", () => {
     );
     await renderWithTheme(<SettingsScreen />);
     expect(await screen.findByText("Left hand, one-handed")).toBeTruthy();
-    expect(row("Decision buttons").props.accessibilityValue).toEqual({
+    expect(row("Like and Pass").props.accessibilityValue).toEqual({
       text: "Left hand, one-handed, closed",
     });
   });
+
+  it.each([
+    ["fi-FI", "Tykkää ja Ohita"],
+    ["sv-FI", "Gilla och Hoppa över"],
+  ])(
+    "names the row of the two buttons in %s by the buttons themselves (#581)",
+    async (tag, name) => {
+      deviceLanguage(tag);
+      await renderWithTheme(<SettingsScreen />);
+      expect(await screen.findByRole("button", { name })).toBeTruthy();
+    },
+  );
 });
 
 describe("the lock's row (#418)", () => {
@@ -726,7 +944,9 @@ describe("the lock's row (#418)", () => {
     expect(row("Lock").props.accessibilityValue).toEqual({ text: "Off, closed" });
     expect(within(row("Lock")).getByText("Off")).toBeTruthy();
     await press(row("Lock"));
-    expect(screen.getByText(/^Lock Kuutti on this phone, so that somebody else/)).toBeTruthy();
+    expect(
+      screen.getByText("The lock stays on this phone, and logging out turns it off."),
+    ).toBeTruthy();
     expect(router.push).not.toHaveBeenCalled();
   });
 

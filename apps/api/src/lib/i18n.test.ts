@@ -159,12 +159,12 @@ describe("the request's language where the middleware has or has not run", () =>
 // A push is worded in the language its device registered in (#102, ADR-055 §1).
 describe("a stored language's t()", () => {
   test.each([
-    ["en", "You have a new message", "You have a new match", "Today's round is ready"],
-    ["fi", "Sinulle on uusi viesti", "Sinulle on uusi mätsi", "Päivän kierros on valmis"],
-    ["sv", "Du har ett nytt meddelande", "Du har en ny matchning", "Dagens omgång är klar"],
-  ])("tFor(%j) words the pushes in it", (locale, message, match, round) => {
+    ["en", "You have a new message", "You have a new match"],
+    ["fi", "Sinulle on uusi viesti", "Sinulle on uusi mätsi"],
+    ["sv", "Du har ett nytt meddelande", "Du har en ny matchning"],
+  ])("tFor(%j) words the pushes in it", (locale, message, match) => {
     const t = tFor(locale);
-    expect([t("push.message"), t("push.match"), t("push.round")]).toEqual([message, match, round]);
+    expect([t("push.message"), t("push.match")]).toEqual([message, match]);
   });
 
   test.each(["de", "", "FI", "fi-FI", "en-XA", "toString", "__proto__"])(

@@ -65,6 +65,14 @@ async function errorCode(response: Response): Promise<string> {
   return ((await response.json()) as { error: { code: string } }).error.code;
 }
 
+async function shownCount(ctx: TestContext, accountId: string): Promise<number> {
+  const { rows } = await ctx.client.query<{ n: number }>(
+    "SELECT count(*)::int AS n FROM card_shown WHERE account_id = $1",
+    [accountId],
+  );
+  return rows[0]?.n ?? 0;
+}
+
 describe("The photo fetch budget of a day", () => {
   test.for([
     ["thumb", 3],
@@ -105,14 +113,84 @@ describe("exposure", () => {
   });
 
   test("Retry-After runs until midnight in Finland", async ({ ctx }) => {
-    const { app } = await appWith(ctx, { thumb: 0, card: 0, full: 0 });
+    const { app } = await appWith(ctx, { thumb: 1, card: 1, full: 1 });
     const a = await signedInAccount(ctx.client);
     const photo = await upload(app, a.headers, await fixturePng(64, 64));
+    expect((await fetchUrl(app, a.headers, photo.id, "thumb")).status).toBe(200);
     const before = new Date();
     const refused = await fetchUrl(app, a.headers, photo.id, "thumb");
     expect(refused.status).toBe(429);
     const expected = secondsUntil(dayWindow(before).end, before);
     expect(Math.abs(Number(refused.headers.get("retry-after")) - expected)).toBeLessThanOrEqual(5);
+  });
+
+  test("A ceiling of 0 is off for the size it names, and the other sizes stay limited", async ({
+    ctx,
+  }) => {
+    const { app, logs } = await appWith(ctx, { thumb: 2, card: 0, full: 1 });
+    const a = await signedInAccount(ctx.client);
+    const photo = await upload(app, a.headers, await fixturePng(64, 64));
+    for (let i = 0; i < 5; i += 1) {
+      expect((await fetchUrl(app, a.headers, photo.id, "card")).status).toBe(200);
+    }
+    expect(await accessRows(ctx, a.accountId, "card")).toBe(5);
+    // The card size is counted still: the record and the alarm read it (ADR-062 §9).
+    expect((await fetchUrl(app, a.headers, photo.id, "thumb")).status).toBe(200);
+    expect((await fetchUrl(app, a.headers, photo.id, "thumb")).status).toBe(200);
+    const thumb = await fetchUrl(app, a.headers, photo.id, "thumb");
+    expect(thumb.status).toBe(429);
+    expect(await errorCode(thumb)).toBe("photo_budget_exceeded");
+    expect((await fetchUrl(app, a.headers, photo.id, "full")).status).toBe(200);
+    expect((await fetchUrl(app, a.headers, photo.id, "full")).status).toBe(429);
+    expect(
+      logs()
+        .filter((l) => l.msg === "photo refused")
+        .map((l) => [l.variant, l.limit]),
+    ).toEqual([
+      ["thumb", 2],
+      ["full", 1],
+    ]);
+  });
+
+  test("A day's cards with a ceiling of 0 are all recorded, and the day's count goes on", async ({
+    ctx,
+  }) => {
+    const a = await signedInAccount(ctx.client);
+    const since = new Date("2026-10-11T00:00:00+03:00");
+    const served = async (limit: number, photoIds: string[], subject: string) =>
+      recordCardServed(ctx.client, {
+        viewerAccountId: a.accountId,
+        subjectAccountId: subject,
+        photoIds,
+        at: new Date("2026-10-11T09:00:00Z"),
+        since,
+        limit,
+      });
+    const subjects: string[] = [];
+    for (let i = 0; i < 3; i += 1) {
+      const { accountId } = await signedInAccount(ctx.client);
+      subjects.push(accountId);
+      const { rows } = await ctx.client.query<{ id: string }>(
+        `INSERT INTO photo (account_id, key, blurhash, width, height, state, position)
+         VALUES ($1, md5($2), 'LEHV6nWB2yk8pyo0adR*.7kCMdnj', 800, 1067, 'approved', 0)
+         RETURNING id`,
+        [accountId, accountId],
+      );
+      const answer = await served(0, [rows[0]?.id as string], accountId);
+      expect(answer).toMatchObject({ used: i, recorded: true, blocked: false, live: true });
+    }
+    expect(await shownCount(ctx, a.accountId)).toBe(3);
+    // A ceiling back from the panel reads the same count: nobody new past it, and somebody shown today still.
+    const { rows } = await ctx.client.query<{ id: string }>(
+      "SELECT id FROM photo WHERE account_id = $1",
+      [subjects[0]],
+    );
+    const fourth = await signedInAccount(ctx.client);
+    expect(await served(3, [], fourth.accountId)).toMatchObject({ used: 3, recorded: false });
+    expect(await served(3, [rows[0]?.id as string], subjects[0] as string)).toMatchObject({
+      used: 3,
+      recorded: true,
+    });
   });
 
   test("The count resets at the day boundary", async ({ ctx }) => {

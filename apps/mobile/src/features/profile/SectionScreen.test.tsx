@@ -3,7 +3,8 @@ import { useLocales } from "expo-localization";
 import type * as React from "react";
 import { clearSession, saveSession } from "@/lib/session";
 import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
-import { expectPinnedHeader } from "@/test/layout";
+import { FAILED_TO_LOAD } from "@/test/failed";
+import { expectPinnedHeader, hasCutText } from "@/test/layout";
 import { renderWithTheme } from "@/test/render";
 import { SectionScreen } from "./SectionScreen";
 import { PROFILE_SECTIONS } from "./sections";
@@ -86,6 +87,9 @@ function fakeApi(
   return { puts };
 }
 
+/** A ready line of the basics, a whole-width row (#581): its name says the mark when it is the one chosen. */
+const preset = (name: string) => screen.getByRole("radio", { name });
+
 const { __navigation: navigation, __router: router } = jest.requireMock("expo-router") as {
   __navigation: {
     addListener: jest.Mock;
@@ -136,7 +140,7 @@ describe("SectionScreen", () => {
     async (id) => {
       fakeApi();
       await show(<SectionScreen section={id} />);
-      await waitFor(() => expect(screen.queryByText("Loading your profile…")).toBeNull());
+      await waitFor(() => expect(screen.queryByText("Loading…")).toBeNull());
       // A text that is still its key means the catalogue and the registry disagree.
       expect(screen.queryAllByText(/^profile\./)).toEqual([]);
       expect(screen.queryByRole("button", { name: "Save" })).toBeNull();
@@ -287,7 +291,7 @@ describe("SectionScreen", () => {
     expect(router.push).toHaveBeenCalledTimes(1);
   });
 
-  it("says why in the question itself, where the line on something unsaved would say less", async () => {
+  it("says why in the question itself", async () => {
     fakeApi({ saveStatus: 400, saveCode: "text_contact_details" });
     const view = await show(<SectionScreen section="basics" />);
     await waitFor(() => expect(screen.getByLabelText("Name on your card")).toBeTruthy());
@@ -297,7 +301,6 @@ describe("SectionScreen", () => {
     await waitFor(() => expect(screen.getByText("Leave without saving?")).toBeTruthy());
     // On the screen and in the dialog: the screen's own line stays once the dialog has gone.
     expect(screen.getAllByText(/e-mail address, a link/)).toHaveLength(2);
-    expect(screen.queryByText("Your changes are not saved yet.")).toBeNull();
   });
 
   it("lets a refused draft go on the word, with no save on the way out", async () => {
@@ -339,9 +342,9 @@ describe("SectionScreen", () => {
     // Meanwhile another section is changed and saved.
     const intent = await show(<SectionScreen section="intent" />);
     await waitFor(() =>
-      expect(screen.getByRole("button", { name: "Something casual" })).toBeTruthy(),
+      expect(screen.getByRole("radio", { name: "Something casual" })).toBeTruthy(),
     );
-    await press(screen.getByRole("button", { name: "Something casual" }));
+    await press(screen.getByRole("radio", { name: "Something casual" }));
     await leaveAndGo(intent);
     expect(document.fields).toEqual({ smoking: "never", intent: "casual" });
 
@@ -374,13 +377,114 @@ describe("SectionScreen", () => {
     expect(screen.queryByText("Leave without saving?")).toBeNull();
   });
 
+  describe("the basics, with what they explained gone (#581)", () => {
+    const LINES = [
+      "I was too lazy to write anything here, so this placeholder says I am a nice fellow.",
+      "Ask me. I answer better than I write.",
+      "The photos say it. The rest over coffee.",
+    ];
+
+    it("has the name's label and no hint: the field stops at its length by itself", async () => {
+      fakeApi();
+      await show(<SectionScreen section="basics" />);
+      await waitFor(() => expect(screen.getByLabelText("Name on your card")).toBeTruthy());
+      expect(screen.getByText("Name on your card")).toBeTruthy();
+      expect(screen.getByLabelText("Name on your card").props.maxLength).toBe(20);
+      expect(screen.queryByText(/How you want to be called/)).toBeNull();
+    });
+
+    it("has the bio's heading of ready lines and no hint: its length is on the list when it matters", async () => {
+      fakeApi();
+      await show(<SectionScreen section="basics" />);
+      await waitFor(() => expect(screen.getByLabelText("About you")).toBeTruthy());
+      expect(screen.queryByText(/count as a bio/)).toBeNull();
+      expect(screen.getByText("Or pick a line instead")).toBeTruthy();
+    });
+
+    it("offers the ready lines as whole-width rows, radios in a group the heading names, with the line chosen said", async () => {
+      fakeApi({ profile: { ...stored({}), bioPreset: "ask_me_instead" } });
+      await show(<SectionScreen section="basics" />);
+      await waitFor(() => expect(screen.getByLabelText("About you")).toBeTruthy());
+      const group = screen.getByLabelText("Or pick a line instead");
+      expect(group.props.accessibilityRole).toBe("radiogroup");
+      expect(group.props.className).not.toMatch(/\bflex-row\b/);
+      expect(screen.getAllByRole("radio").map((row) => row.props.accessibilityLabel)).toEqual([
+        LINES[0],
+        `✓ ${LINES[1]}`,
+        LINES[2],
+      ]);
+      expect(screen.getByText(`✓ ${LINES[1]}`)).toBeTruthy();
+      const found = pressables(screen.toJSON() as HostNode);
+      expect(found.flatMap((node) => a11yProblems(node))).toEqual([]);
+    });
+
+    it("gives the ready lines no line count or fixed height to cut them", async () => {
+      fakeApi();
+      await show(<SectionScreen section="basics" />);
+      await waitFor(() => expect(screen.getByLabelText("About you")).toBeTruthy());
+      expect(hasCutText(screen.toJSON() as HostNode)).toBe(false);
+    });
+
+    it.each([
+      ["fi-FI", "Tai valitse valmis rivi", "Kuvat kertovat. Loput kahvilla."],
+      ["sv-FI", "Eller välj en färdig rad", "Bilderna säger det. Resten över en kaffe."],
+    ])("names the group and its lines in %s", async (tag, heading, line) => {
+      (useLocales as jest.Mock).mockReturnValue([{ languageTag: tag }]);
+      try {
+        fakeApi();
+        await show(<SectionScreen section="basics" />);
+        await waitFor(() => expect(screen.getByLabelText(heading)).toBeTruthy());
+        expect(screen.getByLabelText(heading).props.accessibilityRole).toBe("radiogroup");
+        expect(preset(line)).toBeTruthy();
+      } finally {
+        (useLocales as jest.Mock).mockReturnValue([{ languageTag: "en-US" }]);
+      }
+    });
+
+    it("says of the job title only what to leave out: the field stops at its length by itself", async () => {
+      fakeApi();
+      await show(<SectionScreen section="work" />);
+      await waitFor(() => expect(screen.getByLabelText("Job title")).toBeTruthy());
+      expect(screen.getByText("Without the employer's name")).toBeTruthy();
+      expect(screen.queryByText(/characters/)).toBeNull();
+      expect(screen.getByLabelText("Job title").props.maxLength).toBe(40);
+    });
+  });
+
+  describe("what it draws the answers as (#581)", () => {
+    it("a section of several fields as chips, however short the lists", async () => {
+      fakeApi();
+      await show(<SectionScreen section="lifestyle" />);
+      await waitFor(() => expect(screen.getByText("Smoking")).toBeTruthy());
+      expect(screen.queryByRole("radio")).toBeNull();
+      expect(screen.queryByRole("checkbox")).toBeNull();
+      expect(screen.getByRole("button", { name: "Vaping" })).toBeTruthy();
+      expect(screen.getByRole("button", { name: "Dog" })).toBeTruthy();
+    });
+
+    it("a section of one field as whole-width rows, where the list is short", async () => {
+      fakeApi();
+      await show(<SectionScreen section="intent" />);
+      await waitFor(() => expect(screen.getByLabelText("Looking for")).toBeTruthy());
+      expect(screen.getByLabelText("Looking for").props.accessibilityRole).toBe("radiogroup");
+      expect(screen.getAllByRole("radio")).toHaveLength(4);
+    });
+
+    it("a section of one field as chips, where the list is long: the hobbies", async () => {
+      fakeApi();
+      await show(<SectionScreen section="hobbies" />);
+      await waitFor(() => expect(screen.getByRole("button", { name: "Yoga" })).toBeTruthy());
+      expect(screen.queryByRole("checkbox")).toBeNull();
+    });
+  });
+
   it("takes a written bio over a placeholder", async () => {
     const { puts } = fakeApi({ profile: { ...stored({}), bioPreset: "photos_speak" } });
     await show(<SectionScreen section="basics" />);
     await waitFor(() => expect(screen.getByLabelText("About you")).toBeTruthy());
-    const preset = screen.getByRole("button", { name: "The photos say it. The rest over coffee." });
-    expect(preset.props.accessibilityState?.selected).toBe(true);
+    expect(preset("✓ The photos say it. The rest over coffee.")).toBeTruthy();
     await type(screen.getByLabelText("About you"), "Long walks.");
+    expect(preset("The photos say it. The rest over coffee.")).toBeTruthy();
     await leave();
     expect(puts[0]).toMatchObject({ bio: "Long walks.", bioPreset: null });
   });
@@ -389,13 +493,13 @@ describe("SectionScreen", () => {
     const { puts } = fakeApi({ profile: { ...stored({}), bio: "Long walks." } });
     await show(<SectionScreen section="basics" />);
     await waitFor(() => expect(screen.getByLabelText("About you")).toBeTruthy());
-    const preset = () =>
-      screen.getByRole("button", { name: "The photos say it. The rest over coffee." });
-    await press(preset());
+    await press(preset("The photos say it. The rest over coffee."));
     expect(screen.getByLabelText("About you").props.value).toBe("");
-    expect(preset().props.accessibilityState?.selected).toBe(true);
-    await press(preset());
-    expect(preset().props.accessibilityState?.selected).toBe(false);
+    const chosen = preset("✓ The photos say it. The rest over coffee.");
+    expect(chosen.props.accessibilityState?.checked).toBe(true);
+    await press(chosen);
+    const taken = preset("The photos say it. The rest over coffee.");
+    expect(taken.props.accessibilityState?.checked).toBe(false);
     await leave();
     expect(puts[0]).toMatchObject({ bio: null, bioPreset: null });
   });
@@ -417,7 +521,7 @@ describe("SectionScreen", () => {
         : json({ profile: null, completeness: { complete: false, missing }, home: null }),
     ) as unknown as typeof fetch;
     await show(<SectionScreen section="lifestyle" />);
-    expect(screen.getByText("Your profile could not be loaded.")).toBeTruthy();
+    expect(screen.getByText(FAILED_TO_LOAD)).toBeTruthy();
     // Why, in words: the API answered 500.
     expect(screen.getByText("Kuutti's server had a problem. Try again in a moment.")).toBeTruthy();
     failing = false;
@@ -465,13 +569,13 @@ describe("SectionScreen", () => {
   });
 
   describe("what one is here for, a section of its own (#542)", () => {
-    const LEAD =
-      "This also decides who sees you: people who want the same thing. Open to either covers long-term and casual.";
+    const LEAD = "This also decides who sees you: people who want the same thing.";
     const QUESTION = "What are you here for?";
     const BACK = "Back to what you seek";
-    const option = (name: string) => screen.getByRole("button", { name });
-    const ready = () =>
-      waitFor(() => expect(screen.getByRole("button", { name: "Something casual" })).toBeTruthy());
+    /** An answer by its word, chosen or not: the chosen one's name carries its mark. */
+    const option = (name: string) =>
+      screen.getByRole("radio", { name: new RegExp(`^(✓ )?${name}$`) });
+    const ready = () => waitFor(() => expect(option("Something casual")).toBeTruthy());
 
     it("is titled by onboarding's question, says what the answer does, and goes back to What you seek", async () => {
       fakeApi({ profile: stored({ intent: "casual" }) });
@@ -480,7 +584,7 @@ describe("SectionScreen", () => {
       expectPinnedHeader(QUESTION, BACK);
       expect(screen.getByText(LEAD)).toBeTruthy();
       expect(screen.queryByRole("button", { name: "Back to your profile" })).toBeNull();
-      await press(option(BACK));
+      await press(screen.getByRole("button", { name: BACK }));
       expect(router.back).toHaveBeenCalledTimes(1);
     });
 
@@ -489,13 +593,13 @@ describe("SectionScreen", () => {
         "fi-FI",
         "Mitä etsit täältä?",
         "Takaisin siihen, mitä etsit",
-        "Tämä ratkaisee myös, ketkä näkevät sinut: ne, jotka haluavat samaa. Avoin kummallekin kattaa pitkäaikaisen ja rennon.",
+        "Tämä ratkaisee myös, ketkä näkevät sinut: ne, jotka haluavat samaa.",
       ],
       [
         "sv-FI",
         "Vad är du här för?",
         "Tillbaka till vad du söker",
-        "Det här avgör också vilka som ser dig: de som vill samma sak. Öppen för båda omfattar långvarigt och avslappnat.",
+        "Det här avgör också vilka som ser dig: de som vill samma sak.",
       ],
     ])("speaks %s", async (tag, title, back, lead) => {
       (useLocales as jest.Mock).mockReturnValue([{ languageTag: tag }]);
@@ -518,7 +622,7 @@ describe("SectionScreen", () => {
       expect(screen.queryByRole("button", { name: BACK })).toBeNull();
       // Nor is the answer asked here any more: one answer, one door.
       expect(screen.queryByText("Looking for")).toBeNull();
-      expect(screen.queryByRole("button", { name: "Something casual" })).toBeNull();
+      expect(screen.queryByText("Something casual")).toBeNull();
     });
 
     it("saves nothing when the chosen answer is pressed again", async () => {
@@ -526,7 +630,7 @@ describe("SectionScreen", () => {
       const view = await show(<SectionScreen section="intent" />);
       await ready();
       await press(option("Something casual"));
-      expect(option("Something casual").props.accessibilityState?.selected).toBe(true);
+      expect(option("Something casual").props.accessibilityState?.checked).toBe(true);
       await leaveAndGo(view);
       expect(puts).toEqual([]);
     });
@@ -548,7 +652,7 @@ describe("SectionScreen", () => {
       const { puts } = fakeApi({ profile: stored({ intent: "casual" }) });
       const view = await show(<SectionScreen section="intent" />);
       await ready();
-      await press(option("Hide from your card: Looking for"));
+      await press(screen.getByRole("button", { name: "Hide from your card: Looking for" }));
       await leaveAndGo(view);
       expect(puts).toEqual([
         expect.objectContaining({ fields: { intent: "casual" }, hiddenFields: ["intent"] }),
@@ -568,7 +672,7 @@ describe("SectionScreen", () => {
       expect(
         screen.getAllByText("Saving did not work. Check the fields and try again."),
       ).toHaveLength(2);
-      expect(option("Something long-term").props.accessibilityState?.selected).toBe(true);
+      expect(option("Something long-term").props.accessibilityState?.checked).toBe(true);
     });
   });
 

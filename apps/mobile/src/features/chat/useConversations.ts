@@ -32,13 +32,14 @@ function withEarlierThumbs(earlier: ConversationList, list: ConversationList): C
     !c.counterpart || c.counterpart.deleted || c.state === "closed"
       ? c
       : { ...c, counterpart: { ...c.counterpart, thumb: thumbs.get(c.id) ?? null } };
-  return { open: list.open.map(carry), archived: list.archived.map(carry) };
+  return { ...list, open: list.open.map(carry), archived: list.archived.map(carry) };
 }
 
 /**
  * The list as the socket moved it since the last read (#349): a newer message
  * becomes the row's last line and goes to the top, one of theirs counts as
- * unread, and a message brings an archived conversation back (TD-13). So a
+ * unread, a message brings an archived conversation back (TD-13), and whose
+ * line it is says whose turn it is, the count with it (ADR-062 §5). So a
  * message costs no read of the list; a state other than the row's does.
  */
 export function withLive(
@@ -47,6 +48,7 @@ export function withLive(
 ): ConversationList {
   const moved: ConversationSummary[] = [];
   const rest: ConversationSummary[] = [];
+  let { waiting } = list.yourTurn;
   for (const c of [...list.open, ...list.archived]) {
     const newer = (live[c.id]?.messages ?? []).filter((m) => m.seq > (c.lastMessage?.seq ?? 0));
     const last = newer.at(-1);
@@ -54,6 +56,8 @@ export function withLive(
       rest.push(c);
       continue;
     }
+    const yourTurn = last.side === "theirs";
+    waiting += Number(yourTurn) - Number(c.yourTurn);
     moved.push({
       ...c,
       state: "open",
@@ -66,6 +70,7 @@ export function withLive(
         side: last.side,
       },
       unread: c.unread + newer.filter((m) => m.side === "theirs").length,
+      yourTurn,
     });
   }
   moved.sort((a, b) => (b.lastMessage?.at ?? "").localeCompare(a.lastMessage?.at ?? ""));
@@ -73,6 +78,7 @@ export function withLive(
   return {
     open: all.filter((c) => c.state === "open"),
     archived: all.filter((c) => c.state !== "open"),
+    yourTurn: { ...list.yourTurn, waiting },
   };
 }
 

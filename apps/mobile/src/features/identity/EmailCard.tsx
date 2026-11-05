@@ -1,15 +1,15 @@
-import { formatTime, type PlainMessageKey } from "@kuutti/i18n";
+import type { PlainMessageKey } from "@kuutti/i18n";
 import { type AccountEmailResponse, EMAIL_CODE_LENGTH, EMAIL_MAX } from "@kuutti/schema";
 import { useRouter } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AccessibilityInfo, KeyboardAvoidingView, Platform, ScrollView, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LoadFailed } from "@/components/LoadFailed";
+import { sayAloud } from "@/components/Notice";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Text } from "@/components/ui/text";
-import { DEAL_BREAKERS_PATH } from "@/features/profile";
 import { ApiError } from "@/lib/api";
 import { useT } from "@/lib/locale";
 import { useRowData } from "@/lib/row-data";
@@ -21,6 +21,8 @@ import { useSession } from "./session";
 
 type Notice =
   | "saved"
+  | "removed"
+  | "codeSent"
   | "invalid"
   | "failed"
   | "confirmedNow"
@@ -34,14 +36,16 @@ type Notice =
 
 const NOTICE: Readonly<Record<Notice, PlainMessageKey>> = {
   saved: "account.email.saved",
+  removed: "account.email.removed",
+  codeSent: "account.email.codeSent",
   invalid: "account.email.invalid",
-  failed: "account.email.failed",
+  failed: "load.failed.press",
   confirmedNow: "account.email.confirmedNow",
   codeWrong: "account.email.codeWrong",
   codeSpent: "account.email.codeSpent",
   codeExpired: "account.email.codeExpired",
   codeNone: "account.email.codeNone",
-  sendLimit: "account.email.sendLimit",
+  sendLimit: "errors.enough_today",
   mailUnavailable: "account.email.mailUnavailable",
   codeFailed: "account.email.codeFailed",
 };
@@ -69,12 +73,6 @@ const NO_CODE_LEFT = new Set<string | undefined>([
  * holds now.
  */
 const CHANGED_ELSEWHERE = new Set<string | undefined>(["email_confirmed", "email_none"]);
-
-/**
- * What a call says, line by line: one of the card's notices, or that a code
- * went and until when it works. A save that sends one says both.
- */
-type Said = Notice | { codeSentUntil: string };
 
 type Load =
   | { state: "loading" }
@@ -129,14 +127,12 @@ export function EmailCard({
   if (load.state === "loading") {
     return (
       <Text variant="muted" accessibilityLiveRegion="polite">
-        {t("account.email.loading")}
+        {t("load.loading")}
       </Text>
     );
   }
   if (load.state === "unavailable") {
-    return (
-      <LoadFailed headline={t("account.email.loadFailed")} error={load.error} onRetry={read} />
-    );
+    return <LoadFailed error={load.error} onRetry={read} />;
   }
   return <EmailForm first={load.email} inRow={inRow} onStored={onStored} />;
 }
@@ -145,8 +141,9 @@ export function EmailCard({
  * The card once the address is read: it holds what the API last answered,
  * whether a code waits included. The API answers none past the code's end, so
  * a card left open past it keeps the code's field until Confirm's answer says
- * the code expired. Every call clears the last notice and says its own, in a
- * live region and, on iOS, aloud.
+ * the code expired. Every call clears the last notice and says its own: what
+ * shows by itself is said aloud, with no line of its own (#581); anything else
+ * in a live region and, on iOS, aloud.
  */
 function EmailForm({
   first,
@@ -157,14 +154,14 @@ function EmailForm({
   inRow: boolean;
   onStored?: (email: AccountEmailResponse) => void;
 }) {
-  const { t, locale } = useT();
+  const { t } = useT();
   const tap = useHapticTap();
   // Together, so an answer can tell whether the person has typed in the field
   // since the last one.
   const [{ stored, typed }, setForm] = useState({ stored: first, typed: first.email ?? "" });
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
-  const [said, setSaid] = useState<readonly Said[]>([]);
+  const [said, setSaid] = useState<readonly Notice[]>([]);
   // Which answer the notice is: each one a fresh live region, so Android says
   // the same words again for a second code within the minute.
   const [answers, setAnswers] = useState(0);
@@ -172,29 +169,32 @@ function EmailForm({
   // An address typed and not sent is not kept: Settings asks before it is left (#511).
   useReportUnsaved("email", typed.trim() !== "" && typed.trim() !== (stored.email ?? ""));
   // Whole sentences one after another; nothing is inflected around them.
-  const wordsOf = (lines: readonly Said[]): string =>
-    lines
-      .map((line) =>
-        typeof line === "string"
-          ? t(NOTICE[line])
-          : t("account.email.codeSent", {
-              time: formatTime(locale, new Date(line.codeSentUntil)),
-            }),
-      )
-      .join(" ");
+  const wordsOf = (lines: readonly Notice[]): string =>
+    lines.map((line) => t(NOTICE[line])).join(" ");
 
-  const run = async (call: () => Promise<readonly Said[]>) => {
+  const run = async (call: () => Promise<readonly Notice[]>) => {
     tap();
     setBusy(true);
     setSaid([]);
     try {
       const next = await call();
-      setSaid(next);
+      // What shows by itself (#581): an address kept, and a code on its way if
+      // one went, in the field, the row's value and the line over the code's
+      // field; a removal, in the empty field; a first code, in its section,
+      // which comes with that line. A new code changes nothing on the screen,
+      // so its line under the button is the answer.
+      const saidOnly =
+        next[0] === "removed" ||
+        (next[0] === "saved" && next.every((line) => line === "saved" || line === "codeSent")) ||
+        (next[0] === "codeSent" && stored.codeExpiresAt === null);
+      setSaid(saidOnly ? [] : next);
       setAnswers((n) => n + 1);
       // iOS has no live regions; Android's speak the same words already. Said
       // for each call, not as the words change: a second code sent within the
       // minute has the same words as the first, and is said again.
-      if (next.length > 0 && Platform.OS === "ios") {
+      if (saidOnly) {
+        sayAloud(wordsOf(next));
+      } else if (next.length > 0 && Platform.OS === "ios") {
         AccessibilityInfo.announceForAccessibility(wordsOf(next));
       }
     } finally {
@@ -214,7 +214,7 @@ function EmailForm({
     }));
 
   /** A refused send or confirmation in words; the refusals that leave no code take the waiting one away. */
-  const refused = async (error: unknown): Promise<readonly Said[]> => {
+  const refused = async (error: unknown): Promise<readonly Notice[]> => {
     const reason = error instanceof ApiError ? error.code : undefined;
     if (CHANGED_ELSEWHERE.has(reason)) {
       try {
@@ -231,7 +231,7 @@ function EmailForm({
     return [REFUSALS.get(reason) ?? "codeFailed"];
   };
 
-  const send = async (): Promise<readonly Said[]> => {
+  const send = async (): Promise<readonly Notice[]> => {
     let sent: AccountEmailResponse;
     try {
       sent = await sendEmailCode();
@@ -240,11 +240,11 @@ function EmailForm({
     }
     adopt(sent);
     setCode("");
-    // Narrowing only: a sent code is answered with until when it works.
-    return sent.codeExpiresAt === null ? [] : [{ codeSentUntil: sent.codeExpiresAt }];
+    // A sent code is answered with when it ends: none means none went.
+    return sent.codeExpiresAt === null ? [] : ["codeSent"];
   };
 
-  const confirm = async (): Promise<readonly Said[]> => {
+  const confirm = async (): Promise<readonly Notice[]> => {
     try {
       adopt(await confirmEmailCode(code));
       return ["confirmedNow"];
@@ -256,7 +256,7 @@ function EmailForm({
   };
 
   /** A save or a removal, and the one code a new address gets. */
-  const keep = async (call: () => Promise<AccountEmailResponse>): Promise<readonly Said[]> => {
+  const keep = async (call: () => Promise<AccountEmailResponse>): Promise<readonly Notice[]> => {
     let next: AccountEmailResponse;
     try {
       next = await call();
@@ -265,10 +265,11 @@ function EmailForm({
     }
     setForm({ stored: next, typed: next.email ?? "" });
     setCode("");
+    if (next.email === null) return ["removed"];
     // Setting or changing an address sends its confirmation (#385). The save
     // itself sends nothing, so a send that fails leaves the address saved:
     // "Saved.", then what the send says (ADR-043 §2).
-    const needsCode = next.email !== null && !next.confirmed && next.codeExpiresAt === null;
+    const needsCode = !next.confirmed && next.codeExpiresAt === null;
     return needsCode ? ["saved", ...(await send())] : ["saved"];
   };
 
@@ -298,17 +299,15 @@ function EmailForm({
           setForm((form) => ({ ...form, typed: text }));
         }}
       />
-      {stored.email !== null && (
-        <Text variant="muted">
-          {stored.confirmed ? t("account.email.confirmed") : t("account.email.unconfirmed")}
-        </Text>
+      {/* Nothing to send while the field holds the kept address: one dead button fewer (#581). */}
+      {address !== stored.email && (
+        <Button
+          disabled={busy || address.length === 0}
+          onPress={() => void run(() => keep(() => saveEmail(address)))}
+        >
+          {t("account.email.save")}
+        </Button>
       )}
-      <Button
-        disabled={busy || address.length === 0 || address === stored.email}
-        onPress={() => void run(() => keep(() => saveEmail(address)))}
-      >
-        {t("account.email.save")}
-      </Button>
       {stored.email !== null && !stored.confirmed && (
         <CodeSection
           expiresAt={stored.codeExpiresAt}
@@ -357,9 +356,9 @@ function EmailForm({
 }
 
 /**
- * The unconfirmed address's code (#385, ADR-043 §3): while one waits, until
- * when, its six digits and Confirm, and a new one on request; while none
- * waits, the way to ask for one.
+ * The unconfirmed address's code (#385, ADR-043 §3): while one waits, that it
+ * is on its way, its six digits and Confirm, and a new one on request; while
+ * none waits, the way to ask for one.
  */
 function CodeSection({
   expiresAt,
@@ -369,7 +368,7 @@ function CodeSection({
   onConfirm,
   onSend,
 }: {
-  /** Until when the waiting code works; null when none waits. */
+  /** When the waiting code ends; null when none waits. */
   expiresAt: string | null;
   code: string;
   busy: boolean;
@@ -377,7 +376,7 @@ function CodeSection({
   onConfirm: () => void;
   onSend: () => void;
 }) {
-  const { t, locale } = useT();
+  const { t } = useT();
   if (expiresAt === null) {
     return (
       <Button disabled={busy} onPress={onSend}>
@@ -387,10 +386,8 @@ function CodeSection({
   }
   return (
     <View className="gap-3">
-      {/* The phone's own clock, not Helsinki's as in a conversation: one reader,
-          who holds the time against the clock at the top of the same screen.
-          No live region: the card's notice says it as each code goes. */}
-      <Text>{t("account.email.codeSent", { time: formatTime(locale, new Date(expiresAt)) })}</Text>
+      {/* No live region: each code as it goes is said aloud, or by the card's notice. */}
+      <Text>{t("account.email.codeSent")}</Text>
       <View className="gap-2">
         <Text variant="small">{t("account.email.codeLabel")}</Text>
         <Input
@@ -444,17 +441,6 @@ export function EmailScreen() {
             {t("profile.later.title")}
           </Text>
           <EmailCard />
-          <Text>{t("profile.later.done")}</Text>
-          {/* The deal-breakers come after the optional fields (#149): one tap, never required. */}
-          <Button
-            variant="outline"
-            onPress={() => {
-              tap();
-              router.push(DEAL_BREAKERS_PATH);
-            }}
-          >
-            {t("profile.dealBreakers.open")}
-          </Button>
           <Button
             onPress={() => {
               tap();
@@ -471,8 +457,8 @@ export function EmailScreen() {
 
 /**
  * The e-mail row's value in Settings (#376, #511): the address once
- * confirmed, the address and that it waits for its code, or that there is
- * none; nothing until it has been read.
+ * confirmed, the address and that it waits for its code, or, with none, what
+ * to do (#581); nothing until it has been read.
  */
 export function useEmailSummary(enabled: boolean) {
   const { t } = useT();

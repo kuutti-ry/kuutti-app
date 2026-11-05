@@ -1,15 +1,20 @@
 import { rewardParams } from "./words";
 
-// A reward's units as the messages' arguments (#107): which kinds there are
-// picks the sentence, and the numbers go with it as they are.
+// What an invitation earns as the messages' arguments (#107, #503): which of
+// the two sides earn picks the sentence, zero on a side switching it off, and
+// the numbers go with it as they are.
 
 describe("rewardParams", () => {
   it.each([
-    [{ fish: 1, likes: 0 }, "fish"],
-    [{ fish: 0, likes: 5 }, "likes"],
-    [{ fish: 2, likes: 3 }, "both"],
-    [{ fish: 0, likes: 0 }, "none"],
-  ])("words %j as %s", (units, reward) => {
-    expect(rewardParams(units)).toEqual({ reward, ...units });
+    [{ inviterFish: 1, friendFish: 1 }, "both"],
+    [{ inviterFish: 2, friendFish: 3 }, "both"],
+    [{ inviterFish: 10, friendFish: 10 }, "both"],
+    [{ inviterFish: 1, friendFish: 0 }, "inviter"],
+    [{ inviterFish: 10, friendFish: 0 }, "inviter"],
+    [{ inviterFish: 0, friendFish: 1 }, "friend"],
+    [{ inviterFish: 0, friendFish: 10 }, "friend"],
+    [{ inviterFish: 0, friendFish: 0 }, "none"],
+  ])("words %j as %s", (fish, reward) => {
+    expect(rewardParams(fish)).toEqual({ reward, ...fish });
   });
 });

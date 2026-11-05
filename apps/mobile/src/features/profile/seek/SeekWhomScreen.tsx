@@ -19,9 +19,9 @@ const sameSet = (a: readonly Gender[], b: readonly Gender[]) =>
   a.length === b.length && a.every((gender) => b.includes(gender));
 
 /**
- * Whom one seeks (#542): the seeks step's chips from the stored answer, saved
+ * Whom one seeks (#542): the seeks step's rows from the stored answer, saved
  * on leaving, as often as one wishes (ADR-060 §9). One to three, so the only
- * chip chosen stays chosen and says why. The consent is not asked here: without
+ * row chosen stays chosen and says why. The consent is not asked here: without
  * it the person never reaches this (`useSeeking`).
  */
 export function SeekWhomScreen() {
@@ -31,7 +31,7 @@ export function SeekWhomScreen() {
   const seeking = useSeeking();
   const stored = seeking.status === "ready" ? seeking.seeking.seeks : null;
   const [draft, setDraft] = useState<Gender[] | null>(held ?? null);
-  // How many times the only chip was pressed: each is said, and a new choice ends them.
+  // How many times the only row chosen was pressed: each is said, and a new choice ends them.
   const [refused, setRefused] = useState(0);
   const chosen = draft ?? stored;
   const leaving = useSaveOnLeave<Gender[]>({
@@ -49,11 +49,7 @@ export function SeekWhomScreen() {
     return (
       <SafeAreaView className="flex-1 bg-background">
         <View className="flex-1 items-center justify-center gap-4 p-6">
-          <LoadFailed
-            headline={t("profile.failed")}
-            error={seeking.error}
-            onRetry={() => void seeking.reload()}
-          />
+          <LoadFailed error={seeking.error} onRetry={() => void seeking.reload()} />
         </View>
       </SafeAreaView>
     );
@@ -62,7 +58,7 @@ export function SeekWhomScreen() {
     return (
       <SafeAreaView className="flex-1 bg-background">
         <View className="flex-1 items-center justify-center p-6">
-          <Text accessibilityLiveRegion="polite">{t("profile.loading")}</Text>
+          <Text accessibilityLiveRegion="polite">{t("load.loading")}</Text>
         </View>
       </SafeAreaView>
     );
@@ -76,7 +72,6 @@ export function SeekWhomScreen() {
         onBack={() => router.back()}
       />
       <ScrollView contentContainerClassName="flex-grow gap-6 p-6">
-        <Text>{t("profile.seek.whom.explain")}</Text>
         <SeeksChips
           chosen={chosen}
           onChange={(next) => {
@@ -90,7 +85,7 @@ export function SeekWhomScreen() {
         />
         {refused > 0 && <Notice words={t("profile.seek.whom.keepOne")} answer={refused} refused />}
       </ScrollView>
-      <ConfirmLeaveDialog {...leaving} reason={t("profile.seek.failed")} />
+      <ConfirmLeaveDialog {...leaving} reason={t("load.failed.press")} />
     </SafeAreaView>
   );
 }

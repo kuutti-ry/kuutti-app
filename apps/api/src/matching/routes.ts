@@ -77,13 +77,13 @@ const saveDealBreakersRoute = createRoute({
   path: "/preferences/deal-breakers",
   summary: "Set the caller's deal-breakers",
   description:
-    "The whole set, at most `max`, each on a distinct whitelisted field the person has answered themselves, accepting options the field has. One on distance has no field: it accepts the bands up to nearby, close or around, and lets through those who did not answer whatever the request says, since nobody can leave it unanswered. Hard rows: #87 applies them in the pool, both ways.",
+    "The whole set, at most `max`, each on a distinct whitelisted field the person has answered themselves, accepting options the field has. A person already past a lowered `max` may still remove or change what they hold; only a new field past it is refused. One on distance has no field: it accepts the bands up to nearby, close or around, and lets through those who did not answer whatever the request says, since nobody can leave it unanswered. Hard rows: #87 applies them in the pool, both ways.",
   ...bearer,
   request: { body: { required: true, ...json(DealBreakersUpdate) } },
   responses: {
     200: { description: "Saved; the deal-breakers as stored.", ...json(DealBreakersResponse) },
     400: errorContent(
-      "Validation failed: more than allowed, a field twice, an answer the field has not, or bands that do not run up to one.",
+      "Validation failed: a new field past what is allowed, a field twice, an answer the field has not, or bands that do not run up to one.",
     ),
     401: unauthenticated,
     404: errorContent("No live account (erased meanwhile)."),

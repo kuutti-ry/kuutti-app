@@ -1,14 +1,16 @@
 import { act, fireEvent, screen, waitFor } from "@testing-library/react-native";
 import { useLocales } from "expo-localization";
 import * as SecureStore from "expo-secure-store";
+import { AccessibilityInfo, Platform } from "react-native";
 import { clearSession, saveSession } from "@/lib/session";
 import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
 import { renderWithTheme } from "@/test/render";
 import { FeedbackForm } from "./FeedbackForm";
 
-// Give feedback (#171, ADR-023): the kind in words, the words themselves, the
-// build read by the app; thanks after a send; the cap and a failure in their
-// own words; nothing for a device without a session.
+// Give feedback (#171, ADR-023): who sees it and that nobody is mailed, the kind
+// in words, the words themselves, the build read by the app; thanks after a
+// send, said aloud, with no other line (#581); the cap and a failure in their
+// own words.
 
 jest.mock("nativewind", () => ({
   ...jest.requireActual("nativewind"),
@@ -57,20 +59,31 @@ const type = (words: string) =>
     fireEvent.changeText(screen.getByLabelText("Your feedback"), words);
   });
 const sendButton = () => screen.getByRole("button", { name: /^Send/ });
+/** Every text on the screen, in order. */
+const drawn = () => screen.queryAllByText(/./).map((node) => node.props.children);
+const words = (call: unknown) => (call as jest.Mock).mock.calls.map(([said]) => said);
 
 beforeEach(async () => {
   store.clear();
   (useLocales as jest.Mock).mockReturnValue([{ languageTag: "en-US" }]);
+  (AccessibilityInfo.announceForAccessibility as jest.Mock).mockClear();
+  (AccessibilityInfo.announceForAccessibilityWithOptions as jest.Mock).mockClear();
   await clearSession();
 });
+afterEach(() => jest.restoreAllMocks());
 
 describe("the feedback form, under its row in Settings (#511)", () => {
   it("sends the kind, the words and the build, says thank you, and offers the empty form again", async () => {
     const sent = api(() => new Response(null, { status: 204 }));
     await saveSession(tokens);
     await renderWithTheme(<FeedbackForm />);
-    // The session loads first; the form follows.
     await screen.findByLabelText("Your feedback");
+    // Who sees it cannot be seen, and that there is no reply channel (#581).
+    expect(
+      screen.getByText(
+        "The moderators see that it came from your account; nobody else does. Nobody is mailed.",
+      ),
+    ).toBeTruthy();
     // The field's name is in sight too, not only for a screen reader.
     expect(screen.getByText("Your feedback")).toBeTruthy();
     expect(screen.getByRole("heading", { name: "What is it about?" })).toBeTruthy();
@@ -93,7 +106,7 @@ describe("the feedback form, under its row in Settings (#511)", () => {
         },
       },
     ]);
-    expect(screen.getByText("The moderators will read it. Nobody is mailed.")).toBeTruthy();
+    expect(drawn()).toEqual(["Thank you", "Send more"]);
     noProblems();
     await press("Send more");
     expect(screen.getByLabelText("Your feedback").props.value).toBe("");
@@ -101,11 +114,31 @@ describe("the feedback form, under its row in Settings (#511)", () => {
     expect(sendButton().props.accessibilityState?.disabled).toBe(true);
   });
 
+  it.each<["ios" | "android", string[], string[]]>([
+    ["ios", ["Thank you"], []],
+    ["android", [], ["Thank you"]],
+  ])(
+    "says thank you aloud on %s, with no line under it for a live region to read (#581)",
+    async (os, queued, plain) => {
+      jest.replaceProperty(Platform, "OS", os);
+      api(() => new Response(null, { status: 204 }));
+      await saveSession(tokens);
+      await renderWithTheme(<FeedbackForm />);
+      await screen.findByLabelText("Your feedback");
+      await press("An idea", "radio");
+      await type("The map is slow on my phone.");
+      await press("Send");
+      await waitFor(() => expect(screen.getByRole("heading", { name: "Thank you" })).toBeTruthy());
+      expect(words(AccessibilityInfo.announceForAccessibilityWithOptions)).toEqual(queued);
+      expect(words(AccessibilityInfo.announceForAccessibility)).toEqual(plain);
+      expect(drawn()).toEqual(["Thank you", "Send more"]);
+    },
+  );
+
   it("keeps Send off until a kind is chosen and something is written", async () => {
     const sent = api(() => new Response(null, { status: 204 }));
     await saveSession(tokens);
     await renderWithTheme(<FeedbackForm />);
-    // The session loads first; the form follows.
     await screen.findByLabelText("Your feedback");
     expect(sendButton().props.accessibilityState?.disabled).toBe(true);
     await press("A bug", "radio");
@@ -129,27 +162,23 @@ describe("the feedback form, under its row in Settings (#511)", () => {
     );
     await saveSession(tokens);
     await renderWithTheme(<FeedbackForm />);
-    // The session loads first; the form follows.
     await screen.findByLabelText("Your feedback");
     await press("Praise", "radio");
     await type("The onboarding was quick.");
     await press("Send");
     await waitFor(() =>
       expect(
-        screen.getByText("That is enough feedback for today. You can send more after midnight."),
+        screen.getByText("That is enough for today. You can try again after midnight."),
       ).toBeTruthy(),
     );
     expect(screen.getByLabelText("Your feedback").props.value).toBe("The onboarding was quick.");
     status = 500;
     await press("Send");
-    await waitFor(() => expect(screen.getByText("Sending did not work. Try again.")).toBeTruthy());
+    await waitFor(() =>
+      expect(screen.getByText("That did not go through. Try again.")).toBeTruthy(),
+    );
     expect(screen.queryByRole("heading", { name: "Thank you" })).toBeNull();
-  });
-
-  it("says there is no session on a signed-out device", async () => {
-    api(() => new Response(null, { status: 204 }));
-    await renderWithTheme(<FeedbackForm />);
-    expect(screen.getByText("No session on this device.")).toBeTruthy();
-    expect(screen.queryByLabelText("Your feedback")).toBeNull();
+    // No thanks is said for what did not go.
+    expect(words(AccessibilityInfo.announceForAccessibilityWithOptions)).not.toContain("Thank you");
   });
 });

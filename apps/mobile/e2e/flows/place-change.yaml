@@ -1,7 +1,9 @@
 # The home after onboarding (#514, ADR-061 §1, §3): what the card shows of it,
 # saved on the tap, and a new postal code, whenever the person likes, which
 # starts the card from the town again. In words only: what was typed leaves the
-# field with its save, and no screen shows digits back. Sanna lives in Tapiola,
+# field with its save, and no screen shows digits back, which the screen's one
+# line says. The filled one of the town and the area says what the card shows,
+# and a save is said to a screen reader and not drawn (#581). Sanna lives in Tapiola,
 # Espoo, with the town on her card; the flow puts her back as it found her. A
 # run that stops half-way leaves her elsewhere: `pnpm demo:reset` first.
 appId: fi.kuutti.app
@@ -10,24 +12,26 @@ name: The home changes by a new postal code, the card says the name chosen, and 
 - runFlow: ../common/sign-in.yaml
 - openLink: kuutti://profile
 - extendedWaitUntil:
-    visible: "Your profile|Profiilisi|Din profil"
+    visible: "(The basics|Perustiedot|Grunderna)(, .*)?"
     timeout: 15000
 - tapOn: "Home|Koti|Hem"
 - extendedWaitUntil:
     visible: "What should your card show\\?|Mitä korttisi näyttää\\?|Vad ska ditt kort visa\\?"
     timeout: 15000
-- assertVisible: "On your card: Espoo|Kortillasi: Espoo|På ditt kort: Esbo"
-- assertVisible:
-    text: "Espoo|Esbo"
-    selected: true
+# The second sentence of onboarding's two, the one that is still news here.
+- assertVisible: "Others see a town or your area by name, never the digits\\.|Muut näkevät kaupungin tai alueesi nimen, eivät koskaan numeroita\\.|Andra ser en stad eller ditt område med namn, aldrig siffrorna\\."
+- assertVisible: "✓ Espoo|✓ Esbo"
+- assertNotVisible: "On your card: .*|Kortillasi: .*|På ditt kort: .*"
 - assertNotVisible: ".*\\d{5}.*"
 
-# Her area instead of the town, saved on the tap, and on her card at once.
+# Her area instead of the town, saved on the tap, and on her card at once. The
+# filled one moves, and that is all the eye has of the save.
 - tapOn: "Tapiola|Hagalund"
 - extendedWaitUntil:
-    visible: "On your card: Tapiola|Kortillasi: Tapiola|På ditt kort: Hagalund"
+    visible: "✓ Tapiola|✓ Hagalund"
     timeout: 15000
-- assertVisible: "Saved\\.|Tallennettu\\.|Sparat\\."
+- assertVisible: "Espoo|Esbo"
+- assertNotVisible: "Saved\\.|Tallennettu\\.|Sparat\\."
 - openLink: kuutti://profile/card
 - extendedWaitUntil:
     visible: "Your card|Korttisi|Ditt kort"
@@ -48,12 +52,13 @@ name: The home changes by a new postal code, the card says the name chosen, and 
 - tapOn:
     below: "Postal code|Postinumero|Postnummer"
 - inputText: "33100"
-- tapOn: "Your postal code tells Kuutti.*|Postinumerosi kertoo Kuutille.*|Ditt postnummer berättar för Kuutti.*"
+- tapOn: "Others see a town or your area by name, never the digits\\.|Muut näkevät kaupungin tai alueesi nimen, eivät koskaan numeroita\\.|Andra ser en stad eller ditt område med namn, aldrig siffrorna\\."
 - tapOn: ".*(Tampere Keskus|Tammerfors centrum).*"
 - extendedWaitUntil:
-    visible: "On your card: Tampere|Kortillasi: Tampere|På ditt kort: Tammerfors"
+    visible: "✓ Tampere|✓ Tammerfors"
     timeout: 15000
 - assertNotVisible: ".*\\d{5}.*"
+- assertNotVisible: "Saved\\.|Tallennettu\\.|Sparat\\."
 - openLink: kuutti://profile/card
 - extendedWaitUntil:
     visible: "Your card|Korttisi|Ditt kort"
@@ -72,8 +77,8 @@ name: The home changes by a new postal code, the card says the name chosen, and 
 - tapOn:
     below: "Postal code|Postinumero|Postnummer"
 - inputText: "02100"
-- tapOn: "Your postal code tells Kuutti.*|Postinumerosi kertoo Kuutille.*|Ditt postnummer berättar för Kuutti.*"
+- tapOn: "Others see a town or your area by name, never the digits\\.|Muut näkevät kaupungin tai alueesi nimen, eivät koskaan numeroita\\.|Andra ser en stad eller ditt område med namn, aldrig siffrorna\\."
 - tapOn: ".*(Tapiola|Hagalund).*"
 - extendedWaitUntil:
-    visible: "On your card: Espoo|Kortillasi: Espoo|På ditt kort: Esbo"
+    visible: "✓ Espoo|✓ Esbo"
     timeout: 15000

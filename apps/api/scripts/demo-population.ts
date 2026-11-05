@@ -3,7 +3,7 @@
  * pull request's own, replacing the one that was there.
  *
  *   pnpm demo:population                      three hundred people, the usual seed
- *   pnpm demo:population -- --size 5000       as many as the round builder must carry
+ *   pnpm demo:population -- --size 5000       as many as the queue must walk
  *   pnpm demo:population -- --seed 7          other people, the same ponds
  *   pnpm demo:population -- --photos          with faces of the release, drawn by seed, through the pipeline (#142)
  *   pnpm demo:population -- --remove          removes them and writes nobody
@@ -35,7 +35,7 @@
  * both refuse while there are pictures and no store to delete from.
  */
 import { networkInterfaces } from "node:os";
-import { createPool, MATCHING_CONFIG_V1 } from "@kuutti/db";
+import { createPool } from "@kuutti/db";
 import {
   assertDemoTarget,
   assertStagingProcess,
@@ -53,7 +53,6 @@ import {
   parseDemoCommand,
   plannedPonds,
   removePopulation,
-  uncrossed,
   writePopulation,
 } from "@kuutti/db/demo";
 import { CURRENT_CONSENT_VERSIONS } from "../src/identity/index.ts";
@@ -82,13 +81,10 @@ const command = (() => {
 const { env, size, seed, action, photos } = command;
 
 const ponds = plannedPonds(size);
-// What this size does not show, against the first version of the config: a
-// small population is allowed, it is only said what it is too small for.
-const notShown = uncrossed(ponds, { counterK: MATCHING_CONFIG_V1.pond_counter_k });
 
 if (action === "dry-run") {
   console.log(
-    JSON.stringify({ msg: "demo population (dry run)", env, size, seed, ponds, notShown }, null, 2),
+    JSON.stringify({ msg: "demo population (dry run)", env, size, seed, ponds }, null, 2),
   );
   process.exit(0);
 }
@@ -202,9 +198,7 @@ try {
       special_category: SPECIAL_CATEGORY_CONSENT_VERSION,
     });
     const bar = barOf(people);
-    console.log(
-      JSON.stringify({ msg: "demo population", env, size, seed, ...result, notShown, bar }),
-    );
+    console.log(JSON.stringify({ msg: "demo population", env, size, seed, ...result, bar }));
     if (assets && store) {
       const faces = facesForPopulation(people, assetsFor(assets.manifest, "pool"), seed);
       const accounts = await accountsByLabel(pool, [...faces.keys()]);

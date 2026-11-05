@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   ChatMessage,
   ConversationDetail,
+  ConversationList,
+  ConversationSummary,
   Counterpart,
   type DaysBand,
   daysBand,
@@ -19,6 +21,7 @@ import {
   ReadRequest,
   SendMessageRequest,
   SendPhotoRequest,
+  YourTurnCount,
 } from "./chat.ts";
 
 // The chat's contracts (#348, ADR-031): what a send, a page and a read mark
@@ -107,6 +110,7 @@ describe("the counterpart and the conversation", () => {
       counterpart: { deleted: true },
       lastMessage: null,
       unread: 0,
+      yourTurn: false,
       limits: { maxLength: 2000 },
       counterpartReadUpTo: 4,
       contacts: { mine: [], theirs: [] },
@@ -123,6 +127,36 @@ describe("the counterpart and the conversation", () => {
     for (const closedHow of ["block", "sanction"]) {
       expect(ConversationDetail.safeParse({ ...detail, closedHow }).success, closedHow).toBe(false);
     }
+  });
+
+  it("says of each row whether it waits on the caller, and of the list how many against the limit (ADR-062 §5)", () => {
+    const row = {
+      id: CLIENT_ID,
+      state: "open",
+      closedHow: null,
+      counterpart: null,
+      lastMessage: null,
+      unread: 0,
+      yourTurn: true,
+    };
+    expect(ConversationSummary.parse(row).yourTurn).toBe(true);
+    expect(ConversationSummary.safeParse({ ...row, yourTurn: undefined }).success).toBe(false);
+    expect(ConversationSummary.safeParse({ ...row, yourTurn: 1 }).success).toBe(false);
+    const count = { waiting: 8, limit: 8, warning: 6 };
+    expect(YourTurnCount.parse(count)).toEqual(count);
+    // Off, as a 0 in the panel makes it.
+    expect(YourTurnCount.parse({ waiting: 0, limit: 0, warning: 0 }).limit).toBe(0);
+    for (const wrong of [
+      { ...count, waiting: -1 },
+      { ...count, limit: 1.5 },
+      { ...count, warning: undefined },
+      { ...count, others: 3 },
+    ]) {
+      expect(YourTurnCount.safeParse(wrong).success, JSON.stringify(wrong)).toBe(false);
+    }
+    const list = { open: [row], archived: [], yourTurn: count };
+    expect(ConversationList.parse(list).yourTurn).toEqual(count);
+    expect(ConversationList.safeParse({ ...list, yourTurn: undefined }).success).toBe(false);
   });
 
   it("exports the person's own words and photos, and the other's as a kind, a time and a length only", () => {

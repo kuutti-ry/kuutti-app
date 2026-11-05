@@ -1,0 +1,137 @@
+# The queue's end with few people (#99, ADR-042, ADR-062 §10, #581): two groups,
+# each saying its words once as a heading over rows that show only the field and
+# how many more, each row still heard as its whole sentence. Riikka answers
+# smoking, unanswered until now, and keeps a deal-breaker on it that leaves out
+# those who did not answer: everybody in Riikka's pool, nobody there having
+# answered it. So the queue ends at once, with both ways of relaxing it on offer.
+# Nothing is tapped, and reading the offers relaxes nothing (a relaxation and its
+# undo are jest's and the API's). The deal-breaker and the answer are taken back,
+# so Riikka ends as the stories have it.
+# Riikka is a card of Iida's round, since only those five have anybody a filter can
+# leave out, and Iida's four are in Iida's log of the day from the reset on, where
+# no offer can add them. A card has no short button at the mock bank, hence
+# PERSONA_ON_CARD. The flow runs after `round`, so that one stopping half-way
+# cannot take a card from it, and it holds whatever `round` did: Iida has not
+# answered smoking either, and the others are still left out. A run that stops
+# half-way leaves the filter on Riikka: `pnpm demo:reset` first.
+appId: fi.kuutti.app
+name: With few people left, the queue's end offers the deal-breakers to relax for today in two groups, and reading them relaxes nothing
+---
+- runFlow:
+    file: ../common/sign-in.yaml
+    env:
+      PERSONA: Riikka Kivelä
+      PERSONA_ON_CARD: "true"
+# The person's own answer first: a deal-breaker waits for it (#149).
+- openLink: kuutti://profile/later/smoking
+- extendedWaitUntil:
+    visible:
+      text: "Never|En koskaan|Aldrig"
+      selected: false
+    timeout: 15000
+- waitForAnimationToEnd
+- tapOn: "Never|En koskaan|Aldrig"
+- scrollUntilVisible:
+    element: "Save and continue|Tallenna ja jatka|Spara och fortsätt"
+    direction: DOWN
+    centerElement: true
+    timeout: 60000
+- tapOn: "Save and continue|Tallenna ja jatka|Spara och fortsätt"
+- extendedWaitUntil:
+    notVisible: "Smoking|Tupakointi|Rökning"
+    timeout: 15000
+
+# The deal-breaker, with the switch for those who did not answer off (README: a
+# switch whose label repeats the words beside it). Going back saves it.
+- openLink: kuutti://profile/deal-breakers/smoking
+- extendedWaitUntil:
+    visible: "✓ Everyone|✓ Kaikki|✓ Alla"
+    timeout: 15000
+- waitForAnimationToEnd
+- tapOn: "Never|Ei koskaan|Aldrig"
+- tapOn:
+    text: "1|(Also people who did not answer|Myös ne, jotka eivät vastanneet|Även de som inte svarade), on"
+    rightOf: "Also people who did not answer|Myös ne, jotka eivät vastanneet|Även de som inte svarade"
+- extendedWaitUntil:
+    visible:
+      text: "0|(Also people who did not answer|Myös ne, jotka eivät vastanneet|Även de som inte svarade), off"
+      rightOf: "Also people who did not answer|Myös ne, jotka eivät vastanneet|Även de som inte svarade"
+    timeout: 15000
+- tapOn: "Back|Takaisin|Tillbaka"
+- extendedWaitUntil:
+    notVisible: "Fine with me|Sopii minulle|Okej för mig"
+    timeout: 15000
+
+# The save goes as the screen goes (useSaveOnLeave): read back before the queue,
+# which would fill the day's log with the very people the filter leaves out.
+- openLink: kuutti://profile/deal-breakers/smoking
+- extendedWaitUntil:
+    visible: "✓ Never|✓ Ei koskaan|✓ Aldrig"
+    timeout: 15000
+
+# The end of the queue, and under it the offers, read a moment after.
+- openLink: kuutti://round
+- extendedWaitUntil:
+    visible: "That's everybody for now\\.|Siinä kaikki tällä erää\\.|Det var alla för tillfället\\."
+    timeout: 15000
+- extendedWaitUntil:
+    visible: "Few people today|Tänään vähän ihmisiä|Få personer i dag"
+    timeout: 15000
+# Each way once, as a heading, those who did not answer first; a row under each,
+# which a screen reader hears whole. How many more is in the counter's steps: a
+# few, unless a population with faces (`demo:population -- --photos`) adds more.
+- assertVisible:
+    text: "Set aside for today|Jousta tänään|Släpp på för i dag"
+    below: "Include today those who did not answer|Ota tänään mukaan ne, jotka eivät vastanneet|Ta i dag med dem som inte svarade"
+- assertVisible:
+    text: "(Include those who did not answer|Ota mukaan ne, jotka eivät vastanneet|Ta med dem som inte svarade): (Smoking|Tupakointi|Rökning)\\. (A few more people|About \\d+ more people|Muutama ihminen lisää|Noin \\d+ ihmistä lisää|Några fler personer|Ungefär \\d+ fler personer)"
+    below: "Include today those who did not answer|Ota tänään mukaan ne, jotka eivät vastanneet|Ta i dag med dem som inte svarade"
+    above: "Set aside for today|Jousta tänään|Släpp på för i dag"
+- assertVisible:
+    text: "(Set aside for today|Jousta tänään|Släpp på för i dag): (Smoking|Tupakointi|Rökning)\\. (A few more people|About \\d+ more people|Muutama ihminen lisää|Noin \\d+ ihmistä lisää|Några fler personer|Ungefär \\d+ fler personer)"
+    below: "Set aside for today|Jousta tänään|Släpp på för i dag"
+# The sentence is the label alone: no row draws it as its first line any more. What a
+# row does draw only Android shows Maestro, since on iOS a labelled button exposes
+# its label alone (README).
+- assertNotVisible: "(Include those who did not answer|Ota mukaan ne, jotka eivät vastanneet|Ta med dem som inte svarade): (Smoking|Tupakointi|Rökning)"
+- assertNotVisible: "(Set aside for today|Jousta tänään|Släpp på för i dag): (Smoking|Tupakointi|Rökning)"
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - assertVisible: "Smoking|Tupakointi|Rökning"
+      - assertVisible: "A few more people|About \\d+ more people|Muutama ihminen lisää|Noin \\d+ ihmistä lisää|Några fler personer|Ungefär \\d+ fler personer"
+
+# Taken back, by way of home: the queue must not come into sight again with the
+# filter gone, or it would add those people to the day's log, where the next run's
+# offers could not find them.
+- openLink: kuutti://
+- extendedWaitUntil:
+    visible: "Your profile|Profiilisi|Din profil"
+    timeout: 15000
+- openLink: kuutti://profile/deal-breakers/smoking
+- extendedWaitUntil:
+    visible: "✓ Never|✓ Ei koskaan|✓ Aldrig"
+    timeout: 15000
+- waitForAnimationToEnd
+- tapOn: "Everyone|Kaikki|Alla"
+- assertVisible: "✓ Everyone|✓ Kaikki|✓ Alla"
+- tapOn: "Back|Takaisin|Tillbaka"
+- extendedWaitUntil:
+    notVisible: "Fine with me|Sopii minulle|Okej för mig"
+    timeout: 15000
+- openLink: kuutti://profile/later/smoking
+- extendedWaitUntil:
+    visible: "✓ Never|✓ En koskaan|✓ Aldrig"
+    timeout: 15000
+- waitForAnimationToEnd
+- tapOn: "✓ Never|✓ En koskaan|✓ Aldrig"
+- scrollUntilVisible:
+    element: "Save and continue|Tallenna ja jatka|Spara och fortsätt"
+    direction: DOWN
+    centerElement: true
+    timeout: 60000
+- tapOn: "Save and continue|Tallenna ja jatka|Spara och fortsätt"
+- extendedWaitUntil:
+    notVisible: "Smoking|Tupakointi|Rökning"
+    timeout: 15000

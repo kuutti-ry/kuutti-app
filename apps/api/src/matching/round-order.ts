@@ -4,15 +4,14 @@ import { bandBetween, inEachOthersPool, type PoolPerson } from "./pool.ts";
 import { softMatches } from "./soft.ts";
 
 /**
- * The places of a round that no rule forces (#95, ADR-035, the maintainer's
- * first cut of 20/10/2026): everybody in each other's pool, both ways
- * (rule 7), minus whom a hidden field keeps apart, the nearest band first
- * (ADR-061 §6: with one pond nothing else keeps people local), then the most
- * soft matches (approach 1, counted without weights), up to the round's size.
- * Equal counts are ordered by a hash of the day, the owner and the candidate: a
- * different order for every person and every day, and the same one whenever
- * that day's round is built again. Pure; which people may be candidates at
- * all (visible, let in, not cooling down) is the builder's to say.
+ * The queue's order past the likes waiting (#95, #502, ADR-035, ADR-062 §2):
+ * everybody in each other's pool, both ways (rule 7), minus whom a hidden field
+ * keeps apart, new people the nearest band first (ADR-061 §6: with one pond
+ * nothing else keeps people local), then the most soft matches (approach 1,
+ * counted without weights). Equal counts are ordered by a hash of the day, the
+ * owner and the candidate: a different order for every person and every day, and
+ * the same one whenever it is read again that day. Pure; which people may be
+ * candidates at all (visible, let in, not cooling down) is the builder's to say.
  */
 export type RoundCandidate = { id: string; person: PoolPerson };
 
@@ -27,8 +26,8 @@ export function hiddenByField(a: ProfileFields, b: ProfileFields): boolean {
   return (a.field ?? []).some((field) => theirs.has(field));
 }
 
-/** Whether the two may meet in a round at all: two people, in each other's pool both ways, no hidden field between them. */
-function mayMeet(owner: RoundCandidate, other: RoundCandidate): boolean {
+/** Whether the two may meet at all: two people, in each other's pool both ways, no hidden field between them. */
+export function mayMeet(owner: RoundCandidate, other: RoundCandidate): boolean {
   return (
     other.id !== owner.id &&
     inEachOthersPool(owner.person, other.person) &&
@@ -37,16 +36,16 @@ function mayMeet(owner: RoundCandidate, other: RoundCandidate): boolean {
 }
 
 /**
- * The round's first places (#97, TD-11): the people whose like waits on the
- * owner, in the order given (the oldest like first), whoever of them may
- * still meet the owner, up to `cap`. No order of any approach moves them.
+ * The queue's first places (#97, TD-11, ADR-062 §2): the people whose like
+ * waits on the owner, in the order given (fish first, then the oldest like
+ * first), whoever of them may still meet the owner. Nothing moves them, neither
+ * fit nor distance.
  */
 export function likedYouPlaces(
   owner: RoundCandidate,
   waiting: readonly RoundCandidate[],
-  cap: number,
 ): RoundCandidate[] {
-  return waiting.filter((other) => mayMeet(owner, other)).slice(0, Math.max(0, cap));
+  return waiting.filter((other) => mayMeet(owner, other));
 }
 
 /** The order among equal counts: the same for a day, an owner and a candidate, whenever it is asked. */
@@ -54,15 +53,20 @@ function tieOf(day: string, ownerId: string, candidateId: string): string {
   return createHash("sha256").update(`${day}\n${ownerId}\n${candidateId}`).digest("hex");
 }
 
-/** Somebody of an earlier round who may come back (#99, ADR-042 §1): when last shown, and whether last passed. */
-export type ComingBack = RoundCandidate & { lastShown: string; passed: boolean };
+/** Why somebody seen before comes back, in the order they do (ADR-062 §2). */
+const RETURNS = ["skipped", "passed", "liked", "ended"] as const;
+export type Return = (typeof RETURNS)[number];
+
+/** Somebody seen before who may come back (#99, ADR-042 §1): when last shown, and what they come back from. */
+export type ComingBack = RoundCandidate & { lastShown: string; from: Return };
 
 /**
- * The order in which earlier people come back once nobody new is left (#99,
- * ADR-042 §1, TD-12): those left undecided or liked first, then those passed
- * past the cooldown, each the one shown longest ago first, equal days in the
- * hash order; whoever of them may still meet the owner, up to the size. Pure;
- * who is past the cooldowns is the builder's to say.
+ * The order in which people come back once nobody new is left (#99, ADR-042 §1,
+ * TD-12, ADR-062 §2): skipped cards, then passed people, then people liked with
+ * no answer, then former conversations, each group the one shown longest ago
+ * first, equal days in the hash order; whoever of them may still meet the owner,
+ * up to the size. No band moves them. Pure; who is past their clock is the
+ * builder's to say.
  */
 export function comingBackOrder(
   owner: RoundCandidate,
@@ -74,7 +78,7 @@ export function comingBackOrder(
     .map((other) => ({ other, tie: tieOf(round.day, owner.id, other.id) }))
     .sort(
       (a, b) =>
-        Number(a.other.passed) - Number(b.other.passed) ||
+        RETURNS.indexOf(a.other.from) - RETURNS.indexOf(b.other.from) ||
         (a.other.lastShown < b.other.lastShown
           ? -1
           : a.other.lastShown > b.other.lastShown

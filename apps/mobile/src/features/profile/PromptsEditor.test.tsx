@@ -22,8 +22,8 @@ describe("PromptsEditor", () => {
     // How many of three hold an answer, and no heading of its own: the screen's names the prompts (#239).
     expect(screen.getByLabelText(`0 of ${PROMPTS_MAX} answered`)).toBeTruthy();
     expect(screen.getByText(`0/${PROMPTS_MAX}`)).toBeTruthy();
-    expect(screen.queryByText("Prompts")).toBeNull();
-    expect(screen.getByText("Add a prompt")).toBeTruthy();
+    expect(screen.queryByText("Questions")).toBeNull();
+    expect(screen.getByText("Add a question")).toBeTruthy();
     expect(
       screen.getAllByRole("button").filter((b) => b.props.accessibilityState?.selected === false),
     ).toHaveLength(PROMPT_KEYS.length);
@@ -60,7 +60,7 @@ describe("PromptsEditor", () => {
       { key: "hidden_talent", answer: "Whistling." },
     ]);
     await fireEvent.press(
-      screen.getByRole("button", { name: "Remove the prompt: My hidden talent" }),
+      screen.getByRole("button", { name: "Remove the question: My hidden talent" }),
     );
     expect(prompts).toEqual([{ key: "sunday", answer: "A long breakfast." }]);
     expect(screen.getByRole("button", { name: "My hidden talent" })).toBeTruthy();
@@ -69,7 +69,9 @@ describe("PromptsEditor", () => {
   it("offers nothing more to pick once three are taken", async () => {
     const three = PROMPT_KEYS.slice(0, PROMPTS_MAX).map((key) => ({ key, answer: "x" }));
     await show(three);
-    expect(screen.queryByText("Add a prompt")).toBeNull();
-    expect(screen.getAllByRole("button", { name: /^Remove the prompt/ })).toHaveLength(PROMPTS_MAX);
+    expect(screen.queryByText("Add a question")).toBeNull();
+    expect(screen.getAllByRole("button", { name: /^Remove the question/ })).toHaveLength(
+      PROMPTS_MAX,
+    );
   });
 });

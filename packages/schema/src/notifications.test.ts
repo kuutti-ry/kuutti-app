@@ -28,28 +28,30 @@ const notice = {
 };
 
 describe("the notification choices", () => {
-  it("are four kinds, in the order Settings lists them", () => {
-    expect(NotificationKind.options).toEqual(["round", "message", "match", "moderation"]);
+  it("are three kinds, in the order Settings lists them", () => {
+    expect(NotificationKind.options).toEqual(["message", "match", "moderation"]);
     expect(NotificationKindParams.parse({ kind: "match" })).toEqual({ kind: "match" });
     expect(codes(NotificationKindParams, { kind: "push" })).toEqual(["invalid_value"]);
+    // The round's went with its push (ADR-062 §12).
+    expect(codes(NotificationKindParams, { kind: "round" })).toEqual(["invalid_value"]);
   });
 
   it("take a boolean and nothing else", () => {
     expect(PutNotificationChoice.parse({ enabled: false })).toEqual({ enabled: false });
     expect(codes(PutNotificationChoice, { enabled: "no" })).toEqual(["invalid_type"]);
     expect(codes(PutNotificationChoice, {})).toEqual(["invalid_type"]);
-    expect(codes(PutNotificationChoice, { enabled: true, kind: "round" })).toEqual([
+    expect(codes(PutNotificationChoice, { enabled: true, kind: "match" })).toEqual([
       "unrecognized_keys",
     ]);
     const all = NotificationKind.options.map((kind) => ({ kind, enabled: true }));
-    expect(NotificationChoices.parse({ choices: all }).choices).toHaveLength(4);
+    expect(NotificationChoices.parse({ choices: all }).choices).toHaveLength(3);
     expect(codes(NotificationChoices, { choices: [...all, all[0]] })).toEqual(["too_big"]);
   });
 });
 
 describe("the notices", () => {
   it("carry a warning's reason, and no more than a screen of them", () => {
-    expect(NoticeKind.options).toEqual(["warning", "invitation_counted"]);
+    expect(NoticeKind.options).toEqual(["warning", "invitation_counted", "invitation_friend"]);
     expect(Notices.parse({ notices: [notice] }).notices).toEqual([notice]);
     expect(codes(Notices, { notices: [{ ...notice, reason: "rude" }] })).toEqual(["invalid_value"]);
     expect(codes(Notices, { notices: [{ ...notice, kind: "match" }] })).toEqual(["invalid_union"]);
@@ -64,7 +66,7 @@ describe("the notices", () => {
       kind: "invitation_counted",
       at,
       readAt: at,
-      reward: { fish: 1, likes: 0 },
+      reward: { fish: 1 },
     };
     expect(Notices.parse({ notices: [counted, notice] }).notices).toEqual([counted, notice]);
     const named = Notices.parse({ notices: [{ ...counted, invitee: "Sanna" }] }).notices[0];
@@ -74,11 +76,34 @@ describe("the notices", () => {
       codes(Notices, { notices: [{ ...counted, reward: undefined, reason: "other" }] }),
     ).toEqual(["invalid_type"]);
     const { reason: _reason, ...noReason } = notice;
-    expect(codes(Notices, { notices: [{ ...noReason, reward: { fish: 1, likes: 0 } }] })).toEqual([
+    expect(codes(Notices, { notices: [{ ...noReason, reward: { fish: 1 } }] })).toEqual([
       "invalid_value",
     ]);
-    expect(codes(Notices, { notices: [{ ...counted, reward: { fish: -1, likes: 0 } }] })).toEqual([
+    expect(codes(Notices, { notices: [{ ...counted, reward: { fish: -1 } }] })).toEqual([
       "too_small",
+    ]);
+  });
+
+  it("carry what the invitation a person used earned them, and never who invited them (#503)", () => {
+    const friend = {
+      id: notice.id,
+      kind: "invitation_friend",
+      at,
+      readAt: null,
+      reward: { fish: 2 },
+    };
+    expect(Notices.parse({ notices: [friend] }).notices).toEqual([friend]);
+    const named = Notices.parse({ notices: [{ ...friend, inviter: "Sanna" }] }).notices[0];
+    expect(named).toEqual(friend);
+    // Like a counted invitation's, it carries its reward and no reason.
+    expect(
+      codes(Notices, { notices: [{ ...friend, reward: undefined, reason: "other" }] }),
+    ).toEqual(["invalid_type"]);
+    expect(codes(Notices, { notices: [{ ...friend, reward: { fish: -1 } }] })).toEqual([
+      "too_small",
+    ]);
+    expect(codes(Notices, { notices: [{ ...friend, reward: { fish: 1.5 } }] })).toEqual([
+      "invalid_type",
     ]);
   });
 
@@ -87,12 +112,14 @@ describe("the notices", () => {
       choices: [{ kind: "message", enabled: false }],
       notices: [
         { kind: "warning", at, readAt: at, reason: "other" },
-        { kind: "invitation_counted", at, readAt: null, reward: { fish: 1, likes: 0 } },
+        { kind: "invitation_counted", at, readAt: null, reward: { fish: 1 } },
+        { kind: "invitation_friend", at, readAt: at, reward: { fish: 1 } },
       ],
     });
     expect(exported.notices).toEqual([
       { kind: "warning", at, readAt: at },
       { kind: "invitation_counted", at, readAt: null },
+      { kind: "invitation_friend", at, readAt: at },
     ]);
   });
 });
@@ -133,13 +160,14 @@ describe("a device's push token", () => {
 
 describe("a push's data", () => {
   it("names its kind and nothing else", () => {
-    for (const kind of ["message", "match", "round"] as const) {
+    for (const kind of ["message", "match"] as const) {
       expect(PushData.parse({ kind })).toEqual({ kind });
     }
   });
 
   it("refuses an unknown kind and anything besides the kind: a conversation, a text, a name", () => {
     expect(codes(PushData, { kind: "moderation" })).toEqual(["invalid_value"]);
+    expect(codes(PushData, { kind: "round" })).toEqual(["invalid_value"]);
     expect(codes(PushData, {})).toEqual(["invalid_value"]);
     // Both people's phones would carry the same conversation id (the maintainer's of 25/10/2026).
     expect(

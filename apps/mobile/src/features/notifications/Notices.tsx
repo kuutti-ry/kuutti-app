@@ -5,7 +5,6 @@ import { useCallback, useRef, useState } from "react";
 import { AccessibilityInfo, Platform, View } from "react-native";
 import { Button } from "@/components/ui/button";
 import { Text } from "@/components/ui/text";
-import { rewardParams } from "@/features/rewards";
 import { useT } from "@/lib/locale";
 import { useHapticTap } from "@/theme/haptics";
 import { fetchNotices, markNoticeRead } from "./client";
@@ -28,10 +27,16 @@ function wordsOf(notice: Notice, t: ReturnType<typeof useT>["t"]): { title: stri
       body: t("notices.warning.body", { reason: t(REASONS[notice.reason]) }),
     };
   }
-  // What the counted invitation earned, never who was invited (ADR-044 §9).
+  // What the counted invitation earned the person, never who the other was (ADR-044 §9).
+  if (notice.kind === "invitation_friend") {
+    return {
+      title: t("notices.invitationFriend.title"),
+      body: t("notices.invitationFriend.body", { fish: notice.reward.fish }),
+    };
+  }
   return {
     title: t("notices.invitationCounted.title"),
-    body: t("notices.invitationCounted.body", rewardParams(notice.reward)),
+    body: t("notices.invitationCounted.body", { fish: notice.reward.fish }),
   };
 }
 
@@ -74,8 +79,7 @@ export function Notices() {
     } catch {
       setFailed(notice.id);
       // Android's live region speaks it; iOS has none.
-      if (Platform.OS === "ios")
-        AccessibilityInfo.announceForAccessibility(t("notices.readFailed"));
+      if (Platform.OS === "ios") AccessibilityInfo.announceForAccessibility(t("load.failed.press"));
     }
   };
 
@@ -92,7 +96,7 @@ export function Notices() {
             <Text className="font-semibold">{words.title}</Text>
             <Text>{words.body}</Text>
             {failed === notice.id && (
-              <Text accessibilityLiveRegion="assertive">{t("notices.readFailed")}</Text>
+              <Text accessibilityLiveRegion="assertive">{t("load.failed.press")}</Text>
             )}
             <Button variant="outline" onPress={() => void read(notice)}>
               {t("notices.read")}

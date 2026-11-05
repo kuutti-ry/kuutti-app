@@ -25,19 +25,38 @@ const tIn = (locale: (typeof LOCALES)[number]) => typedT(createI18n({ locale }))
 
 describe("plurals in every language", () => {
   it.each([
-    ["en", 0, "Everyone has finished their profile."],
-    ["en", 1, "1 person is still finishing their profile."],
-    ["en", 2, "2 people are still finishing their profile."],
-    ["en", 1000, `1${nbsp}000 people are still finishing their profile.`],
-    ["fi", 0, "Kaikki ovat saaneet profiilinsa valmiiksi."],
-    ["fi", 1, "1 ihminen viimeistelee vielä profiiliaan."],
-    ["fi", 10, "10 ihmistä viimeistelee vielä profiiliaan."],
-    ["fi", 12345, `12${nbsp}345 ihmistä viimeistelee vielä profiiliaan.`],
-    ["sv", 0, "Alla har gjort klart sin profil."],
-    ["sv", 1, "1 person håller fortfarande på med sin profil."],
-    ["sv", 11, "11 personer håller fortfarande på med sin profil."],
+    ["en", 1, "1 person has completed their profile."],
+    ["en", 2, "2 people have completed their profiles."],
+    ["en", 1000, `1${nbsp}000 people have completed their profiles.`],
+    ["fi", 1, "1 ihminen on saanut profiilinsa valmiiksi."],
+    ["fi", 10, "10 ihmistä on saanut profiilinsa valmiiksi."],
+    ["fi", 12345, `12${nbsp}345 ihmistä on saanut profiilinsa valmiiksi.`],
+    ["sv", 1, "1 person har gjort klart sin profil."],
+    ["sv", 11, "11 personer har gjort klart sina profiler."],
   ] as const)("say %s for %i: %s", (locale, people, text) => {
-    expect(tIn(locale)("pond.counter.finishing", { people })).toBe(text);
+    expect(tIn(locale)("pond.counter.finished", { people })).toBe(text);
+  });
+
+  it.each([
+    ["en", 1, "1 person has completed their profile and is looking for:"],
+    ["en", 477, "477 people have completed their profiles and are looking for:"],
+    ["fi", 1, "1 ihminen on saanut profiilinsa valmiiksi ja etsii:"],
+    ["fi", 477, "477 ihmistä on saanut profiilinsa valmiiksi ja etsii:"],
+    ["sv", 1, "1 person har gjort klart sin profil och söker:"],
+    ["sv", 477, "477 personer har gjort klart sina profiler och söker:"],
+  ] as const)("lead into the bar of a pond in %s for %i: %s", (locale, people, text) => {
+    expect(tIn(locale)("pond.counter.seeks.finished", { people })).toBe(text);
+  });
+
+  it.each([
+    ["en", 0, "Conversations, nothing unread"],
+    ["en", 1, "Conversations, 1 unread message"],
+    ["fi", 0, "Keskustelut, ei lukemattomia"],
+    ["fi", 2, "Keskustelut, 2 lukematonta viestiä"],
+    ["sv", 0, "Samtal, inget oläst"],
+    ["sv", 2, "Samtal, 2 olästa meddelanden"],
+  ] as const)("take an exact zero for its own words in %s: %i", (locale, unread, text) => {
+    expect(tIn(locale)("home.chats.label", { unread })).toBe(text);
   });
 
   it.each([
@@ -69,7 +88,7 @@ describe("plurals in every language", () => {
   });
 
   it("format the numbers of a message with the language's grouping and a decimal comma", () => {
-    expect(tIn("en")("pond.counter.small", { k: 1200 })).toContain(`1${nbsp}200 people`);
+    expect(tIn("en")("pond.counter.seeks.men", { share: 1200 })).toBe(`1${nbsp}200 % men`);
     expect(tIn("en")("pond.counter.seeks.men", { share: 10.5 })).toBe("10,5 % men");
     expect(tIn("sv")("photos.count", { photos: 1, max: 6 })).toBe("1 foto, högst 6");
   });
@@ -89,7 +108,7 @@ describe("selects and fallbacks", () => {
     "fall back from %s to the English of an English-only key",
     (locale) => {
       expect(tIn(locale)("admin.queue.total", { total: 0 })).toBe("Nothing waiting");
-      expect(tIn(locale)("admin.queue.total", { total: 3 })).toBe("3 photos waiting");
+      expect(tIn(locale)("admin.queue.total", { total: 3 })).toBe("3 waiting");
     },
   );
 
@@ -233,7 +252,7 @@ describe("Stadi", () => {
     expect(tIn("fi")("round.like")).toBe("Tykkää");
   });
 
-  it.each([["load.retry"], ["legal.terms.title"], ["push.round"]] as const)(
+  it.each([["load.retry"], ["legal.terms.title"], ["push.match"]] as const)(
     "is the Finnish text where a key has none: %s",
     (key) => {
       expect(stadi(key)).toBe(tIn("fi")(key));

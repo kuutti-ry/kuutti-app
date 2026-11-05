@@ -3043,7 +3043,7 @@ export interface paths {
         };
         /**
          * What the caller may be notified of
-         * @description Every kind (a new round, a message, a match, a moderator's decision), in that order, each on unless the person switched it off. The push reads it for the round, a message and a match; nothing is sent for a moderator's decision yet.
+         * @description Every kind (a message, a match, a moderator's decision), in that order, each on unless the person switched it off. The push reads it for a message and a match; nothing is sent for a moderator's decision yet.
          */
         get: {
             parameters: {
@@ -3330,7 +3330,7 @@ export interface paths {
         };
         /**
          * The caller's invitations
-         * @description Whether the caller may invite (their profile is complete) and may still type a code, what an invitation earns today (matching_config invitation_reward), their open invitations newest first, how many of theirs have counted, and what those earned that is not used yet. Never a code, and nothing of anybody invited.
+         * @description Whether the caller may invite (their profile is complete) and may still type a code, what an invitation earns today (matching_config invitation_reward), their open invitations newest first, how many of theirs have counted, and what invitations earned them that is not used yet. Never a code, and nothing of anybody invited.
          */
         get: {
             parameters: {
@@ -3373,7 +3373,7 @@ export interface paths {
         put?: never;
         /**
          * Make an invitation
-         * @description A code for one friend, in two groups of five, shown here once: Kuutti keeps only its hash. For a caller whose profile is complete; at most matching_config invitations_open open at once. The night the friend's profile first passes the same test, the invitation counts and the caller earns matching_config invitation_reward.
+         * @description A code for one friend, in two groups of five, shown here once: Kuutti keeps only its hash. For a caller whose profile is complete; at most matching_config invitations_open open at once. The night the friend's profile first passes the same test, the invitation counts and the two earn matching_config invitation_reward.
          */
         post: {
             parameters: {
@@ -6201,7 +6201,7 @@ export interface paths {
         };
         /**
          * The pond counter
-         * @description Per pond: bank-verified people with the pond as theirs, their split by self-declared gender, and how many are finishing their profile. A number is published only where at least k people stand behind it (k is in the answer), the split only when every cell is at least k, and a pond's numbers move only once at least k people have come or gone since they were last said. Counted once a day. No session needed. With one, the answer is the caller's and is not cached, and the caller's own pond also says whom its people seek: whole percentages of three bands of finished profiles, those who seek men, those who seek both women and men, and those who seek women, null until every band holds at least k people.
+         * @description Per pond: how many bank-verified people with the pond as theirs have completed their profiles. The number is published only where at least k people stand behind it (k is in the answer), and it moves only once at least k people have come or gone since it was last said. Counted once a day. No session needed. With one, the answer is the caller's and is not cached, and the caller's own pond also says whom its people seek: percentages in steps of five of three bands of finished profiles, those who seek men, those who seek both women and men, and those who seek women, null until every band holds at least k people.
          */
         get: {
             parameters: {
@@ -6318,8 +6318,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Today's round
-         * @description The Finnish day and its cards in order, each with why it is there, how far its person lives as it stood when the entry was written, and the caller's own decision. The first read of a day builds the caller's round once their matching has opened; entries null while they have none, an empty list for a round with nobody to show. A card that cannot be shown now is left out. fishToSend says whether the fish's budget lets the caller send one today, one of matching_config fish_budget in the calendar week (fish_window_days counted from a Monday) or an earned one, never how many. likesLeft says how many of the day's likes the caller has left, from matching_config like_budget_balanced down to zero, by the count that refuses a like. Serving a card writes the shown record and counts against matching_config exposure_cards_per_day (ADR-008).
+         * The next cards of the queue
+         * @description The Finnish day and the next cards to go through, at most ten, in order: likes waiting, then new people, then people coming back. Each says why it is there and how far its person lives as it stood when the entry was written. With nothing left to go through a read adds the next people; entries null while the caller's matching has not opened, an empty list at the queue's end. A card that cannot be shown now, a filter of either side included, is left out. fishToSend says whether the fish's budget lets the caller send one today, one of matching_config fish_budget in the calendar week (fish_window_days counted from a Monday) or an earned one, never how many. likesLeft says how many of the day's likes the caller has left, from matching_config like_budget_balanced down to zero, by the count that refuses a like. yourTurn says how many conversations wait on the caller's answer. Serving a card writes the shown record and counts against matching_config exposure_cards_per_day, where that is not 0 (ADR-008, ADR-062).
          */
         get: {
             parameters: {
@@ -6330,7 +6330,7 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                /** @description Today's round. */
+                /** @description The next cards. */
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -6417,7 +6417,7 @@ export interface paths {
                         "application/json": components["schemas"]["ErrorResponse"];
                     };
                 };
-                /** @description not_found: no round today, no card at that place, a card that can no longer be shown, or a day not begun. */
+                /** @description not_found: no round today, no card at that place, a card that can no longer be shown (a block, a sanction, or for a like a filter of either side), or a day not begun. */
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -6452,8 +6452,8 @@ export interface paths {
         };
         get?: never;
         /**
-         * Like or pass a card
-         * @description Recorded, or replacing the day's earlier decision on the card; the same decision again writes nothing. A day that has ended answers round_expired. A like counts against the day's matching_config like_budget_balanced, except one on a liked_you or fish card; a pass never does. A like of somebody whose like of the caller stands is a match: the answer names its conversation, and that like is final. A fish is a like with a mark, matching_config fish_budget of them in each fish_window_days counted from a Monday, the calendar week; on a liked_you or fish card it is a like. Past either budget, a like or a fish the caller's invitations earned is used by itself, left out of the counts after, and given back when the decision changes the same day. The answer's fishToSend and likesLeft are the round's after this decision.
+         * Like, pass or skip a card
+         * @description Recorded, or replacing the day's earlier decision on the card; the same decision again writes nothing. A day that has ended answers round_expired. A skip moves on, spends nothing and answers no like; the card returns another day. A like counts against the day's matching_config like_budget_balanced, a like back on a liked_you or fish card too; a pass or a skip never does. A new like or fish answers your_turn_limit with matching_config your_turn_limit conversations waiting on the caller, and not_found where either side's filters no longer let the two meet. A like of somebody whose like of the caller stands is a match: the answer names its conversation, and that like is final. A fish is a like with a mark, matching_config fish_budget of them in each fish_window_days counted from a Monday, the calendar week; on a liked_you or fish card it is a like. Past the fish's budget, a fish invitations earned the caller is used by itself, left out of the count after, and given back when the decision changes the same day. The answer's fishToSend, likesLeft and yourTurn are the queue's after this decision.
          */
         put: {
             parameters: {
@@ -6471,7 +6471,7 @@ export interface paths {
                 };
             };
             responses: {
-                /** @description Recorded, with the conversation the card's like is part of, or null for a pass and a like that made no match. */
+                /** @description Recorded, with the conversation the card's like is part of, or null for a pass, a skip and a like that made no match. */
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -6498,7 +6498,7 @@ export interface paths {
                         "application/json": components["schemas"]["ErrorResponse"];
                     };
                 };
-                /** @description not_found: no round today, no card at that place, a card that can no longer be shown, or a day not begun. */
+                /** @description not_found: no round today, no card at that place, a card that can no longer be shown (a block, a sanction, or for a like a filter of either side), or a day not begun. */
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -6507,7 +6507,7 @@ export interface paths {
                         "application/json": components["schemas"]["ErrorResponse"];
                     };
                 };
-                /** @description round_expired: the day named has ended; match_made: the card's like made a match and stays. Nothing was written. */
+                /** @description round_expired: the day named has ended; match_made: the card's like made a match and stays; your_turn_limit: too many conversations wait on the caller's answer. Nothing was written. */
                 409: {
                     headers: {
                         [name: string]: unknown;
@@ -6516,7 +6516,7 @@ export interface paths {
                         "application/json": components["schemas"]["ErrorResponse"];
                     };
                 };
-                /** @description like_budget_exceeded: the day's likes are used up and no earned like is left, Retry-After the wait until the day rolls; fish_budget_exceeded: matching_config fish_budget fish were sent within the period and no earned fish is left, Retry-After the wait until the midnight that begins the next period, a Monday's. Nothing was written. */
+                /** @description like_budget_exceeded: the day's likes are used up, Retry-After the wait until the day rolls; fish_budget_exceeded: matching_config fish_budget fish were sent within the period and no earned fish is left, Retry-After the wait until the midnight that begins the next period, a Monday's. Nothing was written. */
                 429: {
                     headers: {
                         [name: string]: unknown;
@@ -6543,7 +6543,7 @@ export interface paths {
         };
         /**
          * What today's round may relax, and what is relaxed
-         * @description For a short round (fewer ordered places than matching_config round_size, the liked-you and fish places aside), every deal-breaker of the caller's that is not paused and not relaxed today, each way it can be relaxed for the day: unanswered (let through those who did not answer its field) and aside (set it aside), each listed only when it would add somebody today, with more: how much it widens the caller's pool, rounded down to a step of matching_config pond_counter_k. Counted on asking. Also the relaxations in force today. Never another filter (ADR-042).
+         * @description Once no new person is left in the queue, every deal-breaker of the caller's that is not paused and not relaxed today, each way it can be relaxed for the day: unanswered (let through those who did not answer its field) and aside (set it aside), each listed only when it would add somebody today, with more: how much it widens the caller's pool, rounded down to a step of matching_config pond_counter_k. Counted on asking. Also the relaxations in force today. Never another filter (ADR-042).
          */
         get: {
             parameters: {
@@ -6606,7 +6606,7 @@ export interface paths {
         put?: never;
         /**
          * Relax a deal-breaker for today
-         * @description One of the caller's own deal-breakers loosened for the day only: the people it lets in today are added after the round's last place, as many as the room left (round_size less the ordered places), new people first, reason relaxed with the field. Tomorrow's round is built from the filters as stored. The answer is the cards added, served as the round's read serves them (ADR-008).
+         * @description One of the caller's own deal-breakers loosened for the day only: the people it lets in today join the queue, new people first, reason relaxed with the field. Tomorrow's queue reads the filters as stored. The answer is the first cards added, at most ten, served as a read serves them (ADR-008); the next read goes on to the rest.
          */
         post: {
             parameters: {
@@ -6763,6 +6763,275 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/stars": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The people the caller starred
+         * @description Those who may be shown now, the latest star first and in no other order: both people's filters, the accounts' state and the inbox stop are asked on every read, and whoever does not pass is left out with no word why. Each with a name, an age and the main one of the photos the caller was shown, whose thumb is asked for as any photo's. It serves no card and signs no photo.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The list, perhaps empty. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["StarList"];
+                    };
+                };
+                /** @description unauthenticated, session_expired or session_revoked. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/rounds/{day}/entries/{position}/star": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Put a star on a card
+         * @description Marks the card's person for later: it spends nothing and decides nothing, and the same star again answers the one that stands. It reaches nobody. A card holding a like or a pass takes none. first says this is the only star the list shows.
+         */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    day: string;
+                    position: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The star, and whether it is the first. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["StarAnswer"];
+                    };
+                };
+                /** @description Validation failed. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description unauthenticated, session_expired or session_revoked. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description not_found: no such card in today's round, one that can no longer be shown, or one holding a like or a pass. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description round_expired: the day named has ended; stars_full: the list shows matching_config stars_max people. Nothing was written. */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/stars/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Take a star off
+         * @description The person comes back to the queue where it would have them. Nobody is told, and nothing else changes.
+         */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Taken off. */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Validation failed. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description unauthenticated, session_expired or session_revoked. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description not_found: no such star of the caller's. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/stars/{id}/open": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Open a starred person's card
+         * @description The card comes into today's log, or as it stands there, so it is reported seen and decided by its day and place as any card is, spending what those spend anywhere else. Answered as a read of the queue is, with that one card, served as a read serves one (ADR-008, ADR-041).
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The card. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["RoundResponse"];
+                    };
+                };
+                /** @description Validation failed. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description unauthenticated, session_expired or session_revoked. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description not_found: no such star of the caller's, or somebody the list leaves out now. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description card_budget_exceeded: the day's cards are used up; Retry-After is the wait until the day rolls. */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/preferences/deal-breakers": {
         parameters: {
             query?: never;
@@ -6805,7 +7074,7 @@ export interface paths {
         };
         /**
          * Set the caller's deal-breakers
-         * @description The whole set, at most `max`, each on a distinct whitelisted field the person has answered themselves, accepting options the field has. One on distance has no field: it accepts the bands up to nearby, close or around, and lets through those who did not answer whatever the request says, since nobody can leave it unanswered. Hard rows: #87 applies them in the pool, both ways.
+         * @description The whole set, at most `max`, each on a distinct whitelisted field the person has answered themselves, accepting options the field has. A person already past a lowered `max` may still remove or change what they hold; only a new field past it is refused. One on distance has no field: it accepts the bands up to nearby, close or around, and lets through those who did not answer whatever the request says, since nobody can leave it unanswered. Hard rows: #87 applies them in the pool, both ways.
          */
         put: {
             parameters: {
@@ -6829,7 +7098,7 @@ export interface paths {
                         "application/json": components["schemas"]["DealBreakersResponse"];
                     };
                 };
-                /** @description Validation failed: more than allowed, a field twice, an answer the field has not, or bands that do not run up to one. */
+                /** @description Validation failed: a new field past what is allowed, a field twice, an answer the field has not, or bands that do not run up to one. */
                 400: {
                     headers: {
                         [name: string]: unknown;
@@ -7009,8 +7278,6 @@ export interface components {
                 home: {
                     place: string;
                     shownOnCard: string;
-                    /** Format: date-time */
-                    movedAt: string | null;
                 } | null;
                 /** Format: date-time */
                 genderChangedAt: string | null;
@@ -7078,6 +7345,7 @@ export interface components {
             contacts: components["schemas"]["StoredContact"][];
             notifications: components["schemas"]["ExportedNotifications"];
             rounds: components["schemas"]["ExportedRounds"];
+            stars: components["schemas"]["ExportedStars"];
             invitations: components["schemas"]["ExportedInvitations"];
         };
         /** @enum {string|null} */
@@ -7439,9 +7707,9 @@ export interface components {
             enabled: boolean;
         };
         /** @enum {string} */
-        NotificationKind: "round" | "message" | "match" | "moderation";
+        NotificationKind: "message" | "match" | "moderation";
         /** @enum {string} */
-        NoticeKind: "warning" | "invitation_counted";
+        NoticeKind: "warning" | "invitation_counted" | "invitation_friend";
         ExportedRounds: {
             /** @description What this part is, in the request's language. */
             about: string;
@@ -7481,15 +7749,24 @@ export interface components {
             decisionInWords: string | null;
             /** Format: date-time */
             decidedAt: string | null;
+            secondPass: boolean;
             distance: components["schemas"]["DistanceBand"];
             distanceInWords: string | null;
         };
         /** @enum {string} */
         RoundReason: "matches_filters" | "liked_you" | "seen_before" | "relaxed" | "fish";
         /** @enum {string|null} */
-        RoundChoice: "like" | "pass" | "fish" | null;
+        RoundChoice: "like" | "pass" | "fish" | "skip" | null;
         /** @enum {string|null} */
         DistanceBand: "nearby" | "close" | "around" | "far" | null;
+        ExportedStars: {
+            /** @description What this part is, in the request's language. */
+            about: string;
+            items: {
+                /** Format: date-time */
+                at: string;
+            }[];
+        };
         ExportedInvitations: {
             made: {
                 /** Format: date-time */
@@ -7515,7 +7792,7 @@ export interface components {
         /** @enum {string} */
         InvitationState: "open" | "redeemed" | "counted";
         /** @enum {string} */
-        RewardKind: "like" | "fish";
+        RewardKind: "fish";
         HealthResponse: {
             /**
              * @description ok when the database answers and migrations are current; degraded otherwise.
@@ -7980,7 +8257,7 @@ export interface components {
         Notices: {
             notices: components["schemas"]["Notice"][];
         };
-        Notice: components["schemas"]["WarningNotice"] | components["schemas"]["InvitationCountedNotice"];
+        Notice: components["schemas"]["WarningNotice"] | components["schemas"]["InvitationCountedNotice"] | components["schemas"]["InvitationFriendNotice"];
         WarningNotice: {
             /** Format: uuid */
             id: string;
@@ -8011,7 +8288,20 @@ export interface components {
         };
         RewardUnits: {
             fish: number;
-            likes: number;
+        };
+        InvitationFriendNotice: {
+            /** Format: uuid */
+            id: string;
+            /** Format: date-time */
+            at: string;
+            /** Format: date-time */
+            readAt: string | null;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "invitation_friend";
+            reward: components["schemas"]["RewardUnits"];
         };
         PushTokenRequest: {
             token: string;
@@ -8024,15 +8314,14 @@ export interface components {
             redeemable: boolean;
             /** @description What an invitation earns today (matching_config invitation_reward), for the app's words. */
             reward: {
-                fish: number;
-                likes: number;
+                inviterFish: number;
+                friendFish: number;
             };
             open: components["schemas"]["OpenInvitation"][];
             counted: number;
-            /** @description What the person's invitations earned that is not used yet. */
+            /** @description What invitations earned the person that is not used yet, theirs and the one they used. */
             earned: {
                 fish: number;
-                likes: number;
             };
         };
         OpenInvitation: {
@@ -8056,6 +8345,7 @@ export interface components {
         ConversationList: {
             open: components["schemas"]["ConversationSummary"][];
             archived: components["schemas"]["ConversationSummary"][];
+            yourTurn: components["schemas"]["YourTurnCount"];
         };
         ConversationSummary: {
             /** Format: uuid */
@@ -8065,6 +8355,7 @@ export interface components {
             counterpart: components["schemas"]["Counterpart"];
             lastMessage: components["schemas"]["LastMessage"];
             unread: number;
+            yourTurn: boolean;
         };
         Counterpart: components["schemas"]["CounterpartPerson"] | components["schemas"]["CounterpartDeleted"] | null;
         CounterpartPerson: {
@@ -8097,6 +8388,11 @@ export interface components {
         } | null;
         /** @enum {string} */
         MessageSide: "mine" | "theirs";
+        YourTurnCount: {
+            waiting: number;
+            limit: number;
+            warning: number;
+        };
         ConversationDetail: {
             /** Format: uuid */
             id: string;
@@ -8105,6 +8401,7 @@ export interface components {
             counterpart: components["schemas"]["Counterpart"];
             lastMessage: components["schemas"]["LastMessage"];
             unread: number;
+            yourTurn: boolean;
             limits: {
                 maxLength: number;
             };
@@ -8575,16 +8872,9 @@ export interface components {
             pond: components["schemas"]["PondSummary"];
             /** Format: date */
             day: string | null;
-            verified: number | null;
-            split: components["schemas"]["PondCounterSplit"];
-            finishing: number | null;
+            finished: number | null;
             seeks: components["schemas"]["PondSeeks"];
         };
-        PondCounterSplit: {
-            woman: number;
-            man: number;
-            nonBinary: number;
-        } | null;
         PondSeeks: {
             men: number;
             everyone: number;
@@ -8601,6 +8891,7 @@ export interface components {
             entries: components["schemas"]["RoundEntry"][] | null;
             fishToSend: boolean;
             likesLeft: number;
+            yourTurn: number;
         };
         RoundEntry: {
             position: number;
@@ -8608,6 +8899,8 @@ export interface components {
             decision: components["schemas"]["RoundChoice"];
             card: components["schemas"]["ProfileCard"];
             distance: components["schemas"]["DistanceBand"];
+            /** Format: uuid */
+            star: string | null;
             relaxedField?: components["schemas"]["DealBreakerField"];
             notAnswered?: components["schemas"]["DealBreakerField"][];
         };
@@ -8618,6 +8911,7 @@ export interface components {
             } | null;
             fishToSend: boolean;
             likesLeft: number;
+            yourTurn: number;
         };
         RoundDecisionUpdate: {
             decision: components["schemas"]["RoundChoice"];
@@ -8641,6 +8935,25 @@ export interface components {
         };
         RelaxationUndone: {
             removed: number[];
+        };
+        StarList: {
+            items: components["schemas"]["StarredPerson"][];
+        };
+        StarredPerson: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            age: number;
+            photo: {
+                /** Format: uuid */
+                id: string;
+                blurhash: string;
+            } | null;
+        };
+        StarAnswer: {
+            /** Format: uuid */
+            id: string;
+            first: boolean;
         };
         DealBreakersResponse: {
             dealBreakers: components["schemas"]["StoredDealBreaker"][];

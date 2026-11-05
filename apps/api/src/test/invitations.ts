@@ -58,14 +58,14 @@ export async function invitationOf(
 }
 
 /**
- * Units the person earned, as the night's count leaves them: an invitation of
+ * Fish the person earned, as the night's count leaves them: an invitation of
  * theirs redeemed by a person of its own and counted, with one row a unit.
  * The invitation's id.
  */
 export async function earnedUnits(
   db: Queryable,
   accountId: string,
-  units: { fish?: number; likes?: number },
+  units: { fish: number },
   at: Date = new Date(),
 ): Promise<string> {
   const identity = await db.query<{ id: string }>(
@@ -83,15 +83,13 @@ export async function earnedUnits(
   });
   await db.query(
     `INSERT INTO reward (account_id, kind, invitation_id, earned_at)
-     SELECT $1, k.kind::reward_kind, $2, $3
-       FROM (SELECT 'fish' AS kind FROM generate_series(1, $4::int)
-             UNION ALL SELECT 'like' FROM generate_series(1, $5::int)) AS k`,
-    [accountId, invitationId, at, units.fish ?? 0, units.likes ?? 0],
+     SELECT $1, 'fish', $2, $3 FROM generate_series(1, $4::int)`,
+    [accountId, invitationId, at, units.fish],
   );
   return invitationId;
 }
 
-/** The person's units as stored, oldest first, fish before likes of one time: what each is and whether, and on what, it was spent. */
+/** The person's units as stored, oldest first: what each is and whether, and on what, it was spent. */
 export async function unitsOf(
   db: Queryable,
   accountId: string,
@@ -102,7 +100,7 @@ export async function unitsOf(
     spent_entry_id: string | null;
   }>(
     `SELECT kind, spent_at, spent_entry_id FROM reward
-      WHERE account_id = $1 ORDER BY earned_at, kind::text, id`,
+      WHERE account_id = $1 ORDER BY earned_at, id`,
     [accountId],
   );
   return rows.map((row) => ({

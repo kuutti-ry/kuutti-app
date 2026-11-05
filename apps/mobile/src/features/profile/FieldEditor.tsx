@@ -13,6 +13,7 @@ import EyeOff from "lucide-react-native/icons/eye-off";
 import type React from "react";
 import { useState } from "react";
 import { AccessibilityInfo, View } from "react-native";
+import { Choice } from "@/components/Choice";
 import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
 import { Input } from "@/components/ui/input";
@@ -32,6 +33,14 @@ import { fieldLabelKey, optionKey } from "./keys";
  * over them was overkill (the maintainer, #239).
  */
 export const SEARCHABLE_FROM = 14;
+
+/**
+ * On a screen that asks one thing, a list of up to this many options stands as
+ * whole-width rows, one after another, as on I found someone (the maintainer,
+ * 04/11/2026): as chips, six filled a third of the screen and left the rest
+ * empty. A section with several fields and a longer list keep chips.
+ */
+export const ROWS_UP_TO = 8;
 
 /**
  * The options a picker shows (#239): with something typed, every option whose
@@ -90,15 +99,15 @@ export function optionTextKey(
 /** One choice: a button that says whether it is chosen, never a colour alone. */
 export function Chip({
   label,
-  heard,
   selected,
+  disabled,
   onPress,
   glyph,
 }: {
   label: string;
-  /** What a screen reader says where the label alone would not tell two chips apart. */
-  heard?: string;
   selected: boolean;
+  /** Read-only: says what stands and cannot be pressed (a paused deal-breaker's answers, #551). */
+  disabled?: boolean;
   onPress: () => void;
   /** A decorative glyph before the label (#213); the label still names the button. */
   glyph?: React.ReactNode;
@@ -108,7 +117,7 @@ export function Chip({
     return (
       <Button
         variant={variant}
-        accessibilityLabel={heard}
+        disabled={disabled}
         accessibilityState={{ selected }}
         onPress={onPress}
       >
@@ -212,9 +221,10 @@ function FieldHeading({
 /**
  * One field of the registry as the person answers it (#47, #148, ADR-019):
  * choices as chips, with a search box over a long list, the first languages
- * before it and the hobbies in their groups; a number as a stepper; a short
- * text; a setting as a switch; with its title, what the card does with the
- * answer (FieldHeading).
+ * before it and the hobbies in their groups, or as whole-width rows where it
+ * is what its screen asks (`alone`) and the list is short; a number as a
+ * stepper; a short text; a setting as a switch; with its title, what the card
+ * does with the answer (FieldHeading).
  * Nothing here is particular to a field beyond the widget its kind asks for
  * and the one adaptive text of the sheet. The profile screen and the later
  * screens share it; the draft and its update are the caller's.
@@ -223,10 +233,13 @@ export function FieldEditor({
   field,
   draft,
   update,
+  alone = false,
 }: {
   field: ProfileFieldKey;
   draft: Draft;
   update: Update;
+  /** What its screen asks, with at most a companion, not one field of a section's several. */
+  alone?: boolean;
 }) {
   const { t, locale } = useT();
   const tap = useHapticTap();
@@ -262,13 +275,39 @@ export function FieldEditor({
     );
   }
 
-  const chip = (option: string) => {
+  const rows =
+    alone && (spec.kind === "single" || spec.kind === "multi") && spec.options.length <= ROWS_UP_TO;
+  const choice = (option: string) => {
     const selected =
       spec.kind === "multi" ? Array.isArray(value) && value.includes(option) : value === option;
+    const words = t(optionTextKey(field, option, draft.fields));
+    const press = () => {
+      tap();
+      if (spec.kind === "multi") {
+        const next = toggled(chosen, option, spec);
+        if (!seen.includes(option)) setSeen([...seen, option]);
+        setField(next.length > 0 ? next : undefined);
+      } else if (!selected || spec.role !== "hard") {
+        // A hard answer changes and never clears: without what one is here
+        // for, the person is back in onboarding (#542).
+        setField(selected ? undefined : option);
+      }
+    };
+    if (rows) {
+      return (
+        <Choice
+          key={option}
+          label={words}
+          chosen={selected}
+          several={spec.kind === "multi"}
+          onPress={press}
+        />
+      );
+    }
     return (
       <Chip
         key={option}
-        label={t(optionTextKey(field, option, draft.fields))}
+        label={words}
         selected={selected}
         glyph={
           optionGlyph(field, option) && (
@@ -279,18 +318,7 @@ export function FieldEditor({
             />
           )
         }
-        onPress={() => {
-          tap();
-          if (spec.kind === "multi") {
-            const next = toggled(chosen, option, spec);
-            if (!seen.includes(option)) setSeen([...seen, option]);
-            setField(next.length > 0 ? next : undefined);
-          } else if (!selected || spec.role !== "hard") {
-            // A hard answer changes and never clears: without what one is here
-            // for, the person is back in onboarding (#542).
-            setField(selected ? undefined : option);
-          }
-        }}
+        onPress={press}
       />
     );
   };
@@ -311,7 +339,7 @@ export function FieldEditor({
             maxLength={spec.maxLength}
             onChangeText={(text) => setField(text.length > 0 ? text : undefined)}
           />
-          <Text variant="muted">{t("profile.text.hint", { max: spec.maxLength })}</Text>
+          <Text variant="muted">{t("profile.text.hint")}</Text>
         </>
       )}
       {spec.kind === "number" && (
@@ -337,7 +365,7 @@ export function FieldEditor({
           />
           {typeof value === "number" && (
             <Button
-              variant="ghost"
+              variant="outline"
               onPress={() => {
                 tap();
                 setField(undefined);
@@ -348,7 +376,16 @@ export function FieldEditor({
           )}
         </>
       )}
-      {(spec.kind === "single" || spec.kind === "multi") && (
+      {rows && (
+        <View
+          accessibilityRole={spec.kind === "single" ? "radiogroup" : undefined}
+          accessibilityLabel={spec.kind === "single" ? label : undefined}
+          className="gap-2"
+        >
+          {(spec.options as readonly string[]).map(choice)}
+        </View>
+      )}
+      {!rows && (spec.kind === "single" || spec.kind === "multi") && (
         <>
           {spec.options.length >= SEARCHABLE_FROM && (
             <Input
@@ -367,12 +404,12 @@ export function FieldEditor({
                 return (
                   <View key={group} className="gap-1">
                     <HobbyGroupLabel group={group} />
-                    <View className="flex-row flex-wrap gap-2">{options.map(chip)}</View>
+                    <View className="flex-row flex-wrap gap-2">{options.map(choice)}</View>
                   </View>
                 );
               })}
               {matches("other") && (
-                <View className="flex-row flex-wrap gap-2">{chip("other")}</View>
+                <View className="flex-row flex-wrap gap-2">{choice("other")}</View>
               )}
             </View>
           ) : (
@@ -383,7 +420,7 @@ export function FieldEditor({
                 [...chosen, ...seen],
                 search,
                 (option) => t(optionTextKey(field, option, draft.fields)),
-              ).map(chip)}
+              ).map(choice)}
             </View>
           )}
         </>

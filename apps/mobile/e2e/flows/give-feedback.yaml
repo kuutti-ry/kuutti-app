@@ -16,6 +16,7 @@ name: Feedback sent from Settings is thanked, the kind chosen in words
     env:
       ROW: "Give feedback|Anna palautetta|Ge respons"
       INSIDE: "What is it about\\?|Mistä on kyse\\?|Vad gäller det\\?"
+- assertVisible: "The moderators see that it came from your account; nobody else does\\. Nobody is mailed\\.|Moderaattorit näkevät, että viesti tuli tililtäsi; kukaan muu ei näe\\. Kenellekään ei lähetetä sähköpostia\\.|Moderatorerna ser att det kom från ditt konto; ingen annan gör det\\. Ingen får e-post\\."
 # The kind is a radio button whose label ticks it in words, never a colour alone.
 - tapOn: "An idea|Idea|En idé"
 - assertVisible: "✓ An idea|✓ Idea|✓ En idé"
@@ -30,7 +31,7 @@ name: Feedback sent from Settings is thanked, the kind chosen in words
 - extendedWaitUntil:
     visible: "Thank you|Kiitos|Tack"
     timeout: 15000
-- assertVisible: "The moderators will read it\\. Nobody is mailed\\.|Moderaattorit lukevat sen\\. Kenellekään ei lähetetä sähköpostia\\.|Moderatorerna läser den\\. Ingen får e-post\\."
+- assertVisible: "Send more|Lähetä lisää|Skicka mer"
 - runFlow:
     file: ../common/close-settings-row.yaml
     env:

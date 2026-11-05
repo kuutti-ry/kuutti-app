@@ -2,7 +2,7 @@
 # button, and shown on the card in its header after the gender; it is never
 # used for matching. Eetu, who turned 18 last month, is a newcomer; the flow
 # stops at whom he seeks, so one run per `pnpm demo:reset`, and the refusal
-# flow's welcome check still holds for him.
+# flow's check that Eetu reaches onboarding still holds.
 appId: fi.kuutti.app
 name: A label chosen after non-binary shows on the card after the gender
 ---
@@ -20,7 +20,9 @@ name: A label chosen after non-binary shows on the card after the gender
 - extendedWaitUntil:
     visible: "What should we call you\\?|Miksi sinua kutsutaan\\?|Vad ska vi kalla dig\\?"
     timeout: 15000
-- tapOn: "Name on your card|Nimi kortillasi|Namn på ditt kort"
+# The field, below its name drawn over it (#581); an empty field has no text to match.
+- tapOn:
+    below: "Name on your card|Nimi kortillasi|Namn på ditt kort"
 - inputText: "Eetu"
 # A tap on the question, which is no button, closes the keyboard (README, the keyboard).
 - tapOn: "What should we call you\\?|Miksi sinua kutsutaan\\?|Vad ska vi kalla dig\\?"
@@ -33,13 +35,17 @@ name: A label chosen after non-binary shows on the card after the gender
 - extendedWaitUntil:
     visible: "A word for it, if you like|Sana sille, jos haluat|Ett ord för det, om du vill"
     timeout: 15000
+# Under the label's seven whole-width rows (#581), near the screen's bottom edge.
+- scrollUntilVisible:
+    element: "Continue|Jatka|Fortsätt"
+    direction: DOWN
+    centerElement: true
+    timeout: 60000
 - assertVisible:
     text: "Continue|Jatka|Fortsätt"
     enabled: false
 - tapOn: "Genderqueer"
-- assertVisible:
-    text: "Genderqueer"
-    selected: true
+- assertVisible: "✓ Genderqueer"
 - tapOn: "Continue|Jatka|Fortsätt"
 - extendedWaitUntil:
     visible: "Whom are you looking for\\?|Ketä etsit\\?|Vem söker du\\?"

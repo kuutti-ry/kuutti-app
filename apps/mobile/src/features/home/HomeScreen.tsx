@@ -10,7 +10,7 @@ import { Ink } from "@/components/ui/ink";
 import { Text } from "@/components/ui/text";
 import { ChatsButton } from "@/features/chat";
 import { useOnboardingGate, useSession } from "@/features/identity";
-import { RoundButton } from "@/features/matching";
+import { RoundButton, StarsButton } from "@/features/matching";
 import { Notices, PushOffer } from "@/features/notifications";
 import { GateCard, PondCard } from "@/features/pond";
 import { isProduction } from "@/lib/environment";
@@ -22,9 +22,10 @@ import { useHapticTap } from "@/theme/haptics";
 const MARK = require("../../../assets/logo-mark.png");
 
 /**
- * The home screen of a signed-in person (#143): how many people are on Kuutti
- * and whether matching is open, the way to the profile (which holds the photos, the
- * deal-breakers and the later questions, #239), and the settings. The
+ * The home screen of a signed-in person (#143): whether matching is open and the
+ * way to the people, the way to the profile (which holds the photos, the
+ * deal-breakers and the later questions, #239), the conversations, how many
+ * people have completed their profiles last (#54, #581), and the settings. The
  * technical view (the API, the commits, a test error) is one tap away outside
  * production and absent in the store's build. An account that has not
  * finished onboarding (#46) is sent there first; until the status is known
@@ -82,11 +83,11 @@ export function HomeScreen() {
         )}
 
         {gate.status === "checking" && (
-          <Text accessibilityLiveRegion="polite">{t("home.gate.checking")}</Text>
+          <Text accessibilityLiveRegion="polite">{t("load.loading")}</Text>
         )}
         {gate.status === "unknown" && (
           <View className="w-full max-w-md gap-3">
-            <LoadFailed headline={t("home.gate.failed")} error={gate.error} onRetry={gate.retry} />
+            <LoadFailed error={gate.error} onRetry={gate.retry} />
           </View>
         )}
 
@@ -94,14 +95,15 @@ export function HomeScreen() {
           <View className="w-full max-w-md gap-4">
             {/* What must reach the person even without a push, unread, first (#176). */}
             <Notices />
-            {/* How many people are on Kuutti (#54), and whether matching is open for the person
-                (#500); once it is, the way to today's round (#379) and the one offer of
-                notifications, since now there is something to tell (#102, ADR-055 §9). */}
-            <PondCard />
+            {/* Whether matching is open for the person (#500); once it is, the way to the
+                queue (#379), the way to the people the person starred while there are any
+                (#575), and the one offer of notifications, since now there is something to
+                tell (#102, ADR-055 §9). */}
             <GateCard
               whenOpen={
                 <>
                   <RoundButton />
+                  <StarsButton />
                   <PushOffer />
                 </>
               }
@@ -118,6 +120,8 @@ export function HomeScreen() {
             </Button>
             {/* The conversations a match opens, with what is unread (#348). */}
             <ChatsButton />
+            {/* How many people are on Kuutti (#54): last, under the things to do (#581). */}
+            <PondCard />
           </View>
         )}
       </ScrollView>

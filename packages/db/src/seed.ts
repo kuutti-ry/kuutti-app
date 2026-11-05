@@ -21,15 +21,9 @@ export const SEED_PONDS = [
  * number here is a decision (ADR or a new config version), never a test edit.
  */
 export const MATCHING_CONFIG_V1 = {
-  round_size: 12, // TD-11
-  impression_cap_per_day: 40, // TD-11: per candidate
   like_budget_balanced: 12, // TD-14
-  like_budget_contested: 5, // TD-14
-  contest_ratio_threshold: 1.5, // TD-13, TD-14: above this, the contested budget applies
-  liked_you_cap: 10, // TD-11: pending likes appended per day
   like_expiry_days: 14, // TD-11
   pass_cooldown_days: 90, // TD-12
-  shown_cooldown_days: 30, // TD-12
   silent_match_archive_days: 7, // TD-13
   max_photos: 6, // #48: photos per account; the grid and the upload route read it
   // #49, #253: a moderation label the check does not know goes to a person at or
@@ -79,10 +73,9 @@ export const MATCHING_CONFIG_V1 = {
   // descriptions turn out common.
   photo_description_confidence_min: 80,
   // #52 (TD-6, ADR-008): the exposure budget. Cards an account may be served
-  // per day (the card route of #47 counts against it; a round of 12 and up to
-  // 10 pending likes fit several times over) and signed photo URLs per
-  // variant per day, counted from the fetch log in the statement that writes
-  // it. The day is the Finnish calendar day.
+  // per day (the card route of #47 counts against it) and signed photo URLs
+  // per variant per day, counted from the fetch log in the statement that
+  // writes it. The day is the Finnish calendar day. 0 is off (ADR-062 §9).
   exposure_cards_per_day: 60,
   photo_fetches_per_day: { thumb: 600, card: 300, full: 60 },
   // #237 (ADR-007 §3, migration 0040): copies of one's own data per Finnish
@@ -107,13 +100,10 @@ export const MATCHING_CONFIG_V1 = {
   invitation_tries_per_day: 5,
   // #102 (ADR-055 §10, migration 0082): at most one push of a conversation to
   // its recipient in ten minutes; none from 22 to 8 in Helsinki (equal hours
-  // mean no quiet hours); the round's push at 9 in Helsinki.
+  // mean no quiet hours).
   message_push_min_interval_minutes: 10,
   push_quiet_from_hour: 22,
   push_quiet_to_hour: 8,
-  round_push_hour: 9,
-  // #102 (migration 0083): no round push after seven days without an opened round.
-  round_push_idle_days: 7,
   moderation_response_hours: 24, // #303, #299: the hours the association promises to answer within
   // #84 (ADR-030 §4, migration 0052): reports a person may file per Finnish
   // day, counted from report in the statement that writes the row; the sixth
@@ -138,7 +128,7 @@ export const MATCHING_CONFIG_V1 = {
   // #86 (ADR-041, migration 0075): the velocity rules, the maintainer's of
   // 21/10/2026. URLs of other people's photos in the card and full sizes
   // within the minutes; different people's cards served within the minutes,
-  // off while the round bounds them; and reads of the day's round within the
+  // off while the round bounded them; and reads of the day's round within the
   // minutes. A threshold of 0 switches its rule off.
   auto_shadow_ban_photo_fetches: 120,
   auto_shadow_ban_photo_fetches_minutes: 60,
@@ -177,16 +167,28 @@ export const MATCHING_CONFIG_V1 = {
   distance_nearby_km: 5,
   distance_close_km: 15,
   distance_around_km: 50,
+  // #502, #503 (ADR-062 §6, migration 0104): the ladder's clocks, the second
+  // pass the maintainer's of 01/11/2026 and the others #503's of 29/10/2026.
+  liked_cooldown_days: 90,
+  ended_cooldown_days: 90,
+  second_pass_cooldown_days: 365,
+  // #502 (ADR-062 §5, migration 0104): the conversations on a person's turn at
+  // which they can make no new match, and at which the list warns of it.
+  your_turn_limit: 8,
+  your_turn_warning: 6,
+  // #502 (ADR-062 §4, migration 0104): the unread likes that keep a person out
+  // of everybody's ordinary queue until they have gone through them.
+  inbox_stop: 30,
+  // #575 (ADR-064 §5, migration 0108): the most stars a person's list may hold,
+  // the maintainer's of 03/11/2026. Those it leaves out do not count, and 0 is off.
+  stars_max: 10,
 } as const;
 
 /**
  * matching_config version 2: version 1 keeps its row, and the latest version
- * of a key wins (apps/api/src/lib/matching-config.ts). The round is ten cards
- * (#95, ADR-035, migration 0069), the maintainer's of 20/10/2026 for the round
- * builder's first cut.
+ * of a key wins (apps/api/src/lib/matching-config.ts).
  */
 export const MATCHING_CONFIG_V2 = {
-  round_size: 10,
   // #98 (ADR-036, migration 0070): ten likes a day for everybody, the first cut's.
   like_budget_balanced: 10,
   // #513 (ADR-041 History, migration 0088): a card shows every photo in the card
@@ -196,6 +198,17 @@ export const MATCHING_CONFIG_V2 = {
   // #508 (ADR-009 History, migration 0092): six, one on every field a
   // deal-breaker can be set on; the maintainer's of 31/10/2026, where version 1 took two.
   deal_breakers_max: 6,
+  // #503 (ADR-062 §6, migration 0104): a pass holds thirty days, where version 1 took ninety.
+  pass_cooldown_days: 30,
+  // #502 (ADR-062 §9, migration 0104): no ceiling on cards or card photos, the
+  // maintainer's of 01/11/2026; 0 is off. The cards alarm comes on instead.
+  exposure_cards_per_day: 0,
+  photo_fetches_per_day: { thumb: 600, card: 0, full: 60 },
+  auto_shadow_ban_cards_served: 300,
+  auto_shadow_ban_cards_served_minutes: 10,
+  // #503 (ADR-044 §4, migration 0105): earned likes go and the invited friend
+  // earns a fish too, the maintainer's of 29/10 and 31/10/2026.
+  invitation_reward: { inviterFish: 1, friendFish: 1 },
 } as const;
 
 /**
@@ -204,6 +217,9 @@ export const MATCHING_CONFIG_V2 = {
  */
 export const MATCHING_CONFIG_V3 = {
   deal_breakers_max: 7,
+  // #502 (ADR-062 §9, migration 0104): an honest reader of the queue stays
+  // under the photo alarm; the maintainer's of 01/11/2026, where version 2 took 200.
+  auto_shadow_ban_photo_fetches: 1500,
 } as const;
 
 /**

@@ -1,24 +1,27 @@
 import type { ConversationList, ConversationSummary } from "@kuutti/schema";
-import { act, fireEvent, screen, userEvent } from "@testing-library/react-native";
+import { act, fireEvent, screen, userEvent, within } from "@testing-library/react-native";
 import { useLocales } from "expo-localization";
 import * as SecureStore from "expo-secure-store";
-import { AccessibilityInfo, AppState, Platform } from "react-native";
+import { AccessibilityInfo, AppState, PixelRatio, Platform, StyleSheet } from "react-native";
 import { clearSession, saveSession } from "@/lib/session";
 import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
+import { FAILED_TO_LOAD } from "@/test/failed";
 import { expectPinnedHeader } from "@/test/layout";
 import { renderWithTheme } from "@/test/render";
 import { FakeWebSocket } from "@/test/websocket";
+import { MAX_FONT_SCALE } from "@/theme/a11y";
 import { ChatsButton } from "./ChatsButton";
 import { ConversationsScreen } from "./ConversationsScreen";
 import { leaveNotice } from "./notice";
 import { ChatLiveProvider } from "./store";
 import { dayOf, timeOf } from "./time";
 
-// The list of conversations and the home screen's way to it (#348): the two
-// groups, a row's name, age, last line, time and unread mark in words, the
-// empty state, a failure, and the reads on focus, on return and on a pull;
-// live (#349): read again when the socket brings something, the cursors for
-// its resume, and the connection line.
+// The list of conversations and the home screen's way to it (#348): the
+// groups by whose turn it is and the archive, the banner near the limit (ADR-062
+// §5), a row's name, age, last line, time and unread mark in words, the empty
+// state, a failure, and the reads on focus, on return and on a pull; live
+// (#349): read again when the socket brings something, the turn a line moves,
+// the cursors for its resume, and the connection line.
 
 jest.mock("nativewind", () => ({
   ...jest.requireActual("nativewind"),
@@ -43,6 +46,10 @@ const json = (body: unknown, status = 200) =>
 const settle = () => act(() => new Promise<void>((resolve) => setTimeout(resolve, 20)));
 const noProblems = () =>
   expect(pressables(screen.toJSON() as HostNode).flatMap((node) => a11yProblems(node))).toEqual([]);
+/** The words on the screen in the order a screen reader meets them. */
+const inOrder = (node: HostNode | string): string[] =>
+  typeof node === "string" ? [node] : (node.children ?? []).flatMap(inOrder);
+const words = () => inOrder(screen.toJSON() as HostNode);
 
 const OLD = "2026-01-05T10:00:00.000Z";
 const NOW = new Date().toISOString();
@@ -56,10 +63,13 @@ function summary(id: string, over: Partial<ConversationSummary> = {}): Conversat
     counterpart: { deleted: false, name: "Sanna", age: 31, thumb: null },
     lastMessage: { seq: 7, at: NOW, kind: "text", preview: "Nähdäänkö huomenna?", side: "theirs" },
     unread: 2,
+    yourTurn: true,
     ...over,
   };
 }
 const ID = (n: number) => `3f9a2c1e-5b7d-4f01-8a2b-1c3d4e5f6a7${n}`;
+/** The count of a list with `waiting` on the person's turn, against the seed's limit and warning. */
+const COUNT = (waiting: number) => ({ waiting, limit: 8, warning: 6 });
 const LIST: ConversationList = {
   open: [
     summary(ID(1), {
@@ -88,6 +98,7 @@ const LIST: ConversationList = {
       counterpart: { deleted: true },
       lastMessage: { seq: 3, at: OLD, kind: "text", preview: "Hei", side: "theirs" },
       unread: 0,
+      yourTurn: false,
     }),
     // Ended: it names nobody (#351, ADR-031 Open 10).
     summary(ID(4), {
@@ -96,14 +107,17 @@ const LIST: ConversationList = {
       counterpart: null,
       lastMessage: { seq: 12, at: OLD, kind: "text", preview: "Kiitos", side: "mine" },
       unread: 0,
+      yourTurn: false,
     }),
     summary(ID(5), {
       state: "archived",
       counterpart: { deleted: false, name: "Olli", age: 35, thumb: null },
       lastMessage: { seq: 1, at: OLD, kind: "text", preview: "Moi", side: "mine" },
       unread: 1,
+      yourTurn: false,
     }),
   ],
+  yourTurn: COUNT(2),
 };
 
 type Asked = { path: string; query: string };
@@ -141,19 +155,16 @@ describe("the list of conversations", () => {
   it("shows the open and the archived ones, each row read as one, and opens a row", async () => {
     const asked = api(() => json(LIST));
     await renderWithTheme(<ConversationsScreen />);
-    expect(await screen.findByRole("heading", { name: "Open" })).toBeTruthy();
+    expect(await screen.findByRole("heading", { name: "Your turn: 2" })).toBeTruthy();
     expectPinnedHeader("Conversations", "Back");
     expect(screen.getByRole("heading", { name: "Archived" })).toBeTruthy();
-    expect(
-      screen.getByText(
-        "A conversation quiet for a week moves here, and so does one that has ended. Writing in a quiet one brings it back.",
-      ),
-    ).toBeTruthy();
+    // No line under the heading: the rows and what opening one says tell why (#581).
+    expect(words()[words().indexOf("Archived") + 1]).toBe("Deleted user");
     const today = timeOf("en", NOW);
     const old = dayOf("en", OLD);
     for (const name of [
       `Sanna, 31, 2 unread messages, Nähdäänkö huomenna?, ${today}`,
-      "Mikko, 29, No messages yet",
+      "Mikko, 29",
       `Deleted user, This person deleted their account., ${old}`,
       `Conversation ended, You: Kiitos, ${old}`,
       `Olli, 35, 1 unread message, You: Moi, ${old}`,
@@ -178,15 +189,15 @@ describe("the list of conversations", () => {
     api(() => json(LIST));
     leaveNotice("reported");
     await renderWithTheme(<ConversationsScreen />);
-    const words = "Thank you. A moderator will look at it, and you will not see each other again.";
-    expect(await screen.findByText(words)).toBeTruthy();
+    const thanks = "Thank you. A moderator will look at it.";
+    expect(await screen.findByText(thanks)).toBeTruthy();
     expect(screen.getByTestId("notice").props.accessibilityLiveRegion).toBe("polite");
-    expect(announce.mock.calls).toEqual([[words]]);
+    expect(announce.mock.calls).toEqual([[thanks]]);
     // Back again with nothing left to say: the words are gone.
     await act(async () => focus());
-    expect(screen.queryByText(words)).toBeNull();
+    expect(screen.queryByText(thanks)).toBeNull();
     for (const [outcome, said] of [
-      ["blocked", "Blocked. You will not see each other again."],
+      ["blocked", "Blocked."],
       ["unmatched", "The conversation has ended."],
       ["gone", "That conversation is no longer available."],
     ] as const) {
@@ -234,6 +245,7 @@ describe("the list of conversations", () => {
           photo(4, "Mökillä", "mine"),
         ],
         archived: [],
+        yourTurn: COUNT(2),
       }),
     );
     await renderWithTheme(<ConversationsScreen />);
@@ -248,31 +260,78 @@ describe("the list of conversations", () => {
     }
   });
 
-  it("says there is nothing yet", async () => {
-    api(() => json({ open: [], archived: [] }));
+  it.each([
+    ["en-US", "Conversations", "No conversations yet."],
+    ["fi-FI", "Keskustelut", "Ei vielä keskusteluja."],
+    ["sv-FI", "Samtal", "Inga samtal än."],
+  ])("says there is nothing yet, and nothing more: %s", async (languageTag, title, empty) => {
+    (useLocales as jest.Mock).mockReturnValue([{ languageTag }]);
+    api(() => json({ open: [], archived: [], yourTurn: COUNT(0) }));
     await renderWithTheme(<ConversationsScreen />);
-    expect(
-      await screen.findByText(
-        "No conversations yet. A conversation opens here when you match with someone.",
-      ),
-    ).toBeTruthy();
-    expect(screen.queryByRole("heading", { name: "Open" })).toBeNull();
+    expect(await screen.findByText(empty)).toBeTruthy();
+    expect(words()).toEqual([title, empty]);
+    expect(screen.queryAllByRole("heading").map((node) => node.props.children)).toEqual([title]);
   });
+
+  it.each<[string, Partial<ConversationSummary>, string, string[]]>([
+    ["on the person's turn", {}, "Mikko, 29", ["Mikko, 29"]],
+    ["on the other's turn", { yourTurn: false }, "Mikko, 29", ["Mikko, 29"]],
+    ["archived", { state: "archived", yourTurn: false }, "Mikko, 29", ["Mikko, 29"]],
+    [
+      "ended",
+      { state: "closed", closedHow: "unmatch", counterpart: null, yourTurn: false },
+      "Conversation ended",
+      ["Conversation ended"],
+    ],
+    // An erasure still says it, with or without a message.
+    [
+      "left by a deleted account",
+      { state: "closed", closedHow: "erasure", counterpart: { deleted: true }, yourTurn: false },
+      "Deleted user, This person deleted their account.",
+      ["Deleted user", "This person deleted their account."],
+    ],
+  ])(
+    "draws and says no second line for a row with no message, %s, the group above saying whose move it is (#581)",
+    async (_what, over, name, lines) => {
+      const row = summary(ID(2), {
+        counterpart: { deleted: false, name: "Mikko", age: 29, thumb: null },
+        lastMessage: null,
+        unread: 0,
+        ...over,
+      });
+      const open = row.state === "open";
+      api(() =>
+        json({
+          open: open ? [row] : [],
+          archived: open ? [] : [row],
+          yourTurn: COUNT(row.yourTurn ? 1 : 0),
+        }),
+      );
+      await renderWithTheme(<ConversationsScreen />);
+      const found = await screen.findByRole("button", { name });
+      expect(
+        within(found)
+          .getAllByText(/./)
+          .map((node) => node.props.children),
+      ).toEqual(lines);
+      noProblems();
+    },
+  );
 
   it("says why it did not load, and reads again on Try again", async () => {
     api(
       () => json({ error: { code: "internal_error", message: "x", requestId: "r" } }, 500),
-      () => json({ open: [summary(ID(1))], archived: [] }),
+      () => json({ open: [summary(ID(1))], archived: [], yourTurn: COUNT(1) }),
     );
     await renderWithTheme(<ConversationsScreen />);
-    expect(await screen.findByText("Your conversations could not be loaded.")).toBeTruthy();
+    expect(await screen.findByText(FAILED_TO_LOAD)).toBeTruthy();
     await userEvent.setup().press(screen.getByRole("button", { name: "Try again" }));
-    expect(await screen.findByRole("heading", { name: "Open" })).toBeTruthy();
+    expect(await screen.findByRole("heading", { name: "Your turn: 1" })).toBeTruthy();
   });
 
   it("reads again on focus, on return to the foreground and on a pull, and keeps the list when a quiet read fails", async () => {
     const asked = api(
-      () => json({ open: [summary(ID(1))], archived: [] }),
+      () => json({ open: [summary(ID(1))], archived: [], yourTurn: COUNT(1) }),
       () =>
         json({
           open: [
@@ -282,6 +341,7 @@ describe("the list of conversations", () => {
             }),
           ],
           archived: [],
+          yourTurn: COUNT(2),
         }),
       () => json({ error: { code: "internal_error", message: "x", requestId: "r" } }, 500),
     );
@@ -305,6 +365,259 @@ describe("the list of conversations", () => {
   });
 });
 
+describe("whose turn it is (ADR-062 §5)", () => {
+  const mine = (n: number, name: string) =>
+    summary(ID(n), {
+      counterpart: { deleted: false, name, age: 30, thumb: null },
+      lastMessage: { seq: 2, at: OLD, kind: "text", preview: "Hei", side: "theirs" },
+      unread: 0,
+    });
+  const theirs = (n: number, name: string) =>
+    summary(ID(n), {
+      counterpart: { deleted: false, name, age: 30, thumb: null },
+      lastMessage: { seq: 2, at: OLD, kind: "text", preview: "Moi", side: "mine" },
+      unread: 0,
+      yourTurn: false,
+    });
+  it("groups the open ones by turn, the person's first with how many, each as the API ordered it", async () => {
+    api(() =>
+      json({
+        open: [theirs(1, "Aino"), mine(2, "Bea"), theirs(3, "Cia"), mine(4, "Dan")],
+        archived: [summary(ID(5), { state: "archived", yourTurn: false })],
+        yourTurn: COUNT(2),
+      }),
+    );
+    await renderWithTheme(<ConversationsScreen />);
+    await screen.findByRole("heading", { name: "Your turn: 2" });
+    expect(
+      words().filter((text) => /^(Your turn|Their turn|Archived|\w+, \d+$)/.test(text)),
+    ).toEqual([
+      "Your turn: 2",
+      "Bea, 30",
+      "Dan, 30",
+      "Their turn",
+      "Aino, 30",
+      "Cia, 30",
+      "Archived",
+      "Sanna, 31",
+    ]);
+    noProblems();
+  });
+
+  it.each([
+    ["on the person's turn alone", [mine(1, "Bea")], 1, "Your turn: 1", "Their turn"],
+    ["on the other's alone", [theirs(1, "Aino")], 0, "Their turn", /^Your turn/],
+  ])("leaves the empty group out with everybody %s", async (_who, open, waiting, there, gone) => {
+    api(() => json({ open, archived: [], yourTurn: COUNT(waiting) }));
+    await renderWithTheme(<ConversationsScreen />);
+    expect(await screen.findByRole("heading", { name: there })).toBeTruthy();
+    expect(screen.queryByRole("heading", { name: gone })).toBeNull();
+    expect(screen.queryByRole("heading", { name: "Archived" })).toBeNull();
+  });
+
+  it("leaves both out with only the archive left", async () => {
+    api(() =>
+      json({
+        open: [],
+        archived: [summary(ID(5), { state: "archived", yourTurn: false })],
+        yourTurn: COUNT(0),
+      }),
+    );
+    await renderWithTheme(<ConversationsScreen />);
+    expect(await screen.findByRole("heading", { name: "Archived" })).toBeTruthy();
+    expect(screen.queryByRole("heading", { name: /^Your turn/ })).toBeNull();
+    expect(screen.queryByRole("heading", { name: "Their turn" })).toBeNull();
+    expect(screen.queryByText(/You can't like anyone new/)).toBeNull();
+  });
+
+  it("keeps the count through a look back, which signs no thumb", async () => {
+    const asked = api(
+      () => json({ open: [mine(1, "Bea")], archived: [], yourTurn: COUNT(1) }),
+      () => json({ open: [mine(1, "Bea"), mine(2, "Dan")], archived: [], yourTurn: COUNT(2) }),
+    );
+    await renderWithTheme(<ConversationsScreen />);
+    await screen.findByRole("heading", { name: "Your turn: 1" });
+    await act(async () => focus());
+    expect(await screen.findByRole("heading", { name: "Your turn: 2" })).toBeTruthy();
+    expect(asked.map((a) => a.query)).toEqual(["?thumbs=true", "?thumbs=false"]);
+  });
+
+  it.each([
+    ["fi", "Sinun vuorosi: 1", "Toisen vuoro"],
+    ["sv", "Din tur: 1", "Den andras tur"],
+  ])("says the groups in %s", async (languageTag, yours, others) => {
+    (useLocales as jest.Mock).mockReturnValue([{ languageTag }]);
+    api(() =>
+      json({ open: [mine(1, "Bea"), theirs(2, "Aino")], archived: [], yourTurn: COUNT(1) }),
+    );
+    await renderWithTheme(<ConversationsScreen />);
+    expect(await screen.findByRole("heading", { name: yours })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: others })).toBeTruthy();
+  });
+
+  describe("the banner", () => {
+    const WORDS = (limit = 8) =>
+      `You can't like anyone new while ${limit} ${limit === 1 ? "conversation is" : "conversations are"} waiting.`;
+    const counted = (yourTurn: { waiting: number; limit: number; warning: number }) => () =>
+      json({ open: [mine(1, "Bea")], archived: [], yourTurn });
+
+    it.each([
+      ["one under the warning", { waiting: 5, limit: 8, warning: 6 }, false],
+      ["at the warning", { waiting: 6, limit: 8, warning: 6 }, true],
+      [
+        "one conversation, where the panel set a warning of one",
+        { waiting: 1, limit: 2, warning: 1 },
+        true,
+      ],
+      ["a limit of one, where the panel set it", { waiting: 1, limit: 1, warning: 1 }, true],
+      ["past the warning", { waiting: 7, limit: 8, warning: 6 }, true],
+      ["at the limit", { waiting: 8, limit: 8, warning: 6 }, true],
+      ["past the limit, as a lowered limit leaves it", { waiting: 9, limit: 8, warning: 6 }, true],
+      ["with the warning off", { waiting: 8, limit: 8, warning: 0 }, false],
+      ["with the limit off, which refuses nothing", { waiting: 8, limit: 0, warning: 6 }, false],
+      ["with neither on", { waiting: 8, limit: 0, warning: 0 }, false],
+      ["with nobody waiting and the warning off", { waiting: 0, limit: 8, warning: 0 }, false],
+    ])("%s", async (_when, count, shown) => {
+      api(counted(count));
+      await renderWithTheme(<ConversationsScreen />);
+      await screen.findByRole("heading", { name: `Your turn: ${count.waiting}` });
+      expect(screen.queryByText(WORDS(count.limit)) !== null).toBe(shown);
+    });
+
+    it("stands at the top of the list, above the groups, in plain words and a live region", async () => {
+      api(counted({ waiting: 6, limit: 8, warning: 6 }));
+      await renderWithTheme(<ConversationsScreen />);
+      const line = await screen.findByText(WORDS());
+      expect(line.props.accessibilityLiveRegion).toBe("polite");
+      // How many wait is the heading's, right under it: the banner names the limit alone (#581).
+      expect(words().indexOf("Your turn: 6")).toBe(words().indexOf(WORDS()) + 1);
+    });
+
+    it("holds at the largest text: nothing cut, its height the words'", async () => {
+      jest.spyOn(PixelRatio, "getFontScale").mockReturnValue(MAX_FONT_SCALE);
+      api(counted({ waiting: 6, limit: 8, warning: 6 }));
+      await renderWithTheme(<ConversationsScreen />);
+      const line = await screen.findByText(WORDS());
+      expect(line.props.numberOfLines).toBeUndefined();
+      expect(StyleSheet.flatten(line.props.style)?.height).toBeUndefined();
+      const box = screen.getByTestId("turn-warning");
+      expect(box.props.className).not.toMatch(/(^| )(min-|max-)?h-/);
+      expect(StyleSheet.flatten(box.props.style)?.height).toBeUndefined();
+      noProblems();
+    });
+
+    it("is told to VoiceOver as it appears, not on a look back or as the count waiting moves, and again when it comes back or its limit moves (#581)", async () => {
+      jest.replaceProperty(Platform, "OS", "ios");
+      const announce = AccessibilityInfo.announceForAccessibility as jest.Mock;
+      announce.mockClear();
+      api(
+        counted({ waiting: 6, limit: 8, warning: 6 }),
+        counted({ waiting: 6, limit: 8, warning: 6 }),
+        counted({ waiting: 7, limit: 8, warning: 6 }),
+        counted({ waiting: 5, limit: 8, warning: 6 }),
+        counted({ waiting: 6, limit: 8, warning: 6 }),
+        counted({ waiting: 6, limit: 7, warning: 6 }),
+      );
+      await renderWithTheme(<ConversationsScreen />);
+      await screen.findByText(WORDS());
+      await act(async () => focus());
+      await settle();
+      expect(announce.mock.calls).toEqual([[WORDS()]]);
+      await act(async () => focus());
+      await screen.findByRole("heading", { name: "Your turn: 7" });
+      expect(announce.mock.calls).toEqual([[WORDS()]]);
+      // Under the warning it goes, and said nothing as it went.
+      await act(async () => focus());
+      await screen.findByRole("heading", { name: "Your turn: 5" });
+      expect(screen.queryByText(WORDS())).toBeNull();
+      expect(announce.mock.calls).toEqual([[WORDS()]]);
+      await act(async () => focus());
+      await screen.findByText(WORDS());
+      expect(announce.mock.calls).toEqual([[WORDS()], [WORDS()]]);
+      await act(async () => focus());
+      await screen.findByText(WORDS(7));
+      expect(announce.mock.calls).toEqual([[WORDS()], [WORDS()], [WORDS(7)]]);
+    });
+
+    it("leaves the telling to the live region on Android", async () => {
+      jest.replaceProperty(Platform, "OS", "android");
+      const announce = AccessibilityInfo.announceForAccessibility as jest.Mock;
+      announce.mockClear();
+      api(counted({ waiting: 6, limit: 8, warning: 6 }));
+      await renderWithTheme(<ConversationsScreen />);
+      await screen.findByText(WORDS());
+      expect(announce).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ["en", 8, WORDS(8)],
+      ["en", 1, WORDS(1)],
+      ["fi", 8, "Et voi tykätä kenestäkään uudesta, kun 8 keskustelua odottaa."],
+      ["fi", 1, "Et voi tykätä kenestäkään uudesta, kun 1 keskustelu odottaa."],
+      ["sv", 8, "Du kan inte gilla någon ny medan 8 samtal väntar."],
+      ["sv", 1, "Du kan inte gilla någon ny medan 1 samtal väntar."],
+    ])(
+      "says it in %s at a limit of %i, naming what it counts",
+      async (languageTag, limit, said) => {
+        (useLocales as jest.Mock).mockReturnValue([{ languageTag }]);
+        api(counted({ waiting: limit, limit, warning: 1 }));
+        await renderWithTheme(<ConversationsScreen />);
+        expect(await screen.findByText(said)).toBeTruthy();
+      },
+    );
+  });
+
+  it("moves a row and the count as a line comes over the socket, and the banner with them", async () => {
+    FakeWebSocket.install();
+    const asked = api(() =>
+      json({
+        open: [mine(1, "Bea"), theirs(2, "Aino")],
+        archived: [],
+        yourTurn: { waiting: 5, limit: 8, warning: 6 },
+      }),
+    );
+    await renderWithTheme(
+      <ChatLiveProvider>
+        <ConversationsScreen />
+      </ChatLiveProvider>,
+    );
+    await screen.findByRole("heading", { name: "Your turn: 5" });
+    const ws = FakeWebSocket.latest();
+    await act(async () => {
+      ws.open();
+      ws.receive({ type: "ready" });
+    });
+    const line = (id: string, seq: number, side: "mine" | "theirs") => ({
+      type: "message" as const,
+      conversationId: id,
+      message: {
+        id: `00000000-0000-4000-8000-00000000000${seq}`,
+        seq,
+        side,
+        kind: "text" as const,
+        body: "Moi",
+        createdAt: NOW,
+        clientId: null,
+        photo: null,
+      },
+    });
+    // A line from them: their turn is over, and the warning's number is reached.
+    await act(async () => ws.receive(line(ID(2), 3, "theirs")));
+    expect(screen.getByRole("heading", { name: "Your turn: 6" })).toBeTruthy();
+    expect(screen.queryByRole("heading", { name: "Their turn" })).toBeNull();
+    expect(
+      screen.getByText(/^You can't like anyone new while 8 conversations are waiting/),
+    ).toBeTruthy();
+    // A line from the person: it is the other's turn again, and the banner goes.
+    await act(async () => ws.receive(line(ID(1), 4, "mine")));
+    expect(screen.getByRole("heading", { name: "Your turn: 5" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Their turn" })).toBeTruthy();
+    expect(screen.queryByText(/You can't like anyone new/)).toBeNull();
+    // All of it without a read.
+    expect(asked).toHaveLength(1);
+  });
+});
+
 describe("the home screen's Conversations button", () => {
   it("says the unread count in words, shows the mark, asks without thumbs and opens the list", async () => {
     const asked = api(() => json(LIST));
@@ -318,7 +631,7 @@ describe("the home screen's Conversations button", () => {
   });
 
   it("says nothing is unread, with no mark", async () => {
-    api(() => json({ open: [summary(ID(1), { unread: 0 })], archived: [] }));
+    api(() => json({ open: [summary(ID(1), { unread: 0 })], archived: [], yourTurn: COUNT(1) }));
     await renderWithTheme(<ChatsButton />);
     expect(
       await screen.findByRole("button", { name: "Conversations, nothing unread" }),
@@ -342,6 +655,7 @@ describe("the thumbs of the list", () => {
           summary(ID(1), { counterpart: { deleted: false, name: "Sanna", age: 31, thumb: null } }),
         ],
         archived: [],
+        yourTurn: COUNT(1),
       }),
     );
     await renderWithTheme(<ConversationsScreen />);
@@ -369,15 +683,22 @@ describe("the thumbs of the list", () => {
             sanna({ counterpart: { deleted: false, name: "Sanna", age: 31, thumb: thumb(1) } }),
           ],
           archived: [],
+          yourTurn: COUNT(1),
         }),
-      () => json({ open: [sanna({})], archived: [] }),
-      () => json({ open: [], archived: [sanna({ state: "closed", closedHow: "unmatch" })] }),
+      () => json({ open: [sanna({})], archived: [], yourTurn: COUNT(1) }),
+      () =>
+        json({
+          open: [],
+          archived: [sanna({ state: "closed", closedHow: "unmatch", yourTurn: false })],
+          yourTurn: COUNT(0),
+        }),
       () =>
         json({
           open: [
             sanna({ counterpart: { deleted: false, name: "Sanna", age: 31, thumb: thumb(2) } }),
           ],
           archived: [],
+          yourTurn: COUNT(1),
         }),
     );
     // expo-image hands its host view the source as a list.
@@ -424,7 +745,7 @@ describe("the list, live over the socket", () => {
         <ConversationsScreen />
       </ChatLiveProvider>,
     );
-    await screen.findByRole("heading", { name: "Open" });
+    await screen.findByRole("heading", { name: "Your turn: 2" });
     await screen.findByRole("button", { name: "Conversations, 3 unread messages" });
     expect(asked.map((a) => a.query).sort()).toEqual(["?thumbs=false", "?thumbs=true"]);
     const ws = FakeWebSocket.latest();

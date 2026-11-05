@@ -4,13 +4,19 @@ import type * as React from "react";
 import { Linking } from "react-native";
 import { clearSession, saveSession } from "@/lib/session";
 import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
+import { FAILED_TO_LOAD } from "@/test/failed";
 import { renderWithTheme, underProviders } from "@/test/render";
 import { ConsentSwitch, useConsentStates } from "./ConsentSwitches";
 
-// A withdrawable consent as a switch (#46, #146), each on its own screen in
-// Settings since #287: shown as the API holds it, given for the bundled
-// wording, withdrawn by a DELETE, a failure that leaves the switch as it was,
-// and the list's states for the rows that open them.
+// A withdrawable consent as a switch (#46, #146), under its own row in Settings
+// since #287 and #511: shown as the API holds it, given for the bundled wording,
+// withdrawn by a DELETE, a failure that leaves the switch as it was, and the
+// list's states for the rows that open them. The sensitive answers are the one
+// kind switched here: research is not asked (#545, ADR-010 §19).
+
+const LABEL = "Store my sensitive answers";
+const FAILED = "That did not go through. Try again.";
+const SENSITIVE = String(CONSENT_VERSIONS.special_category);
 
 const token = (seed: string) => (seed + "x".repeat(43)).slice(0, 43);
 const session = {
@@ -22,6 +28,8 @@ const session = {
 };
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
+const serverError = () =>
+  json({ error: { code: "internal_error", message: "x", requestId: "r" } }, 500);
 
 function fetchMock(handlers: Array<(req: Request) => Response | null>) {
   const calls: Request[] = [];
@@ -43,6 +51,49 @@ const show = async (ui: React.ReactElement) => {
   });
 };
 
+/** The API's versions, the ones this app carries; `sensitive` overrides the consent's own. */
+const versions = (sensitive = SENSITIVE) => ({
+  terms: CONSENT_VERSIONS.terms,
+  privacy: CONSENT_VERSIONS.privacy,
+  research: CONSENT_VERSIONS.research,
+  special_category: sensitive,
+});
+const record = (kind = "special_category", version = SENSITIVE) => ({
+  kind,
+  version,
+  locale: "en",
+  givenAt: "2026-09-26T10:00:00.000Z",
+  withdrawnAt: null as string | null,
+});
+
+/** The consents as the API holds them; the sensitive answers given or not. */
+function consentsApi(options: {
+  given: boolean;
+  failGive?: boolean;
+  failWithdraw?: boolean;
+  sensitive?: string;
+}) {
+  let consents = options.given ? [record()] : [];
+  const answer = () => json({ consents, currentVersions: versions(options.sensitive) });
+  return fetchMock([
+    (req) => {
+      const path = new URL(req.url).pathname;
+      if (req.method === "GET" && path === "/consents") return answer();
+      if (req.method === "POST" && path === "/consents") {
+        if (options.failGive) return serverError();
+        consents = [record()];
+        return answer();
+      }
+      if (req.method === "DELETE" && path === "/consents/special_category") {
+        if (options.failWithdraw) return serverError();
+        consents = [{ ...record(), withdrawnAt: "2026-09-26T11:00:00.000Z" }];
+        return answer();
+      }
+      return null;
+    },
+  ]);
+}
+
 beforeEach(async () => {
   await saveSession(session);
 });
@@ -51,302 +102,141 @@ afterEach(async () => {
 });
 
 describe("ConsentSwitch", () => {
-  it("shows the research opt-in as a switch and withdraws it", async () => {
-    const version = "2026-09-draft-1";
-    const given: {
-      kind: string;
-      version: string;
-      locale: string;
-      givenAt: string;
-      withdrawnAt: string | null;
-    } = {
-      kind: "research",
-      version,
-      locale: "en",
-      givenAt: "2026-09-26T10:00:00.000Z",
-      withdrawnAt: null,
-    };
-    const versions = {
-      terms: version,
-      privacy: version,
-      research: version,
-      special_category: "2026-10-draft-2",
-    };
-    let consents = [given];
-    fetchMock([
-      (req) => {
-        const path = new URL(req.url).pathname;
-        if (req.method === "GET" && path === "/consents") {
-          return json({ consents, currentVersions: versions });
-        }
-        if (req.method === "DELETE" && path === "/consents/research") {
-          consents = [{ ...given, withdrawnAt: "2026-09-26T11:00:00.000Z" }];
-          return json({ consents, currentVersions: versions });
-        }
-        return null;
-      },
-    ]);
-    await show(<ConsentSwitch kind="research" />);
-    const toggle = await screen.findByLabelText("Take part in research");
+  it("shows the consent as a switch and withdraws it", async () => {
+    consentsApi({ given: true });
+    await show(<ConsentSwitch kind="special_category" />);
+    const toggle = await screen.findByLabelText(LABEL);
     expect(toggle.props.accessibilityState?.checked).toBe(true);
-    expect(screen.getByText(/You can change this at any time/)).toBeTruthy();
-    // One switch, its own kind only (#287).
-    expect(screen.queryByLabelText("Store my sensitive answers")).toBeNull();
+    expect(screen.getByText(/Switching this off removes those answers/)).toBeTruthy();
     await fireEvent(toggle, "press");
     await waitFor(() =>
-      expect(screen.getByLabelText("Take part in research").props.accessibilityState?.checked).toBe(
-        false,
-      ),
+      expect(screen.getByLabelText(LABEL).props.accessibilityState?.checked).toBe(false),
     );
     const found = pressables(screen.toJSON() as HostNode);
     expect(found.flatMap((node) => a11yProblems(node))).toEqual([]);
   });
 
-  /** The consents as the API holds them, for the bundled wording; research given or not. */
-  function consentsApi(options: { research: boolean; failGive?: boolean }) {
-    const versions = {
-      terms: CONSENT_VERSIONS.terms,
-      privacy: CONSENT_VERSIONS.privacy,
-      research: CONSENT_VERSIONS.research,
-      special_category: CONSENT_VERSIONS.special_category,
-    };
-    const record = (kind: string) => ({
-      kind,
-      version: CONSENT_VERSIONS.research,
-      locale: "en",
-      givenAt: "2026-09-26T10:00:00.000Z",
-      withdrawnAt: null,
-    });
-    let consents = options.research ? [record("research")] : [];
-    return fetchMock([
-      (req) => {
-        const path = new URL(req.url).pathname;
-        if (req.method === "GET" && path === "/consents") {
-          return json({ consents, currentVersions: versions });
-        }
-        if (req.method === "POST" && path === "/consents") {
-          if (options.failGive) {
-            return json({ error: { code: "internal_error", message: "x", requestId: "r" } }, 500);
-          }
-          consents = [record("research")];
-          return json({ consents, currentVersions: versions });
-        }
-        return null;
-      },
-    ]);
-  }
-
-  it("gives the research consent for the wording built into the app, in the app's language", async () => {
-    const calls = consentsApi({ research: false });
-    await show(<ConsentSwitch kind="research" />);
-    const toggle = await screen.findByLabelText("Take part in research");
+  it("gives the consent for the wording built into the app, in the app's language", async () => {
+    const calls = consentsApi({ given: false });
+    await show(<ConsentSwitch kind="special_category" />);
+    const toggle = await screen.findByLabelText(LABEL);
     expect(toggle.props.accessibilityState?.checked).toBe(false);
     await fireEvent(toggle, "press");
     await waitFor(() =>
-      expect(screen.getByLabelText("Take part in research").props.accessibilityState?.checked).toBe(
-        true,
-      ),
+      expect(screen.getByLabelText(LABEL).props.accessibilityState?.checked).toBe(true),
     );
     const post = calls.find((c) => c.method === "POST");
     expect(JSON.parse(await (post as Request).text())).toEqual({
-      kind: "research",
-      version: CONSENT_VERSIONS.research,
+      kind: "special_category",
+      version: SENSITIVE,
       locale: "en",
     });
   });
 
   it("hands what a change stored to the row above it, and nothing when the change fails (#511)", async () => {
-    consentsApi({ research: false });
+    consentsApi({ given: false });
     const stored = jest.fn();
-    await show(<ConsentSwitch kind="research" onStored={stored} />);
-    await fireEvent(await screen.findByLabelText("Take part in research"), "press");
+    await show(<ConsentSwitch kind="special_category" onStored={stored} />);
+    await fireEvent(await screen.findByLabelText(LABEL), "press");
     await waitFor(() => expect(stored).toHaveBeenCalledTimes(1));
     expect(stored.mock.calls[0]?.[0].consents).toEqual([
-      expect.objectContaining({ kind: "research", withdrawnAt: null }),
+      expect.objectContaining({ kind: "special_category", withdrawnAt: null }),
     ]);
     stored.mockClear();
-    consentsApi({ research: false, failGive: true });
-    await show(<ConsentSwitch kind="research" onStored={stored} />);
-    await fireEvent(await screen.findByLabelText("Take part in research"), "press");
-    expect(await screen.findByText(/^The research choice could not be saved/)).toBeTruthy();
+    consentsApi({ given: false, failGive: true });
+    await show(<ConsentSwitch kind="special_category" onStored={stored} />);
+    await fireEvent(await screen.findByLabelText(LABEL), "press");
+    expect(await screen.findByText(FAILED)).toBeTruthy();
     expect(stored).not.toHaveBeenCalled();
   });
 
+  it("links to its full text at the version a yes here is given to (#208)", async () => {
+    consentsApi({ given: false });
+    const open = jest.spyOn(Linking, "openURL").mockResolvedValue(true);
+    await show(<ConsentSwitch kind="special_category" />);
+    await screen.findByLabelText(LABEL);
+    await fireEvent.press(
+      screen.getByRole("link", {
+        name: `Read the full text on kuutti.app (version ${SENSITIVE})`,
+      }),
+    );
+    expect(open).toHaveBeenCalledWith(
+      `https://kuutti.app/legal/privacy/#special_category-${SENSITIVE}`,
+    );
+    open.mockRestore();
+  });
+
   it.each([
-    ["research", "Take part in research", "https://kuutti.app/legal/privacy/#research-"],
-    [
-      "special_category",
-      "Store my sensitive answers",
-      "https://kuutti.app/legal/privacy/#special_category-",
-    ],
-  ] as const)(
-    "links %s to its full text at the version a yes here is given to (#208)",
-    async (kind, label, page) => {
-      consentsApi({ research: false });
-      const open = jest.spyOn(Linking, "openURL").mockResolvedValue(true);
-      await show(<ConsentSwitch kind={kind} />);
-      await screen.findByLabelText(label);
-      const version = CONSENT_VERSIONS[kind];
-      await fireEvent.press(
-        screen.getByRole("link", { name: `Read the full text on kuutti.app (version ${version})` }),
-      );
-      expect(open).toHaveBeenCalledWith(`${page}${version}`);
-      open.mockRestore();
+    ["given", { given: false, failGive: true }, false],
+    ["withdrawn", { given: true, failWithdraw: true }, true],
+  ])(
+    "says so when the consent could not be %s, and leaves the switch as it was",
+    async (_how, api, checked) => {
+      consentsApi(api);
+      await show(<ConsentSwitch kind="special_category" />);
+      const toggle = await screen.findByLabelText(LABEL);
+      expect(toggle.props.accessibilityState?.checked).toBe(checked);
+      await fireEvent(toggle, "press");
+      expect(await screen.findByText(FAILED)).toBeTruthy();
+      expect(screen.getByLabelText(LABEL).props.accessibilityState?.checked).toBe(checked);
     },
   );
 
-  it("says so when the research choice could not be saved, and leaves the switch as it was", async () => {
-    consentsApi({ research: false, failGive: true });
-    await show(<ConsentSwitch kind="research" />);
-    await fireEvent(await screen.findByLabelText("Take part in research"), "press");
-    expect(
-      await screen.findByText("The research choice could not be saved. Try again."),
-    ).toBeTruthy();
-    expect(screen.getByLabelText("Take part in research").props.accessibilityState?.checked).toBe(
-      false,
-    );
-  });
-
-  /** Consents where the sensitive answers' wording is newer than this app's: that switch is locked. */
-  function newerSensitiveWording() {
-    const version = "2026-09-draft-1";
-    const versions = {
-      terms: version,
-      privacy: version,
-      research: CONSENT_VERSIONS.research,
-      // Newer than the app's wording: the switch is locked until the app is updated.
-      special_category: "2099-01-newer-than-this-app",
-    };
-    const given = {
-      kind: "research",
-      version: CONSENT_VERSIONS.research,
-      locale: "en",
-      givenAt: "2026-09-26T10:00:00.000Z",
-      withdrawnAt: null as string | null,
-    };
-    let consents: Array<typeof given> = [];
-    return fetchMock([
-      (req) => {
-        const path = new URL(req.url).pathname;
-        if (req.method === "GET" && path === "/consents") {
-          return json({ consents, currentVersions: versions });
-        }
-        if (req.method === "POST" && path === "/consents") {
-          consents = [given];
-          return json({ consents, currentVersions: versions });
-        }
-        return null;
-      },
-    ]);
-  }
-
-  it("says the sensitive answers' own words when their choice could not be saved (#287)", async () => {
-    const versions = {
-      terms: CONSENT_VERSIONS.terms,
-      privacy: CONSENT_VERSIONS.privacy,
-      research: CONSENT_VERSIONS.research,
-      special_category: CONSENT_VERSIONS.special_category,
-    };
-    const given = {
-      kind: "special_category",
-      version: CONSENT_VERSIONS.special_category,
-      locale: "en",
-      givenAt: "2026-09-26T10:00:00.000Z",
-      withdrawnAt: null,
-    };
-    fetchMock([
-      (req) => {
-        const path = new URL(req.url).pathname;
-        if (req.method === "GET" && path === "/consents") {
-          return json({ consents: [given], currentVersions: versions });
-        }
-        if (req.method === "DELETE" && path === "/consents/special_category") {
-          return json({ error: { code: "internal_error", message: "x", requestId: "r" } }, 500);
-        }
-        return null;
-      },
-    ]);
-    await show(<ConsentSwitch kind="special_category" />);
-    const toggle = await screen.findByLabelText("Store my sensitive answers");
-    expect(toggle.props.accessibilityState?.checked).toBe(true);
-    await fireEvent(toggle, "press");
-    expect(
-      await screen.findByText("The sensitive-answers choice could not be saved. Try again."),
-    ).toBeTruthy();
-    expect(screen.queryByText("The research choice could not be saved. Try again.")).toBeNull();
-    expect(
-      screen.getByLabelText("Store my sensitive answers").props.accessibilityState?.checked,
-    ).toBe(true);
-  });
-
   it("toggles from its words too", async () => {
-    newerSensitiveWording();
-    await show(<ConsentSwitch kind="research" />);
-    await screen.findByLabelText("Take part in research");
+    consentsApi({ given: false });
+    await show(<ConsentSwitch kind="special_category" />);
+    await screen.findByLabelText(LABEL);
     await act(async () => {
-      fireEvent.press(screen.getByText("Take part in research"));
+      fireEvent.press(screen.getByText(LABEL));
       await new Promise<void>((resolve) => setTimeout(resolve, 10));
     });
     await waitFor(() =>
-      expect(screen.getByLabelText("Take part in research").props.accessibilityState?.checked).toBe(
-        true,
-      ),
+      expect(screen.getByLabelText(LABEL).props.accessibilityState?.checked).toBe(true),
     );
   });
 
   it("locks a switch whose wording is newer than this app's, says to update, and its words do nothing", async () => {
-    const calls = newerSensitiveWording();
+    const calls = consentsApi({ given: false, sensitive: "2099-01-newer-than-this-app" });
     await show(<ConsentSwitch kind="special_category" />);
-    const toggle = await screen.findByLabelText("Store my sensitive answers");
+    const toggle = await screen.findByLabelText(LABEL);
     expect(toggle.props.accessibilityState?.disabled).toBe(true);
     expect(screen.getByText(/Update the app/)).toBeTruthy();
     const before = calls.length;
     await act(async () => {
-      fireEvent.press(screen.getByText("Store my sensitive answers"));
+      fireEvent.press(screen.getByText(LABEL));
       await new Promise<void>((resolve) => setTimeout(resolve, 10));
     });
     expect(calls.length).toBe(before);
-    expect(
-      screen.getByLabelText("Store my sensitive answers").props.accessibilityState?.checked,
-    ).toBe(false);
+    expect(screen.getByLabelText(LABEL).props.accessibilityState?.checked).toBe(false);
   });
 
   it("says it is reading the consent while the read is on its way", async () => {
     globalThis.fetch = jest.fn(() => new Promise<Response>(() => {})) as unknown as typeof fetch;
-    await show(<ConsentSwitch kind="research" />);
-    expect(screen.getByText("Reading your choice…")).toBeTruthy();
-    expect(screen.queryByLabelText("Take part in research")).toBeNull();
+    await show(<ConsentSwitch kind="special_category" />);
+    expect(screen.getByText("Loading…")).toBeTruthy();
+    expect(screen.queryByLabelText(LABEL)).toBeNull();
   });
 
   it("says why the consent could not be read, and reads it again on request (#287)", async () => {
-    let failing = true;
-    const calls = fetchMock([
-      () =>
-        failing
-          ? json({ error: { code: "internal_error", message: "x", requestId: "r" } }, 500)
-          : null,
-    ]);
-    await show(<ConsentSwitch kind="research" />);
-    expect(screen.getByText("Your choice could not be read.")).toBeTruthy();
+    const calls = fetchMock([serverError]);
+    await show(<ConsentSwitch kind="special_category" />);
+    expect(screen.getByText(FAILED_TO_LOAD)).toBeTruthy();
     expect(screen.getByText("Kuutti's server had a problem. Try again in a moment.")).toBeTruthy();
-    failing = false;
-    consentsApi({ research: true });
+    consentsApi({ given: true });
     await act(async () => {
       fireEvent.press(screen.getByRole("button", { name: "Try again" }));
       await new Promise<void>((resolve) => setTimeout(resolve, 20));
     });
-    expect(
-      (await screen.findByLabelText("Take part in research")).props.accessibilityState?.checked,
-    ).toBe(true);
+    expect((await screen.findByLabelText(LABEL)).props.accessibilityState?.checked).toBe(true);
     expect(calls.length).toBe(1);
   });
 
   it("shows nothing for a signed-out device", async () => {
     await clearSession();
     fetchMock([]);
-    await show(<ConsentSwitch kind="research" />);
-    expect(screen.queryByLabelText("Take part in research")).toBeNull();
-    expect(screen.queryByText("Reading your choice…")).toBeNull();
+    await show(<ConsentSwitch kind="special_category" />);
+    expect(screen.queryByLabelText(LABEL)).toBeNull();
+    expect(screen.queryByText("Loading…")).toBeNull();
   });
 });
 
@@ -360,26 +250,51 @@ describe("useConsentStates", () => {
     });
     return view.result;
   };
+  /** The read of GET /consents, as the API holds these rows of these versions. */
+  const reading = (consents: unknown[], sensitive = SENSITIVE) =>
+    fetchMock([
+      (req) =>
+        req.method === "GET" && new URL(req.url).pathname === "/consents"
+          ? json({ consents, currentVersions: versions(sensitive) })
+          : null,
+    ]);
 
-  it("says each consent's state for its row: on, off, or outdated for a wording newer than the app's", async () => {
-    newerStatesApi();
-    const result = await states();
-    expect(result.current.states).toEqual({ research: "on", special_category: "outdated" });
+  it.each([
+    ["on when given for the current wording", [record()], SENSITIVE, "on"],
+    ["off when none is given", [], SENSITIVE, "off"],
+    [
+      "off when it was withdrawn",
+      [{ ...record(), withdrawnAt: "2026-09-27T10:00:00.000Z" }],
+      SENSITIVE,
+      "off",
+    ],
+    ["off for an older wording", [record("special_category", "2025-01-draft-1")], SENSITIVE, "off"],
+    [
+      "off for a research consent, which is not this one",
+      [record("research", SENSITIVE)],
+      SENSITIVE,
+      "off",
+    ],
+    [
+      "outdated for a wording newer than the app's",
+      [record()],
+      "2099-01-newer-than-this-app",
+      "outdated",
+    ],
+  ])("says the consent's state for its row: %s", async (_what, consents, sensitive, state) => {
+    reading(consents, sensitive);
+    expect((await states()).current.states).toEqual({ special_category: state });
   });
 
-  it("is unavailable for both when the read fails", async () => {
-    fetchMock([
-      () => json({ error: { code: "internal_error", message: "x", requestId: "r" } }, 500),
-    ]);
-    expect((await states()).current.states).toEqual({
-      research: "unavailable",
-      special_category: "unavailable",
-    });
+  it("is unavailable when the read fails", async () => {
+    fetchMock([serverError]);
+    expect((await states()).current.states).toEqual({ special_category: "unavailable" });
   });
 
   it("takes what a switch stored, so its row says it at once (#511)", async () => {
-    newerStatesApi();
+    reading([], "2099-01-newer-than-this-app");
     const result = await states();
+    expect(result.current.states).toEqual({ special_category: "outdated" });
     await act(async () => {
       result.current.stored({
         consents: [],
@@ -387,42 +302,17 @@ describe("useConsentStates", () => {
           terms: CONSENT_VERSIONS.terms ?? "",
           privacy: CONSENT_VERSIONS.privacy ?? "",
           research: CONSENT_VERSIONS.research ?? "",
-          special_category: CONSENT_VERSIONS.special_category ?? "",
+          special_category: SENSITIVE,
         },
       });
     });
-    expect(result.current.states).toEqual({ research: "off", special_category: "off" });
+    expect(result.current.states).toEqual({ special_category: "off" });
   });
 
   it("is loading without a session, and reads nothing", async () => {
     await clearSession();
     const calls = fetchMock([]);
-    expect((await states()).current.states).toEqual({
-      research: "loading",
-      special_category: "loading",
-    });
+    expect((await states()).current.states).toEqual({ special_category: "loading" });
     expect(calls).toHaveLength(0);
   });
-
-  function newerStatesApi() {
-    const versions = {
-      terms: CONSENT_VERSIONS.terms,
-      privacy: CONSENT_VERSIONS.privacy,
-      research: CONSENT_VERSIONS.research,
-      special_category: "2099-01-newer-than-this-app",
-    };
-    const research = {
-      kind: "research",
-      version: CONSENT_VERSIONS.research,
-      locale: "en",
-      givenAt: "2026-09-26T10:00:00.000Z",
-      withdrawnAt: null,
-    };
-    fetchMock([
-      (req) =>
-        req.method === "GET" && new URL(req.url).pathname === "/consents"
-          ? json({ consents: [research], currentVersions: versions })
-          : null,
-    ]);
-  }
 });

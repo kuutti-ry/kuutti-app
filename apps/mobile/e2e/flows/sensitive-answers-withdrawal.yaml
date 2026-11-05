@@ -3,9 +3,8 @@
 # person back to whom they seek, which waits for the consent again on the same
 # screen. The age window is no sensitive answer and stays, so the ages are not
 # asked again (ADR-010 §13, #219). Noa seeks everyone; she answers the same
-# again, which is no change (#147). Research is not offered: it is asked
-# before the bank, never in onboarding (#250, #418). The flow ends where it
-# began: consent given, everyone sought, the consent's row closed.
+# again, which is no change (#147). Research is not offered (#545). The flow
+# ends where it began: consent given, everyone sought, the consent's row closed.
 appId: fi.kuutti.app
 name: Withdrawing the sensitive-answers consent asks whom one seeks again with the consent, and keeps the age window
 ---
@@ -21,7 +20,7 @@ name: Withdrawing the sensitive-answers consent asks whom one seeks again with t
     file: ../common/open-settings-row.yaml
     env:
       ROW: "(Sensitive answers|Arkaluonteiset vastaukset|Känsliga svar)(, .*)?"
-      INSIDE: "Reading your choice…|Luetaan valintaasi…|Läser ditt val…|Store my sensitive answers|Tallenna arkaluonteiset vastaukseni|Spara mina känsliga svar"
+      INSIDE: "Loading…|Ladataan…|Laddar…|Store my sensitive answers|Tallenna arkaluonteiset vastaukseni|Spara mina känsliga svar"
 # A switch's text, to Maestro, is its value ("1" on, "0" off), right of its words.
 - extendedWaitUntil:
     visible:
@@ -43,28 +42,17 @@ name: Withdrawing the sensitive-answers consent asks whom one seeks again with t
     visible: "Whom are you looking for\\?|Ketä etsit\\?|Vem söker du\\?"
     timeout: 15000
 - assertVisible: "Step 3 of 8|Vaihe 3 / 8|Steg 3 av 8"
-- assertVisible:
-    text: "Anyone|Kenet tahansa|Vem som helst"
-    selected: false
+# A row chosen carries its tick in its name, so the words alone find one not chosen (README).
+- assertVisible: "Anyone|Kenet tahansa|Vem som helst"
 - tapOn: "Anyone|Kenet tahansa|Vem som helst"
 # Anyone is all three; one dropped, it is not anyone any more, and back again.
+- tapOn: "✓ Men|✓ Miehiä|✓ Män"
+- assertVisible: "Anyone|Kenet tahansa|Vem som helst"
 - tapOn: "Men|Miehiä|Män"
-- assertVisible:
-    text: "Anyone|Kenet tahansa|Vem som helst"
-    selected: false
-- tapOn: "Men|Miehiä|Män"
-- assertVisible:
-    text: "Anyone|Kenet tahansa|Vem som helst"
-    selected: true
-- assertVisible:
-    text: "Women|Naisia|Kvinnor"
-    selected: true
-- assertVisible:
-    text: "Men|Miehiä|Män"
-    selected: true
-- assertVisible:
-    text: "Non-binary people|Muunsukupuolisia|Icke-binära personer"
-    selected: true
+- assertVisible: "✓ Anyone|✓ Kenet tahansa|✓ Vem som helst"
+- assertVisible: "✓ Women|✓ Naisia|✓ Kvinnor"
+- assertVisible: "✓ Men|✓ Miehiä|✓ Män"
+- assertVisible: "✓ Non-binary people|✓ Muunsukupuolisia|✓ Icke-binära personer"
 - scrollUntilVisible:
     element: "I consent to Kuutti storing whom I seek|Annan Kuutille luvan tallentaa, kenen seuraa etsin|Jag samtycker till att Kuutti lagrar vem jag söker"
     direction: DOWN
@@ -88,12 +76,12 @@ name: Withdrawing the sensitive-answers consent asks whom one seeks again with t
     timeout: 60000
 - tapOn: "Continue|Jatka|Fortsätt"
 
-# Not the ages: the window stayed. Not research either (#250, #418): straight home.
+# Not the ages: the window stayed. Straight home: the gate's sentence, which the
+# profile's screen of the same title does not have.
 - extendedWaitUntil:
-    visible: "People on Kuutti|Ihmiset Kuutissa|Människor på Kuutti"
+    visible: "Matching opens for finished profiles\\. Yours still lacks something\\.|Seuranhaku avautuu valmiille profiileille\\. Sinun profiilistasi puuttuu vielä jotakin\\.|Matchningen öppnar för färdiga profiler\\. I din saknas ännu något\\."
     timeout: 15000
 - assertNotVisible: "What ages\\?|Minkä ikäisiä\\?|Vilka åldrar\\?"
-- assertNotVisible: "Help us learn how matching works|Auta meitä oppimaan, miten yhdistäminen toimii|Hjälp oss lära hur matchningen fungerar"
 - openLink: kuutti://settings
 - extendedWaitUntil:
     visible: "Settings|Asetukset|Inställningar"
@@ -111,4 +99,4 @@ name: Withdrawing the sensitive-answers consent asks whom one seeks again with t
     file: ../common/close-settings-row.yaml
     env:
       ROW: "(Sensitive answers|Arkaluonteiset vastaukset|Känsliga svar)(, .*)?"
-      INSIDE: "Reading your choice…|Luetaan valintaasi…|Läser ditt val…|Store my sensitive answers|Tallenna arkaluonteiset vastaukseni|Spara mina känsliga svar"
+      INSIDE: "Loading…|Ladataan…|Laddar…|Store my sensitive answers|Tallenna arkaluonteiset vastaukseni|Spara mina känsliga svar"

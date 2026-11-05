@@ -143,7 +143,7 @@ describe("a slangi text", () => {
     ["account.break.title"],
     ["onboarding.consents.explain"],
     ["signIn.title"],
-    ["push.round"],
+    ["push.match"],
     ["mail.code.subject"],
     ["support.mieli.name"],
     ["admin.title"],

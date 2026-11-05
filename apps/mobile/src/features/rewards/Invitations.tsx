@@ -1,12 +1,14 @@
 import { formatDateTime, type PlainMessageKey } from "@kuutti/i18n";
 import type {
   InvitationCreated,
+  InvitationReward,
   Invitations as InvitationsAnswer,
   OpenInvitation,
 } from "@kuutti/schema";
 import { useEffect, useRef, useState } from "react";
 import { AccessibilityInfo, Platform, Share, View } from "react-native";
 import { LoadFailed } from "@/components/LoadFailed";
+import { sayAloud } from "@/components/Notice";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -38,13 +40,16 @@ type Notice =
 
 const NOTICE: Readonly<Record<Notice, PlainMessageKey>> = {
   made: "settings.invite.made",
-  makeFailed: "settings.invite.makeFailed",
+  makeFailed: "load.failed.press",
   full: "errors.invitations_full",
   notYet: "errors.invitation_not_yet",
   withdrawn: "settings.invite.withdrawn",
-  withdrawFailed: "settings.invite.withdrawFailed",
+  withdrawFailed: "load.failed.press",
   shareFailed: "settings.invite.shareFailed",
 };
+
+/** What the screen shows by itself: the code's card appears, the invitation leaves the list. Said, not drawn (#581), unless `run` finds the list not read. */
+const SAID_ONLY: ReadonlySet<Notice> = new Set(["made", "withdrawn"]);
 
 /** Making one refused in the API's own words (ADR-044 §5); any other failure says it could not be made. */
 const MAKE_REFUSALS = new Map<string | undefined, Notice>([
@@ -62,18 +67,18 @@ const spoken = (code: string) =>
 /**
  * Settings › Invitations (#107, ADR-044), the settings slice's page around
  * it. For a person whose profile is complete: what an
- * invitation earns today in words, Make an invitation, the code just made
+ * invitation earns today in words, Create an invitation, the code just made
  * (large, selectable, read a character at a time, shown this once since
  * Kuutti keeps only its hash) with Share the code, which hands the phone's
  * sheet the invitation's message, until a read lists it no more; the open
  * invitations by when they were
- * made, each withdrawn after asking; how many counted and what they earned
- * that waits. Anybody else reads that invitations open once the profile is
+ * made, each withdrawn after asking; what they earned that waits. Anybody else reads that invitations open once the profile is
  * complete. Somebody who may still type a code finds its field. Nothing here
- * names a friend, or says that one used a code and has not finished. Every
- * outcome is said in a live region and, on iOS, aloud. The share sheet is
- * injected, as the export's is (AccountActions), so tests see what it was
- * handed.
+ * names a friend, or says that one used a code and has not finished. A made or
+ * withdrawn invitation shows by itself and is said aloud, with no line of its
+ * own (#581); any other outcome is said in a live region and, on iOS, aloud. The
+ * share sheet is injected, as the export's is (AccountActions), so tests see
+ * what it was handed.
  */
 export function Invitations({
   share = Share.share,
@@ -98,11 +103,15 @@ export function Invitations({
   const [answers, setAnswers] = useState(0);
   const [withdrawing, setWithdrawing] = useState<OpenInvitation | null>(null);
   const [redeemed, setRedeemed] = useState(false);
-  // The code just made comes into sight: it is drawn below the button, and
-  // "Its code is below" must not point under the screen's edge (#511).
+  // The code just made comes into sight: it is drawn below the button, nothing
+  // else shows that it was made, and it must not stay under the screen's edge (#511, #581).
   const codeCard = useRevealOn(made?.id ?? null);
 
-  const say = (next: Notice) => {
+  const say = (next: Notice, drawn = !SAID_ONLY.has(next)) => {
+    if (!drawn) {
+      sayAloud(t(NOTICE[next]));
+      return;
+    }
     setNotice(next);
     setAnswers((n) => n + 1);
     // Android's live region speaks it; iOS has none.
@@ -114,8 +123,10 @@ export function Invitations({
     setBusy(true);
     setNotice(null);
     const outcome = await change();
-    await view.refresh();
-    say(outcome);
+    const read = await view.refresh();
+    // Only a read takes a withdrawn invitation off the list: without one it
+    // still stands there, and the words are all that tell the eye.
+    say(outcome, !SAID_ONLY.has(outcome) || (outcome === "withdrawn" && !read));
     setBusy(false);
   };
 
@@ -157,15 +168,13 @@ export function Invitations({
       listedMade.current = true;
     } else if (listedMade.current) {
       setMade(null);
-      // "Its code is below" would point at nothing.
-      setNotice((was) => (was === "made" ? null : was));
     }
   }, [listed, made]);
 
-  const shareCode = async (code: string) => {
+  const shareCode = async (code: string, reward: InvitationReward) => {
     tap();
     try {
-      await share({ message: t("invite.share.message", { code }) });
+      await share({ message: t("invite.share.message", { code, ...rewardParams(reward) }) });
     } catch {
       say("shareFailed");
     }
@@ -174,28 +183,22 @@ export function Invitations({
   if (view.status === "loading") {
     return (
       <Text variant="muted" accessibilityLiveRegion="polite">
-        {t("settings.invite.loading")}
+        {t("load.loading")}
       </Text>
     );
   }
   if (view.status === "failed") {
-    return (
-      <LoadFailed
-        headline={t("settings.invite.loadFailed")}
-        error={view.error}
-        onRetry={view.retry}
-      />
-    );
+    return <LoadFailed error={view.error} onRetry={view.retry} />;
   }
-  const { canInvite, redeemable, reward, open, counted, earned } = view.invitations;
+  const { canInvite, redeemable, reward, open, earned } = view.invitations;
+  const earns = rewardParams(reward);
 
   return (
     <View className="gap-6">
       {canInvite ? (
         <>
           <View className="gap-3">
-            <Text>{t("settings.invite.intro")}</Text>
-            <Text>{t("settings.invite.earns", rewardParams(reward))}</Text>
+            {earns.reward !== "none" && <Text>{t("settings.invite.earns", earns)}</Text>}
             <Button
               disabled={busy}
               onPress={() => {
@@ -229,7 +232,7 @@ export function Invitations({
                 {made.code}
               </Text>
               <Text variant="muted">{t("settings.invite.code.once")}</Text>
-              <Button onPress={() => void shareCode(made.code)}>
+              <Button onPress={() => void shareCode(made.code, reward)}>
                 {t("settings.invite.share")}
               </Button>
             </View>
@@ -261,15 +264,9 @@ export function Invitations({
               })}
             </View>
           )}
-          <View className="gap-2">
-            <Text>{t("settings.invite.counted", { friends: counted })}</Text>
-            {earned.fish > 0 && (
-              <Text>{t("settings.invite.earned.fish", { fish: earned.fish })}</Text>
-            )}
-            {earned.likes > 0 && (
-              <Text>{t("settings.invite.earned.likes", { likes: earned.likes })}</Text>
-            )}
-          </View>
+          {earned.fish > 0 && (
+            <Text>{t("settings.invite.earned.fish", { fish: earned.fish })}</Text>
+          )}
         </>
       ) : (
         <Text>{t("settings.invite.notYet")}</Text>
@@ -282,7 +279,7 @@ export function Invitations({
             <Text accessibilityLiveRegion="polite">{t("invite.redeem.done")}</Text>
           ) : (
             <>
-              <Text>{t("invite.redeem.explain")}</Text>
+              {reward.friendFish > 0 && <Text>{t("invite.redeem.earns", earns)}</Text>}
               <RedeemInvitation
                 onRedeemed={() => {
                   setRedeemed(true);
@@ -325,8 +322,8 @@ export function Invitations({
 
 /**
  * The Invitations row's value in Settings (#376, #511): how many wait to be
- * used, once the person may invite; nothing before, where the row's panel
- * says when they may.
+ * used once the person may invite, or with none, what to do (#581); nothing
+ * before, where the row's panel says when they may.
  */
 export function useInvitationsSummary(enabled: boolean) {
   const { t } = useT();

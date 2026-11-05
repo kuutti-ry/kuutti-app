@@ -1,7 +1,7 @@
 # Contacts shared in a conversation (#103, ADR-031): Elina keeps her
 # Instagram username in Settings, Ways to reach you, where nobody sees it; she
 # opens her conversation with Jussi, shares it with the header's Share contact
-# and sees it marked shared. Jussi signs in and finds it under the
+# and sees its button turn to Stop sharing. Jussi signs in and finds it under the
 # conversation's header. Elina signs in again, stops sharing it and removes it
 # in Settings, closing its row, so the flow runs again without a reset. The stories give the
 # pair their conversation (packages/db/src/seed/conversations.ts), which no
@@ -23,7 +23,7 @@ name: A contact kept in Settings is shared from a conversation's header and show
     file: ../common/open-settings-row.yaml
     env:
       ROW: "Ways to reach you|Mistä sinut tavoittaa|Hur man når dig"
-      INSIDE: "Loading your contact details…|Ladataan yhteystietojasi…|Laddar dina kontaktuppgifter…|Keep the ways to reach you outside the app here\\..*|Pidä täällä yhteystiedot, joilla sinut tavoittaa sovelluksen ulkopuolella\\..*|Spara här hur man når dig utanför appen\\..*"
+      INSIDE: "Loading…|Ladataan…|Laddar…|Nobody sees them until you share one in a conversation\\..*|Kukaan ei näe niitä, ennen kuin jaat jonkin niistä keskustelussa\\..*|Ingen ser dem förrän du delar en av dem i ett samtal\\..*"
 # The cards come once what is kept has been read, the phone number's first;
 # Instagram's is the fourth of five, below the fold. A field is its label.
 - extendedWaitUntil:
@@ -38,9 +38,8 @@ name: A contact kept in Settings is shared from a conversation's header and show
 - inputText: "elina.lukupiiri"
 # There is no Save (#511): leaving the field keeps it. The page keeps the
 # focused field in sight just above the keyboard, with the kind's title
-# above it (the hint between them is Telegram's too). A tap on the title,
-# which is no button and the brand's name in every language, closes the
-# keyboard and leaves the field (README, the keyboard).
+# above it. A tap on the title, which is no button and the brand's name in
+# every language, closes the keyboard and leaves the field (README, the keyboard).
 - tapOn: "Instagram"
 - extendedWaitUntil:
     visible: "Saved\\.|Tallennettu\\.|Sparat\\."
@@ -68,14 +67,14 @@ name: A contact kept in Settings is shared from a conversation's header and show
     visible: "Share your Instagram|Jaa: Instagram|Dela: Instagram"
     timeout: 15000
 - assertVisible: "Instagram: elina\\.lukupiiri"
-- assertVisible: "Jussi sees what you share at once, at the top of this conversation\\. You can stop sharing at any time, but what Jussi already wrote down stays with them\\.|Jussi näkee jakamasi heti tämän keskustelun yläosassa\\. Voit lopettaa jakamisen milloin tahansa, mutta minkä Jussi on jo kirjoittanut muistiin, jää hänelle\\.|Jussi ser det du delar direkt, högst upp i det här samtalet\\. Du kan sluta dela när som helst, men det som Jussi redan har skrivit ner finns kvar\\."
+- assertVisible: "Jussi sees what you share at once\\. You can stop sharing at any time, but what Jussi already wrote down stays with them\\.|Jussi näkee jakamasi heti\\. Voit lopettaa jakamisen milloin tahansa, mutta minkä Jussi on jo kirjoittanut muistiin, jää hänelle\\.|Jussi ser det du delar direkt\\. Du kan sluta dela när som helst, men det som Jussi redan har skrivit ner finns kvar\\."
 - tapOn: "Share your Instagram|Jaa: Instagram|Dela: Instagram"
+# The button turns: its word is the state, and the outcome is said aloud, not drawn (#581).
 - extendedWaitUntil:
-    visible: "Shared\\. Jussi sees it now\\.|Jaettu\\. Jussi näkee sen nyt\\.|Delat\\. Jussi ser det nu\\."
+    visible: "Stop sharing your Instagram|Lopeta jakaminen: Instagram|Sluta dela: Instagram"
     timeout: 15000
-# Marked shared in words, and the button beside it stops it.
-- assertVisible: "Shared in this conversation|Jaettu tässä keskustelussa|Delas i det här samtalet"
-- assertVisible: "Stop sharing your Instagram|Lopeta jakaminen: Instagram|Sluta dela: Instagram"
+- assertNotVisible: "Share your Instagram|Jaa: Instagram|Dela: Instagram"
+- assertNotVisible: "Shared\\. Jussi sees it now\\.|Jaettu\\. Jussi näkee sen nyt\\.|Delat\\. Jussi ser det nu\\."
 - tapOn: "Close|Sulje|Stäng"
 - extendedWaitUntil:
     notVisible: "Stop sharing your Instagram|Lopeta jakaminen: Instagram|Sluta dela: Instagram"
@@ -103,8 +102,8 @@ name: A contact kept in Settings is shared from a conversation's header and show
 - assertVisible: "Open Instagram: Elina|Avaa Instagram: Elina|Öppna Instagram: Elina"
 - assertVisible: "Copy Instagram: Elina|Kopioi Instagram: Elina|Kopiera Instagram: Elina"
 
-# Elina again: still marked shared. She stops sharing it, then removes it in
-# Settings, which leaves her as the stories have her.
+# Elina again: still shared, as its button says. Sharing stops, then the contact
+# goes in Settings, which leaves Elina as the stories have it.
 - runFlow:
     file: ../common/sign-in.yaml
     env:
@@ -123,13 +122,13 @@ name: A contact kept in Settings is shared from a conversation's header and show
 - extendedWaitUntil:
     visible: "Stop sharing your Instagram|Lopeta jakaminen: Instagram|Sluta dela: Instagram"
     timeout: 15000
-- assertVisible: "Shared in this conversation|Jaettu tässä keskustelussa|Delas i det här samtalet"
 - tapOn: "Stop sharing your Instagram|Lopeta jakaminen: Instagram|Sluta dela: Instagram"
+# The button turns back, and the outcome is said aloud, not drawn (#581).
 - extendedWaitUntil:
-    visible: "No longer shared here\\.|Ei enää jaettu tässä\\.|Delas inte längre här\\."
+    visible: "Share your Instagram|Jaa: Instagram|Dela: Instagram"
     timeout: 15000
-- assertVisible: "Share your Instagram|Jaa: Instagram|Dela: Instagram"
-- assertNotVisible: "Shared in this conversation|Jaettu tässä keskustelussa|Delas i det här samtalet"
+- assertNotVisible: "Stop sharing your Instagram|Lopeta jakaminen: Instagram|Sluta dela: Instagram"
+- assertNotVisible: "No longer shared here\\.|Ei enää jaettu tässä\\.|Delas inte längre här\\."
 # Closed before Settings: the dialog lies over the app, not inside the conversation.
 - tapOn: "Close|Sulje|Stäng"
 - extendedWaitUntil:
@@ -144,7 +143,7 @@ name: A contact kept in Settings is shared from a conversation's header and show
     file: ../common/open-settings-row.yaml
     env:
       ROW: "Ways to reach you|Mistä sinut tavoittaa|Hur man når dig"
-      INSIDE: "Loading your contact details…|Ladataan yhteystietojasi…|Laddar dina kontaktuppgifter…|Keep the ways to reach you outside the app here\\..*|Pidä täällä yhteystiedot, joilla sinut tavoittaa sovelluksen ulkopuolella\\..*|Spara här hur man når dig utanför appen\\..*"
+      INSIDE: "Loading…|Ladataan…|Laddar…|Nobody sees them until you share one in a conversation\\..*|Kukaan ei näe niitä, ennen kuin jaat jonkin niistä keskustelussa\\..*|Ingen ser dem förrän du delar en av dem i ett samtal\\..*"
 - extendedWaitUntil:
     visible: "Your phone number|Puhelinnumerosi|Ditt telefonnummer"
     timeout: 15000
@@ -154,12 +153,14 @@ name: A contact kept in Settings is shared from a conversation's header and show
     centerElement: true
     timeout: 60000
 - tapOn: "Remove your Instagram username|Poista Instagram-käyttäjänimesi|Ta bort ditt användarnamn på Instagram"
+# Said aloud and not drawn (#581): Remove goes and the field is empty.
 - extendedWaitUntil:
-    visible: "Removed\\. Wherever you shared it, it is gone now\\.|Poistettu\\. Se on poistunut myös sieltä, missä jaoit sen\\.|Borttaget\\. Det är borta även där du delade det\\."
+    notVisible: "Remove your Instagram username|Poista Instagram-käyttäjänimesi|Ta bort ditt användarnamn på Instagram"
     timeout: 15000
-- assertNotVisible: "Remove your Instagram username|Poista Instagram-käyttäjänimesi|Ta bort ditt användarnamn på Instagram"
+- assertNotVisible: "elina\\.lukupiiri"
+- assertNotVisible: "Removed\\. Wherever you shared it, it is gone now\\.|Poistettu\\. Se on poistunut myös sieltä, missä jaoit sen\\.|Borttaget\\. Det är borta även där du delade det\\."
 - runFlow:
     file: ../common/close-settings-row.yaml
     env:
       ROW: "Ways to reach you|Mistä sinut tavoittaa|Hur man når dig"
-      INSIDE: "Loading your contact details…|Ladataan yhteystietojasi…|Laddar dina kontaktuppgifter…|Keep the ways to reach you outside the app here\\..*|Pidä täällä yhteystiedot, joilla sinut tavoittaa sovelluksen ulkopuolella\\..*|Spara här hur man når dig utanför appen\\..*"
+      INSIDE: "Loading…|Ladataan…|Laddar…|Nobody sees them until you share one in a conversation\\..*|Kukaan ei näe niitä, ennen kuin jaat jonkin niistä keskustelussa\\..*|Ingen ser dem förrän du delar en av dem i ett samtal\\..*"

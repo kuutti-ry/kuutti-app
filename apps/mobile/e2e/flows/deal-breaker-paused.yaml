@@ -1,39 +1,32 @@
 # A deal-breaker waits while the person's own answer on its field is missing
 # (#149, the disclose-to-filter rule, features/matching/preferences.feature):
 # taking one's smoking answer back pauses the smoking deal-breaker, said in
-# words, with nothing deleted; answering again lifts the pause. Sanna smokes
-# never and has no deal-breaker; the flow ends as it began.
+# words, with nothing deleted and what stands drawn read-only (#551); its row on
+# What you seek says so and keeps its screen (#581); answering again lifts the
+# pause. Sanna smokes never and has no deal-breaker; the flow ends as it began.
 appId: fi.kuutti.app
 name: Taking one's own answer back pauses the deal-breaker on it, and answering again lifts the pause
 ---
 - runFlow: ../common/sign-in.yaml
-- openLink: kuutti://profile/deal-breakers
+- openLink: kuutti://profile/deal-breakers/smoking
 - extendedWaitUntil:
-    visible: "Deal-breakers|Ehdottomat rajat|Absoluta gränser"
+    visible: "✓ Everyone|✓ Kaikki|✓ Alla"
     timeout: 15000
 - waitForAnimationToEnd
-- tapOn: "(Deal-breaker: Smoking|Ehdoton raja: Tupakointi|Absolut gräns: Rökning)(, .*)?"
-- tapOn: "Never|En koskaan|Aldrig"
-# The save lies under the rows, the distance's last among them: scrolled to.
-- scrollUntilVisible:
-    element: "Save the deal-breakers|Tallenna rajat|Spara gränserna"
-    direction: DOWN
-    centerElement: true
-    timeout: 60000
-- tapOn: "Save the deal-breakers|Tallenna rajat|Spara gränserna"
+- tapOn: "Never|Ei koskaan|Aldrig"
+- assertVisible: "✓ Never|✓ Ei koskaan|✓ Aldrig"
+- tapOn: "Back|Takaisin|Tillbaka"
 - extendedWaitUntil:
-    visible: "Saved\\.|Tallennettu\\.|Sparat\\."
+    notVisible: "Fine with me|Sopii minulle|Okej för mig"
     timeout: 15000
 
-# Her own answer taken back.
+# Her own answer taken back: the first person's words, on her own question.
 - openLink: kuutti://profile/later/smoking
 - extendedWaitUntil:
-    visible:
-      text: "Never|En koskaan|Aldrig"
-      selected: true
+    visible: "✓ Never|✓ En koskaan|✓ Aldrig"
     timeout: 15000
 - waitForAnimationToEnd
-- tapOn: "Never|En koskaan|Aldrig"
+- tapOn: "✓ Never|✓ En koskaan|✓ Aldrig"
 - scrollUntilVisible:
     element: "Save and continue|Tallenna ja jatka|Spara och fortsätt"
     direction: DOWN
@@ -44,19 +37,34 @@ name: Taking one's own answer back pauses the deal-breaker on it, and answering 
     notVisible: "Smoking|Tupakointi|Rökning"
     timeout: 15000
 
-# Paused, in words; nothing deleted.
-- openLink: kuutti://profile/deal-breakers
+# Paused, in words, on its row and on its screen; nothing deleted. The row keeps
+# its screen, where one that says to share first opens the question (#581).
+- openLink: kuutti://profile/seek
 - extendedWaitUntil:
-    visible: "Paused until you answer it yourself\\.|Tauolla, kunnes vastaat siihen itse\\.|Pausad tills du själv svarar på det\\."
+    visible: "These work both ways.*|Nämä toimivat molempiin suuntiin.*|De här gäller åt båda håll.*"
     timeout: 15000
-- assertVisible:
-    text: "Never|En koskaan|Aldrig"
-    selected: true
+- waitForAnimationToEnd
+- scrollUntilVisible:
+    element: "((Smoking|Tupakointi|Rökning), )?(Paused until you answer it yourself\\.|Tauolla, kunnes vastaat siihen itse\\.|Pausad tills du själv svarar på det\\.)"
+    direction: DOWN
+    centerElement: true
+    timeout: 60000
+- tapOn: "(Smoking|Tupakointi|Rökning)(, .*)?"
+- extendedWaitUntil:
+    visible:
+      text: "✓ Never|✓ Ei koskaan|✓ Aldrig"
+      enabled: false
+    timeout: 15000
+- waitForAnimationToEnd
+- assertVisible: "Paused until you answer it yourself\\.|Tauolla, kunnes vastaat siihen itse\\.|Pausad tills du själv svarar på det\\."
+# Only what stands: the other answers come back with her own.
+- assertNotVisible: "Regularly|Säännöllisesti|Regelbundet"
 
-# Answered again: the pause lifts.
+# Answered again: the pause lifts, back where Answer it was pressed (#542), not
+# on through the later questions.
 - tapOn: "Answer it|Vastaa|Svara"
 - extendedWaitUntil:
-    visible: "Smoking|Tupakointi|Rökning"
+    visible: "When you have a moment|Kun sinulla on hetki|När du har en stund"
     timeout: 15000
 - waitForAnimationToEnd
 - tapOn: "Never|En koskaan|Aldrig"
@@ -66,22 +74,22 @@ name: Taking one's own answer back pauses the deal-breaker on it, and answering 
     centerElement: true
     timeout: 60000
 - tapOn: "Save and continue|Tallenna ja jatka|Spara och fortsätt"
-# Back where Answer it was pressed (#542), not on through the later questions.
 - extendedWaitUntil:
-    visible: "Deal-breakers|Ehdottomat rajat|Absoluta gränser"
+    visible: "Fine with me|Sopii minulle|Okej för mig"
+    timeout: 15000
+# The screen reads the answers again as it comes back, a breath after it shows.
+- extendedWaitUntil:
+    notVisible: "Paused until you answer it yourself\\.|Tauolla, kunnes vastaat siihen itse\\.|Pausad tills du själv svarar på det\\."
     timeout: 15000
 - waitForAnimationToEnd
-- assertNotVisible: "Paused until you answer it yourself\\.|Tauolla, kunnes vastaat siihen itse\\.|Pausad tills du själv svarar på det\\."
+- assertVisible:
+    text: "✓ Never|✓ Ei koskaan|✓ Aldrig"
+    enabled: true
+- assertVisible: "Regularly|Säännöllisesti|Regelbundet"
 
 # Back as it began: no deal-breaker.
-- tapOn: "(Deal-breaker: Smoking|Ehdoton raja: Tupakointi|Absolut gräns: Rökning)(, .*)?"
-- scrollUntilVisible:
-    element: "Save the deal-breakers|Tallenna rajat|Spara gränserna"
-    direction: DOWN
-    centerElement: true
-    timeout: 60000
-- tapOn: "Save the deal-breakers|Tallenna rajat|Spara gränserna"
+- tapOn: "Everyone|Kaikki|Alla"
+- tapOn: "Back|Takaisin|Tillbaka"
 - extendedWaitUntil:
-    visible: "Saved\\.|Tallennettu\\.|Sparat\\."
+    visible: "((Smoking|Tupakointi|Rökning), )?(Everyone|Kaikki|Alla)"
     timeout: 15000
-- assertNotVisible: "Fine with me|Sopii minulle|Okej för mig"

@@ -2,17 +2,16 @@ import type { PlainMessageKey } from "@kuutti/i18n";
 import { FEEDBACK_TEXT_MAX, type FeedbackKind, type FeedbackPlatform } from "@kuutti/schema";
 import { useState } from "react";
 import { Platform, View } from "react-native";
-import { Notice } from "@/components/Notice";
+import { Choice } from "@/components/Choice";
+import { Notice, sayAloud } from "@/components/Notice";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Text } from "@/components/ui/text";
-import { useSession } from "@/features/identity";
 import { ApiError } from "@/lib/api";
 import { buildInfo } from "@/lib/build";
 import { useT } from "@/lib/locale";
 import { useReportUnsaved } from "@/lib/unsaved";
 import { useHapticTap } from "@/theme/haptics";
-import { Choice } from "./Choice";
 import { sendFeedback } from "./feedback-client";
 
 /** The four kinds in the order the person reads them; the panel's own order is the contract's. */
@@ -40,7 +39,6 @@ type State = "idle" | "sending" | "sent" | "failed" | "limited";
 export function FeedbackForm() {
   const { t, locale } = useT();
   const tap = useHapticTap();
-  const session = useSession();
   const [kind, setKind] = useState<FeedbackKind | null>(null);
   const [text, setText] = useState("");
   const [state, setState] = useState<State>("idle");
@@ -62,6 +60,7 @@ export function FeedbackForm() {
       setKind(null);
       setText("");
       setState("sent");
+      sayAloud(t("feedback.thanks.title"));
     } catch (error) {
       setState(error instanceof ApiError && error.status === 429 ? "limited" : "failed");
     }
@@ -69,12 +68,9 @@ export function FeedbackForm() {
 
   return (
     <>
-      {session.status !== "signed-in" ? (
-        <Text variant="muted">{t("settings.session.none")}</Text>
-      ) : state === "sent" ? (
+      {state === "sent" ? (
         <View className="gap-3">
           <Text variant="title">{t("feedback.thanks.title")}</Text>
-          <Notice words={t("feedback.thanks.body")} />
           <Button
             variant="outline"
             onPress={() => {
@@ -129,7 +125,7 @@ export function FeedbackForm() {
           {(state === "failed" || state === "limited") && (
             <Notice
               refused
-              words={state === "limited" ? t("feedback.limited") : t("feedback.failed")}
+              words={state === "limited" ? t("errors.enough_today") : t("load.failed.press")}
             />
           )}
           <Button

@@ -41,7 +41,7 @@ const feedback = tunable(
 const word = tunable("sample_word", version(1, "first"));
 const fetches = tunable("photo_fetches_per_day", version(1, { thumb: 600, card: 300, full: 60 }));
 const tips = tunable("photo_tips_on", version(1, true));
-const share = tunable("contest_ratio_threshold", version(1, 0.6));
+const share = tunable("sample_fraction", version(1, 0.6));
 
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
@@ -127,25 +127,29 @@ describe("the tunables", () => {
       (req) => (isList(req) ? new Promise<Response>((resolve) => (answer = resolve)) : null),
     ]);
     show();
-    expect(screen.getByText("Loading the tunables…")).toHaveAttribute("aria-busy", "true");
+    expect(screen.getByText("Loading…")).toHaveAttribute("aria-busy", "true");
     await waitFor(() => expect(lists(calls)).toHaveLength(1));
-    expect(screen.getByText("Loading the tunables…")).toBeInTheDocument();
+    expect(screen.getByText("Loading…")).toBeInTheDocument();
     answer(json({ items: [feedback, word, fetches, tips] }));
-    expect(await screen.findByText("4 tunables")).toBeInTheDocument();
-    expect(screen.queryByText("Loading the tunables…")).toBeNull();
+    const at = await item("feedback_per_day");
+    expect(screen.queryByText("Loading…")).toBeNull();
     expect(screen.getByRole("heading", { level: 2, name: "Tunables" })).toBeInTheDocument();
     expect(calls[0]?.authorization).toBe(`Bearer ${"t".repeat(43)}`);
+    // The whole list is on the page: nothing counts it (#581).
+    expect(screen.queryByText(/tunables?$/)).toBeNull();
 
+    // A closed row is its key and its value; the version is the first column once it is open (#581).
     const lines = screen.getAllByRole("listitem").map((li) => li.querySelector("summary"));
     expect(lines.map((line) => line?.textContent)).toEqual([
-      "feedback_per_day version 2: 5",
-      "sample_word version 1: first",
-      'photo_fetches_per_day version 1: {"thumb":600,"card":300,"full":60}',
-      "photo_tips_on version 1: true",
+      "feedback_per_day 5",
+      "sample_word first",
+      'photo_fetches_per_day {"thumb":600,"card":300,"full":60}',
+      "photo_tips_on true",
     ]);
 
-    const at = await item("feedback_per_day");
+    // The table keeps its name for a screen reader; the columns and the falling numbers say it to the eye (#581).
     const table = at.getByRole("table", { name: "Versions, newest first" });
+    expect(within(table).getByText("Versions, newest first")).toHaveClass("sr-only");
     const header = within(table)
       .getAllByRole("columnheader")
       .map((cell) => cell.textContent);
@@ -171,18 +175,13 @@ describe("the tunables", () => {
         "3",
         formatDateTime("en", new Date("2026-10-01T09:30:00.000Z")),
         "migration",
-        "Before reasons were kept",
+        // A version with no reason shows the panel's dash (#581).
+        "–",
       ],
     ]);
     // An object's versions show as JSON, like its value line.
     const objectTable = (await item("photo_fetches_per_day")).getByRole("table");
     expect(within(objectTable).getByText('{"thumb":600,"card":300,"full":60}')).toBeInTheDocument();
-  });
-
-  it("says one tunable in the singular", async () => {
-    fetchMock([listOf(word)]);
-    show();
-    expect(await screen.findByText("1 tunable")).toBeInTheDocument();
   });
 
   it("reloads on refresh", async () => {
@@ -191,25 +190,25 @@ describe("the tunables", () => {
       (req) => (isList(req) ? json({ items: page++ === 0 ? [word] : [word, tips] }) : null),
     ]);
     show();
-    expect(await screen.findByText("1 tunable")).toBeInTheDocument();
+    expect(await screen.findByText("sample_word", { selector: "code" })).toBeInTheDocument();
+    expect(screen.queryByText("photo_tips_on", { selector: "code" })).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
-    expect(await screen.findByText("2 tunables")).toBeInTheDocument();
-    expect(screen.getByText("photo_tips_on", { selector: "code" })).toBeInTheDocument();
+    expect(await screen.findByText("photo_tips_on", { selector: "code" })).toBeInTheDocument();
     expect(lists(calls)).toHaveLength(2);
   });
 
   it("says when the tunables could not be loaded", async () => {
     fetchMock([(req) => (isList(req) ? failure("internal_error", 500) : null)]);
     show();
-    expect(await screen.findByRole("alert")).toHaveTextContent("The tunables could not be loaded.");
-    expect(screen.queryByText("Loading the tunables…")).toBeNull();
+    expect(await screen.findByRole("alert")).toHaveTextContent(/^Could not be loaded\.$/);
+    expect(screen.queryByText("Loading…")).toBeNull();
     expect(screen.queryByRole("list")).toBeNull();
   });
 
   it("leaves a refused list to the shell: no list, no failure of its own (#302)", async () => {
     const calls = fetchMock([(req) => (isList(req) ? failure("admin_forbidden", 403) : null)]);
     show();
-    await waitFor(() => expect(screen.queryByText("Loading the tunables…")).toBeNull());
+    await waitFor(() => expect(screen.queryByText("Loading…")).toBeNull());
     expect(lists(calls)).toHaveLength(1);
     expect(screen.queryByRole("alert")).toBeNull();
     expect(screen.queryByRole("list")).toBeNull();
@@ -225,7 +224,7 @@ describe("the tunables", () => {
     expect(number.getByLabelText("Why the change")).toHaveValue("");
     expect(number.getByLabelText("Why the change")).toHaveAttribute("maxlength", "500");
     expect(number.getByLabelText("Why the change")).toBeRequired();
-    const fraction = await item("contest_ratio_threshold");
+    const fraction = await item("sample_fraction");
     expect(fraction.getByLabelText("New value")).toHaveAttribute("inputmode", "decimal");
     const text = await item("sample_word");
     expect(text.getByLabelText("New value")).toHaveValue("first");
@@ -253,8 +252,8 @@ describe("the tunables", () => {
     fireEvent.click(at.getByRole("button", { name: "Change it" }));
     await waitFor(() =>
       expect(
-        screen.getByText("feedback_per_day", { selector: "code" }).closest("summary"),
-      ).toHaveTextContent("feedback_per_day version 3: 7"),
+        screen.getByText("feedback_per_day", { selector: "code" }).closest("summary")?.textContent,
+      ).toBe("feedback_per_day 7"),
     );
     expect(posts(calls)).toEqual([
       {
@@ -271,7 +270,7 @@ describe("the tunables", () => {
       within(at.getAllByRole("row")[1] as HTMLElement).getByText("More room in the pilot"),
     ).toBeInTheDocument();
     expect(at.getByLabelText("Why the change")).toHaveValue("");
-    expect(screen.getByText("Saved. feedback_per_day, version 3: 7")).toBeInTheDocument();
+    expect(screen.getByText("Saved. feedback_per_day: 7")).toBeInTheDocument();
   });
 
   it("keeps every other key open and its draft as it was after a change", async () => {
@@ -283,7 +282,7 @@ describe("the tunables", () => {
     const at = await item("feedback_per_day");
     review(at, "7", "More room in the pilot");
     fireEvent.click(at.getByRole("button", { name: "Change it" }));
-    expect(await screen.findByText("Saved. feedback_per_day, version 3: 7")).toBeInTheDocument();
+    expect(await screen.findByText("Saved. feedback_per_day: 7")).toBeInTheDocument();
     expect(lists(calls)).toHaveLength(1);
     expect(other.getByLabelText("New value")).toHaveValue("helsinki");
     expect(other.getByLabelText("Why the change")).toHaveValue("A draft");
@@ -297,7 +296,12 @@ describe("the tunables", () => {
     expect(region).toBeInTheDocument();
     review(at, "7", "More room in the pilot");
     fireEvent.click(at.getByRole("button", { name: "Change it" }));
-    await waitFor(() => expect(region).toHaveTextContent("Saved. feedback_per_day, version 3: 7"));
+    await waitFor(() => expect(region).toHaveTextContent(/^Saved\. feedback_per_day: 7$/));
+    // The same value again: the line clears as the step opens, so the second save is heard too.
+    review(at, "7", "Once more");
+    expect(region).toBeEmptyDOMElement();
+    fireEvent.click(at.getByRole("button", { name: "Change it" }));
+    await waitFor(() => expect(region).toHaveTextContent(/^Saved\. feedback_per_day: 7$/));
   });
 
   it("moves the focus with each step: the confirm sentence, then back to the value", async () => {
@@ -412,13 +416,11 @@ describe("the tunables", () => {
       value: 1000,
       reason: "Because the pilot said so",
     });
-    const fraction = await item("contest_ratio_threshold");
+    const fraction = await item("sample_fraction");
     review(fraction, "-0.1");
     expect(fraction.getByRole("alert")).toHaveTextContent("This is not a value of the key's type.");
     review(fraction, "0.55");
-    expect(
-      fraction.getByText("Change contest_ratio_threshold? Now: 0.6. New: 0.55"),
-    ).toBeInTheDocument();
+    expect(fraction.getByText("Change sample_fraction? Now: 0.6. New: 0.55")).toBeInTheDocument();
   });
 
   it("holds an object key's other members to their declared type", async () => {
@@ -461,6 +463,29 @@ describe("the tunables", () => {
         "This is not a value of the key's type.",
       );
     }
+    expect(posts(calls)).toEqual([]);
+  });
+
+  it("holds a key to the newest version no admin wrote, so a shape a migration moved is the one it takes (#503)", async () => {
+    const moved = tunable(
+      "invitation_reward",
+      version(
+        3,
+        { inviterFish: 2, friendFish: 1 },
+        { createdBy: ADMIN, reason: "Two for the inviter" },
+      ),
+      version(2, { inviterFish: 1, friendFish: 1 }),
+      version(1, { fish: 1, likes: 0 }),
+    );
+    const calls = fetchMock([listOf(moved)]);
+    show();
+    const at = await item("invitation_reward");
+    // The first version's shape, which the API and the night's count refuse.
+    review(at, '{"fish":2,"likes":0}');
+    expect(at.getByRole("alert")).toHaveTextContent("This is not a value of the key's type.");
+    review(at, '{"inviterFish":3,"friendFish":0}');
+    await at.findByText(/^Change invitation_reward\?/);
+    expect(at.queryByRole("alert")).toBeNull();
     expect(posts(calls)).toEqual([]);
   });
 
@@ -567,10 +592,11 @@ describe("the tunables", () => {
 
   describe("says what the API refused, back at the form, without reloading", () => {
     it.each([
+      // The same words as the form's own check: one text serves both (#581).
       [
         "config_shape",
         () => failure("config_shape", 400),
-        "The value must keep the current one's type and keys.",
+        "This is not a value of the key's type.",
       ],
       [
         "config_conflict",

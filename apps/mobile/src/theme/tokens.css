@@ -10,8 +10,9 @@
  * .high-contrast-dark on the root view and every descendant inherits it.
  *
  * `pnpm --filter mobile check:contrast` holds every text pair to WCAG AA
- * (4.5:1; 7:1 in the high-contrast sets) and control outlines to 3:1. It
- * reads this file, so a value that fails never reaches main.
+ * (4.5:1; 7:1 in the high-contrast sets), and control outlines and the
+ * neighbours of the seeks bar to 3:1. It reads this file, so a value that
+ * fails never reaches main.
  */
 @layer base {
   :root {
@@ -36,6 +37,15 @@
     --ring: 224 76% 48%;
     --overlay: 222 47% 11%;
     --logo-plate: 0 0% 100%;
+    /*
+     * The bands of the bar of whom people seek (SeeksBar, #581), in all four
+     * sets. An agent's colours, tried by calculation, and the designer's to
+     * change: no pink and blue, and neighbours at least 3:1 apart, since the
+     * bar has no gap between them and its words carry the meaning.
+     */
+    --seeks-men: 224 76% 48%;
+    --seeks-everyone: 174 55% 59%;
+    --seeks-women: 273 67% 39%;
     --radius: 8px;
   }
 
@@ -61,6 +71,9 @@
     --ring: 212 96% 78%;
     --overlay: 0 0% 0%;
     --logo-plate: 0 0% 100%;
+    --seeks-men: 212 96% 78%;
+    --seeks-everyone: 175 77% 26%;
+    --seeks-women: 269 100% 92%;
   }
 
   .high-contrast {
@@ -85,6 +98,9 @@
     --ring: 224 90% 25%;
     --overlay: 0 0% 0%;
     --logo-plate: 0 0% 100%;
+    --seeks-men: 224 90% 25%;
+    --seeks-everyone: 175 80% 32%;
+    --seeks-women: 273 80% 22%;
   }
 
   .high-contrast-dark {
@@ -109,5 +125,8 @@
     --ring: 212 100% 85%;
     --overlay: 0 0% 0%;
     --logo-plate: 0 0% 100%;
+    --seeks-men: 212 100% 85%;
+    --seeks-everyone: 175 80% 24%;
+    --seeks-women: 269 100% 92%;
   }
 }

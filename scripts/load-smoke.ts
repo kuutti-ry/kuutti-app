@@ -10,7 +10,8 @@
  *                                              runs against a stand-in on this computer
  *
  * A visit is an assumption about a bad hour (capacity.md): a person opening the app (the onboarding
- * status, then the home's gate) and looking at their profile (the profile and the photo list); on
+ * status, then the home's gate), reading the queue once (ADR-062: a read that finds nothing left
+ * walks the pool, the new cost) and looking at their profile (the profile and the photo list); on
  * one visit in N they also open the photos screen, which reads the list again and asks a signed
  * URL for each thumbnail (ADR-008), N spread so an account's URLs last the run. The public part
  * goes out at the visit's start: every second visit asks for the pond counter (cacheable for an
@@ -47,6 +48,9 @@
  *   50 sessions, 60 thumbnail URLs per account (a tenth of the day's budget), 10 s a request,
  *   200 sockets and 4 an account (the API holds 5 and closes the oldest for a sixth, which must
  *   never be a persona's own phone).
+ * - The alarm on the queue's reads (auto_shadow_ban_round_reads, ADR-041): the plan takes at most
+ *   40 % of it per account, a rate past that reading the queue on one visit in Q, spread as the
+ *   photos screen is, so a run never shadow-bans its own test persons.
  * - ADR-026's budgets: never a sign-in start (the doors). The plan takes at most 40 % of the
  *   address's window and of each person's (from the RateLimit-Limit the API reports), a socket's
  *   upgrade counted on the address, which never gives it back (no guard admits it); as it goes,
@@ -121,6 +125,8 @@ const REST_SHARE = 0.5;
 const WINDOW_MS = 60_000;
 /** Thumbnail URLs per account in one run: a tenth of the day's 600 (photo_fetches_per_day, ADR-008 §1). */
 const URLS_PER_ACCOUNT = 60;
+/** Reads of the queue a minute at which an account is shadow-banned: matching_config auto_shadow_ban_round_reads (ADR-041 §3). */
+const QUEUE_READS_ALARM = 30;
 /**
  * The 5xx alarm fires at five in five minutes (infra/modules/observability); the run stops sending
  * at three, and what is in flight then still finishes.
@@ -130,7 +136,7 @@ const SERVER_ERRORS_MAX = 3;
 const BEND_SHARE = 0.01;
 // A launch evening's share of first sign-ins: an assumption, and the visit's cheapest request.
 const EXCHANGE_EVERY = 4;
-/** The signed-in requests of every visit: onboarding, gate, counter, profile, photo list. */
+/** The signed-in requests of every visit, the queue's read aside: onboarding, gate, counter, profile, photo list. */
 const SIGNED_IN_PER_VISIT = 5;
 /**
  * The chat's sockets an account may hold in a run: one under the API's WS_SOCKETS_PER_ACCOUNT (5),
@@ -177,6 +183,7 @@ const ROUTES = {
   counter: { name: "GET /ponds/counter", method: "GET", signedIn: true, expect: 200 },
   onboarding: { name: "GET /onboarding", method: "GET", signedIn: true, expect: 200 },
   gate: { name: "GET /gate", method: "GET", signedIn: true, expect: 200 },
+  queue: { name: "GET /rounds/today", method: "GET", signedIn: true, expect: 200 },
   profile: { name: "GET /profile", method: "GET", signedIn: true, expect: 200 },
   photos: { name: "GET /photos", method: "GET", signedIn: true, expect: 200 },
   thumb: { name: "GET /photos/{id}/thumb", method: "GET", signedIn: true, expect: 200 },
@@ -202,6 +209,7 @@ type Run = {
   accounts: Account[];
   sockets: Sockets;
   thumbEvery: number;
+  queueEvery: number;
   slots: ReturnType<typeof slots>;
   anonymousRestUntil: number;
   samples: Sample[];
@@ -397,24 +405,31 @@ function percentile(values: readonly number[], p: number): number | null {
  * address's counts the public requests and holds a signed-in one until it is answered, so the
  * requests in flight count against it too; each account's counts its signed-in requests, the
  * visits going round its accounts. The photos screen comes on one visit in thumbEvery, spread so
- * an account's URLs last the whole run: ADR-008's budget, not the app, sets how often. A socket's
- * upgrade counts on the address and is never given back (the socket signs in by its first frame,
- * so no guard admits it); they go out before the first stage and fall in one window or two, and
- * the plan counts them in every one, on the safe side.
+ * an account's URLs last the whole run: ADR-008's budget, not the app, sets how often. The queue is
+ * read on every visit until the top rate would take an account past PLAN_SHARE of its alarm, and
+ * on one visit in queueEvery then: the alarm sets that too, or a run would ban its own test
+ * persons. A socket's upgrade counts on the address and is never given back (the socket signs in
+ * by its first frame, so no guard admits it); they go out before the first stage and fall in one
+ * window or two, and the plan counts them in every one, on the safe side.
  */
 function planOf(
   options: Pick<Options, "rates" | "stageSeconds" | "concurrency" | "sockets">,
   budgets: { addressLimit: number; personLimit: number; accounts: number; photosMax: number },
-): { thumbEvery: number; ceiling: number; neededLimit: number } {
+): { thumbEvery: number; queueEvery: number; ceiling: number; neededLimit: number } {
   const { accounts, photosMax } = budgets;
   const visits = options.rates.reduce((sum, rate) => sum + rate * options.stageSeconds, 0);
+  const top = Math.max(...options.rates);
   const thumbEvery =
     accounts === 0 || photosMax === 0
       ? 1
       : Math.max(1, Math.ceil(((visits / accounts) * photosMax) / URLS_PER_ACCOUNT));
+  const queueEvery =
+    accounts === 0
+      ? 1
+      : Math.max(1, Math.ceil(((top / accounts) * 60) / (PLAN_SHARE * QUEUE_READS_ALARM)));
   const publicPerVisit = 1 / EXCHANGE_EVERY;
-  // The photos screen reads the list again, then a URL a photo.
-  const personPerVisit = SIGNED_IN_PER_VISIT + (1 + photosMax) / thumbEvery;
+  // The queue's read, then the photos screen, which reads the list again and asks a URL a photo.
+  const personPerVisit = SIGNED_IN_PER_VISIT + 1 / queueEvery + (1 + photosMax) / thumbEvery;
   // What the address's window holds besides the public requests: the signed-in requests in
   // flight, and the sockets' upgrades.
   const held = (accounts > 0 ? options.concurrency : 0) + options.sockets;
@@ -423,14 +438,18 @@ function planOf(
     accounts > 0
       ? (accounts * PLAN_SHARE * budgets.personLimit) / (personPerVisit * 60)
       : Number.POSITIVE_INFINITY;
-  const top = Math.max(...options.rates);
   const neededLimit = Math.ceil(
     Math.max(
       (top * publicPerVisit * 60 + held) / PLAN_SHARE,
       accounts > 0 ? ((top / accounts) * personPerVisit * 60) / PLAN_SHARE : 0,
     ),
   );
-  return { thumbEvery, ceiling: Math.max(0, Math.min(byAddress, byPerson)), neededLimit };
+  return {
+    thumbEvery,
+    queueEvery,
+    ceiling: Math.max(0, Math.min(byAddress, byPerson)),
+    neededLimit,
+  };
 }
 
 /** What an answer means for the run; the expected refusal of nobody's code is a success. */
@@ -649,9 +668,10 @@ function countServerError(run: Run): void {
 }
 
 /**
- * A person opening the app and looking at their profile (useOnboardingGate and HomeScreen, then
- * ProfileScreen); the photos screen on one visit in thumbEvery. The public part, a sign-in's last
- * step, goes out at the start: one request's place in a visit.
+ * A person opening the app, reading the queue and looking at their profile (useOnboardingGate and
+ * HomeScreen, then the people screen, then ProfileScreen); the photos screen on one visit in
+ * thumbEvery. The public part, a sign-in's last step, goes out at the start: one request's place
+ * in a visit.
  */
 async function visit(run: Run, n: number): Promise<void> {
   const jobs: Promise<unknown>[] = [];
@@ -671,11 +691,13 @@ async function visit(run: Run, n: number): Promise<void> {
 async function signedIn(run: Run, account: Account): Promise<void> {
   const token = account.access[account.visits % account.access.length];
   const thumbs = account.visits % run.thumbEvery === 0;
+  const queue = account.visits % run.queueEvery === 0;
   account.visits += 1;
   const get = (route: Route, path: string) => call(run, route, path, { token, account });
   await get(ROUTES.onboarding, "/onboarding");
   // The home's two reads, the counter asked with the session for the pond's bar (ADR-013 §18).
   await Promise.all([get(ROUTES.gate, "/gate"), get(ROUTES.counter, "/ponds/counter")]);
+  if (queue) await get(ROUTES.queue, "/rounds/today");
   await Promise.all([get(ROUTES.profile, "/profile"), get(ROUTES.photos, "/photos")]);
   if (!thumbs) return;
   // The photos screen reads the list itself (usePhotos), then a URL for each thumbnail.
@@ -1102,6 +1124,7 @@ async function execute(options: Options, io: Io, now: Date = new Date()): Promis
     accounts: people.accounts,
     sockets: { asked: options.sockets, open: 0, outside: 0, all: [], closing: false },
     thumbEvery: plan.thumbEvery,
+    queueEvery: plan.queueEvery,
     slots: slots(options.concurrency),
     anonymousRestUntil: 0,
     samples: [],
@@ -1115,7 +1138,7 @@ async function execute(options: Options, io: Io, now: Date = new Date()): Promis
   const urlsPerVisit = (people.photosMax / plan.thumbEvery).toFixed(2);
   const grid = accounts > 0 ? `1 in ${plan.thumbEvery} · ${urlsPerVisit}` : "-";
   io.log(
-    `load-smoke: ${options.rates.length} stage${options.rates.length === 1 ? "" : "s"} of ${options.stageSeconds} s; the budgets allow ${plan.ceiling.toFixed(2)} visits a second${accounts > 0 ? `; the photos screen on ${plan.thumbEvery === 1 ? "every visit" : `one visit in ${plan.thumbEvery}`}, ${urlsPerVisit} signed URLs a visit` : ""}`,
+    `load-smoke: ${options.rates.length} stage${options.rates.length === 1 ? "" : "s"} of ${options.stageSeconds} s; the budgets allow ${plan.ceiling.toFixed(2)} visits a second${accounts > 0 ? `; the queue read on ${plan.queueEvery === 1 ? "every visit" : `one visit in ${plan.queueEvery}`}, under its alarm; the photos screen on ${plan.thumbEvery === 1 ? "every visit" : `one visit in ${plan.thumbEvery}`}, ${urlsPerVisit} signed URLs a visit` : ""}`,
   );
   const socketNote = () =>
     options.sockets > 0
@@ -1383,6 +1406,7 @@ async function selfTest(): Promise<never> {
 
   const shape = (plan: ReturnType<typeof planOf>) => [
     plan.thumbEvery,
+    plan.queueEvery,
     plan.ceiling.toFixed(3),
     plan.neededLimit,
   ];
@@ -1395,11 +1419,12 @@ async function selfTest(): Promise<never> {
         { addressLimit: 120, personLimit: 0, accounts: 0, photosMax: 0 },
       ),
     ),
-    [1, "3.200", 19],
+    [1, 1, "3.200", 19],
   );
-  // Seven accounts of six photos over 90 visits: the photos screen every second visit, 8.5
-  // signed-in requests a visit; the accounts bind, 7 * 48 / 510 against (48 - 16) / 15 with the
-  // sixteen in flight the address holds; one visit a second needs 72.9 a minute of each person,
+  // Seven accounts of six photos over 90 visits: the photos screen every second visit, the queue
+  // on every one (8.6 reads a minute of each person against 40 % of the alarm's 30), 9.5
+  // signed-in requests a visit; the accounts bind, 7 * 48 / 570 against (48 - 16) / 15 with the
+  // sixteen in flight the address holds; one visit a second needs 81.4 a minute of each person,
   // / 0.4.
   expect(
     "plan with seven accounts",
@@ -1409,11 +1434,12 @@ async function selfTest(): Promise<never> {
         { addressLimit: 120, personLimit: 120, accounts: 7, photosMax: 6 },
       ),
     ),
-    [2, "0.659", 183],
+    [2, 1, "0.589", 204],
   );
-  // The limit raised to 1000 for the run: 720 visits, the photos screen on every eleventh, 5.64
-  // signed-in requests a visit; the accounts bind, 7 * 400 / 338.2, and six visits a second need
-  // 289.9 a minute of each person, / 0.4.
+  // The limit raised to 1000 for the run: 720 visits, the photos screen on every eleventh, the
+  // queue on every fifth, since six visits a second would be 51.4 reads a minute of each person,
+  // 5.84 signed-in requests a visit; the accounts bind, 7 * 400 / 350.2, and six visits a second
+  // need 300.1 a minute of each person, / 0.4.
   expect(
     "plan with a raised limit",
     shape(
@@ -1422,7 +1448,7 @@ async function selfTest(): Promise<never> {
         { addressLimit: 1000, personLimit: 1000, accounts: 7, photosMax: 6 },
       ),
     ),
-    [11, "8.280", 725],
+    [11, 5, "7.996", 751],
   );
   // The same with four sockets for each of the seven accounts: their 28 upgrades stay on the
   // address, (400 - 32 - 28) / 15, which still does not bind.
@@ -1434,10 +1460,10 @@ async function selfTest(): Promise<never> {
         { addressLimit: 1000, personLimit: 1000, accounts: 7, photosMax: 6 },
       ),
     ),
-    [11, "8.280", 725],
+    [11, 5, "7.996", 751],
   );
   // Under the default limit the 28 upgrades take nearly all the address's share, (48 - 16 - 28) /
-  // 15; one visit a second needs 72.9 a minute of each person, / 0.4.
+  // 15; one visit a second needs 81.4 a minute of each person, / 0.4.
   expect(
     "plan with sockets under the default limit",
     shape(
@@ -1446,7 +1472,7 @@ async function selfTest(): Promise<never> {
         { addressLimit: 120, personLimit: 120, accounts: 7, photosMax: 6 },
       ),
     ),
-    [2, "0.267", 183],
+    [2, 1, "0.267", 204],
   );
   // Forty take more than all of it: nothing is allowed, and half a visit a second needs
   // (7.5 + 56) / 0.4.
@@ -1458,10 +1484,10 @@ async function selfTest(): Promise<never> {
         { addressLimit: 120, personLimit: 120, accounts: 10, photosMax: 6 },
       ),
     ),
-    [1, "0.000", 159],
+    [1, 1, "0.000", 159],
   );
-  // One account without photos: six requests a visit (the photos screen's list on each) against
-  // its 40 % of 120, 48 / 360.
+  // One account without photos: the queue on every fifth visit, 6.2 requests a visit (the photos
+  // screen's list on each) against its 40 % of 120, 48 / 372.
   expect(
     "plan of an account without photos",
     shape(
@@ -1470,7 +1496,7 @@ async function selfTest(): Promise<never> {
         { addressLimit: 120, personLimit: 120, accounts: 1, photosMax: 0 },
       ),
     ),
-    [1, "0.133", 900],
+    [1, 5, "0.129", 930],
   );
 
   const outcomes: Array<[Route, number, string, Outcome]> = [
@@ -1694,6 +1720,7 @@ async function standInRuns(
       "GET /photos/{id}/thumb",
       "GET /ponds/counter",
       "GET /profile",
+      "GET /rounds/today",
       "POST /auth/exchange",
       "POST /auth/refresh",
     ]);
@@ -1703,6 +1730,18 @@ async function standInRuns(
       "the photo lists and URLs of a whole run",
       [times(a.seen, "GET /photos"), times(a.seen, "GET /photos/{id}/thumb")],
       [9, 8],
+    );
+    // One account at four visits a second would read the queue 240 times a minute, past its alarm:
+    // on one visit in twenty, so once in these four.
+    expect(
+      "the queue's reads of a whole run",
+      [
+        times(a.seen, "GET /rounds/today"),
+        runA.out.some((line) =>
+          line.includes("the queue read on one visit in 20, under its alarm"),
+        ),
+      ],
+      [1, true],
     );
     expect(
       "the row of a whole run",
@@ -2204,7 +2243,9 @@ async function standIn(
         expiresAt: later,
       });
     }
-    if (["GET /onboarding", "GET /gate", "GET /profile"].includes(route)) return answer(200, {});
+    if (["GET /onboarding", "GET /gate", "GET /profile", "GET /rounds/today"].includes(route)) {
+      return answer(200, {});
+    }
     return refused(404, "not_found");
   });
   server.on("upgrade", (req, socket: Duplex) => {

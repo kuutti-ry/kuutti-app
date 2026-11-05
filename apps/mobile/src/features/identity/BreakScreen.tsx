@@ -55,7 +55,6 @@ export function BreakScreen() {
         onBack={() => router.back()}
       />
       <ScrollView contentContainerClassName="gap-6 p-6">
-        <Text>{t("account.break.intro")}</Text>
         <View className="gap-3" accessibilityRole="list">
           {CONSEQUENCES.map((key) => (
             <Text key={key} accessibilityRole="text">

@@ -17,8 +17,6 @@ import {
 // the write that sets them, and the switch. Each statement about a person
 // carries that person's account id (rule 6).
 
-const AT = new Date("2026-10-20T09:00:00.000Z");
-
 describe("the pond and the home of an account", () => {
   test("the ponds are listed by name", async ({ ctx }) => {
     const zeta = await pondNamed(ctx.client, "test-repo-zeta");
@@ -31,7 +29,7 @@ describe("the pond and the home of an account", () => {
     const a = await signedInAccount(ctx.client, "a");
     const b = await signedInAccount(ctx.client, "b");
     expect(await findPondOfAccount(ctx.client, a.accountId)).toBeNull();
-    await writeHomeOfAccount(ctx.client, a.accountId, { place: "00530", showsArea: false }, AT);
+    await writeHomeOfAccount(ctx.client, a.accountId, { place: "00530", showsArea: false });
     expect(await findPondOfAccount(ctx.client, a.accountId)).toEqual({
       id: expect.any(String),
       slug: "suomi",
@@ -41,7 +39,6 @@ describe("the pond and the home of an account", () => {
     expect(await findHomeOfAccount(ctx.client, b.accountId)).toEqual({
       place: null,
       showsArea: false,
-      movedAt: null,
     });
   });
 
@@ -49,7 +46,7 @@ describe("the pond and the home of an account", () => {
     const a = await signedInAccount(ctx.client);
     const pondId = await pondNamed(ctx.client, "test-repo-held");
     await ctx.client.query("UPDATE account SET pond_id = $2 WHERE id = $1", [a.accountId, pondId]);
-    await writeHomeOfAccount(ctx.client, a.accountId, { place: "00530", showsArea: true }, AT);
+    await writeHomeOfAccount(ctx.client, a.accountId, { place: "00530", showsArea: true });
     expect(await findPondOfAccount(ctx.client, a.accountId)).toMatchObject({ id: pondId });
   });
 
@@ -57,36 +54,12 @@ describe("the pond and the home of an account", () => {
     ctx,
   }) => {
     const a = await signedInAccount(ctx.client);
-    await writeHomeOfAccount(ctx.client, a.accountId, { place: "00530", showsArea: false }, AT);
-    await writeHomeOfAccount(ctx.client, a.accountId, { place: null, showsArea: true }, AT);
+    await writeHomeOfAccount(ctx.client, a.accountId, { place: "00530", showsArea: false });
+    await writeHomeOfAccount(ctx.client, a.accountId, { place: null, showsArea: true });
     expect(await findHomeOfAccount(ctx.client, a.accountId)).toEqual({
       place: "00530",
       showsArea: true,
-      movedAt: null,
     });
-  });
-
-  test("another place than the one held is a move, at the time given, and overwrites the last", async ({
-    ctx,
-  }) => {
-    const a = await signedInAccount(ctx.client);
-    const write = (place: string | null, at: Date) =>
-      writeHomeOfAccount(ctx.client, a.accountId, { place, showsArea: false }, at);
-    const movedAt = async () => (await findHomeOfAccount(ctx.client, a.accountId))?.movedAt;
-    const LATER = new Date(AT.getTime() + 60_000);
-
-    // The first home moves nobody, nor does the same place again, nor the choice alone.
-    await write("00530", AT);
-    expect(await movedAt()).toBeNull();
-    await write("00530", LATER);
-    expect(await movedAt()).toBeNull();
-    await write(null, LATER);
-    expect(await movedAt()).toBeNull();
-
-    await write("00100", AT);
-    expect(await movedAt()).toEqual(AT);
-    await write("00530", LATER);
-    expect(await movedAt()).toEqual(LATER);
   });
 
   test("the lock finds a live account's home, and nothing on a tombstone", async ({ ctx }) => {
@@ -95,7 +68,6 @@ describe("the pond and the home of an account", () => {
     expect(await lockHomeOfAccount(ctx.client, a.accountId)).toEqual({
       place: "091",
       showsArea: false,
-      movedAt: null,
     });
     await ctx.client.query(
       "UPDATE account SET state = 'deleted', deleted_at = now() WHERE id = $1",

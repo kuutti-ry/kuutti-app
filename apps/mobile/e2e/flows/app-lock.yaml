@@ -26,7 +26,7 @@ name: A passcode set in Settings locks the app at a cold start and back from the
     file: ../common/open-settings-row.yaml
     env:
       ROW: "(Lock|Lukitus|Lås)(, .*)?"
-      INSIDE: "Lock Kuutti on this phone, so that somebody else holding it cannot open your matches and conversations\\. The lock stays on this phone, and logging out turns it off\\.|Lukitse Kuutti tällä puhelimella, jotta kukaan muu puhelinta pitelevä ei pääse matcheihisi ja keskusteluihisi\\. Lukitus koskee vain tätä puhelinta, ja uloskirjautuminen poistaa sen\\.|Lås Kuutti på den här telefonen, så att ingen annan som håller i den kan öppna dina matcher och samtal\\. Låset gäller bara den här telefonen, och när du loggar ut stängs det av\\."
+      INSIDE: "The lock stays on this phone, and logging out turns it off\\.|Lukitus koskee vain tätä puhelinta, ja uloskirjautuminen poistaa sen\\.|Låset gäller bara den här telefonen, och när du loggar ut stängs det av\\."
 - waitForAnimationToEnd
 - tapOn: "Set a passcode|Aseta pääsykoodi|Välj en lösenkod"
 
@@ -45,12 +45,15 @@ name: A passcode set in Settings locks the app at a cold start and back from the
     timeout: 15000
 - waitForAnimationToEnd
 - inputText: "246810"
+# Set: said aloud and not drawn (#581), Change and Remove say it to the eye.
 - extendedWaitUntil:
-    visible: "A passcode is set\\.|Pääsykoodi on asetettu\\.|En lösenkod är vald\\."
+    visible: "Change the passcode|Vaihda pääsykoodi|Byt lösenkod"
     timeout: 15000
-# A tap on the line, which is no button, closes the keyboard (README); the
+- assertNotVisible: "A passcode is set\\.|Pääsykoodi on asetettu\\.|En lösenkod är vald\\."
+# A tap on the row's line, which is no button, closes the keyboard (README); the
 # time in the background shows once the lock is on, after one minute at first.
-- tapOn: "A passcode is set\\.|Pääsykoodi on asetettu\\.|En lösenkod är vald\\."
+- tapOn: "The lock stays on this phone, and logging out turns it off\\.|Lukitus koskee vain tätä puhelinta, ja uloskirjautuminen poistaa sen\\.|Låset gäller bara den här telefonen, och när du loggar ut stängs det av\\."
+- assertVisible: "Remove the passcode|Poista pääsykoodi|Ta bort lösenkoden"
 - scrollUntilVisible:
     element: "Straight away|Heti|Direkt"
     direction: DOWN
@@ -84,7 +87,7 @@ name: A passcode set in Settings locks the app at a cold start and back from the
     notVisible: "Kuutti is locked|Kuutti on lukittu|Kuutti är låst"
     timeout: 15000
 - extendedWaitUntil:
-    visible: "People on Kuutti|Ihmiset Kuutissa|Människor på Kuutti"
+    visible: "Your profile|Profiilisi|Din profil"
     timeout: 15000
 
 # Back from the background with no time allowed: locked again.
@@ -106,4 +109,5 @@ name: A passcode set in Settings locks the app at a cold start and back from the
 - extendedWaitUntil:
     visible: "Signed out by the lock|Lukitus kirjasi sinut ulos|Låset loggade ut dig"
     timeout: 15000
+- assertVisible: "Nothing on your account changed\\. The lock is off until you turn it on again in Settings\\.|Tilillesi ei muuttunut mitään\\. Lukitus on pois päältä, kunnes otat sen taas käyttöön asetuksista\\.|Ingenting ändrades på ditt konto\\. Låset är av tills du slår på det igen i inställningarna\\."
 - assertVisible: "Sign in with your bank|Kirjaudu pankkitunnuksilla|Logga in med din bank"

@@ -1,13 +1,7 @@
 import { PHOTO_CAPTIONS, type Photo, type PhotoCaption } from "@kuutti/schema";
 import { ScrollView, useWindowDimensions, View } from "react-native";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useT } from "@/lib/locale";
 import { useHapticTap } from "@/theme/haptics";
 import { captionKey } from "./captions";
@@ -42,7 +36,6 @@ export function CaptionDialog({
       <DialogContent closeLabel={t("photos.dialog.close")}>
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
-          <DialogDescription>{t("photos.caption.explain")}</DialogDescription>
         </DialogHeader>
         <ScrollView style={{ maxHeight: height / 2 }}>
           <View accessibilityRole="radiogroup" accessibilityLabel={title} className="gap-2">

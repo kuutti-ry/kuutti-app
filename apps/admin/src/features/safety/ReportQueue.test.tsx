@@ -135,8 +135,8 @@ describe("the report queue", () => {
     ]);
     show();
     expect(screen.getByRole("heading", { level: 2, name: "Reports" })).toBeInTheDocument();
-    expect(screen.getByText("Loading the reports…")).toHaveAttribute("aria-busy", "true");
-    expect(await screen.findByText("3 reports wait.")).toBeInTheDocument();
+    expect(screen.getByText("Loading…")).toHaveAttribute("aria-busy", "true");
+    expect(await screen.findByText("3 waiting")).toHaveAttribute("aria-live", "polite");
     expect(screen.queryByText(/Showing the first/)).toBeNull();
 
     const headings = screen.getAllByRole("heading", { level: 3 }).map((h) => h.textContent);
@@ -200,15 +200,17 @@ describe("the report queue", () => {
       ),
     ]);
     show();
-    expect(await screen.findByText("1 report waits.")).toBeInTheDocument();
+    expect(await screen.findByText("1 waiting")).toBeInTheDocument();
     const waiting = screen.getByRole("radio", { name: "Waiting for a decision" });
     expect(waiting).toBeChecked();
-    expect(screen.getByRole("group", { name: "Show" })).toBeInTheDocument();
+    // The two choices say what they choose between: the group's name is only heard (#581).
+    const filter = screen.getByRole("group", { name: "Show" });
+    expect(within(filter).getByText("Show")).toHaveClass("sr-only");
 
     const decided = screen.getByRole("radio", { name: "Decided" });
     decided.focus();
     fireEvent.click(decided);
-    expect(await screen.findByText("2 reports decided.")).toBeInTheDocument();
+    expect(await screen.findByText("2 decided")).toBeInTheDocument();
     expect(decided).toBeChecked();
     expect(document.activeElement).toBe(decided);
     const [acted] = within(await groupOf(X)).getAllByRole("listitem");
@@ -219,25 +221,34 @@ describe("the report queue", () => {
     expect(calls.map(stateOf)).toEqual(["open", "closed"]);
 
     fireEvent.click(waiting);
-    expect(await screen.findByText("1 report waits.")).toBeInTheDocument();
+    expect(await screen.findByText("1 waiting")).toBeInTheDocument();
     expect(calls.map(stateOf)).toEqual(["open", "closed", "open"]);
   });
 
   it("says when nothing waits or nothing was decided, and when the list holds only the first page", async () => {
     fetchMock([pages(page([]), page([report(1)], 120))]);
     show();
-    expect(await screen.findByText("Nothing waits.")).toBeInTheDocument();
+    expect(await screen.findByText("Nothing waiting")).toBeInTheDocument();
     expect(screen.queryByRole("heading", { level: 3 })).toBeNull();
     fireEvent.click(screen.getByRole("radio", { name: "Decided" }));
     expect(
-      await screen.findByText("120 reports decided. Showing the first 1 of them."),
+      await screen.findByText("120 decided · Showing the first 1 of them."),
     ).toBeInTheDocument();
     cleanup();
 
-    fetchMock([pages(page([]), page([]))]);
+    fetchMock([pages(page([report(1)], 80), page([]))]);
+    show();
+    expect(
+      await screen.findByText("80 waiting · Showing the first 1 of them."),
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("radio", { name: "Decided" }));
+    expect(await screen.findByText("Nothing decided")).toBeInTheDocument();
+    cleanup();
+
+    fetchMock([pages(page([]), page([report(1, { outcome: "dismissed", decidedAt: NOW })]))]);
     show();
     fireEvent.click(await screen.findByRole("radio", { name: "Decided" }));
-    expect(await screen.findByText("No report has been decided yet.")).toBeInTheDocument();
+    expect(await screen.findByText("1 decided")).toBeInTheDocument();
   });
 
   it("reloads on refresh", async () => {
@@ -246,9 +257,9 @@ describe("the report queue", () => {
       (req) => (isList(req) ? json(answered++ === 0 ? page([]) : page([report(1)])) : null),
     ]);
     show();
-    expect(await screen.findByText("Nothing waits.")).toBeInTheDocument();
+    expect(await screen.findByText("Nothing waiting")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
-    expect(await screen.findByText("1 report waits.")).toBeInTheDocument();
+    expect(await screen.findByText("1 waiting")).toBeInTheDocument();
     expect(await groupOf(X)).toBeInTheDocument();
   });
 
@@ -259,9 +270,7 @@ describe("the report queue", () => {
     vi.spyOn(console, "error").mockImplementation(() => undefined);
     fetchMock([(req) => (isList(req) ? answer() : null)]);
     show();
-    expect(await screen.findByRole("alert")).toHaveTextContent(
-      "The reports could not be loaded. Try Refresh.",
-    );
+    expect(await screen.findByRole("alert")).toHaveTextContent(/^Could not be loaded\.$/);
     expect(screen.queryByRole("heading", { level: 3 })).toBeNull();
   });
 
@@ -272,7 +281,7 @@ describe("the report queue", () => {
     show();
     await waitFor(() => expect(answers).toEqual([false]));
     expect(screen.queryByRole("alert")).toBeNull();
-    expect(screen.queryByText("Loading the reports…")).toBeNull();
+    expect(screen.queryByText("Loading…")).toBeNull();
     expect(screen.queryByText(/wait/)).toBeNull();
   });
 

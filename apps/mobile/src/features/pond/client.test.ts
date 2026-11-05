@@ -41,7 +41,7 @@ beforeEach(async () => {
 describe("the pond client", () => {
   it("reads the counter with the session, which is what gives the person's pond its bar", async () => {
     const seeks = { men: 30, everyone: 20, women: 50 };
-    const entry = { pond: POND, day: null, verified: null, split: null, finishing: null, seeks };
+    const entry = { pond: POND, day: null, finished: null, seeks };
     const counter = { k: 10, ponds: [entry] };
     const seen = answering(json(counter), refusal(503));
     expect(await fetchPondCounter()).toEqual(counter);
@@ -66,8 +66,30 @@ describe("the pond client", () => {
 
   it("refuses shares that break the contract", async () => {
     const seeks = { men: 0, everyone: 20, women: 80 };
-    const entry = { pond: POND, day: null, verified: null, split: null, finishing: null, seeks };
+    const entry = { pond: POND, day: null, finished: null, seeks };
     answering(json({ k: 10, ponds: [entry] }));
     await expect(fetchPondCounter()).rejects.toThrow();
+  });
+
+  it("refuses a number under the floor", async () => {
+    const entry = { pond: POND, day: "2026-10-05", finished: 9, seeks: null };
+    answering(json({ k: 10, ponds: [entry] }));
+    await expect(fetchPondCounter()).rejects.toThrow();
+  });
+
+  // A bundle older than the API meets this answer until it takes the update (#581, the update
+  // follows the API): outdated, which the card answers with the update, never a number made up.
+  it("refuses an answer of the shape before the one number", async () => {
+    const entry = {
+      pond: POND,
+      day: "2026-10-05",
+      verified: 42,
+      split: null,
+      finishing: 17,
+      seeks: null,
+    };
+    answering(json({ k: 10, ponds: [entry] }));
+    // The name is what picks the way out: `failureKind` calls a ZodError outdated.
+    await expect(fetchPondCounter()).rejects.toMatchObject({ name: "ZodError" });
   });
 });

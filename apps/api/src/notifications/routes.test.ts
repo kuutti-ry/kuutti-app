@@ -5,19 +5,22 @@ import { ErrorResponse, Notices, NotificationChoices } from "@kuutti/schema";
 import { describe, expect, it } from "vitest";
 import { createApp } from "../app.ts";
 import { eraseAccount } from "../identity/index.ts";
+import { invitationCountJob } from "../jobs/invitation-count.ts";
 import { applySanction } from "../safety/index.ts";
-import { signedInAccount } from "../test/account.ts";
+import { signedInAccount, withMatchingConfig } from "../test/account.ts";
 import { interleaved } from "../test/chat.ts";
 import { exportOf } from "../test/export.ts";
 import { captureLogger, type TestContext, test, testConfig } from "../test/harness.ts";
+import { completed, invitationOf } from "../test/invitations.ts";
 import { pidOf, waitsFor, watched } from "../test/races.ts";
 import { setChoice } from "./notifications.ts";
 
 // The notification choices and the notices in the app (#176, ADR-032): every
 // route with its happy path, each validation rule, unauthenticated, the wrong
 // user and each error branch; a warning's notice (features/safety/
-// sanctions.feature), and the choices and notices in the export and the
-// erasure (features/identity/erasure.feature).
+// sanctions.feature), a counted invitation's for each of its two (#107, #503),
+// and the choices and notices in the export and the erasure
+// (features/identity/erasure.feature).
 
 type Person = Awaited<ReturnType<typeof signedInAccount>>;
 type App = ReturnType<typeof createApp>;
@@ -55,7 +58,6 @@ const warn = (ctx: TestContext, who: Person, kind: "warn" | "shadow_ban" = "warn
     at: new Date(),
   });
 const ALL_ON = [
-  { kind: "round", enabled: true },
   { kind: "message", enabled: true },
   { kind: "match", enabled: true },
   { kind: "moderation", enabled: true },
@@ -86,9 +88,11 @@ describe("the notification choices", () => {
     const a = await signedInAccount(ctx.client);
     for (const [kind, body] of [
       ["push", { enabled: false }],
+      // A kind that went with its push (ADR-062 §12).
+      ["round", { enabled: false }],
       ["message", { enabled: "no" }],
       ["message", {}],
-      ["message", { enabled: false, kind: "round" }],
+      ["message", { enabled: false, kind: "match" }],
     ] as const) {
       const answer = await choose(ctx.app, a, kind, body);
       expect(answer.status, JSON.stringify([kind, body])).toBe(400);
@@ -210,6 +214,108 @@ describe("the notices", () => {
       expect((await ctx.app.request("/notices", { headers })).status).toBe(401);
       expect((await read(ctx.app, { headers }, randomUUID())).status).toBe(401);
     }
+  });
+});
+
+describe("the notices of a counted invitation", () => {
+  /** 04:00 in Finland, the night of the count. */
+  const NIGHT = new Date("2026-10-23T01:00:00.000Z");
+
+  /** "A" and the friend "B" who used A's code, counted tonight, each side's reward its own. */
+  async function countedPair(ctx: TestContext) {
+    const a = await signedInAccount(ctx.client);
+    const b = await signedInAccount(ctx.client);
+    await completed(ctx.client, a.accountId);
+    await completed(ctx.client, b.accountId);
+    await invitationOf(ctx.client, a.accountId, { redeemedBy: b.accountId });
+    await withMatchingConfig(ctx.client, {
+      invitation_reward: { inviterFish: 2, friendFish: 3 },
+    });
+    const { logger } = await captureLogger();
+    await invitationCountJob({ db: ctx.client, logger, now: () => NIGHT }).run();
+    return { a, b };
+  }
+
+  test("each of the two reads what it earned them alone, though the invitation holds both people's fish", async ({
+    ctx,
+  }) => {
+    const { a, b } = await countedPair(ctx);
+    expect(await noticesOf(ctx.app, a)).toEqual([
+      {
+        id: expect.any(String),
+        kind: "invitation_counted",
+        at: NIGHT.toISOString(),
+        readAt: null,
+        reward: { fish: 2 },
+      },
+    ]);
+    expect(await noticesOf(ctx.app, b)).toEqual([
+      {
+        id: expect.any(String),
+        kind: "invitation_friend",
+        at: NIGHT.toISOString(),
+        readAt: null,
+        reward: { fish: 3 },
+      },
+    ]);
+  });
+
+  test("a notice says what the invitation earned, whether or not the fish has been used since", async ({
+    ctx,
+  }) => {
+    const { b } = await countedPair(ctx);
+    await ctx.client.query("UPDATE reward SET spent_at = now() WHERE account_id = $1", [
+      b.accountId,
+    ]);
+    expect((await noticesOf(ctx.app, b))[0]).toMatchObject({ reward: { fish: 3 } });
+  });
+
+  test("each kind answers with its own: a warning its reason, the friend's its reward", async ({
+    ctx,
+  }) => {
+    const { b } = await countedPair(ctx);
+    await warn(ctx, b);
+    const answer = await ctx.app.request("/notices", { headers: b.headers });
+    expect(answer.status).toBe(200);
+    // As the phone gets it, before any parsing could drop what should not be there.
+    const { notices } = (await answer.json()) as { notices: Array<Record<string, unknown>> };
+    const fields = (kind: string) =>
+      Object.keys(notices.find((notice) => notice.kind === kind) ?? {}).sort();
+    expect(fields("warning")).toEqual(["at", "id", "kind", "readAt", "reason"]);
+    expect(fields("invitation_friend")).toEqual(["at", "id", "kind", "readAt", "reward"]);
+  });
+
+  test("the friend's notice is the friend's alone to read: the inviter, the invitation's other person, is told there is no such notice", async ({
+    ctx,
+  }) => {
+    const { a, b } = await countedPair(ctx);
+    const [notice] = await noticesOf(ctx.app, b);
+    const id = notice?.id as string;
+
+    const theirs = await read(ctx.app, a, id);
+    expect(theirs.status).toBe(404);
+    expect(await errorCode(theirs)).toBe("not_found");
+    expect((await noticesOf(ctx.app, b))[0]?.readAt).toBeNull();
+
+    expect((await read(ctx.app, b, id)).status).toBe(204);
+    expect((await noticesOf(ctx.app, b))[0]?.readAt).toEqual(expect.any(String));
+    // The inviter's own stays unread.
+    expect((await noticesOf(ctx.app, a))[0]?.readAt).toBeNull();
+  });
+
+  test("the export lists the friend's notice by its kind and dates, nothing of who invited them", async ({
+    ctx,
+  }) => {
+    const { a, b } = await countedPair(ctx);
+    const [notice] = await noticesOf(ctx.app, b);
+    expect((await read(ctx.app, b, notice?.id as string)).status).toBe(204);
+
+    const exported = await exportOf(ctx.app, b.headers);
+
+    expect(exported.notifications.notices).toEqual([
+      { kind: "invitation_friend", at: NIGHT.toISOString(), readAt: expect.any(String) },
+    ]);
+    expect(JSON.stringify(exported.notifications)).not.toContain(a.accountId);
   });
 });
 

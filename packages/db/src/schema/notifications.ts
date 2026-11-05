@@ -16,18 +16,13 @@ import { sanction } from "./safety.ts";
 import { session } from "./sessions.ts";
 
 /**
- * What a person may be notified of (#176, ADR-032): a new round, a message,
- * a match, a moderator's decision. Each kind can be switched off; a kind the
- * person never touched is on, so no row means on. The push reads the switch
- * (#102: the round, the message, the match; #312 will read the decision's).
- * Erased with the account; in the export.
+ * What a person may be notified of (#176, ADR-032): a message, a match, a
+ * moderator's decision. Each kind can be switched off; a kind the person never
+ * touched is on, so no row means on. The push reads the switch (#102: the
+ * message, the match; #312 will read the decision's). Erased with the account;
+ * in the export.
  */
-export const notificationKind = pgEnum("notification_kind", [
-  "round",
-  "message",
-  "match",
-  "moderation",
-]);
+export const notificationKind = pgEnum("notification_kind", ["message", "match", "moderation"]);
 
 export const notificationPreference = pgTable(
   "notification_preference",
@@ -45,19 +40,23 @@ export const notificationPreference = pgTable(
 
 /**
  * What a notice in the app is about (#176, ADR-032): a moderator's warning
- * (ADR-024 §7), or an invitation of the person's that counted (#107,
- * ADR-044). #312's decisions and M5's matches add their kinds when they
- * write one.
+ * (ADR-024 §7), an invitation of the person's that counted (#107, ADR-044), or
+ * the invitation they used, counted (#503). #312's decisions and M5's matches
+ * add their kinds when they write one.
  */
-export const noticeKind = pgEnum("notice_kind", ["warning", "invitation_counted"]);
+export const noticeKind = pgEnum("notice_kind", [
+  "warning",
+  "invitation_counted",
+  "invitation_friend",
+]);
 
 /**
  * A notice in the app (#176, ADR-032): what must reach a person even without
  * a push, shown on the home screen until it is read. It holds no text of its
  * own: the words are the app's, from the kind and what it points at, so a
  * warning's reason is its sanction's, and a counted invitation's reward is
- * the units it earned. It goes with what it points at, and with the account
- * at erasure.
+ * the units it earned the person. It goes with what it points at, and with
+ * the account at erasure.
  */
 export const notice = pgTable(
   "notice",
@@ -81,9 +80,9 @@ export const notice = pgTable(
     ),
     // Named by the old kind, as 0056 and 0060 do: Postgres refuses an enum
     // value in the transaction that adds it, and the migrator applies every
-    // pending migration in one. With two kinds this is "a counted
-    // invitation's notice, and only it, points at its invitation"; a third
-    // kind rewrites it.
+    // pending migration in one. With these kinds this is "an invitation's
+    // notice, and only it, points at its invitation"; a kind that points at
+    // something else rewrites it.
     check(
       "notice_invitation_check",
       sql`(${table.kind} <> 'warning') = (${table.invitationId} IS NOT NULL)`,

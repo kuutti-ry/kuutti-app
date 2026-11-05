@@ -3,6 +3,7 @@ import {
   boolean,
   check,
   date,
+  index,
   pgEnum,
   pgTable,
   smallint,
@@ -28,19 +29,24 @@ export const roundReason = pgEnum("round_reason", [
   "fish",
 ]);
 
-/** What a person decided about a card; undecided is no value, and expired is undecided on an ended day. */
-export const roundDecision = pgEnum("round_decision", ["like", "pass"]);
+/**
+ * What a person did with a card; undecided is no value, and a card shown and
+ * left undecided on an ended day reads as a skip (ADR-062 §3). A skip spends
+ * nothing, starts no clock and answers no like.
+ */
+export const roundDecision = pgEnum("round_decision", ["like", "pass", "skip"]);
 
 /** How far a card's person lives (ADR-061 §5); never kilometres. A closed list, mirrored in packages/schema. */
 export const distanceBand = pgEnum("distance_band", ["nearby", "close", "around", "far"]);
 
 /**
- * A round (TD-11, #96, ADR-034): what one person is shown on one Finnish
- * calendar day, written by the round builder (#95) through `saveRound`. One
- * per account and day. `opened_at` is the first read that found it,
- * `completed_at` the decision after which nothing that can still be shown is
- * undecided. Erasure deletes the person's rounds, their entries with them;
- * the account itself is a tombstone and never deleted.
+ * A round (TD-11, #96, ADR-034, ADR-062 §1): the log of one person's queue on
+ * one Finnish calendar day, opened by the day's first read and filled ten
+ * people at a time. One per account and day. `opened_at` is the first read that
+ * found it, `completed_at` the decision after which nothing that can still be
+ * shown is undecided. The night deletes rounds past a year (ADR-062 §13), and
+ * erasure deletes the person's rounds, their entries with them; the account
+ * itself is a tombstone and never deleted.
  */
 export const rounds = pgTable(
   "rounds",
@@ -62,14 +68,12 @@ export const rounds = pgTable(
 /**
  * One candidate in a round, at its place (from 1), with why they are there,
  * when the phone reported the card seen, and the person's decision, which
- * may change until the day ends (the maintainer, 19/10/2026). Shown means an
- * entry exists. Addressed by its round's day and its position, never by its
- * id. Erasure deletes the entries in which a person is the candidate, and the
- * person's own go with their rounds.
+ * may change until the day ends (the maintainer, 19/10/2026). Seen means
+ * displayed or decided: an entry queued and never displayed is nothing, and
+ * goes at the owner's next day (ADR-062 §2). Addressed by its round's day and
+ * its position, never by its id. Erasure deletes the entries in which a person
+ * is the candidate, and the person's own go with their rounds.
  */
-// shortcut: kept until erasure, about 60,000 rows a day at 5,000 people; a
-// prune past the longest look-back (#99) lifts it once the maintainer sets a
-// retention (ADR-034).
 export const roundEntries = pgTable(
   "round_entries",
   {
@@ -87,21 +91,22 @@ export const roundEntries = pgTable(
     decidedAt: timestamp("decided_at", { withTimezone: true }),
     // A fish (#378, ADR-039) is a like with a mark: every reader of a like reads it as one.
     fish: boolean("fish").notNull().default(false),
+    // A pass with an earlier pass behind it (ADR-062 §6): the year's clock reads
+    // this alone, since the first pass's entry may be pruned before the year ends.
+    secondPass: boolean("second_pass").notNull().default(false),
     // The deal-breaker a relaxed card came in by, its label (#99, ADR-042 §5 and §9).
     relaxedField: text("relaxed_field"),
     // Every relaxation of the day it came in under, the tapped one first: undoing any takes it back, and a like on it waives them all (§6, §7).
     relaxedWith: text("relaxed_with").array().notNull().default(sql`'{}'::text[]`),
-    // The band between the two homes when the entry was written (ADR-061 §5):
-    // frozen, so that a home moved since says nothing new, and read by the
-    // card's line. Null on an entry from before #514.
+    // The band between the two homes when the entry was written (ADR-061 §5,
+    // ADR-062 §8), read by the card's line. Null on an entry from before #514.
     distance: distanceBand("distance"),
   },
   (table) => [
     // One card per place: the read's order, the cascade, and #98's count of the day's likes.
     uniqueIndex("round_entries_round_position_idx").on(table.roundId, table.position),
-    // The exposure index (TD-11): a candidate's entries, and never twice in one round (#99).
-    // shortcut: the seven-day count walks a candidate's entries and takes the
-    // day through rounds; a day on the entry lifts it if #95's count is slow.
+    // A candidate's entries: the likes waiting on a person and the inbox stop's
+    // count (ADR-062 §4), and never twice in one round (#99).
     uniqueIndex("round_entries_candidate_round_idx").on(table.candidateId, table.roundId),
     check("round_entries_position_check", sql`${table.position} >= 1`),
     check(
@@ -110,10 +115,42 @@ export const roundEntries = pgTable(
     ),
     check("round_entries_fish_check", sql`NOT ${table.fish} OR ${table.decision} = 'like'`),
     check(
+      "round_entries_second_pass_check",
+      sql`NOT ${table.secondPass} OR ${table.decision} = 'pass'`,
+    ),
+    check(
       "round_entries_relaxed_check",
       sql`(${table.reason} = 'relaxed') = (${table.relaxedField} IS NOT NULL)
           AND (${table.relaxedField} IS NULL OR ${table.relaxedField} = ANY(${table.relaxedWith}))`,
     ),
+  ],
+);
+
+/**
+ * A star (#575, ADR-064): one person's private mark on another, to come back to
+ * later without a like or a pass. Starred or not, with no degrees: one per pair.
+ * Nothing reads it but the person's own list and queue, so it never reaches the
+ * starred person and feeds no order, count or event. No clock: it goes when the
+ * person clears it, likes or passes, and when either person is erased.
+ */
+export const star = pgTable(
+  "star",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    accountId: uuid("account_id")
+      .notNull()
+      .references(() => account.id),
+    candidateId: uuid("candidate_id")
+      .notNull()
+      .references(() => account.id),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    // One per pair, and the person's own list.
+    uniqueIndex("star_account_candidate_idx").on(table.accountId, table.candidateId),
+    // Erasure of the person starred.
+    index("star_candidate_idx").on(table.candidateId),
+    check("star_not_oneself_check", sql`${table.accountId} <> ${table.candidateId}`),
   ],
 );
 

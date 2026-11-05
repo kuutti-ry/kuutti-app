@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Kuutti API",
-    "version": "0.96.0",
+    "version": "0.107.0",
     "description": "Free, non-commercial dating app for Finland. Every account is verified through a Finnish bank. Source: AGPL-3.0 with App Store exception."
   },
   "components": {
@@ -78,17 +78,11 @@
                   "shownOnCard": {
                     "type": "string",
                     "maxLength": 80
-                  },
-                  "movedAt": {
-                    "type": "string",
-                    "nullable": true,
-                    "format": "date-time"
                   }
                 },
                 "required": [
                   "place",
-                  "shownOnCard",
-                  "movedAt"
+                  "shownOnCard"
                 ]
               },
               "genderChangedAt": {
@@ -354,6 +348,9 @@
           "rounds": {
             "$ref": "#/components/schemas/ExportedRounds"
           },
+          "stars": {
+            "$ref": "#/components/schemas/ExportedStars"
+          },
           "invitations": {
             "$ref": "#/components/schemas/ExportedInvitations"
           }
@@ -382,6 +379,7 @@
           "contacts",
           "notifications",
           "rounds",
+          "stars",
           "invitations"
         ]
       },
@@ -1999,7 +1997,7 @@
             "items": {
               "$ref": "#/components/schemas/NotificationChoice"
             },
-            "maxItems": 4
+            "maxItems": 3
           },
           "notices": {
             "type": "array",
@@ -2051,7 +2049,6 @@
       "NotificationKind": {
         "type": "string",
         "enum": [
-          "round",
           "message",
           "match",
           "moderation"
@@ -2061,7 +2058,8 @@
         "type": "string",
         "enum": [
           "warning",
-          "invitation_counted"
+          "invitation_counted",
+          "invitation_friend"
         ]
       },
       "ExportedRounds": {
@@ -2117,7 +2115,7 @@
             "items": {
               "$ref": "#/components/schemas/ExportedRoundEntry"
             },
-            "maxItems": 50
+            "maxItems": 32767
           }
         },
         "required": [
@@ -2170,7 +2168,7 @@
           "position": {
             "type": "integer",
             "minimum": 1,
-            "maximum": 50
+            "maximum": 32767
           },
           "reason": {
             "$ref": "#/components/schemas/RoundReason"
@@ -2209,6 +2207,9 @@
             "nullable": true,
             "format": "date-time"
           },
+          "secondPass": {
+            "type": "boolean"
+          },
           "distance": {
             "$ref": "#/components/schemas/DistanceBand"
           },
@@ -2227,6 +2228,7 @@
           "decision",
           "decisionInWords",
           "decidedAt",
+          "secondPass",
           "distance",
           "distanceInWords"
         ]
@@ -2248,6 +2250,7 @@
           "like",
           "pass",
           "fish",
+          "skip",
           null
         ]
       },
@@ -2260,6 +2263,35 @@
           "around",
           "far",
           null
+        ]
+      },
+      "ExportedStars": {
+        "type": "object",
+        "properties": {
+          "about": {
+            "type": "string",
+            "description": "What this part is, in the request's language."
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "at": {
+                  "type": "string",
+                  "format": "date-time"
+                }
+              },
+              "required": [
+                "at"
+              ]
+            },
+            "maxItems": 100
+          }
+        },
+        "required": [
+          "about",
+          "items"
         ]
       },
       "ExportedInvitations": {
@@ -2354,7 +2386,6 @@
       "RewardKind": {
         "type": "string",
         "enum": [
-          "like",
           "fish"
         ]
       },
@@ -4005,7 +4036,7 @@
             "items": {
               "$ref": "#/components/schemas/NotificationChoice"
             },
-            "maxItems": 4
+            "maxItems": 3
           }
         },
         "required": [
@@ -4046,13 +4077,17 @@
           },
           {
             "$ref": "#/components/schemas/InvitationCountedNotice"
+          },
+          {
+            "$ref": "#/components/schemas/InvitationFriendNotice"
           }
         ],
         "discriminator": {
           "propertyName": "kind",
           "mapping": {
             "warning": "#/components/schemas/WarningNotice",
-            "invitation_counted": "#/components/schemas/InvitationCountedNotice"
+            "invitation_counted": "#/components/schemas/InvitationCountedNotice",
+            "invitation_friend": "#/components/schemas/InvitationFriendNotice"
           }
         }
       },
@@ -4130,15 +4165,44 @@
           "fish": {
             "type": "integer",
             "minimum": 0
-          },
-          "likes": {
-            "type": "integer",
-            "minimum": 0
           }
         },
         "required": [
-          "fish",
-          "likes"
+          "fish"
+        ]
+      },
+      "InvitationFriendNotice": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "readAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "invitation_friend"
+            ]
+          },
+          "reward": {
+            "$ref": "#/components/schemas/RewardUnits"
+          }
+        },
+        "required": [
+          "id",
+          "at",
+          "readAt",
+          "kind",
+          "reward"
         ]
       },
       "PushTokenRequest": {
@@ -4173,20 +4237,20 @@
           "reward": {
             "type": "object",
             "properties": {
-              "fish": {
+              "inviterFish": {
                 "type": "integer",
                 "minimum": 0,
                 "maximum": 10
               },
-              "likes": {
+              "friendFish": {
                 "type": "integer",
                 "minimum": 0,
-                "maximum": 50
+                "maximum": 10
               }
             },
             "required": [
-              "fish",
-              "likes"
+              "inviterFish",
+              "friendFish"
             ],
             "additionalProperties": false,
             "description": "What an invitation earns today (matching_config invitation_reward), for the app's words."
@@ -4208,17 +4272,12 @@
               "fish": {
                 "type": "integer",
                 "minimum": 0
-              },
-              "likes": {
-                "type": "integer",
-                "minimum": 0
               }
             },
             "required": [
-              "fish",
-              "likes"
+              "fish"
             ],
-            "description": "What the person's invitations earned that is not used yet."
+            "description": "What invitations earned the person that is not used yet, theirs and the one they used."
           }
         },
         "required": [
@@ -4300,11 +4359,15 @@
               "$ref": "#/components/schemas/ConversationSummary"
             },
             "maxItems": 1000
+          },
+          "yourTurn": {
+            "$ref": "#/components/schemas/YourTurnCount"
           }
         },
         "required": [
           "open",
-          "archived"
+          "archived",
+          "yourTurn"
         ]
       },
       "ConversationSummary": {
@@ -4329,6 +4392,9 @@
           "unread": {
             "type": "integer",
             "minimum": 0
+          },
+          "yourTurn": {
+            "type": "boolean"
           }
         },
         "required": [
@@ -4337,7 +4403,8 @@
           "closedHow",
           "counterpart",
           "lastMessage",
-          "unread"
+          "unread",
+          "yourTurn"
         ]
       },
       "Counterpart": {
@@ -4462,6 +4529,29 @@
           "theirs"
         ]
       },
+      "YourTurnCount": {
+        "type": "object",
+        "properties": {
+          "waiting": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "warning": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "waiting",
+          "limit",
+          "warning"
+        ],
+        "additionalProperties": false
+      },
       "ConversationDetail": {
         "type": "object",
         "properties": {
@@ -4484,6 +4574,9 @@
           "unread": {
             "type": "integer",
             "minimum": 0
+          },
+          "yourTurn": {
+            "type": "boolean"
           },
           "limits": {
             "type": "object",
@@ -4515,6 +4608,7 @@
           "counterpart",
           "lastMessage",
           "unread",
+          "yourTurn",
           "limits",
           "counterpartReadUpTo",
           "contacts",
@@ -6386,23 +6480,10 @@
             "nullable": true,
             "format": "date"
           },
-          "verified": {
+          "finished": {
             "type": "integer",
             "nullable": true,
             "minimum": 10
-          },
-          "split": {
-            "$ref": "#/components/schemas/PondCounterSplit"
-          },
-          "finishing": {
-            "type": "integer",
-            "nullable": true,
-            "minimum": 0,
-            "not": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 9
-            }
           },
           "seeks": {
             "$ref": "#/components/schemas/PondSeeks"
@@ -6411,34 +6492,8 @@
         "required": [
           "pond",
           "day",
-          "verified",
-          "split",
-          "finishing",
+          "finished",
           "seeks"
-        ],
-        "additionalProperties": false
-      },
-      "PondCounterSplit": {
-        "type": "object",
-        "nullable": true,
-        "properties": {
-          "woman": {
-            "type": "integer",
-            "minimum": 10
-          },
-          "man": {
-            "type": "integer",
-            "minimum": 10
-          },
-          "nonBinary": {
-            "type": "integer",
-            "minimum": 10
-          }
-        },
-        "required": [
-          "woman",
-          "man",
-          "nonBinary"
         ],
         "additionalProperties": false
       },
@@ -6496,12 +6551,16 @@
             "items": {
               "$ref": "#/components/schemas/RoundEntry"
             },
-            "maxItems": 50
+            "maxItems": 10
           },
           "fishToSend": {
             "type": "boolean"
           },
           "likesLeft": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "yourTurn": {
             "type": "integer",
             "minimum": 0
           }
@@ -6510,7 +6569,8 @@
           "day",
           "entries",
           "fishToSend",
-          "likesLeft"
+          "likesLeft",
+          "yourTurn"
         ]
       },
       "RoundEntry": {
@@ -6519,7 +6579,7 @@
           "position": {
             "type": "integer",
             "minimum": 1,
-            "maximum": 50
+            "maximum": 32767
           },
           "reason": {
             "$ref": "#/components/schemas/RoundReason"
@@ -6532,6 +6592,11 @@
           },
           "distance": {
             "$ref": "#/components/schemas/DistanceBand"
+          },
+          "star": {
+            "type": "string",
+            "nullable": true,
+            "format": "uuid"
           },
           "relaxedField": {
             "$ref": "#/components/schemas/DealBreakerField"
@@ -6549,7 +6614,8 @@
           "reason",
           "decision",
           "card",
-          "distance"
+          "distance",
+          "star"
         ]
       },
       "RoundDecisionAnswer": {
@@ -6575,12 +6641,17 @@
           "likesLeft": {
             "type": "integer",
             "minimum": 0
+          },
+          "yourTurn": {
+            "type": "integer",
+            "minimum": 0
           }
         },
         "required": [
           "match",
           "fishToSend",
-          "likesLeft"
+          "likesLeft",
+          "yourTurn"
         ],
         "additionalProperties": false
       },
@@ -6669,7 +6740,7 @@
             "items": {
               "$ref": "#/components/schemas/RoundEntry"
             },
-            "maxItems": 50
+            "maxItems": 10
           }
         },
         "required": [
@@ -6685,13 +6756,90 @@
             "items": {
               "type": "integer",
               "minimum": 1,
-              "maximum": 50
+              "maximum": 32767
             },
-            "maxItems": 50
+            "maxItems": 32767
           }
         },
         "required": [
           "removed"
+        ],
+        "additionalProperties": false
+      },
+      "StarList": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StarredPerson"
+            },
+            "maxItems": 100
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "additionalProperties": false
+      },
+      "StarredPerson": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "age": {
+            "type": "integer",
+            "minimum": 18,
+            "maximum": 130
+          },
+          "photo": {
+            "type": "object",
+            "nullable": true,
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "blurhash": {
+                "type": "string",
+                "maxLength": 100
+              }
+            },
+            "required": [
+              "id",
+              "blurhash"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "age",
+          "photo"
+        ],
+        "additionalProperties": false
+      },
+      "StarAnswer": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "first": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "first"
         ],
         "additionalProperties": false
       },
@@ -9485,7 +9633,7 @@
     "/account/notifications": {
       "get": {
         "summary": "What the caller may be notified of",
-        "description": "Every kind (a new round, a message, a match, a moderator's decision), in that order, each on unless the person switched it off. The push reads it for the round, a message and a match; nothing is sent for a moderator's decision yet.",
+        "description": "Every kind (a message, a match, a moderator's decision), in that order, each on unless the person switched it off. The push reads it for a message and a match; nothing is sent for a moderator's decision yet.",
         "security": [
           {
             "session": []
@@ -9725,7 +9873,7 @@
     "/invitations": {
       "get": {
         "summary": "The caller's invitations",
-        "description": "Whether the caller may invite (their profile is complete) and may still type a code, what an invitation earns today (matching_config invitation_reward), their open invitations newest first, how many of theirs have counted, and what those earned that is not used yet. Never a code, and nothing of anybody invited.",
+        "description": "Whether the caller may invite (their profile is complete) and may still type a code, what an invitation earns today (matching_config invitation_reward), their open invitations newest first, how many of theirs have counted, and what invitations earned them that is not used yet. Never a code, and nothing of anybody invited.",
         "security": [
           {
             "session": []
@@ -9766,7 +9914,7 @@
       },
       "post": {
         "summary": "Make an invitation",
-        "description": "A code for one friend, in two groups of five, shown here once: Kuutti keeps only its hash. For a caller whose profile is complete; at most matching_config invitations_open open at once. The night the friend's profile first passes the same test, the invitation counts and the caller earns matching_config invitation_reward.",
+        "description": "A code for one friend, in two groups of five, shown here once: Kuutti keeps only its hash. For a caller whose profile is complete; at most matching_config invitations_open open at once. The night the friend's profile first passes the same test, the invitation counts and the two earn matching_config invitation_reward.",
         "security": [
           {
             "session": []
@@ -12619,7 +12767,7 @@
     "/ponds/counter": {
       "get": {
         "summary": "The pond counter",
-        "description": "Per pond: bank-verified people with the pond as theirs, their split by self-declared gender, and how many are finishing their profile. A number is published only where at least k people stand behind it (k is in the answer), the split only when every cell is at least k, and a pond's numbers move only once at least k people have come or gone since they were last said. Counted once a day. No session needed. With one, the answer is the caller's and is not cached, and the caller's own pond also says whom its people seek: whole percentages of three bands of finished profiles, those who seek men, those who seek both women and men, and those who seek women, null until every band holds at least k people.",
+        "description": "Per pond: how many bank-verified people with the pond as theirs have completed their profiles. The number is published only where at least k people stand behind it (k is in the answer), and it moves only once at least k people have come or gone since it was last said. Counted once a day. No session needed. With one, the answer is the caller's and is not cached, and the caller's own pond also says whom its people seek: percentages in steps of five of three bands of finished profiles, those who seek men, those who seek both women and men, and those who seek women, null until every band holds at least k people.",
         "security": [
           {},
           {
@@ -12715,8 +12863,8 @@
     },
     "/rounds/today": {
       "get": {
-        "summary": "Today's round",
-        "description": "The Finnish day and its cards in order, each with why it is there, how far its person lives as it stood when the entry was written, and the caller's own decision. The first read of a day builds the caller's round once their matching has opened; entries null while they have none, an empty list for a round with nobody to show. A card that cannot be shown now is left out. fishToSend says whether the fish's budget lets the caller send one today, one of matching_config fish_budget in the calendar week (fish_window_days counted from a Monday) or an earned one, never how many. likesLeft says how many of the day's likes the caller has left, from matching_config like_budget_balanced down to zero, by the count that refuses a like. Serving a card writes the shown record and counts against matching_config exposure_cards_per_day (ADR-008).",
+        "summary": "The next cards of the queue",
+        "description": "The Finnish day and the next cards to go through, at most ten, in order: likes waiting, then new people, then people coming back. Each says why it is there and how far its person lives as it stood when the entry was written. With nothing left to go through a read adds the next people; entries null while the caller's matching has not opened, an empty list at the queue's end. A card that cannot be shown now, a filter of either side included, is left out. fishToSend says whether the fish's budget lets the caller send one today, one of matching_config fish_budget in the calendar week (fish_window_days counted from a Monday) or an earned one, never how many. likesLeft says how many of the day's likes the caller has left, from matching_config like_budget_balanced down to zero, by the count that refuses a like. yourTurn says how many conversations wait on the caller's answer. Serving a card writes the shown record and counts against matching_config exposure_cards_per_day, where that is not 0 (ADR-008, ADR-062).",
         "security": [
           {
             "session": []
@@ -12724,7 +12872,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Today's round.",
+            "description": "The next cards.",
             "content": {
               "application/json": {
                 "schema": {
@@ -12779,7 +12927,7 @@
             "schema": {
               "type": "integer",
               "minimum": 1,
-              "maximum": 50
+              "maximum": 32767
             },
             "required": true,
             "name": "position",
@@ -12811,7 +12959,7 @@
             }
           },
           "404": {
-            "description": "not_found: no round today, no card at that place, a card that can no longer be shown, or a day not begun.",
+            "description": "not_found: no round today, no card at that place, a card that can no longer be shown (a block, a sanction, or for a like a filter of either side), or a day not begun.",
             "content": {
               "application/json": {
                 "schema": {
@@ -12835,8 +12983,8 @@
     },
     "/rounds/{day}/entries/{position}/decision": {
       "put": {
-        "summary": "Like or pass a card",
-        "description": "Recorded, or replacing the day's earlier decision on the card; the same decision again writes nothing. A day that has ended answers round_expired. A like counts against the day's matching_config like_budget_balanced, except one on a liked_you or fish card; a pass never does. A like of somebody whose like of the caller stands is a match: the answer names its conversation, and that like is final. A fish is a like with a mark, matching_config fish_budget of them in each fish_window_days counted from a Monday, the calendar week; on a liked_you or fish card it is a like. Past either budget, a like or a fish the caller's invitations earned is used by itself, left out of the counts after, and given back when the decision changes the same day. The answer's fishToSend and likesLeft are the round's after this decision.",
+        "summary": "Like, pass or skip a card",
+        "description": "Recorded, or replacing the day's earlier decision on the card; the same decision again writes nothing. A day that has ended answers round_expired. A skip moves on, spends nothing and answers no like; the card returns another day. A like counts against the day's matching_config like_budget_balanced, a like back on a liked_you or fish card too; a pass or a skip never does. A new like or fish answers your_turn_limit with matching_config your_turn_limit conversations waiting on the caller, and not_found where either side's filters no longer let the two meet. A like of somebody whose like of the caller stands is a match: the answer names its conversation, and that like is final. A fish is a like with a mark, matching_config fish_budget of them in each fish_window_days counted from a Monday, the calendar week; on a liked_you or fish card it is a like. Past the fish's budget, a fish invitations earned the caller is used by itself, left out of the count after, and given back when the decision changes the same day. The answer's fishToSend, likesLeft and yourTurn are the queue's after this decision.",
         "security": [
           {
             "session": []
@@ -12856,7 +13004,7 @@
             "schema": {
               "type": "integer",
               "minimum": 1,
-              "maximum": 50
+              "maximum": 32767
             },
             "required": true,
             "name": "position",
@@ -12875,7 +13023,7 @@
         },
         "responses": {
           "200": {
-            "description": "Recorded, with the conversation the card's like is part of, or null for a pass and a like that made no match.",
+            "description": "Recorded, with the conversation the card's like is part of, or null for a pass, a skip and a like that made no match.",
             "content": {
               "application/json": {
                 "schema": {
@@ -12905,7 +13053,7 @@
             }
           },
           "404": {
-            "description": "not_found: no round today, no card at that place, a card that can no longer be shown, or a day not begun.",
+            "description": "not_found: no round today, no card at that place, a card that can no longer be shown (a block, a sanction, or for a like a filter of either side), or a day not begun.",
             "content": {
               "application/json": {
                 "schema": {
@@ -12915,7 +13063,7 @@
             }
           },
           "409": {
-            "description": "round_expired: the day named has ended; match_made: the card's like made a match and stays. Nothing was written.",
+            "description": "round_expired: the day named has ended; match_made: the card's like made a match and stays; your_turn_limit: too many conversations wait on the caller's answer. Nothing was written.",
             "content": {
               "application/json": {
                 "schema": {
@@ -12925,7 +13073,7 @@
             }
           },
           "429": {
-            "description": "like_budget_exceeded: the day's likes are used up and no earned like is left, Retry-After the wait until the day rolls; fish_budget_exceeded: matching_config fish_budget fish were sent within the period and no earned fish is left, Retry-After the wait until the midnight that begins the next period, a Monday's. Nothing was written.",
+            "description": "like_budget_exceeded: the day's likes are used up, Retry-After the wait until the day rolls; fish_budget_exceeded: matching_config fish_budget fish were sent within the period and no earned fish is left, Retry-After the wait until the midnight that begins the next period, a Monday's. Nothing was written.",
             "content": {
               "application/json": {
                 "schema": {
@@ -12940,7 +13088,7 @@
     "/rounds/{day}/relaxations": {
       "get": {
         "summary": "What today's round may relax, and what is relaxed",
-        "description": "For a short round (fewer ordered places than matching_config round_size, the liked-you and fish places aside), every deal-breaker of the caller's that is not paused and not relaxed today, each way it can be relaxed for the day: unanswered (let through those who did not answer its field) and aside (set it aside), each listed only when it would add somebody today, with more: how much it widens the caller's pool, rounded down to a step of matching_config pond_counter_k. Counted on asking. Also the relaxations in force today. Never another filter (ADR-042).",
+        "description": "Once no new person is left in the queue, every deal-breaker of the caller's that is not paused and not relaxed today, each way it can be relaxed for the day: unanswered (let through those who did not answer its field) and aside (set it aside), each listed only when it would add somebody today, with more: how much it widens the caller's pool, rounded down to a step of matching_config pond_counter_k. Counted on asking. Also the relaxations in force today. Never another filter (ADR-042).",
         "security": [
           {
             "session": []
@@ -13012,7 +13160,7 @@
       },
       "post": {
         "summary": "Relax a deal-breaker for today",
-        "description": "One of the caller's own deal-breakers loosened for the day only: the people it lets in today are added after the round's last place, as many as the room left (round_size less the ordered places), new people first, reason relaxed with the field. Tomorrow's round is built from the filters as stored. The answer is the cards added, served as the round's read serves them (ADR-008).",
+        "description": "One of the caller's own deal-breakers loosened for the day only: the people it lets in today join the queue, new people first, reason relaxed with the field. Tomorrow's queue reads the filters as stored. The answer is the first cards added, at most ten, served as a read serves them (ADR-008); the next read goes on to the rest.",
         "security": [
           {
             "session": []
@@ -13185,6 +13333,254 @@
         }
       }
     },
+    "/stars": {
+      "get": {
+        "summary": "The people the caller starred",
+        "description": "Those who may be shown now, the latest star first and in no other order: both people's filters, the accounts' state and the inbox stop are asked on every read, and whoever does not pass is left out with no word why. Each with a name, an age and the main one of the photos the caller was shown, whose thumb is asked for as any photo's. It serves no card and signs no photo.",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The list, perhaps empty.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StarList"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "unauthenticated, session_expired or session_revoked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/rounds/{day}/entries/{position}/star": {
+      "put": {
+        "summary": "Put a star on a card",
+        "description": "Marks the card's person for later: it spends nothing and decides nothing, and the same star again answers the one that stands. It reaches nobody. A card holding a like or a pass takes none. first says this is the only star the list shows.",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "date"
+            },
+            "required": true,
+            "name": "day",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 32767
+            },
+            "required": true,
+            "name": "position",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The star, and whether it is the first.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StarAnswer"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "unauthenticated, session_expired or session_revoked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "not_found: no such card in today's round, one that can no longer be shown, or one holding a like or a pass.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "round_expired: the day named has ended; stars_full: the list shows matching_config stars_max people. Nothing was written.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/stars/{id}": {
+      "delete": {
+        "summary": "Take a star off",
+        "description": "The person comes back to the queue where it would have them. Nobody is told, and nothing else changes.",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Taken off."
+          },
+          "400": {
+            "description": "Validation failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "unauthenticated, session_expired or session_revoked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "not_found: no such star of the caller's.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/stars/{id}/open": {
+      "post": {
+        "summary": "Open a starred person's card",
+        "description": "The card comes into today's log, or as it stands there, so it is reported seen and decided by its day and place as any card is, spending what those spend anywhere else. Answered as a read of the queue is, with that one card, served as a read serves one (ADR-008, ADR-041).",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The card.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoundResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "unauthenticated, session_expired or session_revoked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "not_found: no such star of the caller's, or somebody the list leaves out now.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "card_budget_exceeded: the day's cards are used up; Retry-After is the wait until the day rolls.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/preferences/deal-breakers": {
       "get": {
         "summary": "The caller's deal-breakers",
@@ -13219,7 +13615,7 @@
       },
       "put": {
         "summary": "Set the caller's deal-breakers",
-        "description": "The whole set, at most `max`, each on a distinct whitelisted field the person has answered themselves, accepting options the field has. One on distance has no field: it accepts the bands up to nearby, close or around, and lets through those who did not answer whatever the request says, since nobody can leave it unanswered. Hard rows: #87 applies them in the pool, both ways.",
+        "description": "The whole set, at most `max`, each on a distinct whitelisted field the person has answered themselves, accepting options the field has. A person already past a lowered `max` may still remove or change what they hold; only a new field past it is refused. One on distance has no field: it accepts the bands up to nearby, close or around, and lets through those who did not answer whatever the request says, since nobody can leave it unanswered. Hard rows: #87 applies them in the pool, both ways.",
         "security": [
           {
             "session": []
@@ -13247,7 +13643,7 @@
             }
           },
           "400": {
-            "description": "Validation failed: more than allowed, a field twice, an answer the field has not, or bands that do not run up to one.",
+            "description": "Validation failed: a new field past what is allowed, a field twice, an answer the field has not, or bands that do not run up to one.",
             "content": {
               "application/json": {
                 "schema": {

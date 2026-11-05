@@ -13,9 +13,7 @@ import {
 } from "./identity/index.ts";
 import { invitationCountJob } from "./jobs/invitation-count.ts";
 import type { NightlyJob } from "./jobs/nightly.ts";
-import { countsBands, ensureFirstSnapshot, pondCounterJob } from "./jobs/pond-counter.ts";
-import { roundsJob } from "./jobs/round-builder.ts";
-import type { RoundPushDeps } from "./jobs/round-push.ts";
+import { ensureFirstSnapshot, pondCounterJob } from "./jobs/pond-counter.ts";
 import type { Config } from "./lib/config.ts";
 import type { Logger } from "./lib/logger.ts";
 import { mailerFor } from "./lib/mail.ts";
@@ -23,6 +21,7 @@ import { ensurePreviewDatabase } from "./lib/preview-database.ts";
 import { pusherFor } from "./lib/push.ts";
 import { createS3Client } from "./lib/s3.ts";
 import { initSentry, sentryReporter } from "./lib/sentry.ts";
+import { pruneRounds } from "./matching/index.ts";
 import { createMediaDeps, rejectUnreviewedPhotos, sweepPendingPhotos } from "./media/index.ts";
 import { createPush, type Push } from "./notifications/index.ts";
 import {
@@ -56,8 +55,6 @@ export type Booted = {
   live: Live;
   /** The pushes in flight, which index.ts's shutdown waits for (#102). */
   push: Push;
-  /** The round's push on its own timer, which index.ts arms (#102, ADR-055 §6). */
-  roundPush: RoundPushDeps;
 };
 
 /**
@@ -257,7 +254,7 @@ export async function boot({
     media.setup.mode === "off" || config.APP_ENV === "production"
       ? undefined
       : { db: pool, now, store: s3CopyStore(createS3Client(config), config.S3_BUCKET) };
-  const counter = { db: pool, logger, now, bands: countsBands(config.APP_ENV) };
+  const counter = { db: pool, logger, now };
   const jobs: NightlyJob[] = [
     { name: "sweep-sessions", run: () => sweepSessions({ db: pool, now }) },
     { name: "sweep-admin-sessions", run: () => sweepAdminSessions({ db: pool, now }) },
@@ -272,18 +269,15 @@ export async function boot({
     }),
     // The census of the research block: a cell under k is a warning (ADR-011 §9).
     researchAnonymityJob({ db: pool, logger }),
-    // Suspensions past their day end (#307, ADR-024 §5), before the counter
-    // and the rounds, so a person let back in is counted the same night.
+    // Suspensions past their day end (#307, ADR-024 §5), before the counter,
+    // so a person let back in is counted the same night.
     { name: "end-suspensions", run: async () => ({ ended: await endSuspensions(pool, now()) }) },
     // The day's figures (#54): taken once a day, served all day.
     pondCounterJob(counter),
     // The invitations whose redeemer's profile is complete tonight (#107, ADR-044 §7).
     invitationCountJob({ db: pool, logger, now }),
-    // The day's round for everybody complete in an open pond (#95, #500, ADR-035).
-    // shortcut: none in production until the maintainer has set how long rounds
-    // are kept (ADR-034 Open 2, ADR-035 Open 1) and the filters are asked on read
-    // and on `decide` (#502, his word on #542): both lift this and app.ts's twin.
-    ...(config.APP_ENV === "production" ? [] : [roundsJob({ db: pool, logger, now })]),
+    // Rounds keep a year (#502, ADR-062 §13), their entries and relaxations with them.
+    { name: "prune-rounds", run: async () => ({ pruned: await pruneRounds(pool, now()) }) },
     // A photo nobody decided in photo_queue_reject_days is rejected as not reviewed (#376),
     // wherever there is a queue, Rekognition or none.
     { name: "reject-unreviewed-photos", run: () => rejectUnreviewedPhotos({ db: pool, now }) },
@@ -320,6 +314,5 @@ export async function boot({
     logger.error({ job: "pond-counter", err }, "first pond counter failed"),
   );
 
-  const roundPush: RoundPushDeps = { db: pool, logger, now, push };
-  return { app, pool, jobs, live, push, roundPush };
+  return { app, pool, jobs, live, push };
 }

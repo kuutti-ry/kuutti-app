@@ -25,6 +25,9 @@ like:
 pass:
   definition: Deciding not to talk to someone in this round. Neutral and kind; it must not read as rejection or as a judgement of the other person.
 
+star:
+  definition: A private mark a member puts on somebody's card, to come back to them later without a like or a pass. Only the member sees it; a bookmark, never a rating or a super like. Starred means having one.
+
 standing:
   definition: Whether a verified person is in good standing, suspended or banned. Used in moderation and account notices; formal, factual register.
 

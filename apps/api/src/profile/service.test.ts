@@ -306,7 +306,11 @@ describe("the card across a block (#84, ADR-030, features/safety/blocks.feature)
     expect(await shownRows(ctx, b.accountId)).toBe(0);
     expect(logs().some((line) => line.msg === "card served")).toBe(false);
     // Decided before the budget: with none left a blocked card is still the 404, another card the 429.
-    await withMatchingConfig(ctx.client, { exposure_cards_per_day: 0 });
+    const spent = await signedInAccount(ctx.client);
+    await profileRow(ctx, spent.accountId);
+    await approvedPhotos(ctx, spent.accountId, 2);
+    await card(b.accountId, spent.accountId);
+    await withMatchingConfig(ctx.client, { exposure_cards_per_day: 1 });
     await expect(card(b.accountId, a.accountId)).rejects.toMatchObject({ status: 404 });
     await expect(card(b.accountId, c.accountId)).rejects.toMatchObject({ status: 429 });
     await withMatchingConfig(ctx.client, { exposure_cards_per_day: 5 });

@@ -158,7 +158,7 @@ describe("a report from a conversation", () => {
       [id],
     );
     expect(closed.rows).toEqual([{ closed_how: "block", closed_by: "a" }]);
-    expect(await listOf(ctx.app, a)).toEqual({ open: [], archived: [] });
+    expect(await listOf(ctx.app, a)).toMatchObject({ open: [], archived: [] });
     expect((await ctx.app.request(`/conversations/${id}`, { headers: a.headers })).status).toBe(
       404,
     );

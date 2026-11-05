@@ -11,9 +11,10 @@ import { useFocusEffect, useRouter } from "expo-router";
 import ContactRound from "lucide-react-native/icons/contact-round";
 import ImagePlus from "lucide-react-native/icons/image-plus";
 import { Fragment, useCallback, useEffect, useRef, useState } from "react";
-import { AppState, KeyboardAvoidingView, ScrollView, View } from "react-native";
+import { AppState, KeyboardAvoidingView, Platform, ScrollView, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LoadFailed } from "@/components/LoadFailed";
+import { Notice, sayAloud } from "@/components/Notice";
 import { ScreenHeader } from "@/components/ScreenHeader";
 import { SupportLink } from "@/components/SupportLink";
 import { Button } from "@/components/ui/button";
@@ -112,7 +113,9 @@ type Pending = { body: string; at: string; clientId: string; photo: PickedPhoto 
  * The detail as the socket has told it since it was read (#349): the state,
  * and the read mark. A close ends every share (#103) and no contacts frame
  * follows it, so a conversation the socket closed shows nothing shared with
- * the person (their own are no longer offered).
+ * the person (their own are no longer offered). An end names nobody from the
+ * frame on, as the read after it will (#351), so that the heading says it the
+ * moment the composer goes, even if that read fails (#581).
  */
 function withLive(
   detail: ConversationDetail,
@@ -126,6 +129,7 @@ function withLive(
     ...(state && state.state !== "gone" ? { state: state.state, closedHow: state.closedHow } : {}),
     counterpartReadUpTo: Math.max(detail.counterpartReadUpTo, live.readUpTo),
     ...(closed ? { contacts: { ...detail.contacts, theirs: [] } } : {}),
+    ...(state?.closedHow === "unmatch" ? { counterpart: null } : {}),
   };
 }
 
@@ -134,15 +138,17 @@ function withLive(
  * at the top and newest at the bottom, a day line where the day changes, the
  * person's own on the right and the other's on the left, each with its time
  * and read by a screen reader as who, when and what; "Read" under the last
- * own message the other has read. The composer counts down from the longest
- * message, sends with Send (44 points, labelled, off while empty), shows the
- * message at once and swaps it for the API's answer; a refusal or a failure
- * is said under it in words, the words kept in the field, and the same words
- * sent again keep their id, so a send whose answer was lost is not doubled.
- * An archived conversation says that writing brings it back; a closed one
- * says how it ended instead of the composer, with the way to the support page
- * (#510). Read again on focus, and marked
- * read up to the newest message while on the screen. No gesture: earlier
+ * own message the other has read. The composer sends with Send (44 points,
+ * labelled, off while empty and past the longest message, where a line says so
+ * and no count comes before it, #581), shows the message at once and swaps it
+ * for the API's answer; a refusal or a failure is said under it in words, the
+ * words kept in the field, and the same words sent again keep their id, so a
+ * send whose answer was lost is not doubled. An archived conversation says that
+ * writing brings it back. A closed one has the way to the support page (#510)
+ * instead of the composer: its heading says it ended, and a screen reader is told
+ * if that happens while on the screen (#581); only a counterpart's erasure has a
+ * line of its own. Read again on focus, and marked read up to the newest message
+ * while on the screen. No gesture: earlier
  * messages are a button. Live (#349): what the socket brings joins what was
  * read, by sequence; the read mark and the state follow its frames; "Online"
  * under the header while the counterpart is; a line at the top while the
@@ -417,8 +423,11 @@ export function ConversationScreen({ id }: { id: string }) {
     setPicking(true);
     try {
       const picked = await pickPrepared();
-      if (picked.kind === "picked") setAttached(picked.photo);
-      else if (picked.kind === "denied") setRefusal("photos.error.permission");
+      if (picked.kind === "picked") {
+        setAttached(picked.photo);
+        // The picture and Remove photo show it: said, not drawn (#581).
+        sayAloud(t("chat.composer.photoAttached"));
+      } else if (picked.kind === "denied") setRefusal("photos.error.permission");
       else if (picked.kind === "refused_local") setRefusal("photos.refused.local");
     } catch {
       // The phone could not read the picture to resize it.
@@ -481,8 +490,8 @@ export function ConversationScreen({ id }: { id: string }) {
     }
   };
 
-  // Closed by the socket while on the screen: read again, so the name goes
-  // (an ended conversation names nobody, #351) and Report says the window.
+  // Closed by the socket while on the screen: read again, so an erasure's name
+  // reads Deleted user and Report says the window.
   const closedLive = here?.state?.state === "closed";
   const closedHeld = view.status === "ready" && view.detail.state === "closed";
   useEffect(() => {
@@ -490,7 +499,12 @@ export function ConversationScreen({ id }: { id: string }) {
   }, [closedLive, closedHeld, load]);
 
   /** A report, a block or an end went through, or the conversation was gone: back to the list, while the screen is in front. */
-  const done = (outcome: SafetyOutcome) => handToList(outcome, focused.current);
+  // Whether the composer stood when the screen last had a word to say (#581).
+  const hadComposer = useRef(false);
+  const done = (outcome: SafetyOutcome) => {
+    hadComposer.current = false;
+    handToList(outcome, focused.current);
+  };
 
   // The one who blocked sees it gone at once (ADR-031 §4).
   const shown: ScreenView = here?.state?.state === "gone" ? { status: "gone" } : view;
@@ -509,6 +523,22 @@ export function ConversationScreen({ id }: { id: string }) {
   // conversation. Nothing before a detail was read, or once the API said it
   // is gone.
   const known = detail ?? (view.status === "ready" ? withLive(view.detail, here) : null);
+  // Ended while on the screen: the heading says it and the composer goes, and a
+  // screen reader is told (#581). Behind the dialog of More, or under another
+  // screen, it waits: an end the person brought about there has the dialog and
+  // then the list say what happened (`done`), and one from the other side is said
+  // once the screen is in front again, which a read on focus brings (`view`). An
+  // erasure has its own line, drawn in a live region, which iOS does not have.
+  const state = detail?.state;
+  const closedHow = detail?.closedHow;
+  useEffect(() => {
+    if (state === undefined || acting || !focused.current) return;
+    if (state === "closed" && hadComposer.current) {
+      if (closedHow !== "erasure") sayAloud(t("chat.state.ended"));
+      else if (Platform.OS === "ios") sayAloud(t("chat.state.deleted"));
+    }
+    hadComposer.current = state !== "closed";
+  }, [state, closedHow, acting, view, t]);
   return (
     <SafeAreaView className="flex-1 bg-background">
       <ScreenHeader title={title} backLabel={t("chat.back")} onBack={() => router.back()}>
@@ -567,7 +597,7 @@ export function ConversationScreen({ id }: { id: string }) {
       )}
       {shown.status === "loading" && (
         <Text accessibilityLiveRegion="polite" className="p-6">
-          {t("chat.conversation.loading")}
+          {t("load.loading")}
         </Text>
       )}
       {shown.status === "gone" && (
@@ -582,7 +612,6 @@ export function ConversationScreen({ id }: { id: string }) {
       {shown.status === "failed" && (
         <View className="p-6">
           <LoadFailed
-            headline={t("chat.conversation.failed")}
             error={shown.error}
             onRetry={() => {
               setView({ status: "loading" });
@@ -609,9 +638,9 @@ export function ConversationScreen({ id }: { id: string }) {
             {refusal && <Text accessibilityLiveRegion="assertive">{t(refusal)}</Text>}
             {detail.state === "closed" ? (
               <>
-                <Text accessibilityLiveRegion="polite">
-                  {detail.closedHow === "erasure" ? t("chat.state.deleted") : t("chat.state.ended")}
-                </Text>
+                {detail.closedHow === "erasure" && (
+                  <Text accessibilityLiveRegion="polite">{t("chat.state.deleted")}</Text>
+                )}
                 {/* However it ended: the link tells nothing of how. */}
                 <SupportLink />
               </>
@@ -677,7 +706,15 @@ function Conversation({
       className="flex-1"
       contentContainerClassName="gap-3 p-4"
       keyboardShouldPersistTaps="handled"
-      onContentSizeChange={() => scroll.current?.scrollToEnd({ animated: false })}
+      onContentSizeChange={() => {
+        const toEnd = () => scroll.current?.scrollToEnd({ animated: false });
+        toEnd();
+        // Android sends this as React commits the new size, and runs a view command
+        // ahead of the mount still waiting: under load the scroll stops at the old end,
+        // with the new message under the fold (CI, 05/11/2026). By the next frame the
+        // mount has gone first (ReactChoreographer: DISPATCH_UI, then the timers).
+        requestAnimationFrame(toEnd);
+      }}
     >
       {more && first && (
         <Button variant="ghost" onPress={() => onEarlier(first.seq)}>
@@ -787,9 +824,6 @@ function Composer({
             style={{ width: ATTACHED_EDGE, height: ATTACHED_EDGE, borderRadius: 8 }}
             {...DECORATIVE}
           />
-          <Text accessibilityLiveRegion="polite" className="flex-1">
-            {t("chat.composer.photoAttached")}
-          </Text>
           <Button variant="ghost" disabled={sending} onPress={onDetach}>
             {t("chat.composer.removePhoto")}
           </Button>
@@ -815,12 +849,13 @@ function Composer({
           onChangeText={onChange}
         />
       </View>
-      <View className="flex-row items-center justify-between gap-3">
-        <Text variant="muted" className="flex-1">
-          {left < 0
-            ? t("chat.composer.error.message_too_long")
-            : t("chat.composer.remaining", { characters: left })}
-        </Text>
+      <View className="flex-row items-center justify-end gap-3">
+        {/* The one word that Send has stopped, and its count is gone (#581): said where it appears. */}
+        {left < 0 && (
+          <View className="flex-1">
+            <Notice refused words={t("chat.composer.error.message_too_long")} />
+          </View>
+        )}
         <Button disabled={empty || left < 0 || sending} onPress={onSend}>
           {t("chat.composer.send")}
         </Button>

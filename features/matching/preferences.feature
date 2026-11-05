@@ -90,6 +90,19 @@ Feature: The hard preferences of onboarding
       | a deal-breaker on distance accepting far          | 400    |
       | a deal-breaker on distance past what the config allows | 400 |
 
+  Scenario Outline: A person past a lowered number may remove or change what they hold, and take on nothing new
+    Given a signed-in account holding deal-breakers on smoking, kids and height, with the config lowered to one
+    When it <what>
+    Then the answer is <status> and it holds <held>
+
+    Examples:
+      | what                                   | status | held                            |
+      | removes kids, still one too many       | 200    | smoking and height              |
+      | changes what smoking accepts           | 200    | smoking, changed, kids and height |
+      | sends the set as it stands             | 200    | smoking, kids and height        |
+      | adds monogamy                          | 400    | smoking, kids and height        |
+      | swaps kids for monogamy                | 400    | smoking, kids and height        |
+
   Scenario: Deal-breakers are stored as hard rows beside onboarding's and paused while the own answer is missing
     Given a signed-in account with seeks, an age window and answers on smoking and kids
     When it sets a deal-breaker on each, takes its smoking answer back, and answers again

@@ -28,7 +28,7 @@ Feature: Blocking somebody from a card or a conversation
 
   Scenario: The round leaves a blocked pair out of each other's cards
     Given an open pond of people who all fit
-    When one of them blocks another and the night builds the rounds
+    When one of them blocks another and everybody reads their queue
     Then neither of the two is a card in the other's round, and everybody else has both
 
   Scenario: Blocking again, or blocking somebody who blocked first, answers the same

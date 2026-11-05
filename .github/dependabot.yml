@@ -3,7 +3,10 @@ version: 2
 # Every entry runs on the first of the month and proposes a release only once
 # it is seven days old (cooldown; GitHub's default is three days): most
 # malicious releases are found and pulled within days. Security updates skip
-# both and open when the alert does. What is added by hand meets pnpm's own
+# both and open when the alert does, if the fix is within what the package's
+# parents ask for and it is locked on one major. For the rest the job ends in
+# security_update_not_possible (dependabot/dependabot-core#16434), and the fix
+# is an override in pnpm-workspace.yaml. What is added by hand meets pnpm's own
 # one-day minimumReleaseAge (pnpm-workspace.yaml).
 updates:
   # Keep the actions used in .github/workflows current. Actions are pinned to
@@ -71,6 +74,8 @@ updates:
       - dependency-name: "jest"
         update-types: ["version-update:semver-major"]
       - dependency-name: "@types/jest"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "babel-jest"
         update-types: ["version-update:semver-major"]
 
   # The API image's base image (apps/api/Dockerfile). Node 22 is the

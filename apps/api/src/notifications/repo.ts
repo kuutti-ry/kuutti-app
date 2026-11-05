@@ -51,9 +51,8 @@ export type NoticeRow = {
   readAt: Date | null;
   /** A warning's; null for any other kind. */
   reason: SanctionReason | null;
-  /** The units a counted invitation earned; nought for any other kind. */
+  /** The units a counted invitation earned the person; nought for a warning. */
   fish: number;
-  likes: number;
 };
 
 /**
@@ -66,9 +65,7 @@ export async function listNotices(
   limit: number,
 ): Promise<NoticeRow[]> {
   const { rows } = await db.query<Row>(
-    `SELECT n.id, n.kind, n.created_at, n.read_at, s.reason,
-            count(r.id) FILTER (WHERE r.kind = 'fish')::int AS fish,
-            count(r.id) FILTER (WHERE r.kind = 'like')::int AS likes
+    `SELECT n.id, n.kind, n.created_at, n.read_at, s.reason, count(r.id)::int AS fish
        FROM notice n
        LEFT JOIN sanction s ON s.id = n.sanction_id
        LEFT JOIN reward r ON r.invitation_id = n.invitation_id AND r.account_id = n.account_id
@@ -85,7 +82,6 @@ export async function listNotices(
     readAt: (r.read_at as Date | null) ?? null,
     reason: (r.reason as SanctionReason | null) ?? null,
     fish: r.fish as number,
-    likes: r.likes as number,
   }));
 }
 
@@ -112,16 +108,25 @@ export async function insertWarningNotice(
   );
 }
 
-/** Each counted invitation's notice for its inviter, in the night's count's transaction (#107, ADR-044 §7). */
+/** Each counted invitation's notice for one of its two, in the night's count's transaction (#107, ADR-044 §7). */
 export async function insertInvitationNotices(
   db: Queryable,
-  input: { counted: ReadonlyArray<{ accountId: string; invitationId: string }>; at: Date },
+  input: {
+    kind: "invitation_counted" | "invitation_friend";
+    counted: ReadonlyArray<{ accountId: string; invitationId: string }>;
+    at: Date;
+  },
 ): Promise<void> {
   await db.query(
     `INSERT INTO notice (account_id, kind, invitation_id, created_at)
-     SELECT c.account, 'invitation_counted', c.invitation, $3
+     SELECT c.account, $4::notice_kind, c.invitation, $3
        FROM unnest($1::uuid[], $2::uuid[]) AS c(account, invitation)`,
-    [input.counted.map((c) => c.accountId), input.counted.map((c) => c.invitationId), input.at],
+    [
+      input.counted.map((c) => c.accountId),
+      input.counted.map((c) => c.invitationId),
+      input.at,
+      input.kind,
+    ],
   );
 }
 

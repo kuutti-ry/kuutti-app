@@ -4,10 +4,10 @@
 # Report this photo (#476, §13): a reason and a short note, typed in the dialog
 # with the keyboard up. She is taken back to the list, which thanks her and no
 # longer has the conversation (the report blocked Emmi). Emmi signs in and
-# finds it among the archived, ended and naming nobody, under the group's hint
-# that only a quiet one comes back; inside it, the composer is gone, More
-# offers only the report, and her report goes through too. The stories give
-# the pair their conversation and Emmi's photo
+# finds it among the archived, ended and naming nobody; inside it, the heading
+# says it ended, the composer is gone, the way to the support page stands in its
+# place, More offers only the report, and Emmi's report goes through too. The
+# stories give the pair their conversation and Emmi's photo
 # (packages/db/src/seed/conversations.ts), which no other flow reads. A block
 # is final, so the flow runs once after each `pnpm demo:reset`. That Emmi's
 # card is out of Laura's reach is the API's tests until the round (#96) shows
@@ -86,9 +86,9 @@ name: A report from a conversation takes it from the reporter's list, and the ot
 - tapOn: "Send report|Lähetä ilmoitus|Skicka anmälan"
 # Back on the list, from the photo too: thanked, and the conversation is gone from it.
 - extendedWaitUntil:
-    visible: "Thank you\\. A moderator will look at it, and you will not see each other again\\.|Kiitos\\. Moderaattori katsoo ilmoituksen, eikä teitä näytetä enää toisillenne\\.|Tack\\. En moderator tittar på anmälan, och ni ser inte varandra igen\\."
+    visible: "Thank you\\. A moderator will look at it\\.|Kiitos\\. Moderaattori katsoo ilmoituksen\\.|Tack\\. En moderator tittar på anmälan\\."
     timeout: 15000
-- assertVisible: "No conversations yet\\. A conversation opens here when you match with someone\\.|Ei vielä keskusteluja\\. Keskustelu avautuu tänne, kun saat mätsin\\.|Inga samtal än\\. Ett samtal öppnas här när du får en match\\."
+- assertVisible: "No conversations yet\\.|Ei vielä keskusteluja\\.|Inga samtal än\\."
 - assertNotVisible: "Emmi, \\d+, .*"
 
 # Emmi: the conversation is among the archived, ended, under no name; its
@@ -105,14 +105,17 @@ name: A report from a conversation takes it from the reporter's list, and the ot
 - assertVisible:
     text: "(Conversation ended|Keskustelu päättynyt|Samtalet har avslutats), .*"
     below: "Archived|Arkistoidut|Arkiverade"
-# The group's hint no longer promises that writing brings every one back.
-- assertVisible: "A conversation quiet for a week moves here, and so does one that has ended\\. Writing in a quiet one brings it back\\.|Viikon hiljaa ollut keskustelu siirtyy tänne, samoin päättynyt keskustelu\\. Kun kirjoitat hiljaiseen keskusteluun, se palaa\\.|Ett samtal som varit tyst en vecka flyttas hit, liksom ett samtal som har avslutats\\. När du skriver i ett tyst samtal kommer det tillbaka\\."
 - assertNotVisible: "Laura, \\d+, .*"
 - tapOn: "(Conversation ended|Keskustelu päättynyt|Samtalet har avslutats), .*"
-# Ended in words in place of the composer, which is gone.
+# The way to the support page in place of the composer, which is gone: the list
+# has no such link, so this is the conversation. The heading says it ended, the
+# same however it ended; the line that said so is said aloud only when it ends
+# while on the screen, and never drawn (#581).
 - extendedWaitUntil:
-    visible: "This conversation has ended\\.|Tämä keskustelu on päättynyt\\.|Det här samtalet har avslutats\\."
+    visible: "Support when it's hard|Tukea, kun on vaikeaa|Stöd när det är svårt"
     timeout: 15000
+- assertVisible: "Conversation ended|Keskustelu päättynyt|Samtalet har avslutats"
+- assertNotVisible: "This conversation has ended\\.|Tämä keskustelu on päättynyt\\.|Det här samtalet har avslutats\\."
 - assertNotVisible: "(Message|Viesti|Meddelande)( .*)?"
 - waitForAnimationToEnd
 - tapOn: "More|Lisää|Mer"
@@ -127,6 +130,6 @@ name: A report from a conversation takes it from the reporter's list, and the ot
 - tapOn: "A fake profile, or someone else's photos|Valeprofiili tai jonkun muun kuvat|Falsk profil eller någon annans bilder"
 - tapOn: "Send report|Lähetä ilmoitus|Skicka anmälan"
 - extendedWaitUntil:
-    visible: "Thank you\\. A moderator will look at it, and you will not see each other again\\.|Kiitos\\. Moderaattori katsoo ilmoituksen, eikä teitä näytetä enää toisillenne\\.|Tack\\. En moderator tittar på anmälan, och ni ser inte varandra igen\\."
+    visible: "Thank you\\. A moderator will look at it\\.|Kiitos\\. Moderaattori katsoo ilmoituksen\\.|Tack\\. En moderator tittar på anmälan\\."
     timeout: 15000
-- assertVisible: "No conversations yet\\. A conversation opens here when you match with someone\\.|Ei vielä keskusteluja\\. Keskustelu avautuu tänne, kun saat mätsin\\.|Inga samtal än\\. Ett samtal öppnas här när du får en match\\."
+- assertVisible: "No conversations yet\\.|Ei vielä keskusteluja\\.|Inga samtal än\\."

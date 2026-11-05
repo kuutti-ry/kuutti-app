@@ -1,33 +1,33 @@
-# Today's round (#379, ADR-034): Iida opens it from the gate card on home,
-# meets Henna first, who liked her yesterday, and likes her back: it is a
-# match, which leads to the conversation and back to the round. The next card
-# she passes, takes back with Undo and likes; the one after she reports and
-# blocks from the card's header with a reason and a short note (ADR-030 §11),
-# and it leaves the screen; the last one gets her fish (#378). Then the round
-# says to come back tomorrow. Which of Katja, Minna and Riikka comes when is
-# the day's order, so the flow decides by place, never by name. The stories
-# give Iida her round (packages/db/src/seed/rounds.ts); a match and a block
-# are final, so the flow runs once after each `pnpm demo:reset`, on the same
-# Finnish day: on a later day the builder makes her a round of Henna alone,
-# the other three having been shown within `shown_cooldown_days`.
+# The queue (#379, #502, ADR-034, ADR-062): Iida opens it from the gate card
+# on home, meets Henna first, who liked her yesterday, and likes her back: it
+# is a match, which leads to the conversation and back to the queue. The next
+# card she leaves for later, brings back with Undo, passes, takes back again
+# and likes; the one after she reports and blocks from the card's header with
+# a reason and a short note (ADR-030 §11), and it leaves the screen; the last
+# one gets her fish (#378). Then the queue says that is everybody, and its one
+# button leads into What you seek and back. Which of Katja, Minna and Riikka
+# comes when is the day's order, so the flow decides by place, never by name.
+# The stories give Iida her queue (packages/db/src/seed/rounds.ts), and no
+# other persona fits her; a match and a block are final, so the flow runs once
+# after each `pnpm demo:reset`.
 # shortcut: the note is typed at the phone's own text size; ADR-030 §11's
 # 200% wants a host step between flows (simctl content_size, adb font_scale),
 # which `pnpm e2e` does not have.
 appId: fi.kuutti.app
-name: Today's round shows one card at a time, liking back makes a match, Undo takes a decision back, and a report takes a card away
+name: The queue shows one card at a time, liking back makes a match, Later and Undo leave a decision open, and a report takes a card away
 ---
 - runFlow:
     file: ../common/sign-in.yaml
     env:
       PERSONA: Iida Mattila
-# Home: matching is open, and the gate card leads to the round.
+# Home: matching is open, and the gate card leads to the queue.
 - scrollUntilVisible:
-    element: "Today's round|Päivän kierros|Dagens runda"
+    element: "See people|Katso ihmisiä|Se människor"
     direction: DOWN
     centerElement: true
     timeout: 60000
 - assertVisible: "Matching is open for you\\.|Seuranhaku on sinulle auki\\.|Matchningen är öppen för dig\\."
-- tapOn: "Today's round|Päivän kierros|Dagens runda"
+- tapOn: "See people|Katso ihmisiä|Se människor"
 # Henna first, labelled: she liked Iida, so there is no fish on her card.
 - extendedWaitUntil:
     visible: "Liked you|Tykkäsi sinusta|Gillade dig"
@@ -51,7 +51,7 @@ name: Today's round shows one card at a time, liking back makes a match, Undo ta
 - extendedWaitUntil:
     visible: "It's a match|Se on mätsi|Det är en match"
     timeout: 15000
-# The round keeps the match on its screen until it has the focus again, so
+# The queue keeps the match on its screen until it has the focus again, so
 # the next card comes only after Back.
 - tapOn: "Go to the conversation|Siirry keskusteluun|Gå till samtalet"
 # The conversation the match opened, with nothing in it yet but the composer.
@@ -60,7 +60,7 @@ name: Today's round shows one card at a time, liking back makes a match, Undo ta
     timeout: 15000
 - assertVisible: "Henna, \\d+"
 - tapOn: "Back|Takaisin|Tillbaka"
-# Back in the round: the next card, a stranger's, and Henna's name leaves
+# Back in the queue: the next card, a stranger's, and Henna's name leaves
 # with the conversation's header (README: something going is waited for).
 - extendedWaitUntil:
     visible: "Matches your filters|Vastaa suodattimiasi|Matchar dina filter"
@@ -69,6 +69,18 @@ name: Today's round shows one card at a time, liking back makes a match, Undo ta
     notVisible: "Henna, \\d+"
     timeout: 15000
 - waitForAnimationToEnd
+# Later moves on and spends nothing (ADR-062 §3); Undo brings the card back and
+# says what was decided, and the decision can still change.
+- tapOn: "Later|Myöhemmin|Senare"
+- extendedWaitUntil:
+    visible: "Undo your last decision|Kumoa viimeisin valintasi|Ångra ditt senaste val"
+    timeout: 15000
+# Henna's like back spent one (#503), and Later spends nothing.
+- assertVisible: "9 likes left today|9 tykkäystä jäljellä tänään|9 gillanden kvar i dag"
+- tapOn: "Undo your last decision|Kumoa viimeisin valintasi|Ångra ditt senaste val"
+- extendedWaitUntil:
+    visible: "You left this person for later\\. You can change that until midnight\\.|Jätit tämän henkilön myöhemmäksi\\. Voit muuttaa sitä keskiyöhön asti\\.|Du lämnade den här personen till senare\\. Du kan ändra det fram till midnatt\\."
+    timeout: 15000
 - tapOn: "Pass|Ohita|Hoppa över"
 # Undo brings the passed card back, and says what was decided.
 - extendedWaitUntil:
@@ -83,8 +95,8 @@ name: Today's round shows one card at a time, liking back makes a match, Undo ta
 - extendedWaitUntil:
     notVisible: "You passed on this person\\. You can change that until midnight\\.|Ohitit tämän henkilön\\. Voit muuttaa sitä keskiyöhön asti\\.|Du hoppade över den här personen\\. Du kan ändra det fram till midnatt\\."
     timeout: 15000
-# Her like of the card before is one of the day's: Henna's like back was free.
-- assertVisible: "9 likes left today|9 tykkäystä jäljellä tänään|9 gillanden kvar i dag"
+# Two of the day's are gone: the like of the card before, and Henna's like back.
+- assertVisible: "8 likes left today|8 tykkäystä jäljellä tänään|8 gillanden kvar i dag"
 # Block or report is in the card's header, below the main photo, and may sit
 # at the fold above the decisions' bar: brought to the middle first (README).
 - scrollUntilVisible:
@@ -105,7 +117,7 @@ name: Today's round shows one card at a time, liking back makes a match, Undo ta
 # The note's field carries its label's words as its name, so it is the second
 # of the two. Scrolled to and tapped as itself: since the step asks about one
 # photo too (#476), the label alone can come into view with its field still
-# below the fold, and "below the label" then found the round's bar behind the
+# below the fold, and "below the label" then found the queue's bar behind the
 # dialog, whose Send a fish took the tap (a run of 27/10/2026).
 - scrollUntilVisible:
     element:
@@ -127,7 +139,7 @@ name: Today's round shows one card at a time, liking back makes a match, Undo ta
     index: 0
 - tapOn: "Send report|Lähetä ilmoitus|Skicka anmälan"
 - extendedWaitUntil:
-    visible: "Thank you\\. A moderator will look at it, and you will not see each other again\\.|Kiitos\\. Moderaattori katsoo ilmoituksen, eikä teitä näytetä enää toisillenne\\.|Tack\\. En moderator tittar på anmälan, och ni ser inte varandra igen\\."
+    visible: "Thank you\\. A moderator will look at it\\.|Kiitos\\. Moderaattori katsoo ilmoituksen\\.|Tack\\. En moderator tittar på anmälan\\."
     timeout: 15000
 - tapOn: "Done|Valmis|Klar"
 # The last card takes Iida's fish of the week.
@@ -136,10 +148,22 @@ name: Today's round shows one card at a time, liking back makes a match, Undo ta
     timeout: 15000
 - waitForAnimationToEnd
 - tapOn: "Send a fish|Lähetä kala|Skicka en fisk"
-# The end, in words: no count, no countdown, nothing more to load.
+# The end, in words, once a read finds nobody: no count, no word of tomorrow.
 - extendedWaitUntil:
-    visible: "That was today's round\\. The next one comes tomorrow\\.|Siinä oli päivän kierros\\. Seuraava tulee huomenna\\.|Det var dagens runda\\. Nästa kommer i morgon\\."
+    visible: "That's everybody for now\\.|Siinä kaikki tällä erää\\.|Det var alla för tillfället\\."
     timeout: 15000
 - assertNotVisible: "Like|Tykkää|Gilla"
 - assertNotVisible: "Pass|Ohita|Hoppa över"
+- assertNotVisible: "Later|Myöhemmin|Senare"
 - assertNotVisible: "\\d+ likes? left today|\\d+ tykkäys(tä)? jäljellä tänään|\\d+ gillanden? kvar i dag"
+# Its one button leads into What you seek, and the way back reads the queue
+# again, so a change there works at once (ADR-062 §8, §11).
+- tapOn: "What you seek|Mitä etsit|Vad du söker"
+- extendedWaitUntil:
+    visible: "These work both ways.*|Nämä toimivat molempiin suuntiin.*|De här gäller åt båda håll.*"
+    timeout: 15000
+- waitForAnimationToEnd
+- tapOn: "Back|Takaisin|Tillbaka"
+- extendedWaitUntil:
+    visible: "That's everybody for now\\.|Siinä kaikki tällä erää\\.|Det var alla för tillfället\\."
+    timeout: 15000

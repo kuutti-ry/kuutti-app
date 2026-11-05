@@ -3,7 +3,7 @@ import type { Logger } from "../lib/logger.ts";
 import { CHAT_CHANNEL, type Live } from "./live.ts";
 
 /**
- * The listener (#349, ADR-031 §5): one connection of the pool held for
+ * The listener (#349, ADR-031 §9): one connection of the pool held for
  * LISTEN on the chat's channel, its notifications handed to the hub. When the
  * connection is lost, notifications in the gap are lost with it, so every
  * socket is closed with `restarting`: the phones reconnect and resume from

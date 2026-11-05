@@ -79,7 +79,7 @@ Whether a build carries the Face ID purpose can be read from the build itself (#
 unzip -p kuutti.ipa 'Payload/*.app/Info.plist' | plutil -p - | grep NSFaceIDUsageDescription
 ```
 
-Every build with the module has it (ADR-045 §8). A build with it missing offers the switch, shows no prompt when it is pressed, and says it was not confirmed. A build without the module does not start: `Cannot find native module 'ExpoLocalAuthentication'`.
+The config gives it to every build with the module, and a local simulator build has it (ADR-045 §8); this read has not been done on an `.ipa` from EAS yet. With it taken out of a build by hand, the simulator offers the switch, shows no prompt when it is pressed, and says it was not confirmed; no real iPhone has been tried that way. A build without the module does not start: `Cannot find native module 'ExpoLocalAuthentication'`.
 
 On each phone:
 

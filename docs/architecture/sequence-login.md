@@ -103,7 +103,7 @@ sequenceDiagram
 19. The API stores the SHA-256 of a new one-time code, 32 random bytes, on the attempt, with 60 seconds to live, and logs one line: the level, the method and the outcome, nothing of the person.
 20. The browser is sent to `kuutti://auth?code=…`: part 3.
 21. A refusal after the claim spends the attempt, so a replay is refused too, and a banned, suspended or cooldown refusal is counted on the identity.
-22. The browser is sent to `kuutti://auth?error=` with the refusal's code (`auth_state_mismatch`, `auth_cancelled`, `auth_provider_error`, `auth_under_18`, `auth_banned`, `auth_suspended`, `auth_cooldown`), and `&until=` for a cooldown and for a suspension with an end day. The app has a text for each.
+22. The browser is sent to `kuutti://auth?error=` with the refusal's code (`auth_state_mismatch`, `auth_cancelled`, `auth_provider_error`, `auth_under_18`, `auth_banned`, `auth_suspended`, `auth_cooldown`), and `&until=` for a cooldown and for a suspension with an end day. The app says each on its card: `auth_state_mismatch` and `auth_provider_error` by the card's title alone, over Try again, since nobody acts on which of them it was, and the others with a sentence of their own (#581).
 
 ## Part 3: back in the app
 
@@ -200,7 +200,6 @@ sequenceDiagram
 
 ## Open
 
-- **The order of step 16.** ADR-016 §2 says the `auth_time` check comes "before anything is derived or written". `login.ts` derives the HMAC, the year and month and the age in memory first (`deriveFromBroker`), then compares `auth_time`; nothing is written before either. Step 16 draws both as one step and says neither order. One of the two should change to match the other.
 - **ADR-016's Consequences** still name the fake Telia at `src/test/fake-telia.ts`. Since ADR-017 §6 it is `src/testing/fake-telia.ts` in kuutti-ry/tunnistus-oidc (`docs/vendors/telia.md`).
 - **The doors behind CloudFront.** On staging the API is behind CloudFront while the box's 443 is still open (ADR-005 §7), so `trusted-proxy` stays `traefik` and the sign-in doors of step 5 count by the CloudFront edge that forwarded the request, not by the person's network (ADR-005, History of 2026-10-09; ADR-008 §5). This lifts with CloudFront-only ingress.
 - **PKCE with Telia** stays undecided (ADR-016, Not decided; ADR-027 §6). The app's own code is bound (step 26); Telia's code is not.

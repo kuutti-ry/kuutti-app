@@ -24,7 +24,9 @@ import {
 const SUBJECT = "0c2d2d5f-0b9f-4b1b-8d4b-1d9e2f3a4b5c";
 const NOTE_LABEL = "Anything the moderators should know (optional, up to 500 characters)";
 const ALSO_BLOCKS =
-  "A report also blocks them, for good: you will not see each other here again, even if either of you deletes their account. A block cannot be undone. They are not told.";
+  "You will not see each other here again, even if either of you deletes their account and comes back. A block cannot be undone. They are not told who reported them.";
+const BLOCKED = "Blocked.";
+const THANKS = "Thank you. A moderator will look at it.";
 const CAP =
   "That is enough reports for today. You can still block this person, but then you cannot report them later.";
 const json = (body: unknown, status = 200) =>
@@ -170,6 +172,9 @@ async function expectNoteAboveKeyboard() {
 
 const announced = () =>
   (AccessibilityInfo.announceForAccessibility as jest.Mock).mock.calls.map(([words]) => words);
+/** Everything drawn, in order, so that what a step leaves out is seen to be left out. */
+const said = (node: HostNode | string = screen.toJSON() as HostNode): string[] =>
+  typeof node === "string" ? [node] : (node.children ?? []).flatMap((child) => said(child));
 
 beforeEach(() => {
   (useLocales as jest.Mock).mockReturnValue([{ languageTag: "en-US" }]);
@@ -180,19 +185,14 @@ beforeEach(() => {
 afterEach(() => jest.restoreAllMocks());
 
 describe("SafetyActions", () => {
-  it("opens from its labelled button with Block and Report and block in words, and sends nothing before a choice", async () => {
+  it("opens from its labelled button with Block and Report and block in words and no line under them, and sends nothing before a choice (#581)", async () => {
     const sent = api(done);
     const gone = jest.fn();
     await show(gone);
     noProblems();
     await press("Block or report");
-    expect(screen.getByText("Block or report")).toBeTruthy();
-    expect(screen.getByText("You will not see each other again. They are not told.")).toBeTruthy();
-    expect(
-      screen.getByText(
-        "Tell the moderators what is wrong. This blocks them too. They are not told who reported them.",
-      ),
-    ).toBeTruthy();
+    // The step each choice opens says what it does: this one only chooses.
+    expect(said()).toEqual(["Block or report", "Block", "Report and block", "Cancel"]);
     expect(screen.getByRole("button", { name: "Block" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Report and block" })).toBeTruthy();
     noProblems();
@@ -217,16 +217,14 @@ describe("SafetyActions", () => {
     expect(sent).toEqual([]);
     noProblems();
     await press("Block");
-    await waitFor(() =>
-      expect(screen.getByText("Blocked. You will not see each other again.")).toBeTruthy(),
-    );
+    await waitFor(() => expect(screen.getByText(BLOCKED)).toBeTruthy());
     expect(sent).toEqual([{ path: "/blocks", body: { accountId: SUBJECT } }]);
     // The card stays until the person has read what happened.
     expect(gone).not.toHaveBeenCalled();
     noProblems();
     await pressDone();
     expect(gone).toHaveBeenCalledWith(SUBJECT);
-    expect(screen.queryByText("Blocked. You will not see each other again.")).toBeNull();
+    expect(screen.queryByText(BLOCKED)).toBeNull();
   });
 
   it("hands the card back when the dialog is closed from its corner after a block, and names the two controls apart", async () => {
@@ -236,7 +234,7 @@ describe("SafetyActions", () => {
     await press("Block or report");
     await press("Block");
     await press("Block");
-    await screen.findByText("Blocked. You will not see each other again.");
+    await screen.findByText(BLOCKED);
     // One Close and one Done: a screen reader's list of buttons tells them apart.
     expect(screen.getAllByRole("button", { name: "Close" })).toHaveLength(1);
     expect(screen.getAllByRole("button", { name: "Done" })).toHaveLength(1);
@@ -252,15 +250,13 @@ describe("SafetyActions", () => {
     const blockIt = async () => {
       await press("Block");
       await press("Block");
-      await screen.findByText("Blocked. You will not see each other again.");
+      await screen.findByText(BLOCKED);
     };
     const reportIt = async () => {
       await press("Report and block");
       await press("Harassing, threatening or hateful", "radio");
       await press("Send report");
-      await screen.findByText(
-        "Thank you. A moderator will look at it, and you will not see each other again.",
-      );
+      await screen.findByText(THANKS);
     };
 
     beforeEach(() => router.push.mockReset());
@@ -337,7 +333,7 @@ describe("SafetyActions", () => {
     expect(screen.getByText("The block did not go through. Try again.")).toBeTruthy();
     answer = done;
     await press("Block");
-    expect(await screen.findByText("Blocked. You will not see each other again.")).toBeTruthy();
+    expect(await screen.findByText(BLOCKED)).toBeTruthy();
     expect(screen.queryByText("The block did not go through. Try again.")).toBeNull();
     expect(sent).toHaveLength(3);
   });
@@ -373,11 +369,7 @@ describe("SafetyActions", () => {
     await type("  Says in the bio they are in year nine.  ");
     expect(screen.getByLabelText(NOTE_LABEL).props.maxLength).toBe(500);
     await press("Send report");
-    expect(
-      await screen.findByText(
-        "Thank you. A moderator will look at it, and you will not see each other again.",
-      ),
-    ).toBeTruthy();
+    expect(await screen.findByText(THANKS)).toBeTruthy();
     expect(sent).toEqual([
       {
         path: "/reports",
@@ -434,9 +426,7 @@ describe("SafetyActions", () => {
     expect(disabled("Send report")).toBe(true);
     await press("Something else", "radio");
     await press("Send report");
-    await screen.findByText(
-      "Thank you. A moderator will look at it, and you will not see each other again.",
-    );
+    await screen.findByText(THANKS);
     expect(sent).toEqual([
       { path: "/reports", body: { accountId: SUBJECT, reason: "other", photoId: SECOND } },
     ]);
@@ -467,7 +457,7 @@ describe("SafetyActions", () => {
     await press(SECOND_HEARD, "radio");
     await press("Something else", "radio");
     await press("Send report");
-    expect(await screen.findByText("The report could not be sent. Try again.")).toBeTruthy();
+    expect(await screen.findByText("That did not go through. Try again.")).toBeTruthy();
     expect(checked(`✓ ${SECOND_HEARD}`)).toBe(true);
     // Every option waits while a report is on its way, the photos' too.
     answer = () => new Promise<Response>(() => undefined);
@@ -551,7 +541,7 @@ describe("SafetyActions", () => {
     expect(screen.getByText("Block this person?")).toBeTruthy();
     expect(screen.queryByText(/enough reports for today/)).toBeNull();
     await press("Block");
-    await screen.findByText("Blocked. You will not see each other again.");
+    await screen.findByText(BLOCKED);
     expect(sent.map((s) => s.path)).toEqual(["/reports", "/blocks"]);
     await pressDone();
     expect(gone).toHaveBeenCalledWith(SUBJECT);
@@ -566,7 +556,7 @@ describe("SafetyActions", () => {
     await press("Seems automated, or collects people's details", "radio");
     await type("Sent the same opener to my friend.");
     await press("Send report");
-    expect(await screen.findByText("The report could not be sent. Try again.")).toBeTruthy();
+    expect(await screen.findByText("That did not go through. Try again.")).toBeTruthy();
     expect(
       screen.getByRole("radio", { name: "✓ Seems automated, or collects people's details" }),
     ).toBeTruthy();
@@ -576,7 +566,7 @@ describe("SafetyActions", () => {
     // A 429 that is not the day's reports is no cap to explain: a failure like another.
     answer = () => refusal("rate_limited", 429);
     await press("Send report");
-    expect(screen.getByText("The report could not be sent. Try again.")).toBeTruthy();
+    expect(screen.getByText("That did not go through. Try again.")).toBeTruthy();
     expect(screen.queryByText(/enough reports for today/)).toBeNull();
     // Cancel forgets it all: the next report starts empty.
     await press("Cancel");
@@ -584,7 +574,7 @@ describe("SafetyActions", () => {
     await press("Report and block");
     expect(screen.queryByRole("radio", { name: /✓/ })).toBeNull();
     expect(screen.getByLabelText(NOTE_LABEL).props.value).toBe("");
-    expect(screen.queryByText("The report could not be sent. Try again.")).toBeNull();
+    expect(screen.queryByText("That did not go through. Try again.")).toBeNull();
   });
 
   it.each([
@@ -616,9 +606,7 @@ describe("SafetyActions", () => {
       expect(gone).toHaveBeenCalledWith(SUBJECT);
       expect(screen.queryByText(/Thank you/)).toBeNull();
       // Nothing on the screen says it, so it is spoken, whichever the platform.
-      expect(announced().at(-1)).toBe(
-        "Thank you. A moderator will look at it, and you will not see each other again.",
-      );
+      expect(announced().at(-1)).toBe(THANKS);
     },
   );
 
@@ -661,7 +649,7 @@ describe("SafetyActions", () => {
       land(refusal("internal_error", 500));
       await new Promise<void>((resolve) => setTimeout(resolve, 20));
     });
-    expect(screen.getByText("The report could not be sent. Try again.")).toBeTruthy();
+    expect(screen.getByText("That did not go through. Try again.")).toBeTruthy();
     expect(screen.getByRole("radio", { name: "✓ May be under 18" })).toBeTruthy();
     expect(screen.getByLabelText(NOTE_LABEL).props.value).toBe("Says she is in year nine.");
     expect(disabled("Send report")).toBe(false);
@@ -709,12 +697,12 @@ describe("SafetyActions", () => {
     await press("Block");
     answer = done;
     await press("Block");
-    await screen.findByText("Blocked. You will not see each other again.");
+    await screen.findByText(BLOCKED);
     expect(announced()).toEqual([
       "Sending…",
       "The block did not go through. Try again.",
       "Sending…",
-      "Blocked. You will not see each other again.",
+      BLOCKED,
     ]);
   });
 
@@ -725,7 +713,7 @@ describe("SafetyActions", () => {
     await press("Block or report");
     await press("Block");
     await press("Block");
-    await screen.findByText("Blocked. You will not see each other again.");
+    await screen.findByText(BLOCKED);
     expect(announced()).toEqual([]);
   });
 
@@ -765,6 +753,51 @@ describe("SafetyActions", () => {
     await press("Estä");
     expect(screen.getByText("Estetäänkö tämä henkilö?")).toBeTruthy();
   });
+
+  it.each([
+    {
+      languageTag: "fi-FI",
+      open: "Estä tai ilmoita",
+      block: "Estä",
+      report: "Ilmoita ja estä",
+      reason: "Jokin muu",
+      send: "Lähetä ilmoitus",
+      finish: "Valmis",
+      told: "Ette näe toisianne täällä enää, vaikka jompikumpi teistä poistaisi tilinsä ja palaisi. Estoa ei voi perua. Hänelle ei kerrota, kuka ilmoitti.",
+      thanks: "Kiitos. Moderaattori katsoo ilmoituksen.",
+      blocked: "Estetty.",
+    },
+    {
+      languageTag: "sv-FI",
+      open: "Blockera eller anmäl",
+      block: "Blockera",
+      report: "Anmäl och blockera",
+      reason: "Något annat",
+      send: "Skicka anmälan",
+      finish: "Klar",
+      told: "Ni ser inte varandra här igen, även om någon av er raderar sitt konto och kommer tillbaka. En blockering kan inte ångras. Personen får inte veta vem som anmälde.",
+      thanks: "Tack. En moderator tittar på anmälan.",
+      blocked: "Blockerad.",
+    },
+  ])(
+    "says in $languageTag who is told before a report goes, and each outcome in the fewest words (#581)",
+    async ({ languageTag, open, block, report, reason, send, finish, told, thanks, blocked }) => {
+      (useLocales as jest.Mock).mockReturnValue([{ languageTag }]);
+      api(done);
+      await show();
+      await press(open);
+      await press(report);
+      expect(screen.getByText(told)).toBeTruthy();
+      await press(reason, "radio");
+      await press(send);
+      expect(await screen.findByText(thanks)).toBeTruthy();
+      await press(finish);
+      await press(open);
+      await press(block);
+      await press(block);
+      expect(await screen.findByText(blocked)).toBeTruthy();
+    },
+  );
 });
 
 // The conversation's door (#351, ADR-030 §12): "More" in the header, the
@@ -777,7 +810,7 @@ const CONVERSATION = "3f9a2c1e-5b7d-4f01-8a2b-1c3d4e5f6a70";
 const COPY =
   "The moderators get a copy of this whole conversation, your own messages and photos included, and keep it for twelve months.";
 const ALSO_ENDS =
-  "A report also blocks them, for good, and ends this conversation for both of you: you will not see each other here again, even if either of you deletes their account. A block cannot be undone. They are not told.";
+  "The conversation ends for both of you, and you will not see each other here again, even if either of you deletes their account and comes back. A block cannot be undone. They are not told who reported them.";
 const REPORT = `/conversations/${CONVERSATION}/report`;
 const BLOCK = `/conversations/${CONVERSATION}/block`;
 const POINTS = "The report points the moderators to this photo.";
@@ -839,15 +872,19 @@ describe("ConversationActions", () => {
     noProblems();
     await press("More");
     expect(screen.getByText("Report, block or end")).toBeTruthy();
-    // In this order, as a screen reader reaches them, each with its line.
+    // In this order, as a screen reader reaches them, with no line under any (#581).
     const buttons = screen.getAllByRole("button");
     const at = (name: string) => buttons.indexOf(screen.getByRole("button", { name }));
     const places = ["Block", "Report and block", "End conversation", "Cancel"].map(at);
     expect(places.every((place) => place >= 0)).toBe(true);
     expect([...places].sort((a, b) => a - b)).toEqual(places);
-    expect(
-      screen.getByText("Neither of you can write in it any more. Nobody is blocked."),
-    ).toBeTruthy();
+    expect(said()).toEqual([
+      "Report, block or end",
+      "Block",
+      "Report and block",
+      "End conversation",
+      "Cancel",
+    ]);
     noProblems();
     await press("Cancel");
     expect(screen.queryByText("Report, block or end")).toBeNull();
@@ -919,7 +956,7 @@ describe("ConversationActions", () => {
     ).toBeTruthy();
     expect(unmatch).not.toHaveBeenCalled();
     await press("End conversation");
-    expect(screen.getByText("The conversation could not be ended. Try again.")).toBeTruthy();
+    expect(screen.getByText("That did not go through. Try again.")).toBeTruthy();
     expect(onDone).not.toHaveBeenCalled();
     await press("End conversation");
     expect(unmatch).toHaveBeenCalledTimes(2);
@@ -958,6 +995,7 @@ describe("ConversationActions", () => {
     expect(screen.getByRole("button", { name: "Report and block" })).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Block" })).toBeNull();
     expect(screen.queryByRole("button", { name: "End conversation" })).toBeNull();
+    expect(said()).toEqual(["Report, block or end", "Report and block", "Cancel"]);
     await press("Report and block");
     expect(screen.getByText(COPY)).toBeTruthy();
     expect(screen.getByText(ALSO_BLOCKS)).toBeTruthy();
@@ -975,7 +1013,7 @@ describe("ConversationActions", () => {
     await type("Kept writing after I said no.");
     await press("Send report");
     // No promise about this conversation, whose window may close first.
-    const limited = "That is enough reports for today. You can send more after midnight.";
+    const limited = "That is enough for today. You can try again after midnight.";
     expect(screen.getByText(limited)).toBeTruthy();
     expect(screen.queryByText(CAP)).toBeNull();
     expect(screen.queryByRole("button", { name: "Block" })).toBeNull();
@@ -1073,6 +1111,40 @@ describe("ConversationActions", () => {
     await press("Lopeta keskustelu");
     expect(screen.getByText("Lopetetaanko tämä keskustelu?")).toBeTruthy();
   });
+
+  it.each([
+    [
+      "fi-FI",
+      "Lisää",
+      "Ilmoita ja estä",
+      "Keskustelu päättyy teiltä molemmilta, ettekä näe toisianne täällä enää, vaikka jompikumpi teistä poistaisi tilinsä ja palaisi. Estoa ei voi perua. Hänelle ei kerrota, kuka ilmoitti.",
+      "Ette näe toisianne täällä enää, vaikka jompikumpi teistä poistaisi tilinsä ja palaisi. Estoa ei voi perua. Hänelle ei kerrota, kuka ilmoitti.",
+    ],
+    [
+      "sv-FI",
+      "Mer",
+      "Anmäl och blockera",
+      "Samtalet avslutas för er båda, och ni ser inte varandra här igen, även om någon av er raderar sitt konto och kommer tillbaka. En blockering kan inte ångras. Personen får inte veta vem som anmälde.",
+      "Ni ser inte varandra här igen, även om någon av er raderar sitt konto och kommer tillbaka. En blockering kan inte ångras. Personen får inte veta vem som anmälde.",
+    ],
+  ])(
+    "says in %s who is told before a report goes, the end said while there is one to come (#581)",
+    async (languageTag, more, report, ends, blocks) => {
+      (useLocales as jest.Mock).mockReturnValue([{ languageTag }]);
+      conversationApi(done);
+      const view = await renderWithTheme(<ConversationHost onDone={jest.fn()} />);
+      await press(more);
+      await press(report);
+      expect(screen.getByText(ends)).toBeTruthy();
+      expect(screen.queryByText(blocks)).toBeNull();
+      await view.unmount();
+      await renderWithTheme(<ConversationHost ended onDone={jest.fn()} />);
+      await press(more);
+      await press(report);
+      expect(screen.getByText(blocks)).toBeTruthy();
+      expect(screen.queryByText(ends)).toBeNull();
+    },
+  );
 });
 
 // A conversation photo's door (#476, ADR-030 §13): Report this photo under a
@@ -1080,7 +1152,7 @@ describe("ConversationActions", () => {
 // saying first that the report points the moderators to the photo, then the
 // copy and the block as from More, and the report names the photo's place.
 
-const LIMITED = "That is enough reports for today. You can send more after midnight.";
+const LIMITED = "That is enough for today. You can try again after midnight.";
 const LATE = "This conversation can no longer be reported.";
 
 function PhotoHost({
@@ -1234,7 +1306,7 @@ describe("ConversationPhotoReport", () => {
       release(refusal("internal_error", 500));
       await new Promise<void>((resolve) => setTimeout(resolve, 20));
     });
-    expect(await screen.findByText("The report could not be sent. Try again.")).toBeTruthy();
+    expect(await screen.findByText("That did not go through. Try again.")).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Report this photo" })).toBeNull();
   });
 

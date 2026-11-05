@@ -47,10 +47,10 @@ export function useOpenRow(asked: string | undefined, session: string | null | u
     const left = recall(session);
     setOpen((now) => now ?? left);
   }, [session, asked]);
-  // The session the row was opened in, not the one after it: a logout keeps
-  // Logging out open on screen, saying there is no session, and the next
-  // session finds the list closed. Nothing is remembered before the session
-  // is known, so that the memory outlasts the first moments.
+  // The session the row was opened in, not the one after it: a logout takes
+  // the row away with the session, and the next session finds the list closed.
+  // Nothing is remembered before the session is known, so that the memory
+  // outlasts the first moments.
   const openedIn = useRef(session);
   openedIn.current = session;
   const known = session !== undefined;

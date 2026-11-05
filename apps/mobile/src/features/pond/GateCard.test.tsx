@@ -1,11 +1,15 @@
 import type { GateResponse } from "@kuutti/schema";
 import { act, fireEvent } from "@testing-library/react-native";
+import { useLocales } from "expo-localization";
 import { AppState, View } from "react-native";
 import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
+import { FAILED_TO_LOAD } from "@/test/failed";
 import { renderWithTheme } from "@/test/render";
 import { GateCard } from "./GateCard";
 
-// The gate card (#500, ADR-060 §4): whether matching is open for the person, in words.
+// The gate card (#500, ADR-060 §4): whether matching is open for the person, in
+// words. Each sentence says Matching, so the card's name is a label and never a
+// line of its own (#581).
 
 /** The screen gets the focus again, as on coming back to it (jest.setup.js). */
 const { __focus: focus } = jest.requireMock("expo-router") as { __focus: () => void };
@@ -31,13 +35,58 @@ function answering(answers: Array<() => Response>) {
 
 const settle = () => act(() => new Promise<void>((resolve) => setTimeout(resolve, 20)));
 
+beforeEach(() => {
+  (useLocales as jest.Mock).mockReturnValue([{ languageTag: "en-US" }]);
+});
+
 describe("GateCard", () => {
-  it("asks the gate and names itself", async () => {
+  it("asks the gate", async () => {
     const calls = answering([() => json(gate("closed"))]);
+    await renderWithTheme(<GateCard />);
+    await settle();
+    expect(new URL(calls[0]?.url ?? "").pathname).toBe("/gate");
+  });
+
+  it.each([
+    ["open", () => json(gate("open"))],
+    ["closed", () => json(gate("closed"))],
+    ["incomplete", () => json(gate("incomplete"))],
+    ["unreadable", () => json({ error: { code: "internal_error" } }, 500)],
+  ])("has no name of its own, drawn or as a label: %s (#581)", async (_state, answer) => {
+    answering([answer]);
     const screen = await renderWithTheme(<GateCard />);
     await settle();
-    expect(screen.getByLabelText("Matching")).toBeTruthy();
-    expect(new URL(calls[0]?.url ?? "").pathname).toBe("/gate");
+    expect(screen.queryByLabelText("Matching")).toBeNull();
+    expect(screen.queryByText("Matching")).toBeNull();
+  });
+
+  it("says it is looking in a live region under nothing else, while the first read is on its way (#581)", async () => {
+    let answer: (response: Response) => void = () => undefined;
+    globalThis.fetch = jest.fn(
+      () =>
+        new Promise<Response>((resolve) => {
+          answer = resolve;
+        }),
+    ) as unknown as typeof fetch;
+    const screen = await renderWithTheme(<GateCard />);
+    expect(screen.getByText("Loading…").props.accessibilityLiveRegion).toBe("polite");
+    expect(screen.queryByText("Matching")).toBeNull();
+    await act(async () => answer(json(gate("open"))));
+    await settle();
+    expect(screen.queryByText("Loading…")).toBeNull();
+    expect(screen.getByText("Matching is open for you.")).toBeTruthy();
+  });
+
+  it.each([
+    ["fi-FI", "Seuranhaku"],
+    ["sv-FI", "Matchning"],
+  ])("has no name of its own in %s either (#581)", async (languageTag, name) => {
+    (useLocales as jest.Mock).mockReturnValue([{ languageTag }]);
+    answering([() => json(gate("open"))]);
+    const screen = await renderWithTheme(<GateCard />);
+    await settle();
+    expect(screen.queryByLabelText(name)).toBeNull();
+    expect(screen.queryByText(name)).toBeNull();
   });
 
   it.each([
@@ -75,7 +124,7 @@ describe("GateCard", () => {
     ]);
     const screen = await renderWithTheme(<GateCard />);
     await settle();
-    expect(screen.getByText("Matching could not be checked.")).toBeTruthy();
+    expect(screen.getByText(FAILED_TO_LOAD)).toBeTruthy();
     const retry = screen.getByRole("button", { name: "Try again" });
     expect(retry.props.accessibilityRole).toBe("button");
     await act(async () => {
@@ -112,7 +161,7 @@ describe("GateCard", () => {
     await settle();
     expect(asked).toBe(2);
     expect(screen.getByText(unfinished)).toBeTruthy();
-    expect(screen.queryByText("Looking…")).toBeNull();
+    expect(screen.queryByText("Loading…")).toBeNull();
 
     await act(async () => {
       arrive();
@@ -163,14 +212,14 @@ describe("GateCard", () => {
     });
     await settle();
     expect(screen.getByText("Your profile is finished. Matching has not opened yet.")).toBeTruthy();
-    expect(screen.queryByText("Matching could not be checked.")).toBeNull();
+    expect(screen.queryByText(FAILED_TO_LOAD)).toBeNull();
   });
 
   it("refuses an answer that carries a number", async () => {
     answering([() => json({ state: "closed", needed: 10 })]);
     const screen = await renderWithTheme(<GateCard />);
     await settle();
-    expect(screen.getByText("Matching could not be checked.")).toBeTruthy();
+    expect(screen.getByText(FAILED_TO_LOAD)).toBeTruthy();
   });
 
   it("has a label and a role on everything that can be pressed", async () => {

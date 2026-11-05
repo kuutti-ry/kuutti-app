@@ -10,7 +10,7 @@ How Kuutti is built and where it runs, from the system's side: which apps and se
 | [2. Components](components.md) | The three apps, the packages, the Telia kit and the mock bank; inside the API's one process; the ten slices and which app holds which; the import boundary | ADR-003, ADR-017 §6, ADR-031 §9 |
 | [3. Deployment](deployment.md) | A developer's machine, staging and the services around its box, a pull request's previews, production as applied, the website | ADR-001, ADR-005, ADR-012, ADR-025 |
 | [4. Delivery](delivery.md) | What a pull request, a merge and a release tag set off, workflow by workflow, and what each job may touch | ADR-004, ADR-012, ADR-028 |
-| 5. Sequences: [the bank login](sequence-login.md), [the photo upload](sequence-upload.md), [chat](sequence-chat.md), [the night's jobs](sequence-night.md) | Step by step, between the app, the API, the database and the outside services | ADR-016, ADR-027; ADR-005, ADR-006; ADR-031; ADR-029, ADR-035 |
+| 5. Sequences: [the bank login](sequence-login.md), [the photo upload](sequence-upload.md), [chat](sequence-chat.md), [the night's jobs](sequence-night.md) | Step by step, between the app, the API, the database and the outside services | ADR-016, ADR-027; ADR-005, ADR-006; ADR-031; ADR-029, ADR-062 |
 | [6. Data and trust boundaries](trust.md) | Where a person's data lives and what crosses each boundary: the hetu, the secrets, photos, research events, logs; the security checklist's four surfaces | ADR-001, ADR-008, ADR-011, ADR-027 |
 
 ## How a view is drawn

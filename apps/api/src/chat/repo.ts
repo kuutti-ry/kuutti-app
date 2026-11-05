@@ -63,6 +63,24 @@ const MESSAGE_VISIBLE = `(m.side = me.side OR NOT EXISTS (
   SELECT 1 FROM sanction s
   WHERE ${WITHHOLDING_BAN} AND s.created_at <= m.created_at))`;
 
+/** The newest contact share the caller may see, under the same rule as a message: a shared contact is an answer (the maintainer, 01/11/2026). */
+const LAST_SHARE = `LEFT JOIN LATERAL (
+    SELECT sh.side, sh.shared_at FROM contact_share sh
+    WHERE sh.conversation_id = c.id AND (sh.side = me.side OR NOT EXISTS (
+      SELECT 1 FROM sanction s WHERE ${WITHHOLDING_BAN} AND s.created_at <= sh.shared_at))
+    ORDER BY sh.shared_at DESC LIMIT 1) ls ON true`;
+
+/**
+ * Whether conversation `c` waits on the caller's answer (ADR-062 §5), from what
+ * the caller may see, so a shadow ban shows nothing here: open and not archived,
+ * and the last thing said, a message or a shared contact, came from the other
+ * person. Nothing said yet is both people's turn.
+ */
+const YOUR_TURN = `(c.closed_at IS NULL AND c.archived_at IS NULL AND CASE
+    WHEN lm.created_at IS NULL AND ls.shared_at IS NULL THEN true
+    WHEN ls.shared_at IS NULL OR lm.created_at >= ls.shared_at THEN lm.side <> me.side
+    ELSE ls.side <> me.side END)`;
+
 /**
  * The counterpart's read mark as the caller sees it. Under a shadow ban that
  * withholds, it goes no further than the newest message from before the
@@ -107,6 +125,7 @@ export type ConversationRow = {
     createdAt: Date;
   } | null;
   unread: number;
+  yourTurn: boolean;
 };
 
 type Row = Record<string, unknown>;
@@ -138,6 +157,7 @@ const conversationFrom = (r: Row): ConversationRow => ({
           createdAt: r.last_created_at as Date,
         },
   unread: r.unread as number,
+  yourTurn: r.your_turn === true,
 });
 
 // Nothing is unread in a closed conversation: its marks stand still
@@ -152,16 +172,37 @@ const CONVERSATION_COLUMNS = `c.id, c.opened_at, c.last_message_at, c.next_seq, 
   CASE WHEN c.closed_at IS NOT NULL THEN 0 ELSE
     (SELECT count(*)::int FROM message m
      WHERE m.conversation_id = c.id AND m.side <> me.side AND m.seq > me.read_up_to
-       AND ${MESSAGE_VISIBLE}) END AS unread`;
+       AND ${MESSAGE_VISIBLE}) END AS unread,
+  ${YOUR_TURN} AS your_turn`;
+
+const LAST_MESSAGE = `LEFT JOIN LATERAL (
+    SELECT m.seq, m.side, m.kind, m.body, m.created_at FROM message m
+    WHERE m.conversation_id = c.id AND ${MESSAGE_VISIBLE}
+    ORDER BY m.seq DESC LIMIT 1) lm ON true`;
 
 const CONVERSATION_JOINS = `LEFT JOIN account a ON a.id = them.account_id
   LEFT JOIN profile p ON p.account_id = them.account_id
-  LEFT JOIN LATERAL (
-    SELECT m.seq, m.side, m.kind, m.body, m.created_at FROM message m
-    WHERE m.conversation_id = c.id AND ${MESSAGE_VISIBLE}
-    ORDER BY m.seq DESC LIMIT 1) lm ON true
+  ${LAST_MESSAGE}
+  ${LAST_SHARE}
   LEFT JOIN LATERAL (
     SELECT min(s.created_at) AS began FROM sanction s WHERE ${WITHHOLDING_BAN}) wb ON true`;
+
+/**
+ * How many conversations are on the person's turn (ADR-062 §5), as the list's
+ * own rows read it: what the like path asks before it asks anything of the other
+ * person, so it reads no lock and takes none.
+ */
+export async function countOnTurn(db: Queryable, accountId: string): Promise<number> {
+  const { rows } = await db.query<{ n: number }>(
+    `SELECT count(*)::int AS n
+     ${FROM_CALLER}
+     ${LAST_MESSAGE}
+     ${LAST_SHARE}
+     WHERE me.account_id = $1 AND ${VISIBLE_TO_CALLER} AND ${YOUR_TURN}`,
+    [accountId],
+  );
+  return rows[0]?.n ?? 0;
+}
 
 /** The caller's conversations, newest first by the last message they may see, else by the opening. */
 export async function listConversations(
@@ -874,7 +915,7 @@ export async function copyConversation(
   return result.rowCount ?? 0;
 }
 
-// The socket's fan-out (#349, ADR-031 §5). A notification names a
+// The socket's fan-out (#349, ADR-031 §9). A notification names a
 // conversation, a session or a block, never a person's text; the listener
 // finds whom it concerns with the two routing reads below, and then reads
 // what each of them may see through their own participant row (rule 6), with

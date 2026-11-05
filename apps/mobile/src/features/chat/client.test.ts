@@ -177,6 +177,7 @@ describe("the contacts' routes (#103)", () => {
     counterpart: { deleted: false, name: "Sanna", age: 31, thumb: null },
     lastMessage: null,
     unread: 0,
+    yourTurn: true,
     limits: { maxLength: 30 },
     counterpartReadUpTo: 0,
     contacts: { mine: [{ kind: "instagram", value: "aino.k", shared: true }], theirs: [] },

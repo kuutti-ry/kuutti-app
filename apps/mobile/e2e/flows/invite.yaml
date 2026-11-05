@@ -6,7 +6,7 @@
 # is withdrawn before the end, so the flow leaves her as it found her. A run
 # that stops half-way
 # leaves an invitation open, and after five such runs (`invitations_open`)
-# Make an invitation is refused: `pnpm demo:reset` first. The sheet is the
+# Create an invitation is refused: `pnpm demo:reset` first. The sheet is the
 # system's, in the phone's language, so the flow asserts only that the app's
 # own failure line never shows, and closes what opened (data-export.yaml).
 # Using a code and the night's count are the API's tests.
@@ -18,25 +18,30 @@ name: An invitation made in Settings shows its code once, is shared, and is with
 - extendedWaitUntil:
     visible: "Settings|Asetukset|Inställningar"
     timeout: 15000
-# The row sits under Community (#511), below the fold on a phone, and opens in place.
+# The row sits under Community (#511), below the fold on a phone, and opens in
+# place. With none waiting its own value says Create an invitation too (#581),
+# so neither the row's being open nor the button is told by those words: the
+# first by what the panel says first, the second by that line over it.
 - runFlow:
     file: ../common/open-settings-row.yaml
     env:
       ROW: "(Invitations|Kutsut|Inbjudningar)(, .*)?"
-      INSIDE: "Make an invitation|Tee kutsu|Skapa en inbjudan|Loading your invitations…|Ladataan kutsujasi…|Laddar dina inbjudningar…"
+      INSIDE: "When a friend you invite finishes their profile.*|Kun kutsumasi ystävä saa profiilinsa valmiiksi.*|När en vän du bjuder in gör klart sin profil.*|Loading…|Ladataan…|Laddar…"
+# What an invitation earns, from matching_config invitation_reward: a fish each.
 - extendedWaitUntil:
-    visible: "Make an invitation|Tee kutsu|Skapa en inbjudan"
+    visible: "When a friend you invite finishes their profile, you get a fish and your friend gets a fish\\.|Kun kutsumasi ystävä saa profiilinsa valmiiksi, saat kalan ja ystäväsi saa kalan\\.|När en vän du bjuder in gör klart sin profil får du en fisk och din vän får en fisk\\."
     timeout: 15000
-# What an invitation earns, from matching_config invitation_reward: one fish.
-- assertVisible: "When a friend you invite finishes their profile, you get a fish\\..*|Kun kutsumasi ystävä saa profiilinsa valmiiksi, saat kalan\\..*|När en vän du bjuder in gör klart sin profil får du en fisk\\..*"
-- tapOn: "Make an invitation|Tee kutsu|Skapa en inbjudan"
+- tapOn:
+    text: "Create an invitation|Tee kutsu|Skapa en inbjudan"
+    below: "When a friend you invite finishes their profile, you get a fish and your friend gets a fish\\.|Kun kutsumasi ystävä saa profiilinsa valmiiksi, saat kalan ja ystäväsi saa kalan\\.|När en vän du bjuder in gör klart sin profil får du en fisk och din vän får en fisk\\."
+# Ready: said aloud and not drawn (#581). The code's card is what the eye has: the
+# code in its two groups; where Maestro reads the label, as a screen reader
+# hears it, one character at a time.
 - extendedWaitUntil:
-    visible: "Your invitation is ready\\. Its code is below\\.|Kutsusi on valmis\\. Sen koodi on alla\\.|Din inbjudan är klar\\. Koden finns nedan\\."
+    visible: "[0-9A-HJKMNP-TV-Z]{5}-[0-9A-HJKMNP-TV-Z]{5}|(Invitation code|Kutsukoodi|Inbjudningskod): ([0-9A-HJKMNP-TV-Z] ){4}[0-9A-HJKMNP-TV-Z], ([0-9A-HJKMNP-TV-Z] ){4}[0-9A-HJKMNP-TV-Z]"
     timeout: 15000
-# The code in its two groups; where Maestro reads the label, as a screen
-# reader hears it, one character at a time.
-- assertVisible: "[0-9A-HJKMNP-TV-Z]{5}-[0-9A-HJKMNP-TV-Z]{5}|(Invitation code|Kutsukoodi|Inbjudningskod): ([0-9A-HJKMNP-TV-Z] ){4}[0-9A-HJKMNP-TV-Z], ([0-9A-HJKMNP-TV-Z] ){4}[0-9A-HJKMNP-TV-Z]"
-- assertVisible: "Kuutti shows this code only now and keeps no copy of it\\..*|Kuutti näyttää tämän koodin vain nyt eikä säilytä siitä kopiota\\..*|Kuutti visar den här koden bara nu och sparar ingen kopia av den\\..*"
+- assertVisible: "Kuutti shows this code only now\\. Share it with one friend\\.|Kuutti näyttää tämän koodin vain nyt\\. Jaa se yhdelle ystävälle\\.|Kuutti visar den här koden bara nu\\. Dela den med en vän\\."
+- assertNotVisible: "Your invitation is ready\\. Its code is below\\.|Kutsusi on valmis\\. Sen koodi on alla\\.|Din inbjudan är klar\\. Koden finns nedan\\."
 
 # The share sheet covers the app, and is closed again.
 - scrollUntilVisible:
@@ -61,9 +66,13 @@ name: An invitation made in Settings shows its code once, is shared, and is with
       platform: Android
     commands:
       - back
-- extendedWaitUntil:
-    visible: "Share the code|Jaa koodi|Dela koden"
-    timeout: 15000
+# The swipe also scrolls the page under the sheet, since Settings is one long
+# list (#511), so on iOS the button may have gone down the page.
+- scrollUntilVisible:
+    element: "Share the code|Jaa koodi|Dela koden"
+    direction: DOWN
+    centerElement: true
+    timeout: 60000
 - assertNotVisible: "The share did not open\\..*|Jakaminen ei avautunut\\..*|Delningen öppnades inte\\..*"
 
 # The newest open invitation, first under its heading, is the one just made:
@@ -77,10 +86,16 @@ name: An invitation made in Settings shows its code once, is shared, and is with
 - extendedWaitUntil:
     visible: "Withdraw this invitation\\?|Perutaanko tämä kutsu\\?|Dra tillbaka den här inbjudan\\?"
     timeout: 15000
+- assertVisible: "Its code stops working at once\\.|Sen koodi lakkaa toimimasta heti\\.|Koden slutar fungera direkt\\."
 - tapOn: "Withdraw the invitation|Peru kutsu|Dra tillbaka inbjudan"
+# Withdrawn: said aloud and not drawn (#581). To the eye the code goes with its
+# invitation once the API has answered: the dialog's going is waited for first,
+# so that the page is what is read, and then the code's.
 - extendedWaitUntil:
-    visible: "The invitation was withdrawn\\. Its code no longer works\\.|Kutsu peruttiin\\. Sen koodi ei enää toimi\\.|Inbjudan drogs tillbaka\\. Koden fungerar inte längre\\."
+    notVisible: "Withdraw this invitation\\?|Perutaanko tämä kutsu\\?|Dra tillbaka den här inbjudan\\?"
     timeout: 15000
-# The code went with its invitation.
-- assertNotVisible: "[0-9A-HJKMNP-TV-Z]{5}-[0-9A-HJKMNP-TV-Z]{5}|(Invitation code|Kutsukoodi|Inbjudningskod): .*"
-- assertNotVisible: "The invitation could not be withdrawn\\..*|Kutsua ei voitu perua\\..*|Inbjudan kunde inte dras tillbaka\\..*"
+- extendedWaitUntil:
+    notVisible: "[0-9A-HJKMNP-TV-Z]{5}-[0-9A-HJKMNP-TV-Z]{5}|(Invitation code|Kutsukoodi|Inbjudningskod): .*"
+    timeout: 15000
+- assertNotVisible: "The invitation was withdrawn\\. Its code no longer works\\.|Kutsu peruttiin\\. Sen koodi ei enää toimi\\.|Inbjudan drogs tillbaka\\. Koden fungerar inte längre\\."
+- assertNotVisible: "That did not go through\\. Try again\\.|Se ei onnistunut\\. Yritä uudelleen\\.|Det gick inte\\. Försök igen\\."

@@ -51,7 +51,7 @@ function answering(response: () => Response) {
   return calls;
 }
 
-function show() {
+function show({ legendHidden }: { legendHidden?: boolean } = {}) {
   const onOpen = vi.fn();
   const onApplied = vi.fn(async (_sanction: Sanction, _asked: SanctionKind) => undefined);
   render(
@@ -60,6 +60,7 @@ function show() {
         <SanctionActions
           accountId={ID}
           legend="Act"
+          legendHidden={legendHidden}
           also="And one more thing happens."
           onOpen={onOpen}
           onApplied={onApplied}
@@ -100,12 +101,24 @@ describe("the actions on a person, on their own", () => {
       within(group)
         .getAllByRole("button")
         .map((button) => button.textContent),
-    ).toEqual(["Warn", "Hide from others (shadow ban)", "Suspend until a day"]);
+    ).toEqual(["Warn", "Shadow ban", "Suspend"]);
     expect(screen.queryByRole("button", { name: "Lift" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Look at it again" })).toBeNull();
     fireEvent.click(within(group).getByRole("button", { name: "Warn" }));
     expect(onOpen).toHaveBeenCalledTimes(1);
     expect(screen.getByRole("dialog")).toHaveTextContent("And one more thing happens.");
+  });
+
+  it.each([
+    ["draws the legend by default", undefined, false],
+    ["keeps the legend for a screen reader alone when it is to be hidden (#581)", true, true],
+  ])("%s", (_, legendHidden, hidden) => {
+    answering(() => json(answer, 201));
+    show({ legendHidden });
+    const group = screen.getByRole("group", { name: "Act" });
+    const legend = within(group).getByText("Act");
+    if (hidden) expect(legend).toHaveClass("sr-only");
+    else expect(legend).not.toHaveClass("sr-only");
   });
 
   it("hands an apply's parsed sanction and the kind asked for to onApplied, and closes the step", async () => {

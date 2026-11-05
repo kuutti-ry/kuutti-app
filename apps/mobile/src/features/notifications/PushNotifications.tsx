@@ -31,12 +31,12 @@ export function PushNotifications() {
  * the API words the pushes in it, and whenever the app comes back to the
  * front, since the person may have allowed notifications in the phone's
  * settings meanwhile, or the start found no network (registerPush sends
- * nothing when nothing changed). A tap on a push opens what it is about,
- * which is all it says: the conversations for a message or a match, or
- * today's round. It waits while the lock holds the screens and opens once
- * they are unlocked; a tap that came while signed out, or whose lock was
- * left through the bank, is let go. Either way it is cleared, so it opens
- * nothing twice. A sign-out clears the phone's list of Kuutti's pushes.
+ * nothing when nothing changed). A tap on a push opens the conversations, which
+ * is all a message or a match can say (ADR-062 §12: there is no other push). It
+ * waits while the lock holds the screens and opens once they are unlocked; a
+ * tap that came while signed out, or whose lock was left through the bank, is
+ * let go. Either way it is cleared, so it opens nothing twice. A sign-out clears
+ * the phone's list of Kuutti's pushes.
  */
 function OnThePhone() {
   const { t, locale } = useT();
@@ -82,15 +82,15 @@ function OnThePhone() {
   const { status } = session;
   useEffect(() => {
     // At a cold start the session is still being read, and a screen opened
-    // under the lock would run before anybody unlocked it (the round marked
-    // opened, its photos fetched): the tap waits for both.
+    // under the lock would run before anybody unlocked it (the list's thumbs
+    // signed and fetched): the tap waits for both.
     if (!response || status === "loading" || holding) return;
     Notifications.clearLastNotificationResponse();
     if (status !== "signed-in") return;
     if (response.actionIdentifier !== Notifications.DEFAULT_ACTION_IDENTIFIER) return;
     const data = PushData.safeParse(response.notification.request.content.data);
     if (!data.success) return;
-    router.push(data.data.kind === "round" ? "/round" : "/chats");
+    router.push("/chats");
   }, [response, status, holding, router]);
 
   return null;

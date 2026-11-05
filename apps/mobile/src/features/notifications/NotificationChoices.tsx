@@ -14,10 +14,10 @@ import { fetchChoices, saveChoice } from "./client";
 import { PhoneLine } from "./PhoneLine";
 import { usePhonePermission } from "./usePhonePermission";
 
-const WORDS: Record<NotificationKind, { label: PlainMessageKey; hint: PlainMessageKey }> = {
-  round: { label: "notifications.kind.round.label", hint: "notifications.kind.round.hint" },
-  message: { label: "notifications.kind.message.label", hint: "notifications.kind.message.hint" },
-  match: { label: "notifications.kind.match.label", hint: "notifications.kind.match.hint" },
+/** A kind's name; a line under it only where the switch does less than it seems to. */
+const WORDS: Record<NotificationKind, { label: PlainMessageKey; hint?: PlainMessageKey }> = {
+  message: { label: "notifications.kind.message.label" },
+  match: { label: "notifications.kind.match.label" },
   moderation: {
     label: "notifications.kind.moderation.label",
     hint: "notifications.kind.moderation.hint",
@@ -31,12 +31,12 @@ type ChoicesView =
 
 /**
  * What a person may be notified of (#176, ADR-032): one switch per kind, in
- * the API's order, each with its line, each on until switched off, stored on
- * the server so every phone of the person's and every later sender reads the
- * same. A press saves at once; while it is on its way the switch waits, and a
- * failure is said in words with the switch as it was. Above the switches,
- * whether this phone lets Kuutti notify it at all (#102, ADR-055 §9). The
- * choices as read or stored go to `onStored`, for the row above (#511).
+ * the API's order, each on until switched off, stored on the server so every
+ * phone of the person's and every later sender reads the same. A press saves
+ * at once; while it is on its way the switch waits, and a failure is said in
+ * words with the switch as it was. First, what this phone's answer leaves to
+ * do (#102, ADR-055 §9), then what a notification says. The choices as read
+ * or stored go to `onStored`, for the row above (#511).
  */
 export function NotificationChoices({
   onStored,
@@ -89,17 +89,16 @@ export function NotificationChoices({
 
   return (
     <>
-      <Text>{t("notifications.intro")}</Text>
       <PhoneLine />
+      <Text>{t("notifications.intro")}</Text>
       {view.status === "loading" && (
-        <Text accessibilityLiveRegion="polite">{t("notifications.loading")}</Text>
+        <Text accessibilityLiveRegion="polite">{t("load.loading")}</Text>
       )}
-      {view.status === "failed" && (
-        <LoadFailed headline={t("notifications.failed")} error={view.error} onRetry={read} />
-      )}
+      {view.status === "failed" && <LoadFailed error={view.error} onRetry={read} />}
       {view.status === "ready" &&
         view.choices.map(({ kind, enabled }) => {
-          const label = t(WORDS[kind].label);
+          const { label: labelKey, hint } = WORDS[kind];
+          const label = t(labelKey);
           return (
             <View key={kind} className="gap-1">
               <View className="flex-row items-center justify-between gap-4">
@@ -111,11 +110,11 @@ export function NotificationChoices({
                   onCheckedChange={(on) => void set(kind, on)}
                 />
               </View>
-              <Text variant="muted">{t(WORDS[kind].hint)}</Text>
+              {hint && <Text variant="muted">{t(hint)}</Text>}
             </View>
           );
         })}
-      {failed && <Notice refused words={t("notifications.saveFailed")} answer={failures} />}
+      {failed && <Notice refused words={t("load.failed.press")} answer={failures} />}
     </>
   );
 }

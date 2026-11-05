@@ -42,7 +42,7 @@ const REGISTER: Record<string, Entry> = {
     by: "tombstoneAccount",
     stays: "id identity_id state state_changed_at registered_at deleted_at",
     cleared:
-      "birth_month birth_year email email_confirmed_at found_them_answered gender gender_changed_at home_moved_at home_place home_shows_area paused_from pond_id sanctioned_from",
+      "birth_month birth_year email email_confirmed_at found_them_answered gender gender_changed_at home_place home_shows_area paused_from pond_id sanctioned_from",
     exported: ["account"],
   },
   account_export: { erasure: "goes", by: "deleteExportsOfAccount", exported: ["exports"] },
@@ -204,7 +204,8 @@ const REGISTER: Record<string, Entry> = {
     exported: ["sanctions"],
   },
   session: { erasure: "goes", by: "deleteAccountSessions", exported: ["sessions"] },
-  pond_counter: { erasure: "nobody", why: "A pond's counts by day (ADR-013)." },
+  star: { erasure: "goes", by: "eraseStarsOf", exported: ["stars"] },
+  pond_counter: { erasure: "nobody", why: "A pond's counts, one row each, no history (ADR-013)." },
 };
 
 /** The calls of eraseAccount that erase nothing themselves. */

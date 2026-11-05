@@ -259,7 +259,6 @@ The workflows read `EXPO_TOKEN` and `DOKPLOY_TOKEN` from the environments `stagi
 
 ## Open
 
-- Which profiles a push to `main` builds. `infra/README.md` (CI) and the header of `eas-build.yml` say `development` and `preview`; the job's code builds `development` alone on a push and leaves `preview` to a start by hand. The view says "a native build" and names neither.
 - The switches `STAGING_ENABLED`, `EAS_ENABLED`, `PREVIEWS_ENABLED`, `EAS_PLATFORMS` and the environments' variables are set on GitHub, not in the repository; the view draws what runs when they are on.
 - Production (#25): applied on 2026-10-24 by a rehearsal tag and set up by hand (ADR-049). The first tag that passes the release gate is the first whose `deploy prod` deploys it.
 - Update signing (ADR-004 §4) is not built: an `EXPO_TOKEN` from any of four environments can publish to the `production` channel, and the `preview` environment has no reviewer, so write access to the repository is the trust of the update path. Through EAS the same token uses the Play key and the upload key on the app's testing tracks (ADR-057 §3), and the App Store Connect key on the association's Apple team (ADR-063 §3).

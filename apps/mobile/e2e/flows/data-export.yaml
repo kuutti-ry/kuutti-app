@@ -19,21 +19,21 @@ name: Download my data hands the person's file over
     env:
       ROW: "(A copy of your data|Kopio tiedoistasi|En kopia av dina uppgifter)(, .*)?"
       INSIDE: "Download my data|Lataa tietoni|Ladda ner mina uppgifter"
-- assertVisible: "A file with everything Kuutti holds about you, and nothing about anyone else\\.|Tiedosto, jossa on kaikki, mitä Kuutti tietää sinusta, eikä mitään kenestäkään muusta\\.|En fil med allt Kuutti har om dig, och inget om någon annan\\."
 - tapOn: "Download my data|Lataa tietoni|Ladda ner mina uppgifter"
 # The sheet, or the picker, covers the app.
 - extendedWaitUntil:
     notVisible: "Download my data|Lataa tietoni|Ladda ner mina uppgifter"
     timeout: 20000
-# iOS's sheet is swiped down by its top; Android's folder picker is closed
-# by the back key, which the app takes as a cancelled download, before
-# anything is fetched.
+# iOS's sheet is swiped down by its top, which on iOS 27 lies under the
+# screen's middle: a swipe that starts above it closes the sheet and goes on to
+# scroll the list behind. Android's folder picker is closed by the back key,
+# which the app takes as a cancelled download, before anything is fetched.
 - runFlow:
     when:
       platform: iOS
     commands:
       - swipe:
-          start: "50%, 45%"
+          start: "50%, 63%"
           end: "50%, 98%"
 - runFlow:
     when:
@@ -45,6 +45,6 @@ name: Download my data hands the person's file over
 - extendedWaitUntil:
     visible: "Download my data|Lataa tietoni|Ladda ner mina uppgifter"
     timeout: 15000
-- assertNotVisible: "The download did not work\\. Try again\\.|Lataus ei onnistunut\\. Yritä uudelleen\\.|Nedladdningen misslyckades\\. Försök igen\\."
-- assertNotVisible: "That is enough copies for today\\..*|Tältä päivältä kopioita on jo tarpeeksi\\..*|Det räcker med kopior för i dag\\..*"
-- assertNotVisible: "Done\\. The file is where you chose\\.|Valmis\\. Tiedosto on nyt siellä, minne sen valitsit\\.|Klart\\. Filen finns nu där du valde\\."
+- assertNotVisible: "That did not go through\\. Try again\\.|Se ei onnistunut\\. Yritä uudelleen\\.|Det gick inte\\. Försök igen\\."
+- assertNotVisible: "That is enough for today\\..*|Tältä päivältä riittää\\..*|Det räcker för i dag\\..*"
+- assertNotVisible: "Done\\.|Valmis\\.|Klart\\."

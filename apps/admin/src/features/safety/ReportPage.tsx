@@ -107,8 +107,8 @@ export function ReportPage() {
   return (
     <section aria-labelledby="report-title" className="space-y-6">
       <ScreenTitle id="report-title">{t("admin.report.title", { report: short(id) })}</ScreenTitle>
-      {state.kind === "loading" && <Loading>{t("admin.report.loading")}</Loading>}
-      {state.kind === "error" && <Alert>{t("admin.report.error")}</Alert>}
+      {state.kind === "loading" && <Loading>{t("load.loading")}</Loading>}
+      {state.kind === "error" && <Alert>{t("admin.loadFailed")}</Alert>}
       {state.kind === "missing" && (
         <p className="text-muted-foreground">{t("admin.report.missing")}</p>
       )}
@@ -342,7 +342,6 @@ function ReportBody({ opened }: { opened: ReportDetail }) {
           <CardTitle>{t("admin.report.decisionTitle")}</CardTitle>
           {decision === null && !elsewhere && !closing && (
             <>
-              <p>{t("admin.report.reportedFor", { reason: t(REASON[report.reason]) })}</p>
               <SanctionActions
                 accountId={reported}
                 legend={t("admin.report.act")}
@@ -555,7 +554,7 @@ function CopyPhoto({
         onClick={() => void show()}
       >
         <Image aria-hidden="true" />
-        {t("admin.report.showPhoto")}
+        {t("admin.showPhoto")}
       </Button>
     </>
   );
@@ -616,7 +615,7 @@ function PointedPhoto({
             onClick={() => void show()}
           >
             <Image aria-hidden="true" />
-            {t("admin.report.showPhoto")}
+            {t("admin.showPhoto")}
           </Button>
         </>
       )}

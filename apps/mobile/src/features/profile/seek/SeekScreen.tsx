@@ -1,17 +1,26 @@
-import { GENDERS, type StoredDealBreaker } from "@kuutti/schema";
+import { GENDERS } from "@kuutti/schema";
 import { useFocusEffect, useRouter } from "expo-router";
+import Info from "lucide-react-native/icons/info";
 import { useCallback, useRef, useState } from "react";
-import { ScrollView, View } from "react-native";
+import { AccessibilityInfo, ScrollView, type Text as TextNode, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LoadFailed } from "@/components/LoadFailed";
 import { RowGroup } from "@/components/RowGroup";
 import { ScreenHeader } from "@/components/ScreenHeader";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Icon } from "@/components/ui/icon";
 import { Text } from "@/components/ui/text";
 import { useT } from "@/lib/locale";
 import { useHapticTap } from "@/theme/haptics";
-import { fetchDealBreakers } from "../client";
-import { DEAL_BREAKERS_PATH } from "../DealBreakersScreen";
-import { fieldLabelKey, optionKey, seeksKey } from "../keys";
+import { DealBreakerRows, useDealBreakers } from "../DealBreakerRows";
+import { optionKey, seeksKey } from "../keys";
 import { INTENT_SECTION, sectionPath } from "../sections";
 import { SEEK_AGES_PATH } from "./SeekAgesScreen";
 import { SEEK_WHOM_PATH } from "./SeekWhomScreen";
@@ -20,27 +29,18 @@ import { useSeeking } from "./useSeeking";
 export const SEEK_PATH = "/profile/seek" as const;
 
 /**
- * The deal-breakers set; null until known, and when they could not be read:
- * the row then says nothing of them, its own screen says what failed.
- */
-function useDealBreakers(): [readonly StoredDealBreaker[] | null, () => void] {
-  const [stored, setStored] = useState<readonly StoredDealBreaker[] | null>(null);
-  const read = useCallback(() => {
-    fetchDealBreakers().then(
-      ({ dealBreakers }) => setStored(dealBreakers),
-      () => setStored(null),
-    );
-  }, []);
-  return [stored, read];
-}
-
-/**
  * What a person seeks, as a list of its own (#542), built like the profile's
- * and the settings': each row its answer under onboarding's own question,
- * opening a screen of its own, and nothing edited here. Every answer is a
- * filter both ways, which the line at the top says, naming no moment: today's
- * cards stand until the next round (ADR-034 Open 5). Reached from the profile
- * alone, not Home. The list reads everything again when a screen hands back.
+ * and the settings': each row its answer, opening a screen of its own, and
+ * nothing edited here. Whom, the ages and what one is here for under
+ * onboarding's own questions, then a row per deal-breaker under a heading
+ * (#551), so the list reflects what a person has shared. Every answer is a
+ * filter both ways, which the line at the top says, naming no moment: a change
+ * works on the next read (ADR-062 §8). Beside the heading how many of the
+ * deal-breakers are in use, and the app's one (i), the maintainer's exception of
+ * 04/11/2026: the limit and what a deal-breaker asks of the person, behind a
+ * tap in the shared dialog. An (i) never holds what protects a person. Reached
+ * from the profile and from the queue's end (§11), not Home, so its way back
+ * names neither. The list reads everything again when a screen hands back.
  */
 export function SeekScreen() {
   const { t } = useT();
@@ -49,6 +49,11 @@ export function SeekScreen() {
   const seeking = useSeeking();
   const { reload } = seeking;
   const [dealBreakers, readDealBreakers] = useDealBreakers();
+  const [aboutDealBreakers, setAboutDealBreakers] = useState(false);
+  // The title as the (i)'s dialog opens: the button that opened it is under the scrim.
+  const focusTitle = useCallback((node: TextNode | null) => {
+    if (node) AccessibilityInfo.sendAccessibilityEvent(node, "focus");
+  }, []);
   // The first focus is the mount, which the hook reads already.
   const shown = useRef(false);
   useFocusEffect(
@@ -67,7 +72,7 @@ export function SeekScreen() {
     return (
       <SafeAreaView className="flex-1 bg-background">
         <View className="flex-1 items-center justify-center p-6">
-          <Text accessibilityLiveRegion="polite">{t("profile.loading")}</Text>
+          <Text accessibilityLiveRegion="polite">{t("load.loading")}</Text>
         </View>
       </SafeAreaView>
     );
@@ -77,7 +82,6 @@ export function SeekScreen() {
       <SafeAreaView className="flex-1 bg-background">
         <View className="flex-1 items-center justify-center gap-4 p-6">
           <LoadFailed
-            headline={t("profile.failed")}
             error={seeking.error}
             onRetry={() => {
               readDealBreakers();
@@ -89,7 +93,7 @@ export function SeekScreen() {
     );
   }
 
-  const { seeks, ageWindow, intent } = seeking.seeking;
+  const { seeks, ageWindow, fields } = seeking.seeking;
   const whom =
     seeks.length === GENDERS.length
       ? t("onboarding.seeks.anyone")
@@ -97,22 +101,13 @@ export function SeekScreen() {
           .map((gender) => t(seeksKey(gender)))
           .join(", ");
   const ages = t("profile.seek.ages.summary", ageWindow);
-  const here = intent && t(optionKey("intent", intent));
-  const set =
-    dealBreakers?.length === 0
-      ? t("profile.seek.dealBreakers.none")
-      : dealBreakers
-          ?.map(({ field, paused }) => {
-            const name = t(fieldLabelKey(field));
-            return paused ? t("profile.seek.dealBreakers.paused", { field: name }) : name;
-          })
-          .join(", ");
+  const here = fields.intent && t(optionKey("intent", fields.intent));
 
   return (
     <SafeAreaView className="flex-1 bg-background">
       <ScreenHeader
         title={t("profile.seek.title")}
-        backLabel={t("profile.section.back")}
+        backLabel={t("profile.back")}
         onBack={() => router.back()}
       />
       <ScrollView contentContainerClassName="flex-grow gap-6 p-6">
@@ -141,16 +136,57 @@ export function SeekScreen() {
               value: here,
               onPress: open(sectionPath(INTENT_SECTION)),
             },
-            {
-              key: "dealBreakers",
-              title: t("profile.dealBreakers.open"),
-              summary: set,
-              value: set,
-              onPress: open(DEAL_BREAKERS_PATH),
-            },
           ]}
         />
+        <View className="gap-3">
+          {/* A 44 pt row around a line of text: the margins keep the heading with its rows. */}
+          <View className="-my-2 min-h-touch flex-row items-center gap-2">
+            <Text variant="large" role="heading" aria-level="2" className="shrink">
+              {t("profile.dealBreakers.title")}
+            </Text>
+            {dealBreakers && (
+              <>
+                <Text
+                  variant="muted"
+                  accessibilityLabel={t("profile.dealBreakers.count", {
+                    filters: dealBreakers.dealBreakers.length,
+                    max: dealBreakers.max,
+                  })}
+                >
+                  {t("profile.progress.short", {
+                    answered: dealBreakers.dealBreakers.length,
+                    total: dealBreakers.max,
+                  })}
+                </Text>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  accessibilityLabel={t("profile.dealBreakers.about")}
+                  onPress={() => {
+                    tap();
+                    setAboutDealBreakers(true);
+                  }}
+                >
+                  <Icon as={Info} />
+                </Button>
+              </>
+            )}
+          </View>
+          <DealBreakerRows response={dealBreakers} own={fields} />
+        </View>
       </ScrollView>
+      {dealBreakers && (
+        <Dialog open={aboutDealBreakers} onOpenChange={setAboutDealBreakers}>
+          <DialogContent closeLabel={t("profile.dealBreakers.aboutClose")}>
+            <DialogHeader>
+              <DialogTitle ref={focusTitle}>{t("profile.dealBreakers.title")}</DialogTitle>
+              <DialogDescription>
+                {t("profile.dealBreakers.explain", { max: dealBreakers.max })}
+              </DialogDescription>
+            </DialogHeader>
+          </DialogContent>
+        </Dialog>
+      )}
     </SafeAreaView>
   );
 }

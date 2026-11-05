@@ -7,6 +7,7 @@ import {
   chatRoutes,
   chatSocketRoutes,
   conversationBetween,
+  conversationsOnTurn,
   createLive,
   type Live,
   messageReaders,
@@ -27,7 +28,8 @@ import {
   wellKnownRoutes,
 } from "./identity/index.ts";
 import { isComplete, matchingStatusOf } from "./jobs/pool.ts";
-import { buildRoundOf, relaxationOffers, relaxedCandidates } from "./jobs/round-builder.ts";
+import { fillQueue, fitsNow, relaxationOffers, relaxedCandidates } from "./jobs/round-builder.ts";
+import { starPlace, starredPeople, starsShown } from "./jobs/stars.ts";
 import { requireAdmin } from "./lib/admin-middleware.ts";
 import { requireSession } from "./lib/auth-middleware.ts";
 import type { Config } from "./lib/config.ts";
@@ -48,7 +50,7 @@ import { servedDocument } from "./lib/openapi.ts";
 import type { Pusher } from "./lib/push.ts";
 import { addressOf, limited, personOf, rateLimit } from "./lib/rate-limit.ts";
 import { serverRequestId } from "./lib/request-id.ts";
-import { preferencesRoutes, readPreferences, roundRoutes } from "./matching/index.ts";
+import { preferencesRoutes, readPreferences, roundRoutes, starRoutes } from "./matching/index.ts";
 import { type MediaDeps, photoAdminRoutes, photoRoutes, UPLOAD_ROUTE } from "./media/index.ts";
 import { createPush, notificationRoutes, type Push } from "./notifications/index.ts";
 import { pondAdminRoutes, pondRoutes } from "./pond/index.ts";
@@ -289,7 +291,7 @@ export function createApp(deps: Deps) {
         }),
     ),
   );
-  // ...and what changes in them, live over one socket (#349, ADR-031 §5).
+  // ...and what changes in them, live over one socket (#349, ADR-031 §9).
   app.route(
     "/",
     chatSocketRoutes({
@@ -329,43 +331,47 @@ export function createApp(deps: Deps) {
   // The caller's own answers, which the deal-breakers' pause and the cards' "did not answer" read (#149, #99).
   const ownFieldsOf = async (accountId: string) =>
     (await exportProfile(deps.db, accountId))?.fields ?? {};
-  // Today's round (#96, ADR-034) serves its cards through the profile slice's
-  // builder, handed in here since profile already imports matching; a card
-  // the builder refuses (404) is a card the round leaves out, and its budget's
-  // 429 goes through. A day's first read with no round builds it through the
-  // round builder, which reads across slices and lives with the jobs (#95).
+  // The queue (#96, #502, ADR-034, ADR-062) serves its cards through the profile
+  // slice's builder, handed in here since profile already imports matching; a
+  // card the builder refuses (404) is a card the read leaves out, and its budget's
+  // 429 goes through. Who comes next, and whether two people fit now, are the
+  // queue's builder's, which reads across slices and lives with the jobs (#95).
   // A read is checked by the velocity rules after it (#86, ADR-041).
+  const cardOf = async (viewerAccountId: string, subjectAccountId: string) => {
+    try {
+      const built = await buildCard(
+        {
+          db: deps.db,
+          logger: deps.logger,
+          now: deps.now ?? (() => new Date()),
+          readPreferences,
+        },
+        { viewerAccountId, subjectAccountId },
+      );
+      return built.card;
+    } catch (error) {
+      if (error instanceof AppError && error.status === 404) return null;
+      throw error;
+    }
+  };
   app.route(
     "/",
     roundRoutes(
       deps,
       guard,
-      async (viewerAccountId, subjectAccountId) => {
-        try {
-          const built = await buildCard(
-            {
-              db: deps.db,
-              logger: deps.logger,
-              now: deps.now ?? (() => new Date()),
-              readPreferences,
-            },
-            { viewerAccountId, subjectAccountId },
-          );
-          return built.card;
-        } catch (error) {
-          if (error instanceof AppError && error.status === 404) return null;
-          throw error;
-        }
+      cardOf,
+      {
+        fill: (accountId) => fillQueue(builderDeps(), accountId),
+        fits: (db, accountId, candidateIds) => fitsNow(builderDeps(), db, accountId, candidateIds),
       },
-      // shortcut: nothing is built in production until the maintainer has set how long
-      // rounds are kept (ADR-034 Open 2, ADR-035 Open 1) and the filters are asked on read
-      // and on `decide` (#502, his word on #542): both lift this and boot.ts's twin.
-      deps.config.APP_ENV === "production"
-        ? async () => false
-        : (accountId) => buildRoundOf(builderDeps(), accountId),
       // A match is a conversation (#100, ADR-031): the chat slice's, handed in
       // here since the chat imports the profile, which imports matching.
-      { between: conversationBetween, open: openConversation, made: push.match },
+      {
+        between: conversationBetween,
+        open: openConversation,
+        yourTurn: conversationsOnTurn,
+        made: push.match,
+      },
       roundRead,
       // A short round's relaxations (#99, ADR-042) read the pond as the builder does.
       {
@@ -373,6 +379,25 @@ export function createApp(deps: Deps) {
         candidates: (accountId, relaxation) =>
           relaxedCandidates(builderDeps(), accountId, relaxation),
       },
+      ownFieldsOf,
+    ),
+  );
+  // The stars (#575, ADR-064) serve a card as the queue does, and read across
+  // slices as its builder does, from the jobs.
+  app.route(
+    "/",
+    starRoutes(
+      deps,
+      guard,
+      cardOf,
+      {
+        shown: (db, accountId, candidateIds) =>
+          starsShown(builderDeps(), db, accountId, candidateIds),
+        place: (accountId, candidateId) => starPlace(builderDeps(), accountId, candidateId),
+        people: (accountId) => starredPeople(builderDeps(), accountId),
+      },
+      { yourTurn: conversationsOnTurn },
+      roundRead,
       ownFieldsOf,
     ),
   );

@@ -6,9 +6,10 @@ import { expectPinnedHeader } from "@/test/layout";
 import { renderWithTheme } from "@/test/render";
 import { BreakScreen } from "./BreakScreen";
 
-// The break screen (#170, ADR-022): three lines, a switch that says "I
-// understand", a button that waits for it, and the device signed out when
-// the API says 204; a refusal keeps the session and says so.
+// The break screen (#170, ADR-022): three lines and no line over them (#581),
+// a switch that says "I understand", a button that waits for it, and the
+// device signed out when the API says 204; a refusal keeps the session and
+// says so.
 
 const { __router: router } = jest.requireMock("expo-router") as {
   __router: { back: jest.Mock; replace: jest.Mock };
@@ -84,6 +85,12 @@ describe("BreakScreen", () => {
     ]) {
       expect(screen.getByText(line)).toBeTruthy();
     }
+    // Nothing over the three lines, nor between them and the switch.
+    const drawn = screen.getAllByText(/./).map((node) => node.props.children);
+    expect(drawn).toHaveLength(6);
+    expect(drawn[0]).toBe("Take a break from Kuutti");
+    expect(drawn[1]).toMatch(/^Your profile leaves everybody's view/);
+    expect(drawn.slice(-2)).toEqual([UNDERSTAND, START]);
     expect(disabled(START)).toBe(true);
     expect(pressables(screen.toJSON() as HostNode).flatMap((node) => a11yProblems(node))).toEqual(
       [],

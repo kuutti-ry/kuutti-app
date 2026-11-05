@@ -22,20 +22,20 @@ import { openPond, type PeopleOptions, people, pondNamed } from "../test/people.
 import {
   isComplete,
   matchingStatusOf,
-  openPondIds,
   openPondOf,
+  pondIdOf,
   subjectOf,
   subjectsOfPond,
 } from "./pool.ts";
-import { buildRounds } from "./round-builder.ts";
+import { fillQueue } from "./round-builder.ts";
 
 // features/pond/opening.feature (#500, ADR-060): who is complete, what a
 // person is told of their matching, and what an admin's switch does to the
-// rounds. The switch's routes are pond/admin-routes.test.ts.
+// queue. The switch's routes are pond/admin-routes.test.ts.
 
-/** 04:00 in Helsinki. */
-const NIGHT = new Date("2026-10-20T01:00:00.000Z");
-const NEXT_NIGHT = new Date("2026-10-21T01:00:00.000Z");
+/** Noon in Helsinki. */
+const NOON = new Date("2026-10-20T09:00:00.000Z");
+const NEXT_NOON = new Date("2026-10-21T09:00:00.000Z");
 
 /** Women who seek women: every two of them are in each other's pool. */
 const ALIKE: PeopleOptions = { gender: "woman", seeks: ["woman"], complete: true, consented: true };
@@ -55,9 +55,12 @@ const roundCount = async (db: Queryable, accountId: string) =>
     ])
   ).rows[0]?.n;
 
-async function night(ctx: TestContext, at = NIGHT) {
+/** Each of them reads the queue, as far as who has a round goes; whether each read added anybody. */
+async function reads(ctx: TestContext, ids: readonly string[], at = NOON) {
   const { logger } = await captureLogger();
-  return buildRounds({ db: ctx.client, logger, now: () => at });
+  const added: boolean[] = [];
+  for (const id of ids) added.push(await fillQueue({ db: ctx.client, logger, now: () => at }, id));
+  return added;
 }
 
 const turn = async (ctx: TestContext, pondId: string, open: boolean) => {
@@ -75,7 +78,7 @@ describe("a pond's switch", () => {
     const pond = await pondNamed(ctx.client, "test-opening");
     const ids = await people(ctx.client, pond, 31, ALIKE);
 
-    expect(await night(ctx)).toEqual({ ponds: 0, built: 0, cards: 0, failed: 0 });
+    expect(await reads(ctx, ids)).toEqual(ids.map(() => false));
     for (const id of ids) expect(await roundCount(ctx.client, id)).toBe(0);
     expect(await statusOf(ctx, ids[0])).toBe("closed");
     expect(await statusOf(ctx, ids[30])).toBe("closed");
@@ -86,21 +89,20 @@ describe("a pond's switch", () => {
 
     expect(await statusOf(ctx, ids[0])).toBe("open");
     expect(await statusOf(ctx, ids[30])).toBe("open");
-    expect(await night(ctx)).toMatchObject({ ponds: 1, built: 31, failed: 0 });
+    expect(await reads(ctx, ids)).toEqual(ids.map(() => true));
     for (const id of ids) expect(await roundCount(ctx.client, id)).toBe(1);
   });
 
-  test("Closing a pond builds no new round and ends no conversation", async ({ ctx }) => {
+  test("Closing a pond opens no new round and ends no conversation", async ({ ctx }) => {
     const pond = await pondNamed(ctx.client, "test-closing");
     await openPond(ctx.client, pond);
     const [a, b] = await people(ctx.client, pond, 2, ALIKE);
     if (!a || !b) throw new Error("people not written");
-    await night(ctx);
+    await reads(ctx, [a]);
     const conversation = await conversationBetween(ctx.client, a, b);
     const who = await signInAs(ctx.client, a);
-    const noon = new Date(NIGHT.getTime() + 8 * 3600 * 1000);
     const { logger } = await captureLogger();
-    const app = createApp({ config: testConfig(), logger, db: ctx.client, now: () => noon });
+    const app = createApp({ config: testConfig(), logger, db: ctx.client, now: () => NOON });
     const read = async () => {
       const response = await app.request("/rounds/today", { headers: who.headers });
       expect(response.status).toBe(200);
@@ -117,16 +119,19 @@ describe("a pond's switch", () => {
     const talk = await app.request(`/conversations/${conversation}`, { headers: who.headers });
     expect(talk.status).toBe(200);
     expect(await statusOf(ctx, a)).toBe("closed");
-    expect(await night(ctx, NEXT_NIGHT)).toEqual({ ponds: 0, built: 0, cards: 0, failed: 0 });
+    expect(await reads(ctx, [a], NEXT_NOON)).toEqual([false]);
     expect(await roundCount(ctx.client, a)).toBe(1);
   });
 
-  test("the night reads the switch of every pond, each on its own", async ({ ctx }) => {
+  test("the switch is read for the person, whatever another pond's says", async ({ ctx }) => {
     const open = await pondNamed(ctx.client, "test-open-a");
     const shut = await pondNamed(ctx.client, "test-open-b");
     await openPond(ctx.client, open);
-    expect(await openPondIds(ctx.client)).toContain(open);
-    expect(await openPondIds(ctx.client)).not.toContain(shut);
+    const [here] = await people(ctx.client, open, 1, ALIKE);
+    const [there] = await people(ctx.client, shut, 1, ALIKE);
+    expect(await openPondOf(ctx.client, here ?? "")).toBe(open);
+    expect(await openPondOf(ctx.client, there ?? "")).toBeNull();
+    expect(await pondIdOf(ctx.client, there ?? "")).toBe(shut);
   });
 });
 
@@ -189,10 +194,10 @@ describe("what a person is told", () => {
     if (!paused || !suspended || !banned) throw new Error("people not written");
     await ctx.client.query("UPDATE account SET state = 'paused' WHERE id = $1", [paused]);
     await ctx.client.query("UPDATE account SET state = 'suspended' WHERE id = $1", [suspended]);
-    const deps = { db: ctx.client, now: () => NIGHT };
+    const deps = { db: ctx.client, now: () => NOON };
     for (const id of [paused, suspended, banned]) {
       expect(await matchingStatusOf(deps, id)).toEqual({ state: "incomplete" });
-      expect(await isComplete(ctx.client, id, NIGHT)).toBe(false);
+      expect(await isComplete(ctx.client, id, NOON)).toBe(false);
     }
     expect(await openPondOf(ctx.client, paused)).toBeNull();
     expect(await openPondOf(ctx.client, suspended)).toBeNull();
@@ -228,7 +233,7 @@ describe("who is complete", () => {
       throw new Error("people not written");
     }
 
-    await night(ctx);
+    await reads(ctx, [she, shadow, unfinished, outdated, paused, banned]);
 
     const cards = async (id: string) =>
       (
@@ -255,12 +260,12 @@ describe("who is complete", () => {
       const pond = await pondNamed(ctx.client, `test-complete-consent-${kind}`);
       const [who] = await people(ctx.client, pond, 1, ALIKE);
       if (!who) throw new Error("person not written");
-      expect(await isComplete(ctx.client, who, NIGHT)).toBe(true);
+      expect(await isComplete(ctx.client, who, NOON)).toBe(true);
       await ctx.client.query(
         "UPDATE consent SET withdrawn_at = now() WHERE account_id = $1 AND kind = $2",
         [who, kind],
       );
-      expect(await isComplete(ctx.client, who, NIGHT)).toBe(false);
+      expect(await isComplete(ctx.client, who, NOON)).toBe(false);
     },
   );
 
@@ -274,7 +279,7 @@ describe("who is complete", () => {
       noIntent,
     ]);
     await ctx.client.query("DELETE FROM photo WHERE account_id = $1", [noPhotos]);
-    expect((await subjectsOfPond(ctx.client, pond, NIGHT)).map((s) => s.id)).toEqual([whole]);
+    expect((await subjectsOfPond(ctx.client, pond, NOON)).map((s) => s.id)).toEqual([whole]);
     for (const id of [noBirth, noIntent, noPhotos]) {
       expect(await statusOf(ctx, id), id).toBe("incomplete");
     }
@@ -288,7 +293,7 @@ describe("who is complete", () => {
       "UPDATE photo SET purpose = 'message', position = NULL WHERE account_id = $1",
       [messagesOnly],
     );
-    expect((await subjectsOfPond(ctx.client, pond, NIGHT)).map((s) => s.id)).toEqual([whole]);
+    expect((await subjectsOfPond(ctx.client, pond, NOON)).map((s) => s.id)).toEqual([whole]);
     expect(await statusOf(ctx, messagesOnly)).toBe("incomplete");
   });
 
@@ -298,7 +303,7 @@ describe("who is complete", () => {
     const pond = await pondNamed(ctx.client, "test-complete-ready-line");
     const [line] = await people(ctx.client, pond, 1, { ...ALIKE, bio: "ready_line" });
     const [neither] = await people(ctx.client, pond, 1, { ...ALIKE, bio: "none" });
-    expect((await subjectsOfPond(ctx.client, pond, NIGHT)).map((s) => s.id)).toEqual([line]);
+    expect((await subjectsOfPond(ctx.client, pond, NOON)).map((s) => s.id)).toEqual([line]);
     expect(await statusOf(ctx, neither)).toBe("incomplete");
   });
 
@@ -307,11 +312,11 @@ describe("who is complete", () => {
     const [whole, short] = await people(ctx.client, pond, 2, ALIKE);
     if (!whole || !short) throw new Error("people not written");
     await ctx.client.query("DELETE FROM photo WHERE account_id = $1", [short]);
-    expect(await isComplete(ctx.client, whole, NIGHT)).toBe(true);
-    expect(await isComplete(ctx.client, short, NIGHT)).toBe(false);
+    expect(await isComplete(ctx.client, whole, NOON)).toBe(true);
+    expect(await isComplete(ctx.client, short, NOON)).toBe(false);
     // Closed, or open: completeness does not ask the switch, the invitations' question.
     await openPond(ctx.client, pond);
-    expect(await isComplete(ctx.client, whole, NIGHT)).toBe(true);
+    expect(await isComplete(ctx.client, whole, NOON)).toBe(true);
     expect(await openPondOf(ctx.client, whole)).toBe(pond);
   });
 });
@@ -340,7 +345,7 @@ describe("a home in the pool (#514, ADR-061)", () => {
     const [she] = await people(ctx.client, pond, 1, { ...ALIKE, home: null });
     await people(ctx.client, pond, 2, ALIKE);
     expect(await statusOf(ctx, she)).toBe("incomplete");
-    expect((await subjectsOfPond(ctx.client, pond, NIGHT)).map((s) => s.id)).not.toContain(she);
+    expect((await subjectsOfPond(ctx.client, pond, NOON)).map((s) => s.id)).not.toContain(she);
 
     const read = statusRead(ctx, she);
     const before = await read();
@@ -354,7 +359,7 @@ describe("a home in the pool (#514, ADR-061)", () => {
     expect((await putHome(ctx, she, "00530")).status).toBe(200);
     expect((await read()).missing).toEqual([]);
     expect(await statusOf(ctx, she)).toBe("open");
-    expect((await subjectsOfPond(ctx.client, pond, NIGHT)).map((s) => s.id)).toContain(she);
+    expect((await subjectsOfPond(ctx.client, pond, NOON)).map((s) => s.id)).toContain(she);
   });
 
   test("A place the list no longer knows reads as no home, and the step opens again", async ({
@@ -374,11 +379,11 @@ describe("a home in the pool (#514, ADR-061)", () => {
     expect(JSON.stringify(ctx.logs())).not.toContain("12345");
 
     expect(await statusOf(ctx, she)).toBe("incomplete");
-    expect(await subjectOf(ctx.client, pond, she ?? "", NIGHT)).toBeNull();
+    expect(await subjectOf(ctx.client, pond, she ?? "", NOON)).toBeNull();
 
     // A new one is taken like a first.
     expect((await putHome(ctx, she, "00530")).status).toBe(200);
-    expect((await subjectOf(ctx.client, pond, she ?? "", NIGHT))?.person.home).toMatchObject(
+    expect((await subjectOf(ctx.client, pond, she ?? "", NOON))?.person.home).toMatchObject(
       pointOf("00530") ?? {},
     );
   });
@@ -396,7 +401,7 @@ describe("a home in the pool (#514, ADR-061)", () => {
         await (await ctx.app.request("/profile/card", { headers: who.headers })).json(),
       ).card?.place;
     const homeOf = async (id: string | undefined) =>
-      (await subjectOf(ctx.client, pond, id ?? "", NIGHT))?.person.home;
+      (await subjectOf(ctx.client, pond, id ?? "", NOON))?.person.home;
     expect(await preview()).toEqual({ fi: "Kallio", sv: "Berghäll" });
     expect(await homeOf(area)).toMatchObject(pointOf("00530") ?? {});
 
@@ -428,7 +433,7 @@ describe("a home in the pool (#514, ADR-061)", () => {
       distance_close_km: 2,
       distance_around_km: 3,
     });
-    expect((await subjectOf(ctx.client, pond, she ?? "", NIGHT))?.person.home).toEqual({
+    expect((await subjectOf(ctx.client, pond, she ?? "", NOON))?.person.home).toEqual({
       ...pointOf("00530"),
       edges: { nearby: 1, close: 2, around: 3 },
     });

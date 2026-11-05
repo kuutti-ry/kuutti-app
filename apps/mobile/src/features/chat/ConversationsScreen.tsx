@@ -1,7 +1,7 @@
-import type { ConversationSummary } from "@kuutti/schema";
+import type { ConversationSummary, YourTurnCount } from "@kuutti/schema";
 import { Image } from "expo-image";
 import { useFocusEffect, useRouter } from "expo-router";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   AccessibilityInfo,
   Platform,
@@ -44,16 +44,16 @@ export function counterpartName(t: T, conversation: ConversationSummary): string
 
 /**
  * The line under the name: that the other deleted their account, else the
- * last message (a photo's caption, or "Photo" without one, #350), else that
- * there is none. An ended conversation's name says it ended, so its line is
- * its last message, which tells it from another.
+ * last message (a photo's caption, or "Photo" without one, #350), else none: the
+ * group above the row says whose move it is (#581). An ended conversation's name
+ * says it ended, so its line is its last message, which tells it from another.
  */
-function lineOf(t: T, conversation: ConversationSummary): string {
+function lineOf(t: T, conversation: ConversationSummary): string | null {
   if (conversation.state === "closed" && conversation.closedHow === "erasure") {
     return t("chat.state.deleted");
   }
   const last = conversation.lastMessage;
-  if (!last) return t("chat.row.noMessages");
+  if (!last) return null;
   const preview = last.kind === "photo" && last.preview === "" ? t("chat.row.photo") : last.preview;
   return last.side === "mine" ? t("chat.row.mine", { preview }) : preview;
 }
@@ -108,9 +108,11 @@ function Row({ conversation }: { conversation: ConversationSummary }) {
       )}
       <View className="flex-1 gap-0.5">
         <Text className="font-semibold">{name}</Text>
-        <Text variant="muted" numberOfLines={2}>
-          {line}
-        </Text>
+        {line !== null && (
+          <Text variant="muted" numberOfLines={2}>
+            {line}
+          </Text>
+        )}
       </View>
       <View className="items-end gap-1">
         {when && <Text variant="muted">{when}</Text>}
@@ -120,13 +122,59 @@ function Row({ conversation }: { conversation: ConversationSummary }) {
   );
 }
 
+/** A group of the list under its heading, left out with nobody in it. */
+function Group({
+  title,
+  conversations,
+}: {
+  title: string;
+  conversations: readonly ConversationSummary[];
+}) {
+  if (conversations.length === 0) return null;
+  return (
+    <View className="gap-1">
+      <Text variant="h4" accessibilityRole="header">
+        {title}
+      </Text>
+      {conversations.map((conversation) => (
+        <Row key={conversation.id} conversation={conversation} />
+      ))}
+    </View>
+  );
+}
+
 /**
- * The list of conversations (#348): the open ones, then the archived and the
- * closed ones under a heading of their own, each newest first, as the API
- * orders them. Read again on focus, by pulling down, and when the socket
- * brings something new (#349), with a line at the top while it is lost. A
- * row opens the conversation. Back from a report, a block or an end in a
- * conversation (#351), the top says what happened, once, to a screen reader
+ * The line that says the limit is near (ADR-062 §5), from `warning`
+ * conversations on the person's turn on, while a limit stands: 0 is off for
+ * either. It says the limit; how many wait is the heading's under it (#581).
+ * Plain words in an outline, no colour and no alarm, wrapped at any text size.
+ * iOS has no live regions, so VoiceOver is told when it appears; TalkBack reads
+ * the region itself.
+ */
+function TurnWarning({ count }: { count: YourTurnCount }) {
+  const { t } = useT();
+  const { waiting, limit, warning } = count;
+  const words =
+    limit > 0 && warning > 0 && waiting >= warning ? t("chat.list.turnWarning", { limit }) : null;
+  useEffect(() => {
+    if (words !== null && Platform.OS === "ios") AccessibilityInfo.announceForAccessibility(words);
+  }, [words]);
+  if (words === null) return null;
+  return (
+    <View testID="turn-warning" className="rounded-lg border border-border p-4">
+      <Text accessibilityLiveRegion="polite">{words}</Text>
+    </View>
+  );
+}
+
+/**
+ * The list of conversations (#348, ADR-062 §5): those on the person's turn,
+ * with how many, those on the other's, then the archived and the closed ones,
+ * each under a heading of its own and newest first, as the API orders them, and
+ * a group with nobody in it left out. Read again on focus, by pulling down, and
+ * when the socket brings something new (#349), with a line at the top while it
+ * is lost. A row opens the conversation. Back from a report, a block or an end
+ * in a conversation (#351), the top says what happened, once, to a screen reader
  * too, with the way to the support page (#510).
  */
 export function ConversationsScreen() {
@@ -175,34 +223,25 @@ export function ConversationsScreen() {
           </View>
         )}
         {view.status === "loading" && (
-          <Text accessibilityLiveRegion="polite">{t("chat.list.loading")}</Text>
+          <Text accessibilityLiveRegion="polite">{t("load.loading")}</Text>
         )}
-        {view.status === "failed" && (
-          <LoadFailed headline={t("chat.list.failed")} error={view.error} onRetry={view.retry} />
-        )}
+        {view.status === "failed" && <LoadFailed error={view.error} onRetry={view.retry} />}
         {view.status === "ready" &&
           view.list.open.length === 0 &&
           view.list.archived.length === 0 && <Text>{t("chat.list.empty")}</Text>}
-        {view.status === "ready" && view.list.open.length > 0 && (
-          <View className="gap-1">
-            <Text variant="h4" accessibilityRole="header">
-              {t("chat.list.open")}
-            </Text>
-            {view.list.open.map((conversation) => (
-              <Row key={conversation.id} conversation={conversation} />
-            ))}
-          </View>
-        )}
-        {view.status === "ready" && view.list.archived.length > 0 && (
-          <View className="gap-1">
-            <Text variant="h4" accessibilityRole="header">
-              {t("chat.list.archived")}
-            </Text>
-            <Text variant="muted">{t("chat.list.archivedHint")}</Text>
-            {view.list.archived.map((conversation) => (
-              <Row key={conversation.id} conversation={conversation} />
-            ))}
-          </View>
+        {view.status === "ready" && (
+          <>
+            <TurnWarning count={view.list.yourTurn} />
+            <Group
+              title={t("chat.list.yourTurn", { waiting: String(view.list.yourTurn.waiting) })}
+              conversations={view.list.open.filter((conversation) => conversation.yourTurn)}
+            />
+            <Group
+              title={t("chat.list.theirTurn")}
+              conversations={view.list.open.filter((conversation) => !conversation.yourTurn)}
+            />
+            <Group title={t("chat.list.archived")} conversations={view.list.archived} />
+          </>
         )}
       </ScrollView>
     </SafeAreaView>

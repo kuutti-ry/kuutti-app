@@ -64,7 +64,7 @@ describe("the tables", () => {
       // "Löysin hänet": a count by day and reason, naming nobody (#83, ADR-040).
       "found_them_count",
       "identity",
-      // An invitation, and the units it earned its inviter (#107, ADR-044).
+      // An invitation, and the units it earned its two (#107, #503, ADR-044).
       "invitation",
       "matching_config",
       "message",
@@ -91,6 +91,8 @@ describe("the tables", () => {
       "rounds",
       "sanction",
       "session",
+      // One person's private mark on another (#575, ADR-064).
+      "star",
     ]);
   });
 
@@ -133,6 +135,25 @@ describe("the tables", () => {
   });
 });
 
+describe("the pond counter (#581, ADR-013)", () => {
+  it("holds one number and the bands: no total, nobody's gender, nobody finishing", () => {
+    const columns = byName.get("pond_counter")?.columns ?? [];
+    expect(columns.map((column) => column.name).sort()).toEqual([
+      "day",
+      "finished",
+      "pond_id",
+      "seeks_everyone",
+      "seeks_men",
+      "seeks_women",
+      "taken_at",
+    ]);
+    const finished = columns.find((column) => column.name === "finished");
+    expect(finished?.getSQLType()).toBe("integer");
+    expect(finished?.notNull).toBe(true);
+    expect(finished?.default).toBe(0);
+  });
+});
+
 describe("a person's home (ADR-061)", () => {
   const column = (table: string, name: string) =>
     byName.get(table)?.columns.find((candidate) => candidate.name === name);
@@ -142,24 +163,27 @@ describe("a person's home (ADR-061)", () => {
       ?.columns.map((candidate) => candidate.name)
       .filter((name) => words.test(name));
 
-  it("is one place kept, the card's choice and the time of the latest move, on the account (§1, §2, §5)", () => {
+  it("is one place kept and the card's choice, on the account, and no time of a move (§1, §2, ADR-062 §8)", () => {
     expect(column("account", "home_place")?.getSQLType()).toBe("text");
     expect(column("account", "home_place")?.notNull).toBe(false);
     expect(column("account", "home_shows_area")?.getSQLType()).toBe("boolean");
     expect(column("account", "home_shows_area")?.notNull).toBe(true);
     expect(column("account", "home_shows_area")?.default).toBe(false);
-    expect(column("account", "home_moved_at")?.getSQLType()).toBe("timestamp with time zone");
-    expect(column("account", "home_moved_at")?.notNull).toBe(false);
     expect(named("account", /home|postal|place|location/)).toEqual([
       "home_place",
       "home_shows_area",
-      "home_moved_at",
     ]);
   });
 
   it("gives a round's entry a frozen band, null on an entry from before it (§5)", () => {
     expect(column("round_entries", "distance")?.getSQLType()).toBe("distance_band");
     expect(column("round_entries", "distance")?.notNull).toBe(false);
+  });
+
+  it("marks a second pass on its entry, off unless the pass is one (ADR-062 §6)", () => {
+    expect(column("round_entries", "second_pass")?.getSQLType()).toBe("boolean");
+    expect(column("round_entries", "second_pass")?.notNull).toBe(true);
+    expect(column("round_entries", "second_pass")?.default).toBe(false);
   });
 });
 
@@ -180,7 +204,7 @@ describe("the foreign keys", () => {
       "contact_share.conversation_id -> conversation.id cascade",
       "conversation_participant.conversation_id -> conversation.id cascade",
       "message.conversation_id -> conversation.id cascade",
-      // A counted invitation's notice goes with its invitation (#107).
+      // A counted invitation's notice, either side's, goes with its invitation (#107, #503).
       "notice.invitation_id -> invitation.id cascade",
       // A warning's notice goes with its warning (#176).
       "notice.sanction_id -> sanction.id cascade",
@@ -238,6 +262,9 @@ describe("the foreign keys", () => {
       "rounds",
       "sanction",
       "session",
+      // Who put a star and on whom (#575): gone at the erasure of either.
+      "star",
+      "star",
     ]);
     const toIdentity = references
       .filter((reference) => reference.includes(" -> identity.id"))
@@ -365,6 +392,8 @@ describe("the indexes", () => {
     ["notification_preference", "notification_preference_kind_idx", ["account_id", "kind"]],
     ["found_them_count", "found_them_count_day_reason_idx", ["day", "reason"]],
     ["round_relaxation", "round_relaxation_round_field_idx", ["round_id", "field"]],
+    // Starred or not, with no degrees (#575).
+    ["star", "star_account_candidate_idx", ["account_id", "candidate_id"]],
     // One invitation per code, and one redeemed per person (#107).
     ["invitation", "invitation_code_hash_idx", ["code_hash"]],
     ["invitation", "invitation_redeemed_by_idx", ["redeemed_by_account_id"]],
@@ -385,6 +414,8 @@ describe("the indexes", () => {
     ["sanction", "sanction_account_created_idx", ["account_id", "created_at"]],
     ["sanction", "sanction_identity_open_idx", ["identity_id"]],
     ["report", "report_reporter_created_idx", ["reporter_account_id", "created_at"]],
+    // The erasure of the person starred finds the stars on them (#575).
+    ["star", "star_candidate_idx", ["candidate_id"]],
     ["photo", "photo_message_day_idx", ["account_id", "created_at"]],
     ["report_message", "report_message_photo_idx", ["photo_id"]],
     // The SET NULL of a deleted photo finds the reports pointing at it (#476).

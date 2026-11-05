@@ -9,6 +9,7 @@ import { useLocales } from "expo-localization";
 import type * as React from "react";
 import { saveSession } from "@/lib/session";
 import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
+import { FAILED_TO_LOAD } from "@/test/failed";
 import { expectPinnedHeader } from "@/test/layout";
 import { renderWithTheme } from "@/test/render";
 import { ProfileScreen } from "./ProfileScreen";
@@ -233,7 +234,7 @@ describe("ProfileScreen", () => {
     expectPinnedHeader("Your profile", "See your card");
   });
 
-  it("lists the photos and the sections with what each holds, after what the card still needs, every row labelled", async () => {
+  it("lists the photos and the sections, after what the card still needs, every row labelled", async () => {
     fakeApi([["display_name", "photos"]]);
     await show(<ProfileScreen />);
     await waitFor(() => expect(screen.getByText("The basics")).toBeTruthy());
@@ -243,7 +244,7 @@ describe("ProfileScreen", () => {
       "Photos",
       "Home",
       "Gender",
-      "Prompts",
+      "Questions",
       "Relationship and kids",
       "Work and education",
       "Lifestyle",
@@ -252,8 +253,6 @@ describe("ProfileScreen", () => {
     ]) {
       expect(screen.getByRole("button", { name: title })).toBeTruthy();
     }
-    expect(screen.getByText("Smoking, nicotine, drinking, drugs, exercise and pets")).toBeTruthy();
-    expect(screen.getByText("What others see first on your card")).toBeTruthy();
     // No lead text about the card: a dating app's profile explains itself (#239).
     expect(screen.queryByText(/What others see on your card/)).toBeNull();
     // Nothing is edited on the list, so there is nothing to save.
@@ -263,6 +262,77 @@ describe("ProfileScreen", () => {
     // The back arrow and the eye, the photos, the home, the gender and seven sections, What you seek and the later questions.
     expect(found).toHaveLength(14);
     expect(found.flatMap((node) => a11yProblems(node))).toEqual([]);
+  });
+
+  describe("what each row holds, heard and not drawn (#581)", () => {
+    const row = (name: string) => screen.getByRole("button", { name });
+    const ready = async () => {
+      fakeApi([[]]);
+      await show(<ProfileScreen />);
+      await waitFor(() => expect(screen.getByText("The basics")).toBeTruthy());
+    };
+    const HINTS = [
+      ["The basics", "Name, a few words about you, height and languages"],
+      ["Relationship and kids", "Relationship structure and kids"],
+      ["Work and education", "Education, field, work and job title"],
+      ["Lifestyle", "Smoking, nicotine, drinking, drugs, exercise and pets"],
+      ["Hobbies", "Things you like doing, as many as you like"],
+      ["Beliefs", "Parties you could vote for, religion and star sign"],
+    ];
+
+    it.each(HINTS)(
+      "says what %s holds to a screen reader, and draws no second line",
+      async (title, hint) => {
+        await ready();
+        expect(row(title).props.accessibilityHint).toBe(hint);
+        expect(screen.queryByText(hint)).toBeNull();
+        expect(screen.queryByText(hint, { includeHiddenElements: true })).toBeNull();
+      },
+    );
+
+    it.each([
+      ["Photos", "What others see first on your card"],
+      ["Questions", "Up to three questions, answered in your own words"],
+      ["What you seek", "Whom, what ages, what you are here for and your deal-breakers"],
+    ])("has no hint on %s, and no line: its title and its count say it", async (title, line) => {
+      await ready();
+      expect(row(title).props.accessibilityHint).toBeUndefined();
+      expect(screen.queryByText(line)).toBeNull();
+    });
+
+    it("draws each row's title and count alone: the list fits one phone screen", async () => {
+      await ready();
+      const lines = (title: string) =>
+        within(row(title))
+          .getAllByText(/./, { includeHiddenElements: true })
+          .map((node) => node.props.children);
+      expect(lines("Lifestyle")).toEqual(["Lifestyle", "0/6"]);
+      expect(lines("Questions")).toEqual(["Questions", "0/3"]);
+      expect(lines("Photos")).toEqual(["Photos", "0/2"]);
+      expect(lines("What you seek")).toEqual(["What you seek"]);
+    });
+
+    it.each([
+      [
+        "fi-FI",
+        "Elämäntavat",
+        "Tupakointi, nikotiini, alkoholi, huumeet, liikunta ja lemmikit",
+        "Kysymykset",
+      ],
+      ["sv-FI", "Livsstil", "Rökning, nikotin, alkohol, droger, motion och husdjur", "Frågor"],
+    ])("says it in %s", async (tag, title, hint, questions) => {
+      (useLocales as jest.Mock).mockReturnValue([{ languageTag: tag }]);
+      try {
+        fakeApi([[]]);
+        await show(<ProfileScreen />);
+        await waitFor(() => expect(row(title)).toBeTruthy());
+        expect(row(title).props.accessibilityHint).toBe(hint);
+        expect(screen.queryByText(hint)).toBeNull();
+        expect(row(questions).props.accessibilityHint).toBeUndefined();
+      } finally {
+        (useLocales as jest.Mock).mockReturnValue([{ languageTag: "en-US" }]);
+      }
+    });
   });
 
   it("says nothing about the card once it is complete (#239)", async () => {
@@ -300,7 +370,7 @@ describe("ProfileScreen", () => {
     // Photos are approved, not answered.
     await waitFor(() => expect(progressValue("Photos")).toBe("1 of 2 approved"));
     expect(progressValue("The basics")).toBe("Done");
-    expect(progressValue("Prompts")).toBe("1 of 3 answered");
+    expect(progressValue("Questions")).toBe("1 of 3 answered");
     expect(progressValue("Relationship and kids")).toBe("Done");
     expect(progressValue("Work and education")).toBe("1 of 3 answered");
     expect(progressValue("Lifestyle")).toBe("1 of 6 answered");
@@ -310,36 +380,38 @@ describe("ProfileScreen", () => {
     expect(screen.getByRole("button", { name: "Hobbies" }).props.accessibilityLabel).toBe(
       "Hobbies",
     );
-    // Rows take turns between the two marks for the maintainer to compare (#239):
-    // the photos, prompts, work and hobbies rows carry a ring (one of them done),
-    // the basics, relationship, lifestyle and beliefs rows a count (two of them done).
-    // Both are hidden from screen readers, which hear the value instead.
+    // A count on every part not yet done, where one question is one item (#581), and a
+    // check mark on the rest, each hidden from screen readers, which hear the value instead.
     const hidden = { includeHiddenElements: true };
-    expect(screen.getAllByTestId("progress-ring", hidden)).toHaveLength(3);
-    expect(screen.queryAllByTestId("progress-ring")).toEqual([]);
-    expect(screen.getByText("1/6", hidden)).toBeTruthy();
-    expect(screen.getByText("0/3", hidden)).toBeTruthy();
-    expect(screen.queryByText("1/6")).toBeNull();
+    expect(screen.getAllByText(/^\d+\/\d+$/, hidden).map((node) => node.props.children)).toEqual([
+      "1/2",
+      "1/3",
+      "1/3",
+      "1/6",
+      "0/3",
+    ]);
+    expect(screen.queryAllByText(/^\d+\/\d+$/)).toEqual([]);
+    expect(screen.getAllByTestId("progress-done", hidden)).toHaveLength(3);
+    expect(screen.queryAllByTestId("progress-done")).toEqual([]);
     // No mark on What you seek or the later questions: neither is a part one fills.
     expect(progressValue("What you seek")).toBeUndefined();
     expect(progressValue("Fill in the rest when you have a moment")).toBeUndefined();
   });
 
-  it("keeps the marks' turns on the rows there are: the section that left the list takes none (#542)", async () => {
+  it("draws the count on every part with nothing answered, the section that left the list none (#542, #581)", async () => {
     fakeApi([[]]);
     await show(<ProfileScreen />);
     await waitFor(() => expect(progressValue("Photos")).toBe("0 of 2 approved"));
     const hidden = { includeHiddenElements: true };
-    const markOf = (name: string) => {
-      const row = within(screen.getByRole("button", { name }));
-      if (row.queryByTestId("progress-ring", hidden)) return "ring";
-      return row.queryByText(/^\d+\/\d+$/, hidden) ? "count" : "none";
-    };
+    const markOf = (name: string) =>
+      within(screen.getByRole("button", { name }))
+        .queryAllByText(/^\d+\/\d+$/, hidden)
+        .map((node) => node.props.children);
     expect(
       [
         "Photos",
         "The basics",
-        "Prompts",
+        "Questions",
         "Relationship and kids",
         "Work and education",
         "Lifestyle",
@@ -347,14 +419,14 @@ describe("ProfileScreen", () => {
         "Beliefs",
       ].map((name) => [name, markOf(name)]),
     ).toEqual([
-      ["Photos", "ring"],
-      ["The basics", "count"],
-      ["Prompts", "ring"],
-      ["Relationship and kids", "count"],
-      ["Work and education", "ring"],
-      ["Lifestyle", "count"],
-      ["Hobbies", "ring"],
-      ["Beliefs", "count"],
+      ["Photos", ["0/2"]],
+      ["The basics", ["0/4"]],
+      ["Questions", ["0/3"]],
+      ["Relationship and kids", ["0/3"]],
+      ["Work and education", ["0/3"]],
+      ["Lifestyle", ["0/6"]],
+      ["Hobbies", ["0/1"]],
+      ["Beliefs", ["0/3"]],
     ]);
   });
 
@@ -367,27 +439,30 @@ describe("ProfileScreen", () => {
   });
 
   describe("What you seek's row (#542)", () => {
-    const SUMMARY = "Whom, what ages, what you are here for and your deal-breakers";
     const ready = async (document?: Document) => {
       fakeApi([[]], { document });
       await show(<ProfileScreen />);
       await waitFor(() => expect(screen.getByText("The basics")).toBeTruthy());
     };
 
-    it("opens the list, and says what is on it, heard as the hint", async () => {
+    it("opens the list, its title alone (#581)", async () => {
       await ready();
       const row = screen.getByRole("button", { name: "What you seek" });
-      expect(row.props.accessibilityHint).toBe(SUMMARY);
-      expect(screen.getByText(SUMMARY)).toBeTruthy();
+      expect(row.props.accessibilityHint).toBeUndefined();
+      expect(
+        within(row)
+          .getAllByText(/./)
+          .map((node) => node.props.children),
+      ).toEqual(["What you seek"]);
       await press(row);
       expect(router.push).toHaveBeenCalledWith("/profile/seek");
     });
 
     it("holds no answer, whatever is answered: the list is where those are", async () => {
       await ready({ fields: { intent: "casual" } });
-      expect(screen.getByRole("button", { name: "What you seek" }).props.accessibilityHint).toBe(
-        SUMMARY,
-      );
+      const row = screen.getByRole("button", { name: "What you seek" });
+      expect(row.props.accessibilityHint).toBeUndefined();
+      expect(row.props.accessibilityValue?.text).toBeUndefined();
       expect(screen.queryByText("Something casual")).toBeNull();
     });
 
@@ -400,7 +475,7 @@ describe("ProfileScreen", () => {
         "Home",
         "Gender",
         "The basics",
-        "Prompts",
+        "Questions",
         "Relationship and kids",
         "Work and education",
         "Lifestyle",
@@ -554,7 +629,7 @@ describe("ProfileScreen", () => {
       return json({ profile: null, completeness: { complete: true, missing: [] }, home: null });
     }) as unknown as typeof fetch;
     await show(<ProfileScreen />);
-    expect(screen.getByText("Your profile could not be loaded.")).toBeTruthy();
+    expect(screen.getByText(FAILED_TO_LOAD)).toBeTruthy();
     // Why, in words: the API answered 500.
     expect(screen.getByText("Kuutti's server had a problem. Try again in a moment.")).toBeTruthy();
     failing = false;
@@ -572,7 +647,7 @@ describe("ProfileScreen", () => {
       }),
     ) as unknown as typeof fetch;
     await show(<ProfileScreen />);
-    expect(screen.getByText("Your profile could not be loaded.")).toBeTruthy();
+    expect(screen.getByText(FAILED_TO_LOAD)).toBeTruthy();
     expect(screen.getByText(/older than Kuutti's server/)).toBeTruthy();
     expect(screen.getByRole("button", { name: "Update the app" })).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Try again" })).toBeNull();

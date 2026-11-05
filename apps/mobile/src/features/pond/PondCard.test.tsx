@@ -1,10 +1,12 @@
 import type { PondCounterResponse, PondSummary } from "@kuutti/schema";
 import { act, fireEvent } from "@testing-library/react-native";
+import { FAILED_TO_LOAD } from "@/test/failed";
 import { renderWithTheme } from "@/test/render";
 import { PondCard } from "./PondCard";
 
-// The pond card (#54, ADR-013): figures in words, nothing below the
-// threshold, and the bar of whom those people seek (#507).
+// The pond card (#54, #581, ADR-013): the number in one sentence, none below the
+// threshold, the bar of whom those people seek right under it (#507), and not a
+// word that a profile can be unfinished.
 
 const POND: PondSummary = {
   id: "0b1c1c4e-9a8e-4a0b-9c3a-0c8d1e2f3a01",
@@ -17,10 +19,8 @@ const counter = (figures: Partial<PondCounterResponse["ponds"][number]>): PondCo
   ponds: [
     {
       pond: POND,
-      day: figures.verified == null ? null : "2026-10-05",
-      verified: null,
-      split: null,
-      finishing: null,
+      day: figures.finished == null ? null : "2026-10-05",
+      finished: null,
       seeks: null,
       ...figures,
     },
@@ -31,6 +31,8 @@ const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
 
 const BAR = { men: 30, everyone: 20, women: 50 };
+const HEADING = "People on Kuutti";
+const SMALL = "Kuutti is just getting started.";
 
 function answering(answers: Array<() => Response>) {
   const calls: Request[] = [];
@@ -48,112 +50,122 @@ function answering(answers: Array<() => Response>) {
 
 const settle = () => act(() => new Promise<void>((resolve) => setTimeout(resolve, 20)));
 
+/** The card as it stands once the answer is in, and every line it holds, hidden or not, in order. */
+async function cardAnswering(body: PondCounterResponse) {
+  answering([() => json(body)]);
+  const screen = await renderWithTheme(<PondCard />);
+  await settle();
+  const lines = screen
+    .getAllByText(/./, { includeHiddenElements: true })
+    .map((node) => node.props.children);
+  return { screen, lines };
+}
+
 describe("PondCard", () => {
-  it("says the figures in words, under one heading that names no area", async () => {
-    const calls = answering([() => json(counter({ verified: 42, finishing: 17, seeks: BAR }))]);
+  it("says the number in one sentence under one heading that names no area, and the bar right under it", async () => {
+    const calls = answering([() => json(counter({ finished: 477, seeks: BAR }))]);
     const screen = await renderWithTheme(<PondCard />);
     await settle();
-    expect(screen.getByLabelText("People on Kuutti")).toBeTruthy();
-    expect(screen.getByText("People on Kuutti")).toBeTruthy();
-    expect(screen.queryByText("Your area")).toBeNull();
-    expect(screen.queryByText("Finland")).toBeNull();
-    expect(screen.getByText("42 people have identified with their bank")).toBeTruthy();
-    expect(screen.getByText("30 % men")).toBeTruthy();
-    expect(screen.getByText("20 % everyone")).toBeTruthy();
-    expect(screen.getByText("50 % women")).toBeTruthy();
-    expect(screen.getByText("17 people are still finishing their profile.")).toBeTruthy();
-    expect(
-      screen.getByText(
-        "The numbers change only in steps of at least 10 people, so that one person does not show.",
-      ),
-    ).toBeTruthy();
+    expect(screen.getByLabelText(HEADING)).toBeTruthy();
+    expect(screen.getByText(HEADING)).toBeTruthy();
+    const sentence = screen.getByText(
+      "477 people have completed their profiles and are looking for:",
+    );
+    const siblings = sentence.parent?.children ?? [];
+    const next = siblings[siblings.indexOf(sentence) + 1];
+    expect(typeof next === "object" && next.props.accessibilityRole).toBe("image");
     expect(new URL(calls[0]?.url ?? "").pathname).toBe("/ponds/counter");
   });
 
-  it("no longer says the gender split, even when the counter does", async () => {
-    answering([
-      () =>
-        json(
-          counter({ verified: 42, split: { woman: 20, man: 12, nonBinary: 10 }, finishing: 17 }),
-        ),
+  it("says nothing but the heading, the sentence and the bar's labels while it has a bar", async () => {
+    const { lines } = await cardAnswering(counter({ finished: 477, seeks: BAR }));
+    expect(lines).toEqual([
+      HEADING,
+      "477 people have completed their profiles and are looking for:",
+      "30 % men",
+      "20 % everyone",
+      "50 % women",
     ]);
-    const screen = await renderWithTheme(<PondCard />);
-    await settle();
-    expect(screen.getByText("42 people have identified with their bank")).toBeTruthy();
-    expect(screen.queryByText(/non-binary/)).toBeNull();
   });
 
-  it("draws no bar while the pond may not say it", async () => {
-    answering([() => json(counter({ verified: 30, finishing: 0 }))]);
-    const screen = await renderWithTheme(<PondCard />);
-    await settle();
-    expect(screen.getByText("30 people have identified with their bank")).toBeTruthy();
+  it("ends the sentence where there is no bar to lead into, and draws none", async () => {
+    const { screen, lines } = await cardAnswering(counter({ finished: 30 }));
+    expect(lines).toEqual([HEADING, "30 people have completed their profiles."]);
     expect(screen.queryByRole("image")).toBeNull();
   });
 
-  it("brings the bar back with the figures on Try again", async () => {
+  it("says only that Kuutti is getting started below the threshold, with no number and no condition", async () => {
+    const { screen, lines } = await cardAnswering(counter({}));
+    expect(lines).toEqual([HEADING, SMALL]);
+    expect(screen.queryByRole("image")).toBeNull();
+  });
+
+  it("says the same of a counter that lists no pond", async () => {
+    const { screen, lines } = await cardAnswering({ k: 10, ponds: [] });
+    expect(lines).toEqual([HEADING, SMALL]);
+    expect(screen.queryByRole("image")).toBeNull();
+  });
+
+  it("draws no bar below the threshold, whatever the answer says", async () => {
+    const { screen, lines } = await cardAnswering(counter({ seeks: BAR }));
+    expect(lines).toEqual([HEADING, SMALL]);
+    expect(screen.queryByRole("image")).toBeNull();
+  });
+
+  it("gives a screen reader no word of a profile that is not complete either", async () => {
+    const { screen } = await cardAnswering(counter({ finished: 477, seeks: BAR }));
+    expect(screen.getByRole("image").props.accessibilityLabel).toBe(
+      "Of the people with a finished profile who are looking for men or women, 30 percent are looking for men. 20 percent are looking for everyone. 50 percent are looking for women.",
+    );
+    expect(screen.queryByLabelText(/finishing|unfinished|not complete|incomplete/i)).toBeNull();
+  });
+
+  it("brings the bar back with the number on Try again", async () => {
     answering([
       () => json({ error: { code: "internal_error", message: "x", requestId: "r" } }, 500),
-      () => json(counter({ verified: 30, finishing: 0, seeks: BAR })),
+      () => json(counter({ finished: 30, seeks: BAR })),
     ]);
     const screen = await renderWithTheme(<PondCard />);
     await settle();
-    expect(screen.getByText("The numbers could not be read.")).toBeTruthy();
+    expect(screen.getByText(FAILED_TO_LOAD)).toBeTruthy();
     expect(screen.queryByRole("image")).toBeNull();
     await act(async () => {
       fireEvent.press(screen.getByRole("button", { name: "Try again" }));
       await new Promise<void>((resolve) => setTimeout(resolve, 20));
     });
     await settle();
-    expect(screen.getByText("30 people have identified with their bank")).toBeTruthy();
+    expect(
+      screen.getByText("30 people have completed their profiles and are looking for:"),
+    ).toBeTruthy();
     expect(screen.getByText("30 % men")).toBeTruthy();
   });
 
-  it("draws no bar below the threshold, whatever the answer says", async () => {
-    answering([() => json(counter({ seeks: BAR }))]);
+  it("offers the update and no number when the answer has the shape before the one number", async () => {
+    const before = {
+      pond: POND,
+      day: "2026-10-05",
+      verified: 42,
+      split: null,
+      finishing: 17,
+      seeks: null,
+    };
+    answering([() => json({ k: 10, ponds: [before] })]);
     const screen = await renderWithTheme(<PondCard />);
     await settle();
-    expect(screen.queryByRole("image")).toBeNull();
-  });
-
-  it("says no number about a pond below the threshold", async () => {
-    answering([() => json(counter({}))]);
-    const screen = await renderWithTheme(<PondCard />);
-    await settle();
-    expect(
-      screen.getByText(
-        "Kuutti is just getting started. Numbers are shown only when at least 10 people are here.",
-      ),
-    ).toBeTruthy();
-    expect(screen.queryByText(/identified with their bank/)).toBeNull();
-    expect(screen.queryByText(/finishing their profile/)).toBeNull();
-    expect(screen.queryByText(/in steps of/)).toBeNull();
-  });
-
-  it("has words for nobody finishing", async () => {
-    answering([() => json(counter({ verified: 30, split: null, finishing: 0 }))]);
-    const screen = await renderWithTheme(<PondCard />);
-    await settle();
-    expect(screen.getByText("30 people have identified with their bank")).toBeTruthy();
-    expect(screen.getByText("Everyone has finished their profile.")).toBeTruthy();
-  });
-
-  it("says nothing of people finishing when the counter hides their number", async () => {
-    answering([() => json(counter({ verified: 12, split: null, finishing: null }))]);
-    const screen = await renderWithTheme(<PondCard />);
-    await settle();
-    expect(screen.getByText("12 people have identified with their bank")).toBeTruthy();
-    expect(screen.queryByText(/finish/)).toBeNull();
+    expect(screen.getByText(FAILED_TO_LOAD)).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Update the app" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Try again" })).toBeNull();
+    expect(screen.queryByText(/42/)).toBeNull();
   });
 
   it("offers another try when the figures cannot be read", async () => {
     answering([
       () => json({ error: { code: "internal_error", message: "x", requestId: "r" } }, 500),
-      () => json(counter({ verified: 11, split: null, finishing: 11 })),
+      () => json(counter({ finished: 11 })),
     ]);
     const screen = await renderWithTheme(<PondCard />);
     await settle();
-    expect(screen.getByText("The numbers could not be read.")).toBeTruthy();
+    expect(screen.getByText(FAILED_TO_LOAD)).toBeTruthy();
     const retry = screen.getByRole("button", { name: "Try again" });
     expect(retry.props.accessibilityRole).toBe("button");
     await act(async () => {
@@ -161,7 +173,7 @@ describe("PondCard", () => {
       await new Promise<void>((resolve) => setTimeout(resolve, 20));
     });
     await settle();
-    expect(screen.getByText("11 people have identified with their bank")).toBeTruthy();
-    expect(screen.getByText("11 people are still finishing their profile.")).toBeTruthy();
+    expect(screen.getByText("11 people have completed their profiles.")).toBeTruthy();
+    expect(screen.queryByText(FAILED_TO_LOAD)).toBeNull();
   });
 });

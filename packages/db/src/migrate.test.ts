@@ -2,7 +2,7 @@ import { spawn } from "node:child_process";
 import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { ConfigKeyName, ConfigVersion } from "@kuutti/schema";
+import { ConfigKeyName, ConfigVersion, InvitationReward } from "@kuutti/schema";
 import { describe, expect, it } from "vitest";
 import { readJournal } from "./journal.ts";
 import { migrate } from "./migrate.ts";
@@ -393,43 +393,49 @@ describe("migrate", () => {
         const entryId = entries[0]?.id;
         await expect(
           pool.query(
-            "INSERT INTO reward (account_id, kind, invitation_id, spent_entry_id) VALUES ($1, 'like', $2, $3)",
+            "INSERT INTO reward (account_id, kind, invitation_id, spent_entry_id) VALUES ($1, 'fish', $2, $3)",
             [inviter, usedId, entryId],
           ),
         ).rejects.toMatchObject(refused("reward_spent_check"));
         await pool.query(
           `INSERT INTO reward (account_id, kind, invitation_id, spent_at, spent_entry_id)
-           VALUES ($1, 'like', $2, $3, $4), ($1, 'fish', $2, NULL, NULL)`,
+           VALUES ($1, 'fish', $2, $3, $4), ($1, 'fish', $2, NULL, NULL)`,
           [inviter, usedId, AT, entryId],
         );
-        await expect(
-          pool.query(
-            "INSERT INTO reward (account_id, kind, invitation_id) VALUES ($1, 'boost', $2)",
-            [inviter, usedId],
-          ),
-        ).rejects.toMatchObject({ code: "22P02" });
+        // Earned likes went with #503.
+        for (const kind of ["boost", "like"]) {
+          await expect(
+            pool.query("INSERT INTO reward (account_id, kind, invitation_id) VALUES ($1, $3, $2)", [
+              inviter,
+              usedId,
+              kind,
+            ]),
+          ).rejects.toMatchObject({ code: "22P02" });
+        }
         await pool.query("DELETE FROM round_entries WHERE id = $1", [entryId]);
         const spent = await pool.query<{ kind: string; spent: boolean; entry: string | null }>(
-          `SELECT kind, spent_at IS NOT NULL AS spent, spent_entry_id AS entry FROM reward ORDER BY kind`,
+          `SELECT kind, spent_at IS NOT NULL AS spent, spent_entry_id AS entry FROM reward
+           ORDER BY spent_at NULLS LAST`,
         );
-        // In the enum's order: like, then fish.
         expect(spent.rows).toEqual([
-          { kind: "like", spent: true, entry: null },
+          { kind: "fish", spent: true, entry: null },
           { kind: "fish", spent: false, entry: null },
         ]);
 
-        // A counted invitation's notice points at its invitation, and only it does.
+        // An invitation's notice, either side's, points at its invitation, and only it does.
         const notice = (kind: string, invitationId: string | null) =>
           pool.query("INSERT INTO notice (account_id, kind, invitation_id) VALUES ($1, $2, $3)", [
             inviter,
             kind,
             invitationId,
           ]);
-        await expect(notice("invitation_counted", null)).rejects.toMatchObject(
-          refused("notice_invitation_check"),
-        );
+        for (const kind of ["invitation_counted", "invitation_friend"]) {
+          await expect(notice(kind, null)).rejects.toMatchObject(
+            refused("notice_invitation_check"),
+          );
+          await notice(kind, usedId);
+        }
         await expect(notice("warning", usedId)).rejects.toMatchObject({ code: "23514" });
-        await notice("invitation_counted", usedId);
 
         // The units and the notice go with their invitation.
         await pool.query("DELETE FROM invitation WHERE id = $1", [usedId]);
@@ -484,7 +490,7 @@ describe("migrate", () => {
             )
           ).rows;
           // Versions 1 and 2 of the migrations before it, every one of them;
-          // the keys a later migration adds (0072, #378; 0048, #303; 0052, #84; 0054, #348; 0057, #350; 0061, #351; 0065, #105; 0068, #376; 0075, #86; 0078, #385; 0080, #107; 0082 and 0083, #102; 0097, #514) are not there yet.
+          // the keys a later migration adds (0072, #378; 0048, #303; 0052, #84; 0054, #348; 0057, #350; 0061, #351; 0065, #105; 0068, #376; 0075, #86; 0078, #385; 0080, #107; 0082, #102; 0097, #514; 0104, #502; 0108, #575) are not there yet.
           const later = new Set([
             "moderation_response_hours",
             "reports_per_day",
@@ -518,24 +524,46 @@ describe("migrate", () => {
             "message_push_min_interval_minutes",
             "push_quiet_from_hour",
             "push_quiet_to_hour",
-            "round_push_hour",
-            "round_push_idle_days",
             "home_min_inhabitants",
             "home_town_min_inhabitants",
             "distance_nearby_km",
             "distance_close_km",
             "distance_around_km",
+            "liked_cooldown_days",
+            "ended_cooldown_days",
+            "second_pass_cooldown_days",
+            "your_turn_limit",
+            "your_turn_warning",
+            "inbox_stop",
+            "stars_max",
           ]);
-          // A key's second version a later migration writes (0069, #95; 0070, #98; 0088, #513; 0092, #508) is not there yet either.
+          // A key's second version a later migration writes (0070, #98; 0088, #513; 0092, #508; 0104, #502; 0105, #503) is not there yet either.
           const laterVersions = new Set([
-            "round_size",
             "like_budget_balanced",
             "auto_shadow_ban_photo_fetches",
             "deal_breakers_max",
+            "pass_cooldown_days",
+            "exposure_cards_per_day",
+            "photo_fetches_per_day",
+            "auto_shadow_ban_cards_served",
+            "auto_shadow_ban_cards_served_minutes",
+            "invitation_reward",
           ]);
-          // The gate's two keys and default_pond's two versions stand here still: the seed has none
-          // of them, and 0094 and 0101 delete them (#500).
-          const goneSince = ["gate_k", "majority_share_max", "default_pond", "default_pond"];
+          // The gate's two keys, default_pond's two versions, the daily set's keys and the contest
+          // rule's two keys stand here still: the seed has none of them, and 0094, 0101, 0104 and 0105
+          // delete them (#500, #502, #503).
+          const goneSince = [
+            "gate_k",
+            "majority_share_max",
+            "default_pond",
+            "default_pond",
+            "round_size",
+            "impression_cap_per_day",
+            "liked_you_cap",
+            "shown_cooldown_days",
+            "like_budget_contested",
+            "contest_ratio_threshold",
+          ];
           expect(rows).toHaveLength(
             Object.keys(MATCHING_CONFIG_V1).filter((key) => !later.has(key)).length +
               Object.keys(MATCHING_CONFIG_V2).filter((key) => !laterVersions.has(key)).length +
@@ -663,6 +691,7 @@ describe("migrate", () => {
 
   it("migrations 0098 and 0099 rename the counter's table and key, every row and version as it stood (#500)", async () => {
     const before0098 = migrationsBefore("0098_pond_counter");
+    const through0099 = migrationsBefore("0100_pond_one_row");
     try {
       await withTemporaryDatabase(async (url) => {
         const pool = createPool({ connectionString: url, max: 2 });
@@ -691,7 +720,7 @@ describe("migrate", () => {
           expect(figures).toHaveLength(1);
           expect(kept).toHaveLength(2);
 
-          expect((await migrate(pool, MIGRATIONS)).state).toBe("applied");
+          expect((await migrate(pool, through0099)).state).toBe("applied");
 
           const old = await pool.query("SELECT to_regclass('public.waitlist_snapshot') AS old");
           expect(old.rows).toEqual([{ old: null }]);
@@ -712,6 +741,61 @@ describe("migrate", () => {
       });
     } finally {
       rmSync(before0098, { recursive: true, force: true });
+      rmSync(through0099, { recursive: true, force: true });
+    }
+  });
+
+  it("migration 0109 takes the total, the gender split and the number finishing away, and leaves the number at zero, the day and the bands as they stood (#581)", async () => {
+    const before0109 = migrationsBefore("0109_pond_counter_finished");
+    try {
+      await withTemporaryDatabase(async (url) => {
+        const pool = createPool({ connectionString: url, max: 2 });
+        try {
+          await migrate(pool, before0109);
+          await pool.query(
+            `INSERT INTO pond_counter
+               (pond_id, day, verified, woman, man, non_binary, finishing, seeks_men, seeks_everyone, seeks_women)
+             SELECT id, '2026-10-30', 40, 12, 14, 11, 3, 10, 11, 12 FROM ponds WHERE slug = 'suomi'`,
+          );
+          const [stood] = (await pool.query("SELECT * FROM pond_counter")).rows;
+          expect(stood).toMatchObject({ verified: 40, woman: 12, finishing: 3 });
+
+          expect((await migrate(pool, MIGRATIONS)).state).toBe("applied");
+
+          // Every column by name: nothing of the old figures is left to read.
+          expect((await pool.query("SELECT * FROM pond_counter")).rows).toEqual([
+            {
+              pond_id: stood.pond_id,
+              day: stood.day,
+              finished: 0,
+              seeks_men: 10,
+              seeks_everyone: 11,
+              seeks_women: 12,
+              taken_at: stood.taken_at,
+            },
+          ]);
+          // Not null, with its default: a row that names no number stands at zero, below the floor.
+          await pool.query(
+            `INSERT INTO ponds (slug, name_nominative) VALUES ('uusi', 'Uusi');
+             INSERT INTO pond_counter (pond_id, day)
+               SELECT id, '2026-11-04' FROM ponds WHERE slug = 'uusi'`,
+          );
+          const { rows } = await pool.query<{ finished: number }>(
+            `SELECT finished FROM pond_counter
+             WHERE pond_id = (SELECT id FROM ponds WHERE slug = 'uusi')`,
+          );
+          expect(rows).toEqual([{ finished: 0 }]);
+          await expect(
+            pool.query("UPDATE pond_counter SET finished = NULL WHERE pond_id = $1", [
+              stood.pond_id,
+            ]),
+          ).rejects.toMatchObject({ code: "23502" });
+        } finally {
+          await pool.end();
+        }
+      });
+    } finally {
+      rmSync(before0109, { recursive: true, force: true });
     }
   });
 
@@ -1035,6 +1119,8 @@ describe("migrate", () => {
 
   it("migration 0101 takes default_pond away, every version whoever wrote it, and no other key (#500)", async () => {
     const before = migrationsBefore("0101_default_pond_goes");
+    // 0101 alone: the keys 0102 and 0104 take are theirs.
+    const through = migrationsBefore("0102_round_push_goes");
     try {
       await withTemporaryDatabase(async (url) => {
         const pool = createPool({ connectionString: url, max: 2 });
@@ -1053,10 +1139,194 @@ describe("migrate", () => {
           const kept = await others();
           expect((await versionsOf(pool, "default_pond")).length).toBe(4);
 
-          expect((await migrate(pool, MIGRATIONS)).state).toBe("applied");
+          expect((await migrate(pool, through)).state).toBe("applied");
 
           expect(await versionsOf(pool, "default_pond")).toEqual([]);
           expect(await others()).toEqual(kept);
+        } finally {
+          await pool.end();
+        }
+      });
+    } finally {
+      rmSync(before, { recursive: true, force: true });
+      rmSync(through, { recursive: true, force: true });
+    }
+  });
+
+  /** An enum's values as the database orders them. */
+  const labelsOf = async (pool: Queryable, name: string) =>
+    (
+      await pool.query<{ label: string }>(
+        `SELECT e.enumlabel AS label FROM pg_enum e JOIN pg_type t ON t.oid = e.enumtypid
+         WHERE t.typname = $1 ORDER BY e.enumsortorder`,
+        [name],
+      )
+    ).rows.map((row) => row.label);
+
+  it("migrations 0105 and 0106 take the earned likes and the contest rule's keys away, every version whoever wrote it, and carry the panel's fish over to the inviter with one for the friend (#503, ADR-044 §4)", async () => {
+    const before = migrationsBefore("0105_like_economy");
+    try {
+      await withTemporaryDatabase(async (url) => {
+        const pool = createPool({ connectionString: url, max: 2 });
+        try {
+          await migrate(pool, before);
+          expect(await labelsOf(pool, "reward_kind")).toEqual(["like", "fish"]);
+          const [inviter, friend] = [
+            await aPerson(pool, "a", null),
+            await aPerson(pool, "b", null),
+          ];
+          const { rows: invitations } = await pool.query<{ id: string }>(
+            `INSERT INTO invitation (inviter_account_id, code_hash, redeemed_by_account_id, redeemed_at, counted_at)
+             VALUES ($1, $2, $3, $4, $4) RETURNING id`,
+            [inviter, "9".repeat(64), friend, AT],
+          );
+          const invitationId = invitations[0]?.id;
+          const { rows: rounds } = await pool.query<{ id: string }>(
+            "INSERT INTO rounds (account_id, day) VALUES ($1, '2026-10-22') RETURNING id",
+            [inviter],
+          );
+          const { rows: entries } = await pool.query<{ id: string }>(
+            `INSERT INTO round_entries (round_id, position, candidate_id, reason, decision, decided_at)
+             VALUES ($1, 1, $2, 'matches_filters', 'like', $3) RETURNING id`,
+            [rounds[0]?.id, friend, AT],
+          );
+          // One like waiting, one spent on a decision, and a fish of each.
+          await pool.query(
+            `INSERT INTO reward (account_id, kind, invitation_id, earned_at, spent_at, spent_entry_id) VALUES
+               ($1, 'like', $2, $3, NULL, NULL), ($1, 'like', $2, $3, $3, $4),
+               ($1, 'fish', $2, $3, NULL, NULL), ($1, 'fish', $2, $3, $3, $4)`,
+            [inviter, invitationId, AT, entries[0]?.id],
+          );
+          await pool.query(
+            "INSERT INTO notice (account_id, kind, invitation_id, created_at) VALUES ($1, 'invitation_counted', $2, $3)",
+            [inviter, invitationId, AT],
+          );
+          // Each key changed in the panel: neither a like's fish nor a contest's value may stay behind.
+          await pool.query(
+            `INSERT INTO matching_config (version, key, value, created_by, reason) VALUES
+               (2, 'invitation_reward', '{"fish": 3, "likes": 0}'::jsonb, 'admin', 'Three for the launch'),
+               (2, 'like_budget_contested', '4'::jsonb, 'admin', 'Fewer where it is crowded'),
+               (2, 'contest_ratio_threshold', '1.25'::jsonb, 'admin', 'Sooner')`,
+          );
+          const units = async () =>
+            (
+              await pool.query<Record<string, unknown>>(
+                `SELECT id, account_id, kind::text AS kind, invitation_id, earned_at, spent_at, spent_entry_id
+                 FROM reward ORDER BY spent_at NULLS FIRST`,
+              )
+            ).rows;
+          const untouched = async () =>
+            (
+              await pool.query(
+                `SELECT key, version, value, created_by, reason FROM matching_config
+                 WHERE key NOT IN ('invitation_reward', 'like_budget_contested', 'contest_ratio_threshold')
+                   AND created_by <> 'migration:0108'
+                 ORDER BY key, version`,
+              )
+            ).rows;
+          const others = await untouched();
+          const stood = await units();
+          expect(stood).toHaveLength(4);
+          expect((await versionsOf(pool, "like_budget_contested")).length).toBe(2);
+          expect((await versionsOf(pool, "contest_ratio_threshold")).length).toBe(2);
+
+          expect((await migrate(pool, MIGRATIONS)).state).toBe("applied");
+
+          // The likes go, used or not, and the fish stand as they stood.
+          expect(await units()).toEqual(stood.filter((unit) => unit.kind === "fish"));
+          expect(await labelsOf(pool, "reward_kind")).toEqual(["fish"]);
+          expect(await labelsOf(pool, "notice_kind")).toEqual([
+            "warning",
+            "invitation_counted",
+            "invitation_friend",
+          ]);
+          const column = await pool.query(
+            `SELECT udt_name, is_nullable FROM information_schema.columns
+             WHERE table_name = 'reward' AND column_name = 'kind'`,
+          );
+          expect(column.rows).toEqual([{ udt_name: "reward_kind", is_nullable: "NO" }]);
+          const indexes = await pool.query<{ indexname: string }>(
+            "SELECT indexname FROM pg_indexes WHERE tablename = 'reward' ORDER BY indexname",
+          );
+          expect(indexes.rows.map((row) => row.indexname)).toEqual([
+            "reward_account_kind_idx",
+            "reward_invitation_idx",
+            "reward_pkey",
+            "reward_spent_entry_idx",
+          ]);
+          // What a like paid for stands, and so does the notice of what earned it.
+          const decided = await pool.query("SELECT decision FROM round_entries");
+          expect(decided.rows).toEqual([{ decision: "like" }]);
+          const noticed = await pool.query("SELECT account_id, kind FROM notice");
+          expect(noticed.rows).toEqual([{ account_id: inviter, kind: "invitation_counted" }]);
+
+          expect(await versionsOf(pool, "like_budget_contested")).toEqual([]);
+          expect(await versionsOf(pool, "contest_ratio_threshold")).toEqual([]);
+          expect(await untouched()).toEqual(others);
+          const reward = await versionsOf(pool, "invitation_reward");
+          expect(reward).toEqual([
+            {
+              version: 1,
+              value: { fish: 1, likes: 0 },
+              created_by: "migration:0080",
+              reason: null,
+            },
+            {
+              version: 2,
+              value: { fish: 3, likes: 0 },
+              created_by: "admin",
+              reason: "Three for the launch",
+            },
+            {
+              version: 3,
+              value: { inviterFish: 3, friendFish: 1 },
+              created_by: "migration:0105",
+              reason: null,
+            },
+          ]);
+          // The latest version is the one the night reads, and it reads it with the contract.
+          expect(InvitationReward.safeParse(reward.at(-1)?.value).error).toBeUndefined();
+
+          // A like is refused from here on, and the friend's notice can be written.
+          await expect(
+            pool.query(
+              "INSERT INTO reward (account_id, kind, invitation_id) VALUES ($1, 'like', $2)",
+              [inviter, invitationId],
+            ),
+          ).rejects.toMatchObject({ code: "22P02" });
+          await pool.query(
+            "INSERT INTO notice (account_id, kind, invitation_id) VALUES ($1, 'invitation_friend', $2)",
+            [friend, invitationId],
+          );
+        } finally {
+          await pool.end();
+        }
+      });
+    } finally {
+      rmSync(before, { recursive: true, force: true });
+    }
+  });
+
+  it("migration 0105 keeps an inviter's side the panel switched off at none, and the likes it gave go with the kind (#503)", async () => {
+    const before = migrationsBefore("0105_like_economy");
+    try {
+      await withTemporaryDatabase(async (url) => {
+        const pool = createPool({ connectionString: url, max: 2 });
+        try {
+          await migrate(pool, before);
+          await pool.query(
+            `INSERT INTO matching_config (version, key, value, created_by, reason)
+             VALUES (2, 'invitation_reward', '{"fish": 0, "likes": 5}'::jsonb, 'admin', 'Likes for a while')`,
+          );
+
+          expect((await migrate(pool, MIGRATIONS)).state).toBe("applied");
+
+          expect((await versionsOf(pool, "invitation_reward")).at(-1)).toEqual({
+            version: 3,
+            value: { inviterFish: 0, friendFish: 1 },
+            created_by: "migration:0105",
+            reason: null,
+          });
         } finally {
           await pool.end();
         }
@@ -1087,11 +1357,9 @@ describe("migrate", () => {
           expect((await migrate(pool, MIGRATIONS)).state).toBe("applied");
 
           const homes = await pool.query(
-            "SELECT DISTINCT home_place, home_shows_area, home_moved_at FROM account",
+            "SELECT DISTINCT home_place, home_shows_area FROM account",
           );
-          expect(homes.rows).toEqual([
-            { home_place: null, home_shows_area: false, home_moved_at: null },
-          ]);
+          expect(homes.rows).toEqual([{ home_place: null, home_shows_area: false }]);
           const write = (band: string) =>
             pool.query("UPDATE round_entries SET distance = $1 RETURNING distance", [band]);
           const entries = await pool.query("SELECT distance FROM round_entries");
@@ -1107,6 +1375,192 @@ describe("migrate", () => {
     } finally {
       rmSync(before, { recursive: true, force: true });
     }
+  });
+
+  describe("the queue's migrations (#502, ADR-062)", () => {
+    /** Every key of the daily set and the round's push, which 0102 and 0104 delete whole. */
+    const GONE = [
+      "round_size",
+      "liked_you_cap",
+      "shown_cooldown_days",
+      "impression_cap_per_day",
+      "round_push_hour",
+      "round_push_idle_days",
+    ];
+
+    it("migrations 0102 and 0104 take the daily set's keys and the round's push away, every version whoever wrote it, and no switch of the kind survives", async () => {
+      const before = migrationsBefore("0102_round_push_goes");
+      // Through 0104 alone: the keys later migrations move are theirs.
+      const through = migrationsBefore("0105_like_economy");
+      try {
+        await withTemporaryDatabase(async (url) => {
+          const pool = createPool({ connectionString: url, max: 2 });
+          try {
+            await migrate(pool, before);
+            const person = await aPerson(pool, "a", null);
+            await pool.query(
+              `INSERT INTO notification_preference (account_id, kind, enabled) VALUES
+                 ($1, 'round', false), ($1, 'message', false), ($1, 'match', true)`,
+              [person],
+            );
+            await pool.query(
+              `INSERT INTO matching_config (version, key, value, created_by, reason) VALUES
+                 (3, 'round_size', '8'::jsonb, 'admin', 'Fewer at first'),
+                 (2, 'round_push_hour', '10'::jsonb, 'admin', 'A little later')`,
+            );
+            const others = async () =>
+              (
+                await pool.query(
+                  `SELECT key, version, value FROM matching_config
+                    WHERE key <> ALL($1::text[])
+                      AND created_by NOT IN ('migration:0104', 'migration:0108')
+                    ORDER BY key, version`,
+                  [GONE],
+                )
+              ).rows;
+            const kept = await others();
+            for (const key of GONE) {
+              expect((await versionsOf(pool, key)).length, key).toBeGreaterThan(0);
+            }
+
+            expect((await migrate(pool, through)).state).toBe("applied");
+
+            for (const key of GONE) expect(await versionsOf(pool, key), key).toEqual([]);
+            expect(await others()).toEqual(kept);
+            const switches = await pool.query(
+              "SELECT kind, enabled FROM notification_preference ORDER BY kind",
+            );
+            expect(switches.rows).toEqual([
+              { kind: "message", enabled: false },
+              { kind: "match", enabled: true },
+            ]);
+            const kinds = await pool.query<{ label: string }>(
+              "SELECT unnest(enum_range(NULL::notification_kind))::text AS label",
+            );
+            expect(kinds.rows.map((row) => row.label)).toEqual(["message", "match", "moderation"]);
+            await expect(
+              pool.query(
+                "INSERT INTO notification_preference (account_id, kind, enabled) VALUES ($1, 'round', false)",
+                [person],
+              ),
+            ).rejects.toThrow(/invalid input value for enum notification_kind/);
+          } finally {
+            await pool.end();
+          }
+        });
+      } finally {
+        rmSync(before, { recursive: true, force: true });
+        rmSync(through, { recursive: true, force: true });
+      }
+    });
+
+    it("migration 0103 adds the skip and the second pass's mark, which only a pass carries, and takes the move's time off the account", async () => {
+      const before = migrationsBefore("0103_queue_ladder");
+      try {
+        await withTemporaryDatabase(async (url) => {
+          const pool = createPool({ connectionString: url, max: 2 });
+          try {
+            await migrate(pool, before);
+            const [one, other] = [await aPerson(pool, "a", null), await aPerson(pool, "b", null)];
+            await pool.query("UPDATE account SET home_moved_at = now() WHERE id = $1", [one]);
+            const { rows: rounds } = await pool.query<{ id: string }>(
+              "INSERT INTO rounds (account_id, day) VALUES ($1, '2026-10-30') RETURNING id",
+              [one],
+            );
+            await pool.query(
+              `INSERT INTO round_entries (round_id, position, candidate_id, reason, decision, decided_at)
+               VALUES ($1, 1, $2, 'matches_filters', 'pass', now())`,
+              [rounds[0]?.id, other],
+            );
+
+            expect((await migrate(pool, MIGRATIONS)).state).toBe("applied");
+
+            const moved = await pool.query(
+              `SELECT 1 FROM information_schema.columns
+                WHERE table_schema = 'public' AND table_name = 'account' AND column_name = 'home_moved_at'`,
+            );
+            expect(moved.rows).toEqual([]);
+            const mark = (value: boolean, decision: string) =>
+              pool.query(
+                "UPDATE round_entries SET decision = $2::round_decision, second_pass = $1 RETURNING second_pass",
+                [value, decision],
+              );
+            // A pass from before it is a first pass.
+            const entries = await pool.query("SELECT second_pass FROM round_entries");
+            expect(entries.rows).toEqual([{ second_pass: false }]);
+            expect((await mark(true, "pass")).rows).toEqual([{ second_pass: true }]);
+            expect((await mark(false, "skip")).rows).toEqual([{ second_pass: false }]);
+            for (const decision of ["like", "skip"]) {
+              await expect(mark(true, decision), decision).rejects.toThrow(
+                /round_entries_second_pass_check/,
+              );
+            }
+          } finally {
+            await pool.end();
+          }
+        });
+      } finally {
+        rmSync(before, { recursive: true, force: true });
+      }
+    });
+
+    it("migration 0104 follows a value set in the panel with the next version, the photo budget's other sizes as they were, and writes the new keys", async () => {
+      const before = migrationsBefore("0104_queue_config");
+      try {
+        await withTemporaryDatabase(async (url) => {
+          const pool = createPool({ connectionString: url, max: 2 });
+          try {
+            await migrate(pool, before);
+            await pool.query(
+              `INSERT INTO matching_config (version, key, value, created_by, reason) VALUES
+                 (2, 'pass_cooldown_days', '60'::jsonb, 'admin', 'Two months'),
+                 (2, 'exposure_cards_per_day', '45'::jsonb, 'admin', 'Fewer'),
+                 (2, 'photo_fetches_per_day', '{"thumb": 500, "card": 200, "full": 30}'::jsonb, 'admin', 'Fewer'),
+                 (3, 'photo_fetches_per_day', '{"thumb": 400, "card": 100, "full": 20}'::jsonb, 'admin', 'Fewer still'),
+                 (2, 'auto_shadow_ban_cards_served', '45'::jsonb, 'admin', 'On'),
+                 (2, 'auto_shadow_ban_cards_served_minutes', '30'::jsonb, 'admin', 'Shorter'),
+                 (3, 'auto_shadow_ban_photo_fetches', '250'::jsonb, 'admin', 'Higher')`,
+            );
+
+            expect((await migrate(pool, MIGRATIONS)).state).toBe("applied");
+
+            const next = (version: number, value: unknown) => ({
+              version,
+              value,
+              created_by: "migration:0104",
+              reason: null,
+            });
+            for (const [key, version, value] of [
+              ["pass_cooldown_days", 3, 30],
+              ["exposure_cards_per_day", 3, 0],
+              ["photo_fetches_per_day", 4, { thumb: 400, card: 0, full: 20 }],
+              ["auto_shadow_ban_cards_served", 3, 300],
+              ["auto_shadow_ban_cards_served_minutes", 3, 10],
+              ["auto_shadow_ban_photo_fetches", 4, 1500],
+            ] as const) {
+              const versions = await versionsOf(pool, key);
+              expect(versions.at(-1), key).toEqual(next(version, value));
+              // The panel's own row stays as it was, its reason with it.
+              expect(versions.at(-2)?.created_by, key).toBe("admin");
+            }
+            for (const [key, value] of [
+              ["liked_cooldown_days", 90],
+              ["ended_cooldown_days", 90],
+              ["second_pass_cooldown_days", 365],
+              ["your_turn_limit", 8],
+              ["your_turn_warning", 6],
+              ["inbox_stop", 30],
+            ] as const) {
+              expect(await versionsOf(pool, key), key).toEqual([next(1, value)]);
+            }
+          } finally {
+            await pool.end();
+          }
+        });
+      } finally {
+        rmSync(before, { recursive: true, force: true });
+      }
+    });
   });
 
   it("is a no-op the second time", async () => {
@@ -1161,6 +1615,7 @@ describe("migrate", () => {
           "rounds",
           "sanction",
           "session",
+          "star",
         ]);
       } finally {
         await pool.end();

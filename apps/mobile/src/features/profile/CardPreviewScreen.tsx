@@ -16,7 +16,11 @@ type State =
   | { status: "error"; error: unknown }
   | { status: "ready"; preview: CardPreviewResponse };
 
-/** The owner looking at their own card (#47): built the way a round builds it, nothing recorded. */
+/**
+ * The owner looking at their own card (#47): built the way a round builds it,
+ * nothing recorded. What it still needs stands above it, as on the profile, and
+ * a card can be called what others see only once nothing is missing (#581).
+ */
 export function CardPreviewScreen() {
   const { t } = useT();
   const router = useRouter();
@@ -36,6 +40,7 @@ export function CardPreviewScreen() {
       live = false;
     };
   }, [attempt]);
+  const preview = state.status === "ready" ? state.preview : null;
 
   return (
     <SafeAreaView className="flex-1 bg-background">
@@ -45,21 +50,26 @@ export function CardPreviewScreen() {
         onBack={() => router.back()}
       />
       <ScrollView contentContainerClassName="flex-grow gap-4 p-6">
-        <Text>{t("profile.card.explain")}</Text>
         {state.status === "loading" && (
-          <Text accessibilityLiveRegion="polite">{t("profile.card.loading")}</Text>
+          <Text accessibilityLiveRegion="polite">{t("load.loading")}</Text>
         )}
         {state.status === "error" && (
-          <LoadFailed
-            headline={t("profile.card.failed")}
-            error={state.error}
-            onRetry={() => setAttempt((n) => n + 1)}
-          />
+          <LoadFailed error={state.error} onRetry={() => setAttempt((n) => n + 1)} />
         )}
-        {state.status === "ready" && !state.preview.card && <Text>{t("profile.card.empty")}</Text>}
-        {state.status === "ready" && state.preview.card && (
+        {preview && !preview.completeness.complete && (
+          <View className="gap-1">
+            <Text variant="small">{t("profile.completeness.title")}</Text>
+            {preview.completeness.missing.map((item) => (
+              <Text key={item} variant="muted">
+                {completenessText(t, item)}
+              </Text>
+            ))}
+          </View>
+        )}
+        {preview?.card && preview.completeness.complete && <Text>{t("profile.card.explain")}</Text>}
+        {preview?.card && (
           <ProfileCardView
-            card={state.preview.card}
+            card={preview.card}
             onRefused={(code) => setRefusal(code ?? "unknown")}
           />
         )}
@@ -71,16 +81,6 @@ export function CardPreviewScreen() {
                 : "photos.error.notShown",
             )}
           </Text>
-        )}
-        {state.status === "ready" && !state.preview.completeness.complete && (
-          <View className="gap-1">
-            <Text variant="small">{t("profile.completeness.title")}</Text>
-            {state.preview.completeness.missing.map((item) => (
-              <Text key={item} variant="muted">
-                {completenessText(t, item)}
-              </Text>
-            ))}
-          </View>
         )}
       </ScrollView>
     </SafeAreaView>

@@ -1,21 +1,30 @@
 import { act, fireEvent, screen } from "@testing-library/react-native";
 import { useLocales } from "expo-localization";
+import * as Notifications from "expo-notifications";
 import { clearSession, saveSession } from "@/lib/session";
 import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
+import { FAILED_TO_LOAD } from "@/test/failed";
 import { renderWithTheme } from "@/test/render";
 import { NotificationChoices } from "./NotificationChoices";
 
-// What a person may be notified of (#176, ADR-032): the four switches in the
-// API's order with their lines, the phone's own permission above them (#102),
-// a press saved at once and the switch waiting meanwhile, a failure said in
-// words with the switch as it was, a load that failed with Try again, and
-// every switch labelled.
+// What a person may be notified of (#176, ADR-032): what this phone's answer
+// leaves to do first (#102), then what a notification says, then the switches
+// in the API's order, a line only under the one that does less than it seems
+// to (#581); a press saved at once and the switch waiting meanwhile, a failure
+// said in words with the switch as it was, a load that failed with Try again,
+// and every switch labelled.
 
+const INTRO =
+  "A notification says that there is a new message or a new match, never what it says or from whom.";
+const KINDS = ["Messages", "Matches", "Moderators' decisions"];
+const HINT = "Nothing is sent to your phones for these yet.";
+/** Every text on the screen, in order. */
+const drawn = () => screen.queryAllByText(/./).map((node) => node.props.children);
 const token = (seed: string) => (seed + "x".repeat(43)).slice(0, 43);
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
 const choices = (off: string[] = []) => ({
-  choices: ["round", "message", "match", "moderation"].map((kind) => ({
+  choices: ["message", "match", "moderation"].map((kind) => ({
     kind,
     enabled: !off.includes(kind),
   })),
@@ -56,23 +65,19 @@ beforeEach(async () => {
 });
 
 describe("NotificationChoices", () => {
-  it("shows each kind with its line, as the API holds it, and saves a press at once", async () => {
+  it("shows each kind as the API holds it, and saves a press at once", async () => {
     const seen = api((sent) =>
       sent.method === "GET" ? json(choices(["match"])) : json(choices(["match", "message"])),
     );
     await renderWithTheme(<NotificationChoices />);
     expect(await screen.findByRole("switch", { name: "Messages" })).toBeTruthy();
-    // Above the switches, what the phone itself lets Kuutti do (#102; PhoneLine.test.tsx).
-    expect(
-      await screen.findByText("This phone has not been asked yet whether Kuutti may notify it."),
-    ).toBeTruthy();
-    for (const name of ["A new round", "Messages", "Moderators' decisions"]) {
+    for (const name of ["Messages", "Moderators' decisions"]) {
       expect(checked(name)).toBe(true);
     }
     expect(checked("Matches")).toBe(false);
-    expect(
-      screen.getByText("That there is a new message, never what it says or who sent it."),
-    ).toBeTruthy();
+    // The round's push went with the daily set (ADR-062 §12), and its switch with it.
+    expect(screen.getAllByRole("switch")).toHaveLength(3);
+    expect(screen.queryByRole("switch", { name: "A new round" })).toBeNull();
     noProblems();
     await act(async () =>
       fireEvent(screen.getByRole("switch", { name: "Messages" }), "onCheckedChange", false),
@@ -86,6 +91,53 @@ describe("NotificationChoices", () => {
     expect(checked("Messages")).toBe(false);
   });
 
+  it.each<[string, object | null, string[]]>([
+    ["never asked", null, ["Allow notifications"]],
+    [
+      "refusing them",
+      { granted: false, canAskAgain: false, ios: { status: 1 } },
+      ["Open the phone's settings"],
+    ],
+    ["allowing them", { granted: true, canAskAgain: true, ios: { status: 2 } }, []],
+  ])(
+    "draws what a phone %s leaves to do first, then what a notification says, then the kinds, a line under Moderators' decisions alone (#581)",
+    async (_phone, answer, phonePart) => {
+      if (answer)
+        jest.mocked(Notifications).getPermissionsAsync.mockResolvedValueOnce(answer as never);
+      api(() => json(choices()));
+      await renderWithTheme(<NotificationChoices />);
+      await screen.findByRole("switch", { name: "Messages" });
+      await settle();
+      expect(drawn()).toEqual([...phonePart, INTRO, ...KINDS, HINT]);
+      noProblems();
+    },
+  );
+
+  it.each([
+    [
+      "fi-FI",
+      "Ilmoitus kertoo, että sinulle on uusi viesti tai uusi mätsi, ei koskaan mitä siinä lukee tai keneltä se on.",
+      "Viestit",
+      "Näistä ei vielä lähetetä puhelimillesi mitään.",
+    ],
+    [
+      "sv-FI",
+      "En avisering säger att det finns ett nytt meddelande eller en ny matchning, aldrig vad det står eller från vem.",
+      "Meddelanden",
+      "Inget skickas till dina telefoner om detta än.",
+    ],
+  ])(
+    "says what a notification says, and the line of Moderators' decisions, in %s",
+    async (languageTag, intro, messages, hint) => {
+      (useLocales as jest.Mock).mockReturnValue([{ languageTag }]);
+      api(() => json(choices()));
+      await renderWithTheme(<NotificationChoices />);
+      expect(await screen.findByRole("switch", { name: messages })).toBeTruthy();
+      expect(screen.getByText(intro)).toBeTruthy();
+      expect(screen.getByText(hint)).toBeTruthy();
+    },
+  );
+
   it("says a change that failed and keeps the switch as it was", async () => {
     api((sent) =>
       sent.method === "GET"
@@ -98,7 +150,7 @@ describe("NotificationChoices", () => {
       fireEvent(screen.getByRole("switch", { name: "Matches" }), "onCheckedChange", false),
     );
     await settle();
-    expect(screen.getByText("The change was not saved. Try again.")).toBeTruthy();
+    expect(screen.getByText("That did not go through. Try again.")).toBeTruthy();
     expect(checked("Matches")).toBe(true);
   });
 
@@ -112,8 +164,8 @@ describe("NotificationChoices", () => {
       return json(choices());
     });
     await renderWithTheme(<NotificationChoices />);
-    expect(await screen.findByText("Your choices could not be loaded.")).toBeTruthy();
+    expect(await screen.findByText(FAILED_TO_LOAD)).toBeTruthy();
     await act(async () => fireEvent.press(screen.getByRole("button", { name: "Try again" })));
-    expect(await screen.findByRole("switch", { name: "A new round" })).toBeTruthy();
+    expect(await screen.findByRole("switch", { name: "Messages" })).toBeTruthy();
   });
 });

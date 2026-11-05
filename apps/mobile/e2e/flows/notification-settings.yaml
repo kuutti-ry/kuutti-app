@@ -1,9 +1,10 @@
-# Notification choices (#176, ADR-032; #102, ADR-055 §9): a row under Account
-# in Settings that opens in place (#511) and says that the choices decide what
-# Kuutti tells the phones, then whether this phone lets Kuutti notify it, which on the emulator
-# and the simulator is never asked (no flow answers the phone's question), and
-# holds a switch per kind, each on until switched off and kept on the server.
-# Asking, allowing and refusing are the jest tests' (PhoneLine). Sanna switches
+# Notification choices (#176, ADR-032; #102, ADR-055 §9): a row under Notifications
+# and contacts in Settings that opens in place (#511), with first what this phone's answer
+# leaves to do, which on the emulator and the simulator, never asked (no flow
+# answers the phone's question), is Allow notifications; then one line on what a
+# notification says (#581), and a switch per kind, each on until switched off
+# and kept on the server. Asking, allowing and refusing, and what a change of
+# the phone's answer says aloud, are the jest tests' (PhoneLine). Sanna switches
 # Messages off, leaves, finds it kept when she comes back by way of home,
 # where the row is still open, read again, and switches it on again, so the
 # flow leaves her as it found her, the row closed. The
@@ -16,63 +17,65 @@ name: The messages switch in Settings, Notifications, goes off, is kept on the s
 - extendedWaitUntil:
     visible: "Settings|Asetukset|Inställningar"
     timeout: 15000
-# The row sits under Account, below the fold on a phone; it is read by its title.
+# The row sits under Notifications and contacts, below the fold on a phone; it is read by its title.
 - runFlow:
     file: ../common/open-settings-row.yaml
     env:
       ROW: "(Notifications|Ilmoitukset|Aviseringar)(, .*)?"
-      INSIDE: "What you choose here decides what Kuutti tells your phones\\..*|Valintasi ratkaisevat, mistä Kuutti kertoo puhelimillesi\\..*|Det du väljer här avgör vad Kuutti berättar för dina telefoner\\..*"
-# The phone's line comes once the phone has been read.
+      INSIDE: "A notification says that there is a new message or a new match, never what it says or from whom\\.|Ilmoitus kertoo, että sinulle on uusi viesti tai uusi mätsi, ei koskaan mitä siinä lukee tai keneltä se on\\.|En avisering säger att det finns ett nytt meddelande eller en ny matchning, aldrig vad det står eller från vem\\."
+# The phone's button comes once the phone has been read; its answer has no line
+# of its own, and a change of it is said aloud, which Maestro cannot hear (#581).
 - extendedWaitUntil:
-    visible: "This phone has not been asked yet whether Kuutti may notify it\\.|Tältä puhelimelta ei ole vielä kysytty, saako Kuutti lähettää sille ilmoituksia\\.|Den här telefonen har inte frågats än om Kuutti får skicka aviseringar till den\\."
+    visible: "Allow notifications|Salli ilmoitukset|Tillåt aviseringar"
     timeout: 15000
+- assertNotVisible: "This phone has not been asked yet whether Kuutti may notify it\\.|Tältä puhelimelta ei ole vielä kysytty, saako Kuutti lähettää sille ilmoituksia\\.|Den här telefonen har inte frågats än om Kuutti får skicka aviseringar till den\\."
 # A switch's text, to Maestro, is its value ("0" off, "1" on) on iOS, and its
 # words with its state on Android. Every switch sits at the right edge, so the
-# Messages switch is found between the round's line and its own, not by
-# rightOf, which compares x alone and would take any switch.
+# Messages switch, the first, is found between the panel's line and the next
+# kind's name, not by rightOf, which compares x alone and would take any switch.
 - extendedWaitUntil:
     visible:
       text: "1|(Messages|Viestit|Meddelanden), on"
-      below: "When the day's people are ready for you\\.|Kun päivän ihmiset ovat valmiina sinulle\\.|När dagens personer är redo för dig\\."
-      above: "That there is a new message, never what it says or who sent it\\.|Että sinulle on uusi viesti, ei koskaan mitä siinä lukee tai kuka sen lähetti\\.|Att det finns ett nytt meddelande, aldrig vad det säger eller vem som skickade det\\."
+      below: "A notification says that there is a new message or a new match, never what it says or from whom\\.|Ilmoitus kertoo, että sinulle on uusi viesti tai uusi mätsi, ei koskaan mitä siinä lukee tai keneltä se on\\.|En avisering säger att det finns ett nytt meddelande eller en ny matchning, aldrig vad det står eller från vem\\."
+      above: "Matches|Mätsit|Matchningar"
     timeout: 15000
 - tapOn: "Messages|Viestit|Meddelanden"
 - extendedWaitUntil:
     visible:
       text: "0|(Messages|Viestit|Meddelanden), off"
-      below: "When the day's people are ready for you\\.|Kun päivän ihmiset ovat valmiina sinulle\\.|När dagens personer är redo för dig\\."
-      above: "That there is a new message, never what it says or who sent it\\.|Että sinulle on uusi viesti, ei koskaan mitä siinä lukee tai kuka sen lähetti\\.|Att det finns ett nytt meddelande, aldrig vad det säger eller vem som skickade det\\."
+      below: "A notification says that there is a new message or a new match, never what it says or from whom\\.|Ilmoitus kertoo, että sinulle on uusi viesti tai uusi mätsi, ei koskaan mitä siinä lukee tai keneltä se on\\.|En avisering säger att det finns ett nytt meddelande eller en ny matchning, aldrig vad det står eller från vem\\."
+      above: "Matches|Mätsit|Matchningar"
     timeout: 15000
-- assertNotVisible: "The change was not saved\\. Try again\\.|Muutosta ei tallennettu\\. Yritä uudelleen\\.|Ändringen sparades inte\\. Försök igen\\."
+- assertNotVisible: "That did not go through\\. Try again\\.|Se ei onnistunut\\. Yritä uudelleen\\.|Det gick inte\\. Försök igen\\."
 
 # Kept on the server: home first, so Settings is read again rather than shown
 # as it was; the row comes back open, as it was left.
 - openLink: kuutti://
 - extendedWaitUntil:
-    visible: "People on Kuutti|Ihmiset Kuutissa|Människor på Kuutti"
+    visible: "Your profile|Profiilisi|Din profil"
     timeout: 15000
 - openLink: kuutti://settings
 - runFlow:
     file: ../common/open-settings-row.yaml
     env:
       ROW: "(Notifications|Ilmoitukset|Aviseringar)(, .*)?"
-      INSIDE: "What you choose here decides what Kuutti tells your phones\\..*|Valintasi ratkaisevat, mistä Kuutti kertoo puhelimillesi\\..*|Det du väljer här avgör vad Kuutti berättar för dina telefoner\\..*"
+      INSIDE: "A notification says that there is a new message or a new match, never what it says or from whom\\.|Ilmoitus kertoo, että sinulle on uusi viesti tai uusi mätsi, ei koskaan mitä siinä lukee tai keneltä se on\\.|En avisering säger att det finns ett nytt meddelande eller en ny matchning, aldrig vad det står eller från vem\\."
 - extendedWaitUntil:
     visible:
       text: "0|(Messages|Viestit|Meddelanden), off"
-      below: "When the day's people are ready for you\\.|Kun päivän ihmiset ovat valmiina sinulle\\.|När dagens personer är redo för dig\\."
-      above: "That there is a new message, never what it says or who sent it\\.|Että sinulle on uusi viesti, ei koskaan mitä siinä lukee tai kuka sen lähetti\\.|Att det finns ett nytt meddelande, aldrig vad det säger eller vem som skickade det\\."
+      below: "A notification says that there is a new message or a new match, never what it says or from whom\\.|Ilmoitus kertoo, että sinulle on uusi viesti tai uusi mätsi, ei koskaan mitä siinä lukee tai keneltä se on\\.|En avisering säger att det finns ett nytt meddelande eller en ny matchning, aldrig vad det står eller från vem\\."
+      above: "Matches|Mätsit|Matchningar"
     timeout: 15000
 - tapOn: "Messages|Viestit|Meddelanden"
 - extendedWaitUntil:
     visible:
       text: "1|(Messages|Viestit|Meddelanden), on"
-      below: "When the day's people are ready for you\\.|Kun päivän ihmiset ovat valmiina sinulle\\.|När dagens personer är redo för dig\\."
-      above: "That there is a new message, never what it says or who sent it\\.|Että sinulle on uusi viesti, ei koskaan mitä siinä lukee tai kuka sen lähetti\\.|Att det finns ett nytt meddelande, aldrig vad det säger eller vem som skickade det\\."
+      below: "A notification says that there is a new message or a new match, never what it says or from whom\\.|Ilmoitus kertoo, että sinulle on uusi viesti tai uusi mätsi, ei koskaan mitä siinä lukee tai keneltä se on\\.|En avisering säger att det finns ett nytt meddelande eller en ny matchning, aldrig vad det står eller från vem\\."
+      above: "Matches|Mätsit|Matchningar"
     timeout: 15000
-- assertNotVisible: "The change was not saved\\. Try again\\.|Muutosta ei tallennettu\\. Yritä uudelleen\\.|Ändringen sparades inte\\. Försök igen\\."
+- assertNotVisible: "That did not go through\\. Try again\\.|Se ei onnistunut\\. Yritä uudelleen\\.|Det gick inte\\. Försök igen\\."
 - runFlow:
     file: ../common/close-settings-row.yaml
     env:
       ROW: "(Notifications|Ilmoitukset|Aviseringar)(, .*)?"
-      INSIDE: "What you choose here decides what Kuutti tells your phones\\..*|Valintasi ratkaisevat, mistä Kuutti kertoo puhelimillesi\\..*|Det du väljer här avgör vad Kuutti berättar för dina telefoner\\..*"
+      INSIDE: "A notification says that there is a new message or a new match, never what it says or from whom\\.|Ilmoitus kertoo, että sinulle on uusi viesti tai uusi mätsi, ei koskaan mitä siinä lukee tai keneltä se on\\.|En avisering säger att det finns ett nytt meddelande eller en ny matchning, aldrig vad det står eller från vem\\."

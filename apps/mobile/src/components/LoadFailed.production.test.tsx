@@ -13,7 +13,6 @@ describe("LoadFailed in production", () => {
     (updateApp as jest.Mock).mockResolvedValue("none");
     await renderWithTheme(
       <LoadFailed
-        headline="Your profile could not be loaded."
         error={Object.assign(new Error("contract"), { name: "ZodError" })}
         onRetry={jest.fn()}
       />,

@@ -33,6 +33,16 @@ export const fieldLabelKey = (field: DealBreakerField): PlainMessageKey =>
 export const optionKey = (field: DealBreakerField, option: string): PlainMessageKey =>
   `profile.option.${field}.${option}` as PlainMessageKey;
 
+/**
+ * An answer as a deal-breaker names it, which is about somebody else (#551):
+ * where the person's own words are in the first person ("En koskaan", "Yes,
+ * living with me"), a filter has words of its own. The value stored is the same.
+ */
+export const filterOptionKey = (field: DealBreakerField, option: string): PlainMessageKey =>
+  field === "hasKids" || field === "wantsKids" || (field === "smoking" && option === "never")
+    ? (`profile.filterOption.${field}.${option}` as PlainMessageKey)
+    : optionKey(field, option);
+
 export const promptKey = (key: PromptKey): PlainMessageKey =>
   `profile.prompt.${key}` as PlainMessageKey;
 

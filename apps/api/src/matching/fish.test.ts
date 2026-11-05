@@ -5,14 +5,14 @@ import { CURRENT_CONSENT_VERSIONS } from "../identity/index.ts";
 import { finnishDay } from "../lib/finnish-day.ts";
 import { signInAs } from "../test/account.ts";
 import { captureLogger, describe, expect, test, testConfig } from "../test/harness.ts";
-import { people } from "../test/people.ts";
-import { exportRounds, saveRound } from "./rounds.ts";
+import { logged, peopleWhoFit } from "../test/rounds.ts";
+import { exportRounds } from "./rounds.ts";
 
 // The fish (#378, ADR-039, features/matching/fish.feature): its budget in a
 // calendar week, Monday to Sunday (#475), and the wait a refusal names, given back the same day, a
 // like for the day's likes and the match, a like on a card that answers one,
 // the event, and what the sender and the export read. Its place in the other
-// person's round is jobs/round-builder.test.ts.
+// person's queue is jobs/round-builder.test.ts.
 
 /** 12:00 in Finland, one Friday; its week began on Monday 12 October. */
 const T = new Date("2026-10-16T09:00:00.000Z");
@@ -31,38 +31,27 @@ async function appAt(db: Queryable, at: Date = T): Promise<App> {
 }
 
 async function cast(db: Queryable, count: number): Promise<Person[]> {
-  const ids = await people(db, null, count, { complete: true, consented: true });
+  const ids = await peopleWhoFit(db, count);
   return Promise.all(ids.map((id) => signInAs(db, id)));
 }
 
 /** A round for `owner` `days` before today with these cards, each of the reason given or matching every filter. */
-async function roundOf(
+const roundOf = (
   db: Queryable,
   owner: Person,
   cards: (Person | { person: Person; reason: "liked_you" | "fish" })[],
   days = 0,
-) {
-  const at = daysBefore(days);
-  const built = await saveRound(
-    { db, logger: (await captureLogger()).logger, now: () => at },
-    {
-      accountId: owner.accountId,
-      day: finnishDay(at),
-      ordering: "count",
-      entries: cards.map((card) =>
-        "person" in card
-          ? { candidateId: card.person.accountId, reason: card.reason, distance: "nearby" as const }
-          : {
-              candidateId: card.accountId,
-              reason: "matches_filters" as const,
-              distance: "nearby" as const,
-            },
-      ),
-    },
+) =>
+  logged(
+    db,
+    owner.accountId,
+    finnishDay(daysBefore(days)),
+    cards.map((card) =>
+      "person" in card
+        ? { candidateId: card.person.accountId, reason: card.reason }
+        : card.accountId,
+    ),
   );
-  if (!built) throw new Error("round not built");
-  return built.roundId;
-}
 
 /** `sender` sent `to` a fish, or a like, on a round of `days` before today. */
 async function sentBefore(db: Queryable, sender: Person, to: Person, days: number, fish: boolean) {
@@ -106,6 +95,13 @@ async function fishToSendAfter(answer: Response) {
   return RoundDecisionAnswer.parse(await answer.json()).fishToSend;
 }
 
+/** What a decision's answer says of the caller's two budgets after it. */
+async function budgetsAfter(answer: Response) {
+  expect(answer.status).toBe(200);
+  const { fishToSend, likesLeft } = RoundDecisionAnswer.parse(await answer.json());
+  return { fishToSend, likesLeft };
+}
+
 async function setConfig(db: Queryable, key: string, value: unknown) {
   await db.query(
     `INSERT INTO matching_config (version, key, value, created_by)
@@ -115,7 +111,9 @@ async function setConfig(db: Queryable, key: string, value: unknown) {
 }
 
 describe("the fish", () => {
-  test("a fish is recorded as a like with its mark, and read back as a fish", async ({ ctx }) => {
+  test("a fish is recorded as a like with its mark, and the export says a fish", async ({
+    ctx,
+  }) => {
     const [a, b] = await cast(ctx.client, 2);
     if (!a || !b) throw new Error("cast not written");
     const roundId = await roundOf(ctx.client, a, [b]);
@@ -124,11 +122,6 @@ describe("the fish", () => {
     expect((await choose(app, a, 1, "fish")).status).toBe(200);
 
     expect(await entriesOf(ctx.client, roundId)).toEqual([{ decision: "like", fish: true }]);
-    const read = RoundResponse.parse(
-      await (await app.request("/rounds/today", { headers: a.headers })).json(),
-    );
-    expect(read.entries?.map((entry) => entry.decision)).toEqual(["fish"]);
-    // The export reads it back too, in its own word.
     const [round] = await exportRounds(ctx.client, a.accountId, 10);
     expect(round?.entries.map((entry) => entry.decision)).toEqual(["fish"]);
   });
@@ -216,7 +209,7 @@ describe("the fish", () => {
     });
     expect(refused.status).toBe(429);
     expect(ErrorResponse.parse(await refused.json()).error.message).toBe(
-      "Du kan inte skicka en fisk just nu. Du kan fortfarande gilla.",
+      "Du kan inte skicka en fisk just nu.",
     );
     expect(Number(refused.headers.get("retry-after"))).toBe(
       (NEXT_MONDAY.getTime() - T.getTime()) / 1000,
@@ -293,6 +286,7 @@ describe("the fish", () => {
   });
 
   test("A fish on a card of somebody whose like waits is a like", async ({ ctx }) => {
+    await setConfig(ctx.client, "like_budget_balanced", 2);
     const [a, b, c] = await cast(ctx.client, 3);
     if (!a || !b || !c) throw new Error("cast not written");
     await sentBefore(ctx.client, b, a, 1, false);
@@ -302,8 +296,11 @@ describe("the fish", () => {
     const answer = await choose(app, a, 1, "fish");
 
     expect(answer.status).toBe(200);
-    expect(RoundDecisionAnswer.parse(await answer.json()).match).not.toBeNull();
-    // No fish spent: the next goes.
+    const { match, fishToSend, likesLeft } = RoundDecisionAnswer.parse(await answer.json());
+    expect(match).not.toBeNull();
+    // One of the day's likes spent and no fish: the next goes.
+    expect(likesLeft).toBe(1);
+    expect(fishToSend).toBe(true);
     expect((await choose(app, a, 2, "fish")).status).toBe(200);
     expect(await entriesOf(ctx.client, roundId)).toEqual([
       { decision: "like", fish: false },
@@ -311,8 +308,10 @@ describe("the fish", () => {
     ]);
   });
 
-  test("a like back on a fish card is free, and a fish there is a like", async ({ ctx }) => {
-    await setConfig(ctx.client, "like_budget_balanced", 1);
+  test("a like back on a fish card spends one of the day's likes, and so does a fish there, which is a like", async ({
+    ctx,
+  }) => {
+    await setConfig(ctx.client, "like_budget_balanced", 2);
     const [a, b, c, d] = await cast(ctx.client, 4);
     if (!a || !b || !c || !d) throw new Error("cast not written");
     await sentBefore(ctx.client, b, a, 1, true);
@@ -324,15 +323,78 @@ describe("the fish", () => {
     ]);
     const app = await appAt(ctx.client);
 
-    // The day's one like on an ordinary card, then a like and a fish back on the fish cards.
-    expect((await choose(app, a, 3, "like")).status).toBe(200);
-    expect((await choose(app, a, 1, "like")).status).toBe(200);
-    expect((await choose(app, a, 2, "fish")).status).toBe(200);
+    expect(await budgetsAfter(await choose(app, a, 1, "like"))).toEqual({
+      fishToSend: true,
+      likesLeft: 1,
+    });
+    expect(await budgetsAfter(await choose(app, a, 2, "fish"))).toEqual({
+      fishToSend: true,
+      likesLeft: 0,
+    });
+    const refused = await choose(app, a, 3, "like");
 
+    expect(refused.status).toBe(429);
+    expect(await codeOf(refused)).toBe("like_budget_exceeded");
     expect(await entriesOf(ctx.client, roundId)).toEqual([
       { decision: "like", fish: false },
       { decision: "like", fish: false },
+      { decision: null, fish: false },
+    ]);
+  });
+
+  test.for([
+    ["a like", "liked_you", "like"],
+    ["a fish", "liked_you", "fish"],
+    ["a like", "fish", "like"],
+    ["a fish", "fish", "fish"],
+  ] as const)(
+    "%s on a %s card with no likes left is refused, and the like it would answer keeps waiting",
+    async ([, reason, decision], { ctx }) => {
+      await setConfig(ctx.client, "like_budget_balanced", 1);
+      const [a, b, c] = await cast(ctx.client, 3);
+      if (!a || !b || !c) throw new Error("cast not written");
+      await sentBefore(ctx.client, b, a, 1, reason === "fish");
+      const roundId = await roundOf(ctx.client, a, [{ person: b, reason }, c]);
+      const app = await appAt(ctx.client);
+      expect((await choose(app, a, 2, "like")).status).toBe(200);
+
+      const refused = await choose(app, a, 1, decision);
+
+      expect(refused.status).toBe(429);
+      expect(await codeOf(refused)).toBe("like_budget_exceeded");
+      expect(Number(refused.headers.get("retry-after"))).toBe(12 * 3600);
+      expect(await entriesOf(ctx.client, roundId)).toEqual([
+        { decision: null, fish: false },
+        { decision: "like", fish: false },
+      ]);
+      const conversations = await ctx.client.query(
+        "SELECT 1 FROM conversation_participant WHERE account_id = $1",
+        [a.accountId],
+      );
+      expect(conversations.rowCount).toBe(0);
+      expect(await fishToSendOn(app, a)).toBe(true);
+    },
+  );
+
+  test("a fish past the day's likes and the week's fish is refused for the likes, until midnight", async ({
+    ctx,
+  }) => {
+    await setConfig(ctx.client, "like_budget_balanced", 1);
+    const [a, b, c, x] = await cast(ctx.client, 4);
+    if (!a || !b || !c || !x) throw new Error("cast not written");
+    await sentBefore(ctx.client, a, x, 3, true);
+    const roundId = await roundOf(ctx.client, a, [b, c]);
+    const app = await appAt(ctx.client);
+    expect((await choose(app, a, 1, "like")).status).toBe(200);
+
+    const refused = await choose(app, a, 2, "fish");
+
+    expect(refused.status).toBe(429);
+    expect(await codeOf(refused)).toBe("like_budget_exceeded");
+    expect(Number(refused.headers.get("retry-after"))).toBe(12 * 3600);
+    expect(await entriesOf(ctx.client, roundId)).toEqual([
       { decision: "like", fish: false },
+      { decision: null, fish: false },
     ]);
   });
 
@@ -420,16 +482,57 @@ describe("whether a fish can go today (#475)", () => {
     expect(await fishToSendAfter(await choose(app, a, 1, "fish"))).toBe(true);
   });
 
-  test("with fish switched off none can go, whether or not a round is built", async ({ ctx }) => {
+  test("the fish's own budget says whether one can go, with no likes left too, and a like made a fish still goes (#503)", async ({
+    ctx,
+  }) => {
+    await setConfig(ctx.client, "like_budget_balanced", 1);
+    const [a, b] = await cast(ctx.client, 2);
+    if (!a || !b) throw new Error("cast not written");
+    const roundId = await roundOf(ctx.client, a, [b]);
+    const app = await appAt(ctx.client);
+
+    expect(await budgetsAfter(await choose(app, a, 1, "like"))).toEqual({
+      fishToSend: true,
+      likesLeft: 0,
+    });
+    expect(await fishToSendOn(app, a)).toBe(true);
+
+    expect(await budgetsAfter(await choose(app, a, 1, "fish"))).toEqual({
+      fishToSend: false,
+      likesLeft: 0,
+    });
+    expect(await entriesOf(ctx.client, roundId)).toEqual([{ decision: "like", fish: true }]);
+  });
+
+  test("a fish on a card liked back already is the same like, with no likes left too", async ({
+    ctx,
+  }) => {
+    await setConfig(ctx.client, "like_budget_balanced", 1);
+    const [a, b] = await cast(ctx.client, 2);
+    if (!a || !b) throw new Error("cast not written");
+    await sentBefore(ctx.client, b, a, 1, false);
+    const roundId = await roundOf(ctx.client, a, [{ person: b, reason: "liked_you" }]);
+    const app = await appAt(ctx.client);
+    expect((await choose(app, a, 1, "like")).status).toBe(200);
+
+    expect(await budgetsAfter(await choose(app, a, 1, "fish"))).toEqual({
+      fishToSend: true,
+      likesLeft: 0,
+    });
+
+    expect(await entriesOf(ctx.client, roundId)).toEqual([{ decision: "like", fish: false }]);
+  });
+
+  test("with fish switched off none can go, whether or not the day is open", async ({ ctx }) => {
     await setConfig(ctx.client, "fish_budget", 0);
     const [a, b] = await cast(ctx.client, 2);
     if (!a || !b) throw new Error("cast not written");
     const app = await appAt(ctx.client);
-    // No round yet, and matching not open: nothing builds one.
-    const unbuilt = RoundResponse.parse(
+    // No round yet, and matching not open: nothing opens one.
+    const unopened = RoundResponse.parse(
       await (await app.request("/rounds/today", { headers: a.headers })).json(),
     );
-    expect(unbuilt).toMatchObject({ entries: null, fishToSend: false });
+    expect(unopened).toMatchObject({ entries: null, fishToSend: false });
     await roundOf(ctx.client, a, [b]);
     expect(await fishToSendOn(app, a)).toBe(false);
     expect(await fishToSendAfter(await choose(app, a, 1, "like"))).toBe(false);

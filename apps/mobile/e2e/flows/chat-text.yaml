@@ -26,14 +26,14 @@ name: A message reaches the other person with its time, the writer then sees it 
     visible: "Archived|Arkistoidut|Arkiverade"
     timeout: 15000
 - waitForAnimationToEnd
-# A row is one element: the name with the age, what is unread, the last line, when.
+# A row is one element: the name with the age, what is unread, the last line,
+# when. Nobody wrote in this one, so the name with the age is all it has (#581).
 - assertVisible:
-    text: "Sanna, \\d+, (No messages yet|Ei vielä viestejä|Inga meddelanden än)"
+    text: "Sanna, \\d+"
     below: "Archived|Arkistoidut|Arkiverade"
-- assertVisible: "A conversation quiet for a week moves here, and so does one that has ended\\. Writing in a quiet one brings it back\\.|Viikon hiljaa ollut keskustelu siirtyy tänne, samoin päättynyt keskustelu\\. Kun kirjoitat hiljaiseen keskusteluun, se palaa\\.|Ett samtal som varit tyst en vecka flyttas hit, liksom ett samtal som har avslutats\\. När du skriver i ett tyst samtal kommer det tillbaka\\."
 - tapOn:
     text: "Ville, \\d+, .*"
-    below: "Open|Avoimet|Öppna"
+    below: "Your turn: \\d+|Their turn|Sinun vuorosi: \\d+|Toisen vuoro|Din tur: \\d+|Den andras tur"
 # The field is its label, and on iOS its placeholder after it.
 - extendedWaitUntil:
     visible: "(Message|Viesti|Meddelande)( .*)?"

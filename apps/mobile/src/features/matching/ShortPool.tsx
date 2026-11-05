@@ -8,15 +8,28 @@ import { useT } from "@/lib/locale";
 import { useHapticTap } from "@/theme/haptics";
 import { fetchRelaxations } from "./client";
 
+/** The two ways to relax a deal-breaker, in the order they are offered: each says its words once, over its rows (#581). */
+const WAYS = [
+  {
+    kind: "unanswered",
+    heading: "round.short.unanswered.title",
+    spoken: "round.short.unanswered",
+  },
+  { kind: "aside", heading: "round.short.aside.title", spoken: "round.short.aside" },
+] as const;
+
 /**
- * The short pool (#99, ADR-042), at the end of a short round or an empty one:
- * what the person may relax for today, each a button that says the
- * deal-breaker, the way and how much it widens their pool (in the counter's
- * steps, `pond_counter_k`, never a count of cards), and what is relaxed today, each undone by one tap.
+ * The short pool (#99, ADR-042, ADR-062 §10), at the queue's end: what the
+ * person may relax for today, a group for each way under a heading that says it,
+ * its "today" carrying that nothing changes tomorrow (#581), and in it a button
+ * for each deal-breaker that says the field and how much it widens their pool
+ * (in the counter's steps, `pond_counter_k`, never a count of cards), its whole
+ * sentence its spoken label; and what is relaxed today, each undone by one tap.
+ * Only the heading is bold: a button's text is by default, so the field says
+ * medium and how much regular (the maintainer's note on too much bold, #581).
  * Read when it comes into sight, as the offers are counted on asking, and
  * again after each tap. Nothing relaxes but the person's tap; a read that
- * fails shows nothing, and the round's end says to come back tomorrow as
- * before.
+ * fails shows nothing, and the end stands as it does without offers.
  */
 export function ShortPool({
   day,
@@ -53,34 +66,39 @@ export function ShortPool({
   };
 
   return (
-    <View className="gap-3">
+    <View className="gap-4">
       {pool.offers.length > 0 && (
         <>
           <Text variant="h3" accessibilityRole="header">
             {t("round.short.title")}
           </Text>
-          <Text>{t("round.short.explain")}</Text>
-          {pool.offers.map((offer) => {
-            const what = t(
-              offer.kind === "unanswered" ? "round.short.unanswered" : "round.short.aside",
-              { field: field(offer.field) },
-            );
-            const more = t("round.short.more", { more: offer.more });
+          {WAYS.map(({ kind, heading, spoken }) => {
+            const offers = pool.offers.filter((offer) => offer.kind === kind);
+            if (offers.length === 0) return null;
             return (
-              <Button
-                key={`${offer.field}/${offer.kind}`}
-                variant="outline"
-                className="flex-col items-start py-3"
-                disabled={busy}
-                accessibilityLabel={`${what}. ${more}`}
-                onPress={() => {
-                  tap();
-                  then(onRelax({ field: offer.field, kind: offer.kind }));
-                }}
-              >
-                <Text>{what}</Text>
-                <Text variant="muted">{more}</Text>
-              </Button>
+              <View key={kind} className="gap-2">
+                <Text variant="title">{t(heading)}</Text>
+                {offers.map((offer) => {
+                  const what = t(spoken, { field: field(offer.field) });
+                  const more = t("round.short.more", { more: offer.more });
+                  return (
+                    <Button
+                      key={offer.field}
+                      variant="outline"
+                      className="flex-col items-start py-3"
+                      disabled={busy}
+                      accessibilityLabel={`${what}. ${more}`}
+                      onPress={() => {
+                        tap();
+                        then(onRelax({ field: offer.field, kind }));
+                      }}
+                    >
+                      <Text className="font-medium">{field(offer.field)}</Text>
+                      <Text className="font-normal">{more}</Text>
+                    </Button>
+                  );
+                })}
+              </View>
             );
           })}
         </>

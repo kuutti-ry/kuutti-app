@@ -768,9 +768,9 @@ describe.skipIf(!reachable)("the personas, through the mock bank", () => {
         await call(bank, login.accessToken, "GET", "/conversations?thumbs=false"),
       );
     };
-    const named = (list: ConversationList) =>
+    const named = ({ open, archived }: ConversationList) =>
       Object.fromEntries(
-        Object.entries(list).map(([group, rows]) => [
+        Object.entries({ open, archived }).map(([group, rows]) => [
           group,
           rows.map((c) => ({
             name: c.counterpart && !c.counterpart.deleted ? c.counterpart.name : null,

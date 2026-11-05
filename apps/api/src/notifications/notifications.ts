@@ -37,14 +37,14 @@ export async function setChoice(
   return choicesOf(deps.db, input.accountId);
 }
 
-/** One notice as the contract has it: a warning with its reason, a counted invitation with what it earned. */
+/** One notice as the contract has it: a warning with its reason, a counted invitation with what it earned the person. */
 function noticeOf(row: repo.NoticeRow): Notice {
   const base = { id: row.id, at: row.at.toISOString(), readAt: row.readAt?.toISOString() ?? null };
-  if (row.kind === "invitation_counted") {
-    return { ...base, kind: row.kind, reward: { fish: row.fish, likes: row.likes } };
+  if (row.kind === "warning") {
+    // A warning holds its sanction (notice_warning_check), so its reason is there.
+    return { ...base, kind: row.kind, reason: row.reason as SanctionReason };
   }
-  // A warning holds its sanction (notice_warning_check), so its reason is there.
-  return { ...base, kind: row.kind, reason: row.reason as SanctionReason };
+  return { ...base, kind: row.kind, reward: { fish: row.fish } };
 }
 
 /** The caller's newest notices. */
@@ -71,10 +71,14 @@ export async function recordWarningNotice(
   await repo.insertWarningNotice(db, input);
 }
 
-/** A counted invitation tells its inviter (ADR-044 §9), in the night's count's transaction. */
+/** A counted invitation tells its inviter and its friend (ADR-044 §9), in the night's count's transaction. */
 export async function recordInvitationNotices(
   db: Queryable,
-  input: { counted: ReadonlyArray<{ accountId: string; invitationId: string }>; at: Date },
+  input: {
+    kind: "invitation_counted" | "invitation_friend";
+    counted: ReadonlyArray<{ accountId: string; invitationId: string }>;
+    at: Date;
+  },
 ): Promise<void> {
   await repo.insertInvitationNotices(db, input);
 }

@@ -9,14 +9,17 @@ import { generateHetu } from "@kuutti-ry/tunnistus-oidc/hetu";
 import type { QueryResultRow } from "pg";
 import { describe, expect } from "vitest";
 import { createApp } from "../app.ts";
+import { invitationCountJob } from "../jobs/invitation-count.ts";
 import type { Mailer, MailMessage } from "../lib/mail.ts";
 import { signedInAccount, signInAs } from "../test/account.ts";
 import { CHALLENGE, VERIFIER } from "../test/attempt.ts";
 import { captureLogger, type TestContext, test, testConfig } from "../test/harness.ts";
+import { completed, invitationOf } from "../test/invitations.ts";
 import { HOME, people, pondNamed } from "../test/people.ts";
+import { pidOf, type Watched, waitsFor, watched, withTwoConnections } from "../test/races.ts";
 import { deriveArtificialIdentity, registerArtificial } from "./artificial.ts";
 import type { BrokerIdentity, IdentityBroker } from "./broker.ts";
-import { eraseAccount } from "./erasure.ts";
+import { type ErasureSummary, eraseAccount } from "./erasure.ts";
 import { deriveIdentity, hmacKeyFromHex } from "./hetu.ts";
 import { startLogin } from "./login.ts";
 import { CURRENT_CONSENT_VERSIONS } from "./onboarding.ts";
@@ -436,7 +439,7 @@ describe("the status read racing another request", () => {
 
   test("an erasure just after the home is written clears what it wrote", async ({ ctx }) => {
     const me = await signedInAccount(ctx.client, undefined, { state: "registered" });
-    const db = interleaved(ctx.client, { after: /UPDATE account\s+SET home_moved_at/ }, () =>
+    const db = interleaved(ctx.client, { after: /UPDATE account\s+SET home_place/ }, () =>
       eraseOnOtherDevice(ctx, me.accountId),
     );
     const { app } = await appOn(db);
@@ -1206,3 +1209,212 @@ async function liveAccounts(ctx: { client: Queryable }, hetuHmac: string) {
   );
   return rows[0]?.n;
 }
+
+describe("an erasure racing the night's count of invitations", () => {
+  // The night writes for both people of an invitation, so it locks both before
+  // it touches the invitation, and an erasure takes the account before the
+  // invitation (#503, rewards/repo.ts's lockParties). The other order leaves
+  // each waiting for the other: Postgres then ends one of them, 40P01, which
+  // `watched` turns into an outcome no test here expects. On connections of
+  // their own and committed rows, since a lock needs two; `interleaved` holds
+  // one of the two at the moment the other must meet what it holds.
+
+  /** 04:00 in Finland, the night of the count. */
+  const NIGHT = new Date("2026-10-23T01:00:00.000Z");
+
+  /** An inviter and the friend who used their code, both complete. */
+  async function invitedPair(db: Queryable) {
+    const [inviter, friend] = await people(db, null, 2);
+    if (!inviter || !friend) throw new Error("cast not written");
+    await completed(db, inviter);
+    await completed(db, friend);
+    await invitationOf(db, inviter, { redeemedBy: friend });
+    return { inviter, friend };
+  }
+
+  /** Whose units and notices are left, and what became of the invitation. */
+  const left = async (db: Queryable) => ({
+    units: (await db.query("SELECT account_id FROM reward")).rows,
+    notices: (await db.query("SELECT account_id, kind FROM notice")).rows,
+    invitations: (
+      await db.query(
+        "SELECT inviter_account_id, redeemed_by_account_id, counted_at FROM invitation",
+      )
+    ).rows,
+  });
+
+  test("an erasure of the friend that holds the account when the night reaches them makes the night wait, and the invitation goes uncounted", async () => {
+    await withTwoConnections("kuutti-503-friend-first", async (pool, erasing, counting) => {
+      const { friend } = await invitedPair(pool);
+      const { logger } = await captureLogger();
+      const erasingPid = await pidOf(erasing);
+      const countingPid = await pidOf(counting);
+      await erasing.query("BEGIN");
+      await counting.query("BEGIN");
+      let count: Watched<unknown> | undefined;
+      // The erasure holds the account, and has not reached the units or the invitation.
+      const db = interleaved(
+        erasing,
+        { before: /DELETE FROM reward WHERE account_id/ },
+        async () => {
+          count = watched(invitationCountJob({ db: counting, logger, now: () => NIGHT }).run());
+          expect(await waitsFor(pool, countingPid, erasingPid, count.settled)).toBe(true);
+        },
+      );
+      const erasure = await eraseAccount({ db, logger, now: () => NIGHT }, friend);
+      expect(db.ran()).toBe(true);
+      await erasing.query("COMMIT");
+      expect(await count?.outcome).toEqual({ counted: 0, fish: 0 });
+      await counting.query("COMMIT");
+      expect(erasure).toMatchObject({ rewardUnits: 0, notices: 0, usedInvitationsDeleted: 1 });
+      expect(await left(pool)).toEqual({ units: [], notices: [], invitations: [] });
+    });
+  });
+
+  test("an erasure of the friend that arrives while the night writes waits for the night, takes what it wrote of theirs and leaves the inviter's", async () => {
+    await withTwoConnections("kuutti-503-count-first", async (pool, counting, erasing) => {
+      const { inviter, friend } = await invitedPair(pool);
+      const { logger } = await captureLogger();
+      const countingPid = await pidOf(counting);
+      const erasingPid = await pidOf(erasing);
+      await counting.query("BEGIN");
+      await erasing.query("BEGIN");
+      let erasure: Watched<ErasureSummary> | undefined;
+      // The invitation is marked, and neither the units nor the notices are written.
+      const db = interleaved(
+        counting,
+        { after: /UPDATE invitation i SET counted_at/ },
+        async () => {
+          erasure = watched(eraseAccount({ db: erasing, logger, now: () => NIGHT }, friend));
+          expect(await waitsFor(pool, erasingPid, countingPid, erasure.settled)).toBe(true);
+        },
+      );
+      expect(await invitationCountJob({ db, logger, now: () => NIGHT }).run()).toEqual({
+        counted: 1,
+        fish: 2,
+      });
+      expect(db.ran()).toBe(true);
+      await counting.query("COMMIT");
+      expect(await erasure?.outcome).toMatchObject({
+        rewardUnits: 1,
+        notices: 1,
+        usedInvitationsDeleted: 0,
+        usedInvitationsKept: 1,
+      });
+      await erasing.query("COMMIT");
+      expect(await left(pool)).toEqual({
+        units: [{ account_id: inviter }],
+        notices: [{ account_id: inviter, kind: "invitation_counted" }],
+        invitations: [
+          { inviter_account_id: inviter, redeemed_by_account_id: null, counted_at: NIGHT },
+        ],
+      });
+    });
+  });
+
+  test("an erasure of the inviter that holds the account when the night reaches them makes the night wait, and the invitation counts for the friend alone", async () => {
+    await withTwoConnections("kuutti-503-inviter-first", async (pool, erasing, counting) => {
+      const { inviter, friend } = await invitedPair(pool);
+      const { logger } = await captureLogger();
+      const erasingPid = await pidOf(erasing);
+      const countingPid = await pidOf(counting);
+      await erasing.query("BEGIN");
+      await counting.query("BEGIN");
+      let count: Watched<unknown> | undefined;
+      const db = interleaved(
+        erasing,
+        { before: /DELETE FROM reward WHERE account_id/ },
+        async () => {
+          count = watched(invitationCountJob({ db: counting, logger, now: () => NIGHT }).run());
+          expect(await waitsFor(pool, countingPid, erasingPid, count.settled)).toBe(true);
+        },
+      );
+      await eraseAccount({ db, logger, now: () => NIGHT }, inviter);
+      await erasing.query("COMMIT");
+      expect(await count?.outcome).toEqual({ counted: 1, fish: 1 });
+      await counting.query("COMMIT");
+      expect(await left(pool)).toEqual({
+        units: [{ account_id: friend }],
+        notices: [{ account_id: friend, kind: "invitation_friend" }],
+        invitations: [
+          { inviter_account_id: null, redeemed_by_account_id: friend, counted_at: NIGHT },
+        ],
+      });
+    });
+  });
+
+  test("two erasures of a counted invitation's two people take turns, and the later takes the row away", async () => {
+    await withTwoConnections("kuutti-503-both-go", async (pool, earlier, later) => {
+      const [inviter, friend] = await people(pool, null, 2);
+      if (!inviter || !friend) throw new Error("cast not written");
+      await invitationOf(pool, inviter, { redeemedBy: friend, countedAt: NIGHT });
+      const { logger } = await captureLogger();
+      const earlierPid = await pidOf(earlier);
+      const laterPid = await pidOf(later);
+      await earlier.query("BEGIN");
+      await later.query("BEGIN");
+      let second: Watched<ErasureSummary> | undefined;
+      // The inviter's link is cut, not yet committed.
+      const db = interleaved(
+        earlier,
+        { after: /UPDATE invitation SET inviter_account_id = NULL/ },
+        async () => {
+          second = watched(eraseAccount({ db: later, logger, now: () => NIGHT }, friend));
+          expect(await waitsFor(pool, laterPid, earlierPid, second.settled)).toBe(true);
+        },
+      );
+      await eraseAccount({ db, logger, now: () => NIGHT }, inviter);
+      expect(db.ran()).toBe(true);
+      await earlier.query("COMMIT");
+      expect(await second?.outcome).toMatchObject({
+        usedInvitationsDeleted: 1,
+        usedInvitationsKept: 0,
+      });
+      await later.query("COMMIT");
+      expect(await left(pool)).toEqual({ units: [], notices: [], invitations: [] });
+    });
+  });
+
+  test("an erasure of the friend committed between the night's read of who is complete and its lock leaves nothing to write", async ({
+    ctx,
+  }) => {
+    const pair = await invitedPair(ctx.client);
+    const { logger } = await captureLogger();
+    const db = interleaved(ctx.client, { before: /FOR SHARE OF a/ }, () =>
+      eraseAccount({ db: ctx.client, logger, now: () => NIGHT }, pair.friend),
+    );
+    expect(await invitationCountJob({ db, logger, now: () => NIGHT }).run()).toEqual({
+      counted: 0,
+      fish: 0,
+    });
+    expect(db.ran()).toBe(true);
+    const nobody = [pair.inviter, pair.friend];
+    for (const table of ["reward", "notice"]) {
+      const { rows } = await ctx.client.query(
+        `SELECT 1 FROM ${table} WHERE account_id = ANY($1::uuid[])`,
+        [nobody],
+      );
+      expect(rows, table).toEqual([]);
+    }
+  });
+
+  test("an erasure of the inviter committed between the night's read of who is complete and its lock leaves the friend's side to write", async ({
+    ctx,
+  }) => {
+    const pair = await invitedPair(ctx.client);
+    const { logger } = await captureLogger();
+    const db = interleaved(ctx.client, { before: /FOR SHARE OF a/ }, () =>
+      eraseAccount({ db: ctx.client, logger, now: () => NIGHT }, pair.inviter),
+    );
+    expect(await invitationCountJob({ db, logger, now: () => NIGHT }).run()).toEqual({
+      counted: 1,
+      fish: 1,
+    });
+    expect(db.ran()).toBe(true);
+    const { rows } = await ctx.client.query(
+      "SELECT account_id FROM reward WHERE account_id = ANY($1::uuid[])",
+      [[pair.inviter, pair.friend]],
+    );
+    expect(rows).toEqual([{ account_id: pair.friend }]);
+  });
+});

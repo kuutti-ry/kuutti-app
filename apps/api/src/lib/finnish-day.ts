@@ -14,7 +14,14 @@ export function finnishDay(at: Date): string {
   }).format(at);
 }
 
-/** The hour of an instant in Finland, 0 to 23: the quiet hours and the round's push (ADR-055 §6, §7). */
+/** A Finnish day `days` after another, both as `YYYY-MM-DD`; before it, for a negative number. */
+export function addDays(day: string, days: number): string {
+  const at = new Date(`${day}T12:00:00Z`);
+  at.setUTCDate(at.getUTCDate() + days);
+  return at.toISOString().slice(0, 10);
+}
+
+/** The hour of an instant in Finland, 0 to 23: the quiet hours (ADR-055 §7). */
 export function finnishHour(at: Date): number {
   const hour = new Intl.DateTimeFormat("en-GB", {
     timeZone: "Europe/Helsinki",
@@ -30,8 +37,8 @@ const DAY_MS = 24 * HOUR_MS;
 
 /**
  * Milliseconds from `now` to the next `hour`:00 Europe/Helsinki, whatever the
- * clocks did between: the night's jobs, the round's push and a push's time to
- * live (#102, ADR-055 §6, §7).
+ * clocks did between: the night's jobs and a push's time to live (#102, ADR-055
+ * §7).
  */
 export function msUntilFinnishHour(now: Date, hour: number): number {
   const parts = new Intl.DateTimeFormat("en-GB", {

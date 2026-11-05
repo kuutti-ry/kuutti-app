@@ -19,7 +19,7 @@ import PhotosRoute from "../app/photos/index";
 // biome-ignore lint/style/noRestrictedImports: a route file, not a slice internal
 import CardPreviewRoute from "../app/profile/card";
 // biome-ignore lint/style/noRestrictedImports: a route file, not a slice internal
-import DealBreakersRoute from "../app/profile/deal-breakers";
+import DealBreakerFieldRoute from "../app/profile/deal-breakers/[field]";
 // biome-ignore lint/style/noRestrictedImports: a route file, not a slice internal
 import GenderRoute from "../app/profile/gender";
 import ProfileRoute from "../app/profile/index";
@@ -122,7 +122,7 @@ jest.mock("@/features/profile", () => {
     createElement(Text, { testID: name }, JSON.stringify(props));
   return {
     CardPreviewScreen: probe("CardPreviewScreen"),
-    DealBreakersScreen: probe("DealBreakersScreen"),
+    DealBreakerFieldScreen: probe("DealBreakerFieldScreen"),
     GenderScreen: probe("GenderScreen"),
     holdLinkWhileUnsaved: jest.fn((path: string) => path),
     LaterFieldScreen: probe("LaterFieldScreen"),
@@ -187,7 +187,6 @@ describe("the screens without params", () => {
     ["/photos", PhotosRoute, "PhotosScreen"],
     ["/profile", ProfileRoute, "ProfileScreen"],
     ["/profile/card", CardPreviewRoute, "CardPreviewScreen"],
-    ["/profile/deal-breakers", DealBreakersRoute, "DealBreakersScreen"],
     ["/profile/gender", GenderRoute, "GenderScreen"],
     ["/profile/place", PlaceRoute, "PlaceScreen"],
     ["/profile/seek", SeekRoute, "SeekScreen"],
@@ -207,6 +206,11 @@ describe("the screens without params", () => {
 
   it("/photos turns the stack's back gesture off, so a drag to the right keeps the tile (#179)", async () => {
     await render(<PhotosRoute />);
+    expect(propsOf("Stack.Screen")).toEqual({ options: { gestureEnabled: false } });
+  });
+
+  it("/onboarding turns it off too: its photos step holds the same grid, and nothing under it is a step to go back to (#581)", async () => {
+    await render(<OnboardingRoute />);
     expect(propsOf("Stack.Screen")).toEqual({ options: { gestureEnabled: false } });
   });
 
@@ -324,23 +328,8 @@ describe("the bank login's return, /auth", () => {
 });
 
 describe("the photos screen, /photos", () => {
-  it("hands the onboarding's step as numbers when it opened the screen (#146)", async () => {
-    params({ step: "8", total: "10" });
-    await render(<PhotosRoute />);
-    expect(propsOf("PhotosScreen")).toEqual({ progress: { step: 8, total: 10 } });
-  });
-
-  it.each<Record<string, string | readonly string[]>>([
-    { step: "8" },
-    { total: "10" },
-    { step: "", total: "10" },
-    { step: "eight", total: "10" },
-    { step: "11", total: "10" },
-    { step: "0", total: "10" },
-    { step: "1.5", total: "10" },
-    { step: ["8", "9"], total: "10" },
-  ])("hands no step for %j, which no onboarding sends", async (value) => {
-    params(value);
+  it("hands no step, whatever a link says: onboarding's photos step is its own screen now (#581)", async () => {
+    params({ step: "7", total: "8" });
     await render(<PhotosRoute />);
     expect(propsOf("PhotosScreen")).toEqual({});
   });
@@ -420,6 +409,16 @@ describe("the profile's routes with a param", () => {
     params({});
     await render(<LaterFieldRoute />);
     expect(propsOf("LaterFieldScreen")).toEqual({ field: "", once: false });
+  });
+
+  it("hands a deal-breaker's route its field, none to an address without one (#551)", async () => {
+    params({ field: "smoking" });
+    const view = await render(<DealBreakerFieldRoute />);
+    expect(propsOf("DealBreakerFieldScreen")).toEqual({ field: "smoking" });
+    await view.unmount();
+    params({});
+    await render(<DealBreakerFieldRoute />);
+    expect(propsOf("DealBreakerFieldScreen")).toEqual({ field: "" });
   });
 
   it("says a later field was opened for its one answer when the link says once (#542)", async () => {

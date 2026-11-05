@@ -1,0 +1,70 @@
+# The star (#575, ADR-064): Iida puts one on Henna's card, the first in her queue,
+# which says that only she sees it, and the card stays. Home then has a way to
+# the Starred list, which it had not before; the list opens Henna's card as it
+# stands, and its row takes the star off. The list says nobody is there, and home
+# goes back to how it was. Nothing is decided, so round.yaml, Iida's too, finds
+# her queue as the stories left it. Deciding from the list, the cap and whoever
+# the list leaves out are the API's and jest's tests.
+appId: fi.kuutti.app
+name: A star on a card brings the person to a Starred list only they see, and taking it off leaves everything as it was
+---
+- runFlow:
+    file: ../common/sign-in.yaml
+    env:
+      PERSONA: Iida Mattila
+# Home: no star yet, so no way to a list of them.
+- scrollUntilVisible:
+    element: "See people|Katso ihmisiä|Se människor"
+    direction: DOWN
+    centerElement: true
+    timeout: 60000
+- assertNotVisible: "Starred|Tähdellä merkityt|Stjärnmärkta"
+- tapOn: "See people|Katso ihmisiä|Se människor"
+- extendedWaitUntil:
+    visible: "Liked you|Tykkäsi sinusta|Gillade dig"
+    timeout: 15000
+- assertVisible: "Henna, \\d+"
+- waitForAnimationToEnd
+# The first star says who sees it, and the card stays. On iOS a labelled button
+# exposes its label alone (README), and the label names the person.
+- tapOn: "(Star|Tähti|Stjärna): Henna"
+- extendedWaitUntil:
+    visible: "Only you can see your stars\\.|Vain sinä näet tähtesi\\.|Bara du ser dina stjärnor\\."
+    timeout: 15000
+- assertVisible: "Henna, \\d+"
+# Home now has the way to the list, by its word and no count.
+- tapOn: "Back to home|Takaisin alkuun|Tillbaka till start"
+- scrollUntilVisible:
+    element: "Starred|Tähdellä merkityt|Stjärnmärkta"
+    direction: DOWN
+    centerElement: true
+    timeout: 60000
+- tapOn: "Starred|Tähdellä merkityt|Stjärnmärkta"
+# The rows stand under the title alone: the first star said who sees it (#581).
+# A row opens the card as it stands: Iida has not answered Henna's like.
+- extendedWaitUntil:
+    visible: "Henna, \\d+"
+    timeout: 15000
+- waitForAnimationToEnd
+- tapOn: "Henna, \\d+"
+- extendedWaitUntil:
+    visible: "Liked you|Tykkäsi sinusta|Gillade dig"
+    timeout: 15000
+- waitForAnimationToEnd
+- tapOn: "Back to Starred|Takaisin tähdellä merkittyihin|Tillbaka till stjärnmärkta"
+# The row's own star takes it off, and the row goes.
+- extendedWaitUntil:
+    visible: "(Take the star off|Poista tähti|Ta bort stjärnan): Henna"
+    timeout: 15000
+- tapOn: "(Take the star off|Poista tähti|Ta bort stjärnan): Henna"
+- extendedWaitUntil:
+    visible: "Nobody here right now\\.|Täällä ei ole nyt ketään\\.|Ingen här just nu\\."
+    timeout: 15000
+- tapOn: "Back to home|Takaisin alkuun|Tillbaka till start"
+# Home as it was: something going is waited for (README).
+- extendedWaitUntil:
+    visible: "See people|Katso ihmisiä|Se människor"
+    timeout: 15000
+- extendedWaitUntil:
+    notVisible: "Starred|Tähdellä merkityt|Stjärnmärkta"
+    timeout: 15000

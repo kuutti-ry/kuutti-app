@@ -344,7 +344,7 @@ describe("ProfileCardView", () => {
     await act(async () => {
       fireEvent.press(screen.getByRole("button", { name: "Block" }));
     });
-    await screen.findByText("Blocked. You will not see each other again.");
+    await screen.findByText("Blocked.");
     await act(async () => {
       fireEvent.press(screen.getByRole("button", { name: "Done" }));
     });

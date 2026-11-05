@@ -10,7 +10,7 @@ import CircleAlert from "lucide-react-native/icons/circle-alert";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Keyboard, Platform, type TextInput, View } from "react-native";
 import { LoadFailed } from "@/components/LoadFailed";
-import { Notice as Said } from "@/components/Notice";
+import { Notice as Said, sayAloud } from "@/components/Notice";
 import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
 import { Input } from "@/components/ui/input";
@@ -29,7 +29,6 @@ import { codeOf, HOME_REGION, type Region, readPhone, showPhone } from "./phone"
 type Stored = Partial<Record<ContactKind, string | undefined>>;
 type Notice =
   | "saved"
-  | "removed"
   | "stillSaved"
   | "invalid"
   | "phoneShort"
@@ -53,7 +52,7 @@ const NUMBER: ReadonlySet<ContactKind> = new Set(["phone", "whatsapp"]);
 
 /**
  * The person's contacts (#103), under Settings' Ways to reach you row (#511):
- * the line that nobody sees them until one is shared in a conversation, then
+ * who sees them and how far a change reaches, then
  * a part per kind (phone number, WhatsApp, Telegram, Instagram, Snapchat),
  * with a hairline between them rather than cards inside the list's card.
  * While they are being read it says so; a read that failed says why, with a
@@ -95,12 +94,12 @@ export function YourContacts({ onStored }: { onStored?: (kept: readonly ContactK
   if (state === "loading") {
     return (
       <Text variant="muted" accessibilityLiveRegion="polite">
-        {t("settings.contacts.loading")}
+        {t("load.loading")}
       </Text>
     );
   }
   if (state === "unavailable") {
-    return <LoadFailed headline={t("settings.contacts.loadFailed")} error={error} onRetry={read} />;
+    return <LoadFailed error={error} onRetry={read} />;
   }
   return (
     <View className="gap-6">
@@ -120,7 +119,8 @@ export function YourContacts({ onStored }: { onStored?: (kept: readonly ContactK
 
 /**
  * One kind, as the e-mail's (#148): its mark (#474), its name and Remove
- * beside it (only while one is kept), what to type, and the field with what
+ * beside it (only while one is kept), for a phone number that another country
+ * has its code first (#581), and the field with what
  * is kept in its stored form. There is no Save: leaving the field keeps what
  * it holds, as the profile does (the maintainer, 29/10/2026, #511). What is
  * typed is checked on the phone first, with the API's own rule; a refusal
@@ -129,7 +129,8 @@ export function YourContacts({ onStored }: { onStored?: (kept: readonly ContactK
  * are right. An emptied field takes nothing away: the kept one comes back,
  * and Remove is the way. A keep or a removal counts with the messages of a
  * minute (#103), and one past them, or a failure, keeps the words with a way
- * to try again. One request at a time; an answer leaves alone what was typed
+ * to try again: Try again while the field holds words it can send, Remove for
+ * a removal. One request at a time; an answer leaves alone what was typed
  * after it was asked. Leaving Settings with a change not yet sent sends it
  * on the way out.
  */
@@ -181,12 +182,15 @@ function ContactCard({
   const kept = formOf(words, region);
   const form = kept !== null && !REFUSED.has(kept as Notice) ? kept : null;
   const refused = notice !== null && REFUSED.has(notice);
+  // What leaving the field would send, and so all that Try again can do: after a
+  // removal that failed the field holds what is kept, and Remove is the way again.
+  const sendable = form !== null && form !== stored;
   // Typed and not kept: words that are no contact of the kind, or a right one
   // the API did not take (a failure, the minute's messages). A right one not
   // sent yet goes on the way out, and needs no word.
   useReportUnsaved(kind, words !== "" && (form === null || (form !== stored && refused)));
 
-  const run = async (call: () => Promise<string | null>, done: "saved" | "removed") => {
+  const run = async (call: () => Promise<string | null>) => {
     setBusy(true);
     typedSince.current = false;
     try {
@@ -194,7 +198,13 @@ function ContactCard({
       latest.current.onStored(value);
       if (!typedSince.current) setTyped(shown(value));
       if (number && value !== null) setRegion(showPhone(value).region);
-      say(done);
+      if (value !== null) {
+        say("saved");
+      } else {
+        // The field empties, Remove goes and the row's value changes: said, not drawn (#581).
+        setSaid(null);
+        sayAloud(t("settings.contacts.removed"));
+      }
     } catch (error) {
       const failure = error instanceof ApiError ? error : null;
       say(
@@ -230,7 +240,7 @@ function ContactCard({
       return;
     }
     // A number goes as E.164 (+358…), which the API's rule reads as it is.
-    if (!sending) void run(async () => (await saveContact(kind, next)).value, "saved");
+    if (!sending) void run(async () => (await saveContact(kind, next)).value);
   };
 
   // Android's keyboard can go with the field still focused (its back key, a
@@ -322,14 +332,14 @@ function ContactCard({
                 void run(async () => {
                   await removeContact(kind);
                   return null;
-                }, "removed");
+                });
               }}
             >
               {t("settings.contacts.remove")}
             </Button>
           )}
         </View>
-        <Text variant="muted">{t("settings.contacts.hint", { kind })}</Text>
+        {kind === "phone" && <Text variant="muted">{t("settings.contacts.phoneHint")}</Text>}
       </View>
       {number ? (
         <View className="flex-row flex-wrap gap-2">
@@ -383,7 +393,7 @@ function ContactCard({
               <Said words={answerWords} refused={REFUSED.has(said.notice)} answer={said.answer} />
             </View>
           </View>
-          {(said.notice === "pace" || said.notice === "failed") && (
+          {(said.notice === "pace" || said.notice === "failed") && sendable && (
             <Button
               variant="outline"
               className="self-start"
@@ -393,7 +403,7 @@ function ContactCard({
                 leave();
               }}
             >
-              {t("settings.contacts.retry")}
+              {t("load.retry")}
             </Button>
           )}
         </View>
@@ -412,8 +422,6 @@ function wordsOf(
   switch (notice) {
     case "saved":
       return t("settings.contacts.saved");
-    case "removed":
-      return t("settings.contacts.removed");
     case "stillSaved":
       return t("settings.contacts.stillSaved");
     case "invalid":
@@ -427,7 +435,7 @@ function wordsOf(
     case "pace":
       return t("chat.contact.error.message_budget_exceeded");
     case "failed":
-      return t("settings.contacts.failed");
+      return t("load.failed.press");
   }
 }
 
@@ -437,7 +445,7 @@ const readKept = () =>
     CONTACT_KINDS.filter((kind) => contacts.some((contact) => contact.kind === kind)),
   );
 
-/** The Ways to reach you row's value in Settings (#376, #511): the kinds kept, by name, or none. */
+/** The Ways to reach you row's value in Settings (#376, #511): the kinds kept, by name, or, with none, what to do (#581). */
 export function useContactsSummary(enabled: boolean) {
   const { t } = useT();
   const { data, stored } = useRowData<readonly ContactKind[]>(readKept, enabled);

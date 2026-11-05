@@ -23,7 +23,7 @@
     },
     {
       "name": "@expo/cli",
-      "version": "57.0.28",
+      "version": "57.0.32",
       "license": "MIT",
       "provider": "expo",
       "licences": [
@@ -39,7 +39,7 @@
     },
     {
       "name": "@expo/metro-runtime",
-      "version": "57.0.16",
+      "version": "57.0.17",
       "license": "MIT",
       "provider": "expo",
       "licences": [
@@ -55,7 +55,7 @@
     },
     {
       "name": "@expo/ui",
-      "version": "57.0.22",
+      "version": "57.0.26",
       "license": "MIT",
       "provider": "expo",
       "licences": [
@@ -200,7 +200,7 @@
     },
     {
       "name": "@formatjs/intl-pluralrules",
-      "version": "6.3.15",
+      "version": "6.3.16",
       "license": "MIT",
       "provider": "formatjs",
       "licences": [
@@ -468,7 +468,7 @@
     },
     {
       "name": "@sentry/browser",
-      "version": "10.75.2",
+      "version": "10.76.2",
       "license": "MIT",
       "provider": "sentry",
       "licences": [
@@ -484,7 +484,7 @@
     },
     {
       "name": "@sentry/browser-utils",
-      "version": "10.75.2",
+      "version": "10.76.2",
       "license": "MIT",
       "provider": "sentry",
       "licences": [
@@ -516,7 +516,7 @@
     },
     {
       "name": "@sentry/core",
-      "version": "10.75.2",
+      "version": "10.76.2",
       "license": "MIT",
       "provider": "sentry",
       "licences": [
@@ -532,7 +532,7 @@
     },
     {
       "name": "@sentry/feedback",
-      "version": "10.75.2",
+      "version": "10.76.2",
       "license": "MIT",
       "provider": "sentry",
       "licences": [
@@ -548,7 +548,7 @@
     },
     {
       "name": "@sentry/react",
-      "version": "10.75.2",
+      "version": "10.76.2",
       "license": "MIT",
       "provider": "sentry",
       "licences": [
@@ -564,7 +564,7 @@
     },
     {
       "name": "@sentry/react-native",
-      "version": "8.29.0",
+      "version": "8.32.0",
       "license": "MIT",
       "provider": "sentry",
       "licences": [
@@ -580,7 +580,7 @@
     },
     {
       "name": "@sentry/replay",
-      "version": "10.75.2",
+      "version": "10.76.2",
       "license": "MIT",
       "provider": "sentry",
       "licences": [
@@ -596,7 +596,7 @@
     },
     {
       "name": "@sentry/replay-canvas",
-      "version": "10.75.2",
+      "version": "10.76.2",
       "license": "MIT",
       "provider": "sentry",
       "licences": [
@@ -802,7 +802,7 @@
     },
     {
       "name": "expo",
-      "version": "57.0.27",
+      "version": "57.0.31",
       "license": "MIT",
       "provider": "Expo",
       "licences": [
@@ -834,7 +834,7 @@
     },
     {
       "name": "expo-asset",
-      "version": "57.0.19",
+      "version": "57.0.20",
       "license": "MIT",
       "provider": "650 Industries, Inc.",
       "licences": [
@@ -850,7 +850,7 @@
     },
     {
       "name": "expo-constants",
-      "version": "57.0.21",
+      "version": "57.0.22",
       "license": "MIT",
       "provider": "650 Industries, Inc.",
       "licences": [
@@ -978,7 +978,7 @@
     },
     {
       "name": "expo-linking",
-      "version": "57.0.12",
+      "version": "57.0.13",
       "license": "MIT",
       "provider": "650 Industries, Inc.",
       "licences": [
@@ -1026,7 +1026,7 @@
     },
     {
       "name": "expo-modules-core",
-      "version": "57.0.21",
+      "version": "57.0.24",
       "license": "MIT",
       "provider": "650 Industries, Inc.",
       "licences": [
@@ -1058,7 +1058,7 @@
     },
     {
       "name": "expo-router",
-      "version": "57.0.25",
+      "version": "57.0.29",
       "license": "MIT",
       "provider": "650 Industries, Inc.",
       "licences": [
@@ -1131,7 +1131,7 @@
     },
     {
       "name": "expo-updates",
-      "version": "57.0.25",
+      "version": "57.0.26",
       "license": "MIT",
       "provider": "650 Industries, Inc.",
       "licences": [
@@ -1213,7 +1213,7 @@
     },
     {
       "name": "i18next",
-      "version": "26.4.2",
+      "version": "26.5.11",
       "license": "MIT",
       "provider": "Jan Mühlemann",
       "licences": [
@@ -1229,7 +1229,7 @@
     },
     {
       "name": "i18next-icu",
-      "version": "2.5.0",
+      "version": "2.6.1",
       "license": "MIT",
       "provider": "Jan Mühlemann",
       "licences": [
@@ -1312,7 +1312,7 @@
     },
     {
       "name": "lucide-react-native",
-      "version": "1.52.0",
+      "version": "1.62.0",
       "license": "ISC",
       "provider": "Eric Fennis",
       "licences": [
@@ -1457,7 +1457,7 @@
     },
     {
       "name": "react",
-      "version": "19.3.0",
+      "version": "19.3.1",
       "license": "MIT",
       "provider": null,
       "licences": [
@@ -1489,7 +1489,7 @@
     },
     {
       "name": "react-i18next",
-      "version": "17.0.16",
+      "version": "17.1.9",
       "license": "MIT",
       "provider": "Jan Mühlemann",
       "licences": [

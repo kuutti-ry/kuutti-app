@@ -40,14 +40,13 @@ export const REQUEST_SPACING_MS = 200;
 const LINES: Record<PushData["kind"], PlainMessageKey> = {
   message: "push.message",
   match: "push.match",
-  round: "push.round",
 };
 
 /**
  * Runs a task after `ms`, on a timer that keeps no process alive. The task
  * never rejects: it logs its own failure. Tests hand in their own, and await it.
  */
-export type Schedule = (ms: number, task: () => Promise<void>) => void;
+type Schedule = (ms: number, task: () => Promise<void>) => void;
 
 const realSchedule: Schedule = (ms, task) => {
   setTimeout(() => void task(), ms).unref();
@@ -115,37 +114,26 @@ export function createPush(deps: PushDeps) {
     };
   }
 
-  /** The accounts among `accountIds` whose switch for `kind` is on: no row means on (ADR-032 §1). */
-  async function switchedOn(kind: NotificationKind, accountIds: string[]): Promise<string[]> {
-    const { rows } = await deps.db.query<{ account_id: string }>(
-      `SELECT account_id FROM notification_preference
-        WHERE account_id = ANY($1::uuid[]) AND kind = $2 AND NOT enabled`,
-      [accountIds, kind],
+  /** Whether the person's switch for `kind` is on: no row means on (ADR-032 §1). */
+  async function switchedOn(kind: NotificationKind, accountId: string): Promise<boolean> {
+    const { rows } = await deps.db.query(
+      `SELECT 1 FROM notification_preference
+        WHERE account_id = $1 AND kind = $2 AND NOT enabled`,
+      [accountId, kind],
     );
-    const off = new Set(rows.map((row) => row.account_id));
-    return accountIds.filter((id) => !off.has(id));
+    return rows.length === 0;
   }
 
-  /** The tokens of the accounts' live sessions: an expired one waits for the night's prune, unsent to. */
-  async function tokensOf(accountIds: string[], at: Date): Promise<Token[]> {
-    const { rows } = await deps.db.query<{
-      id: string;
-      account_id: string;
-      token: string;
-      locale: string;
-    }>(
-      `SELECT t.id, t.account_id, t.token, t.locale FROM push_token t
+  /** The tokens of the person's live sessions: an expired one waits for the night's prune, unsent to. */
+  async function tokensOf(accountId: string, at: Date): Promise<Token[]> {
+    const { rows } = await deps.db.query<{ id: string; token: string; locale: string }>(
+      `SELECT t.id, t.token, t.locale FROM push_token t
          JOIN session s ON s.id = t.session_id AND s.account_id = t.account_id
-        WHERE t.account_id = ANY($1::uuid[]) AND s.revoked_at IS NULL AND s.expires_at > $2
-        ORDER BY t.account_id, t.created_at`,
-      [accountIds, at],
+        WHERE t.account_id = $1 AND s.revoked_at IS NULL AND s.expires_at > $2
+        ORDER BY t.created_at`,
+      [accountId, at],
     );
-    return rows.map((row) => ({
-      id: row.id,
-      accountId: row.account_id,
-      token: row.token,
-      locale: row.locale,
-    }));
+    return rows.map((row) => ({ ...row, accountId }));
   }
 
   /** A token Apple or Google no longer knows goes (ADR-055 §8), by its row and its account. */
@@ -232,7 +220,7 @@ export function createPush(deps: PushDeps) {
   }
 
   /**
-   * One push of `data` to every live device of `accountIds`, worded in each
+   * One push of `data` to every live device of the person, worded in each
    * device's language. The number of pushes Expo took; none in the quiet
    * hours, where nothing is kept for later (Open 1), and none of them waits
    * for its phone into them. A request at a time, a hundred pushes each and
@@ -240,18 +228,13 @@ export function createPush(deps: PushDeps) {
    * the tickets of those before it are read; a refusal is logged and nothing
    * is retried (Open 4).
    */
-  async function deliver(
-    accountIds: string[],
-    data: PushData,
-    priority: PushMessage["priority"],
-  ): Promise<number> {
-    const { pusher } = deps;
-    if (!pusher || accountIds.length === 0) return 0;
+  async function deliver(pusher: Pusher, accountId: string, data: PushData): Promise<number> {
     const at = deps.now();
     const { quiet, ttl } = await timing(at);
     if (quiet) return 0;
     const kind = data.kind;
-    const tokens = await tokensOf(await switchedOn(kind, accountIds), at);
+    if (!(await switchedOn(kind, accountId))) return 0;
+    const tokens = await tokensOf(accountId, at);
     if (tokens.length === 0) return 0;
     const all = tokens.map((token) => ({
       token,
@@ -263,7 +246,7 @@ export function createPush(deps: PushDeps) {
         collapseId: kind,
         tag: kind,
         channelId: "default",
-        priority,
+        priority: "high",
         sound: "default",
         ttl,
       } satisfies PushMessage,
@@ -286,7 +269,7 @@ export function createPush(deps: PushDeps) {
         }
         // The push is gone either way; a refusal that cannot be acted on (the
         // database away) is logged and the rest go on, so nothing is retried
-        // that was sent (a round run tried again would push everybody twice).
+        // that was sent.
         try {
           await refused(token, ticket.error, kind);
         } catch (error) {
@@ -320,7 +303,8 @@ export function createPush(deps: PushDeps) {
      * interval counts from the push that went. Returns at once.
      */
     message(input: { conversationId: string; readers: () => Promise<readonly string[]> }): void {
-      if (!deps.pusher) return;
+      const { pusher } = deps;
+      if (!pusher) return;
       inTheBackground("message", async () => {
         const nowMs = deps.now().getTime();
         const intervalMs =
@@ -340,7 +324,7 @@ export function createPush(deps: PushDeps) {
           lastPushed.set(key, nowMs);
           let sent = 0;
           try {
-            sent = await deliver([accountId], { kind: "message" }, "high");
+            sent = await deliver(pusher, accountId, { kind: "message" });
           } finally {
             if (sent === 0) lastPushed.delete(key);
           }
@@ -353,22 +337,11 @@ export function createPush(deps: PushDeps) {
      * in the app or not, since no frame tells of a new match. Returns at once.
      */
     match(input: { accountId: string }): void {
-      if (!deps.pusher) return;
+      const { pusher } = deps;
+      if (!pusher) return;
       inTheBackground("match", async () => {
-        await deliver([input.accountId], { kind: "match" }, "high");
+        await deliver(pusher, input.accountId, { kind: "match" });
       });
-    },
-
-    /** The day's round (ADR-055 §6), to those the job chose; the job waits for it and logs its failure, and `settled` waits for it too. */
-    round(accountIds: readonly string[]): Promise<number> {
-      const run = deliver([...accountIds], { kind: "round" }, "normal");
-      const watched = run.then(
-        () => undefined,
-        () => undefined,
-      );
-      inFlight.add(watched);
-      void watched.finally(() => inFlight.delete(watched));
-      return run;
     },
 
     /** Resolves once every push started in the background has settled: the tests, and a shutdown. */

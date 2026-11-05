@@ -61,5 +61,9 @@ export const sectionTitleKey = (id: SectionId): PlainMessageKey =>
   id === INTENT_SECTION
     ? "onboarding.intent.title"
     : (`profile.section.${id}.title` as PlainMessageKey);
-export const sectionSummaryKey = (id: SectionId) =>
-  `profile.section.${id}.summary` as PlainMessageKey;
+/**
+ * What a section's row says to a screen reader beyond its title: what it holds
+ * (#581). Never drawn. The prompts have none: their title and count say it.
+ */
+export const sectionHintKey = (id: SectionId): PlainMessageKey | undefined =>
+  id === "prompts" ? undefined : (`profile.section.${id}.summary` as PlainMessageKey);

@@ -67,13 +67,11 @@ export type PreparedPick =
  * The chain on the phone before anything is sent (#48), for the photos screen
  * and the chat's composer (#350) alike: the library, the on-device check on
  * the picked file (before the resize and before any byte leaves the phone),
- * then the pre-resize. `onPreparing` is told once a picture is chosen, while
- * it is checked and resized.
+ * then the pre-resize.
  */
-export async function pickPrepared(onPreparing?: () => void): Promise<PreparedPick> {
+export async function pickPrepared(): Promise<PreparedPick> {
   const picked = await pickPhoto();
   if (picked.kind !== "picked") return picked;
-  onPreparing?.();
   if ((await checkPhoto(picked.asset.uri)) === "refuse") return { kind: "refused_local" };
   return { kind: "picked", photo: await prepareForUpload(picked.asset) };
 }

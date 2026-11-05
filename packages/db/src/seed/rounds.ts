@@ -1,15 +1,15 @@
 import { type Queryable, transaction } from "../pool.ts";
 
 /**
- * The round of the personas' stories (#379, ADR-034, ADR-037): Iida opens the
- * app to the day's round, the four women of the round's cast in it, Henna
- * first, who liked her yesterday, so that Iida's like back is a match.
+ * The round of the personas' stories (#379, ADR-034, ADR-037, ADR-062): Iida
+ * opens the app to the day's queue, the four women of the round's cast in it,
+ * Henna first, who liked her yesterday, so that Iida's like back is a match.
  *
  * One thing in it no route does, written as rows, as the conversations are:
  * a like on the day before (a decision is taken on the day it is of, and the
- * day has ended). The day's round itself is built by the round builder (#95)
- * in the API's demo commands, in a pond they have opened (`openPonds`), as the
- * night builds it.
+ * day has ended). The day itself is opened by the queue's builder (#502) in the
+ * API's demo commands, in a pond they have opened (`openPonds`), as the day's
+ * first read would.
  */
 export type PersonaRound = {
   /** Whose round the day has, by persona key. */

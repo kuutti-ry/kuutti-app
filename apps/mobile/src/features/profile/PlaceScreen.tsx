@@ -6,6 +6,7 @@ import { View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { KeyboardScrollView } from "@/components/KeyboardScrollView";
 import { LoadFailed } from "@/components/LoadFailed";
+import { sayAloud } from "@/components/Notice";
 import { ScreenHeader } from "@/components/ScreenHeader";
 import { Text } from "@/components/ui/text";
 import { ApiError } from "@/lib/api";
@@ -14,12 +15,11 @@ import { saveHome } from "./client";
 import { PlaceChoice, PlacePicker, useSpokenOnIos } from "./PlaceEditor";
 import { useProfile } from "./useProfile";
 
-type Notice = "saved" | "unknown" | "failed";
+type Notice = "unknown" | "failed";
 
 const NOTICE: Readonly<Record<Notice, PlainMessageKey>> = {
-  saved: "profile.place.saved",
   unknown: "errors.postal_code_unknown",
-  failed: "profile.place.failed",
+  failed: "load.failed.press",
 };
 
 /**
@@ -27,7 +27,8 @@ const NOTICE: Readonly<Record<Notice, PlainMessageKey>> = {
  * and a new postal code, as often as they like (§1), which starts the card
  * from the town again (§3). In words only: a place's digits are never shown
  * back, and what was typed goes with the save. Both save on the tap, so
- * nothing waits to be lost on leaving.
+ * nothing waits to be lost on leaving. A save is heard, not drawn (#581): the
+ * filled button moves, or the field empties and the buttons show the new town.
  */
 export function PlaceScreen() {
   const { t } = useT();
@@ -45,7 +46,7 @@ export function PlaceScreen() {
     return (
       <SafeAreaView className="flex-1 bg-background">
         <View className="flex-1 items-center justify-center p-6">
-          <Text accessibilityLiveRegion="polite">{t("profile.loading")}</Text>
+          <Text accessibilityLiveRegion="polite">{t("load.loading")}</Text>
         </View>
       </SafeAreaView>
     );
@@ -54,11 +55,7 @@ export function PlaceScreen() {
     return (
       <SafeAreaView className="flex-1 bg-background">
         <View className="flex-1 items-center justify-center gap-4 p-6">
-          <LoadFailed
-            headline={t("profile.failed")}
-            error={profile.error}
-            onRetry={() => void profile.reload()}
-          />
+          <LoadFailed error={profile.error} onRetry={() => void profile.reload()} />
         </View>
       </SafeAreaView>
     );
@@ -67,9 +64,10 @@ export function PlaceScreen() {
   const save = async (update: HomeUpdate) => {
     setSaving(true);
     setNotice(null);
+    sayAloud(t("profile.saving"));
     try {
       setSaved(await saveHome(update));
-      setNotice("saved");
+      sayAloud(t("profile.place.saved"));
       // A new key clears the field: the digits go with their save.
       if (update.postalCode !== undefined) setPicks((n) => n + 1);
     } catch (error) {
@@ -89,23 +87,11 @@ export function PlaceScreen() {
         onBack={() => router.back()}
       />
       <KeyboardScrollView contentContainerClassName="flex-grow gap-6 p-6">
-        <Text>{t("profile.place.explain")}</Text>
+        <Text>{t("profile.place.othersSee")}</Text>
         {home && (
-          <View className="gap-2">
-            <Text variant="h3" accessibilityRole="header">
-              {t("profile.place.choice")}
-            </Text>
-            <PlaceChoice
-              home={home}
-              busy={saving}
-              onChoose={(showArea) => void save({ showArea })}
-            />
-          </View>
+          <PlaceChoice home={home} busy={saving} onChoose={(showArea) => void save({ showArea })} />
         )}
-        {saving && <Text accessibilityLiveRegion="polite">{t("profile.saving")}</Text>}
-        {words !== null && (
-          <Text accessibilityLiveRegion={notice === "saved" ? "polite" : "assertive"}>{words}</Text>
-        )}
+        {words !== null && <Text accessibilityLiveRegion="assertive">{words}</Text>}
         <PlacePicker
           key={picks}
           busy={saving}

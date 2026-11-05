@@ -30,9 +30,9 @@ import { useList } from "../../lib/use-list.ts";
 
 // The tunables (#304, #305, admins only): every key of matching_config with
 // its value and history, and a change with a reason, shown old and new before
-// it is sent. The API holds the value to the shape its key declared (the
-// first version); the form reads the input the same way, so a typo is caught
-// here first. A saved change updates its key in place: nothing else on the
+// it is sent. The API holds the value to the shape its key declared (its
+// newest version no admin wrote); the form reads the input the same way, so a
+// typo is caught here first. A saved change updates its key in place: nothing else on the
 // screen moves. English only (TD-17); keyboard first.
 
 /** A value as the panel shows it: an object as JSON, the rest as it is. */
@@ -115,49 +115,44 @@ export function ConfigList() {
         </Button>
       </div>
       <p aria-live="polite" className="font-medium empty:sr-only">
-        {saved
-          ? t("admin.config.changed", {
-              key: saved.key,
-              value: shown(saved.value),
-              version: String(saved.version),
-            })
-          : ""}
+        {saved ? t("admin.config.changed", { key: saved.key, value: shown(saved.value) }) : ""}
       </p>
-      {state.kind === "loading" && <Loading>{t("admin.config.loading")}</Loading>}
-      {state.kind === "error" && <Alert>{t("admin.config.error")}</Alert>}
+      {state.kind === "loading" && <Loading>{t("load.loading")}</Loading>}
+      {state.kind === "error" && <Alert>{t("admin.loadFailed")}</Alert>}
       {state.kind === "ready" && (
-        <>
-          <p className="text-muted-foreground">{t("admin.config.total", { total: state.total })}</p>
-          <ul className="grid gap-3">
-            {state.items.map((item) => (
-              <Tunable
-                key={item.key}
-                item={item}
-                onChanged={(change) => {
-                  setSaved(change);
-                  update((items) =>
-                    items.map((i) => (i.key === change.key ? withChange(i, change) : i)),
-                  );
-                }}
-              />
-            ))}
-          </ul>
-        </>
+        <ul className="grid gap-3">
+          {state.items.map((item) => (
+            <Tunable
+              key={item.key}
+              item={item}
+              onOpen={() => setSaved(null)}
+              onChanged={(change) => {
+                setSaved(change);
+                update((items) =>
+                  items.map((i) => (i.key === change.key ? withChange(i, change) : i)),
+                );
+              }}
+            />
+          ))}
+        </ul>
       )}
     </section>
   );
 }
 
 type Step =
-  | { kind: "editing"; error?: "invalid" | "config_shape" | "config_conflict" | "failed" }
+  | { kind: "editing"; error?: "invalid" | "config_conflict" | "failed" }
   | { kind: "confirming"; value: ConfigValue }
   | { kind: "saving"; value: ConfigValue };
 
 function Tunable({
   item,
+  onOpen,
   onChanged,
 }: {
   item: ConfigKey;
+  /** The confirm step opens: the line of the last save clears, so the next one is heard. */
+  onOpen: () => void;
   onChanged: (change: ConfigChange) => void;
 }) {
   const { t, locale } = useT();
@@ -166,8 +161,8 @@ function Tunable({
   const [reason, setReason] = useState("");
   const [step, setStep] = useState<Step>({ kind: "editing" });
   const object = typeof item.value === "object";
-  // The shape the key declared: its first version, the migration's (the history is newest first).
-  const declared = item.versions.at(-1)?.value ?? item.value;
+  // The shape the key declared: its newest version no admin wrote, a migration's (the history is newest first).
+  const declared = item.versions.find((version) => version.reason === null)?.value ?? item.value;
   const whole = typeof declared === "number" && Number.isInteger(declared);
 
   // The focus follows the step: to the confirm sentence when it appears, back
@@ -187,6 +182,7 @@ function Tunable({
     event.preventDefault();
     const value = parseAs(declared, input);
     if (value === null) return setStep({ kind: "editing", error: "invalid" });
+    onOpen();
     setStep({ kind: "confirming", value });
   };
 
@@ -204,7 +200,8 @@ function Tunable({
       const code = (answer?.error as { error?: { code?: string } } | undefined)?.error?.code;
       return setStep({
         kind: "editing",
-        error: code === "config_shape" || code === "config_conflict" ? code : "failed",
+        // The API's refusal of a shape says what the form's own check does: one text serves both.
+        error: code === "config_shape" ? "invalid" : code === "config_conflict" ? code : "failed",
       });
     }
     // The answer held to its contract, as the list is (rules/admin.md).
@@ -217,7 +214,6 @@ function Tunable({
 
   const errorText = {
     invalid: t("admin.config.invalid"),
-    config_shape: t("admin.config.shape"),
     config_conflict: t("admin.config.conflict"),
     failed: t("admin.config.failed"),
   } as const;
@@ -233,16 +229,12 @@ function Tunable({
               className="size-4 shrink-0 transition-transform group-open:rotate-90 motion-reduce:transition-none"
             />
             <code className="font-semibold">{item.key}</code>{" "}
-            <span className="text-muted-foreground wrap-anywhere">
-              {t("admin.config.current", {
-                version: String(item.version),
-                value: shown(item.value),
-              })}
-            </span>
+            <span className="text-muted-foreground wrap-anywhere">{shown(item.value)}</span>
           </summary>
           <CardContent className="gap-4 border-t pt-4 pb-4 sm:pb-5">
             <Table className="[&_td]:align-top">
-              <TableCaption>{t("admin.config.history")}</TableCaption>
+              {/* The columns and the falling version numbers say it; a screen reader keeps the name. */}
+              <TableCaption className="sr-only">{t("admin.config.history")}</TableCaption>
               <TableHeader>
                 <TableRow>
                   <TableHead scope="col">{t("admin.config.col.version")}</TableHead>
@@ -261,9 +253,7 @@ function Tunable({
                     </TableCell>
                     <TableCell>{formatDateTime(locale, new Date(v.validFrom))}</TableCell>
                     <TableCell>{v.createdBy}</TableCell>
-                    <TableCell className="min-w-48 whitespace-normal">
-                      {v.reason ?? t("admin.config.noReason")}
-                    </TableCell>
+                    <TableCell className="min-w-48 whitespace-normal">{v.reason ?? "–"}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>

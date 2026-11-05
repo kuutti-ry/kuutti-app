@@ -2,11 +2,12 @@ name: EAS build
 
 # Native builds on EAS (#10, TD-2). On a v* tag: the production profile for
 # both platforms, behind the prod environment (its reviewer approves the
-# release anyway). On main: the development and preview profiles, but only
-# when the project's fingerprint differs from the last finished development
-# build's, so a JS-only change never spends a build; those reach devices as
-# EAS Updates from deploy.yml. Never per pull request: the free tier is 15
-# builds per platform a month. Install links are on the project's builds page
+# release anyway). On main: the development profile alone, preview by hand,
+# and only when the project's fingerprint differs from the last finished
+# development build's, so a JS-only change never spends a build; those reach
+# devices as EAS Updates from deploy.yml. Never per pull request: the free
+# tier is 15 builds per platform a month. Install links are on the project's
+# builds page
 # (https://expo.dev/accounts/kuutti/projects/kuutti/builds); a repository
 # variable EAS_BUILDS_ISSUE, if set, mirrors them onto that issue as well.
 # EAS_ENABLED switches this on. By hand only, the staging profile: the staging

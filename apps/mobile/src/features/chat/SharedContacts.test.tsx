@@ -23,7 +23,7 @@ const announced = () =>
 const INSTAGRAM = { kind: "instagram", value: "ville.k" } as const;
 const TELEGRAM = { kind: "telegram", value: "ville_k" } as const;
 const PHONE = { kind: "phone", value: "+358401234567" } as const;
-const REFUSED = "This did not open on your phone. You can copy it instead.";
+const REFUSED = "This did not open on your phone.";
 
 const labels = () =>
   pressables(screen.toJSON() as HostNode).map((node) => String(node.props.accessibilityLabel));
@@ -182,6 +182,26 @@ describe("opening and copying what the other person shares", () => {
     await press("link", "Call Ville");
     expect(await screen.findByText(REFUSED)).toBeTruthy();
   });
+
+  it.each([
+    ["fi-FI", "Soita: Ville", "Tämä ei auennut puhelimessasi.", "Kopioi puhelinnumero: Ville"],
+    [
+      "sv-FI",
+      "Ring: Ville",
+      "Det gick inte att öppna på din telefon.",
+      "Kopiera telefonnummer: Ville",
+    ],
+  ])(
+    "says a contact the phone cannot open in the phone's language, %s",
+    async (languageTag, call, words, copy) => {
+      (useLocales as jest.Mock).mockReturnValue([{ languageTag }]);
+      jest.spyOn(Linking, "openURL").mockResolvedValue(false);
+      await renderWithTheme(<SharedContacts name="Ville" theirs={[PHONE]} />);
+      await press("link", call);
+      expect(await screen.findByText(words)).toBeTruthy();
+      expect(screen.getByRole("button", { name: copy })).toBeTruthy();
+    },
+  );
 
   it("takes back what was said at the next press, and says nothing when it opens", async () => {
     jest.replaceProperty(Platform, "OS", "ios");

@@ -1,7 +1,9 @@
 import type { PlainMessageKey } from "@kuutti/i18n";
 import * as Sentry from "@sentry/react-native";
 import { useEffect, useState } from "react";
-import { AccessibilityInfo, AppState, Linking, Platform, View } from "react-native";
+import { AccessibilityInfo, AppState, Keyboard, Linking, Platform, View } from "react-native";
+import { Choice } from "@/components/Choice";
+import { sayAloud } from "@/components/Notice";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -9,7 +11,6 @@ import { Text } from "@/components/ui/text";
 import { GRACE_MINUTES, PasscodeField, useLock } from "@/features/identity";
 import { useT } from "@/lib/locale";
 import { useHapticTap } from "@/theme/haptics";
-import { Choice } from "./Choice";
 
 /** Said aloud on iOS; Android's live region below says it already. */
 function announce(words: string) {
@@ -37,6 +38,12 @@ function PasscodeSetup({
   const [first, setFirst] = useState<string | null>(null);
   const [typed, setTyped] = useState("");
   const [mismatch, setMismatch] = useState(false);
+  // The field goes with this step. Android can leave its keyboard up with nothing
+  // to type into, over what comes next, unless it is closed while the field stands.
+  const leave = (then: () => void) => {
+    Keyboard.dismiss();
+    then();
+  };
   return (
     <View className="gap-4">
       <PasscodeField
@@ -52,7 +59,7 @@ function PasscodeSetup({
             setFirst(code);
             setMismatch(false);
           } else if (code === first) {
-            onDone(code);
+            leave(() => onDone(code));
           } else {
             setFirst(null);
             setMismatch(true);
@@ -61,7 +68,7 @@ function PasscodeSetup({
         }}
       />
       {mismatch && <Text accessibilityLiveRegion="assertive">{t("lock.passcode.mismatch")}</Text>}
-      <Button variant="outline" onPress={onCancel}>
+      <Button variant="outline" onPress={() => leave(onCancel)}>
         {t("lock.passcode.cancel")}
       </Button>
     </View>
@@ -176,13 +183,13 @@ export function LockControls() {
           onDone={(code) => {
             void lock.setPasscode(code).then(() => {
               setChoosing(false);
-              announce(t("lock.settings.passcodeSet"));
+              // Change and Remove say it to the eye (#581).
+              sayAloud(t("lock.settings.passcodeSet"));
             });
           }}
         />
       ) : lock.settings?.passcode ? (
         <View className="gap-2">
-          <Text accessibilityLiveRegion="polite">{t("lock.settings.passcodeSet")}</Text>
           <Button
             variant="outline"
             onPress={() => {
@@ -233,7 +240,6 @@ export function LockControls() {
               />
             ))}
           </View>
-          <Text variant="muted">{t("lock.settings.always")}</Text>
         </View>
       )}
     </View>

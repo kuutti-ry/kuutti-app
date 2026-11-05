@@ -1,10 +1,18 @@
 import { createI18n, type Locale, typedT } from "@kuutti/i18n";
-import { CompletenessItem, DISTANCE_BANDS, GENDERS, type HomeSummary } from "@kuutti/schema";
+import {
+  CompletenessItem,
+  DealBreakerField,
+  DISTANCE_BANDS,
+  dealBreakerOptions,
+  GENDERS,
+  type HomeSummary,
+} from "@kuutti/schema";
 import { renderHook } from "@testing-library/react-native";
 import { LocaleProvider, useT } from "@/lib/locale";
 import {
   completenessText,
   fieldLabelKey,
+  filterOptionKey,
   genderKey,
   optionKey,
   placeName,
@@ -35,6 +43,56 @@ describe("the profile's message keys", () => {
   it("name the distance, which is no field of the registry, the same way (ADR-061 §7)", () => {
     expect(fieldLabelKey("distance")).toBe("profile.field.distance");
     expect(optionKey("distance", "far")).toBe("profile.option.distance.far");
+  });
+
+  describe("an answer as a deal-breaker names it (#551)", () => {
+    it.each([
+      ["smoking", "never", "profile.filterOption.smoking.never"],
+      ["hasKids", "yes_with_me", "profile.filterOption.hasKids.yes_with_me"],
+      ["hasKids", "no", "profile.filterOption.hasKids.no"],
+      ["wantsKids", "not_sure", "profile.filterOption.wantsKids.not_sure"],
+    ] as const)(
+      "has words of its own for %s %s, which the person's own are not",
+      (field, option, key) => {
+        expect(filterOptionKey(field, option)).toBe(key);
+      },
+    );
+
+    it.each([
+      ["smoking", "regularly"],
+      ["monogamy", "monogamous"],
+      ["languages", "fi"],
+      ["height", "taller"],
+      ["distance", "nearby"],
+    ] as const)(
+      "reads %s %s as the person's own, since those words fit anybody",
+      (field, option) => {
+        expect(filterOptionKey(field, option)).toBe(optionKey(field, option));
+      },
+    );
+
+    it.each(["en", "fi", "sv"] as const)(
+      "has every answer of every deal-breaker in %s, none a key",
+      (locale) => {
+        const t = typedT(createI18n({ locale }));
+        for (const field of DealBreakerField.options) {
+          const words = dealBreakerOptions(field).map((option) => {
+            const key = filterOptionKey(field, option);
+            expect(t(key)).not.toBe(key);
+            return t(key);
+          });
+          expect(new Set(words).size).toBe(words.length);
+        }
+      },
+    );
+
+    it("is in the third person in Finnish, where the person's own are in the first", () => {
+      const t = typedT(createI18n({ locale: "fi" }));
+      expect(t(filterOptionKey("smoking", "never"))).toBe("Ei koskaan");
+      expect(t(optionKey("smoking", "never"))).toBe("En koskaan");
+      expect(t(filterOptionKey("wantsKids", "want"))).toBe("Haluaa lapsia");
+      expect(t(optionKey("wantsKids", "want"))).toBe("Haluan lapsia");
+    });
   });
 
   // The API builds the label's key from the field in the export (erasure.ts).
@@ -117,11 +175,21 @@ describe("completenessText", () => {
     expect(completenessText(t, "display_name")).toBe("A name on the card");
     expect(completenessText(t, "photos")).toBe("At least 2 approved photos");
     expect(completenessText(t, "bio_or_prompts")).toBe(
-      "A bio of 50 characters, a ready line, or two answered prompts",
+      "A bio of 50 characters, a ready line, or two answered questions",
     );
-    expect(completenessText(t, "seeks")).toBe("Whom you are looking for (set in onboarding)");
-    expect(completenessText(t, "age_window")).toBe("Your age window (set in onboarding)");
+    expect(completenessText(t, "seeks")).toBe("Whom you are looking for");
+    expect(completenessText(t, "age_window")).toBe("Your age window");
     const texts = CompletenessItem.options.map((item) => completenessText(t, item));
     expect(new Set(texts).size).toBe(CompletenessItem.options.length);
+  });
+
+  // Nobody without these two reaches the list, so it points nowhere (#581).
+  it.each([
+    ["fi", "Ketä etsit", "Ikähaarukkasi"],
+    ["sv", "Vem du söker", "Ditt åldersspann"],
+  ] as const)("says whom and the ages in %s with no word of onboarding", (locale, whom, ages) => {
+    const t = typedT(createI18n({ locale }));
+    expect(completenessText(t, "seeks")).toBe(whom);
+    expect(completenessText(t, "age_window")).toBe(ages);
   });
 });

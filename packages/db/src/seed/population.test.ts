@@ -18,7 +18,6 @@ import {
   planSizes,
   type SyntheticPerson,
   summarise,
-  uncrossed,
 } from "./population.ts";
 import { createRandom } from "./rng.ts";
 import {
@@ -38,9 +37,6 @@ const VERSIONS = {
   privacy: "test-privacy-1",
   special_category: "test-special-1",
 };
-const THRESHOLDS = { counterK: MATCHING_CONFIG_V1.pond_counter_k };
-/** From this many people up, the population shows everything it is there for. */
-const SHOWS_EVERYTHING_FROM = 174;
 /** A few places by the people behind them, as the API hands them in; the real list and what it keeps are tested beside it (apps/api/scripts/demo/demo-homes.test.ts). */
 const HOMES: HomePlaces = { "00530": 18, "33100": 9, "20100": 6, "091": 2, "149": 1 };
 
@@ -114,43 +110,23 @@ describe("the synthetic population", () => {
     }
   });
 
-  it("crosses the thresholds it is there to cross", () => {
+  it("puts everybody who onboarded in the one pond, in the planned shares", () => {
     const ponds = summarise(people);
-    const { counterK } = THRESHOLDS;
-    // The one pond (ADR-061 §8): every cell at ten or more.
+    // The one pond (ADR-061 §8).
     expect(ponds.suomi).toMatchObject({
       people: 276,
       woman: 88,
       man: 171,
       non_binary: 17,
     });
-    for (const gender of Gender.options) {
-      expect(ponds.suomi?.[gender]).toBeGreaterThanOrEqual(counterK);
-    }
     expect(Object.keys(ponds)).toEqual(["suomi"]);
     expect(people.filter((p) => p.pond === null)).toHaveLength(24);
-    expect(uncrossed(ponds, THRESHOLDS)).toEqual([]);
   });
 
-  it("shows everything from 174 people up, and says what a smaller one does not", () => {
+  it("draws the people it plans, at any size", () => {
     for (const size of [1, 26, 100, 300, 1234]) {
       expect(summarise(generatePopulation({ size })), String(size)).toEqual(plannedPonds(size));
     }
-    // Every size there is: the plan is arithmetic, nobody is drawn.
-    const tooSmall: number[] = [];
-    for (let size = 1; size <= DEMO_SIZE_MAX; size += 1) {
-      if (uncrossed(plannedPonds(size), THRESHOLDS).length > 0) tooSmall.push(size);
-    }
-    expect(Math.max(...tooSmall)).toBe(SHOWS_EVERYTHING_FROM - 1);
-    // Every size from there up shows everything; below it one size happens to round the smallest cell up to k.
-    expect(tooSmall.every((size) => size < SHOWS_EVERYTHING_FROM)).toBe(true);
-    expect(tooSmall.length).toBeGreaterThanOrEqual(SHOWS_EVERYTHING_FROM - 2);
-    expect(uncrossed(plannedPonds(100), THRESHOLDS)).toEqual([
-      "the pond has a cell under the counter's k, so it shows no split",
-    ]);
-    expect(uncrossed({}, THRESHOLDS)).toEqual([
-      "the pond has a cell under the counter's k, so it shows no split",
-    ]);
   });
 
   it("passes the contracts a person's own answers pass", () => {
@@ -478,7 +454,17 @@ describe("writing the population", () => {
           [`${DEMO_SUBJECT_PREFIX}demo-0001`],
         );
         expect(await count("SELECT count(*) AS n FROM photo_check_note")).toBe(1);
+        // A star between two of them goes too, or its foreign keys would stop the removal (#575).
+        await pool.query(
+          `INSERT INTO star (account_id, candidate_id)
+           SELECT x.id, y.id FROM account x JOIN identity xi ON xi.id = x.identity_id,
+                  account y JOIN identity yi ON yi.id = y.identity_id
+            WHERE xi.broker_subject = $1 AND yi.broker_subject = $2`,
+          [`${DEMO_SUBJECT_PREFIX}demo-0001`, `${DEMO_SUBJECT_PREFIX}demo-0002`],
+        );
+        expect(await count("SELECT count(*) AS n FROM star")).toBe(1);
         expect(await removePopulation(pool)).toEqual({ removed: 100, spared: 0 });
+        expect(await count("SELECT count(*) AS n FROM star")).toBe(0);
         expect(await count("SELECT count(*) AS n FROM photo_check_note")).toBe(0);
         expect(await marked()).toBe(0);
         expect(await count("SELECT count(*) AS n FROM identity")).toBe(others);
