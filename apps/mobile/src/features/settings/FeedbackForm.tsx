@@ -2,6 +2,7 @@ import type { PlainMessageKey } from "@kuutti/i18n";
 import { FEEDBACK_TEXT_MAX, type FeedbackKind, type FeedbackPlatform } from "@kuutti/schema";
 import { useState } from "react";
 import { Platform, View } from "react-native";
+import { Choice } from "@/components/Choice";
 import { Notice, sayAloud } from "@/components/Notice";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,7 +12,6 @@ import { buildInfo } from "@/lib/build";
 import { useT } from "@/lib/locale";
 import { useReportUnsaved } from "@/lib/unsaved";
 import { useHapticTap } from "@/theme/haptics";
-import { Choice } from "./Choice";
 import { sendFeedback } from "./feedback-client";
 
 /** The four kinds in the order the person reads them; the panel's own order is the contract's. */

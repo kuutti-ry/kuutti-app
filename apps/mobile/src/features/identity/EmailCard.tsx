@@ -10,7 +10,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Text } from "@/components/ui/text";
-import { DEAL_BREAKERS_PATH } from "@/features/profile";
 import { ApiError } from "@/lib/api";
 import { useT } from "@/lib/locale";
 import { useRowData } from "@/lib/row-data";
@@ -444,16 +443,6 @@ export function EmailScreen() {
             {t("profile.later.title")}
           </Text>
           <EmailCard />
-          {/* The deal-breakers come after the optional fields (#149): one tap, never required. */}
-          <Button
-            variant="outline"
-            onPress={() => {
-              tap();
-              router.push(DEAL_BREAKERS_PATH);
-            }}
-          >
-            {t("profile.dealBreakers.open")}
-          </Button>
           <Button
             onPress={() => {
               tap();

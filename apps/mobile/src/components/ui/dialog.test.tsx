@@ -250,6 +250,22 @@ describe("Dialog with a field, as the keyboard comes (#351)", () => {
     expect(style(around().space).paddingBottom).toBe(0);
   });
 
+  it.each(["ios", "android"] as const)(
+    "on %s, gives a dialog the whole width of its space however few its words, so every dialog is one width (#581)",
+    async (os) => {
+      if (os === "android") onAndroid();
+      else jest.replaceProperty(Platform, "OS", os);
+      await renderWithTheme(
+        <Dialog open>
+          <DialogContent closeLabel="Close">
+            <DialogTitle>Sure?</DialogTitle>
+          </DialogContent>
+        </Dialog>,
+      );
+      expect(style(around().fading).width).toBe("100%");
+    },
+  );
+
   it("on iOS, puts away a keyboard the screen behind left up as it opens, keeps its place, where the scroll view insets itself, and leaves the field's own keyboard be", async () => {
     jest.replaceProperty(Platform, "OS", "ios");
     const dismiss = jest.spyOn(Keyboard, "dismiss");

@@ -1,11 +1,11 @@
 import type { PlainMessageKey } from "@kuutti/i18n";
 import { View } from "react-native";
+import { Choice } from "@/components/Choice";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Text } from "@/components/ui/text";
 import { type ButtonStyle, type Hand, useDecisionButtons } from "@/lib/decision-buttons";
 import { useT } from "@/lib/locale";
-import { Choice } from "./Choice";
 
 /** The two hands, in the order they are offered; the right is the default. */
 const HANDS: ReadonlyArray<{ value: Hand; label: PlainMessageKey }> = [

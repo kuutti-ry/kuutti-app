@@ -16,6 +16,8 @@ export type Row = {
   title: string;
   /** What is in it, or what is chosen, under the title; a screen reader hears it as the hint, unless it is the value. */
   summary?: string;
+  /** What is in it, heard as the hint and never drawn, where the title says enough to the eye (#581). */
+  hint?: string;
   /** Its state in words, heard as the value (the profile's progress, the theme chosen). */
   value?: string;
   /** A mark of its state, drawn before the chevron. */
@@ -133,7 +135,7 @@ function RowView({ row, last }: { row: Row; last: boolean }) {
       variant="ghost"
       accessibilityLabel={row.title}
       // A summary that is the state is heard once, as the value.
-      accessibilityHint={row.summary !== row.value ? row.summary : undefined}
+      accessibilityHint={row.hint ?? (row.summary !== row.value ? row.summary : undefined)}
       accessibilityValue={value ? { text: value } : undefined}
       accessibilityState={holds && !ios ? { expanded: open } : undefined}
       // TalkBack offers expand and collapse from its actions; without a handler they would open nothing.

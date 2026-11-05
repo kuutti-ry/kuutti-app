@@ -22,9 +22,9 @@ The steps in the order the sheet asks them (ADR-010, #146), one screen each, "Co
 4. Whom she seeks: one to three; under it the line "I consent to Kuutti storing whom I seek" (the article 9 consent, ADR-019 §4). Choose men.
 5. Intent: long-term, casual, or open to either.
 6. Age window: buttons, not a number field, around her own age.
-7. "Where do you live?": "Your postal code tells Kuutti how far people are. Others see a town or your area by name, never the digits." Type five digits; the names under the field come from a list on the phone, so a half-typed home never reaches the server. Then "What should your card show?": the town or, where her area is large enough to keep, the area, which she may choose. Where none is, the step says "Your card shows the nearest town." Say what happened: what is kept is a place of at least three thousand people, and the home changes whenever she likes (ADR-061).
-8. Photos: "Add photos", at least three. From the camera roll: three or more of her five pictures (the runbook put them there). Each goes through the pipeline: resized, EXIF stripped, three variants, a blurhash, the check. Locally the check queues everything, so the grid shows them pending; on staging Rekognition approves a face within seconds.
-9. "A few words": two prompts of twelve, or a bio of fifty characters.
+7. "Where do you live?": "Your postal code tells Kuutti how far people are. Others see a town or your area by name, never the digits." Type five digits; the names under the field come from a list on the phone, so a half-typed home never reaches the server. Then "What should your card show?": the town or, where her area is large enough to keep, the area, which she may choose. Where none is, "On your card:" and the town stand in the question's place. Say what happened: what is kept is a place of at least three thousand people, and the home changes whenever she likes (ADR-061).
+8. Photos: "Add photos", at least three. From the camera roll: three or more of her five pictures (the runbook put them there). Each goes through the pipeline: resized, EXIF stripped, three variants, a blurhash, the check. Locally the check queues everything, so the grid shows them "In review"; on staging Rekognition approves a face within seconds.
+9. "A few words": two questions of twelve, or a bio of fifty characters.
 10. Done. Writing the home also set the pond, of which there is one, the whole country; there is no pond step.
 
 The account is active once the four matching answers and the two consents are there (ADR-010 §6); the profile steps may be finished later.
@@ -35,16 +35,16 @@ The home screen: "Kuutti", two cards and the way onward.
 
 - "People on Kuutti": the counter, in tens, with the bar of whom people with a finished profile seek, which the population's fifty fill (population.md), and "n people are still finishing their profile." (ADR-013).
 - "Matching": where Aino stands. With her photos pending: "Matching opens for finished profiles. Yours still lacks something." Once her photos are approved: "Matching is open for you.", since the demo commands open the pond; once an admin has closed it, "Your profile is finished. Matching has not opened yet." (ADR-060).
-- Below: "Your profile". The profile list holds the rest (#239): "Photos" and the sections, each with a check mark once done or how far it is filled, then "What you seek", which holds whom she seeks, the ages, what she is here for and "Your deal-breakers" (up to seven: distance, which everybody can set, and the others only on what she answered herself, #149, ADR-061 §7) and, while a question is unanswered, "Fill in the rest when you have a moment" (the optional fields, one per screen, "Ask me later" on each, #148). The eye at the top opens her card.
+- Below: "Your profile". The profile list holds the rest (#239): "Photos" and the sections, each with a check mark once done or how far it is filled, then "What you seek", which holds whom she seeks, the ages, what she is here for and "Deal-breakers" (up to seven: distance, which everybody can set, and the others only on what she answered herself, #149, ADR-061 §7) and, while a question is unanswered, "Fill in the rest when you have a moment" (the optional fields, one per screen, "Ask me later" on each, #148). The eye at the top opens her card.
 
-In "Your profile", show "Fill in the rest when you have a moment" for one field and skip it; open "What you seek" and show the deal-breakers' rows: the field she has not answered says "Share yours first."
+In "Your profile", show "Fill in the rest when you have a moment" for one field and skip it; open "What you seek" and show the deal-breakers' rows: the field she has not answered says "Share yours first.", and pressing it opens that question.
 
 ## Scene 4: Sanna's card (1 min)
 
 Sign out (Settings, "Log out") and sign in as Sanna Korhonen (locally her button; on staging Nordea `DEMOUSER4`). Her story is complete: a profile, five approved photos, matching open.
 
 - Home: "Matching is open for you."
-- "Your profile" → the eye, "See your card": the card as others see it (#150): the first photo, "Sanna, 49", "Woman", "Espoo", the town of the home she typed, one prompt answer, the other photos, the fields that are information (languages named in the reader's language, "Something long-term", the hobbies, "171 cm"), nothing that is a setting or a soft preference, and no distance, which only a card of the queue has.
+- "Your profile" → the eye, "See your card": the card as others see it (#150): the first photo, "Sanna, 49", "Woman", "Espoo", the town of the home she typed, one answered question, the other photos, the fields that are information (languages named in the reader's language, "Something long-term", the hobbies, "171 cm"), nothing that is a setting or a soft preference, and no distance, which only a card of the queue has.
 
 ## Scene 5: People (3 min)
 

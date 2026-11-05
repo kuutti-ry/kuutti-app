@@ -175,11 +175,21 @@ describe("completenessText", () => {
     expect(completenessText(t, "display_name")).toBe("A name on the card");
     expect(completenessText(t, "photos")).toBe("At least 2 approved photos");
     expect(completenessText(t, "bio_or_prompts")).toBe(
-      "A bio of 50 characters, a ready line, or two answered prompts",
+      "A bio of 50 characters, a ready line, or two answered questions",
     );
-    expect(completenessText(t, "seeks")).toBe("Whom you are looking for (set in onboarding)");
-    expect(completenessText(t, "age_window")).toBe("Your age window (set in onboarding)");
+    expect(completenessText(t, "seeks")).toBe("Whom you are looking for");
+    expect(completenessText(t, "age_window")).toBe("Your age window");
     const texts = CompletenessItem.options.map((item) => completenessText(t, item));
     expect(new Set(texts).size).toBe(CompletenessItem.options.length);
+  });
+
+  // Nobody without these two reaches the list, so it points nowhere (#581).
+  it.each([
+    ["fi", "Ketä etsit", "Ikähaarukkasi"],
+    ["sv", "Vem du söker", "Ditt åldersspann"],
+  ] as const)("says whom and the ages in %s with no word of onboarding", (locale, whom, ages) => {
+    const t = typedT(createI18n({ locale }));
+    expect(completenessText(t, "seeks")).toBe(whom);
+    expect(completenessText(t, "age_window")).toBe(ages);
   });
 });

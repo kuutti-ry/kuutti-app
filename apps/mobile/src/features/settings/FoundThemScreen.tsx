@@ -2,13 +2,13 @@ import type { PlainMessageKey } from "@kuutti/i18n";
 import type { FoundReason } from "@kuutti/schema";
 import { useEffect, useState } from "react";
 import { View } from "react-native";
+import { Choice } from "@/components/Choice";
 import { Button } from "@/components/ui/button";
 import { Text } from "@/components/ui/text";
 import { useSession } from "@/features/identity";
 import { ApiError } from "@/lib/api";
 import { useT } from "@/lib/locale";
 import { useHapticTap } from "@/theme/haptics";
-import { Choice } from "./Choice";
 import { readFoundThem, tellFoundThem } from "./found-them-client";
 import { SettingsPage } from "./SettingsPage";
 

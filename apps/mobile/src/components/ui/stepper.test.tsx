@@ -1,12 +1,13 @@
 import { fireEvent, screen } from "@testing-library/react-native";
 import { AccessibilityInfo, Platform } from "react-native";
 import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
+import { hasCutText } from "@/test/layout";
 import { renderWithTheme, underProviders } from "@/test/render";
 import { Stepper } from "./stepper";
 
 // A number between a minus and a plus (ADR-010 §9, #146, #148): both answers
-// are labelled buttons, the number is announced as it changes, and a step past
-// either end is not offered.
+// are labelled buttons that stand well clear of the number (#581), the number
+// is announced as it changes, and a step past either end is not offered.
 
 function show(props: Partial<React.ComponentProps<typeof Stepper>> = {}) {
   const onChange = jest.fn();
@@ -72,9 +73,24 @@ describe("Stepper", () => {
     expect(rootClass()).not.toMatch(/\bflex-1\b/);
   });
 
-  it("takes the flex a row gives it", async () => {
-    await show({ className: "flex-1" });
-    expect(rootClass()).toMatch(/\bflex-1\b/);
+  it("stands its minus and plus well clear of the number (#581)", async () => {
+    await show();
+    const minus = screen.getByRole("button", { name: "One centimetre less" });
+    const number = screen.getByText("170 cm");
+    // The minus, the number and the plus are the one row's three children.
+    const row = minus.parent;
+    expect(row?.props.className).toMatch(/\bflex-row\b/);
+    expect(row?.props.className).toMatch(/\bgap-6\b/);
+    expect(row?.props.className).not.toMatch(/\bgap-[0-5]\b/);
+    expect(number.parent).toBe(row);
+    expect(screen.getByRole("button", { name: "One centimetre more" }).parent).toBe(row);
+  });
+
+  it("lets what it shows wrap before its buttons do, never cut at the largest text (#581)", async () => {
+    await show({ shown: "No answer yet, and a long way from one" });
+    const shown = screen.getByText("No answer yet, and a long way from one");
+    expect(shown.props.className).toMatch(/\bshrink\b/);
+    expect(hasCutText(screen.toJSON() as HostNode)).toBe(false);
   });
 
   /** The children of every host Text drawn: a label left empty still takes a line of the column. */

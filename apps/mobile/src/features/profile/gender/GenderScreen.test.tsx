@@ -4,15 +4,15 @@ import { useLocales } from "expo-localization";
 import { AccessibilityInfo, PixelRatio, Platform } from "react-native";
 import { saveSession } from "@/lib/session";
 import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
-import { expectPinnedHeader, hasCutText } from "@/test/layout";
+import { hasCutText } from "@/test/layout";
 import { renderWithTheme } from "@/test/render";
 import { MAX_FONT_SCALE } from "@/theme/a11y";
 import { GENDER_PATH, GenderScreen } from "./GenderScreen";
 
 // The person's own gender after sign-up (#552): the three genders from the
-// stored answer, saved on leaving, the limit said up front and the date while
-// it runs, and the identity label offered while non-binary is chosen with none
-// stored, and taken away by a change from non-binary.
+// stored answer as whole-width rows (#581), saved on leaving, the limit said up
+// front and the date while it runs, and the identity label offered while
+// non-binary is chosen with none stored, and taken away by a change from non-binary.
 
 const { __navigation: navigation, __router: router } = jest.requireMock("expo-router") as {
   __navigation: { emit: (name: string, event: unknown) => void };
@@ -33,9 +33,10 @@ const press = (element: ReturnType<typeof screen.getByRole>) =>
     fireEvent.press(element);
     await settle();
   });
-const choose = (name: string) => press(screen.getByRole("button", { name }));
-const selected = (name: string) =>
-  screen.getByRole("button", { name }).props.accessibilityState?.selected;
+/** An answer by its word, chosen or not: the chosen one's name carries its mark. */
+const option = (name: string) => screen.getByRole("radio", { name: new RegExp(`^(✓ )?${name}$`) });
+const choose = (name: string) => press(option(name));
+const selected = (name: string) => option(name).props.accessibilityState?.checked;
 
 /** Leaving as the stack does it: the screen goes at once, its save on the way after it (#238). */
 const leaveAndGo = async (view: Awaited<ReturnType<typeof show>>) => {
@@ -60,7 +61,7 @@ const WHEN = (locale: "en" | "fi" | "sv") => formatDateTime(locale, new Date(FRO
 const WAITING = `You changed this recently. Next change possible: ${WHEN("en")}.`;
 const LABEL_GOES = "This also takes away the word you chose for it.";
 const LEAD =
-  "This is on your card, so a change reaches everybody who can see you. After a change, the next one is possible only after a waiting time.";
+  "This is on your card. After a change, the next one is possible only after a waiting time.";
 
 /** What the API keeps; a save replaces what it names, unless a refusal answers it. */
 type Server = {
@@ -182,13 +183,35 @@ describe("GenderScreen", () => {
   it("starts from the stored answer under a pinned header, every control labelled, with no Save", async () => {
     fakeApi();
     await show();
-    expectPinnedHeader("Gender", "Back to your profile");
+    // Pinned, by where they stand: the rows' group below bears the title's word as its name.
+    const scrolls = (element: { parent: unknown }): boolean => {
+      for (let node: unknown = element.parent; node; node = (node as { parent: unknown }).parent) {
+        if ((node as { type: unknown }).type === "RCTScrollView") return true;
+      }
+      return false;
+    };
+    expect(scrolls(screen.getByRole("heading", { name: "Gender" }))).toBe(false);
+    expect(scrolls(screen.getByRole("button", { name: "Back to your profile" }))).toBe(false);
     expect(screen.getByText(LEAD)).toBeTruthy();
     expect(selected("Woman")).toBe(true);
     expect(selected("Man")).toBe(false);
     expect(selected("Non-binary")).toBe(false);
     expect(screen.queryByRole("button", { name: /save/i })).toBeNull();
     expect(pressables(screen.toJSON() as HostNode).flatMap((n) => a11yProblems(n))).toEqual([]);
+  });
+
+  it("draws the three genders as whole-width rows, radios in a group named by the gender (#581)", async () => {
+    fakeApi();
+    await show();
+    const group = screen.getByLabelText("Gender");
+    expect(group.props.accessibilityRole).toBe("radiogroup");
+    expect(group.props.className).not.toMatch(/\bflex-row\b/);
+    expect(screen.getAllByRole("radio").map((row) => row.props.accessibilityLabel)).toEqual([
+      "✓ Woman",
+      "Man",
+      "Non-binary",
+    ]);
+    expect(screen.getByText("✓ Woman")).toBeTruthy();
   });
 
   it("goes back to the profile from the header", async () => {
@@ -490,12 +513,25 @@ describe("GenderScreen", () => {
     const WORD = "A word for it, if you like";
     const SHOWN = "The word is shown on your card and never used for matching.";
 
+    it("is whole-width rows too, radios in a group of their own named by its heading, every one labelled (#581)", async () => {
+      fakeApi({ gender: "non_binary" });
+      await show();
+      const group = screen.getByLabelText(WORD);
+      expect(group.props.accessibilityRole).toBe("radiogroup");
+      expect(group.props.className).not.toMatch(/\bflex-row\b/);
+      // The three genders, and the seven words.
+      expect(screen.getAllByRole("radio")).toHaveLength(10);
+      expect(option("Genderfluid").parent).toBe(group);
+      expect(pressables(screen.toJSON() as HostNode).flatMap((n) => a11yProblems(n))).toEqual([]);
+    });
+
     it("is not offered to a woman or a man", async () => {
       fakeApi();
       await show();
       expect(screen.queryByText(WORD)).toBeNull();
       await choose("Man");
       expect(screen.queryByText(WORD)).toBeNull();
+      expect(screen.queryByLabelText(WORD)).toBeNull();
     });
 
     it("is offered on a change to non-binary, sent after the gender was accepted", async () => {
@@ -626,14 +662,23 @@ describe("GenderScreen", () => {
       "Sukupuoli",
       "Mies",
       `Muutit tätä äskettäin. Seuraava muutos mahdollinen: ${WHEN("fi")}.`,
+      "Tämä näkyy kortillasi. Muutoksen jälkeen seuraava on mahdollinen vasta odotusajan jälkeen.",
     ],
-    ["sv-FI", "Kön", "Man", `Du ändrade det här nyligen. Nästa ändring möjlig: ${WHEN("sv")}.`],
-  ])("speaks %s", async (tag, title, man, waiting) => {
+    [
+      "sv-FI",
+      "Kön",
+      "Man",
+      `Du ändrade det här nyligen. Nästa ändring möjlig: ${WHEN("sv")}.`,
+      "Det här visas på ditt kort. Efter en ändring är nästa möjlig först efter en väntetid.",
+    ],
+  ])("speaks %s", async (tag, title, man, waiting, lead) => {
     (useLocales as jest.Mock).mockReturnValue([{ languageTag: tag }]);
     fakeApi({ nextChange: FROM });
     await show();
     expect(screen.getByRole("heading", { name: title })).toBeTruthy();
-    expect(screen.getByRole("button", { name: man })).toBeTruthy();
+    expect(screen.getByLabelText(title).props.accessibilityRole).toBe("radiogroup");
+    expect(option(man)).toBeTruthy();
     expect(screen.getByText(waiting)).toBeTruthy();
+    expect(screen.getByText(lead)).toBeTruthy();
   });
 });

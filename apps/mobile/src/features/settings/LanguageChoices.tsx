@@ -1,5 +1,6 @@
 import { LOCALE_NAMES } from "@kuutti/i18n";
 import { View } from "react-native";
+import { Choice } from "@/components/Choice";
 import {
   LOCALE_FLAGS,
   type LocalePreference,
@@ -7,7 +8,6 @@ import {
   useLocaleSettings,
   useT,
 } from "@/lib/locale";
-import { Choice } from "./Choice";
 
 /** The language: the phone's by default, or one of the offered ones, stored (#143, #287), in its Settings row (#511). */
 export function LanguageChoices() {
