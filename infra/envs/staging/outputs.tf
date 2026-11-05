@@ -38,6 +38,11 @@ output "preview_database_document" {
   value       = module.compute.preview_database_document
 }
 
+output "demo_reset_document" {
+  description = "Run Command document demo-reset.yml sends to return the demo personas to where they begin (#613, ADR-018 §8)."
+  value       = module.compute.demo_reset_document
+}
+
 output "api_url" {
   description = "GitHub environment variable API_URL; ADMIN_API_URL in the environment preview, since the panel's previews call this API (ADR-025 §6)."
   value       = "https://api.staging.${var.domain}"

@@ -10,6 +10,7 @@ infra/scripts/dokploy-setup.sh
 infra/scripts/db-app-role.sh
 .github/workflows/preview.yml
 .github/workflows/preview-cleanup.yml
+.github/workflows/demo-reset.yml
 .github/scripts/dokploy-preview.sh
 apps/api/src/lib/preview-database.ts
 -->
@@ -71,7 +72,7 @@ flowchart TB
 ```mermaid
 flowchart TB
   accTitle: Deployment, part 2: staging, its network and its box
-  accDescr: api.staging.kuutti.app is CloudFront, which serves photos from the private media bucket and sends everything else over HTTPS to the box. Dokploy's control plane and the previews reach the box directly by its Elastic IP. On the box, in a public subnet, Traefik terminates TLS and routes by host to Dokploy, the API and the previews, which share one wildcard certificate that Traefik obtains by writing one TXT record in Route 53. RDS PostgreSQL sits in two private subnets with no NAT. Ingress from CloudFront alone is planned. The box has 2 GB of swap and pushes its free memory to CloudWatch every minute.
+  accDescr: api.staging.kuutti.app is CloudFront, which serves photos from the private media bucket and sends everything else over HTTPS to the box. Dokploy's control plane and the previews reach the box directly by its Elastic IP. GitHub Actions can also send one Run Command document that returns the demo personas to where they begin inside the API's container. On the box, in a public subnet, Traefik terminates TLS and routes by host to Dokploy, the API and the previews, which share one wildcard certificate that Traefik obtains by writing one TXT record in Route 53. RDS PostgreSQL sits in two private subnets with no NAT. Ingress from CloudFront alone is planned. The box has 2 GB of swap and pushes its free memory to CloudWatch every minute.
   n11["Phones, browsers, the health probe and GitHub Actions"]
   subgraph dns["Route 53, zone kuutti.app"]
     n12["api.staging: alias of the API's distribution"]
@@ -99,6 +100,7 @@ flowchart TB
   end
   n24["Ingress from CloudFront alone: planned, #198"]:::notbuilt
   n25["Swap, 2 GB, and the free memory to CloudWatch every minute, #77"]
+  n64["Run Command document kuutti-staging-demo-reset: demo-assets, then demo-reset, in the api container"]
   n12 -->|"names"| n14
   n13 -->|"names"| n18
   n11 -->|"api.staging, HTTPS"| n14
@@ -118,12 +120,14 @@ flowchart TB
   n22 -->|"5432, TLS, as kuutti_preview"| n23
   n24 -.->|"planned, #198"| n17
   n25 -->|"on"| n18
+  n11 -->|"demo-reset.yml sends, as kuutti-ci-plan"| n64
+  n64 -->|"docker exec, as root on the box"| n21
   classDef notbuilt stroke-dasharray: 5 5
 ```
 
 ### Steps
 
-11. Who reaches staging from outside: phones and browsers, Route 53's health checkers, and GitHub Actions, which deploys through Dokploy's API.
+11. Who reaches staging from outside: phones and browsers, Route 53's health checkers, and GitHub Actions, which deploys through Dokploy's API and, by hand, sends the demo's reset (step 64).
 12. Route 53: `api.staging.kuutti.app` is an alias (A and AAAA) of the API's distribution, since staging's `media_enabled` is on.
 13. Route 53: `dokploy.staging`, `origin.api.staging` and `*.preview.api.staging` are A records to the box's Elastic IP, with a TTL of five minutes; `preview.api.staging` carries a CAA record of its own, Let's Encrypt by DNS-01 only (step 19). With media off, `api.staging` would be such a record in place of `origin.api.staging`.
 14. CloudFront's default behaviour: every method, nothing cached, every viewer header and cookie forwarded with the ones CloudFront adds (the viewer's address, the WebSocket's headers), sent over HTTPS (TLS 1.2) to `origin.api.staging`. TLS for viewers ends here, with an ACM certificate from us-east-1. Price class 100 (Europe and North America), HTTP/2 and HTTP/3, IPv6.
@@ -138,6 +142,7 @@ flowchart TB
 23. RDS PostgreSQL 17 (the major pinned, minor versions applied automatically), single-AZ, `db.t4g.micro`: gp3 storage from 20 GB growing to 100, encrypted, 35 days of point-in-time recovery, TLS forced, Extended Support declined, not publicly reachable, no deletion protection on staging. Its subnet group spans the two private subnets in the region's first two zones, as RDS requires even for one instance. Its security group admits 5432 from the box's security group alone. The master password is held by AWS; the API connects as `kuutti_app`, a preview as `kuutti_preview`.
 24. Planned, #198: ingress from CloudFront alone. The switch `cloudfront_only_ingress` replaces the open 443 rule with CloudFront's origin-facing prefix list. It stays off until Dokploy's control plane and the previews are behind the distribution too (ADR-005 §7), and the rate limiter's `trusted-proxy` turns to `cloudfront` in the same apply, never before (ADR-008 §5); a precondition in the composition refuses the one without the other.
 25. Swap and the free memory (#77, ADR-046): a 2 GB `/swapfile` with `vm.swappiness = 10`, and `MemAvailable` pushed every minute to `Kuutti/staging/box` by a cron line, which the alarm `kuutti-staging-memory-low` reads (part 3). First boot runs the script; the running box got it from the Run Command document `kuutti-staging-headroom` on 2026-10-24. Dokploy runs without a memory limit (ADR-046 §2).
+64. The Run Command document `kuutti-staging-demo-reset` (#613, ADR-018 §8): `demo-reset.yml`, started by hand from `main` ([Delivery](delivery.md), part 5), sends it as `kuutti-ci-plan`, which the bootstrap lets send exactly this document to exactly this box, as it sends the preview database's (step 50). It takes no parameter. On the box, as root, it finds the task of the `api` application and runs `node dist/demo-assets.js` and then `node dist/demo-reset.js --env staging` in the container, both reading staging's parameters through the instance role as the API does; the reset's exit code is the command's, 2 naming the personas it spared (a staff role or a line in the audit log, ADR-014 §12), 3 meaning no `api` container runs. Declared by staging alone (`demo_reset = true` in `envs/staging`); production has no such document, and its container refuses the command anyway (ADR-018 §3). The headroom document of step 25 is the box's third, sent by the maintainer alone.
 
 ## Part 3: staging, the services around the box
 
@@ -321,8 +326,9 @@ flowchart TB
 - Local: [docker-compose.yml](../../docker-compose.yml), [scripts/dev-env.ts](../../scripts/dev-env.ts), [services/mock-idp](../../services/mock-idp), [apps/admin/src/lib/api.ts](../../apps/admin/src/lib/api.ts)
 - Staging and production: [infra/envs/staging](../../infra/envs/staging) and [infra/envs/prod](../../infra/envs/prod) (`main.tf`, `dns.tf`, `variables.tf`); the modules [network](../../infra/modules/network), [compute](../../infra/modules/compute) (with its first-boot script and the vendored Dokploy installer), [data](../../infra/modules/data), [media](../../infra/modules/media), [admin](../../infra/modules/admin), [research](../../infra/modules/research), [observability](../../infra/modules/observability); [infra/bootstrap](../../infra/bootstrap) (the state bucket, the zone, the SES identity, the CI roles); [infra/scripts/dokploy-setup.sh](../../infra/scripts/dokploy-setup.sh), [db-app-role.sh](../../infra/scripts/db-app-role.sh)
 - Previews: [.github/workflows/preview.yml](../../.github/workflows/preview.yml), [preview-cleanup.yml](../../.github/workflows/preview-cleanup.yml), [.github/scripts/dokploy-preview.sh](../../.github/scripts/dokploy-preview.sh), [apps/api/src/lib/preview-database.ts](../../apps/api/src/lib/preview-database.ts), [apps/api/src/lib/config.ts](../../apps/api/src/lib/config.ts) (what a preview drops)
+- The demo's reset: [.github/workflows/demo-reset.yml](../../.github/workflows/demo-reset.yml), the document in [compute](../../infra/modules/compute) and its right in [bootstrap](../../infra/bootstrap) (ADR-018 §8)
 - The manual: [infra/README.md](../../infra/README.md) (Environments, Media, Mail, Admin panel, Research copy, Observability, Previews, Backups and rebuilding the box, Secrets, The website), [docs/runbooks/incident.md](../runbooks/incident.md)
-- ADRs: [ADR-001](../adr/001-infrastructure-as-code.md) (OpenTofu; Dokploy's configuration as the manual island), [ADR-005](../adr/005-media-pipeline-and-delivery.md) (the distribution, §7 the ingress switch), [ADR-008](../adr/008-exposure-budget-and-client-address.md) §5 (the trusted proxy), [ADR-012](../adr/012-unattended-preview-cleanup.md) (the sweep), [ADR-014](../adr/014-demo-mode.md) (the mock bank; no real bank on a preview), [ADR-018](../adr/018-staging-is-the-demo.md) (staging holds no real person), [ADR-020](../adr/020-end-to-end-flows-with-maestro.md) (the flows on the local environment), [ADR-025](../adr/025-admin-host.md) (the panel's host and its previews), [ADR-029](../adr/029-the-research-copy.md) (the research copy), [ADR-043](../adr/043-email-confirmation.md) §5 and §6 (SES and staging's testers), [ADR-046](../adr/046-box-headroom.md) (swap and the memory alarm), [ADR-048](../adr/048-dokploy-owner-first.md) (nothing public before Dokploy's owner), [ADR-049](../adr/049-production-before-the-first-release.md) (production before the first release), [ADR-054](../adr/054-backup-write-only.md) (the box writes its backup and never reads it)
+- ADRs: [ADR-001](../adr/001-infrastructure-as-code.md) (OpenTofu; Dokploy's configuration as the manual island), [ADR-005](../adr/005-media-pipeline-and-delivery.md) (the distribution, §7 the ingress switch), [ADR-008](../adr/008-exposure-budget-and-client-address.md) §5 (the trusted proxy), [ADR-012](../adr/012-unattended-preview-cleanup.md) (the sweep), [ADR-014](../adr/014-demo-mode.md) (the mock bank; no real bank on a preview), [ADR-018](../adr/018-staging-is-the-demo.md) (staging holds no real person; §8 the reset from a workflow), [ADR-020](../adr/020-end-to-end-flows-with-maestro.md) (the flows on the local environment), [ADR-025](../adr/025-admin-host.md) (the panel's host and its previews), [ADR-029](../adr/029-the-research-copy.md) (the research copy), [ADR-043](../adr/043-email-confirmation.md) §5 and §6 (SES and staging's testers), [ADR-046](../adr/046-box-headroom.md) (swap and the memory alarm), [ADR-048](../adr/048-dokploy-owner-first.md) (nothing public before Dokploy's owner), [ADR-049](../adr/049-production-before-the-first-release.md) (production before the first release), [ADR-054](../adr/054-backup-write-only.md) (the box writes its backup and never reads it)
 - Issues: #198 (ingress from CloudFront alone), #77 (swap and the memory alarm, ADR-046), #25 (production), #385 and #196 (SES)
 
 ## Open

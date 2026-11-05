@@ -46,6 +46,7 @@ module "compute" {
   cpu_credits                = "standard" # a pegged staging box slows down instead of costing extra
   manage_session_preferences = true
   preview_databases          = true # pull-request previews run here (#9)
+  demo_reset                 = true # the demo lives here (ADR-018); demo-reset.yml sends its document (#613)
 
   # Swap (#77, ADR-046): the size the box has had by hand since 2026-10-08.
   # Its people are Telia's test persons (ADR-018), so no real hetu can be paged.
