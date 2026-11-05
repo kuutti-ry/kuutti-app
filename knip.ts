@@ -10,17 +10,15 @@ import type { KnipConfig } from "knip";
  * export kept on purpose is marked in its own file, never ignored here.
  */
 const config: KnipConfig = {
-  // scripts/e2e.ts shells out to the first two, which come from Homebrew, not
-  // from npm; scripts/logo/icons.mjs to sips, macOS's own image tool.
-  ignoreBinaries: ["brew", "maestro", "sips"],
+  // scripts/e2e.ts shells out to the first three, which come from Homebrew or
+  // Android Studio (adb), not from npm; scripts/logo/icons.mjs to sips, macOS's
+  // own image tool.
+  ignoreBinaries: ["adb", "brew", "maestro", "sips"],
   workspaces: {
     "apps/mobile": {
       entry: [
         // Read by @expo/fingerprint by convention (e2e.yml, deploy.yml).
         "fingerprint.config.js",
-        // Expo config plugins that app.json names by their paths.
-        "plugins/withNoForceDark.js",
-        "plugins/withSaiga.js",
         // Metro's platform resolution takes it over intl-polyfill.ts on a phone;
         // it is what the two @formatjs packages are for.
         "src/lib/intl-polyfill.native.ts",
