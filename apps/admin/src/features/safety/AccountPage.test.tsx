@@ -268,7 +268,7 @@ describe("a person's page", () => {
     ];
     fetchMock([pageOf(page({ audit })), sanctionsOf(sanctions)]);
     show();
-    const table = await screen.findByRole("table", { name: "At most fifty" });
+    const table = await screen.findByRole("table", { name: "What staff did and saw" });
     const [cells] = within(table)
       .getAllByRole("row")
       .slice(1)
@@ -354,7 +354,7 @@ describe("a person's page", () => {
 
     // What staff did and saw: a captioned table, the actor by the start of their id, the detail as JSON.
     // The caption is drawn: past fifty rows nothing else says that older ones exist (#581).
-    const audit = screen.getByRole("table", { name: "At most fifty" });
+    const audit = screen.getByRole("table", { name: "What staff did and saw" });
     expect(within(audit).getByText("At most fifty")).not.toHaveClass("sr-only");
     expect(
       within(audit)
@@ -493,9 +493,9 @@ describe("a person's page", () => {
       expect(alert).toHaveTextContent(/^Could not be loaded\.$/);
       expect(screen.getAllByRole("alert")).toHaveLength(1);
       // Of what: the heading right above says so (#581).
-      expect(
-        screen.getByRole("heading", { level: 3, name: "Sanctions" }).parentElement,
-      ).toContainElement(alert);
+      expect(screen.getByRole("heading", { level: 3, name: "Sanctions" }).nextElementSibling).toBe(
+        alert,
+      );
       expect(termValue("Name")).toBe("Aino");
       expect(screen.getAllByRole("button", { name: "Show photo" })).toHaveLength(2);
       expect(screen.getByText(/The map froze\./)).toBeInTheDocument();

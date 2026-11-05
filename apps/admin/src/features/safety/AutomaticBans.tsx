@@ -91,7 +91,7 @@ export function AutomaticBans() {
   return (
     <section aria-labelledby="automatic-bans-title" className="space-y-6">
       <ScreenTitle id="automatic-bans-title">{t("admin.automaticBans.title")}</ScreenTitle>
-      {state.kind === "ready" && (
+      {state.kind === "ready" && state.items.length > 0 && (
         <p className="max-w-prose text-muted-foreground">
           {t("admin.automaticBans.explain", { hours: state.reviewHours })}
         </p>

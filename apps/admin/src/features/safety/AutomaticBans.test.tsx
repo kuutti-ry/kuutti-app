@@ -272,7 +272,7 @@ describe("the automatic shadow bans", () => {
   });
 
   it("says a one-hour review time in the singular", async () => {
-    fetchMock([listOf(queue([], 0, 1))]);
+    fetchMock([listOf(queue([ban(7)], 1, 1))]);
     show();
     expect(await screen.findByText(/Confirm or reverse each within 1 hour\./)).toBeInTheDocument();
   });
@@ -308,6 +308,7 @@ describe("the automatic shadow bans", () => {
     show();
     expect(await screen.findByText("Nothing waiting")).toBeInTheDocument();
     expect(screen.queryAllByRole("listitem")).toHaveLength(0);
+    expect(screen.queryByText(/Confirm or reverse/)).toBeNull();
     expect(screen.getAllByRole("button").map((button) => button.textContent)).toEqual(["Refresh"]);
   });
 

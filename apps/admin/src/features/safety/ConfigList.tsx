@@ -125,6 +125,7 @@ export function ConfigList() {
             <Tunable
               key={item.key}
               item={item}
+              onOpen={() => setSaved(null)}
               onChanged={(change) => {
                 setSaved(change);
                 update((items) =>
@@ -146,9 +147,12 @@ type Step =
 
 function Tunable({
   item,
+  onOpen,
   onChanged,
 }: {
   item: ConfigKey;
+  /** The confirm step opens: the line of the last save clears, so the next one is heard. */
+  onOpen: () => void;
   onChanged: (change: ConfigChange) => void;
 }) {
   const { t, locale } = useT();
@@ -178,6 +182,7 @@ function Tunable({
     event.preventDefault();
     const value = parseAs(declared, input);
     if (value === null) return setStep({ kind: "editing", error: "invalid" });
+    onOpen();
     setStep({ kind: "confirming", value });
   };
 

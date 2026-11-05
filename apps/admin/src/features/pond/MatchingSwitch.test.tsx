@@ -202,6 +202,16 @@ describe("turning the switch", () => {
     expect(screen.queryByText("Matching is now open.")).toBeNull();
   });
 
+  it("clears what it last said on Refresh, which may read the switch the other way", async () => {
+    fetchMock([listing(pond(false)), pressing(() => json(pond(true)))]);
+    show();
+    fireEvent.click(await screen.findByRole("button", { name: "Open matching" }));
+    fireEvent.click(within(step()).getByRole("button", { name: "Open matching" }));
+    await screen.findByText("Matching is now open.");
+    fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
+    expect(screen.queryByText("Matching is now open.")).toBeNull();
+  });
+
   it("leaves with nothing sent on Cancel, and gives the focus back", async () => {
     const calls = fetchMock([listing(pond(false))]);
     show();

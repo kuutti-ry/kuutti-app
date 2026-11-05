@@ -297,6 +297,11 @@ describe("the tunables", () => {
     review(at, "7", "More room in the pilot");
     fireEvent.click(at.getByRole("button", { name: "Change it" }));
     await waitFor(() => expect(region).toHaveTextContent(/^Saved\. feedback_per_day: 7$/));
+    // The same value again: the line clears as the step opens, so the second save is heard too.
+    review(at, "7", "Once more");
+    expect(region).toBeEmptyDOMElement();
+    fireEvent.click(at.getByRole("button", { name: "Change it" }));
+    await waitFor(() => expect(region).toHaveTextContent(/^Saved\. feedback_per_day: 7$/));
   });
 
   it("moves the focus with each step: the confirm sentence, then back to the value", async () => {

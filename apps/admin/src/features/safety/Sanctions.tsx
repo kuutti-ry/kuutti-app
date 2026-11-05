@@ -218,6 +218,7 @@ export function Sanctions({
 
   return (
     <>
+      {items === null && <Alert>{t("admin.loadFailed")}</Alert>}
       <SanctionActions
         accountId={accountId}
         legend={t("admin.sanction.actions")}
@@ -230,9 +231,7 @@ export function Sanctions({
       <p ref={status} role="status" tabIndex={-1} className="font-medium empty:sr-only">
         {done}
       </p>
-      {items === null ? (
-        <Alert>{t("admin.loadFailed")}</Alert>
-      ) : items.length === 0 ? (
+      {items === null ? null : items.length === 0 ? (
         <p className="text-muted-foreground">{t("admin.account.none")}</p>
       ) : (
         <ul className="grid gap-2">

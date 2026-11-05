@@ -413,7 +413,7 @@ describe("the audit log", () => {
     await shown();
     fill({ Who: "someone" });
     expect(await screen.findByRole("alert")).toHaveTextContent(
-      "A filter is not valid: an id is a uuid, an action is two words with a dot.",
+      "A filter is not valid: an id is a uuid, an action is two words with a dot, a subject type is one word in small letters.",
     );
     expect(screen.queryByRole("table")).toBeNull();
     expect(screen.queryByRole("button", { name: "Older" })).toBeNull();

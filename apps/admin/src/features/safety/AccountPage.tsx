@@ -322,11 +322,11 @@ export function AccountPage() {
       </Card>
       <Card>
         <CardContent>
-          <CardTitle>{t("admin.account.auditTitle")}</CardTitle>
+          <CardTitle id="account-audit-title">{t("admin.account.auditTitle")}</CardTitle>
           {page.audit.length === 0 ? (
             <p className="text-muted-foreground">{t("admin.account.none")}</p>
           ) : (
-            <Table className="[&_td]:align-top">
+            <Table aria-labelledby="account-audit-title" className="[&_td]:align-top">
               <TableCaption>{t("admin.account.auditCaption")}</TableCaption>
               <TableHeader>
                 <TableRow>

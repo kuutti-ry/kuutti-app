@@ -1006,10 +1006,34 @@ describe("the sanctions' history", () => {
     const alert = await screen.findByRole("alert");
     expect(alert.textContent).toBe("Could not be loaded.");
     // Of what: the heading right above says so, and the page stands around it (#581).
-    expect(
-      screen.getByRole("heading", { level: 3, name: "Sanctions" }).parentElement,
-    ).toContainElement(alert);
+    expect(screen.getByRole("heading", { level: 3, name: "Sanctions" }).nextElementSibling).toBe(
+      alert,
+    );
     expect(buttonsIn(await actions())).toEqual(MODERATOR_ACTIONS);
+  });
+
+  it("says the apply and that the list did not load, each in its place, when the read after it fails too", async () => {
+    const added = entry(9, { kind: "warn", note: TEXT, endsAt: null });
+    fetchMock([
+      thePage(),
+      on(
+        "GET",
+        LIST,
+        () => json({ items: [] }),
+        () => json({ error: { code: "internal_error" } }, 500),
+      ),
+      on("POST", LIST, () => json(answerOf(added), 201)),
+    ]);
+    show();
+    const { send } = await ready("warn");
+    fireEvent.click(send);
+    const status = sanctionStatus();
+    await waitFor(() => expect(status).toHaveTextContent("Applied: Warning."));
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toBe("Could not be loaded.");
+    expect(screen.getByRole("heading", { level: 3, name: "Sanctions" }).nextElementSibling).toBe(
+      alert,
+    );
   });
 
   it("sends nothing when an incomplete step's form is submitted anyway", async () => {

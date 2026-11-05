@@ -532,9 +532,7 @@ describe("acting on the reported person", () => {
     ]);
     show({ strict: true });
     const { dialog, send } = await warn();
-    expect(dialog).toHaveTextContent(
-      "Applying one also closes this report as acted on; the reporter's export will say it was acted on, never which action.",
-    );
+    expect(dialog).toHaveTextContent("Applying one also closes this report as acted on.");
     fireEvent.click(send);
     await waitFor(() =>
       expect(status()).toHaveTextContent("Applied: Warning. The report is closed as acted on."),
@@ -746,7 +744,7 @@ describe("closing the report with a sanction applied since", () => {
       within(dialog).getByRole("heading", { name: "Close the report as acted on" }),
     ).toBeInTheDocument();
     expect(dialog).toHaveTextContent(
-      `The report closes as acted on, naming this sanction: Suspension, applied ${when(APPLIED)}. Nothing more happens to the reported person; the reporter's export will say it was acted on, never which action.`,
+      `The report closes as acted on, naming this sanction: Suspension, applied ${when(APPLIED)}. Nothing more happens to the reported person.`,
     );
     fireEvent.click(within(dialog).getByRole("button", { name: "Close report" }));
     await waitFor(() => expect(status()).toHaveTextContent("Report closed as acted on."));
@@ -835,7 +833,7 @@ describe("dismissing the report", () => {
         within(dialog).getByRole("heading", { name: "Dismiss the report" }),
       ).toBeInTheDocument();
       expect(dialog).toHaveTextContent(
-        "The report closes with no action on the reported person. The block between the two stays. The reporter's export will say it was dismissed.",
+        "The report closes with no action on the reported person. The block between the two stays.",
       );
       if (how === "Cancel") fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
       else fireEvent.keyDown(document.activeElement as Element, { key: "Escape" });

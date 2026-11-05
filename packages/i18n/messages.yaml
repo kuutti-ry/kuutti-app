@@ -5867,7 +5867,7 @@ admin.queue.title:
 
 admin.queue.total:
   en: "{total, plural, =0 {Nothing waiting} one {# waiting} other {# waiting}}"
-  description: "Admin panel, on Reports, Automatic shadow bans, Photos and Feedback: how many wait in all, past the list's first page too, said again when one is decided; the screen's heading says of what (#581)."
+  description: "Admin panel, on Reports, Automatic shadow bans, Photos and Feedback: how many wait in all, past the list's first page too; on Automatic shadow bans, Photos and Feedback said again when one is decided; the screen's heading says of what (#581)."
 
 admin.queue.loading:
   en: Loading the queue…
@@ -6191,7 +6191,7 @@ admin.late:
 
 admin.loadFailed:
   en: "Could not be loaded."
-  description: "Admin panel, in place of what a screen or a section shows when it failed to load; the heading right above says of what (#581)."
+  description: "Admin panel, in place of what a screen or a section shows when it failed to load; the screen's or the section's heading says of what (#581)."
 
 admin.showPhoto:
   en: "Show photo"
@@ -6470,7 +6470,7 @@ admin.report.act:
   description: "Admin panel, one report's page (#312), the decision: the legend of the sanctions' buttons (#308)."
 
 admin.report.actAlso:
-  en: "Applying one also closes this report as acted on; the reporter's export will say it was acted on, never which action."
+  en: "Applying one also closes this report as acted on."
   description: "Admin panel, one report's page (#312), the decision: a line in a sanction's confirm step, saying the rest of its effect."
 
 admin.report.closeWithTitle:
@@ -6486,7 +6486,7 @@ admin.report.closeTitle:
   description: "Admin panel, one report's page (#312), the decision: the heading of the step that closes the report naming a sanction."
 
 admin.report.closeEffect:
-  en: "The report closes as acted on, naming this sanction: {kind}, applied {time}. Nothing more happens to the reported person; the reporter's export will say it was acted on, never which action."
+  en: "The report closes as acted on, naming this sanction: {kind}, applied {time}. Nothing more happens to the reported person."
   description: "Admin panel, one report's page (#312), the decision: the effect of closing the report with a sanction, {kind} being the sanction's kind."
 
 admin.report.closeConfirm:
@@ -6502,7 +6502,7 @@ admin.report.dismissTitle:
   description: "Admin panel, one report's page (#312), the decision: the heading of the step that dismisses the report."
 
 admin.report.dismissEffect:
-  en: "The report closes with no action on the reported person. The block between the two stays. The reporter's export will say it was dismissed."
+  en: "The report closes with no action on the reported person. The block between the two stays."
   description: "Admin panel, one report's page (#312), the decision: the effect of dismissing the report."
 
 admin.report.dismissConfirm:
@@ -6846,7 +6846,7 @@ admin.audit.loading:
   description: "Admin panel, while a page of the audit log is fetched (#309)."
 
 admin.audit.invalid:
-  en: "A filter is not valid: an id is a uuid, an action is two words with a dot."
+  en: "A filter is not valid: an id is a uuid, an action is two words with a dot, a subject type is one word in small letters."
   description: "Admin panel, the API refused the filters (#309)."
 
 admin.audit.none:

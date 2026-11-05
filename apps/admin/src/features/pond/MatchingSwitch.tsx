@@ -44,7 +44,13 @@ export function MatchingSwitch() {
     <section aria-labelledby="matching-title" className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <ScreenTitle id="matching-title">{t("admin.matching.title")}</ScreenTitle>
-        <Button variant="outline" onClick={() => void reload()}>
+        <Button
+          variant="outline"
+          onClick={() => {
+            setSaid(null);
+            void reload();
+          }}
+        >
           <RefreshCw aria-hidden="true" />
           {t("admin.matching.refresh")}
         </Button>

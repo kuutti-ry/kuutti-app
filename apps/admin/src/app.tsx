@@ -249,7 +249,7 @@ function Menu({ screens }: { screens: readonly Screen[] }) {
             <NavLink
               to={screen.path}
               end
-              className="flex min-h-11 items-center gap-3 rounded-md px-3 text-sm font-medium whitespace-nowrap text-muted-foreground no-underline hover:bg-accent hover:text-accent-foreground aria-[current=page]:bg-accent aria-[current=page]:font-semibold aria-[current=page]:text-accent-foreground aria-[current=page]:shadow-[inset_0_-3px_0_var(--primary)] md:aria-[current=page]:shadow-[inset_3px_0_0_var(--primary)] forced-colors:aria-[current=page]:underline"
+              className="flex min-h-11 items-center gap-3 rounded-md px-3 text-sm font-medium whitespace-nowrap text-muted-foreground md:whitespace-normal no-underline hover:bg-accent hover:text-accent-foreground aria-[current=page]:bg-accent aria-[current=page]:font-semibold aria-[current=page]:text-accent-foreground aria-[current=page]:shadow-[inset_0_-3px_0_var(--primary)] md:aria-[current=page]:shadow-[inset_3px_0_0_var(--primary)] forced-colors:aria-[current=page]:underline"
             >
               <screen.icon aria-hidden="true" className="size-4 shrink-0" />
               {t(screen.label)}

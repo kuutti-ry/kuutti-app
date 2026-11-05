@@ -125,7 +125,7 @@ export function Overview() {
           </ul>
           {/* The association's measure (#83, ADR-040): counts by reason, nobody's name. */}
           <Card>
-            <CardHeader className="flex-col">
+            <CardHeader>
               <CardTitle id="found-them-title">{t("admin.overview.foundThem.title")}</CardTitle>
             </CardHeader>
             <CardContent>

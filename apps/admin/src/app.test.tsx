@@ -468,6 +468,7 @@ describe("App", () => {
     );
     await waitFor(() => expect(calls).toContain("GET /admin/config"));
     await waitFor(() => expect(screen.queryByText("Loading the tunables…")).toBeNull());
+    expect(screen.queryByRole("alert")).toBeNull();
     expect(document.title).toBe("Tunables · Kuutti admin");
   });
 
@@ -484,6 +485,7 @@ describe("App", () => {
     expect(await screen.findByRole("heading", { level: 2, name: "Tunables" })).toBeInTheDocument();
     await waitFor(() => expect(calls).toContain("GET /admin/config"));
     await waitFor(() => expect(screen.queryByText("Loading the tunables…")).toBeNull());
+    expect(screen.queryByRole("alert")).toBeNull();
     expect(calls).not.toContain("GET /admin/photos/queue");
     expect(screen.queryByText("Your role does not allow this.")).toBeNull();
   });
