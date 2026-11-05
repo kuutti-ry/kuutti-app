@@ -26,7 +26,8 @@ const REFUSALS: Refusals = { codes: {}, failed: "admin.matching.failed" };
 export function MatchingSwitch() {
   const { t } = useT();
   // What the last press did, said in a live region that is always there, so
-  // the first press is announced too.
+  // the first press is announced too. Heard and never drawn: the badge turns
+  // and the button changes its name.
   const [said, setSaid] = useState<boolean | null>(null);
   const [turning, setTurning] = useState<AdminPond | null>(null);
   const { state, reload, update } = useList({
@@ -43,23 +44,27 @@ export function MatchingSwitch() {
     <section aria-labelledby="matching-title" className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <ScreenTitle id="matching-title">{t("admin.matching.title")}</ScreenTitle>
-        <Button variant="outline" onClick={() => void reload()}>
+        <Button
+          variant="outline"
+          onClick={() => {
+            setSaid(null);
+            void reload();
+          }}
+        >
           <RefreshCw aria-hidden="true" />
           {t("admin.matching.refresh")}
         </Button>
       </div>
-      <p className="max-w-prose text-muted-foreground">{t("admin.matching.explain")}</p>
-      <p aria-live="polite" className="font-medium empty:sr-only">
+      <p aria-live="polite" className="sr-only">
         {said === true && t("admin.matching.opened")}
         {said === false && t("admin.matching.closedNow")}
       </p>
       {state.kind === "loading" && <Loading>{t("admin.matching.loading")}</Loading>}
-      {state.kind === "error" && <Alert>{t("admin.matching.error")}</Alert>}
+      {state.kind === "error" && <Alert>{t("admin.loadFailed")}</Alert>}
       {pond && (
         <Card className="py-0 sm:py-0">
           {/* Wraps at a phone's width, so the press is never out of sight. */}
           <CardContent className="flex-row flex-wrap items-center gap-x-4 gap-y-2 py-3">
-            <span className="font-medium">{t("admin.matching.where")}</span>
             {/* The word says it, the fill only repeats it: never colour alone. */}
             <Badge variant={pond.matchingOpen ? "default" : "secondary"}>
               {t(pond.matchingOpen ? "admin.matching.open" : "admin.matching.closed")}

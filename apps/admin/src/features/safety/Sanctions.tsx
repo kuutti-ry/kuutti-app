@@ -115,20 +115,24 @@ type Step = { kind: "lift"; item: SanctionEntry } | { kind: "review"; item: Sanc
 
 /**
  * The actions on a person, the gentlest first, and the confirm step of each
- * (#308): on the person's page under Sanctions, and on a report's (#312),
- * where `also` says in the step what more applying one does there. Only an
- * apply reaches `onApplied`, with the sanction the API answered and the kind
- * the step asked for; a lift and a second look are the person's page's own.
+ * (#308): on the person's page under Sanctions, whose heading stands right
+ * above them, so the group's name is only heard there (`legendHidden`); and on
+ * a report's (#312), which shows two people, so its name is drawn, and where
+ * `also` says in the step what more applying one does there. Only an apply
+ * reaches `onApplied`, with the sanction the API answered and the kind the
+ * step asked for; a lift and a second look are the person's page's own.
  */
 export function SanctionActions({
   accountId,
   legend,
+  legendHidden = false,
   also,
   onOpen,
   onApplied,
 }: {
   accountId: string;
   legend: string;
+  legendHidden?: boolean;
   also?: string;
   /** A step opens: the line that said the last change is cleared, so the next one is heard. */
   onOpen: () => void;
@@ -140,7 +144,7 @@ export function SanctionActions({
   return (
     <>
       <fieldset>
-        <legend className="mb-2 text-sm font-medium">{legend}</legend>
+        <legend className={legendHidden ? "sr-only" : "mb-2 text-sm font-medium"}>{legend}</legend>
         <div className="flex flex-wrap gap-3">
           {ORDER.filter((kind) => kind !== "ban" || admin).map((kind) => (
             <Button
@@ -214,9 +218,11 @@ export function Sanctions({
 
   return (
     <>
+      {items === null && <Alert>{t("admin.loadFailed")}</Alert>}
       <SanctionActions
         accountId={accountId}
         legend={t("admin.sanction.actions")}
+        legendHidden
         onOpen={() => setDone("")}
         onApplied={(_, asked) =>
           finish(t("admin.sanction.done.apply", { kind: t(KIND_WORDS[asked]) }))
@@ -225,9 +231,7 @@ export function Sanctions({
       <p ref={status} role="status" tabIndex={-1} className="font-medium empty:sr-only">
         {done}
       </p>
-      {items === null ? (
-        <Alert>{t("admin.account.sanctionsError")}</Alert>
-      ) : items.length === 0 ? (
+      {items === null ? null : items.length === 0 ? (
         <p className="text-muted-foreground">{t("admin.account.none")}</p>
       ) : (
         <ul className="grid gap-2">
@@ -496,7 +500,11 @@ export type FixedReview = {
   submit: string;
 };
 
-/** A second look at a sanction (#307): a note, and keep it or lift it; on a person's page and the automatic bans' list. */
+/**
+ * A second look at a sanction (#307): a note, and keep it or lift it, with
+ * what a lift does said beside Lift it; on a person's page and the automatic
+ * bans' list. One already lifted offers only Keep it.
+ */
 export function ReviewStep({
   item,
   fixed,
@@ -532,7 +540,7 @@ export function ReviewStep({
       onClose={onCancel}
     >
       <form className="grid gap-4" onSubmit={submit}>
-        <p>{fixed?.effect ?? t("admin.sanction.reviewExplain")}</p>
+        {fixed && <p>{fixed.effect}</p>}
         {refused && <Alert>{t(refused)}</Alert>}
         <div className="grid gap-2">
           <Label htmlFor={`${ids}-note`}>{t("admin.sanction.reviewNote")}</Label>
@@ -567,17 +575,23 @@ export function ReviewStep({
               {t("admin.sanction.keep")}
             </label>
             {!item.liftedAt && (
-              <label className={CHOICE}>
-                <input
-                  className="size-4 accent-primary"
-                  type="radio"
-                  name={`${ids}-outcome`}
-                  value="lift"
-                  checked={outcome === "lift"}
-                  onChange={() => setOutcome("lift")}
-                />
-                {t("admin.sanction.liftIt")}
-              </label>
+              <>
+                <label className={CHOICE}>
+                  <input
+                    className="size-4 accent-primary"
+                    type="radio"
+                    name={`${ids}-outcome`}
+                    value="lift"
+                    checked={outcome === "lift"}
+                    aria-describedby={`${ids}-lift`}
+                    onChange={() => setOutcome("lift")}
+                  />
+                  {t("admin.sanction.liftIt")}
+                </label>
+                <p id={`${ids}-lift`} className="text-muted-foreground">
+                  {t(LIFT_EFFECT[item.kind])}
+                </p>
+              </>
             )}
           </fieldset>
         )}

@@ -74,16 +74,15 @@ afterEach(() => {
 });
 
 describe("the switch", () => {
-  it("is busy while it loads, and says what the switch is", async () => {
+  it("is busy while it loads, then is its state and the press that changes it, nothing explaining them (#581)", async () => {
     fetchMock([listing(pond(false))]);
     show();
     expect(screen.getByText("Loading…")).toHaveAttribute("aria-busy", "true");
-    expect(screen.getByRole("heading", { name: "Matching" })).toBeInTheDocument();
-    expect(
-      screen.getByText(/Matching opens for the whole country when an admin turns it on here/),
-    ).toBeInTheDocument();
-    await screen.findByText("All of Finland");
+    const heading = screen.getByRole("heading", { name: "Matching" });
+    await screen.findByRole("button", { name: "Open matching" });
     expect(screen.queryByText("Loading…")).toBeNull();
+    // The whole screen: its heading, Refresh, the state in a word and the press.
+    expect(heading.closest("section")?.textContent).toBe("MatchingRefreshClosedOpen matching");
   });
 
   it.each([
@@ -113,22 +112,23 @@ describe("the switch", () => {
   it.each([
     ["the API fails", () => failure("internal_error", 500)],
     ["the answer is not the contract", () => json({ items: [{ id: "suomi" }] })],
-  ])("says the switch could not be read when %s", async (_, respond) => {
+  ])("says the switch could not be loaded when %s", async (_, respond) => {
     vi.spyOn(console, "error").mockImplementation(() => undefined);
     fetchMock([(req) => (isList(req) ? respond() : null)]);
     show();
-    expect(
-      await screen.findByText("Whether matching is open could not be read."),
-    ).toBeInTheDocument();
-    expect(screen.queryByText("All of Finland")).toBeNull();
+    expect(await screen.findByRole("alert")).toHaveTextContent(/^Could not be loaded\.$/);
+    expect(screen.queryByRole("button", { name: "Open matching" })).toBeNull();
   });
 
-  it("reads the switch again on Refresh", async () => {
-    const calls = fetchMock([listing(pond(false))]);
+  it("reads the switch again on Refresh, and shows what is true now", async () => {
+    let open = false;
+    const calls = fetchMock([(req) => (isList(req) ? json({ items: [pond(open)] }) : null)]);
     show();
-    await screen.findByText("All of Finland");
+    expect(await screen.findByText("Closed")).toBeInTheDocument();
+    open = true;
     fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
-    await waitFor(() => expect(calls.filter(isList)).toHaveLength(2));
+    expect(await screen.findByText("Open")).toBeInTheDocument();
+    expect(calls.filter(isList)).toHaveLength(2);
   });
 });
 
@@ -172,6 +172,26 @@ describe("turning the switch", () => {
     expect(await screen.findByText("Closed")).toBeInTheDocument();
   });
 
+  it.each([
+    ["Matching is now open.", false, "Open matching"],
+    ["Matching is now closed.", true, "Close matching"],
+  ])(
+    "says %s to a screen reader alone, in a live region there before the press (#581)",
+    async (words, open, press) => {
+      fetchMock([listing(pond(open)), pressing(() => json(pond(!open)))]);
+      show();
+      const turn = await screen.findByRole("button", { name: press });
+      const region = document.querySelector("p[aria-live='polite']");
+      expect(region).toBeEmptyDOMElement();
+      expect(region).toHaveClass("sr-only");
+      fireEvent.click(turn);
+      fireEvent.click(within(step()).getByRole("button", { name: press }));
+      await waitFor(() => expect(region).toHaveTextContent(words));
+      // Never drawn: the badge turns and the button changes its name.
+      expect(region).toHaveClass("sr-only");
+    },
+  );
+
   it("clears what it last said when the next step opens, so the next press is heard", async () => {
     fetchMock([listing(pond(false)), pressing(() => json(pond(true)))]);
     show();
@@ -179,6 +199,16 @@ describe("turning the switch", () => {
     fireEvent.click(within(step()).getByRole("button", { name: "Open matching" }));
     await screen.findByText("Matching is now open.");
     fireEvent.click(screen.getByRole("button", { name: "Close matching" }));
+    expect(screen.queryByText("Matching is now open.")).toBeNull();
+  });
+
+  it("clears what it last said on Refresh, which may read the switch the other way", async () => {
+    fetchMock([listing(pond(false)), pressing(() => json(pond(true)))]);
+    show();
+    fireEvent.click(await screen.findByRole("button", { name: "Open matching" }));
+    fireEvent.click(within(step()).getByRole("button", { name: "Open matching" }));
+    await screen.findByText("Matching is now open.");
+    fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
     expect(screen.queryByText("Matching is now open.")).toBeNull();
   });
 

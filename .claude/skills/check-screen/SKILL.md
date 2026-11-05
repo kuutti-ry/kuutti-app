@@ -20,6 +20,8 @@ Not only what changed. From the header to the footer, and where the fold falls:
 
 Compare with how it looked before the change. A change that fits on its own can still push something else off the screen.
 
+Then ask: does anything on this screen explain the screen? A tagline, a helper line or a secondary label that says what the screen is for or what its controls do means the layout needs fixing, not a sentence (#581). A fact that protects a person keeps its words, and a control keeps its accessibility label.
+
 ## 3. Every state
 
 Loading, empty, an error from the server, no network, a refusal in its own words, disabled and read-only (drawn, never faded), and the longest real content: a long name, a long bio, the longest of the three languages. Finnish is usually the longest. Test what a person can actually reach.

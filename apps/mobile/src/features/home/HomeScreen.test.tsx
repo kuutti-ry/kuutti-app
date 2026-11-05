@@ -51,9 +51,7 @@ const POND: PondSummary = {
 };
 const counter: PondCounterResponse = {
   k: 10,
-  ponds: [
-    { pond: POND, day: "2026-10-05", verified: 150, split: null, finishing: null, seeks: null },
-  ],
+  ponds: [{ pond: POND, day: "2026-10-05", finished: 150, seeks: null }],
 };
 const gate: GateResponse = { state: "closed" };
 const json = (body: unknown, status = 200) =>
@@ -87,6 +85,7 @@ describe("HomeScreen", () => {
     expect(screen.getByRole("heading", { name: "Kuutti" })).toBeTruthy();
     // Both cards have fetched and painted before anything is pressed.
     expect(await screen.findByText("People on Kuutti")).toBeTruthy();
+    expect(await screen.findByText("150 people have completed their profiles.")).toBeTruthy();
     expect(
       await screen.findByText("Your profile is finished. Matching has not opened yet."),
     ).toBeTruthy();

@@ -36,12 +36,18 @@ const TEXT_PAIRS: ReadonlyArray<readonly [foreground: string, background: string
   ["destructive", "card"],
 ];
 
-/** Outlines that identify a control (WCAG 1.4.11): 3:1. --border is decorative and exempt. */
+/**
+ * What must stand apart to be seen (WCAG 1.4.11), 3:1: outlines that identify a
+ * control, --border being decorative and exempt, and the neighbours in the seeks
+ * bar (#581), which has no gap between them.
+ */
 const NON_TEXT_PAIRS: ReadonlyArray<readonly [foreground: string, background: string]> = [
   ["input", "background"],
   ["input", "card"],
   ["ring", "background"],
   ["ring", "card"],
+  ["seeks-men", "seeks-everyone"],
+  ["seeks-everyone", "seeks-women"],
 ];
 
 const AA_TEXT = 4.5;

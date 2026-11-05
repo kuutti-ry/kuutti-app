@@ -32,12 +32,13 @@ afterEach(() => {
 });
 
 describe("SignIn", () => {
-  it("explains the bank login under its heading and shows no alert when nothing went wrong", async () => {
+  it("is a heading and one button, with no alert when nothing went wrong (#581)", async () => {
     show();
-    expect(await screen.findByRole("heading", { level: 2, name: "Sign in" })).toBeInTheDocument();
-    expect(screen.getByText(/Moderators sign in with their bank/)).toBeInTheDocument();
+    const heading = await screen.findByRole("heading", { level: 2, name: "Sign in" });
     expect(screen.queryByRole("alert")).toBeNull();
     expect(screen.getByRole("button", { name: "Sign in with your bank" })).toBeEnabled();
+    // The whole card: the button says the bank, and a login with no role gets its own line.
+    expect(heading.parentElement?.textContent).toBe("Sign inSign in with your bank");
   });
 
   it("names a refusal it knows", async () => {

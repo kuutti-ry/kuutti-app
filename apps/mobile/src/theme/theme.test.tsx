@@ -71,6 +71,18 @@ describe("tokens", () => {
       expect(names(set)).toEqual(names(":root"));
     }
   });
+
+  it("back every colour class of the Tailwind config, the seeks bar's among them", () => {
+    const defined = Object.keys(
+      parseTokenSets(readFileSync(resolve(__dirname, "tokens.css"), "utf8"))[":root"] ?? {},
+    );
+    const { colors } = require("../../tailwind.config.js").theme.extend as {
+      colors: Record<string, string | Record<string, string>>;
+    };
+    const used = [...JSON.stringify(colors).matchAll(/var\(--([\w-]+)\)/g)].map((m) => m[1]);
+    expect(used).toEqual(expect.arrayContaining(["seeks-men", "seeks-everyone", "seeks-women"]));
+    expect(used.filter((name) => !defined.includes(name ?? ""))).toEqual([]);
+  });
 });
 
 describe("ThemeProvider", () => {

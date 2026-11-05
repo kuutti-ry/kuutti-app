@@ -76,8 +76,6 @@ export {
   type SyntheticPerson,
   type SyntheticProfile,
   summarise,
-  type Thresholds,
-  uncrossed,
 } from "./population.ts";
 export {
   openPonds,

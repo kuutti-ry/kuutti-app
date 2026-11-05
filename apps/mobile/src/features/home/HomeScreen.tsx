@@ -25,7 +25,7 @@ const MARK = require("../../../assets/logo-mark.png");
  * The home screen of a signed-in person (#143): whether matching is open and the
  * way to the people, the way to the profile (which holds the photos, the
  * deal-breakers and the later questions, #239), the conversations, how many
- * people are on Kuutti last (#581), and the settings. The
+ * people have completed their profiles last (#54, #581), and the settings. The
  * technical view (the API, the commits, a test error) is one tap away outside
  * production and absent in the store's build. An account that has not
  * finished onboarding (#46) is sent there first; until the status is known

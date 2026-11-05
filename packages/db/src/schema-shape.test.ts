@@ -135,6 +135,25 @@ describe("the tables", () => {
   });
 });
 
+describe("the pond counter (#581, ADR-013)", () => {
+  it("holds one number and the bands: no total, nobody's gender, nobody finishing", () => {
+    const columns = byName.get("pond_counter")?.columns ?? [];
+    expect(columns.map((column) => column.name).sort()).toEqual([
+      "day",
+      "finished",
+      "pond_id",
+      "seeks_everyone",
+      "seeks_men",
+      "seeks_women",
+      "taken_at",
+    ]);
+    const finished = columns.find((column) => column.name === "finished");
+    expect(finished?.getSQLType()).toBe("integer");
+    expect(finished?.notNull).toBe(true);
+    expect(finished?.default).toBe(0);
+  });
+});
+
 describe("a person's home (ADR-061)", () => {
   const column = (table: string, name: string) =>
     byName.get(table)?.columns.find((candidate) => candidate.name === name);

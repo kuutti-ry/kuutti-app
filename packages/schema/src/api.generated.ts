@@ -6201,7 +6201,7 @@ export interface paths {
         };
         /**
          * The pond counter
-         * @description Per pond: bank-verified people with the pond as theirs, their split by self-declared gender, and how many are finishing their profile. A number is published only where at least k people stand behind it (k is in the answer), the split only when every cell is at least k, and a pond's numbers move only once at least k people have come or gone since they were last said. Counted once a day. No session needed. With one, the answer is the caller's and is not cached, and the caller's own pond also says whom its people seek: whole percentages of three bands of finished profiles, those who seek men, those who seek both women and men, and those who seek women, null until every band holds at least k people.
+         * @description Per pond: how many bank-verified people with the pond as theirs have completed their profiles. The number is published only where at least k people stand behind it (k is in the answer), and it moves only once at least k people have come or gone since it was last said. Counted once a day. No session needed. With one, the answer is the caller's and is not cached, and the caller's own pond also says whom its people seek: percentages in steps of five of three bands of finished profiles, those who seek men, those who seek both women and men, and those who seek women, null until every band holds at least k people.
          */
         get: {
             parameters: {
@@ -8872,16 +8872,9 @@ export interface components {
             pond: components["schemas"]["PondSummary"];
             /** Format: date */
             day: string | null;
-            verified: number | null;
-            split: components["schemas"]["PondCounterSplit"];
-            finishing: number | null;
+            finished: number | null;
             seeks: components["schemas"]["PondSeeks"];
         };
-        PondCounterSplit: {
-            woman: number;
-            man: number;
-            nonBinary: number;
-        } | null;
         PondSeeks: {
             men: number;
             everyone: number;

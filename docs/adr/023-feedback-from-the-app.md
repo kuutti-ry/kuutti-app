@@ -35,3 +35,4 @@ The demo and the first users will find what the checklist did not, and the only 
 ## History
 
 - 2026-11-04 (#581, the maintainer's yes to the table of that day, rows S71, S72 and S93): §5, in place. The row is drawn only with a session, so the form has no line for a device without one. The line over the form says who sees the sender and that nobody is mailed, and after a send the thanks and Send more stand alone, the thanks also said aloud on both platforms.
+- 2026-11-04 (#581, the maintainer's yes to the table of that day, rows M15 and M43): §6's words. A row's line ends at its time, and after it the sender's "Account …" is itself the link to the person's page, where "account …" and a link The person's page stood; its 44 px target is an agent's addition to the table. The list's count reads "4 waiting" or "Nothing waiting".
