@@ -443,6 +443,42 @@ resource "aws_iam_role_policy" "ci_plan_admin_previews" {
   policy = data.aws_iam_policy_document.ci_plan_admin_previews.json
 }
 
+# The demo's reset (#613, ADR-018 §8): demo-reset.yml returns staging's demo
+# personas to where they begin through the one Run Command document
+# envs/staging declares (modules/compute), as preview-cleanup.yml drops a
+# preview database. The plan role may send exactly that document to exactly
+# that box and nothing else; the document takes no parameter, so the most a
+# holder of the role can do is reset staging's personas, which is what the
+# workflow is for. Both halves again: SendCommand is authorised against the
+# document and against the instance, and this policy stands on its own.
+data "aws_iam_policy_document" "ci_plan_demo_reset" {
+  statement {
+    sid       = "DemoResetDocument"
+    effect    = "Allow"
+    actions   = ["ssm:SendCommand"]
+    resources = ["arn:aws:ssm:${var.region}:${local.account_id}:document/${var.project}-staging-demo-reset"]
+  }
+
+  statement {
+    sid       = "StagingBoxOnly"
+    effect    = "Allow"
+    actions   = ["ssm:SendCommand"]
+    resources = ["arn:aws:ec2:${var.region}:${local.account_id}:instance/*"]
+
+    condition {
+      test     = "StringEquals"
+      variable = "ssm:resourceTag/Name"
+      values   = ["${var.project}-staging"]
+    }
+  }
+}
+
+resource "aws_iam_role_policy" "ci_plan_demo_reset" {
+  name   = "demo-reset"
+  role   = aws_iam_role.ci_plan.id
+  policy = data.aws_iam_policy_document.ci_plan_demo_reset.json
+}
+
 resource "aws_iam_role" "ci_apply" {
   name                 = "${var.project}-ci-apply"
   path                 = local.iam_path

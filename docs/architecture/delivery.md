@@ -7,6 +7,7 @@
 .github/workflows/release.yml
 .github/workflows/preview.yml
 .github/workflows/preview-cleanup.yml
+.github/workflows/demo-reset.yml
 .github/workflows/infra.yml
 .github/workflows/infra-prod.yml
 .github/workflows/infra-oidc.yml
@@ -214,6 +215,26 @@ flowchart TB
 42. TestFlight's internal testing: once Apple has processed the build, it reaches the internal group without Apple's review, and the group holds the team alone, users of the association's team in App Store Connect, for the same reason as Play's list (ADR-004 §3). Testers install and update the app with the TestFlight app; a build stops opening 90 days after its upload, so the staging profile is started again before then.
 43. Planned, #193: a production build on a release tag, submitted to a closed track and to TestFlight's external testing for the beta, once ADR-004 §4 is settled, the release gate passes and production has bank identification (ADR-049), and the reviewers have a way in (#560).
 
+## Part 5: the demo reset by hand
+
+```mermaid
+flowchart TB
+  accTitle: Delivery, part 5: the demo reset by hand
+  accDescr: Somebody with write access starts demo-reset.yml from main. The job assumes kuutti-ci-plan and sends the one Run Command document the role may send to the staging box, which runs the demo's picture fetch and then the reset inside the API's container. The reset's lines come back as the run's log and step summary, and the run is red when a persona was spared.
+  n44["Somebody with write access starts demo-reset.yml from main"]
+  n45["Run Command document kuutti-staging-demo-reset, sent as kuutti-ci-plan"]
+  n46["The api container on the staging box: demo-assets, then demo-reset --env staging"]
+  n44 -->|"by hand, from main"| n45
+  n45 -->|"docker exec, as root on the box"| n46
+  n46 -->|"the reset's lines and its exit code"| n44
+```
+
+### Steps
+
+44. `demo-reset.yml`, by hand from `main` (the Actions tab, or `gh workflow run demo-reset.yml`), by anyone with write access to the repository: it returns staging's twenty-five demo personas to where they begin, so that a round of testing starts clean (#613, ADR-018 §8). A dispatch from another branch stops at its first step: the plan role trusts pull requests and `main`, and `main`'s copy of the file is the reviewed one. One run at a time; no schedule (the nightly reset is one line here when it is wanted) and no pull-request trigger.
+45. The job assumes `kuutti-ci-plan` by OIDC and sends the Run Command document `kuutti-staging-demo-reset` ([Deployment](deployment.md), step 64) to the instance tagged `kuutti-staging`: the one document and the one box the bootstrap lets the role send to, beside the preview database's, and the document takes no parameter. Then it waits, up to the document's half hour, and writes the invocation's output to the log and to the step summary.
+46. On the box, as root: the task of Dokploy's `api` application, then `node dist/demo-assets.js` (the pictures' release into the container's cache, which a new container starts without) and `node dist/demo-reset.js --env staging`, both reading staging's parameters through the instance role as the API does, so the reset still runs inside the container and nowhere else (ADR-018 §2 to §4). Its exit code is the run's: 0, everybody reset; 2, somebody spared, a persona with a staff role or a line in the audit log, named in the last line (ADR-014 §12); 3, no `api` container running.
+
 ## What each job may touch
 
 | Workflow, job | When | GitHub environment | AWS role | Secrets | Switches and variables |
@@ -234,6 +255,7 @@ flowchart TB
 | `preview-cleanup.yml`, `select`, `remove previews` | `main`: every push, a schedule, by hand | `preview-cleanup` | none | `DOKPLOY_TOKEN` (both), `EXPO_TOKEN` (`remove previews`); `GITHUB_TOKEN`, `pull-requests: write` (`select`) | `PREVIEWS_ENABLED`; the preview variables, `ADMIN_BUCKET` |
 | `preview-cleanup.yml`, `drop kuutti_pr_<n>`, `remove admin pr-<n>/` | the same | none | `kuutti-ci-plan`, as `main` | none | `AWS_PLAN_ROLE_ARN` |
 | `preview-cleanup.yml`, `withdraw waiting runs` | the same | none | none | `GITHUB_TOKEN`, `actions: write` | none |
+| `demo-reset.yml`, `reset` | `main`: by hand | none | `kuutti-ci-plan`, as `main` | none | `AWS_PLAN_ROLE_ARN` |
 | `infra.yml`, `fmt` | changes under `infra/` | none | none | none | none |
 | `infra.yml`, `plan` | the same, pull requests and `main` | none | `kuutti-ci-plan` | `GITHUB_TOKEN`, `pull-requests: write` | `ALERT_EMAIL`, `MAIL_TESTERS`, `AWS_PLAN_ROLE_ARN` |
 | `infra.yml`, `apply staging` | `main` | `staging` | `kuutti-ci-apply` | none | `STAGING_ENABLED`, `ALERT_EMAIL`, `MAIL_TESTERS` |
@@ -249,11 +271,11 @@ The workflows read `EXPO_TOKEN` and `DOKPLOY_TOKEN` from the environments `stagi
 
 ## Where it lives
 
-- Workflows: [build.yml](../../.github/workflows/build.yml), [deploy.yml](../../.github/workflows/deploy.yml), [admin-deploy.yml](../../.github/workflows/admin-deploy.yml), [release.yml](../../.github/workflows/release.yml), [preview.yml](../../.github/workflows/preview.yml), [preview-cleanup.yml](../../.github/workflows/preview-cleanup.yml), [infra.yml](../../.github/workflows/infra.yml), [infra-prod.yml](../../.github/workflows/infra-prod.yml), [infra-oidc.yml](../../.github/workflows/infra-oidc.yml), [eas-build.yml](../../.github/workflows/eas-build.yml), [ci.yml](../../.github/workflows/ci.yml), [dco.yml](../../.github/workflows/dco.yml), [secret-scan.yml](../../.github/workflows/secret-scan.yml), [e2e.yml](../../.github/workflows/e2e.yml), [e2e-admin.yml](../../.github/workflows/e2e-admin.yml), [auto-approve.yml](../../.github/workflows/auto-approve.yml)
+- Workflows: [build.yml](../../.github/workflows/build.yml), [deploy.yml](../../.github/workflows/deploy.yml), [admin-deploy.yml](../../.github/workflows/admin-deploy.yml), [release.yml](../../.github/workflows/release.yml), [preview.yml](../../.github/workflows/preview.yml), [preview-cleanup.yml](../../.github/workflows/preview-cleanup.yml), [demo-reset.yml](../../.github/workflows/demo-reset.yml), [infra.yml](../../.github/workflows/infra.yml), [infra-prod.yml](../../.github/workflows/infra-prod.yml), [infra-oidc.yml](../../.github/workflows/infra-oidc.yml), [eas-build.yml](../../.github/workflows/eas-build.yml), [ci.yml](../../.github/workflows/ci.yml), [dco.yml](../../.github/workflows/dco.yml), [secret-scan.yml](../../.github/workflows/secret-scan.yml), [e2e.yml](../../.github/workflows/e2e.yml), [e2e-admin.yml](../../.github/workflows/e2e-admin.yml), [auto-approve.yml](../../.github/workflows/auto-approve.yml)
 - Scripts: [.github/scripts](../../.github/scripts) (`aws-oidc.sh`, the OIDC exchange with no third-party action; `dokploy-deploy.sh`; `dokploy-preview.sh`; `wait-healthy.sh`; `check-workflow-permissions.py`)
 - The roles and their trust: [infra/bootstrap/main.tf](../../infra/bootstrap/main.tf); the environments, the rulesets and the variables: [infra/README.md](../../infra/README.md) (After bootstrap: GitHub; Environments, CI; Previews; Admin panel)
 - The app's channels and profiles: [apps/mobile/eas.json](../../apps/mobile/eas.json), [apps/mobile/app.json](../../apps/mobile/app.json)
-- ADRs: [ADR-001](../adr/001-infrastructure-as-code.md) (plans on pull requests, applies behind environments), [ADR-004](../adr/004-eas-update-integrity.md) (updates not signed; who can publish), [ADR-012](../adr/012-unattended-preview-cleanup.md) (the sweep), [ADR-020](../adr/020-end-to-end-flows-with-maestro.md) §6 and §7 (the flows in CI), [ADR-025](../adr/025-admin-host.md) §5 to §8 (the panel's deploy and previews), [ADR-028](../adr/028-versioning-and-the-bump.md) (the version), [ADR-049](../adr/049-production-before-the-first-release.md) (production's first apply from a rehearsal tag), [ADR-057](../adr/057-google-play-internal-testing.md) (the staging app on Google Play's internal testing track), [ADR-063](../adr/063-testflight-internal-testing.md) (the staging app on TestFlight's internal testing)
+- ADRs: [ADR-001](../adr/001-infrastructure-as-code.md) (plans on pull requests, applies behind environments), [ADR-004](../adr/004-eas-update-integrity.md) (updates not signed; who can publish), [ADR-012](../adr/012-unattended-preview-cleanup.md) (the sweep), [ADR-018](../adr/018-staging-is-the-demo.md) §8 (the demo reset by hand), [ADR-020](../adr/020-end-to-end-flows-with-maestro.md) §6 and §7 (the flows in CI), [ADR-025](../adr/025-admin-host.md) §5 to §8 (the panel's deploy and previews), [ADR-028](../adr/028-versioning-and-the-bump.md) (the version), [ADR-049](../adr/049-production-before-the-first-release.md) (production's first apply from a rehearsal tag), [ADR-057](../adr/057-google-play-internal-testing.md) (the staging app on Google Play's internal testing track), [ADR-063](../adr/063-testflight-internal-testing.md) (the staging app on TestFlight's internal testing)
 - Not drawn, since they deliver nothing: `audit.yml`, `dead-code.yml`, `dependency-review.yml`, `scorecard.yml`, and `export.yml`, the weekly copy of what exists only on GitHub, under its own role `kuutti-ci-export`.
 - Issues: #25 (production), #77 (the box's memory, which a deploy and three previews at once have exhausted before)
 

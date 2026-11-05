@@ -346,6 +346,54 @@ resource "aws_ssm_document" "preview_database" {
 }
 
 # ---------------------------------------------------------------------------
+# The demo's reset (#613, ADR-018 §8). The personas are returned to where they
+# begin by the reset that lives inside the API's container and nowhere else
+# (ADR-018 §2 to §4); this document is how demo-reset.yml says "now" from
+# GitHub, without a terminal on the box. Sent by the plan role, which the
+# bootstrap allows to send exactly this document to exactly this box, as it
+# sends the preview database's. It takes no parameter. Runs as root on the box:
+# finds the task of Dokploy's api application (<environment>-api-<id>.1.<task>,
+# infra/README.md), fetches the pictures' release into the container's cache
+# (the cache is the container's own, and a new container starts without it),
+# then runs the reset, whose exit code is the command's: 2 names the personas
+# it spared, 3 says no api container runs. Nothing here holds a secret: both
+# commands read the environment's parameters through the instance role, as the
+# API does, and the lines they print carry keys and counts (ADR-018 §2).
+# ---------------------------------------------------------------------------
+
+resource "aws_ssm_document" "demo_reset" {
+  count = var.demo_reset ? 1 : 0
+
+  name            = "${local.name}-demo-reset"
+  document_type   = "Command"
+  document_format = "JSON"
+
+  content = jsonencode({
+    schemaVersion = "2.2"
+    description   = "Returns the demo personas of ${local.name} to where they begin, inside the API's container: demo-assets, then demo-reset --env ${var.environment} (#613, ADR-018 §8). Sent by demo-reset.yml."
+    parameters    = {}
+    mainSteps = [{
+      action = "aws:runShellScript"
+      name   = "resetPersonas"
+      inputs = {
+        timeoutSeconds = "1800"
+        runCommand = [
+          # The agent runs these lines with sh (dash), which has no pipefail; the one pipe here is a head.
+          "set -eu",
+          "export PATH=\"$PATH:/snap/bin\"",
+          # By id, not by a Go template: {{ }} is a parameter to Run Command.
+          "c=$(docker ps -q --filter \"name=^${var.environment}-api-\" | head -n 1)",
+          "[ -n \"$c\" ] || { echo \"no running ${var.environment}-api container\"; exit 3; }",
+          "docker ps --filter \"name=^${var.environment}-api-\"",
+          "docker exec \"$c\" node dist/demo-assets.js",
+          "docker exec \"$c\" node dist/demo-reset.js --env ${var.environment}",
+        ]
+      }
+    }]
+  })
+}
+
+# ---------------------------------------------------------------------------
 # Headroom on a running box (#77, ADR-046). user_data gives a new box its
 # swap and the free-memory metric at first boot, and
 # ignore_changes keeps a running box from ever seeing an edit of it. So the
