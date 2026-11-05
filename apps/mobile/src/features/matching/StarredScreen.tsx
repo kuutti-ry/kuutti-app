@@ -93,9 +93,7 @@ export function StarredScreen() {
         {view.status === "loading" && (
           <Text accessibilityLiveRegion="polite">{t("load.loading")}</Text>
         )}
-        {view.status === "failed" && (
-          <LoadFailed error={view.error} onRetry={retry} />
-        )}
+        {view.status === "failed" && <LoadFailed error={view.error} onRetry={retry} />}
         {view.status === "ready" && view.items.length === 0 && <Text>{t("stars.none")}</Text>}
         {view.status === "ready" && view.items.length > 0 && (
           <View className="gap-1">

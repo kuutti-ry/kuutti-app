@@ -1,8 +1,8 @@
 import type { PondCounterResponse, PondSummary } from "@kuutti/schema";
 import { act, fireEvent } from "@testing-library/react-native";
+import { FAILED_TO_LOAD } from "@/test/failed";
 import { renderWithTheme } from "@/test/render";
 import { PondCard } from "./PondCard";
-import { FAILED_TO_LOAD } from "@/test/failed";
 
 // The pond card (#54, #581, ADR-013): the number in one sentence, none below the
 // threshold, the bar of whom those people seek right under it (#507), and not a

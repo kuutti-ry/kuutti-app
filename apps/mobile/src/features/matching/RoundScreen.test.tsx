@@ -5,10 +5,10 @@ import * as SecureStore from "expo-secure-store";
 import { AccessibilityInfo, AppState, Dimensions, Platform, StyleSheet, View } from "react-native";
 import { clearSession, saveSession } from "@/lib/session";
 import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
+import { FAILED_TO_LOAD } from "@/test/failed";
 import { renderWithTheme, underProviders } from "@/test/render";
 import { TOUCH_TARGET } from "@/theme/a11y";
 import { RoundScreen } from "./RoundScreen";
-import { FAILED_TO_LOAD } from "@/test/failed";
 
 // The queue on the phone (#379, #502, ADR-034, ADR-062): one card at a time
 // with its reason, like, pass and Later as buttons, Undo on the last decision,
@@ -1413,9 +1413,7 @@ describe("reading on past the last card (ADR-062 §1)", () => {
       api(reading(page(entry(1, "Henna")), () => refusal("internal", 500)));
       await show();
       await press("Pass");
-      expect(screen.getByText(FAILED_TO_LOAD).props.accessibilityLiveRegion).toBe(
-        "assertive",
-      );
+      expect(screen.getByText(FAILED_TO_LOAD).props.accessibilityLiveRegion).toBe("assertive");
       expect(announced()).toEqual(said);
       // The reason itself says it, queued behind what is being said (`LoadFailed`).
       expect(

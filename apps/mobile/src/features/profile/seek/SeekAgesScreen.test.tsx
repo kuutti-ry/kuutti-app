@@ -3,10 +3,10 @@ import { useLocales } from "expo-localization";
 import type * as React from "react";
 import { saveSession } from "@/lib/session";
 import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
+import { FAILED_TO_LOAD } from "@/test/failed";
 import { expectPinnedHeader } from "@/test/layout";
 import { renderWithTheme } from "@/test/render";
 import { SeekAgesScreen } from "./SeekAgesScreen";
-import { FAILED_TO_LOAD } from "@/test/failed";
 
 // The age window (#542): the bounds of onboarding, from the stored answer, two
 // steppers that never cross, saved on leaving. Every answer is a button.

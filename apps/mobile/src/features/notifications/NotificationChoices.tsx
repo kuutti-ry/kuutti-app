@@ -94,9 +94,7 @@ export function NotificationChoices({
       {view.status === "loading" && (
         <Text accessibilityLiveRegion="polite">{t("load.loading")}</Text>
       )}
-      {view.status === "failed" && (
-        <LoadFailed error={view.error} onRetry={read} />
-      )}
+      {view.status === "failed" && <LoadFailed error={view.error} onRetry={read} />}
       {view.status === "ready" &&
         view.choices.map(({ kind, enabled }) => {
           const { label: labelKey, hint } = WORDS[kind];

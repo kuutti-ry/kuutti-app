@@ -7,12 +7,12 @@ import type * as React from "react";
 import { AccessibilityInfo, PixelRatio, Platform } from "react-native";
 import { saveSession } from "@/lib/session";
 import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
+import { FAILED_TO_LOAD } from "@/test/failed";
 import { hasCutText } from "@/test/layout";
 import { renderWithTheme } from "@/test/render";
 import { FakeXhr } from "@/test/xhr";
 import { MAX_FONT_SCALE } from "@/theme/a11y";
 import { defaultAgeWindow, OnboardingScreen } from "./OnboardingScreen";
-import { FAILED_TO_LOAD } from "@/test/failed";
 
 /** The names of the radio groups on the screen, each a plain view that a role query would leave out. */
 const radioGroups = () =>
@@ -1040,11 +1040,7 @@ describe("OnboardingScreen", () => {
       const api = failingUntilOk("/onboarding");
       await press(onward());
       await flush();
-      await waitFor(() =>
-        expect(
-          screen.getByText(FAILED_TO_LOAD),
-        ).toBeTruthy(),
-      );
+      await waitFor(() => expect(screen.getByText(FAILED_TO_LOAD)).toBeTruthy());
       api.ok();
       await press(screen.getByRole("button", { name: "Try again" }));
       await flush();
@@ -1715,11 +1711,7 @@ describe("OnboardingScreen", () => {
     fakeApi();
     const api = failingUntilOk("/onboarding");
     await show(<OnboardingScreen />);
-    await waitFor(() =>
-      expect(
-        screen.getByText(FAILED_TO_LOAD),
-      ).toBeTruthy(),
-    );
+    await waitFor(() => expect(screen.getByText(FAILED_TO_LOAD)).toBeTruthy());
     expect(screen.getByText("Kuutti's server had a problem. Try again in a moment.")).toBeTruthy();
     api.ok();
     await press(screen.getByRole("button", { name: "Try again" }));

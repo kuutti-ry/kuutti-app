@@ -4,12 +4,12 @@ import * as SecureStore from "expo-secure-store";
 import { AccessibilityInfo } from "react-native";
 import { clearSession, saveSession } from "@/lib/session";
 import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
+import { FAILED_TO_LOAD } from "@/test/failed";
 import { renderWithTheme } from "@/test/render";
 import { FakeWebSocket } from "@/test/websocket";
 import { ChatPhotoScreen } from "./ChatPhotoScreen";
 import { takeNotice } from "./notice";
 import { ChatLiveProvider } from "./store";
-import { FAILED_TO_LOAD } from "@/test/failed";
 
 // A conversation's photo full size (#350): read again by its place, the full
 // size contained with its label, the description under it when the setting

@@ -118,10 +118,7 @@ export function LaterFieldScreen({ field, once = false }: { field: string; once?
     return (
       <SafeAreaView className="flex-1 bg-background">
         <View className="flex-1 items-center justify-center gap-4 p-6">
-          <LoadFailed
-            error={profile.error}
-            onRetry={() => void profile.reload()}
-          />
+          <LoadFailed error={profile.error} onRetry={() => void profile.reload()} />
         </View>
       </SafeAreaView>
     );

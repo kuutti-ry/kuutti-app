@@ -9,10 +9,10 @@ import { useLocales } from "expo-localization";
 import type * as React from "react";
 import { saveSession } from "@/lib/session";
 import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
+import { FAILED_TO_LOAD } from "@/test/failed";
 import { expectPinnedHeader } from "@/test/layout";
 import { renderWithTheme } from "@/test/render";
 import { ProfileScreen } from "./ProfileScreen";
-import { FAILED_TO_LOAD } from "@/test/failed";
 
 /** A valid answer to any field of the registry, for a document that answers everything. */
 function answerOf(key: ProfileFieldKey): unknown {

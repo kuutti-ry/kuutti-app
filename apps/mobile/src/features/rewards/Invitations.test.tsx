@@ -6,9 +6,9 @@ import { AccessibilityInfo, AppState, Platform, Share } from "react-native";
 import { RevealProvider } from "@/lib/reveal";
 import { clearSession, saveSession } from "@/lib/session";
 import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
+import { FAILED_TO_LOAD } from "@/test/failed";
 import { renderWithTheme } from "@/test/render";
 import { Invitations } from "./Invitations";
-import { FAILED_TO_LOAD } from "@/test/failed";
 
 // Settings › Invitations (#107, ADR-044): what an invitation earns in words,
 // while it earns anything; Create an invitation and the code shown once, read
@@ -139,9 +139,7 @@ describe("Invitations", () => {
         }),
     ) as unknown as typeof fetch;
     await renderWithTheme(<Invitations />);
-    expect(screen.getByText("Loading…").props.accessibilityLiveRegion).toBe(
-      "polite",
-    );
+    expect(screen.getByText("Loading…").props.accessibilityLiveRegion).toBe("polite");
     await act(async () => waiting.shift()?.(refusal("internal_error", 500)));
     expect(screen.getByText(FAILED_TO_LOAD)).toBeTruthy();
     expect(screen.getByText("Kuutti's server had a problem. Try again in a moment.")).toBeTruthy();

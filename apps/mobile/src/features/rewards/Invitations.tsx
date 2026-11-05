@@ -188,12 +188,7 @@ export function Invitations({
     );
   }
   if (view.status === "failed") {
-    return (
-      <LoadFailed
-        error={view.error}
-        onRetry={view.retry}
-      />
-    );
+    return <LoadFailed error={view.error} onRetry={view.retry} />;
   }
   const { canInvite, redeemable, reward, open, earned } = view.invitations;
   const earns = rewardParams(reward);

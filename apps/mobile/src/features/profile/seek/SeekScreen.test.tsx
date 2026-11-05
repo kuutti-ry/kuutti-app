@@ -4,10 +4,10 @@ import type * as React from "react";
 import { AccessibilityInfo } from "react-native";
 import { saveSession } from "@/lib/session";
 import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
+import { FAILED_TO_LOAD } from "@/test/failed";
 import { expectPinnedHeader } from "@/test/layout";
 import { renderWithTheme } from "@/test/render";
 import { SeekScreen } from "./SeekScreen";
-import { FAILED_TO_LOAD } from "@/test/failed";
 
 // What a person seeks, as a list of its own (#542): each row its answer under
 // onboarding's own question, heard once, and nothing edited here. Beside the

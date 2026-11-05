@@ -6,9 +6,9 @@ import { AccessibilityInfo, Platform } from "react-native";
 import { clearSession, saveSession } from "@/lib/session";
 import { UnsavedRow } from "@/lib/unsaved";
 import { a11yProblems, type HostNode, markBefore, pressables } from "@/test/a11y";
+import { FAILED_TO_LOAD } from "@/test/failed";
 import { renderWithTheme, underProviders } from "@/test/render";
 import { YourContacts } from "./YourContacts";
-import { FAILED_TO_LOAD } from "@/test/failed";
 
 // The contacts a person keeps (#103), under Settings' Ways to reach you row
 // (#511): the read with its loading line and its failure, a part per kind
@@ -157,9 +157,7 @@ describe("Ways to reach you", () => {
       }) as unknown as Response,
     ]);
     await renderWithTheme(<YourContacts />);
-    expect(screen.getByText("Loading…").props.accessibilityLiveRegion).toBe(
-      "polite",
-    );
+    expect(screen.getByText("Loading…").props.accessibilityLiveRegion).toBe("polite");
     await act(async () =>
       answer(json({ contacts: [{ kind: "phone", value: "+358401234567", updatedAt: AT }] })),
     );
@@ -437,9 +435,7 @@ describe("Ways to reach you", () => {
     await type("Your Telegram username", "aino_k2");
     await leave("Your Telegram username");
     for (let i = 0; i < 2; i += 1) {
-      expect(
-        screen.getByText("That did not go through. Try again."),
-      ).toBeTruthy();
+      expect(screen.getByText("That did not go through. Try again.")).toBeTruthy();
       expect(field("Your Telegram username").props.value).toBe("aino_k2");
       if (i === 0) await press("Try again");
     }

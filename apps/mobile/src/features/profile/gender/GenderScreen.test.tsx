@@ -4,11 +4,11 @@ import { useLocales } from "expo-localization";
 import { AccessibilityInfo, PixelRatio, Platform } from "react-native";
 import { saveSession } from "@/lib/session";
 import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
+import { FAILED_TO_LOAD } from "@/test/failed";
 import { hasCutText } from "@/test/layout";
 import { renderWithTheme } from "@/test/render";
 import { MAX_FONT_SCALE } from "@/theme/a11y";
 import { GENDER_PATH, GenderScreen } from "./GenderScreen";
-import { FAILED_TO_LOAD } from "@/test/failed";
 
 // The person's own gender after sign-up (#552): the three genders from the
 // stored answer as whole-width rows (#581), saved on leaving, the limit said up

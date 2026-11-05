@@ -6,10 +6,10 @@ import { AccessibilityInfo, DeviceEventEmitter, Platform, StyleSheet, View } fro
 import { clearSession, saveSession } from "@/lib/session";
 import { UnsavedRow } from "@/lib/unsaved";
 import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
+import { FAILED_TO_LOAD } from "@/test/failed";
 import { renderWithTheme, underProviders } from "@/test/render";
 import { EmailCard, EmailScreen } from "./EmailCard";
 import { markLockOffered } from "./lock/LockProvider";
-import { FAILED_TO_LOAD } from "@/test/failed";
 
 // The optional e-mail's card (#148) and its confirmation by a code (#385,
 // ADR-043): every state the card shows, what each call answers in words, what
@@ -176,9 +176,7 @@ describe("EmailCard, reading the address", () => {
     globalThis.fetch = jest.fn(() => new Promise<Response>(() => {})) as unknown as typeof fetch;
     await show(<EmailCard />);
     expect(screen.getByText("Loading…")).toBeTruthy();
-    expect(screen.getByText("Loading…").props.accessibilityLiveRegion).toBe(
-      "polite",
-    );
+    expect(screen.getByText("Loading…").props.accessibilityLiveRegion).toBe("polite");
     expect(screen.queryByText("A way to stay in touch")).toBeNull();
   });
 

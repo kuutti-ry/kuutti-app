@@ -139,12 +139,7 @@ export function ConsentSwitch({
     );
   }
   if (consent.state === "unavailable") {
-    return (
-      <LoadFailed
-        error={consent.error}
-        onRetry={consent.read}
-      />
-    );
+    return <LoadFailed error={consent.error} onRetry={consent.read} />;
   }
   const label = t(LABEL[kind]);
   const locked = consent.busy || consent.state === "outdated";

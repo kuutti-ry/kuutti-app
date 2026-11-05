@@ -4,11 +4,11 @@ import { useLocales } from "expo-localization";
 import { AccessibilityInfo, PixelRatio, Platform } from "react-native";
 import { saveSession } from "@/lib/session";
 import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
+import { FAILED_TO_LOAD } from "@/test/failed";
 import { expectPinnedHeader, hasCutText } from "@/test/layout";
 import { renderWithTheme } from "@/test/render";
 import { MAX_FONT_SCALE } from "@/theme/a11y";
 import { PlaceScreen } from "./PlaceScreen";
-import { FAILED_TO_LOAD } from "@/test/failed";
 
 // The home after onboarding (ADR-061): what the card shows of it, and a new
 // postal code, as often as the person likes. In words only, and what was typed
@@ -218,7 +218,9 @@ describe("PlaceScreen", () => {
     fakeApi(IN_KALLIO, answer);
     await show();
     await press(option("Kallio"));
-    await waitFor(() => expect(screen.getByText("That did not go through. Try again.")).toBeTruthy());
+    await waitFor(() =>
+      expect(screen.getByText("That did not go through. Try again.")).toBeTruthy(),
+    );
     expect(checked("Helsinki")).toBe(true);
     expect(checked("Kallio")).toBe(false);
   });
@@ -259,7 +261,9 @@ describe("PlaceScreen", () => {
     );
     await show();
     await press(option("Kallio"));
-    await waitFor(() => expect(screen.getByText("That did not go through. Try again.")).toBeTruthy());
+    await waitFor(() =>
+      expect(screen.getByText("That did not go through. Try again.")).toBeTruthy(),
+    );
     refuse = false;
     await press(option("Kallio"));
     expect(screen.queryByText("That did not go through. Try again.")).toBeNull();

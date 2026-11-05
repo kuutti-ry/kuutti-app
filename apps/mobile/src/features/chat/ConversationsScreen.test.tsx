@@ -5,6 +5,7 @@ import * as SecureStore from "expo-secure-store";
 import { AccessibilityInfo, AppState, PixelRatio, Platform, StyleSheet } from "react-native";
 import { clearSession, saveSession } from "@/lib/session";
 import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
+import { FAILED_TO_LOAD } from "@/test/failed";
 import { expectPinnedHeader } from "@/test/layout";
 import { renderWithTheme } from "@/test/render";
 import { FakeWebSocket } from "@/test/websocket";
@@ -14,7 +15,6 @@ import { ConversationsScreen } from "./ConversationsScreen";
 import { leaveNotice } from "./notice";
 import { ChatLiveProvider } from "./store";
 import { dayOf, timeOf } from "./time";
-import { FAILED_TO_LOAD } from "@/test/failed";
 
 // The list of conversations and the home screen's way to it (#348): the
 // groups by whose turn it is and the archive, the banner near the limit (ADR-062

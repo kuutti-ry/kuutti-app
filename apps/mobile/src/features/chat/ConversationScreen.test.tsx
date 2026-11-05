@@ -7,6 +7,7 @@ import { AccessibilityInfo, AppState, Clipboard, Linking, Platform } from "react
 import { pickPrepared } from "@/features/media";
 import { clearSession, saveSession } from "@/lib/session";
 import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
+import { FAILED_TO_LOAD } from "@/test/failed";
 import { expectPinnedHeader } from "@/test/layout";
 import { renderWithTheme } from "@/test/render";
 import { FakeWebSocket } from "@/test/websocket";
@@ -15,7 +16,6 @@ import { ConversationScreen } from "./ConversationScreen";
 import { takeNotice } from "./notice";
 import { ChatLiveProvider } from "./store";
 import { dayOf, timeOf } from "./time";
-import { FAILED_TO_LOAD } from "@/test/failed";
 
 // One conversation (#348): the header, the messages by day with who, when and
 // what, "Read", the read mark, the composer, Send, the
@@ -1030,9 +1030,7 @@ describe("contacts in a conversation (#103)", () => {
     expect(screen.getByRole("button", { name: "Share your Instagram" })).toBeTruthy();
     for (let i = 0; i < 2; i += 1) {
       await press("Share your Instagram");
-      expect(
-        screen.getByText("That did not go through. Try again."),
-      ).toBeTruthy();
+      expect(screen.getByText("That did not go through. Try again.")).toBeTruthy();
     }
     expect(detailReads()).toBe(before);
     // Removed on another phone meanwhile: said, read again, and gone from the dialog and the header.

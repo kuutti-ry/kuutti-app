@@ -54,10 +54,7 @@ export function CardPreviewScreen() {
           <Text accessibilityLiveRegion="polite">{t("load.loading")}</Text>
         )}
         {state.status === "error" && (
-          <LoadFailed
-            error={state.error}
-            onRetry={() => setAttempt((n) => n + 1)}
-          />
+          <LoadFailed error={state.error} onRetry={() => setAttempt((n) => n + 1)} />
         )}
         {preview && !preview.completeness.complete && (
           <View className="gap-1">

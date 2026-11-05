@@ -132,9 +132,7 @@ export function EmailCard({
     );
   }
   if (load.state === "unavailable") {
-    return (
-      <LoadFailed error={load.error} onRetry={read} />
-    );
+    return <LoadFailed error={load.error} onRetry={read} />;
   }
   return <EmailForm first={load.email} inRow={inRow} onStored={onStored} />;
 }

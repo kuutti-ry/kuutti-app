@@ -44,10 +44,7 @@ export function SeekAgesScreen() {
     return (
       <SafeAreaView className="flex-1 bg-background">
         <View className="flex-1 items-center justify-center gap-4 p-6">
-          <LoadFailed
-            error={seeking.error}
-            onRetry={() => void seeking.reload()}
-          />
+          <LoadFailed error={seeking.error} onRetry={() => void seeking.reload()} />
         </View>
       </SafeAreaView>
     );

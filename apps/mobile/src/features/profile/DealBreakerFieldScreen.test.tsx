@@ -4,10 +4,10 @@ import type * as React from "react";
 import { AccessibilityInfo, Platform } from "react-native";
 import { saveSession } from "@/lib/session";
 import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
+import { FAILED_TO_LOAD } from "@/test/failed";
 import { expectPinnedHeader, hasCutText } from "@/test/layout";
 import { renderWithTheme } from "@/test/render";
 import { DealBreakerFieldScreen } from "./DealBreakerFieldScreen";
-import { FAILED_TO_LOAD } from "@/test/failed";
 
 // One deal-breaker on a screen of its own (#551): Everyone first, then what is
 // fine, as whole-width rows unless the list is long (#581), saved on leaving as

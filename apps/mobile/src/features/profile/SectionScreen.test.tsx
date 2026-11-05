@@ -3,11 +3,11 @@ import { useLocales } from "expo-localization";
 import type * as React from "react";
 import { clearSession, saveSession } from "@/lib/session";
 import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
+import { FAILED_TO_LOAD } from "@/test/failed";
 import { expectPinnedHeader, hasCutText } from "@/test/layout";
 import { renderWithTheme } from "@/test/render";
 import { SectionScreen } from "./SectionScreen";
 import { PROFILE_SECTIONS } from "./sections";
-import { FAILED_TO_LOAD } from "@/test/failed";
 
 const settle = () => new Promise<void>((resolve) => setTimeout(resolve, 10));
 const show = async (ui: React.ReactElement) => {

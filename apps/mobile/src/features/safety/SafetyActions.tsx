@@ -601,9 +601,7 @@ function SafetyDialog({
             </DialogHeader>
             <ScrollView style={{ flexShrink: 1 }} contentContainerClassName="gap-4">
               <DialogDescription>{t("chat.unmatch.body")}</DialogDescription>
-              {notice && (
-                <Text accessibilityLiveRegion="assertive">{t("load.failed.press")}</Text>
-              )}
+              {notice && <Text accessibilityLiveRegion="assertive">{t("load.failed.press")}</Text>}
               {working}
             </ScrollView>
             <DialogFooter>

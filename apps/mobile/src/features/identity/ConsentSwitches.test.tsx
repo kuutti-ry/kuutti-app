@@ -4,9 +4,9 @@ import type * as React from "react";
 import { Linking } from "react-native";
 import { clearSession, saveSession } from "@/lib/session";
 import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
+import { FAILED_TO_LOAD } from "@/test/failed";
 import { renderWithTheme, underProviders } from "@/test/render";
 import { ConsentSwitch, useConsentStates } from "./ConsentSwitches";
-import { FAILED_TO_LOAD } from "@/test/failed";
 
 // A withdrawable consent as a switch (#46, #146), under its own row in Settings
 // since #287 and #511: shown as the API holds it, given for the bundled wording,

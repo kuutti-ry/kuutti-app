@@ -129,9 +129,7 @@ describe("the found-them screen", () => {
     await renderWithTheme(<FoundThemScreen />);
     await press("Another reason", "radio");
     await press("Tell Kuutti");
-    const failed = await screen.findByText(
-      "That did not go through. Try again.",
-    );
+    const failed = await screen.findByText("That did not go through. Try again.");
     // Said at once by a screen reader, wherever its focus is.
     expect(failed.props.accessibilityLiveRegion).toBe("assertive");
     expect(screen.getByRole("radio", { name: "✓ Another reason" })).toBeTruthy();

@@ -188,10 +188,7 @@ describe("the automatic shadow bans", () => {
     expect(
       screen.getByRole("heading", { level: 2, name: "Automatic shadow bans" }),
     ).toBeInTheDocument();
-    expect(screen.getByText("Loading…")).toHaveAttribute(
-      "aria-busy",
-      "true",
-    );
+    expect(screen.getByText("Loading…")).toHaveAttribute("aria-busy", "true");
     expect(screen.queryByRole("list")).toBeNull();
     await waitFor(() => expect(calls).toHaveLength(1));
     release(json(queue([oldest, middle, newest])));
@@ -335,9 +332,7 @@ describe("the automatic shadow bans", () => {
     fetchMock([on("GET", LIST, () => failure(403, "admin_forbidden"))]);
     show();
     await waitFor(() => expect(role).toHaveBeenCalledWith(false));
-    await waitFor(() =>
-      expect(screen.queryByText("Loading…")).toBeNull(),
-    );
+    await waitFor(() => expect(screen.queryByText("Loading…")).toBeNull());
     expect(screen.queryByRole("alert")).toBeNull();
     expect(screen.queryByRole("list")).toBeNull();
     expect(screen.queryByText(/wait/)).toBeNull();

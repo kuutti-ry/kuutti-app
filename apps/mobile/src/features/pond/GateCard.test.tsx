@@ -3,9 +3,9 @@ import { act, fireEvent } from "@testing-library/react-native";
 import { useLocales } from "expo-localization";
 import { AppState, View } from "react-native";
 import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
+import { FAILED_TO_LOAD } from "@/test/failed";
 import { renderWithTheme } from "@/test/render";
 import { GateCard } from "./GateCard";
-import { FAILED_TO_LOAD } from "@/test/failed";
 
 // The gate card (#500, ADR-060 §4): whether matching is open for the person, in
 // words. Each sentence says Matching, so the card's name is a label and never a

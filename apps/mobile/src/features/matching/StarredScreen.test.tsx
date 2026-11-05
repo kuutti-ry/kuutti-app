@@ -3,10 +3,10 @@ import { act, fireEvent, screen, within } from "@testing-library/react-native";
 import { useLocales } from "expo-localization";
 import { clearSession, saveSession } from "@/lib/session";
 import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
+import { FAILED_TO_LOAD } from "@/test/failed";
 import { renderWithTheme } from "@/test/render";
 import { StarredScreen } from "./StarredScreen";
 import { StarsButton } from "./StarsButton";
-import { FAILED_TO_LOAD } from "@/test/failed";
 
 // The Starred list on the phone (#575, ADR-064 §6): the people as the API gives them
 // and in its order, a row that opens the card and a star that takes the star off,

@@ -6,10 +6,10 @@ import * as React from "react";
 import { useSession } from "@/features/identity";
 import { clearSession, saveSession } from "@/lib/session";
 import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
+import { FAILED_TO_LOAD } from "@/test/failed";
 import { renderWithTheme } from "@/test/render";
 import { HomeRoute } from "./HomeRoute";
 import { HomeScreen } from "./HomeScreen";
-import { FAILED_TO_LOAD } from "@/test/failed";
 
 // The onboarding gate (#46) is the identity slice's; here it says what the
 // test needs, so the screen can be seen complete, checking or unknown.

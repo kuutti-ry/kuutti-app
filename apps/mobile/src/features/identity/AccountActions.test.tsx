@@ -206,9 +206,7 @@ describe("AccountActions", () => {
     await show(<ExportData share={share as never} />);
     await fireEvent.press(screen.getByRole("button", { name: "Download my data" }));
     expect(
-      await screen.findByText(
-        "That is enough for today. You can try again after midnight.",
-      ),
+      await screen.findByText("That is enough for today. You can try again after midnight."),
     ).toBeTruthy();
     expect(share).not.toHaveBeenCalled();
     expect(screen.queryByText("That did not go through. Try again.")).toBeNull();
@@ -409,9 +407,7 @@ describe("ExportData on Android", () => {
     await show(<ExportData />);
     await fireEvent.press(screen.getByRole("button", { name: "Download my data" }));
     expect(
-      await screen.findByText(
-        "That is enough for today. You can try again after midnight.",
-      ),
+      await screen.findByText("That is enough for today. You can try again after midnight."),
     ).toBeTruthy();
     expect(cache.size).toBe(0);
     expect(screen.queryByText(SAVED)).toBeNull();

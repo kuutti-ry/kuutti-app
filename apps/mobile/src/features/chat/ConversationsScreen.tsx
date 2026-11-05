@@ -225,9 +225,7 @@ export function ConversationsScreen() {
         {view.status === "loading" && (
           <Text accessibilityLiveRegion="polite">{t("load.loading")}</Text>
         )}
-        {view.status === "failed" && (
-          <LoadFailed error={view.error} onRetry={view.retry} />
-        )}
+        {view.status === "failed" && <LoadFailed error={view.error} onRetry={view.retry} />}
         {view.status === "ready" &&
           view.list.open.length === 0 &&
           view.list.archived.length === 0 && <Text>{t("chat.list.empty")}</Text>}

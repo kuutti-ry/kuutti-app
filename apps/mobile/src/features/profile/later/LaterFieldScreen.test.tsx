@@ -5,10 +5,10 @@ import { StrictMode } from "react";
 import { AccessibilityInfo, Platform } from "react-native";
 import { saveSession } from "@/lib/session";
 import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
+import { FAILED_TO_LOAD } from "@/test/failed";
 import { expectPinnedHeader } from "@/test/layout";
 import { renderWithTheme, underProviders } from "@/test/render";
 import { LaterFieldScreen, laterProgress, screenOpen } from "./LaterFieldScreen";
-import { FAILED_TO_LOAD } from "@/test/failed";
 
 /** The names of the radio groups on the screen, each a plain view that a role query would leave out. */
 const radioGroups = () =>

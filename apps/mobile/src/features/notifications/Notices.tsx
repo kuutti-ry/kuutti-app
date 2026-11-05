@@ -79,8 +79,7 @@ export function Notices() {
     } catch {
       setFailed(notice.id);
       // Android's live region speaks it; iOS has none.
-      if (Platform.OS === "ios")
-        AccessibilityInfo.announceForAccessibility(t("load.failed.press"));
+      if (Platform.OS === "ios") AccessibilityInfo.announceForAccessibility(t("load.failed.press"));
     }
   };
 

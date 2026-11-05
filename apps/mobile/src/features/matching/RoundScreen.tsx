@@ -217,9 +217,7 @@ export function RoundScreen({ star }: { star?: string }) {
         {view.status === "loading" && (
           <Text accessibilityLiveRegion="polite">{t("load.loading")}</Text>
         )}
-        {view.status === "failed" && (
-          <LoadFailed error={view.error} onRetry={round.retry} />
-        )}
+        {view.status === "failed" && <LoadFailed error={view.error} onRetry={round.retry} />}
         {view.status === "budget" && (
           <Text ref={focus} accessibilityLiveRegion="polite">
             {t("errors.card_budget_exceeded")}

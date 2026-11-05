@@ -54,11 +54,7 @@ describe("LoadFailed", () => {
   it("offers to update an app older than its API, and no retry that cannot help", async () => {
     update.mockReturnValue(new Promise(() => undefined));
     const onRetry = await show(outdated);
-    expect(
-      screen.getByText(
-        "This version of the app is older than Kuutti's server.",
-      ),
-    ).toBeTruthy();
+    expect(screen.getByText("This version of the app is older than Kuutti's server.")).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Try again" })).toBeNull();
     await act(async () => {
       fireEvent.press(screen.getByRole("button", { name: "Update the app" }));

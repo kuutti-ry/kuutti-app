@@ -4,10 +4,10 @@ import type * as React from "react";
 import { AccessibilityInfo, Platform } from "react-native";
 import { saveSession } from "@/lib/session";
 import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
+import { FAILED_TO_LOAD } from "@/test/failed";
 import { expectPinnedHeader } from "@/test/layout";
 import { renderWithTheme } from "@/test/render";
 import { SeekWhomScreen } from "./SeekWhomScreen";
-import { FAILED_TO_LOAD } from "@/test/failed";
 
 // Whom one seeks (#542): the seeks step's rows from the stored answer, each a
 // checkbox, saved on leaving, one to three, and whoever has no consent never gets
