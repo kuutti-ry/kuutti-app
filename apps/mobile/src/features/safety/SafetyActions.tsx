@@ -88,10 +88,12 @@ const WINDOW_SHARE = 0.9;
 
 /**
  * Block or report the person of someone else's card (#84, ADR-030 §11): an
- * icon button labelled in words, then one dialog. A block is confirmed in
- * words that say it is final, holds through either person's deletion and is
- * not told; a report asks for one of #106's reasons and, if the person likes,
- * a few lines, and says it blocks too, as finally. It may name one of the
+ * icon button labelled in words, then one dialog, whose first step only chooses:
+ * the step each choice opens says what it does before anything goes (#581). A
+ * block is confirmed in words that say it is final, holds through either
+ * person's deletion and is not told; a report asks for one of #106's reasons and,
+ * if the person likes, a few lines, and says it blocks too, as finally, and that
+ * they are not told who reported them. It may name one of the
  * card's own photos (#476, ADR-030 §13): "Is it about one photo?", "Not one
  * photo" chosen first, each photo heard as the card names it and drawn from
  * the phone's cache, so nothing new is signed or counted (ADR-008); a card
@@ -545,28 +547,19 @@ function SafetyDialog({
             </DialogHeader>
             <ScrollView style={{ flexShrink: 1 }} contentContainerClassName="gap-4">
               {offers.block && (
-                <View className="gap-1">
-                  <Button variant="outline" onPress={() => go("block")}>
-                    {t("safety.actions.block")}
-                  </Button>
-                  <Text variant="muted">{t("safety.actions.blockHint")}</Text>
-                </View>
+                <Button variant="outline" onPress={() => go("block")}>
+                  {t("safety.actions.block")}
+                </Button>
               )}
               {offers.report && (
-                <View className="gap-1">
-                  <Button variant="outline" onPress={() => go("report")}>
-                    {t("safety.actions.report")}
-                  </Button>
-                  <Text variant="muted">{t("safety.actions.reportHint")}</Text>
-                </View>
+                <Button variant="outline" onPress={() => go("report")}>
+                  {t("safety.actions.report")}
+                </Button>
               )}
               {offers.unmatch && (
-                <View className="gap-1">
-                  <Button variant="outline" onPress={() => go("unmatch")}>
-                    {t("chat.actions.unmatch")}
-                  </Button>
-                  <Text variant="muted">{t("chat.actions.unmatchHint")}</Text>
-                </View>
+                <Button variant="outline" onPress={() => go("unmatch")}>
+                  {t("chat.actions.unmatch")}
+                </Button>
               )}
             </ScrollView>
             <DialogFooter>

@@ -199,44 +199,14 @@ describe("Notices", () => {
   );
 
   it.each([
-    [
-      "en",
-      1,
-      "The invitation you used counted",
-      "The invitation earned you a fish. An earned fish is used by itself once your own fish are used up.",
-    ],
-    [
-      "en",
-      2,
-      "The invitation you used counted",
-      "The invitation earned you 2 fish. An earned fish is used by itself once your own fish are used up.",
-    ],
-    [
-      "fi",
-      1,
-      "Käyttämäsi kutsu laskettiin",
-      "Kutsu toi sinulle kalan. Ansaittu kala käytetään automaattisesti, kun omat kalasi on käytetty.",
-    ],
-    [
-      "fi",
-      2,
-      "Käyttämäsi kutsu laskettiin",
-      "Kutsu toi sinulle 2 kalaa. Ansaittu kala käytetään automaattisesti, kun omat kalasi on käytetty.",
-    ],
-    [
-      "sv",
-      1,
-      "Inbjudan du använde räknades",
-      "Inbjudan gav dig en fisk. En intjänad fisk används automatiskt när dina egna fiskar är slut.",
-    ],
-    [
-      "sv",
-      2,
-      "Inbjudan du använde räknades",
-      "Inbjudan gav dig 2 fiskar. En intjänad fisk används automatiskt när dina egna fiskar är slut.",
-    ],
+    ["en", 1, "The invitation you used counted", "The invitation earned you a fish."],
+    ["en", 2, "The invitation you used counted", "The invitation earned you 2 fish."],
+    ["fi", 1, "Käyttämäsi kutsu laskettiin", "Kutsu toi sinulle kalan."],
+    ["fi", 2, "Käyttämäsi kutsu laskettiin", "Kutsu toi sinulle 2 kalaa."],
+    ["sv", 1, "Inbjudan du använde räknades", "Inbjudan gav dig en fisk."],
+    ["sv", 2, "Inbjudan du använde räknades", "Inbjudan gav dig 2 fiskar."],
   ] as const)(
-    "says in %s what the invitation earned the friend who used it, %i fish, and nothing of who",
+    "says in %s what the invitation earned the friend who used it, %i fish, and nothing of who or of how a fish is spent",
     async (locale, fish, title, body) => {
       (useLocales as jest.Mock).mockReturnValue([{ languageTag: locale }]);
       api([used(2, { fish })]);

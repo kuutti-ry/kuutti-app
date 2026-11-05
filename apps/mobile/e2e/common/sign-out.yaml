@@ -32,7 +32,7 @@ appId: fi.kuutti.app
           timeout: 15000
 - runFlow:
     when:
-      visible: "People on Kuutti|Ihmiset Kuutissa|Människor på Kuutti|Welcome to Kuutti|Tervetuloa Kuuttiin|Välkommen till Kuutti"
+      visible: "Your profile|Profiilisi|Din profil|Welcome to Kuutti|Tervetuloa Kuuttiin|Välkommen till Kuutti"
     commands:
       # Logging out opens under its row (#511), by a link that names it rather
       # than a scroll to it: a swipe through Settings could pass over its row

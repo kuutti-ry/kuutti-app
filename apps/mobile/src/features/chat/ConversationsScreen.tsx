@@ -44,16 +44,16 @@ export function counterpartName(t: T, conversation: ConversationSummary): string
 
 /**
  * The line under the name: that the other deleted their account, else the
- * last message (a photo's caption, or "Photo" without one, #350), else that
- * there is none. An ended conversation's name says it ended, so its line is
- * its last message, which tells it from another.
+ * last message (a photo's caption, or "Photo" without one, #350), else none: the
+ * group above the row says whose move it is (#581). An ended conversation's name
+ * says it ended, so its line is its last message, which tells it from another.
  */
-function lineOf(t: T, conversation: ConversationSummary): string {
+function lineOf(t: T, conversation: ConversationSummary): string | null {
   if (conversation.state === "closed" && conversation.closedHow === "erasure") {
     return t("chat.state.deleted");
   }
   const last = conversation.lastMessage;
-  if (!last) return t("chat.row.noMessages");
+  if (!last) return null;
   const preview = last.kind === "photo" && last.preview === "" ? t("chat.row.photo") : last.preview;
   return last.side === "mine" ? t("chat.row.mine", { preview }) : preview;
 }
@@ -108,9 +108,11 @@ function Row({ conversation }: { conversation: ConversationSummary }) {
       )}
       <View className="flex-1 gap-0.5">
         <Text className="font-semibold">{name}</Text>
-        <Text variant="muted" numberOfLines={2}>
-          {line}
-        </Text>
+        {line !== null && (
+          <Text variant="muted" numberOfLines={2}>
+            {line}
+          </Text>
+        )}
       </View>
       <View className="items-end gap-1">
         {when && <Text variant="muted">{when}</Text>}
@@ -123,11 +125,9 @@ function Row({ conversation }: { conversation: ConversationSummary }) {
 /** A group of the list under its heading, left out with nobody in it. */
 function Group({
   title,
-  hint,
   conversations,
 }: {
   title: string;
-  hint?: string;
   conversations: readonly ConversationSummary[];
 }) {
   if (conversations.length === 0) return null;
@@ -136,7 +136,6 @@ function Group({
       <Text variant="h4" accessibilityRole="header">
         {title}
       </Text>
-      {hint !== undefined && <Text variant="muted">{hint}</Text>}
       {conversations.map((conversation) => (
         <Row key={conversation.id} conversation={conversation} />
       ))}
@@ -147,17 +146,16 @@ function Group({
 /**
  * The line that says the limit is near (ADR-062 §5), from `warning`
  * conversations on the person's turn on, while a limit stands: 0 is off for
- * either. Plain words in an outline, no colour and no alarm, wrapped at any
- * text size. iOS has no live regions, so VoiceOver is told when it appears and
- * when the number moves; TalkBack reads the region itself.
+ * either. It says the limit; how many wait is the heading's under it (#581).
+ * Plain words in an outline, no colour and no alarm, wrapped at any text size.
+ * iOS has no live regions, so VoiceOver is told when it appears; TalkBack reads
+ * the region itself.
  */
 function TurnWarning({ count }: { count: YourTurnCount }) {
   const { t } = useT();
   const { waiting, limit, warning } = count;
   const words =
-    limit > 0 && warning > 0 && waiting >= warning
-      ? t("chat.list.turnWarning", { waiting, limit })
-      : null;
+    limit > 0 && warning > 0 && waiting >= warning ? t("chat.list.turnWarning", { limit }) : null;
   useEffect(() => {
     if (words !== null && Platform.OS === "ios") AccessibilityInfo.announceForAccessibility(words);
   }, [words]);
@@ -244,11 +242,7 @@ export function ConversationsScreen() {
               title={t("chat.list.theirTurn")}
               conversations={view.list.open.filter((conversation) => !conversation.yourTurn)}
             />
-            <Group
-              title={t("chat.list.archived")}
-              hint={t("chat.list.archivedHint")}
-              conversations={view.list.archived}
-            />
+            <Group title={t("chat.list.archived")} conversations={view.list.archived} />
           </>
         )}
       </ScrollView>

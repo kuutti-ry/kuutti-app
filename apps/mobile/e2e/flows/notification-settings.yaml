@@ -52,7 +52,7 @@ name: The messages switch in Settings, Notifications, goes off, is kept on the s
 # as it was; the row comes back open, as it was left.
 - openLink: kuutti://
 - extendedWaitUntil:
-    visible: "People on Kuutti|Ihmiset Kuutissa|Människor på Kuutti"
+    visible: "Your profile|Profiilisi|Din profil"
     timeout: 15000
 - openLink: kuutti://settings
 - runFlow:

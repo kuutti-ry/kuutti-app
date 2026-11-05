@@ -124,8 +124,8 @@ export const ConversationSummary = z
      * Null once the conversation has ended for any reason but the other
      * person's erasure (#351, ADR-031 Open 10): no name, no age, no thumb,
      * before and after either person leaves, so the person blocked never
-     * learns of the blocker's erasure; the app heads it "This conversation
-     * has ended".
+     * learns of the blocker's erasure; the app heads it "Conversation
+     * ended".
      */
     counterpart: Counterpart.nullable(),
     /** The newest message the caller may see; null before the first. */

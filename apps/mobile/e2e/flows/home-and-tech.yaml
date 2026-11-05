@@ -1,7 +1,8 @@
-# The home screen of an onboarded person (#53, #54, #500): how many people are
-# on Kuutti, in the person's language and in steps of ten, whether matching is
-# open in words, and the way to the profile, which holds the photos, the
-# deal-breakers and the later questions (#239). Outside production the wrench opens
+# The home screen of an onboarded person (#53, #54, #500, #581): first whether
+# matching is open, in its sentence alone, with See people; then the way to the
+# profile, which holds the photos, the deal-breakers and the later questions
+# (#239), and the conversations; last how many people are on Kuutti, in the
+# person's language and in steps of ten. Outside production the wrench opens
 # the tech screen, which names the environment and the API it talks to.
 # The numbers need the synthetic population (`pnpm demo:population`): the card
 # shows them from ten people up. The demo commands open the pond, so matching
@@ -12,16 +13,33 @@ appId: fi.kuutti.app
 name: Home says how many people are on Kuutti and the gate in words, and the wrench names the API
 ---
 - runFlow: ../common/sign-in.yaml
-- assertVisible: "People on Kuutti|Ihmiset Kuutissa|Människor på Kuutti"
-- assertVisible: "\\d+ people have identified with their bank|\\d+ ihmistä on tunnistautunut pankkitunnuksilla|\\d+ personer har identifierat sig med bank-id"
-- assertVisible: ".*\\d+ percent are looking for everyone.*|.*\\d+ prosenttia etsii kaikkia.*|.*\\d+ procent söker alla.*"
-- assertVisible: "Matching|Seuranhaku|Matchning"
+# The sentence says Matching, so no word of it stands over the sentence (#581).
 - assertVisible: "Matching is open for you\\.|Seuranhaku on sinulle auki\\.|Matchningen är öppen för dig\\."
+- assertNotVisible: "Matching|Seuranhaku|Matchning"
 - assertNotVisible: "Matching opens for finished profiles\\. Yours still lacks something\\.|Seuranhaku avautuu valmiille profiileille\\. Sinun profiilistasi puuttuu vielä jotakin\\.|Matchningen öppnar för färdiga profiler\\. I din saknas ännu något\\."
+# The things to do first, in this order, in sight with the offer of notifications
+# above the two buttons (#581). The second button's name says what is unread.
+- assertVisible:
+    text: "See people|Katso ihmisiä|Se människor"
+    below: "Matching is open for you\\.|Seuranhaku on sinulle auki\\.|Matchningen är öppen för dig\\."
+- assertVisible:
+    text: "Your profile|Profiilisi|Din profil"
+    below: "See people|Katso ihmisiä|Se människor"
+- assertVisible:
+    text: "(Conversations|Keskustelut|Samtal)(, .*)?"
+    below: "Your profile|Profiilisi|Din profil"
+# How many people are on Kuutti last, at the foot of the list, where nothing can be
+# centred: reached by its lines, each wholly in sight, with no centring (README).
 - scrollUntilVisible:
-    element: "Your profile|Profiilisi|Din profil"
+    element: "\\d+ people have identified with their bank|\\d+ ihmistä on tunnistautunut pankkitunnuksilla|\\d+ personer har identifierat sig med bank-id"
     direction: DOWN
-    centerElement: true
+    timeout: 60000
+- assertVisible:
+    text: "People on Kuutti|Ihmiset Kuutissa|Människor på Kuutti"
+    below: "(Conversations|Keskustelut|Samtal)(, .*)?"
+- scrollUntilVisible:
+    element: ".*\\d+ percent are looking for everyone.*|.*\\d+ prosenttia etsii kaikkia.*|.*\\d+ procent söker alla.*"
+    direction: DOWN
     timeout: 60000
 - assertNotVisible: "Your deal-breakers|Ehdottomat rajasi|Dina absoluta gränser"
 - assertNotVisible: "Fill in the rest when you have a moment|Täydennä loput, kun sinulla on hetki|Fyll i resten när du har en stund"

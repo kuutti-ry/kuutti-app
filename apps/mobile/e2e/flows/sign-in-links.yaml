@@ -27,7 +27,7 @@ name: A sign-in link not asked for is refused without touching the session, and 
 # No such screen: home.
 - openLink: kuutti://auth/return
 - extendedWaitUntil:
-    visible: "People on Kuutti|Ihmiset Kuutissa|Människor på Kuutti"
+    visible: "Your profile|Profiilisi|Din profil"
     timeout: 15000
 - assertNotVisible: "Unmatched Route"
 

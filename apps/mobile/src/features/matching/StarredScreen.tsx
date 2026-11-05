@@ -98,14 +98,11 @@ export function StarredScreen() {
         )}
         {view.status === "ready" && view.items.length === 0 && <Text>{t("stars.none")}</Text>}
         {view.status === "ready" && view.items.length > 0 && (
-          <>
-            <Text variant="muted">{t("stars.explain")}</Text>
-            <View className="gap-1">
-              {view.items.map((person) => (
-                <Row key={person.id} person={person} onClear={() => void clear(person.id)} />
-              ))}
-            </View>
-          </>
+          <View className="gap-1">
+            {view.items.map((person) => (
+              <Row key={person.id} person={person} onClear={() => void clear(person.id)} />
+            ))}
+          </View>
         )}
       </ScrollView>
     </SafeAreaView>

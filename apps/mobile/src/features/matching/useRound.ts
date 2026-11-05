@@ -64,7 +64,6 @@ export type RoundNotice =
       | "round.short.failed"
       | "round.gone"
       | "round.decision.failed"
-      | "round.newDay"
     >
   | { waiting: number };
 
@@ -99,11 +98,12 @@ const byPosition = (entries: readonly RoundEntry[]): RoundEntry[] =>
  * no card.
  *
  * A day that ended while the screen was open is read anew: the API refuses
- * the old day's writes (409 `round_expired`), and the screen says why it
- * shows other cards; so is a queue that comes back in sight on another day,
- * and one whose next read finds another day. An answer to the old day's
- * request that lands after that changes nothing of the new day. A card that is
- * gone meanwhile (404) leaves the screen.
+ * the old day's writes (409 `round_expired`), and the screen says that a press
+ * was lost; so is a queue that comes back in sight on another day, and one whose
+ * next read finds another day, with no word, since nothing was lost and the next
+ * card is simply there (#581). An answer to the old day's request that lands
+ * after that changes nothing of the new day. A card that is gone meanwhile (404)
+ * leaves the screen.
  *
  * Given `star`, the id of a star on the Starred list (#575, ADR-064 §2), the same
  * for that one card, as it stands in today's log, however it was left there, and
@@ -148,9 +148,9 @@ export function useRound(star?: string) {
 
   /**
    * The next cards (ADR-062 §1), kept after those of the same day the phone
-   * holds. An answer of another day takes their place and says so: the day
-   * ended between the last card and this read. One with nothing undecided in
-   * it ends the queue, so that no answer can bring on another read by itself.
+   * holds. An answer of another day takes their place: the day ended between
+   * the last card and this read. One with nothing undecided in it ends the
+   * queue, so that no answer can bring on another read by itself.
    */
   const readCards = useCallback(() => {
     asked.current += 1;
@@ -161,7 +161,7 @@ export function useRound(star?: string) {
         if (mine !== asked.current) return;
         readOn.current = finnishDay(Date.now());
         const held = shown.current;
-        if (held && held.day !== answer.day) leaveDay("round.newDay");
+        if (held && held.day !== answer.day) leaveDay(null);
         const kept = held?.day === answer.day ? held.entries : null;
         showRound({
           ...answer,
@@ -255,7 +255,7 @@ export function useRound(star?: string) {
         today !== finnishDay(new Date(`${round.day}T12:00:00Z`)) &&
         today !== readOn.current
       ) {
-        read("round.newDay");
+        read(null);
       } else if (backOnScreen && !star) {
         setMore((was) => (was.status === "end" ? { status: "ask" } : was));
       }
@@ -293,7 +293,7 @@ export function useRound(star?: string) {
     seen.current.add(key);
     reportSeen(day, position).catch((error: unknown) => {
       if (statusOf(error) === 404) drop(day, position);
-      else if (codeOf(error) === "round_expired" && onDay(day)) read("round.newDay");
+      else if (codeOf(error) === "round_expired" && onDay(day)) read(null);
     });
   }, [day, position, read, drop, onDay]);
 

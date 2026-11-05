@@ -70,6 +70,9 @@ executionOrder:
     - A star on a card brings the person to a Starred list only they see, and taking it off leaves everything as it was
     # Iida, the queue's (#379): a match and a report are final, so once per reset.
     - The queue shows one card at a time, liking back makes a match, Later and Undo leave a decision open, and a report takes a card away
+    # Riikka, a card of that queue, whose filters the short pool's flow changes and puts
+    # back (#99, #581): after it, so that one stopping half-way takes no card from it.
+    - With few people left, the queue's end offers the deal-breakers to relax for today in two groups, and reading them relaxes nothing
     # Aino, who tells Kuutti she found someone, then whose account goes: last.
     - I found someone tells Kuutti the reason once, thanks the person, and asks no more
     - Deleting the account asks first, signs the person out, and the next login is refused until the cooldown ends

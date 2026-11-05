@@ -10,7 +10,7 @@ name: The home changes by a new postal code, the card says the name chosen, and 
 - runFlow: ../common/sign-in.yaml
 - openLink: kuutti://profile
 - extendedWaitUntil:
-    visible: "Your profile|Profiilisi|Din profil"
+    visible: "(The basics|Perustiedot|Grunderna)(, .*)?"
     timeout: 15000
 - tapOn: "Home|Koti|Hem"
 - extendedWaitUntil:

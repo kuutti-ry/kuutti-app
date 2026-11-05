@@ -77,6 +77,9 @@ const press = async (name: string) => {
 };
 const noProblems = () =>
   expect(pressables(screen.toJSON() as HostNode).flatMap((node) => a11yProblems(node))).toEqual([]);
+/** Everything the screen draws, in order, so that a line nobody asked for is seen. */
+const said = (node: HostNode | string = screen.toJSON() as HostNode): string[] =>
+  typeof node === "string" ? [node] : (node.children ?? []).flatMap((child) => said(child));
 
 beforeEach(async () => {
   router.push.mockReset();
@@ -93,14 +96,12 @@ beforeEach(async () => {
 });
 
 describe("the Starred list", () => {
-  it("shows the people in the API's order, each named with their age, and says only the person sees it", async () => {
+  it("shows the people in the API's order, each named with their age, with no line above them (#581)", async () => {
     api(list(HENNA, KATJA));
     await show();
 
     expect(screen.getByRole("heading", { name: "Starred" })).toBeTruthy();
-    expect(
-      screen.getByText("Only you can see this list. A like or a pass takes the star off."),
-    ).toBeTruthy();
+    expect(said()).toEqual(["Starred", "Henna, 31", "Katja, 44"]);
     expect(
       screen
         .getAllByRole("button")
@@ -169,16 +170,19 @@ describe("the Starred list", () => {
     expect(screen.getByRole("button", { name: "Henna, 31" })).toBeTruthy();
   });
 
-  it("says so with nobody on the list, and never that anybody went", async () => {
-    api(list());
-    await show();
-    expect(
-      screen.getByText("Nobody here right now. A star on a card brings that person here."),
-    ).toBeTruthy();
-    expect(
-      screen.queryByText("Only you can see this list. A like or a pass takes the star off."),
-    ).toBeNull();
-  });
+  it.each([
+    ["en-US", "Starred", "Nobody here right now."],
+    ["fi-FI", "Tähdellä merkityt", "Täällä ei ole nyt ketään."],
+    ["sv-FI", "Stjärnmärkta", "Ingen här just nu."],
+  ])(
+    "says so with nobody on the list, and never that anybody went or how anybody comes: %s",
+    async (languageTag, title, words) => {
+      (useLocales as jest.Mock).mockReturnValue([{ languageTag }]);
+      api(list());
+      await show();
+      expect(said()).toEqual([title, words]);
+    },
+  );
 
   it("says it is loading, in a live region", async () => {
     let answer: (response: Response) => void = () => undefined;

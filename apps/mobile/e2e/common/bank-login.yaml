@@ -76,6 +76,19 @@ appId: fi.kuutti.app
 # visible, and the tap there missed.
 # iOS asks before handing the link back to the app; Chrome hands it on. A tap
 # on a page that still moves is lost: tapped again while the button is there.
+# The people of Iida's round have no short button: a caller who signs in as one
+# (short-pool.yaml) passes PERSONA_ON_CARD, and the card is brought to the middle
+# of the page first, far from the edge that made a card's tap miss. A plain
+# condition, which asks nothing of the screen and costs the others no time (README).
+- runFlow:
+    when:
+      true: ${PERSONA_ON_CARD || false}
+    commands:
+      - scrollUntilVisible:
+          element: ".*${PERSONA}.*"
+          direction: DOWN
+          centerElement: true
+          timeout: 60000
 - waitForAnimationToEnd
 - retry:
     maxRetries: 2
@@ -86,7 +99,7 @@ appId: fi.kuutti.app
           commands:
             - tapOn: ".*${PERSONA}.*"
       - extendedWaitUntil:
-          visible: "Open|Avaa|Öppna|Sign-in did not complete|Kirjautuminen ei onnistunut|Inloggningen slutfördes inte|People on Kuutti|Ihmiset Kuutissa|Människor på Kuutti|Welcome to Kuutti|Tervetuloa Kuuttiin|Välkommen till Kuutti"
+          visible: "Open|Avaa|Öppna|Sign-in did not complete|Kirjautuminen ei onnistunut|Inloggningen slutfördes inte|Your profile|Profiilisi|Din profil|Welcome to Kuutti|Tervetuloa Kuuttiin|Välkommen till Kuutti"
           timeout: 20000
 # Only iOS asks: on Android the question would cost its 7 s on every sign-in.
 - runFlow:

@@ -37,4 +37,4 @@ name: Log out everywhere ends this device's session, and reopening the app does 
 - stopApp
 - runFlow: ../common/open-app.yaml
 - assertVisible: "Sign in with your bank|Kirjaudu pankkitunnuksilla|Logga in med din bank"
-- assertNotVisible: "People on Kuutti|Ihmiset Kuutissa|Människor på Kuutti"
+- assertNotVisible: "Your profile|Profiilisi|Din profil"

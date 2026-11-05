@@ -95,3 +95,4 @@ Rows the schema's DSL cannot express, so two of the three are `generate --custom
 ## History
 
 - 2026-11-03 (#503): Open 2 marked answered, the maintainer's of 2026-11-01, which ADR-036 already recorded. The Consequences' issue for starting attestation now exists as #580.
+- 2026-11-04 (#581, the maintainer's yes to the table of that day, row C58): the words of §5's banner, an agent's. It says the limit alone, "You can't like anyone new while 8 conversations are waiting.", since how many wait is the heading right under it, so it is told once as it appears and not again when that number moves. `your_turn_warning` and the refusal's number do not change.

@@ -153,6 +153,29 @@ const appBecomes = async (state: string) => {
   });
   await settle();
 };
+/** Every line that speaks by itself where it appears, a notice above the card among them. */
+const liveLines = () =>
+  screen
+    .queryAllByText(/./)
+    .filter((node) => node.props.accessibilityLiveRegion === "polite")
+    .map((node) => node.props.children);
+/** Everything the screen draws, in order, so that what a state leaves out is seen to be left out. */
+const said = (node: HostNode | string = screen.toJSON() as HostNode): string[] =>
+  typeof node === "string" ? [node] : (node.children ?? []).flatMap((child) => said(child));
+/** The words inside a component or an element: a line's own, or a button's. */
+const wordsIn = (node: unknown): string[] => {
+  if (typeof node === "string") return [node];
+  if (Array.isArray(node)) return node.flatMap(wordsIn);
+  const { props } = (node ?? {}) as { props?: { children?: unknown } };
+  return props ? wordsIn(props.children) : [];
+};
+/** What the screen reader was last taken to, by its role and its words. */
+const takenTo = () => {
+  const [node, event] = (AccessibilityInfo.sendAccessibilityEvent as jest.Mock).mock.calls.at(
+    -1,
+  ) as [{ props: { accessibilityRole?: string } }, string];
+  return { event, role: node.props.accessibilityRole, words: wordsIn(node) };
+};
 /** The kinds of node a text sits inside, its own first. */
 const ancestorsOf = (words: string) => {
   const kinds: unknown[] = [];
@@ -297,7 +320,7 @@ describe("the queue", () => {
     expect(sent.seen()).toEqual([1, 1]);
   });
 
-  it("reads the queue again when a card's seen report finds that the day ended, and says so", async () => {
+  it("reads the queue again when a card's seen report finds that the day ended, with no word, the reader taken to the new card (#581)", async () => {
     let reads = 0;
     const sent = api((call) => {
       if (call.path === "/rounds/today") {
@@ -319,8 +342,11 @@ describe("the queue", () => {
     });
     await show();
     await settle();
-    expect(screen.getByText("A new day began at midnight.")).toBeTruthy();
+    // Nothing was lost: the next card is simply there.
     expect(heading("Riikka, 31")).toBeTruthy();
+    expect(liveLines()).toEqual([]);
+    expect(announced()).toEqual([]);
+    expect(takenTo()).toEqual({ event: "focus", words: ["Matches your filters"] });
     expect(sent.reads()).toBe(2);
   });
 
@@ -340,11 +366,9 @@ describe("the queue", () => {
     await show();
     await press("Like");
     expect(heading("It's a match")).toBeTruthy();
-    expect(
-      screen.getByText(
-        "You both liked each other, so a conversation is open for you two under Conversations.",
-      ),
-    ).toBeTruthy();
+    // Its title and two buttons say what happened and what is open (#581).
+    expect(said()).toEqual(["People", "It's a match", "Go to the conversation", "Back to people"]);
+    expect(takenTo()).toEqual({ event: "focus", words: ["It's a match"] });
     // The next card waits behind the match: neither shown nor reported seen.
     expect(screen.queryByRole("heading", { name: "Katja, 32" })).toBeNull();
     expect(sent.seen()).toEqual([1]);
@@ -559,12 +583,30 @@ describe("the queue", () => {
     );
     await show();
     await press("Send a fish");
-    expect(screen.getByText("You cannot send a fish just now. You can still like.")).toBeTruthy();
+    expect(screen.getByText("You cannot send a fish just now.")).toBeTruthy();
     expect(heading("Katja, 32")).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Send a fish" })).toBeNull();
     await press("Like");
     expect(screen.getByText("That's everybody for now.")).toBeTruthy();
   });
+
+  it.each([
+    ["fi-FI", "Lähetä kala", "Et voi lähettää kalaa juuri nyt."],
+    ["sv-FI", "Skicka en fisk", "Du kan inte skicka en fisk just nu."],
+  ])(
+    "says a fish that cannot go in %s, in the fewest words (#581)",
+    async (languageTag, fish, words) => {
+      (useLocales as jest.Mock).mockReturnValue([{ languageTag }]);
+      api(
+        (call) =>
+          call.path.endsWith("/decision") ? refusal("fish_budget_exceeded", 429) : undefined,
+        { day: DAY, entries: [entry(2, "Katja")], fishToSend: true, likesLeft: 10, yourTurn: 0 },
+      );
+      await show();
+      await press(fish);
+      expect(screen.getByText(words)).toBeTruthy();
+    },
+  );
 
   it("takes a card that was liked into a match elsewhere as liked, when its first decision here is refused", async () => {
     api((call) =>
@@ -584,7 +626,7 @@ describe("the queue", () => {
     });
     await press("Block");
     await press("Block");
-    await screen.findByText("Blocked. You will not see each other again.");
+    await screen.findByText("Blocked.");
     await press("Done");
     await waitFor(() => expect(heading("Katja, 32")).toBeTruthy());
     expect(sent.calls.find((c) => c.path === "/blocks")?.body).toEqual({
@@ -771,7 +813,8 @@ describe("the queue", () => {
       await act(async () => answer());
       await settle();
       expect(heading("Riikka, 31")).toBeTruthy();
-      expect(screen.getByText("A new day began at midnight.")).toBeTruthy();
+      // Not a word of the old day's answer, whatever it says.
+      expect(liveLines()).toEqual([]);
       expect(screen.queryByRole("heading", { name: "It's a match" })).toBeNull();
       expect(screen.queryByRole("button", { name: "Undo your last decision" })).toBeNull();
       expect(sent.reads()).toBe(2);
@@ -1081,7 +1124,7 @@ describe("a queue left open past midnight", () => {
     ["at its end", [], "That's everybody for now."],
     ["not open", null, "There is nobody to show you yet."],
   ] as const)(
-    "is read anew when the app comes back on the next day, and says so: %s",
+    "is read anew when the app comes back on the next day, with no word, the reader taken to the new card: %s (#581)",
     async (_what, entries, words) => {
       const now = jest.spyOn(Date, "now").mockReturnValue(NOON);
       const sent = days({
@@ -1097,11 +1140,32 @@ describe("a queue left open past midnight", () => {
       await appBecomes("background");
       expect(sent.reads()).toBe(1);
       await appBecomes("active");
-      expect(screen.getByText("A new day began at midnight.")).toBeTruthy();
       expect(heading("Riikka, 31")).toBeTruthy();
+      expect(liveLines()).toEqual([]);
+      expect(announced()).toEqual([]);
+      expect(takenTo()).toEqual({ event: "focus", words: ["Matches your filters"] });
       expect(sent.reads()).toBe(2);
     },
   );
+
+  it("takes what the old day's card had to say away with it (#581)", async () => {
+    const now = jest.spyOn(Date, "now").mockReturnValue(NOON);
+    const reads = reading(page(entry(1, "Henna")), { ...page(entry(1, "Riikka")), day: NEXT_DAY });
+    api((call) =>
+      call.path.endsWith("/decision")
+        ? refusal("like_budget_exceeded", 429, { "retry-after": "3600" })
+        : reads(call),
+    );
+    await show();
+    await press("Like");
+    expect(liveLines()).toEqual([
+      "You have used today's likes. New ones come after midnight; you can still pass.",
+    ]);
+    now.mockReturnValue(AFTER_MIDNIGHT);
+    await appBecomes("active");
+    expect(heading("Riikka, 31")).toBeTruthy();
+    expect(liveLines()).toEqual([]);
+  });
 
   it("is not read again when the app comes back on the same day with a card on the screen", async () => {
     const now = jest.spyOn(Date, "now").mockReturnValue(NOON);
@@ -1177,8 +1241,8 @@ describe("a queue left open past midnight", () => {
     expect(sent.reads()).toBe(1);
     await act(async () => focusRound());
     await settle();
-    expect(screen.getByText("A new day began at midnight.")).toBeTruthy();
     expect(heading("Riikka, 31")).toBeTruthy();
+    expect(liveLines()).toEqual([]);
     expect(sent.reads()).toBe(2);
     // Henna's, then Riikka's; yesterday's next card never.
     expect(sent.seen()).toEqual([1, 1]);
@@ -1384,14 +1448,17 @@ describe("reading on past the last card (ADR-062 §1)", () => {
     expect(heading("Henna, 31")).toBeTruthy();
   });
 
-  it("takes an answer of another day in the place of what it holds, says so, and has nothing left to undo", async () => {
+  it("takes an answer of another day in the place of what it holds, with no word, and has nothing left to undo (#581)", async () => {
     const sent = api(
       reading(page(entry(1, "Henna")), { ...page(entry(1, "Riikka")), day: NEXT_DAY }),
     );
     await show();
     await press("Pass");
-    expect(screen.getByText("A new day began at midnight.")).toBeTruthy();
     expect(heading("Riikka, 31")).toBeTruthy();
+    expect(liveLines()).toEqual([]);
+    // The read past the last card is told, as any is; nothing after it.
+    expect(announced()).toEqual(["Loading people…"]);
+    expect(takenTo()).toEqual({ event: "focus", words: ["Matches your filters"] });
     expect(screen.queryByRole("button", { name: "Undo your last decision" })).toBeNull();
     // The new day's card at the same place is a card of its own.
     expect(sent.seen()).toEqual([1, 1]);
@@ -2542,6 +2609,145 @@ describe("the short pool (#99, ADR-042)", () => {
     expect(sent.calls.filter((c) => c.method !== "GET")).toEqual([]);
   });
 
+  describe("its groups (#581)", () => {
+    const INCLUDE_HEADING = "Include today those who did not answer";
+    const ASIDE_HEADING = "Set aside for today";
+    /** Offers in an order that mixes the ways: the screen says each way once. */
+    const mixed = {
+      short: true,
+      offers: [
+        { field: "smoking", kind: "aside", more: 0 },
+        { field: "smoking", kind: "unanswered", more: 10 },
+        { field: "hasKids", kind: "aside", more: 20 },
+        { field: "hasKids", kind: "unanswered", more: 0 },
+      ],
+      relaxed: [],
+    };
+    const offering =
+      (pool: unknown): Answer =>
+      (call) =>
+        call.path === RELAXATIONS ? json(pool) : undefined;
+    /** What the panel draws, from its heading to the way into What you seek. */
+    const panel = () => said().slice(said().indexOf("Few people today"), -1);
+
+    it("says each way once as a heading over rows of the field and how much, with no sentence", async () => {
+      api(offering(mixed), EMPTY);
+      await show();
+      expect(panel()).toEqual([
+        "Few people today",
+        INCLUDE_HEADING,
+        "Smoking",
+        "About 10 more people",
+        "Kids",
+        "A few more people",
+        ASIDE_HEADING,
+        "Smoking",
+        "A few more people",
+        "Kids",
+        "About 20 more people",
+      ]);
+      expect(said().at(-1)).toBe("What you seek");
+      expect(heading(INCLUDE_HEADING)).toBeTruthy();
+      expect(heading(ASIDE_HEADING)).toBeTruthy();
+      noProblems();
+    });
+
+    it("keeps each row's whole sentence as its spoken label, a button on a full target", async () => {
+      api(offering(mixed), EMPTY);
+      await show();
+      for (const name of [
+        "Include those who did not answer: Smoking. About 10 more people",
+        "Include those who did not answer: Kids. A few more people",
+        "Set aside for today: Smoking. A few more people",
+        "Set aside for today: Kids. About 20 more people",
+      ]) {
+        expect(screen.getByRole("button", { name })).toBeTruthy();
+      }
+      expect(pressables(screen.toJSON() as HostNode).flatMap((node) => a11yProblems(node))).toEqual(
+        [],
+      );
+    });
+
+    it("leaves only the group's heading bold: the field in medium, how much in regular", async () => {
+      api(offering(mixed), EMPTY);
+      await show();
+      const row = screen.getByRole("button", {
+        name: "Set aside for today: Kids. About 20 more people",
+      });
+      const classes = (node: { props: { className?: unknown } }) => String(node.props.className);
+      expect(classes(within(row).getByText("Kids"))).toMatch(/(^| )font-medium( |$)/);
+      expect(classes(within(row).getByText("Kids"))).not.toMatch(/font-semibold/);
+      expect(classes(within(row).getByText("About 20 more people"))).toMatch(
+        /(^| )font-normal( |$)/,
+      );
+      expect(classes(within(row).getByText("About 20 more people"))).not.toMatch(/font-semibold/);
+      expect(classes(screen.getByText(ASIDE_HEADING))).toMatch(/(^| )font-semibold( |$)/);
+      expect(classes(screen.getByText(INCLUDE_HEADING))).toMatch(/(^| )font-semibold( |$)/);
+    });
+
+    it.each([
+      ["those who did not answer", "unanswered", INCLUDE_HEADING, ASIDE_HEADING],
+      ["what may be set aside", "aside", ASIDE_HEADING, INCLUDE_HEADING],
+    ])("draws no group for a way with no offer, with only %s", async (_what, kind, there, gone) => {
+      api(
+        offering({ short: true, offers: [{ field: "smoking", kind, more: 10 }], relaxed: [] }),
+        EMPTY,
+      );
+      await show();
+      expect(heading(there)).toBeTruthy();
+      expect(screen.queryByRole("heading", { name: gone })).toBeNull();
+      expect(panel()).toEqual(["Few people today", there, "Smoking", "About 10 more people"]);
+    });
+
+    it.each([
+      ["Include those who did not answer: Kids. A few more people", "hasKids", "unanswered"],
+      ["Set aside for today: Kids. About 20 more people", "hasKids", "aside"],
+      ["Set aside for today: Smoking. A few more people", "smoking", "aside"],
+    ])("sends what a row says, its own field by its own way: %s", async (name, field, kind) => {
+      const sent = api((call) => {
+        if (call.path === RELAXATIONS && call.method === "GET") return json(mixed);
+        if (call.path === RELAXATIONS) return json({ entries: [] });
+        return undefined;
+      }, EMPTY);
+      await show();
+      await press(name);
+      expect(sent.calls.find((c) => c.method === "POST" && c.path === RELAXATIONS)?.body).toEqual({
+        field,
+        kind,
+      });
+    });
+
+    it.each([
+      [
+        "fi-FI",
+        "Tänään vähän ihmisiä",
+        "Ota tänään mukaan ne, jotka eivät vastanneet",
+        "Jousta tänään",
+        "Ota mukaan ne, jotka eivät vastanneet: Tupakointi. Noin 10 ihmistä lisää",
+        "Jousta tänään: Tupakointi. Muutama ihminen lisää",
+      ],
+      [
+        "sv-FI",
+        "Få personer i dag",
+        "Ta i dag med dem som inte svarade",
+        "Släpp på för i dag",
+        "Ta med dem som inte svarade: Rökning. Ungefär 10 fler personer",
+        "Släpp på för i dag: Rökning. Några fler personer",
+      ],
+    ])(
+      "says it all in %s, the headings and each row's whole sentence",
+      async (languageTag, title, include, aside, includeRow, asideRow) => {
+        (useLocales as jest.Mock).mockReturnValue([{ languageTag }]);
+        api(offering(offered), EMPTY);
+        await show();
+        for (const name of [title, include, aside]) expect(heading(name)).toBeTruthy();
+        for (const name of [includeRow, asideRow]) {
+          expect(screen.getByRole("button", { name })).toBeTruthy();
+        }
+      },
+    );
+  });
+
   it("adds the relaxation's cards after the last on a tap, the first on the screen with its deal-breaker named", async () => {
     const sent = api((call) => {
       if (call.path === RELAXATIONS && call.method === "GET") return json(offered);
@@ -2564,7 +2770,10 @@ describe("the short pool (#99, ADR-042)", () => {
   });
 
   it("goes on to the rest a relaxation lets in once its first cards are read (ADR-062 §10)", async () => {
-    const reads = reading(EMPTY, page(entry(6, "Saara", "relaxed")));
+    const reads = reading(
+      EMPTY,
+      page({ ...entry(6, "Saara", "relaxed"), relaxedField: "smoking" }),
+    );
     const sent = api((call) => {
       if (call.path === RELAXATIONS && call.method === "GET") return json(offered);
       if (call.path === RELAXATIONS) return json({ entries: [relaxedCard] });
@@ -2757,8 +2966,7 @@ describe("the short pool (#99, ADR-042)", () => {
       await relaxing.answer(late());
       await settle();
       expect(heading("Riikka, 31")).toBeTruthy();
-      expect(screen.getByText("A new day began at midnight.")).toBeTruthy();
-      expect(screen.queryByText("That did not go through. Try again.")).toBeNull();
+      expect(liveLines()).toEqual([]);
     },
   );
 
@@ -2878,7 +3086,7 @@ describe("a star on a card (#575, ADR-064)", () => {
   const STAR_ID = "7a1c1c4e-9a8e-4a0b-9c3a-0c8d1e2f3a01";
   const CARD_STAR = `/rounds/${DAY}/entries/2/star`;
   const CLEAR = `/stars/${STAR_ID}`;
-  const FIRST = "Only you can see your stars. Nobody is told.";
+  const FIRST = "Only you can see your stars.";
   const STRANGERS: RoundResponse = {
     day: DAY,
     entries: [entry(2, "Katja"), entry(4, "Minna")],
@@ -2937,6 +3145,17 @@ describe("a star on a card (#575, ADR-064)", () => {
 
     expect(screen.getByText(FIRST).props.accessibilityLiveRegion).toBe("polite");
     expect(announced()).toContain(FIRST);
+  });
+
+  it.each([
+    ["fi-FI", "Tähti: Katja", "Vain sinä näet tähtesi."],
+    ["sv-FI", "Stjärna: Katja", "Bara du ser dina stjärnor."],
+  ])("says who sees a first star in %s, and only that (#581)", async (languageTag, star, words) => {
+    (useLocales as jest.Mock).mockReturnValue([{ languageTag }]);
+    api(put(true), STRANGERS);
+    await show();
+    await press(star);
+    expect(screen.getByText(words)).toBeTruthy();
   });
 
   it("says nothing of that on a later star", async () => {
@@ -3129,18 +3348,22 @@ describe("a card opened from the Starred list (#575, ADR-064 §2)", () => {
     );
     await showStar();
     expect(heading("Katja, 39")).toBeTruthy();
-    expect(screen.queryByText("Done with this card.")).toBeNull();
+    // The header's arrow alone: the way back that follows a card waits for it to go.
+    expect(screen.getAllByRole("button", { name: BACK })).toHaveLength(1);
   });
 
-  it("after a decision says it is done, leads back, keeps Undo, and reads nothing more", async () => {
+  it("after a decision leaves the way back alone, the reader taken to that button, keeps Undo, and reads nothing more (#581)", async () => {
     const { calls, decisions, reads } = api(opening());
     await showStar();
 
     await press("Pass");
 
     expect(decisions()).toEqual([`${DAY}/9 pass`]);
-    expect(screen.getByText("Done with this card.")).toBeTruthy();
-    expect(screen.queryByText("That's everybody for now.")).toBeNull();
+    // The title and the way back, with Undo's icon in the header: no line, and no word of the queue's end.
+    expect(said()).toEqual(["Starred", BACK]);
+    expect(screen.getByRole("button", { name: "Undo your last decision" })).toBeTruthy();
+    expect(takenTo()).toEqual({ event: "focus", role: "button", words: [BACK] });
+    noProblems();
     expect(reads()).toBe(0);
     expect(calls.filter((c) => c.path === OPEN)).toHaveLength(1);
 
@@ -3167,7 +3390,28 @@ describe("a card opened from the Starred list (#575, ADR-064 §2)", () => {
     await settle();
 
     expect(calls.filter((c) => c.path === OPEN)).toHaveLength(1);
-    expect(screen.getByText("Done with this card.")).toBeTruthy();
+    expect(screen.getAllByRole("button", { name: BACK })).toHaveLength(2);
+    // Coming back in sight takes the reader nowhere new: the card's reason, then the button.
+    expect(AccessibilityInfo.sendAccessibilityEvent).toHaveBeenCalledTimes(2);
+  });
+
+  it("after a block leaves the way back alone too, the reader taken to that button, with nothing to undo (#581)", async () => {
+    const { decisions, reads } = api(opening());
+    await showStar();
+    await act(async () => {
+      fireEvent.press(screen.getByRole("button", { name: "Block or report" }));
+    });
+    await press("Block");
+    await press("Block");
+    await screen.findByText("Blocked.");
+    await press("Done");
+
+    await waitFor(() => expect(screen.getAllByRole("button", { name: BACK })).toHaveLength(2));
+    expect(said()).toEqual(["Starred", BACK]);
+    expect(takenTo()).toEqual({ event: "focus", role: "button", words: [BACK] });
+    expect(decisions()).toEqual([]);
+    expect(reads()).toBe(0);
+    noProblems();
   });
 
   it("offers the conversation or the way back when the like makes a match", async () => {
@@ -3187,6 +3431,8 @@ describe("a card opened from the Starred list (#575, ADR-064 §2)", () => {
 
     expect(screen.getByRole("heading", { name: "It's a match" })).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Back to people" })).toBeNull();
+    // The match's title takes the reader: the way back is a choice beside the conversation.
+    expect(takenTo()).toEqual({ event: "focus", words: ["It's a match"] });
     const buttons = screen.getAllByRole("button", { name: BACK });
     await act(async () => {
       fireEvent.press(buttons[buttons.length - 1] as never);
@@ -3202,6 +3448,8 @@ describe("a card opened from the Starred list (#575, ADR-064 §2)", () => {
     expect(screen.queryByText("Try again")).toBeNull();
     const buttons = screen.getAllByRole("button", { name: BACK });
     expect(buttons.length).toBe(2);
+    // Here a line says what became of the card, and the reader is taken to the line.
+    expect(takenTo()).toEqual({ event: "focus", words: ["That card is no longer available."] });
     noProblems();
   });
 

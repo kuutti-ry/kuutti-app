@@ -17,7 +17,7 @@ appId: fi.kuutti.app
 # open-app.yaml. iOS has no such dialog; on Android its absence is asked as
 # `notVisible`, in half a second, where a `visible` that fails costs 7 s (README).
 - extendedWaitUntil:
-    visible: "People on Kuutti|Ihmiset Kuutissa|Människor på Kuutti|Welcome to Kuutti|Tervetuloa Kuuttiin|Välkommen till Kuutti|.* isn't responding"
+    visible: "Your profile|Profiilisi|Din profil|Welcome to Kuutti|Tervetuloa Kuuttiin|Välkommen till Kuutti|.* isn't responding"
     timeout: 30000
 - evalScript: ${output.notResponding = true}
 - runFlow:
@@ -33,5 +33,5 @@ appId: fi.kuutti.app
     commands:
       - tapOn: "Wait"
 - extendedWaitUntil:
-    visible: "People on Kuutti|Ihmiset Kuutissa|Människor på Kuutti|Welcome to Kuutti|Tervetuloa Kuuttiin|Välkommen till Kuutti"
+    visible: "Your profile|Profiilisi|Din profil|Welcome to Kuutti|Tervetuloa Kuuttiin|Välkommen till Kuutti"
     timeout: 30000

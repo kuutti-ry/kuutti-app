@@ -3404,10 +3404,10 @@ errors.relaxations_changed:
   machine: { fi: true, sv: true }
 
 errors.fish_budget_exceeded:
-  en: "You cannot send a fish just now. You can still like."
+  en: "You cannot send a fish just now."
   description: "Today's round (429 with Retry-After, #378, ADR-039): the person has sent matching_config fish_budget fish within the period of fish_window_days counted from a Monday, the calendar week (#475), and no earned fish waits; Retry-After says when the next can go. The round screen says it when another phone sent the week's fish meanwhile, and takes the fish button away; it never names the day of the next, which is Monday. Nothing was saved. Never a number or a period: both are tunables."
-  fi: "Et voi lähettää kalaa juuri nyt. Voit silti tykätä."
-  sv: "Du kan inte skicka en fisk just nu. Du kan fortfarande gilla."
+  fi: "Et voi lähettää kalaa juuri nyt."
+  sv: "Du kan inte skicka en fisk just nu."
   machine: { fi: true, sv: true }
 
 errors.like_budget_exceeded:
@@ -3468,7 +3468,7 @@ errors.conversation_closed:
 
 errors.message_too_long:
   en: "The message is too long. Make it shorter and send it again."
-  description: "Send (400, #348): over matching_config message_max_length characters after trimming. Never a number: the limit is a tunable, and the composer counts down."
+  description: "Send (400, #348): over matching_config message_max_length characters after trimming. Never a number: the limit is a tunable, and the composer says the same past it."
   fi: "Viesti on liian pitkä. Lyhennä sitä ja lähetä uudelleen."
   sv: "Meddelandet är för långt. Korta det och skicka igen."
   machine: { fi: true, sv: true }
@@ -8144,13 +8144,6 @@ pond.counter.failed:
   machine: { fi: true, sv: true }
 
 # --- The gate card (#500, ADR-060): whether matching is open for the person ---
-pond.gate.title:
-  en: "Matching"
-  description: "Gate card: the line above the state, and the card's accessible name. One word, a heading. The card says whether matching is open for the person (#500): their profile lacks something, it is finished and matching has not opened, or open."
-  fi: "Seuranhaku"
-  sv: "Matchning"
-  machine: { fi: true, sv: true }
-
 pond.gate.incomplete:
   en: "Matching opens for finished profiles. Yours still lacks something."
   description: "Gate card when the person's profile or onboarding is not complete. The profile screen says what is missing; this only says that something is."
@@ -8245,13 +8238,6 @@ round.reason.seen_before:
   sv: "Sedd tidigare"
   machine: { fi: true, sv: true }
 
-round.reason.relaxed:
-  en: "Shown because you widened your filters"
-  description: "Why a card is in the round (TD-12, #99), above the card: the person is there because the reader relaxed a filter for a short pool, when the API names no field (an older API). A short label."
-  fi: "Näytetään, koska laajensit suodattimiasi"
-  sv: "Visas för att du vidgade dina filter"
-  machine: { fi: true, sv: true }
-
 round.reason.fish:
   en: "Sent you a fish"
   description: "Why a card is in the round (TD-12, #378, ADR-039): this person sent the reader a fish, a like that goes first; liking back makes a match. The word fish is the app's own for it (ADR-039 Open 1), for the native review. A short label."
@@ -8282,35 +8268,42 @@ round.relaxed.undo:
 
 round.short.title:
   en: "Few people today"
-  description: "Heading of the short-pool panel at the end of a short round (TD-12, #99, ADR-042 §2): the reader's deal-breakers leave few people. Never blames the reader."
+  description: "Heading of the short-pool panel at the end of a short round (TD-12, #99, ADR-042 §2): the reader's deal-breakers leave few people. With the groups' headings under it (round.short.unanswered.title, round.short.aside.title) it is all the panel says (#581). Never blames the reader."
   fi: "Tänään vähän ihmisiä"
   sv: "Få personer i dag"
   machine: { fi: true, sv: true }
 
-round.short.explain:
-  en: "Your deal-breakers leave few people today. You can relax one for today only: tomorrow they hold as you set them, and one tap undoes it."
-  description: "Short-pool panel (#99, ADR-042 §3): a relaxation is for the day only, by the reader's tap, undone by one; nothing else is ever relaxed."
-  fi: "Ehdottomat rajasi jättävät tänään vähän ihmisiä. Voit joustaa yhdestä vain tämän päivän ajan: huomenna ne pätevät niin kuin asetit ne, ja yksi napautus peruu jouston."
-  sv: "Dina absoluta gränser lämnar få personer i dag. Du kan släppa på en bara för i dag: i morgon gäller de som du har ställt in dem, och ett tryck ångrar det."
+round.short.unanswered.title:
+  en: "Include today those who did not answer"
+  description: "Heading of a group in the short-pool panel (#99, ADR-042 §3, #581), over rows that name only a deal-breaker's field and how many more: for today, let through people who left that field unanswered. 'Today' has to carry that nothing changes tomorrow: no other line says so."
+  fi: "Ota tänään mukaan ne, jotka eivät vastanneet"
+  sv: "Ta i dag med dem som inte svarade"
+  machine: { fi: true, sv: true }
+
+round.short.aside.title:
+  en: "Set aside for today"
+  description: "Heading of a group in the short-pool panel (#99, ADR-042 §3, #581), over rows that name only a deal-breaker's field and how many more: set that deal-breaker aside for today only. 'Today' has to carry that nothing changes tomorrow: no other line says so."
+  fi: "Jousta tänään"
+  sv: "Släpp på för i dag"
   machine: { fi: true, sv: true }
 
 round.short.unanswered:
   en: "Include those who did not answer: {field}"
-  description: "Button of the short-pool panel (#99, ADR-042 §3): for today, let through people who left this deal-breaker's field unanswered. {field} is the field's label, after a colon."
+  description: "What a screen reader says for a row under round.short.unanswered.title in the short-pool panel (#99, ADR-042 §3, #581), before how many more; never drawn, since the row shows the field alone: for today, let through people who left this deal-breaker's field unanswered. {field} is the field's label, after a colon."
   fi: "Ota mukaan ne, jotka eivät vastanneet: {field}"
   sv: "Ta med dem som inte svarade: {field}"
   machine: { fi: true, sv: true }
 
 round.short.aside:
   en: "Set aside for today: {field}"
-  description: "Button of the short-pool panel (#99, ADR-042 §3): set this deal-breaker aside for today only. {field} is the field's label, after a colon."
-  fi: "Ohita tänään: {field}"
-  sv: "Bortse från i dag: {field}"
+  description: "What a screen reader says for a row under round.short.aside.title in the short-pool panel (#99, ADR-042 §3, #581), before how many more; never drawn, since the row shows the field alone: set this deal-breaker aside for today only. {field} is the field's label, after a colon."
+  fi: "Jousta tänään: {field}"
+  sv: "Släpp på för i dag: {field}"
   machine: { fi: true, sv: true }
 
 round.short.more:
   en: "{more, plural, =0 {A few more people} one {About # more person} other {About # more people}}"
-  description: "Under a short-pool button (#99, ADR-042 §4): how much the relaxation widens the reader's pool, rounded down to the counter's step (matching_config pond_counter_k, ten or more); zero means fewer than a step. Never a count of cards."
+  description: "A short-pool row's second line, under the deal-breaker's field (#99, ADR-042 §4): how much the relaxation widens the reader's pool, rounded down to the counter's step (matching_config pond_counter_k, ten or more); zero means fewer than a step. Never a count of cards."
   fi: "{more, plural, =0 {Muutama ihminen lisää} one {Noin # ihminen lisää} other {Noin # ihmistä lisää}}"
   sv: "{more, plural, =0 {Några fler personer} one {Ungefär # person till} other {Ungefär # fler personer}}"
   machine: { fi: true, sv: true }
@@ -8434,13 +8427,6 @@ round.none:
   sv: "Det finns ingen att visa dig än."
   machine: { fi: true, sv: true }
 
-round.newDay:
-  en: "A new day began at midnight."
-  description: "The queue's screen when the day ended while it was open and the new day was read in its place (ADR-034 §3). Said once, above the card."
-  fi: "Uusi päivä alkoi keskiyöllä."
-  sv: "En ny dag började vid midnatt."
-  machine: { fi: true, sv: true }
-
 round.gone:
   en: "That card is no longer available."
   description: "Round screen when the card on it could not be decided because it is gone meanwhile (404: the person was blocked, left, or is no longer shown). The card leaves the screen. Never says why."
@@ -8462,13 +8448,6 @@ round.match.title:
   sv: "Det är en match"
   slangi: "Nyt natsaa"
   machine: { fi: true, sv: true, slangi: true }
-
-round.match.body:
-  en: "You both liked each other, so a conversation is open for you two under Conversations."
-  description: "Round screen under the match headline (#100): what the match is and where it is. Conversations is the list's name (chat.list.title)."
-  fi: "Tykkäsitte toisistanne, joten teillä on nyt keskustelu Keskusteluissa."
-  sv: "Ni gillade varandra, så nu har ni ett samtal under Samtal."
-  machine: { fi: true, sv: true }
 
 round.match.open:
   en: "Go to the conversation"
@@ -8510,10 +8489,10 @@ round.star.label:
   machine: { fi: true, sv: true }
 
 round.star.first:
-  en: "Only you can see your stars. Nobody is told."
-  description: "Above the card when a star is the only one on the person's list (#575, ADR-064 §7), so that it cannot be taken for a super like, which other apps use a star for. Plain and calm."
-  fi: "Vain sinä näet tähtesi. Kenellekään ei kerrota."
-  sv: "Bara du ser dina stjärnor. Ingen får veta."
+  en: "Only you can see your stars."
+  description: "Above the card when a star is the only one on the person's list (#575, ADR-064 §7), so that it cannot be taken for a super like, which other apps use a star for. The one line that says who sees a star: the Starred list says nothing of it (#581). Plain and calm."
+  fi: "Vain sinä näet tähtesi."
+  sv: "Bara du ser dina stjärnor."
   machine: { fi: true, sv: true }
 
 round.star.failed:
@@ -8544,13 +8523,6 @@ stars.back:
   sv: "Tillbaka till start"
   machine: { fi: true, sv: true }
 
-stars.explain:
-  en: "Only you can see this list. A like or a pass takes the star off."
-  description: "The line at the top of the Starred list (#575, ADR-064 §3, §7). Never says anything about anybody who has left the list."
-  fi: "Vain sinä näet tämän listan. Tykkäys tai ohitus poistaa tähden."
-  sv: "Bara du ser den här listan. Ett gillande eller en överhoppning tar bort stjärnan."
-  machine: { fi: true, sv: true }
-
 stars.loading:
   en: "Loading your stars…"
   description: "The Starred list while it is read (#575)."
@@ -8566,10 +8538,10 @@ stars.failed:
   machine: { fi: true, sv: true }
 
 stars.none:
-  en: "Nobody here right now. A star on a card brings that person here."
+  en: "Nobody here right now."
   description: "The Starred list with nobody to show (#575). It may hold stars left out for now, so it never says the person has none, and never why anybody is gone (ADR-064 §6)."
-  fi: "Täällä ei ole nyt ketään. Kortin tähti tuo ihmisen tänne."
-  sv: "Ingen här just nu. En stjärna på ett kort tar personen hit."
+  fi: "Täällä ei ole nyt ketään."
+  sv: "Ingen här just nu."
   machine: { fi: true, sv: true }
 
 stars.clear.label:
@@ -8595,16 +8567,9 @@ stars.photo.label:
 
 stars.card.back:
   en: "Back to Starred"
-  description: "The back arrow's spoken name and the button on a card opened from the Starred list, once it is decided (#575): where they go."
+  description: "The back arrow's spoken name and the button on a card opened from the Starred list, once it is decided (#575): where they go. Once the card is gone this button is all that stands, and the screen reader is taken to it (#581)."
   fi: "Takaisin tähdellä merkittyihin"
   sv: "Tillbaka till stjärnmärkta"
-  machine: { fi: true, sv: true }
-
-stars.card.done:
-  en: "Done with this card."
-  description: "On a card opened from the Starred list, after a decision or a block (#575): the line the screen reader is taken to, above the button back. Undo may still stand in the header. Says nothing about the other person."
-  fi: "Tämä kortti on nyt käsitelty."
-  sv: "Det här kortet är klart."
   machine: { fi: true, sv: true }
 
 # --- The chat (#348, ADR-031): the list of conversations, a conversation and its composer ---
@@ -8645,24 +8610,17 @@ chat.list.theirTurn:
   machine: { fi: true, sv: true }
 
 chat.list.turnWarning:
-  en: "{waiting, plural, one {# conversation is waiting for your answer.} other {# conversations are waiting for your answer.}} You can't like anyone new while {limit, plural, one {# is} other {# are}} waiting."
-  description: "Banner at the top of the list from matching_config your_turn_warning conversations on the reader's turn (ADR-062 §5). {waiting} is their number and {limit} matching_config your_turn_limit. Plain, no alarm."
-  fi: "{waiting, plural, one {# keskustelu odottaa vastaustasi.} other {# keskustelua odottaa vastaustasi.}} Et voi tykätä kenestäkään uudesta, kun {limit, plural, one {# odottaa} other {# odottaa}}."
-  sv: "{waiting, plural, one {# samtal väntar på ditt svar.} other {# samtal väntar på ditt svar.}} Du kan inte gilla någon ny medan {limit, plural, one {# väntar} other {# väntar}}."
-  machine: { fi: true, sv: true }
-
-chat.list.archivedHint:
-  en: "A conversation quiet for a week moves here, and so does one that has ended. Writing in a quiet one brings it back."
-  description: "One line under the Archived heading (#348, TD-13, #351): the group holds the quiet conversations and the ended ones, and only a quiet one comes back when the person writes in it; an ended one never opens again. The week is silent_match_archive_days; say it plainly, no countdown. Never says how a conversation ended."
-  fi: "Viikon hiljaa ollut keskustelu siirtyy tänne, samoin päättynyt keskustelu. Kun kirjoitat hiljaiseen keskusteluun, se palaa."
-  sv: "Ett samtal som varit tyst en vecka flyttas hit, liksom ett samtal som har avslutats. När du skriver i ett tyst samtal kommer det tillbaka."
+  en: "You can't like anyone new while {limit, plural, one {# conversation is} other {# conversations are}} waiting."
+  description: "Banner at the top of the list from matching_config your_turn_warning conversations on the reader's turn (ADR-062 §5). {limit} is matching_config your_turn_limit; how many wait now is the heading's right under it (chat.list.yourTurn). Plain, no alarm."
+  fi: "Et voi tykätä kenestäkään uudesta, kun {limit, plural, one {# keskustelu odottaa} other {# keskustelua odottaa}}."
+  sv: "Du kan inte gilla någon ny medan {limit, plural, one {# samtal väntar} other {# samtal väntar}}."
   machine: { fi: true, sv: true }
 
 chat.list.empty:
-  en: "No conversations yet. A conversation opens here when you match with someone."
+  en: "No conversations yet."
   description: "The list when the person has no conversation (#348). Calm, no hurry."
-  fi: "Ei vielä keskusteluja. Keskustelu avautuu tänne, kun saat mätsin."
-  sv: "Inga samtal än. Ett samtal öppnas här när du får en match."
+  fi: "Ei vielä keskusteluja."
+  sv: "Inga samtal än."
   machine: { fi: true, sv: true }
 
 chat.list.loading:
@@ -8684,13 +8642,6 @@ chat.deletedUser:
   description: "Stands for the counterpart of a conversation once they deleted their account (#348, TD-7): the messages stay with the person, under this name."
   fi: "Poistettu käyttäjä"
   sv: "Raderad användare"
-  machine: { fi: true, sv: true }
-
-chat.row.noMessages:
-  en: "No messages yet"
-  description: "A row of the list before the first message (#348)."
-  fi: "Ei vielä viestejä"
-  sv: "Inga meddelanden än"
   machine: { fi: true, sv: true }
 
 chat.row.mine:
@@ -8716,7 +8667,7 @@ chat.unread.badge:
 
 chat.state.ended:
   en: "This conversation has ended."
-  description: "A closed conversation, instead of the composer and in the row of one ended before the conversation named nobody (#348, #351): an ended one, however it ended. Never says blocked or removed (ADR-030 §6)."
+  description: "An ended conversation (#348, #351), however it ended: never says blocked or removed (ADR-030 §6). Drawn in the share dialog when the conversation ended while it was open, where the buttons have gone and no heading says why. On the conversation's own screen it is heard and never drawn, when the conversation ends while on the screen: the heading says it there (chat.closed.title, #581)."
   fi: "Tämä keskustelu on päättynyt."
   sv: "Det här samtalet har avslutats."
   machine: { fi: true, sv: true }
@@ -8763,13 +8714,6 @@ chat.actions.unmatch:
   sv: "Avsluta samtalet"
   machine: { fi: true, sv: true }
 
-chat.actions.unmatchHint:
-  en: "Neither of you can write in it any more. Nobody is blocked."
-  description: "The conversation's dialog of actions (#351), the line under End conversation: what an unmatch does, and that it is not a block."
-  fi: "Kumpikaan teistä ei voi enää kirjoittaa siihen. Ketään ei estetä."
-  sv: "Ingen av er kan skriva i det längre. Ingen blockeras."
-  machine: { fi: true, sv: true }
-
 chat.unmatch.title:
   en: "End this conversation?"
   description: "The conversation's dialog of actions (#351), the title of the step that confirms ending the conversation."
@@ -8813,10 +8757,10 @@ chat.report.copy:
   machine: { fi: true, sv: true }
 
 chat.report.alsoEnds:
-  en: "A report also blocks them, for good, and ends this conversation for both of you: you will not see each other here again, even if either of you deletes their account. A block cannot be undone. They are not told."
-  description: "The report step of the conversation's dialog of actions (#351, ADR-030 §1, §4 and §12), under chat.report.copy in a conversation that has not ended: sending the report sets the same final block as Block and ends the conversation for both; there is no confirmation step after it. In an ended conversation safety.report.alsoBlocks stands in its place. Says what chat.block.body says, in the report's words."
-  fi: "Ilmoitus myös estää hänet pysyvästi ja päättää tämän keskustelun teiltä molemmilta: ette näe toisianne täällä enää, vaikka jompikumpi teistä poistaisi tilinsä. Estoa ei voi perua. Hänelle ei kerrota."
-  sv: "En anmälan blockerar också personen, för gott, och avslutar det här samtalet för er båda: ni ser inte varandra här igen, även om någon av er raderar sitt konto. En blockering kan inte ångras. Personen får inte veta det."
+  en: "The conversation ends for both of you, and you will not see each other here again, even if either of you deletes their account and comes back. A block cannot be undone. They are not told who reported them."
+  description: "The report step of the conversation's dialog of actions (#351, ADR-030 §1, §4 and §12), under chat.report.copy in a conversation that has not ended, and under the step's title, which says it blocks: sending the report sets the same final block as Block and ends the conversation for both, with no confirmation step after it. In an ended conversation safety.report.alsoBlocks stands in its place. Says what chat.block.body says, but for who is told: they are not told who reported them, never a bare 'not told', since a moderator's warning can reach the person with its reason."
+  fi: "Keskustelu päättyy teiltä molemmilta, ettekä näe toisianne täällä enää, vaikka jompikumpi teistä poistaisi tilinsä ja palaisi. Estoa ei voi perua. Hänelle ei kerrota, kuka ilmoitti."
+  sv: "Samtalet avslutas för er båda, och ni ser inte varandra här igen, även om någon av er raderar sitt konto och kommer tillbaka. En blockering kan inte ångras. Personen får inte veta vem som anmälde."
   machine: { fi: true, sv: true }
 
 chat.report.limited:
@@ -8917,13 +8861,6 @@ chat.composer.placeholder:
   sv: "Skriv ett meddelande"
   machine: { fi: true, sv: true }
 
-chat.composer.remaining:
-  en: "{characters, plural, one {# character left} other {# characters left}}"
-  description: "Under the composer (#348): what is left of matching_config message_max_length."
-  fi: "{characters, plural, one {# merkki jäljellä} other {# merkkiä jäljellä}}"
-  sv: "{characters, plural, one {# tecken kvar} other {# tecken kvar}}"
-  machine: { fi: true, sv: true }
-
 chat.composer.send:
   en: "Send"
   description: "The composer's send button (#348). Short."
@@ -8933,7 +8870,7 @@ chat.composer.send:
 
 chat.composer.error.message_too_long:
   en: "The message is too long. Make it shorter and send it again."
-  description: "Under the composer when the API refused the length (#348). The words stay in the field."
+  description: "Under the composer past the longest message, where Send stops, and when the API refused the length (#348). The words stay in the field. Names no number: the limit is a tunable."
   fi: "Viesti on liian pitkä. Lyhennä sitä ja lähetä uudelleen."
   sv: "Meddelandet är för långt. Korta det och skicka igen."
   machine: { fi: true, sv: true }
@@ -8988,10 +8925,10 @@ chat.composer.photo:
   machine: { fi: true, sv: true }
 
 chat.composer.photoAttached:
-  en: "Photo attached. The words in the field go under it."
-  description: "Beside the small picture above the composer's field once a photo is picked (#350), said politely when it appears: Send sends the photo, with the field's words, if any, as its caption."
-  fi: "Kuva liitetty. Kentän sanat tulevat sen alle."
-  sv: "Foto bifogat. Orden i fältet hamnar under det."
+  en: "Photo attached."
+  description: "Heard and never drawn (#350, #581): told to a screen reader when a photo is picked, since the small picture above the composer's field says nothing to it. Send sends the photo, with the field's words, if any, as its caption."
+  fi: "Kuva liitetty."
+  sv: "Foto bifogat."
   machine: { fi: true, sv: true }
 
 chat.composer.removePhoto:
@@ -9142,10 +9079,10 @@ chat.contact.copied:
   machine: { fi: true, sv: true }
 
 chat.contact.openRefused:
-  en: "This did not open on your phone. You can copy it instead."
-  description: "Said under the lines of a conversation's header when the phone refused to open a contact (#473): a tablet with no calls, a link nothing on the phone takes. Copy is still there beside it."
-  fi: "Tämä ei auennut puhelimessasi. Voit kopioida sen."
-  sv: "Det gick inte att öppna på din telefon. Du kan kopiera det i stället."
+  en: "This did not open on your phone."
+  description: "Said under the lines of a conversation's header when the phone refused to open a contact (#473): a tablet with no calls, a link nothing on the phone takes. Copy stands right beside the button they pressed, so it says nothing of that."
+  fi: "Tämä ei auennut puhelimessasi."
+  sv: "Det gick inte att öppna på din telefon."
   machine: { fi: true, sv: true }
 
 chat.contact.share.open:
@@ -9163,10 +9100,10 @@ chat.contact.share.title:
   machine: { fi: true, sv: true }
 
 chat.contact.share.body:
-  en: "{name} sees what you share at once, at the top of this conversation. You can stop sharing at any time, but what {name} already wrote down stays with them."
+  en: "{name} sees what you share at once. You can stop sharing at any time, but what {name} already wrote down stays with them."
   description: "The share dialog's sentence under its title (#103): no agreement step, nothing asked back; stopping takes the contact off the screen, not out of the other person's notes. {name} is the other person's name, in nominative, as a subject."
-  fi: "{name} näkee jakamasi heti tämän keskustelun yläosassa. Voit lopettaa jakamisen milloin tahansa, mutta minkä {name} on jo kirjoittanut muistiin, jää hänelle."
-  sv: "{name} ser det du delar direkt, högst upp i det här samtalet. Du kan sluta dela när som helst, men det som {name} redan har skrivit ner finns kvar."
+  fi: "{name} näkee jakamasi heti. Voit lopettaa jakamisen milloin tahansa, mutta minkä {name} on jo kirjoittanut muistiin, jää hänelle."
+  sv: "{name} ser det du delar direkt. Du kan sluta dela när som helst, men det som {name} redan har skrivit ner finns kvar."
   machine: { fi: true, sv: true }
 
 chat.contact.share.share:
@@ -9197,23 +9134,16 @@ chat.contact.share.stopLabel:
   sv: "{kind, select, phone {Sluta dela: telefon} whatsapp {Sluta dela: WhatsApp} telegram {Sluta dela: Telegram} instagram {Sluta dela: Instagram} snapchat {Sluta dela: Snapchat} other {Sluta dela}}"
   machine: { fi: true, sv: true }
 
-chat.contact.share.sharedHere:
-  en: "Shared in this conversation"
-  description: "Under a contact in the share dialog while it is shared here (#103), so the state is said in words, not only by the button."
-  fi: "Jaettu tässä keskustelussa"
-  sv: "Delas i det här samtalet"
-  machine: { fi: true, sv: true }
-
 chat.contact.share.shared:
   en: "Shared. {name} sees it now."
-  description: "Said in the share dialog after a share went through (#103), without interrupting. {name} is the other person's name, in nominative, as a subject."
+  description: "Heard and never drawn (#103, #581): told to a screen reader after a share went through, without interrupting. The button turns to Stop sharing, and the sentence above says the other sees it at once. {name} is the other person's name, in nominative, as a subject."
   fi: "Jaettu. {name} näkee sen nyt."
   sv: "Delat. {name} ser det nu."
   machine: { fi: true, sv: true }
 
 chat.contact.share.stopped:
   en: "No longer shared here."
-  description: "Said in the share dialog after Stop sharing went through (#103), without interrupting: the other person no longer sees it."
+  description: "Heard and never drawn (#103, #581): told to a screen reader after Stop sharing went through, without interrupting: the other person no longer sees it. The button turns back to Share."
   fi: "Ei enää jaettu tässä."
   sv: "Delas inte längre här."
   machine: { fi: true, sv: true }
@@ -9843,10 +9773,10 @@ notices.invitationFriend.title:
   machine: { fi: true, sv: true }
 
 notices.invitationFriend.body:
-  en: "The invitation earned you {fish, plural, one {a fish} other {# fish}}. An earned fish is used by itself once your own fish are used up."
-  description: "The home screen's notices (#503, ADR-044 §9), under the title: what the invitation earned the person who used it. The invitation earned it, never the finished profile: finishing one's own profile earns nothing (the maintainer, 31/10/2026). fish is the units it earned them, at least one. Never who invited them. Fish is the app's super-like (ADR-039); earned fish wait and are used by themselves, never a number of days or a period (tunables)."
-  fi: "Kutsu toi sinulle {fish, plural, one {kalan} other {# kalaa}}. Ansaittu kala käytetään automaattisesti, kun omat kalasi on käytetty."
-  sv: "Inbjudan gav dig {fish, plural, one {en fisk} other {# fiskar}}. En intjänad fisk används automatiskt när dina egna fiskar är slut."
+  en: "The invitation earned you {fish, plural, one {a fish} other {# fish}}."
+  description: "The home screen's notices (#503, ADR-044 §9), under the title: what the invitation earned the person who used it. The invitation earned it, never the finished profile: finishing one's own profile earns nothing (the maintainer, 31/10/2026). fish is the units it earned them, at least one. Never who invited them. Fish is the app's super-like (ADR-039). Nothing here on how a fish is spent, which it does by itself (#581), and never a number of days or a period (tunables)."
+  fi: "Kutsu toi sinulle {fish, plural, one {kalan} other {# kalaa}}."
+  sv: "Inbjudan gav dig {fish, plural, one {en fisk} other {# fiskar}}."
   machine: { fi: true, sv: true }
 
 # --- Invitations (#107, ADR-044): a code for one friend, made and withdrawn in Settings, typed by the friend after the bank login ---
@@ -10405,25 +10335,11 @@ safety.actions.block:
   sv: "Blockera"
   machine: { fi: true, sv: true }
 
-safety.actions.blockHint:
-  en: "You will not see each other again. They are not told."
-  description: "The block-or-report dialog (#84), the line under the Block button: what a block does. Calm; the other person is not told."
-  fi: "Ette näe toisianne enää. Hänelle ei kerrota."
-  sv: "Ni ser inte varandra igen. Personen får inte veta det."
-  machine: { fi: true, sv: true }
-
 safety.actions.report:
   en: "Report and block"
   description: "The block-or-report dialog (#84, ADR-030 §4): the button that chooses a report, which blocks as well, and the title of the report step."
   fi: "Ilmoita ja estä"
   sv: "Anmäl och blockera"
-  machine: { fi: true, sv: true }
-
-safety.actions.reportHint:
-  en: "Tell the moderators what is wrong. This blocks them too. They are not told who reported them."
-  description: "The block-or-report dialog (#84, ADR-030 §4), the line under the Report and block button: who reads a report, that it blocks as well, and that the reported person never learns who sent it."
-  fi: "Kerro moderaattoreille, mikä on vialla. Tämä myös estää hänet. Hänelle ei kerrota, kuka ilmoitti."
-  sv: "Berätta för moderatorerna vad som är fel. Det blockerar också personen. Personen får inte veta vem som anmälde."
   machine: { fi: true, sv: true }
 
 safety.actions.cancel:
@@ -10476,10 +10392,10 @@ safety.block.body:
   machine: { fi: true, sv: true }
 
 safety.block.done:
-  en: "Blocked. You will not see each other again."
-  description: "The block-or-report dialog (#84), after the block went through; closing the dialog takes the card away."
-  fi: "Estetty. Ette näe toisianne enää."
-  sv: "Blockerad. Ni ser inte varandra igen."
+  en: "Blocked."
+  description: "The block-or-report dialog (#84), after the block went through; closing the dialog takes the card away. Also what the list of conversations says after a block from a conversation (#351). One word: the step before it said what a block does."
+  fi: "Estetty."
+  sv: "Blockerad."
   machine: { fi: true, sv: true }
 
 safety.block.failed:
@@ -10490,10 +10406,10 @@ safety.block.failed:
   machine: { fi: true, sv: true }
 
 safety.report.alsoBlocks:
-  en: "A report also blocks them, for good: you will not see each other here again, even if either of you deletes their account. A block cannot be undone. They are not told."
-  description: "The block-or-report dialog (#84, ADR-030 §1 and §4), under the report step's title: sending a report sets the same final block as the Block path, so it says what safety.block.body says; there is no confirmation step after it."
-  fi: "Ilmoitus myös estää hänet pysyvästi: ette näe toisianne täällä enää, vaikka jompikumpi teistä poistaisi tilinsä. Estoa ei voi perua. Hänelle ei kerrota."
-  sv: "En anmälan blockerar också personen, för gott: ni ser inte varandra här igen, även om någon av er raderar sitt konto. En blockering kan inte ångras. Personen får inte veta det."
+  en: "You will not see each other here again, even if either of you deletes their account and comes back. A block cannot be undone. They are not told who reported them."
+  description: "The block-or-report dialog (#84, ADR-030 §1 and §4), under the report step's title, which says it blocks: sending a report sets the same final block as the Block path, with no confirmation step after it, so this says what safety.block.body says, but for who is told. They are not told who reported them, never a bare 'not told': a moderator's warning can reach the person with its reason. Also in an ended conversation's report step, under chat.report.copy."
+  fi: "Ette näe toisianne täällä enää, vaikka jompikumpi teistä poistaisi tilinsä ja palaisi. Estoa ei voi perua. Hänelle ei kerrota, kuka ilmoitti."
+  sv: "Ni ser inte varandra här igen, även om någon av er raderar sitt konto och kommer tillbaka. En blockering kan inte ångras. Personen får inte veta vem som anmälde."
   machine: { fi: true, sv: true }
 
 safety.report.reasonLabel:
@@ -10574,10 +10490,10 @@ safety.report.send:
   machine: { fi: true, sv: true }
 
 safety.report.done:
-  en: "Thank you. A moderator will look at it, and you will not see each other again."
-  description: "The block-or-report dialog (#84), after the report went through (and its block); closing the dialog takes the card away. Also said when a report of the same person was already waiting, which the API answers alike."
-  fi: "Kiitos. Moderaattori katsoo ilmoituksen, eikä teitä näytetä enää toisillenne."
-  sv: "Tack. En moderator tittar på anmälan, och ni ser inte varandra igen."
+  en: "Thank you. A moderator will look at it."
+  description: "The block-or-report dialog (#84), after the report went through (and its block); closing the dialog takes the card away. Also what the list of conversations says after a report from a conversation (#351), and said when a report of the same person was already waiting, which the API answers alike. The step before it said that they will not see each other here again."
+  fi: "Kiitos. Moderaattori katsoo ilmoituksen."
+  sv: "Tack. En moderator tittar på anmälan."
   machine: { fi: true, sv: true }
 
 safety.report.failed:
