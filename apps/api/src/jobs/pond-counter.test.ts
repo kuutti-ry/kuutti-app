@@ -1,6 +1,6 @@
 import { resolve } from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
-import { createPool, migrate, withTemporaryDatabase } from "@kuutti/db";
+import { createPool, migrate, type Queryable, withTemporaryDatabase } from "@kuutti/db";
 import { PondCounterResponse } from "@kuutti/schema";
 import { it } from "vitest";
 import { withMatchingConfig } from "../test/account.ts";
@@ -29,6 +29,9 @@ async function deps(ctx: TestContext, at: Date) {
 
 const taken = async (ctx: TestContext, at: Date) => takeSnapshot((await deps(ctx, at)).deps);
 
+const inState = (ctx: TestContext, ids: readonly (string | undefined)[], state: string) =>
+  ctx.client.query("UPDATE account SET state = $2::account_state WHERE id = ANY($1)", [ids, state]);
+
 const bandsOf = async (ctx: TestContext, pond: string) => {
   const counts = (await countPonds(ctx.client)).get(pond);
   return [counts?.seeksMen, counts?.seeksEveryone, counts?.seeksWomen];
@@ -44,114 +47,93 @@ describe("the figures", () => {
     ctx,
   }) => {
     const pond = await pondNamed(ctx.client, "test-counter-counted");
-    await people(ctx.client, pond, 5, { gender: "woman", state: "registered" });
-    await people(ctx.client, pond, 4, { gender: "man", state: "active" });
-    await people(ctx.client, pond, 1, { gender: "woman", state: "shadow_banned" });
+    await people(ctx.client, pond, 9, { complete: true });
+    await inState(ctx, await people(ctx.client, pond, 1, { complete: true }), "shadow_banned");
     for (const state of ["paused", "suspended", "deleted"] as const) {
-      await people(ctx.client, pond, 1, { gender: "woman", state });
+      await inState(ctx, await people(ctx.client, pond, 1, { complete: true }), state);
     }
-    await people(ctx.client, pond, 1, { gender: "man", state: "active", standing: "banned" });
-    await people(ctx.client, null, 1, { gender: "woman", state: "active" });
+    await people(ctx.client, pond, 1, { complete: true, standing: "banned" });
+    await people(ctx.client, null, 1, { complete: true });
 
-    const counts = (await countPonds(ctx.client)).get(pond);
-    expect(counts).toEqual({
-      verified: 10,
-      woman: 6,
-      man: 4,
-      nonBinary: 0,
-      finishing: 10,
+    const ponds = await countPonds(ctx.client);
+    expect(ponds.get(pond)).toEqual({
+      finished: 10,
       seeksMen: 0,
       seeksEveryone: 0,
       seeksWomen: 0,
     });
+    expect([...ponds.keys()]).not.toContain(null);
   });
 
-  test("a shadow-banned account with a complete profile is not finishing, like an active one", async ({
+  test("a complete profile on an account that is not active yet, or is banned, is not counted", async ({
     ctx,
   }) => {
-    const pond = await pondNamed(ctx.client, "test-counter-shadow");
-    const [id] = await people(ctx.client, pond, 1, { gender: "woman", complete: true });
-    expect((await countPonds(ctx.client)).get(pond)?.finishing).toBe(0);
-    await ctx.client.query("UPDATE account SET state = 'shadow_banned' WHERE id = $1", [id]);
-    expect((await countPonds(ctx.client)).get(pond)).toMatchObject({ verified: 1, finishing: 0 });
+    const pond = await pondNamed(ctx.client, "test-counter-not-active");
+    await inState(ctx, await people(ctx.client, pond, 1, { complete: true }), "registered");
+    await inState(ctx, await people(ctx.client, pond, 1, { complete: true }), "banned");
+    await people(ctx.client, pond, 1, { complete: true });
+    expect((await countPonds(ctx.client)).get(pond)).toMatchObject({ finished: 1 });
   });
 
-  test("a ready line in place of a bio completes the profile, and neither leaves it finishing (#239)", async ({
+  test("a ready line in place of a bio completes the profile, and neither leaves it uncounted (#239)", async ({
     ctx,
   }) => {
     const pond = await pondNamed(ctx.client, "test-counter-ready-line");
-    await people(ctx.client, pond, 1, { gender: "woman", complete: true, bio: "ready_line" });
-    await people(ctx.client, pond, 1, { gender: "woman", complete: true, bio: "none" });
-    expect((await countPonds(ctx.client)).get(pond)).toMatchObject({ verified: 2, finishing: 1 });
+    await people(ctx.client, pond, 1, { complete: true, bio: "ready_line" });
+    await people(ctx.client, pond, 1, { complete: true, bio: "none" });
+    expect((await countPonds(ctx.client)).get(pond)).toMatchObject({ finished: 1 });
   });
 
-  test("photos sent in conversations finish no profile: one whose approved photos are all of messages is finishing (#350)", async ({
+  test("photos sent in conversations finish no profile: one whose approved photos are all of messages is not counted (#350)", async ({
     ctx,
   }) => {
     const pond = await pondNamed(ctx.client, "test-counter-message-photos");
-    const [messagesOnly] = await people(ctx.client, pond, 2, { gender: "woman", complete: true });
+    const [messagesOnly] = await people(ctx.client, pond, 2, { complete: true });
     // The same three approved photos, sent in conversations instead.
     await ctx.client.query(
       "UPDATE photo SET purpose = 'message', position = NULL WHERE account_id = $1",
       [messagesOnly],
     );
-    expect((await countPonds(ctx.client)).get(pond)).toMatchObject({ verified: 2, finishing: 1 });
+    expect((await countPonds(ctx.client)).get(pond)).toMatchObject({ finished: 1 });
   });
 
-  test("A profile that is not complete counts as finishing", async ({ ctx }) => {
-    const pond = await pondNamed(ctx.client, "test-counter-finishing");
-    await people(ctx.client, pond, 10, { gender: "woman", complete: true });
-    await people(ctx.client, pond, 9, { gender: "man", state: "active" });
-    await people(ctx.client, pond, 6, { state: "registered" });
+  test("A profile that is not complete is not counted", async ({ ctx }) => {
+    const pond = await pondNamed(ctx.client, "test-counter-not-complete");
+    await people(ctx.client, pond, 10, { complete: true });
+    // One thing short of complete on an active account, and those who have only begun.
+    await people(ctx.client, pond, 9, { complete: true, bio: "none" });
+    await people(ctx.client, pond, 3, { state: "active" });
+    await people(ctx.client, pond, 3, { state: "registered" });
     await taken(ctx, DAY_1);
-    expect(await listed(ctx, pond)).toMatchObject({ verified: 25, finishing: 15, split: null });
+    expect(await listed(ctx, pond)).toMatchObject({ day: "2026-10-05", finished: 10 });
   });
 
-  test("The people finishing are counted in public only when they and the rest are none or at least k", async ({
-    ctx,
-  }) => {
-    const pond = await pondNamed(ctx.client, "test-counter-finishing-small");
-    await people(ctx.client, pond, 3, { gender: "woman", complete: true });
-    await people(ctx.client, pond, 9, { gender: "man", state: "active" });
-    await taken(ctx, DAY_1);
-    expect(await listed(ctx, pond)).toMatchObject({ verified: 12, finishing: null });
-  });
-
-  test("a complete profile on an account that is not active yet is still finishing", async ({
-    ctx,
-  }) => {
-    const pond = await pondNamed(ctx.client, "test-counter-not-active");
-    const [id] = await people(ctx.client, pond, 1, { gender: "woman", complete: true });
-    await ctx.client.query("UPDATE account SET state = 'registered' WHERE id = $1", [id]);
-    expect((await countPonds(ctx.client)).get(pond)?.finishing).toBe(1);
-  });
-
-  test("The figures of a pond move only once at least k people have come or gone", async ({
+  test("The number of a pond moves only once at least k people have come or gone", async ({
     ctx,
   }) => {
     const pond = await pondNamed(ctx.client, "test-counter-steps");
-    await people(ctx.client, pond, 25, { gender: "woman" });
+    await people(ctx.client, pond, 25, { complete: true });
     expect((await taken(ctx, DAY_1)).day).toBe("2026-10-05");
     const said = await listed(ctx, pond);
-    expect(said).toMatchObject({ day: "2026-10-05", verified: 25 });
+    expect(said).toMatchObject({ day: "2026-10-05", finished: 25 });
 
-    await people(ctx.client, pond, 9, { gender: "man" });
+    await people(ctx.client, pond, 9, { complete: true });
     await taken(ctx, DAY_2);
     expect(await listed(ctx, pond)).toEqual(said);
 
-    await people(ctx.client, pond, 1, { gender: "man" });
+    await people(ctx.client, pond, 1, { complete: true });
     await taken(ctx, DAY_3);
-    expect(await listed(ctx, pond)).toMatchObject({ day: "2026-10-07", verified: 35 });
+    expect(await listed(ctx, pond)).toMatchObject({ day: "2026-10-07", finished: 35 });
   });
 
   test("The accounts are counted at most once a day", async ({ ctx }) => {
     const pond = await pondNamed(ctx.client, "test-counter-once");
-    await people(ctx.client, pond, 25, { gender: "woman" });
+    await people(ctx.client, pond, 25, { complete: true });
     expect(await taken(ctx, DAY_1)).toMatchObject({ counted: true });
     const said = await listed(ctx, pond);
-    expect(said).toMatchObject({ day: "2026-10-05", verified: 25 });
+    expect(said).toMatchObject({ day: "2026-10-05", finished: 25 });
 
-    await people(ctx.client, pond, 10, { gender: "man" });
+    await people(ctx.client, pond, 10, { complete: true });
     const again = await deps(ctx, LATER_ON_DAY_1);
     expect(await takeSnapshot(again.deps)).toEqual({
       day: "2026-10-05",
@@ -163,61 +145,55 @@ describe("the figures", () => {
     expect(again.lines().map((l) => l.msg)).toContain("pond counter: counted today already");
 
     expect(await taken(ctx, DAY_2)).toMatchObject({ counted: true });
-    expect(await listed(ctx, pond)).toMatchObject({ day: "2026-10-06", verified: 35 });
+    expect(await listed(ctx, pond)).toMatchObject({ day: "2026-10-06", finished: 35 });
   });
 
   test("a pond that did not move is marked as counted too, its figures and their day as they were", async ({
     ctx,
   }) => {
     const pond = await pondNamed(ctx.client, "test-counter-mark");
-    await people(ctx.client, pond, 25, { gender: "woman" });
+    await people(ctx.client, pond, 25, { complete: true });
     await taken(ctx, DAY_1);
-    await people(ctx.client, pond, 3, { gender: "woman" });
+    await people(ctx.client, pond, 3, { complete: true });
     await taken(ctx, DAY_2);
-    const { rows } = await ctx.client.query<{ day: string; verified: number; taken_at: Date }>(
-      `SELECT to_char(day, 'YYYY-MM-DD') AS day, verified, taken_at
+    const { rows } = await ctx.client.query<{ day: string; finished: number; taken_at: Date }>(
+      `SELECT to_char(day, 'YYYY-MM-DD') AS day, finished, taken_at
        FROM pond_counter WHERE pond_id = $1`,
       [pond],
     );
-    expect(rows).toEqual([{ day: "2026-10-05", verified: 25, taken_at: DAY_2 }]);
+    expect(rows).toEqual([{ day: "2026-10-05", finished: 25, taken_at: DAY_2 }]);
   });
 
   test("The figures do not move between two counts", async ({ ctx }) => {
     const pond = await pondNamed(ctx.client, "test-counter-between");
-    await people(ctx.client, pond, 11, { gender: "woman" });
+    await people(ctx.client, pond, 11, { complete: true });
     await taken(ctx, DAY_1);
     const said = await listed(ctx, pond);
-    expect(said?.verified).toBe(11);
+    expect(said?.finished).toBe(11);
 
-    await people(ctx.client, pond, 15, { gender: "woman" });
+    await people(ctx.client, pond, 15, { complete: true });
     expect(await listed(ctx, pond)).toEqual(said);
 
     await taken(ctx, DAY_2);
-    expect(await listed(ctx, pond)).toMatchObject({ day: "2026-10-06", verified: 26 });
+    expect(await listed(ctx, pond)).toMatchObject({ day: "2026-10-06", finished: 26 });
   });
 
   test("one arrival and one departure a day never show, however many days pass", async ({
     ctx,
   }) => {
     const pond = await pondNamed(ctx.client, "test-counter-quiet");
-    await people(ctx.client, pond, 13, { gender: "woman" });
-    await people(ctx.client, pond, 12, { gender: "man" });
-    await people(ctx.client, pond, 10, { gender: "non_binary" });
+    const [first, second] = await people(ctx.client, pond, 10, { complete: true });
     await taken(ctx, DAY_1);
     const said = await listed(ctx, pond);
-    expect(said?.split).toEqual({ woman: 13, man: 12, nonBinary: 10 });
+    expect(said?.finished).toBe(10);
 
-    // A woman comes: the total and her cell would each have gone up by one.
-    await people(ctx.client, pond, 1, { gender: "woman" });
+    // Somebody finishes: the number would have gone up by one.
+    await people(ctx.client, pond, 1, { complete: true });
     await taken(ctx, DAY_2);
     expect(await listed(ctx, pond)).toEqual(said);
 
-    // A non-binary person leaves: the cell is nine now, and the split still stands as it was said.
-    await ctx.client.query(
-      `UPDATE account SET state = 'paused' WHERE id =
-         (SELECT id FROM account WHERE pond_id = $1 AND gender = 'non_binary' LIMIT 1)`,
-      [pond],
-    );
+    // Two leave: it would be nine, under k, and it still stands as it was said.
+    await inState(ctx, [first, second], "paused");
     await taken(ctx, DAY_3);
     expect(await listed(ctx, pond)).toEqual(said);
   });
@@ -226,17 +202,15 @@ describe("the figures", () => {
     ctx,
   }) => {
     const pond = await pondNamed(ctx.client, "test-counter-raised");
-    for (const gender of ["woman", "man", "non_binary"] as const) {
-      await people(ctx.client, pond, 15, { gender });
-    }
+    await people(ctx.client, pond, 45, { complete: true });
     await taken(ctx, DAY_1);
     const said = await listed(ctx, pond);
-    expect(said).toMatchObject({ verified: 45, split: { woman: 15, man: 15, nonBinary: 15 } });
+    expect(said).toMatchObject({ day: "2026-10-05", finished: 45 });
 
     await withMatchingConfig(ctx.client, { pond_counter_k: 50 });
     await taken(ctx, DAY_2);
-    expect(await listed(ctx, pond)).toMatchObject({ day: null, verified: null, split: null });
-    await people(ctx.client, pond, 1, { gender: "woman" });
+    expect(await listed(ctx, pond)).toMatchObject({ day: null, finished: null });
+    await people(ctx.client, pond, 1, { complete: true });
     await taken(ctx, DAY_3);
 
     await withMatchingConfig(ctx.client, { pond_counter_k: 10 });
@@ -245,36 +219,39 @@ describe("the figures", () => {
 
   test("a pond that was never said follows every count until it reaches k", async ({ ctx }) => {
     const pond = await pondNamed(ctx.client, "test-counter-growing");
-    await people(ctx.client, pond, 4, { gender: "man" });
+    await people(ctx.client, pond, 4, { complete: true });
     await taken(ctx, DAY_1);
-    expect(await listed(ctx, pond)).toMatchObject({ day: null, verified: null });
-    await people(ctx.client, pond, 6, { gender: "man" });
+    expect(await listed(ctx, pond)).toMatchObject({ day: null, finished: null });
+    await people(ctx.client, pond, 6, { complete: true });
     await taken(ctx, DAY_2);
-    expect(await listed(ctx, pond)).toMatchObject({ day: "2026-10-06", verified: 10 });
+    expect(await listed(ctx, pond)).toMatchObject({ day: "2026-10-06", finished: 10 });
   });
 
   test("there is one row per pond, zeros included, and no history", async ({ ctx }) => {
     const chosen = await pondNamed(ctx.client, "test-counter-chosen");
     const empty = await pondNamed(ctx.client, "test-counter-empty");
-    await people(ctx.client, chosen, 2, { gender: "man" });
+    const begun = await pondNamed(ctx.client, "test-counter-begun");
+    await people(ctx.client, chosen, 2, { complete: true });
+    await people(ctx.client, begun, 12, { state: "active" });
     await taken(ctx, DAY_1);
-    await people(ctx.client, chosen, 30, { gender: "man" });
+    await people(ctx.client, chosen, 30, { complete: true });
     await taken(ctx, DAY_2);
-    const { rows } = await ctx.client.query<{ pond_id: string; verified: number; day: string }>(
-      `SELECT pond_id, verified, to_char(day, 'YYYY-MM-DD') AS day
+    const { rows } = await ctx.client.query<{ pond_id: string; finished: number; day: string }>(
+      `SELECT pond_id, finished, to_char(day, 'YYYY-MM-DD') AS day
        FROM pond_counter WHERE pond_id = ANY($1)`,
-      [[chosen, empty]],
+      [[chosen, empty, begun]],
     );
-    expect(rows).toHaveLength(2);
-    expect(Object.fromEntries(rows.map((r) => [r.pond_id, [r.verified, r.day]]))).toEqual({
+    expect(rows).toHaveLength(3);
+    expect(Object.fromEntries(rows.map((r) => [r.pond_id, [r.finished, r.day]]))).toEqual({
       [chosen]: [32, "2026-10-06"],
       [empty]: [0, "2026-10-05"],
+      [begun]: [0, "2026-10-05"],
     });
   });
 
   test("the job logs how many ponds moved, and no figure of any pond", async ({ ctx }) => {
     const pond = await pondNamed(ctx.client, "test-counter-log");
-    await people(ctx.client, pond, 37, { gender: "man" });
+    await people(ctx.client, pond, 37, { complete: true });
     const { deps: d, lines } = await deps(ctx, DAY_1);
     const job = pondCounterJob(d);
     expect(job.name).toBe("pond-counter");
@@ -285,7 +262,7 @@ describe("the figures", () => {
     expect(logged).toHaveLength(1);
     const keys = Object.keys(logged[0] ?? {});
     expect(keys).toEqual(expect.arrayContaining(["day", "moved", "ponds"]));
-    for (const figure of ["accounts", "verified", "woman", "man", "nonBinary", "finishing"]) {
+    for (const figure of ["accounts", "finished", "seeksMen", "seeksEveryone", "seeksWomen"]) {
       expect(keys).not.toContain(figure);
     }
     expect(JSON.stringify(logged)).not.toContain(pond);
@@ -297,6 +274,55 @@ describe("the figures", () => {
     const first = await ensureFirstSnapshot((await deps(ctx, DAY_1)).deps);
     expect(first?.day).toBe("2026-10-05");
     expect(await ensureFirstSnapshot((await deps(ctx, DAY_2)).deps)).toBeNull();
+  });
+
+  test("a row as the migration leaves it says no number, the boot does not count it, and the next count replaces it at once (#581)", async ({
+    ctx,
+  }) => {
+    const pond = await pondNamed(ctx.client, "test-counter-migrated");
+    const finished = { complete: true, consented: true, seeks: ["man" as const] };
+    await people(ctx.client, pond, 12, finished);
+    await taken(ctx, DAY_1);
+    // Migration 0109: the old figures gone, the bands as they stood, and the number at its default.
+    await ctx.client.query("UPDATE pond_counter SET finished = 0 WHERE pond_id = $1", [pond]);
+    expect(await listed(ctx, pond)).toMatchObject({ day: null, finished: null });
+
+    expect(await ensureFirstSnapshot((await deps(ctx, DAY_2)).deps)).toBeNull();
+    expect(await listed(ctx, pond)).toMatchObject({ day: null, finished: null });
+
+    // Zero was never said, so no step holds the row back: one more in a band comes through with it.
+    await people(ctx.client, pond, 1, finished);
+    await taken(ctx, DAY_2);
+    expect(await listed(ctx, pond)).toMatchObject({ day: "2026-10-06", finished: 13 });
+    const { rows } = await ctx.client.query<{ seeks_men: number }>(
+      "SELECT seeks_men FROM pond_counter WHERE pond_id = $1",
+      [pond],
+    );
+    expect(rows).toEqual([{ seeks_men: 13 }]);
+  });
+
+  test("the count asks nobody's gender, and gender changes nothing in what it finds (#581)", async ({
+    ctx,
+  }) => {
+    const pond = await pondNamed(ctx.client, "test-counter-no-gender");
+    for (const gender of ["woman", "man", "non_binary", null] as const) {
+      await people(ctx.client, pond, 1, { complete: true, consented: true, gender });
+    }
+    const asked: string[] = [];
+    const watching = {
+      query: (text: string, values?: unknown[]) => {
+        asked.push(text);
+        return ctx.client.query(text, values);
+      },
+    } as Queryable;
+    expect((await countPonds(watching)).get(pond)).toEqual({
+      finished: 4,
+      seeksMen: 4,
+      seeksEveryone: 0,
+      seeksWomen: 0,
+    });
+    expect(asked).toHaveLength(1);
+    expect(asked[0]).not.toMatch(/gender/i);
   });
 });
 
@@ -311,9 +337,9 @@ describe("two counts at once", () => {
         await migrate(pool, resolve(import.meta.dirname, "../../../../packages/db/drizzle"));
         const { logger } = await captureLogger();
         const pond = await pondNamed(pool, "test-counter-parallel");
-        await people(pool, pond, 45, { gender: "woman" });
+        await people(pool, pond, 45, { complete: true });
         await takeSnapshot({ db: pool, logger, now: () => DAY_1 });
-        await people(pool, pond, 10, { gender: "woman" });
+        await people(pool, pond, 10, { complete: true });
 
         // The first count of the day, by hand: it holds the lock, has written
         // 55 and has marked every row as counted.
@@ -322,29 +348,29 @@ describe("two counts at once", () => {
         try {
           await first.query("BEGIN");
           await first.query("SELECT pg_advisory_xact_lock($1)", [POND_COUNTER_LOCK_KEY]);
-          await first.query(
-            "UPDATE pond_counter SET verified = 55, woman = 55, finishing = 55, day = $2 WHERE pond_id = $1",
-            [pond, "2026-10-06"],
-          );
+          await first.query("UPDATE pond_counter SET finished = 55, day = $2 WHERE pond_id = $1", [
+            pond,
+            "2026-10-06",
+          ]);
           await first.query("UPDATE pond_counter SET taken_at = $1", [DAY_2]);
           second = takeSnapshot({ db: pool, logger, now: () => DAY_2 });
           const waited = await Promise.race([second.then(() => "ran"), sleep(300, "waited")]);
           expect(waited).toBe("waited");
-          // Somebody joins before the second count gets to look.
-          await people(pool, pond, 1, { gender: "woman" });
+          // Somebody finishes before the second count gets to look.
+          await people(pool, pond, 1, { complete: true });
           await first.query("COMMIT");
         } finally {
           first.release();
         }
         // The day has had its count: the second process counts nothing.
         expect(await second).toMatchObject({ moved: 0, counted: false });
-        const { rows } = await pool.query<{ verified: number }>(
-          "SELECT verified FROM pond_counter WHERE pond_id = $1",
+        const { rows } = await pool.query<{ finished: number }>(
+          "SELECT finished FROM pond_counter WHERE pond_id = $1",
           [pond],
         );
         // Without the lock the second count would have seen neither the 55 nor
         // the mark, compared 56 with 45, and written 56.
-        expect(rows).toEqual([{ verified: 55 }]);
+        expect(rows).toEqual([{ finished: 55 }]);
       } finally {
         await pool.end();
       }
@@ -366,26 +392,22 @@ describe("the bands of the bar (#507)", () => {
       const pond = await pondNamed(ctx.client, `test-band-${seeks.join("-")}`);
       await people(ctx.client, pond, 1, { complete: true, consented: true, seeks: [...seeks] });
       expect(await bandsOf(ctx, pond)).toEqual(band);
-      expect((await countPonds(ctx.client)).get(pond)).toMatchObject({ verified: 1, finishing: 0 });
+      expect((await countPonds(ctx.client)).get(pond)).toMatchObject({ finished: 1 });
     });
   });
 
   test("Only finished profiles stand in a band", async ({ ctx }) => {
     const pond = await pondNamed(ctx.client, "test-band-finished");
     await people(ctx.client, pond, 10, { complete: true, consented: true, seeks: ["man"] });
-    const finishing = await people(ctx.client, pond, 10, {
+    // Everything a finished profile has, but for its bio.
+    await people(ctx.client, pond, 10, {
       complete: true,
       consented: true,
       seeks: ["man"],
+      bio: "none",
     });
-    await ctx.client.query("UPDATE account SET state = 'registered' WHERE id = ANY($1)", [
-      finishing,
-    ]);
     expect(await bandsOf(ctx, pond)).toEqual([10, 0, 0]);
-    expect((await countPonds(ctx.client)).get(pond)).toMatchObject({
-      verified: 20,
-      finishing: 10,
-    });
+    expect((await countPonds(ctx.client)).get(pond)).toMatchObject({ finished: 10 });
   });
 
   test("a shadow-banned finished profile stands in its band like any other", async ({ ctx }) => {
@@ -413,7 +435,7 @@ describe("the bands of the bar (#507)", () => {
     await people(ctx.client, pond, 1, { complete: true, seeks: ["man"] });
     expect(await bandsOf(ctx, pond)).toEqual([1, 0, 0]);
     // Finished all the same: the consent says nothing of the profile.
-    expect((await countPonds(ctx.client)).get(pond)).toMatchObject({ verified: 3, finishing: 0 });
+    expect((await countPonds(ctx.client)).get(pond)).toMatchObject({ finished: 3 });
   });
 
   test("A finished profile on a withdrawn consent stands in no band", async ({ ctx }) => {
@@ -429,7 +451,7 @@ describe("the bands of the bar (#507)", () => {
       [withdrawn],
     );
     expect(await bandsOf(ctx, pond)).toEqual([1, 0, 0]);
-    expect((await countPonds(ctx.client)).get(pond)).toMatchObject({ verified: 2, finishing: 0 });
+    expect((await countPonds(ctx.client)).get(pond)).toMatchObject({ finished: 2 });
   });
 
   test("the job's log line says no band, as it says no figure", async ({ ctx }) => {
@@ -454,7 +476,7 @@ describe("the bands of the bar (#507)", () => {
     ]);
   });
 
-  test("a row from before the bands takes them at the next count, the total standing", async ({
+  test("a row from before the bands takes them at the next count, the number standing", async ({
     ctx,
   }) => {
     const pond = await pondNamed(ctx.client, "test-band-before");
@@ -466,10 +488,10 @@ describe("the bands of the bar (#507)", () => {
     );
     await people(ctx.client, pond, 1, { complete: true, consented: true, seeks: ["man"] });
     await taken(ctx, DAY_2);
-    const { rows } = await ctx.client.query<{ verified: number; seeks_men: number }>(
-      "SELECT verified, seeks_men FROM pond_counter WHERE pond_id = $1",
+    const { rows } = await ctx.client.query<{ finished: number; seeks_men: number }>(
+      "SELECT finished, seeks_men FROM pond_counter WHERE pond_id = $1",
       [pond],
     );
-    expect(rows[0]).toEqual({ verified: 12, seeks_men: 13 });
+    expect(rows[0]).toEqual({ finished: 12, seeks_men: 13 });
   });
 });

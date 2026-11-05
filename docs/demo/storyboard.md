@@ -36,7 +36,7 @@ The home screen: "Kuutti", what there is to do, and the counter's card last (#58
 
 - Where Aino stands, on a card with no word above its sentence. With her photos pending: "Matching opens for finished profiles. Yours still lacks something." Once her photos are approved: "Matching is open for you.", since the demo commands open the pond; once an admin has closed it, "Your profile is finished. Matching has not opened yet." (ADR-060).
 - Below: "Your profile". The profile list holds the rest (#239): "Photos" and the sections, each with a check mark once done or how far it is filled, then "What you seek", which holds whom she seeks, the ages, what she is here for and "Deal-breakers" (up to seven: distance, which everybody can set, and the others only on what she answered herself, #149, ADR-061 §7) and, while a question is unanswered, "Fill in the rest when you have a moment" (the optional fields, one per screen, "Ask me later" on each, #148). The eye at the top opens her card.
-- Last, "People on Kuutti": the counter, in tens, with the bar of whom people with a finished profile seek, which the population's fifty fill (population.md), and "n people are still finishing their profile." (ADR-013).
+- Last, "People on Kuutti": "n people have completed their profiles and are looking for:", a number that moves in tens, and right under it the bar in three colours with its percentages in words, which the population's fifty fill (population.md; ADR-013).
 
 In "Your profile", show "Fill in the rest when you have a moment" for one field and skip it; open "What you seek" and show the deal-breakers' rows: the field she has not answered says "Share yours first.", and pressing it opens that question.
 

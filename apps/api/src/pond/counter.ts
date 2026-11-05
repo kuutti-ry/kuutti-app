@@ -12,7 +12,7 @@ import * as repo from "./repo.ts";
 
 /**
  * The pond counter's read (#54, ADR-013): for every pond the figures it stands
- * on, each through `publishCounts`, which says a number only where at least k
+ * on, its number through `publishCounts`, which says it only where at least k
  * people stand behind it. The figures are written by the nightly job in
  * `jobs/pond-counter.ts`, which is where the accounts are counted; the one
  * person's row read here is the caller's own, for their pond's bar.
@@ -33,11 +33,7 @@ export async function readPondCounterK(db: Queryable): Promise<number> {
 type FiguresRow = {
   pond_id: string;
   day: string;
-  verified: number;
-  woman: number;
-  man: number;
-  non_binary: number;
-  finishing: number;
+  finished: number;
   seeks_men: number;
   seeks_everyone: number;
   seeks_women: number;
@@ -48,7 +44,7 @@ export type StandingFigures = { day: string; counts: PondCounterCounts };
 /** The figures every pond stands on, exact: for the job that moves them and the read that publishes them. */
 export async function readStandingFigures(db: Queryable): Promise<Map<string, StandingFigures>> {
   const { rows } = await db.query<FiguresRow>(
-    `SELECT pond_id, to_char(day, 'YYYY-MM-DD') AS day, verified, woman, man, non_binary, finishing,
+    `SELECT pond_id, to_char(day, 'YYYY-MM-DD') AS day, finished,
             seeks_men, seeks_everyone, seeks_women
      FROM pond_counter`,
   );
@@ -58,11 +54,7 @@ export async function readStandingFigures(db: Queryable): Promise<Map<string, St
       {
         day: row.day,
         counts: {
-          verified: row.verified,
-          woman: row.woman,
-          man: row.man,
-          nonBinary: row.non_binary,
-          finishing: row.finishing,
+          finished: row.finished,
           seeksMen: row.seeks_men,
           seeksEveryone: row.seeks_everyone,
           seeksWomen: row.seeks_women,
@@ -120,12 +112,12 @@ export async function readPondCounter(
     ponds: ponds.map((pond) => {
       // A pond created after the last count has no row yet: listed, with no number.
       const figures = standing.get(pond.id) ?? null;
-      const published = publishCounts(figures?.counts ?? null, k);
+      const finished = publishCounts(figures?.counts ?? null, k);
       // No number, no day: when a small pond was last counted is nobody's business.
       return {
         pond,
-        day: published.verified === null ? null : (figures?.day ?? null),
-        ...published,
+        day: finished === null ? null : (figures?.day ?? null),
+        finished,
         seeks: pond.id === bar?.pondId ? bar.seeks : null,
       };
     }),

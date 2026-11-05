@@ -1,16 +1,21 @@
 # The home screen of an onboarded person (#53, #54, #500, #581): first whether
 # matching is open, in its sentence alone, with See people; then the way to the
 # profile, which holds the photos, the deal-breakers and the later questions
-# (#239), and the conversations; last how many people are on Kuutti, in the
-# person's language and in steps of ten. Outside production the wrench opens
-# the tech screen, which names the environment and the API it talks to.
-# The numbers need the synthetic population (`pnpm demo:population`): the card
-# shows them from ten people up. The demo commands open the pond, so matching
-# is open for Sanna; `apps/mobile/src/features/pond/GateCard.test.tsx` has the
-# other two states. The bar of whom people seek comes from the population's
-# fifty people who count as finished for it and for nothing else. Read only.
+# (#239), and the conversations; last how many people have completed their
+# profiles, in the person's language, in one sentence that leads into the bar of
+# whom they seek, with no line on a profile that is not complete. Outside
+# production the wrench opens the tech screen, which names the environment and
+# the API it talks to.
+# The number and the bar need the synthetic population (`pnpm demo:population`):
+# its fifty people who count as finished for the counter and for nothing else
+# carry both over the threshold. The sentence with no bar, and the card below ten
+# finished profiles, which says no number, are
+# `apps/mobile/src/features/pond/PondCard.test.tsx`'s. The demo commands open the
+# pond, so matching is open for Sanna;
+# `apps/mobile/src/features/pond/GateCard.test.tsx` has the other two states.
+# Read only.
 appId: fi.kuutti.app
-name: Home says how many people are on Kuutti and the gate in words, and the wrench names the API
+name: Home says how many people have completed their profiles and the gate in words, and the wrench names the API
 ---
 - runFlow: ../common/sign-in.yaml
 # The sentence says Matching, so no word of it stands over the sentence (#581).
@@ -28,19 +33,38 @@ name: Home says how many people are on Kuutti and the gate in words, and the wre
 - assertVisible:
     text: "(Conversations|Keskustelut|Samtal)(, .*)?"
     below: "Your profile|Profiilisi|Din profil"
-# How many people are on Kuutti last, at the foot of the list, where nothing can be
-# centred: reached by its lines, each wholly in sight, with no centring (README).
+# How many people have completed their profiles last, at the foot of the list,
+# where nothing can be centred: reached by its lines, each wholly in sight, with no
+# centring (README).
 - scrollUntilVisible:
-    element: "\\d+ people have identified with their bank|\\d+ ihmistä on tunnistautunut pankkitunnuksilla|\\d+ personer har identifierat sig med bank-id"
+    element: "\\d+ people have completed their profiles and are looking for:|\\d+ ihmistä on saanut profiilinsa valmiiksi ja etsii:|\\d+ personer har gjort klart sina profiler och söker:"
     direction: DOWN
     timeout: 60000
 - assertVisible:
     text: "People on Kuutti|Ihmiset Kuutissa|Människor på Kuutti"
     below: "(Conversations|Keskustelut|Samtal)(, .*)?"
+# The bar is one element, read as a screen reader hears it. The percentages under
+# it are drawn inside that element, so only Android reads them as text of their
+# own (as contact-share.yaml's shared line), each with its word, never the colour
+# alone.
 - scrollUntilVisible:
     element: ".*\\d+ percent are looking for everyone.*|.*\\d+ prosenttia etsii kaikkia.*|.*\\d+ procent söker alla.*"
     direction: DOWN
     timeout: 60000
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - assertVisible: "\\d+ % men|\\d+ % miehiä|\\d+ % män"
+      - assertVisible: "\\d+ % everyone|\\d+ % kaikkia|\\d+ % alla"
+      - assertVisible: "\\d+ % women|\\d+ % naisia|\\d+ % kvinnor"
+# Nothing on the card says that a profile can be unfinished, in any of that
+# line's forms (the maintainer's word of 04/11/2026, #581). The sentence on the
+# bank, the bar's own title and the line on the steps are gone too.
+- assertNotVisible: ".*still finishing.*|Everyone has finished their profile\\.|.*viimeistelee vielä.*|Kaikki ovat saaneet profiilinsa valmiiksi\\.|.*håller fortfarande på.*|Alla har gjort klart sin profil\\."
+- assertNotVisible: "\\d+ people have identified with their bank|\\d+ ihmistä on tunnistautunut pankkitunnuksilla|\\d+ personer har identifierat sig med bank-id"
+- assertNotVisible: "Whom people with a finished profile are looking for|Ketä valmiin profiilin tehneet etsivät|Vem personer med färdig profil söker"
+- assertNotVisible: "The numbers change only in steps of .*|Luvut muuttuvat vain vähintään .*|Siffrorna ändras bara i steg om .*"
 - assertNotVisible: "Fill in the rest when you have a moment|Täydennä loput, kun sinulla on hetki|Fyll i resten när du har en stund"
 
 - openLink: kuutti://tech
