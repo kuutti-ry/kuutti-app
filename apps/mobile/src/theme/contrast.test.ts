@@ -64,6 +64,38 @@ describe("contrast", () => {
     expect(checkContrast({ ":root": withoutBackground }).some((f) => f.ratio === 0)).toBe(true);
   });
 
+  it.each(Object.keys(parseTokenSets(TOKENS)))(
+    "holds each pair of neighbours in the seeks bar to 3:1 in %s, and only neighbours",
+    (name) => {
+      const set = parseTokenSets(TOKENS)[name];
+      if (!set) throw new Error(`no ${name} set`);
+      const everyone = set["seeks-everyone"] ?? "";
+      const failing = (changed: Record<string, string>) =>
+        checkContrast({ [name]: { ...set, ...changed } }).map(
+          (f) => `${f.foreground}/${f.background} ${f.required}`,
+        );
+      expect(failing({ "seeks-men": everyone })).toEqual(["seeks-men/seeks-everyone 3"]);
+      expect(failing({ "seeks-women": everyone })).toEqual(["seeks-everyone/seeks-women 3"]);
+      // The two ends never touch: the words, and the middle between them, tell them apart.
+      expect(failing({ "seeks-women": set["seeks-men"] ?? "" })).toEqual([]);
+    },
+  );
+
+  it("fails a seeks bar that misses a band", () => {
+    const light = parseTokenSets(TOKENS)[":root"];
+    if (!light) throw new Error("no :root set");
+    const { "seeks-women": _dropped, ...withoutWomen } = light;
+    expect(checkContrast({ ":root": withoutWomen })).toEqual([
+      {
+        set: ":root",
+        foreground: "seeks-everyone",
+        background: "seeks-women",
+        ratio: 0,
+        required: 3,
+      },
+    ]);
+  });
+
   it("converts a grey without a hue and a hue past 240 degrees", () => {
     expect(hslChannelsToRgb("0 0% 50%")).toEqual([0.5, 0.5, 0.5]);
     expect(hslChannelsToRgb("300 100% 50%")?.map((c) => Math.round(c * 255))).toEqual([

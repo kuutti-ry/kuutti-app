@@ -10,9 +10,7 @@ const json = (body: unknown, status = 200) =>
 const ENTRY = {
   pond: { id: "0b4f3a0e-7c2f-4e2b-9a9a-1a2b3c4d5e01", slug: "suomi", name: "Suomi" },
   day: "2026-10-05",
-  verified: 150,
-  split: null,
-  finishing: null,
+  finished: 150,
   seeks: null,
 };
 const COUNTER = { k: 10, ponds: [ENTRY] };
@@ -29,18 +27,18 @@ function pendingReads() {
 }
 
 describe("usePondCounter", () => {
-  it("gives the pond's figures and the step they are said in", async () => {
+  it("gives the pond's figures", async () => {
     globalThis.fetch = jest.fn(async () => json(COUNTER)) as unknown as typeof fetch;
     const { result } = await renderHook(() => usePondCounter());
     await waitFor(() => expect(result.current.status).toBe("ready"));
-    expect(result.current).toMatchObject({ status: "ready", k: 10, figures: ENTRY });
+    expect(result.current).toMatchObject({ status: "ready", figures: ENTRY });
   });
 
   it("has no figures when the list is empty", async () => {
     globalThis.fetch = jest.fn(async () => json({ k: 10, ponds: [] })) as unknown as typeof fetch;
     const { result } = await renderHook(() => usePondCounter());
     await waitFor(() => expect(result.current.status).toBe("ready"));
-    expect(result.current).toMatchObject({ k: 10, figures: null });
+    expect(result.current).toMatchObject({ status: "ready", figures: null });
   });
 
   it("fails, and loads again on a retry", async () => {

@@ -10,6 +10,10 @@ Dated checks of the design tokens (`apps/mobile/src/theme/tokens.css`, TD-9; the
 - `--primary` and `--destructive` keep different hues (blue against olive) but land at almost the same lightness: 1.0:1 to 1.4:1 between them in every set. They can be told apart side by side, not reliably on their own. That is the accessibility rule in practice: a destructive action is never marked by colour alone, it differs in label, shape and position, and pass and like are never a red and green pair.
 - Nothing in the palette relies on a red and green distinction.
 
+## The seeks bar's colours, 2026-11-04 (#581)
+
+Three tokens, `--seeks-men`, `--seeks-everyone` and `--seeks-women`, an agent's and the designer's to change. Calculated with the Machado matrix above at severity 1.0, no picture kept: neighbours stand at 3.06:1 or more in every set, and the two ends, which never touch, at 1.07 to 1.43:1. Their words and order carry the meaning (ADR-013 §12).
+
 ## UI foundation on the iOS simulator, 2026-09-19 (#12)
 
 `ui-foundation-2026-09-19/`: the smoke screen on iPhone 18 Pro (iOS 27), built from the primitives and tokens. `ios-light.png` and `ios-dark.png` follow the system appearance; `ios-high-contrast-light.png` and `ios-high-contrast-dark.png` were switched by the OS setting Increase Contrast (`xcrun simctl ui <udid> increase_contrast enabled`), not by the in-app toggle, so they also show the app following the system; `ios-largest-font.png` is the largest accessibility text size (`content_size accessibility-extra-extra-extra-large`): text grows to the 2x cap and nothing is clipped. The grey round button at the top right is the dev client's own tools button, not part of the app.

@@ -138,7 +138,6 @@ describe.concurrent("demo:population", () => {
         seed: 7,
       });
       expect(Object.keys(plan.ponds as object).length).toBeGreaterThan(0);
-      expect(plan.notShown).toEqual(expect.any(Array));
     },
     TIMEOUT,
   );

@@ -29,6 +29,12 @@ module.exports = {
         overlay: token("overlay"),
         // Behind a logo made for a light page (#510); no text sits on it.
         "logo-plate": token("logo-plate"),
+        // The bands of the bar of whom people seek (SeeksBar, #581); no text sits on them.
+        seeks: {
+          men: token("seeks-men"),
+          everyone: token("seeks-everyone"),
+          women: token("seeks-women"),
+        },
       },
       borderRadius: {
         lg: "var(--radius)",
