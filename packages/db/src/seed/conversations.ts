@@ -169,10 +169,11 @@ export async function writeConversations(
   db: Queryable,
   accounts: ReadonlyMap<string, string>,
   now: Date,
+  conversations: readonly PersonaConversation[] = PERSONA_CONVERSATIONS,
 ): Promise<ConversationsResult> {
   const result: ConversationsResult = { written: 0, already: 0, missing: 0 };
   const hoursAgo = (hours: number) => new Date(now.getTime() - hours * HOUR_MS);
-  for (const told of PERSONA_CONVERSATIONS) {
+  for (const told of conversations) {
     const a = accounts.get(told.between[0]);
     const b = accounts.get(told.between[1]);
     if (!a || !b) {

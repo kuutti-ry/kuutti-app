@@ -308,7 +308,7 @@ aws ssm start-session --target "$(tofu output -raw instance_id)"
 sudo docker ps --format '{{.Names}}' | grep staging-api   # the task of the api service, staging-api-<id>.1.<task>
 sudo docker exec -it <container> node dist/demo-assets.js   # the photos release, public, over HTTPS; again after every deploy
 sudo docker exec -it <container> node dist/demo-stories.js
-sudo docker exec -it <container> node dist/demo-population.js --env staging
+sudo docker exec -it <container> node dist/demo-population.js --env staging --photos   # with the cast (#560), before the reset, which gives the members their likes and chats
 sudo docker exec -it <container> node dist/demo-reset.js --env staging
 ```
 

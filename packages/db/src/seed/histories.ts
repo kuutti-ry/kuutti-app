@@ -46,7 +46,8 @@ export const PERSONA_HISTORIES: readonly PersonaHistory[] = [
     onboarding: {
       gender: "woman",
       seeks: ["man"],
-      ageWindow: { min: 42, max: 56 },
+      // Ten years either way, for Sanna, Noa and Kerttu (#560), so that the cast's ages vary.
+      ageWindow: { min: 39, max: 59 },
       home: "02100",
     },
     profile: {
@@ -83,7 +84,7 @@ export const PERSONA_HISTORIES: readonly PersonaHistory[] = [
     onboarding: {
       gender: "non_binary",
       seeks: ["woman", "man", "non_binary"],
-      ageWindow: { min: 35, max: 50 },
+      ageWindow: { min: 33, max: 53 },
       home: "02150",
     },
     profile: {
@@ -121,7 +122,7 @@ export const PERSONA_HISTORIES: readonly PersonaHistory[] = [
     onboarding: {
       gender: "woman",
       seeks: ["woman", "man"],
-      ageWindow: { min: 40, max: 55 },
+      ageWindow: { min: 36, max: 56 },
       home: "10210",
     },
     profile: {

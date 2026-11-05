@@ -31,7 +31,7 @@ Chosen 09/10/2026.
 | `faces/minna/1.jpg` … `2.jpg` | Minna's profile (complete): a card in Iida's round (#379) | 2 | a woman of 36 |
 | `faces/riikka/1.jpg` … `2.jpg` | Riikka's profile (complete): a card in Iida's round (#379) | 2 | a woman of 37 |
 | `faces/pool/001.jpg` … `060.jpg` | the synthetic population, drawn by seed | 60 | sixty different adults of 18 to 80, every gender, the mix of a Finnish city, one picture each, each a plausible first profile photo |
-| `faces/cast/<key>/1.jpg` … `3.jpg` | the cast (#560): people nobody signs in as, with no Telia test user. Nothing reads them yet | 144 | forty-eight invented adults of 24 to 53, three pictures each |
+| `faces/cast/<key>/1.jpg` … `3.jpg` | the cast (#560): people nobody signs in as, with no Telia test user, written with `demo:population -- --photos` (`population.md`) | 144 | forty-eight invented adults of 24 to 53, three pictures each |
 | `negatives/no-face.jpg` | no person | 1 | a landscape, no person: the automatic check finds no face and rejects it, the owner told why (ADR-006 §2, #253); queued only where the check queues everything |
 | `negatives/several-people.jpg` | a group photo | 1 | three people in one picture: more than one face, so the check rejects it and tells the owner why (ADR-006 §2, #206); queued only where the check queues everything |
 | `negatives/text.jpg` | no person | 1 | a picture that is mostly a page of text: no face, so rejected like the landscape |
@@ -356,7 +356,7 @@ Exactly one person, face clearly visible, no text or logos. Candid phone photo, 
 
 ### The cast (#560): 48 people, three pictures each
 
-People nobody signs in as, with no Telia test user: on staging they are to be the cards of the accounts a phone can sign in as. The maintainer asked on 05/11/2026 for forty-eight of them, with varied backgrounds, funnier pictures, pets and dogs, and one DJ. Nothing in the app reads them yet.
+People nobody signs in as, with no Telia test user: on staging they are to be the cards of the accounts a phone can sign in as. The maintainer asked on 05/11/2026 for forty-eight of them, with varied backgrounds, funnier pictures, pets and dogs, and one DJ. `population.md` says who sees whom.
 
 These are not one paste each. A prompt is built from the lines below:
 
