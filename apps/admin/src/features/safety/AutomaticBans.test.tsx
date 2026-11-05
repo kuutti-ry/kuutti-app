@@ -196,16 +196,9 @@ describe("the automatic shadow bans", () => {
     await waitFor(() => expect(calls).toHaveLength(1));
     release(json(queue([oldest, middle, newest])));
 
-    expect(await screen.findByText("3 automatic shadow bans wait.")).toHaveAttribute(
-      "aria-live",
-      "polite",
-    );
+    expect(await screen.findByText("3 waiting")).toHaveAttribute("aria-live", "polite");
     expect(screen.queryByText("Loading the automatic shadow bans…")).toBeNull();
-    expect(
-      screen.getByText(
-        "A rule hid these people from everyone else, and they are not told. Confirm or reverse each within 48 hours. Past that the shadow ban stays as it is, and says Late.",
-      ),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Confirm or reverse each within 48 hours.")).toBeInTheDocument();
     expect(screen.queryByText(/Showing the first/)).toBeNull();
     const items = within(screen.getByRole("list")).getAllByRole("listitem");
     expect(items.map((item) => within(item).getByRole("link").textContent)).toEqual([
@@ -222,8 +215,8 @@ describe("the automatic shadow bans", () => {
       "Hidden: 5 hours.",
     ]);
     expect(lines(await lineOf(newest))).toEqual([reportsWords(newest), "Hidden: 2 hours."]);
-    // None is past the review time: the explanation names Late, no line says it.
-    expect(screen.queryByText(/Late \(/)).toBeNull();
+    // None is past the review time: no line says Late.
+    expect(screen.queryByText(/Late/)).toBeNull();
     expect(document.querySelector("strong")).toBeNull();
     // Asked once, with the moderator's token, and nothing else.
     expect(asked(calls)).toEqual([`GET ${LIST}`]);
@@ -279,7 +272,7 @@ describe("the automatic shadow bans", () => {
   });
 
   it("says a one-hour review time in the singular", async () => {
-    fetchMock([listOf(queue([], 0, 1))]);
+    fetchMock([listOf(queue([ban(7)], 1, 1))]);
     show();
     expect(await screen.findByText(/Confirm or reverse each within 1 hour\./)).toBeInTheDocument();
   });
@@ -306,24 +299,23 @@ describe("the automatic shadow bans", () => {
     fetchMock([listOf(queue([ban(1), ban(2)], 150))]);
     show();
     expect(
-      await screen.findByText("150 automatic shadow bans wait. Showing the first 2 of them."),
+      await screen.findByText("150 waiting · Showing the first 2 of them."),
     ).toBeInTheDocument();
   });
 
   it("says none waits when the list is empty, with no line and no button but Refresh", async () => {
     fetchMock([listOf(queue([]))]);
     show();
-    expect(await screen.findByText("No automatic shadow ban waits.")).toBeInTheDocument();
+    expect(await screen.findByText("Nothing waiting")).toBeInTheDocument();
     expect(screen.queryAllByRole("listitem")).toHaveLength(0);
+    expect(screen.queryByText(/Confirm or reverse/)).toBeNull();
     expect(screen.getAllByRole("button").map((button) => button.textContent)).toEqual(["Refresh"]);
   });
 
   it("says the list could not be loaded when the API fails", async () => {
     fetchMock([on("GET", LIST, () => failure(500, "internal_error"))]);
     show();
-    expect(await screen.findByRole("alert")).toHaveTextContent(
-      "The automatic shadow bans could not be loaded. Try Refresh.",
-    );
+    expect(await screen.findByRole("alert")).toHaveTextContent(/^Could not be loaded\.$/);
     expect(screen.queryByRole("list")).toBeNull();
     expect(screen.queryByText(/Confirm or reverse/)).toBeNull();
   });
@@ -333,9 +325,7 @@ describe("the automatic shadow bans", () => {
     // A rule the panel does not know.
     fetchMock([listOf({ ...queue([]), items: [{ ...ban(1), rule: "likes" }], total: 1 })]);
     show();
-    expect(await screen.findByRole("alert")).toHaveTextContent(
-      "The automatic shadow bans could not be loaded. Try Refresh.",
-    );
+    expect(await screen.findByRole("alert")).toHaveTextContent(/^Could not be loaded\.$/);
     expect(log).toHaveBeenCalledWith("automatic bans load failed", expect.anything());
   });
 
@@ -360,9 +350,9 @@ describe("the automatic shadow bans", () => {
     const item = ban(1);
     const calls = fetchMock([listOf(queue([]), queue([item]))]);
     show();
-    expect(await screen.findByText("No automatic shadow ban waits.")).toBeInTheDocument();
+    expect(await screen.findByText("Nothing waiting")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
-    expect(await screen.findByText("1 automatic shadow ban waits.")).toBeInTheDocument();
+    expect(await screen.findByText("1 waiting")).toBeInTheDocument();
     expect(await lineOf(item)).toBeInTheDocument();
     expect(asked(calls)).toEqual([`GET ${LIST}`, `GET ${LIST}`]);
   });
@@ -387,9 +377,10 @@ describe("confirming or reversing an automatic shadow ban", () => {
     expect(
       within(dialog).getByText(`${reportsWords(second)} ${CONFIRM_EFFECT}`),
     ).toBeInTheDocument();
-    // The button pressed is the decision: no choice to make again, none preset.
+    // The button pressed is the decision: no choice to make again, none preset, and only its own effect said.
     expect(within(dialog).queryAllByRole("radio")).toHaveLength(0);
     expect(within(dialog).queryByRole("group")).toBeNull();
+    expect(dialog).not.toHaveTextContent("Others see the person again");
     const note = noteIn(dialog);
     expect(note).toHaveFocus();
     expect(note).toBeRequired();
@@ -406,7 +397,9 @@ describe("confirming or reversing an automatic shadow ban", () => {
     const status = screen.getByRole("status");
     await waitFor(() =>
       expect(status).toHaveTextContent(
-        `Confirmed: the shadow ban on account ${second.accountId.slice(0, 8)} stays. The reports filed before it can now be closed with it, one by one. Open the reports`,
+        new RegExp(
+          `^Confirmed: the shadow ban on account ${second.accountId.slice(0, 8)} stays\\. Open the reports$`,
+        ),
       ),
     );
     expect(screen.queryByRole("dialog")).toBeNull();
@@ -414,7 +407,7 @@ describe("confirming or reversing an automatic shadow ban", () => {
     await waitFor(() => expect(status).toHaveFocus());
     expect(screen.queryByRole("link", { name: linkName(second) })).toBeNull();
     expect(await lineOf(first)).toBeInTheDocument();
-    expect(screen.getByText("1 automatic shadow ban waits.")).toBeInTheDocument();
+    expect(screen.getByText("1 waiting")).toBeInTheDocument();
     expect(asked(calls)).toEqual([`GET ${LIST}`, `POST ${reviewRoute(second)}`]);
     expect(await bodyOf(calls[1])).toEqual({ note: TEXT, outcome: "keep" });
 
@@ -444,6 +437,7 @@ describe("confirming or reversing an automatic shadow ban", () => {
       ),
     ).toBeInTheDocument();
     expect(within(dialog).queryAllByRole("radio")).toHaveLength(0);
+    expect(dialog).not.toHaveTextContent("Others see the person again");
     const send = within(dialog).getByRole("button", { name: "Reverse" });
     expect(send).toBeDisabled();
     fireEvent.change(noteIn(dialog), { target: { value: TEXT } });
@@ -459,7 +453,7 @@ describe("confirming or reversing an automatic shadow ban", () => {
     expect(within(status).queryByRole("link")).toBeNull();
     expect(screen.queryByRole("dialog")).toBeNull();
     expect(screen.queryAllByRole("listitem")).toHaveLength(0);
-    expect(screen.getByText("No automatic shadow ban waits.")).toBeInTheDocument();
+    expect(screen.getByText("Nothing waiting")).toBeInTheDocument();
     expect(asked(calls)).toEqual([`GET ${LIST}`, `POST ${reviewRoute(item)}`]);
     expect(await bodyOf(calls[1])).toEqual({ note: TEXT, outcome: "lift" });
   });
@@ -487,7 +481,7 @@ describe("confirming or reversing an automatic shadow ban", () => {
     fireEvent.click(within(two).getByRole("button", { name: "Reverse" }));
     await waitFor(() => expect(status).toHaveTextContent(/^Reversed:/));
     await waitFor(() => expect(status).toHaveFocus());
-    expect(screen.getByText("No automatic shadow ban waits.")).toBeInTheDocument();
+    expect(screen.getByText("Nothing waiting")).toBeInTheDocument();
   });
 
   it.each(["Cancel", "Escape"])(
@@ -504,7 +498,7 @@ describe("confirming or reversing an automatic shadow ban", () => {
       expect(button).toHaveFocus();
       expect(screen.getByRole("status")).toBeEmptyDOMElement();
       expect(await lineOf(item)).toBeInTheDocument();
-      expect(screen.getByText("1 automatic shadow ban waits.")).toBeInTheDocument();
+      expect(screen.getByText("1 waiting")).toBeInTheDocument();
       expect(asked(calls)).toEqual([`GET ${LIST}`]);
     },
   );
@@ -539,7 +533,7 @@ describe("confirming or reversing an automatic shadow ban", () => {
     expect(screen.getByRole("dialog")).toBe(dialog);
     expect(screen.getByRole("status")).toBeEmptyDOMElement();
     expect(await lineOf(item)).toBeInTheDocument();
-    expect(screen.getByText("1 automatic shadow ban waits.")).toBeInTheDocument();
+    expect(screen.getByText("1 waiting")).toBeInTheDocument();
     expect(asked(calls)).toEqual([`GET ${LIST}`, `POST ${reviewRoute(item)}`]);
   });
 

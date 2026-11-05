@@ -13,7 +13,6 @@ import { Loading } from "../../components/ui/spinner.tsx";
 import {
   Table,
   TableBody,
-  TableCaption,
   TableCell,
   TableHead,
   TableHeader,
@@ -176,7 +175,7 @@ export function AuditLog() {
       </Card>
       {state.kind === "loading" && <Loading>{t("admin.audit.loading")}</Loading>}
       {state.kind === "error" && (
-        <Alert>{t(state.invalid ? "admin.audit.invalid" : "admin.audit.error")}</Alert>
+        <Alert>{t(state.invalid ? "admin.audit.invalid" : "admin.loadFailed")}</Alert>
       )}
       {state.kind === "ready" && (
         <>
@@ -186,8 +185,7 @@ export function AuditLog() {
                 {state.page.items.length === 0 ? (
                   <p className="text-muted-foreground">{t("admin.audit.none")}</p>
                 ) : (
-                  <Table className="[&_td]:align-top">
-                    <TableCaption>{t("admin.audit.caption")}</TableCaption>
+                  <Table aria-labelledby="audit-title" className="[&_td]:align-top">
                     <TableHeader>
                       <TableRow>
                         <TableHead scope="col">{t("admin.account.col.when")}</TableHead>
@@ -214,7 +212,7 @@ export function AuditLog() {
                           {/* The automatic rules hold no role, and never held one. */}
                           <TableCell>
                             {row.actorIdentityId === null
-                              ? t("admin.audit.roleAutomatic")
+                              ? "–"
                               : (row.actorRole ?? t("admin.audit.noRole"))}
                           </TableCell>
                           <TableCell>{row.action}</TableCell>

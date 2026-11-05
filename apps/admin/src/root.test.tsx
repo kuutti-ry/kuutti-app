@@ -127,7 +127,7 @@ describe("mount under a preview's base", () => {
       signedIn(calls);
       await mountAt(path);
       expect(
-        await screen.findByRole("heading", { level: 2, name: "What waits" }),
+        await screen.findByRole("heading", { level: 2, name: "Overview" }),
       ).toBeInTheDocument();
       expect(calls).toContain("GET /admin/overview");
       const menu = screen.getByRole("navigation", { name: "Screens" });

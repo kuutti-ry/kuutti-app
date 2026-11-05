@@ -30,15 +30,17 @@ test("a suspension is applied through its confirm step and lifted through anothe
   const sanctions = await openThePage(page);
   await expect(sanctions.getByText("None.")).toBeVisible();
 
-  await sanctions.getByRole("button", { name: "Suspend until a day" }).click();
+  // The group's name is only heard here (#581): the heading Sanctions stands right above it.
+  const actions = sanctions.getByRole("group", { name: "Actions on this person" });
+  await actions.getByRole("button", { name: "Suspend", exact: true }).click();
   const apply = page.getByRole("dialog", { name: "Suspend this person" });
   await expect(apply).toContainText("Ends every session now and refuses the bank login");
   const confirm = apply.getByRole("button", { name: "Apply" });
   await expect(confirm).toBeDisabled();
   await apply.getByLabel("Reason").selectOption({ label: "Harassment" });
-  await apply.getByLabel("Note: what happened, in a few words").fill("Unkind words in a round.");
+  await apply.getByLabel("Note", { exact: true }).fill("Unkind words in a round.");
   // The day after the earliest the field takes, so a run across midnight still asks a later day.
-  const ends = apply.getByLabel("Suspended until the start of this day");
+  const ends = apply.getByLabel("Suspended until", { exact: true });
   const earliest = new Date(`${await ends.getAttribute("min")}T12:00:00Z`);
   earliest.setUTCDate(earliest.getUTCDate() + 1);
   await ends.fill(earliest.toISOString().slice(0, 10));
@@ -48,9 +50,19 @@ test("a suspension is applied through its confirm step and lifted through anothe
   const entry = sanctions.getByRole("listitem").filter({ hasText: "Unkind words in a round." });
   await expect(entry).toContainText("Suspension");
 
+  // A second look says what lifting does, beside Lift it (#581), as the lift's own step does. The
+  // API refuses a second look to whoever applied the sanction, so this one is read and left.
+  const lifting = "The person may sign in again, unless something else still open stops them.";
+  await entry.getByRole("button", { name: "Look at it again" }).click();
+  const look = page.getByRole("dialog", { name: "Look at it again: Suspension" });
+  await expect(look).toContainText(lifting);
+  await expect(look.getByRole("radio", { name: "Lift it" })).toHaveAccessibleDescription(lifting);
+  await look.getByRole("button", { name: "Cancel" }).click();
+  await expect(look).toBeHidden();
+
   await entry.getByRole("button", { name: "Lift" }).click();
   const lift = page.getByRole("dialog", { name: "Lift: Suspension" });
-  await expect(lift).toContainText("The person may sign in again");
+  await expect(lift).toContainText(lifting);
   await lift.getByRole("button", { name: "Lift" }).click();
   await expect(lift).toBeHidden();
   await expect(sanctions.getByRole("status")).toHaveText("Lifted: Suspension.");
@@ -79,7 +91,7 @@ test("a confirm step is kept by the keyboard and gives the focus back", async ({
   await page.keyboard.press("Tab");
   await expect(reason).toBeFocused();
   await page.keyboard.press("Tab");
-  await expect(step.getByLabel("Note: what happened, in a few words")).toBeFocused();
+  await expect(step.getByLabel("Note", { exact: true })).toBeFocused();
   // The page behind cannot be reached while the step is open.
   await expect(page.locator("#root")).toHaveAttribute("inert", "");
 
@@ -117,7 +129,7 @@ test("an approved photo is taken down through its confirm step, and stays in the
 
   // The page is read again: the line says it and has the focus, as the button went with the photo.
   const status = photos.getByRole("status");
-  await expect(status).toHaveText("Taken down. Nobody else is given the photo from now on.");
+  await expect(status).toHaveText("Taken down.");
   await expect(status).toBeFocused();
   await expect(items.nth(at)).toHaveText(/^rejected · other · /);
   await expect(items.nth(at).getByRole("button", { name: "Take down…" })).toHaveCount(0);

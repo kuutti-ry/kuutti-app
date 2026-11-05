@@ -47,7 +47,7 @@ export function PhotoQueue() {
         </Button>
       </header>
       {state.kind === "loading" && <Loading>{t("admin.queue.loading")}</Loading>}
-      {state.kind === "error" && <Alert>{t("admin.queue.error")}</Alert>}
+      {state.kind === "error" && <Alert>{t("admin.loadFailed")}</Alert>}
       {state.kind === "ready" && (
         <>
           <p aria-live="polite" className="text-muted-foreground">
@@ -151,7 +151,7 @@ function QueueItem({ item, onDecided }: { item: PhotoReviewItem; onDecided: () =
                 <EyeOff aria-hidden="true" className="size-6 text-muted-foreground" />
                 <p>{t("admin.queue.sensitive")}</p>
                 <Button variant="outline" onClick={() => setShown(true)}>
-                  {t("admin.queue.show")}
+                  {t("admin.showPhoto")}
                 </Button>
               </div>
             ) : url ? (
@@ -167,10 +167,12 @@ function QueueItem({ item, onDecided }: { item: PhotoReviewItem; onDecided: () =
                 <Loading>{t("admin.queue.imageLoading")}</Loading>
               </div>
             )}
-            <figcaption className="text-xs text-muted-foreground">
-              {t("admin.queue.uploaded", { time: uploaded })} ·{" "}
-              {t("admin.queue.account", { account: item.accountId.slice(0, 8) })} ·{" "}
-              <Link to={`/accounts/${item.accountId}`}>{t("admin.account.pageLink")}</Link>
+            {/* Two lines: the link's 44 px target (M43) does not fit beside the date under a photo, and a dot would hang at the line's end. */}
+            <figcaption className="flex flex-col items-start text-xs text-muted-foreground">
+              <span>{t("admin.queue.uploaded", { time: uploaded })}</span>
+              <Link className="target" to={`/accounts/${item.accountId}`}>
+                {t("admin.queue.account", { account: item.accountId.slice(0, 8) })}
+              </Link>
             </figcaption>
           </figure>
           <div className="flex flex-col gap-4">
@@ -182,9 +184,7 @@ function QueueItem({ item, onDecided }: { item: PhotoReviewItem; onDecided: () =
               ) : (
                 <>
                   <p>{t("admin.queue.faces", { faces: item.faces })}</p>
-                  {item.labels.length === 0 ? (
-                    <p className="text-muted-foreground">{t("admin.queue.noLabels")}</p>
-                  ) : (
+                  {item.labels.length > 0 && (
                     <ul className="list-disc space-y-0.5 ps-5">
                       {item.labels.map((label) => (
                         <li key={`${label.parentName}/${label.name}`}>

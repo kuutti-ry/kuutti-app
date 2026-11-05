@@ -7,13 +7,7 @@ import { Link } from "react-router";
 import { Alert } from "../../components/ui/alert.tsx";
 import { badgeVariants } from "../../components/ui/badge.tsx";
 import { Button } from "../../components/ui/button.tsx";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "../../components/ui/card.tsx";
+import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card.tsx";
 import { Loading } from "../../components/ui/spinner.tsx";
 import {
   Table,
@@ -87,12 +81,9 @@ export function Overview() {
         </Button>
       </div>
       {state.kind === "loading" && <Loading>{t("admin.overview.loading")}</Loading>}
-      {state.kind === "error" && <Alert>{t("admin.overview.error")}</Alert>}
+      {state.kind === "error" && <Alert>{t("admin.loadFailed")}</Alert>}
       {state.kind === "ready" && (
         <>
-          {state.overview.queues.every((q) => q.waiting === 0) && (
-            <p className="text-muted-foreground">{t("admin.overview.empty")}</p>
-          )}
           <ul className="grid gap-4 sm:grid-cols-2">
             {state.overview.queues.map((q) => {
               const { label, path } = QUEUES[q.queue];
@@ -134,9 +125,8 @@ export function Overview() {
           </ul>
           {/* The association's measure (#83, ADR-040): counts by reason, nobody's name. */}
           <Card>
-            <CardHeader className="flex-col">
+            <CardHeader>
               <CardTitle id="found-them-title">{t("admin.overview.foundThem.title")}</CardTitle>
-              <CardDescription>{t("admin.overview.foundThem.note")}</CardDescription>
             </CardHeader>
             <CardContent>
               <Table aria-labelledby="found-them-title">

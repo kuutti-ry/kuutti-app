@@ -91,7 +91,7 @@ export function AutomaticBans() {
   return (
     <section aria-labelledby="automatic-bans-title" className="space-y-6">
       <ScreenTitle id="automatic-bans-title">{t("admin.automaticBans.title")}</ScreenTitle>
-      {state.kind === "ready" && (
+      {state.kind === "ready" && state.items.length > 0 && (
         <p className="max-w-prose text-muted-foreground">
           {t("admin.automaticBans.explain", { hours: state.reviewHours })}
         </p>
@@ -99,9 +99,9 @@ export function AutomaticBans() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         {state.kind === "ready" && (
           <p aria-live="polite" className="text-muted-foreground">
-            {t("admin.automaticBans.total", { total: state.total })}
+            {t("admin.queue.total", { total: state.total })}
             {state.items.length < state.total && (
-              <> {t("admin.automaticBans.shown", { shown: String(state.items.length) })}</>
+              <> · {t("admin.automaticBans.shown", { shown: String(state.items.length) })}</>
             )}
           </p>
         )}
@@ -123,7 +123,7 @@ export function AutomaticBans() {
           t("admin.automaticBans.done.reverse", { account: short(done.ban.accountId) })}
       </p>
       {state.kind === "loading" && <Loading>{t("admin.automaticBans.loading")}</Loading>}
-      {state.kind === "error" && <Alert>{t("admin.automaticBans.error")}</Alert>}
+      {state.kind === "error" && <Alert>{t("admin.loadFailed")}</Alert>}
       {state.kind === "ready" && (
         <ul className="grid gap-4">
           {state.items.map((ban) => (
