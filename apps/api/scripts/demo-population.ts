@@ -5,7 +5,7 @@
  *   pnpm demo:population                      three hundred people, the usual seed
  *   pnpm demo:population -- --size 5000       as many as the queue must walk
  *   pnpm demo:population -- --seed 7          other people, the same ponds
- *   pnpm demo:population -- --photos          with faces of the release, drawn by seed, through the pipeline (#142)
+ *   pnpm demo:population -- --photos          with faces of the release, drawn by seed, through the pipeline (#142), and the cast (#560)
  *   pnpm demo:population -- --remove          removes them and writes nobody
  *   pnpm demo:population -- --dry-run         counts per pond, nothing written, no connection
  *
@@ -33,6 +33,11 @@
  * removal takes it away, and either leaves the pictures' objects without a
  * row, so both delete the orphans through the media slice afterwards, and
  * both refuse while there are pictures and no store to delete from.
+ *
+ * The cast (#560) comes with faces or not at all: without them nobody shows them
+ * to anybody. Each has a set of their own. Replacing the population takes them
+ * with it, and with them the likes and chats they gave the members, so the demo
+ * reset comes after this: that is what gives those.
  */
 import { networkInterfaces } from "node:os";
 import { createPool } from "@kuutti/db";
@@ -41,6 +46,7 @@ import {
   assertStagingProcess,
   assetsFor,
   barOf,
+  castFaces,
   DEMO_LABEL_PREFIX,
   DEMO_SUBJECT_PREFIX,
   DemoCommandError,
@@ -62,7 +68,7 @@ import { createLogger } from "../src/lib/logger.ts";
 import { createMediaDeps, deleteOrphanedObjects, type MediaDeps } from "../src/media/index.ts";
 import { SPECIAL_CATEGORY_CONSENT_VERSION } from "../src/profile/index.ts";
 import { DemoError, whyNotTheLocalStore } from "./demo/bank.ts";
-import { populationWithHomes } from "./demo/homes.ts";
+import { peopleToWrite } from "./demo/homes.ts";
 import { loadAssets, uploadFaces } from "./demo/photos.ts";
 
 function fail(message: string, code = 1): never {
@@ -192,7 +198,7 @@ try {
     const result = await removePopulation(pool);
     console.log(JSON.stringify({ msg: "demo population removed", env, ...result }));
   } else {
-    const people = populationWithHomes({ size, seed });
+    const { drawn, people } = peopleToWrite({ size, seed, photos });
     const result = await writePopulation(pool, people, {
       ...CURRENT_CONSENT_VERSIONS,
       special_category: SPECIAL_CATEGORY_CONSENT_VERSION,
@@ -200,7 +206,10 @@ try {
     const bar = barOf(people);
     console.log(JSON.stringify({ msg: "demo population", env, size, seed, ...result, bar }));
     if (assets && store) {
-      const faces = facesForPopulation(people, assetsFor(assets.manifest, "pool"), seed);
+      const faces = new Map([
+        ...facesForPopulation(drawn, assetsFor(assets.manifest, "pool"), seed),
+        ...castFaces(assets.manifest),
+      ]);
       const accounts = await accountsByLabel(pool, [...faces.keys()]);
       const byAccount = new Map<string, readonly PhotoAsset[]>();
       for (const [label, own] of faces) {

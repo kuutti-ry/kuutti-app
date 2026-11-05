@@ -5,6 +5,16 @@
 
 export { renderBankPage } from "./bank-page.ts";
 export {
+  CAST,
+  CAST_CONVERSATIONS,
+  CAST_LIKES,
+  type CastPerson,
+  castAccounts,
+  castFaces,
+  castPeople,
+  removeCastLeftovers,
+} from "./cast.ts";
+export {
   assertDemoTarget,
   assertStagingProcess,
   DEMO_ENVIRONMENTS,
@@ -83,6 +93,7 @@ export {
   type PersonaRound,
   type RoundsResult,
   writeRounds,
+  writeWaitingLikes,
 } from "./rounds.ts";
 export { everyText } from "./words.ts";
 export {

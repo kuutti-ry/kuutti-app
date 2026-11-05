@@ -1,5 +1,5 @@
 import { MATCHING_CONFIG_V1 } from "@kuutti/db";
-import { generatePopulation, type HomePlaces } from "@kuutti/db/demo";
+import { castPeople, generatePopulation, type HomePlaces } from "@kuutti/db/demo";
 import { keptPlace } from "../../src/pond/index.ts";
 // biome-ignore lint/style/noRestrictedImports: the list's own rows, read as places.ts reads them: how many people live where is a thing only the demo asks, so the slice's index does not carry it
 import { PLACE_AREA_ROWS } from "../../src/pond/places.generated.ts";
@@ -27,3 +27,17 @@ export function populationHomes(
 /** The population a command writes: everybody who onboarded has a home, or the writer refuses them all. */
 export const populationWithHomes = (options: { size: number; seed: number }) =>
   generatePopulation({ ...options, homes: populationHomes() });
+
+/** The cast (#560), each at what is kept of the postal code they would type (ADR-061 §2), by the API's own rule. */
+export const castWithHomes = (minInhabitants: number = MATCHING_CONFIG_V1.home_min_inhabitants) =>
+  castPeople((postalCode) => keptPlace(postalCode, minInhabitants));
+
+/**
+ * Who a write of the population writes: those it draws, whom the pool's faces are
+ * for, and with faces the cast, who are nobody's card without them. So a write
+ * with no pictures, as the e2e jobs make, is what it always was.
+ */
+export function peopleToWrite(options: { size: number; seed: number; photos: boolean }) {
+  const drawn = populationWithHomes(options);
+  return { drawn, people: options.photos ? [...drawn, ...castWithHomes()] : drawn };
+}

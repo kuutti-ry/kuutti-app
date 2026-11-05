@@ -47,6 +47,7 @@ import { createLogger, type Logger } from "../src/lib/logger.ts";
 import { createMediaDeps } from "../src/media/index.ts";
 import { DemoError, lookAtApi, onThisComputer, whyNotTheLocalStore } from "./demo/bank.ts";
 import {
+  giveCastStories,
   giveConversations,
   giveHistory,
   givePhotoMessages,
@@ -120,6 +121,8 @@ async function recount(
   if (results.length === 0) return;
   const rounds = await giveRounds({ db: pool, logger, now }, results);
   console.log(JSON.stringify({ msg: "demo reset: rounds", ...rounds }));
+  const cast = await giveCastStories(pool, results, now());
+  console.log(JSON.stringify({ msg: "demo reset: the cast's stories", ...cast }));
 }
 
 function sparedOrThrow(reset: ResetResult): void {

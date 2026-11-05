@@ -18,7 +18,7 @@ After a write or a removal the public counter (#54) is counted anew over what is
 |---|---|
 | `-- --size 5000` | as many people as asked, 1 to 5,000. From 250 people up the population shows everything it is there for, the bar among it, whatever the seed; a smaller one is written too, and may show no bar (the command's `bar` says what it filled, below) |
 | `-- --seed 7` | other people in the same pond, in other homes |
-| `-- --photos` | faces of the release for the people, drawn by seed (none, a few or the whole grid), through the upload pipeline like anybody's; `pnpm demo:assets` fetches the release first. Locally the faces are approved as a moderator would (the local check queues everything); on staging Rekognition decides |
+| `-- --photos` | faces of the release for the people, drawn by seed (none, a few or the whole grid), through the upload pipeline like anybody's; `pnpm demo:assets` fetches the release first. Locally the faces are approved as a moderator would (the local check queues everything); on staging Rekognition decides. With them come the cast (below), each with faces of their own |
 | `-- --dry-run` | prints the counts per pond and writes nothing; it does not connect |
 | `-- --remove` | removes the synthetic population and writes nobody |
 | `-- --env preview` | for a pull request's own database, `kuutti_pr_<n>` |
@@ -94,6 +94,31 @@ The home card's bar of whom people seek (#507, ADR-013 §12) counts finished pro
 | everything else as drawn | their seek answers, consents and profiles are the population's own |
 
 They are the pond's number too: the card says these fifty, with anybody else whose profile is finished, a persona or somebody the pictures finish. A test in `apps/api/src/pond/counter.test.ts` holds the whole of it, from the write to the shares, and that none of them is in anybody's pool. The bar shows after a write; the command refuses production. The command's line says how many it filled (`bar`). From 250 people up every band is full whatever the seed, which a test holds; smaller populations may fall short in the middle band and then show no bar.
+
+## The cast (#560)
+
+Forty-eight more people, for the accounts a staging phone can sign in as to go through: nobody without faces is anybody's card, so they are written only with `--photos`, and a write without it, which the e2e jobs make, is what it always was. They are made by hand, not drawn (`packages/db/src/seed/cast.ts`): each has three faces of their own in the release (`faces/cast/<key>/`, never another's), a bio written for them, and a postal code of which the API's own rule keeps what it keeps. Their labels are `demo-cast-<key>`. They are marked, written and removed as everybody here is, nobody signs in as them, and none has a code.
+
+| who | people | ages | seek | age window | here for |
+|---|---|---|---|---|---|
+| men for the members | 22 | 40 to 53 | women, non-binary people | 30 to 62 | long-term |
+| women for the members | 4 | 45 to 52 | women, non-binary people | 40 to 60 | long-term |
+| non-binary people | 2 | 34, 38 | anyone | 25 to 55 | open to either |
+| younger men | 10 | 28 to 31 | anyone | 21 to 45 | open to either |
+| younger women | 10 | 24 to 31 | anyone | 21 to 45 | open to either |
+
+A card never shows whom its person seeks or their age window, so these are wide and one man fits three members. What sets the number is Sanna, who seeks only men. Wider windows on the members' side would not lower it: filters run both ways. A test holds all of it against the product's filters on every month to the end of 2028 (`apps/api/scripts/demo/demo-cast.test.ts`), and that nobody here fits Iida's window, so her round stays what her flow expects.
+
+| account | test bank | cards | waiting first | open chats |
+|---|---|---|---|---|
+| Sanna | Nordea `DEMOUSER4` | 20, men | Jere's fish, likes of Risto and Karim | Juha, on her turn; Mika, on his |
+| Noa | Nordea `DEMOUSER3` | 26, every gender | Jere's fish, likes of Robin and Timo | Harri, on their turn; Leena, on hers |
+| Kerttu | Säästöpankki `22222222` | 25, women and men | Jere's fish, a like of Tiina | Seppo, on her turn, once she has accepted the terms again |
+| Aino, Onni | Nordea `DEMOUSER2`, `DEMOUSER1` | 8 to 10 after onboarding, at the window the app offers | nothing | nothing |
+
+The reset and the stories give the likes, the fish and the chats (`giveCastStories`), as rows, the likes on the day before. So the population comes first: a write replaces the people, and takes what they gave the members with it, so after a later write the reset runs again. Where no cast has been written, the reset gives nothing and says so. An erased member's chats would stay for the other side, who will never read them, so each giving takes those away first.
+
+They count for the counter and the bar, since they have finished profiles: with them the bar leans towards those who seek both and those who seek women.
 
 ## What makes a synthetic person unmistakable
 

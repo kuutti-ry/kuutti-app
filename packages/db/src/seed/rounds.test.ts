@@ -4,7 +4,7 @@ import { migrate } from "../migrate.ts";
 import { createPool, type Queryable } from "../pool.ts";
 import { withTemporaryDatabase } from "../test/temporary-database.ts";
 import { PERSONA_HISTORIES } from "./histories.ts";
-import { openPonds, PERSONA_ROUNDS, writeRounds } from "./rounds.ts";
+import { openPonds, PERSONA_ROUNDS, writeRounds, writeWaitingLikes } from "./rounds.ts";
 
 // The round of the stories (#379): Henna's like of Iida on the day before, and
 // the ponds the demo commands open. Whether the cast pass each other's filters is the
@@ -122,6 +122,87 @@ describe("writing the round of the stories", () => {
           liked: 0,
           already: 0,
           missing: 1,
+        });
+      } finally {
+        await pool.end();
+      }
+    });
+  });
+
+  it("writes likes and fish of one person on several, in one round of the day before, each once", async () => {
+    await withTemporaryDatabase(async (url) => {
+      const pool = createPool({ connectionString: url, max: 2 });
+      try {
+        await migrate(pool, MIGRATIONS);
+        const pond = await pool.query<{ id: string }>("SELECT id FROM ponds WHERE slug = 'suomi'");
+        const pondId = pond.rows[0]?.id as string;
+        const sanna = await account(pool, "hash-sanna", pondId);
+        const noa = await account(pool, "hash-noa", pondId);
+        const jere = await account(pool, "hash-jere", pondId);
+        const risto = await account(pool, "hash-risto", pondId);
+        const accounts = new Map([
+          ["sanna", sanna],
+          ["noa", noa],
+          ["jere", jere],
+          ["risto", risto],
+        ]);
+        const stories = [
+          { of: "sanna", fishFrom: ["jere"], likedBy: ["risto"] },
+          { of: "noa", fishFrom: [], likedBy: ["jere"] },
+        ];
+        const now = new Date("2026-10-20T21:30:00Z");
+
+        expect(await writeWaitingLikes(pool, stories, accounts, now)).toEqual({
+          liked: 3,
+          already: 0,
+          missing: 0,
+        });
+        const midday = new Date("2026-10-20T10:00:00Z");
+        const likes = await pool.query(
+          `SELECT r.account_id, r.day::text AS day, e.position, e.candidate_id, e.decision, e.decided_at, e.fish
+             FROM rounds r JOIN round_entries e ON e.round_id = r.id
+            ORDER BY e.fish DESC, r.account_id = $1 DESC, e.position`,
+          [jere],
+        );
+        const row = (of: string, by: string, position: number, fish: boolean) => ({
+          account_id: by,
+          day: "2026-10-20",
+          position,
+          candidate_id: of,
+          decision: "like",
+          decided_at: midday,
+          fish,
+        });
+        expect(likes.rows).toEqual([
+          row(sanna, jere, 1, true),
+          row(noa, jere, 2, false),
+          row(sanna, risto, 1, false),
+        ]);
+        const rounds = await pool.query("SELECT count(*)::int AS n FROM rounds");
+        expect(rounds.rows).toEqual([{ n: 2 }]);
+
+        // Again on the same day: nothing new.
+        expect(await writeWaitingLikes(pool, stories, accounts, now)).toEqual({
+          liked: 0,
+          already: 3,
+          missing: 0,
+        });
+
+        // Somebody has no account this time, on either side: each like that needs them is missing.
+        const noJere = new Map([
+          ["sanna", sanna],
+          ["noa", noa],
+          ["risto", risto],
+        ]);
+        expect(await writeWaitingLikes(pool, stories, noJere, now)).toEqual({
+          liked: 0,
+          already: 1,
+          missing: 2,
+        });
+        expect(await writeWaitingLikes(pool, stories, new Map([["jere", jere]]), now)).toEqual({
+          liked: 0,
+          already: 0,
+          missing: 3,
         });
       } finally {
         await pool.end();

@@ -20,6 +20,13 @@ export type PersonaRound = {
 
 export const PERSONA_ROUNDS: readonly PersonaRound[] = [{ of: "iida", likedBy: ["henna"] }];
 
+/** What waits on somebody the day after it was given, by key (#560): nothing of it opens their day. */
+export type WaitingLikes = {
+  of: string;
+  fishFrom: readonly string[];
+  likedBy: readonly string[];
+};
+
 /**
  * `liked`: likes written; `already`: a round of that day the liker had before
  * (the staging job runs again without a reset); `missing`: a persona of the
@@ -97,6 +104,59 @@ export async function writeRounds(
           [id, of, noon],
         );
         return true;
+      });
+      if (written) result.liked += 1;
+      else result.already += 1;
+    }
+  }
+  return result;
+}
+
+/**
+ * Writes likes and fish of the day before, as `writeRounds` does, for people who
+ * like more than one person: the liker's one round of that day holds them all.
+ * A like already there stays, so a second run on the same day writes nothing.
+ */
+export async function writeWaitingLikes(
+  db: Queryable,
+  stories: readonly WaitingLikes[],
+  accounts: ReadonlyMap<string, string>,
+  now: Date,
+): Promise<RoundsResult> {
+  const result: RoundsResult = { liked: 0, already: 0, missing: 0 };
+  const yesterday = dayBefore(finnishDay(now));
+  // Midday in Finland on the day before (noon in winter, one in summer).
+  const noon = new Date(`${yesterday}T10:00:00Z`);
+  for (const story of stories) {
+    const of = accounts.get(story.of);
+    const likes = [
+      ...story.fishFrom.map((key) => ({ key, fish: true })),
+      ...story.likedBy.map((key) => ({ key, fish: false })),
+    ];
+    for (const { key, fish } of likes) {
+      const liker = accounts.get(key);
+      if (!of || !liker) {
+        result.missing += 1;
+        continue;
+      }
+      const written = await transaction(db, async (tx) => {
+        const round = await tx.query<{ id: string }>(
+          `INSERT INTO rounds (account_id, day, built_at, opened_at, completed_at)
+           VALUES ($1, $2, $3, $3, $3)
+           ON CONFLICT (account_id, day) DO UPDATE SET account_id = EXCLUDED.account_id
+           RETURNING id`,
+          [liker, yesterday, noon],
+        );
+        const entry = await tx.query(
+          `INSERT INTO round_entries
+             (round_id, position, candidate_id, reason, seen_at, decision, decided_at, fish)
+           SELECT $1::uuid, coalesce(max(position), 0) + 1, $2::uuid, 'matches_filters', $3::timestamptz,
+                  'like', $3::timestamptz, $4::boolean
+             FROM round_entries WHERE round_id = $1::uuid
+           ON CONFLICT (candidate_id, round_id) DO NOTHING`,
+          [round.rows[0]?.id, of, noon, fish],
+        );
+        return entry.rowCount === 1;
       });
       if (written) result.liked += 1;
       else result.already += 1;
