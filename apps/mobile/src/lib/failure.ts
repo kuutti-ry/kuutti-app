@@ -8,8 +8,13 @@ import { ApiError } from "./api";
  */
 export type FailureKind = "offline" | "server" | "outdated" | "other";
 
-// What React Native's fetch (and the web's) throws when no answer came back.
+// What the web's fetch throws when no answer came back, and React Native's own.
 const NETWORK = /network request failed|failed to fetch|load failed|network ?error/i;
+// A phone's global fetch is Expo's (expo/src/winter): a plain Error, "fetch failed: "
+// and the platform's reason, in the phone's language, so the reason cannot be read.
+// Only leaving a request behind is no failed network.
+const EXPO_FETCH = "fetch failed: ";
+const LEFT_BEHIND = /aborted|canceled/i;
 
 export function failureKind(error: unknown): FailureKind {
   if (error instanceof ApiError) {
@@ -19,5 +24,12 @@ export function failureKind(error: unknown): FailureKind {
   // does not know yet. By name, so a second copy of zod is recognised too.
   if (error instanceof Error && error.name === "ZodError") return "outdated";
   if (error instanceof TypeError && NETWORK.test(error.message)) return "offline";
+  if (
+    error instanceof Error &&
+    error.message.startsWith(EXPO_FETCH) &&
+    !LEFT_BEHIND.test(error.message)
+  ) {
+    return "offline";
+  }
   return "other";
 }
