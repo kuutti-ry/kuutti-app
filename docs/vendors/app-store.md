@@ -17,7 +17,7 @@ From the testers' phones TestFlight sends Apple crash logs and usage data, which
 
 - **The distribution certificate** of the association's team, which EAS holds and hands to every cloud build: it signs the staging build for App Store Connect, and the ad hoc builds with their own profiles.
 - **The provisioning profiles**: an App Store profile for the staging and production builds, and an ad hoc one listing the registered devices for the development and preview builds. EAS makes and keeps them.
-- **The App Store Connect API key**: a team key with the App Manager role, made by EAS at the first interactive run and held by EAS alone. A team key reaches every app of the team, and its role cannot be changed afterwards (ADR-063 §3).
+- **The App Store Connect API key**: a team key, made by EAS at the first interactive run and held by EAS alone. ADR-063 §3 gives it the App Manager role; the one in use reads Admin on EAS (read on 2026-11-05, ADR-063, Open 6). A team key reaches every app of the team, and its role cannot be changed afterwards (ADR-063 §3).
 - **The APNs key** of the team, for push through Expo (ADR-055, `docs/vendors/expo.md`). It is the kind that serves both environments; Expo does not say whether its push service takes Apple's newer keys held to one environment or to chosen apps (ADR-063, Open 4).
 
 ## Moving `fi.kuutti.app` from the individual team
@@ -38,7 +38,7 @@ The App ID and every iOS build until 2026-11-02 are on the maintainer's individu
    ```sh
    EXPO_APPLE_ID=<the Account Holder's Apple Account> pnpm exec eas credentials:configure-build --platform ios --profile development
    ```
-   and the same with `--profile preview`. The next native change on `main` builds on them.
+   and the same with `--profile preview`. The next native change on `main` builds on them. EAS keeps one build credential per distribution type, so step 3 moves only the App Store one, and until this step every development and preview build fails in Xcode, while EAS still calls the old profile active. Done on 2026-11-04, with one iPhone registered.
 5. **The testers.** App Store Connect, Users and Access, +: each team member's Apple Account, with the Developer or Marketing role and access to Kuutti alone. An invitation lapses after three days and can be sent again. Once it is accepted: TestFlight, Internal Testing, the group "Team (Expo)", add the tester. The list is Play's (ADR-063 §2). Each tester installs TestFlight on the iPhone, accepts the e-mail invitation and installs Kuutti.
 6. **The team id of the verified links.** `/kuutti/<env>/ios-team-id` becomes `2NC5W5B372` in each environment where it is set (`devices.md`, Verified links), and the API is restarted. It matters once #184's native batch is installed.
 7. **The old team.** Once a tester has installed from TestFlight and a push has reached that phone: on the individual team, revoke the APNs key and the distribution certificate (Certificates, Identifiers & Profiles, Keys and Certificates) (ADR-063 §5).
@@ -72,7 +72,7 @@ The answers given to Google Play on 2026-11-01 (the listing, the content rating 
 - **A development or preview build fails at its profile** after the move: no device is registered on the new team, or the ad hoc profile was not made there (step 4).
 - **A build waits with "Missing Compliance":** `app.json` answers the encryption question (`ITSAppUsesNonExemptEncryption`, false), so this means a build made without it.
 - **A tester sees no build:** the invitation as a user is not accepted (it lapses after three days), the tester is not in the group, Apple is still processing the build, or the build is older than 90 days.
-- **No push reaches an iPhone after the move:** EAS has no APNs key of the new team (`eas credentials -p ios`, Push Notifications).
+- **No push reaches an iPhone after the move:** EAS has no APNs key of the new team (`eas credentials -p ios`, Push Notifications, Add a new push key: "Set up your project to use Push Notifications" stops at "already set up" while any key is attached, the old team's too, as on 2026-11-04). The app's own team on EAS also still reads the individual team, which builds ignore; whether Expo's push service reads it is unproven (ADR-063, History).
 - **A bad build:** App Store Connect, TestFlight, the build, Expire Build; the next staging build replaces it. A bad JavaScript update is stopped at EAS, not here (ADR-004, `docs/runbooks/incident.md`).
 
 ## Sources, read on 2026-11-02
