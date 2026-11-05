@@ -17,7 +17,7 @@ packages/i18n/src/legal.ts
 infra/bootstrap/
 -->
 
-Who uses Kuutti, and which outside services it depends on: the direction of every call and what travels on it. It is for a contributor or a reviewer who wants the whole picture before reading the code or `infra/`. It draws staging, the one environment that runs today; production, applied on 2026-10-24 without bank identification (ADR-049), composes the same services less a few ([Deployment](deployment.md), part 5). Outside AWS, Kuutti has five vendors: Expo, GitHub, Telia, Sentry and, for the app's store builds, Google Play. This view draws ADR-001, ADR-004, ADR-005, ADR-006, ADR-014, ADR-016, ADR-017, ADR-018, ADR-025, ADR-029, ADR-031, ADR-032, ADR-041, ADR-043, ADR-052, ADR-055, ADR-056, ADR-057 and ADR-062.
+Who uses Kuutti, and which outside services it depends on: the direction of every call and what travels on it. It is for a contributor or a reviewer who wants the whole picture before reading the code or `infra/`. It draws staging, the one environment that runs today; production, applied on 2026-10-24 without bank identification (ADR-049), composes the same services less a few ([Deployment](deployment.md), part 5). Outside AWS, Kuutti has six vendors: Expo, GitHub, Telia, Sentry and, for the app's store builds, Google Play and Apple's App Store Connect. This view draws ADR-001, ADR-004, ADR-005, ADR-006, ADR-014, ADR-016, ADR-017, ADR-018, ADR-025, ADR-029, ADR-031, ADR-032, ADR-041, ADR-043, ADR-052, ADR-055, ADR-056, ADR-057, ADR-062 and ADR-063.
 
 ## Part 1: the people and what their devices reach
 
@@ -144,7 +144,7 @@ flowchart TB
 ```mermaid
 flowchart TB
   accTitle: Context, part 3: how code reaches the services
-  accDescr: A contributor pushes to the repository on GitHub, which starts GitHub Actions. The workflows push the API image to GHCR, deploy it through Dokploy on the staging box, which pulls it, and exchange their OIDC token for an AWS role to plan and apply the infrastructure. They start native builds on EAS Build, publish JavaScript to EAS Update, put a pull request's web export on EAS Hosting and upload source maps to Sentry. EAS Build, and the website's Amplify, fetch the typeface from the association's private fonts repository with a token of their own, which no workflow holds; the maintainer uploads the panel's copy by hand. A staging store build goes from EAS to Google Play's internal testing track, with a service account key that EAS holds. The website deploys from its own repository through Amplify.
+  accDescr: A contributor pushes to the repository on GitHub, which starts GitHub Actions. The workflows push the API image to GHCR, deploy it through Dokploy on the staging box, which pulls it, and exchange their OIDC token for an AWS role to plan and apply the infrastructure. They start native builds on EAS Build, publish JavaScript to EAS Update, put a pull request's web export on EAS Hosting and upload source maps to Sentry. EAS Build, and the website's Amplify, fetch the typeface from the association's private fonts repository with a token of their own, which no workflow holds; the maintainer uploads the panel's copy by hand. A staging store build goes from EAS to Google Play's internal testing track, with a service account key that EAS holds, and to TestFlight's internal testing in App Store Connect, with an API key that EAS holds. The website deploys from its own repository through Amplify.
   subgraph people3["The people"]
     n28["A contributor or the maintainer"]
   end
@@ -166,6 +166,7 @@ flowchart TB
   end
   n37["Sentry: the update's source maps"]
   n42["Google Play: the internal testing track"]
+  n43["App Store Connect: TestFlight's internal testing"]
   subgraph site["The website"]
     n38["kuutti-ry/kuutti-app-site, its own repository"]
     n39["Amplify Hosting: kuutti.app"]
@@ -186,6 +187,7 @@ flowchart TB
   n39 -->|"fetches Saiga at build, FONTS_TOKEN, the site's own"| n40
   n28 -->|"the maintainer uploads Saiga by hand, pnpm fonts"| n41
   n34 -->|"submits a staging store build, with the service account key EAS holds"| n42
+  n34 -->|"submits a staging store build, with the API key EAS holds"| n43
 ```
 
 ### Steps
@@ -205,13 +207,14 @@ flowchart TB
 40. `kuutti-ry/kuutti-app-fonts`: the association's private repository of Saiga, Kuutti's typeface, which Spoke Type licensed to Kuutti ry for Kuutti only and which is never public as a file (ADR-052). EAS Build and the website's Amplify read it at a pinned commit, each with a read-only token of its own, and hold every file to its SHA-256. No GitHub workflow reads it or holds a token for it, and a member's laptop reads it with the member's own login (`pnpm fonts`).
 41. The panel's bucket, `fonts/saiga-<version>/`: Saiga's faces, which the maintainer uploads from a laptop, since the panel is built on GitHub's runners, which never have them. The deploy leaves the folder alone, and the panel's CSP allows fonts from its own origin.
 42. Google Play, the association's developer account: a build of the profile `staging`, started by hand, is submitted by EAS to the app's internal testing track once it is built, with the key of a Google service account that EAS holds and no workflow sees ([Delivery](delivery.md), part 4; ADR-057). The team installs the staging app from Play. What Google receives: `docs/vendors/google-play.md`.
+43. App Store Connect, the association's Apple team (Kuutti ry): the same build's iOS side is submitted by EAS with an App Store Connect API key that EAS holds and no workflow sees, and reaches TestFlight's internal testing ([Delivery](delivery.md), part 4; ADR-063). The team installs it with TestFlight. What Apple receives: `docs/vendors/app-store.md`.
 
 ## Where it lives
 
 - The API's outside calls: [lib/ssm.ts](../../apps/api/src/lib/ssm.ts), [lib/config.ts](../../apps/api/src/lib/config.ts) (`loadConfig`, `ssmPrefix`, what a preview drops), [lib/s3.ts](../../apps/api/src/lib/s3.ts), [media/urls.ts](../../apps/api/src/media/urls.ts) (signed URLs), [media/wiring.ts](../../apps/api/src/media/wiring.ts) (Rekognition), [lib/mail.ts](../../apps/api/src/lib/mail.ts) (SES), [lib/sentry.ts](../../apps/api/src/lib/sentry.ts), [identity/oidc-broker.ts](../../apps/api/src/identity/oidc-broker.ts) (Telia, through `@kuutti-ry/tunnistus-oidc`), [research/copy-store.ts](../../apps/api/src/research/copy-store.ts)
 - The clients: [apps/mobile/app.json](../../apps/mobile/app.json) (`updates`, Sentry), [apps/mobile/eas.json](../../apps/mobile/eas.json) (channels), [apps/mobile/src/lib/api-url.ts](../../apps/mobile/src/lib/api-url.ts), [apps/mobile/src/lib/sentry.ts](../../apps/mobile/src/lib/sentry.ts), [apps/admin/src/lib/api.ts](../../apps/admin/src/lib/api.ts), [packages/i18n/src/legal.ts](../../packages/i18n/src/legal.ts) (the website's legal pages)
 - AWS: [infra/modules](../../infra/modules) (`compute`, `media`, `admin`, `research`, `observability`), [infra/envs/staging](../../infra/envs/staging), [infra/bootstrap](../../infra/bootstrap) (OIDC roles, the zone, the SES identity, billing); [infra/README.md](../../infra/README.md), Media, Mail, Admin panel, Research copy, Observability, The website
-- Vendors: [docs/vendors/telia.md](../vendors/telia.md), [docs/vendors/expo.md](../vendors/expo.md), [docs/vendors/google-play.md](../vendors/google-play.md)
+- Vendors: [docs/vendors/telia.md](../vendors/telia.md), [docs/vendors/expo.md](../vendors/expo.md), [docs/vendors/google-play.md](../vendors/google-play.md), [docs/vendors/app-store.md](../vendors/app-store.md)
 - Workflows: [.github/workflows](../../.github/workflows), drawn in [Delivery](delivery.md)
 - ADRs: [ADR-001](../adr/001-infrastructure-as-code.md) (one AWS account, OpenTofu), [ADR-004](../adr/004-eas-update-integrity.md) (updates not signed), [ADR-005](../adr/005-media-pipeline-and-delivery.md) (photos through CloudFront), [ADR-006](../adr/006-photo-moderation.md) (Rekognition), [ADR-014](../adr/014-demo-mode.md) §1 (no real bank on a preview), [ADR-016](../adr/016-fresh-bank-login.md) and [ADR-017](../adr/017-tunnistus-oidc-package.md) (the bank login and the Telia kit), [ADR-018](../adr/018-staging-is-the-demo.md) (staging holds test persons only), [ADR-025](../adr/025-admin-host.md) (the panel's host), [ADR-029](../adr/029-the-research-copy.md) (the research copy and the researcher's role), [ADR-031](../adr/031-chat.md) and [ADR-032](../adr/032-notification-choices-and-notices.md) (no push yet), [ADR-041](../adr/041-velocity.md) (velocity), [ADR-056](../adr/056-attestation-later-no-screenshot-notice.md) (attestation later), [ADR-043](../adr/043-email-confirmation.md) (SES), [ADR-057](../adr/057-google-play-internal-testing.md) (the staging app on Google Play)
 - Issues: #102 (push), #86 (anti-scraping: attestation later), #385 and #196 (mail), #25 (production), #193 (the stores)

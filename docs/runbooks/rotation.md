@@ -41,6 +41,7 @@ There is no rotation calendar. Rotate when a value may have been seen by someone
 | GitHub variables, AWS access from CI | repository and environment variables; OIDC roles | the workflows | an owner | 12 |
 | `FONTS_TOKEN`, read-only on `kuutti-ry/kuutti-app-fonts` alone | EAS environments `preview`, `production`, visibility secret. Never GitHub. The website's Amplify app holds a token of its own, rotated in `kuutti-app-site` (its decision 18) | EAS builds, `eas-build-pre-install` (`scripts/fonts.ts`, ADR-052) | the maintainer | 13 |
 | the Google Play service account's JSON key; Play's upload key, EAS's keystore of `fi.kuutti.app` | EAS's credentials of `fi.kuutti.app`, no other copy. Never GitHub | EAS Submit and EAS builds, for any holder of `EXPO_TOKEN`; the `staging` profile's `--auto-submit` (ADR-057) | the maintainer (Google Cloud, expo.dev, Play Console) | 14 |
+| the App Store Connect API key of the association's Apple team; its APNs key | EAS's credentials of the team and of `fi.kuutti.app`, no other copy. Never GitHub | EAS Submit, for any holder of `EXPO_TOKEN`, through the `staging` profile's `--auto-submit` (ADR-063); Expo's push service (ADR-055) | the maintainer, as the team's Account Holder (App Store Connect, the developer site, expo.dev) | 15 |
 
 ## 1. Database application password
 
@@ -251,7 +252,7 @@ Then revoke the old token on expo.dev.
 
 **What breaks meanwhile:** the EAS steps of `deploy.yml` (after the API is already deployed), `eas-build.yml`, the preview lanes and the sweep's EAS removals fail until the new token is set. The sweep retries.
 
-**If it leaked:** revoke first, before setting the new one. Then look at what was published to the `staging` and `production` channels since the leak (the project's updates on expo.dev). Roll a bad one back as ADR-004 says: republish the previous commit, or `eas update:republish`. Channel edits stay the maintainer's. The token also reached Google Play through EAS, which uses the Play key for any holder and hands the upload key to every cloud build (ADR-057 §3): in Play Console, read each testing track's history; halt on a closed or open track what nobody started, and replace an internal release, which cannot be halted, with a staging build from a known-good `main`. Then replace the Play key and reset the upload key (section 14).
+**If it leaked:** revoke first, before setting the new one. Then look at what was published to the `staging` and `production` channels since the leak (the project's updates on expo.dev). Roll a bad one back as ADR-004 says: republish the previous commit, or `eas update:republish`. Channel edits stay the maintainer's. The token also reached Google Play through EAS, which uses the Play key for any holder and hands the upload key to every cloud build (ADR-057 §3): in Play Console, read each testing track's history; halt on a closed or open track what nobody started, and replace an internal release, which cannot be halted, with a staging build from a known-good `main`. Then replace the Play key and reset the upload key (section 14). It also reached App Store Connect through EAS (ADR-063 §3): read the app's TestFlight builds, expire any nobody started, and replace the App Store Connect key (section 15). Every cloud build is also handed the team's distribution certificate, so replace that too (section 16).
 
 ## 11. Sentry DSNs and the source-map token
 
@@ -264,7 +265,7 @@ Then revoke the old token on expo.dev.
 3. The EAS environments `preview` and `production`, visibility secret: replace the value as for the DSN above.
 4. Revoke the old token in Sentry.
 
-**Check.** The next deploy's step "Upload the update's source maps to Sentry" passes, and the next EAS build uploads its maps (`devices.md`: a build without readable stack traces fails).
+**Check.** The next deploy's step "Upload the update's source maps to Sentry" passes, and the next EAS build uploads its maps. A `production` build without them fails, but a `preview` environment build goes on (`devices.md`), so read its log for a `warning: sentry-cli` line: a dead token shows nowhere else.
 
 **What breaks meanwhile:** revoke the old token before the new one is in place and the upload step fails the deploy job (the update is already out), and EAS builds fail. Set first, revoke last.
 
@@ -307,13 +308,32 @@ Personal Sentry tokens made for settings work are revoked when the work is done 
 
 **The upload key** is EAS's keystore of `fi.kuutti.app`, which also signs the development and preview APKs; EAS holds it and nobody rotates it on a schedule. When it is lost or out: make a new keystore for the app on EAS (`eas credentials -p android`), and in Play Console, Manage Play app signing, request an upload key reset with the new key's certificate as a PEM file (`keytool -export -rfc` on the keystore, which `eas credentials` can download), then delete the downloaded keystore and its passwords from the disk. No bundle can be uploaded until Google has made the change. Then register the new key under Android developer verification (`docs/vendors/google-play.md`, step 7) and put its fingerprint in place of the old one in `/kuutti/<env>/android-cert-fingerprints` (`devices.md`, Verified links). A phone with an expo.dev APK signed with the old key cannot update to one signed with the new: it uninstalls first.
 
-## 15. Nothing to rotate
+## 15. Apple: the App Store Connect API key and the APNs key
+
+**The App Store Connect API key** lets EAS upload a build of `fi.kuutti.app` to App Store Connect, from where it reaches TestFlight's internal group (ADR-063 §3). It is a team key of the association's Apple team, with the App Manager role by ADR-063 §3 (the one in use reads Admin on EAS, ADR-063, Open 6). A team key reaches every app of the team, and its role cannot be changed afterwards. It lives in one place, EAS's credentials of the team, assigned to the app's submissions, and no copy is kept, on a laptop or in GitHub. Apple offers its private half once, when it is made.
+
+1. Let EAS make the new one, as the Account Holder: in `apps/mobile`, `eas credentials -p ios`, the profile `staging`, App Store Connect: Manage your API Key, a new key, the role App Manager, assigned to the app's submissions. Or make it in App Store Connect (Users and Access, Integrations, Team Keys; the Account Holder or an Admin), with the role App Manager, download the `.p8` outside the checkout, upload it the same way with its key id and issuer id, and delete the file.
+2. Revoke the old key in App Store Connect (the same page). A revoked key cannot be brought back, and stays listed for 30 days.
+
+**Check.** The next `staging` build's iOS submission ends finished on expo.dev, and the build shows in TestFlight.
+
+**What breaks meanwhile:** a submission between the old key's revocation and the new one's assignment fails, and its build reaches nobody until `eas submit --platform ios --profile staging --id <build id>`. Assign first, revoke last.
+
+**If it leaked:** revoke it in App Store Connect first. With App Manager it can create versions of every app of the team and submit them for Apple's review, change their listings and prices, and manage TestFlight's groups and testers; only Apple's review stands between a version and the App Store. With Admin, which the one in use reads on EAS, it can also manage the team's users and keys and remove apps. Read the app's versions, its TestFlight builds and groups, and Users and Access for anything nobody started.
+
+**The maintainer's own App Store Connect key**, for the `asc` command-line tool, is in the maintainer's Keychain and not at EAS. Nothing depends on it but that tool: make a new one in App Store Connect (Users and Access, Integrations) if it is still wanted, and revoke the old one. Its role has not been read (ADR-063, Open 7).
+
+**The APNs key** lets Expo's push service wake iPhones for `fi.kuutti.app` (ADR-055). It lives in EAS's credentials of the app, with no copy. Make a new one at developer.apple.com (Certificates, Identifiers & Profiles, Keys, Apple Push Notifications service), or let `eas credentials -p ios`, Push Notifications, make it; upload it there, then revoke the old one at Apple. A push between the revocation and the upload fails, and its receipt says so (`docs/vendors/expo.md`). Apple caps how many keys a team holds, so an unused one is revoked rather than kept. **If it leaked:** with a phone's device token it can send that phone a notification that reads as Kuutti's, so upload the new key and revoke the old one at once.
+
+The distribution certificate and the provisioning profiles are section 16's.
+
+## 16. Nothing to rotate
 
 - **S3.** Deployed environments have no S3 keys: the API writes through its instance role. `S3_ACCESS_KEY` and `S3_SECRET_KEY` exist for the local stand-in only (`apps/api/src/lib/config.ts`).
 - **The instance role's credentials** are short-lived and issued by AWS to the box. A box that may be compromised is rebuilt and every secret under its prefix is rotated (`incident.md`).
 - **Encryption keys of SSM, S3 and RDS** are AWS-managed (`aws/ssm`, SSE-S3, RDS storage encryption). Their rotation is AWS's.
 - **TLS certificates** renew themselves: ACM for CloudFront, Let's Encrypt through Traefik on the box.
-- **Store signing credentials** (the Android keystore, the iOS distribution certificate and profiles) are held by EAS (`apps/mobile/README.md`, Setting up EAS). This page does not rotate them on a schedule; a lost or leaked Android keystore is section 14's upload key. Play's own signing keys are Google's (`docs/vendors/google-play.md`).
+- **Store signing credentials** (the Android keystore, the iOS distribution certificate and profiles) are held by EAS (`apps/mobile/README.md`, Setting up EAS). This page does not rotate them on a schedule; a lost or leaked Android keystore is section 14's upload key. Play's own signing keys are Google's (`docs/vendors/google-play.md`). A leaked iOS distribution certificate is revoked at developer.apple.com and EAS makes a new one at the next interactive run (`eas credentials -p ios`); the profiles made with it are made again.
 - **Developer keys** for maintainer tools are not service secrets: the Claude API key of `pnpm i18n:translate` (`packages/i18n/README.md`) and the image-model key of the demo pictures (`docs/demo/photo-prompts.md`) live in the developer's own environment and are revoked at their provider.
 - **Human logins** (the mailbox, AWS root and Identity Center, GitHub, Expo, Dokploy, Sentry) are `custody.md`'s; a lost device is `SECURITY.md`'s.
 
