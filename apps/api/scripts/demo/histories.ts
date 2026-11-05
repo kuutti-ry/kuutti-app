@@ -2,6 +2,10 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Queryable } from "@kuutti/db";
 import {
+  CAST_CONVERSATIONS,
+  CAST_LIKES,
+  type ConversationsResult,
+  castAccounts,
   type DemoPersona,
   MOCK_BANK_AMR,
   OLDER_TERMS_VERSION,
@@ -10,8 +14,10 @@ import {
   type PersonaHistory,
   personaOf,
   type RoundsResult,
+  removeCastLeftovers,
   writeConversations,
   writeRounds,
+  writeWaitingLikes,
 } from "@kuutti/db/demo";
 import type { AuthExchangeResponse } from "@kuutti/schema";
 import {
@@ -350,6 +356,33 @@ export async function giveRounds(
     if (opened.rows.length > 0 || (await fillQueue(deps, of))) standing += 1;
   }
   return { ...written, standing };
+}
+
+/**
+ * What the cast gives the members of the stories (#560): a fish and likes waiting,
+ * so that a like back makes a match, and chats with something unread. Nothing where
+ * no cast has been written (`pnpm demo:population -- --photos`), as in the e2e jobs.
+ * Told before, it stays. What an erased member left with them goes first.
+ */
+export async function giveCastStories(
+  db: Queryable,
+  results: readonly HistoryResult[],
+  at: Date,
+): Promise<{
+  cast: number;
+  leftovers?: number;
+  likes?: RoundsResult;
+  conversations?: ConversationsResult;
+}> {
+  const cast = await castAccounts(db);
+  if (cast.size === 0) return { cast: 0 };
+  const accounts = new Map([...accountsOf(results), ...cast]);
+  return {
+    cast: cast.size,
+    leftovers: await removeCastLeftovers(db, cast),
+    likes: await writeWaitingLikes(db, CAST_LIKES, accounts, at),
+    conversations: await writeConversations(db, accounts, at, CAST_CONVERSATIONS),
+  };
 }
 
 const HOUR_MS = 60 * 60 * 1000;
