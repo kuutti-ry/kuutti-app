@@ -7,7 +7,8 @@ appId: fi.kuutti.app
 # lock off, so no flow is ever kept out by another's lock. It is seldom
 # there, so its absence is asked as `notVisible`, in half a second, and it is
 # left behind a flag the condition clears (README). Signed out that way, the
-# check after it finds no signed-in screen and goes nowhere near Settings.
+# sign-in screen goes nowhere near Settings; the screen before the bank does,
+# since nothing tells it from a signed-in welcome step (below).
 - evalScript: ${output.locked = true}
 - runFlow:
     when:
@@ -28,11 +29,15 @@ appId: fi.kuutti.app
           timeout: 60000
       - tapOn: "Sign in with the bank instead|Kirjaudu mieluummin pankkitunnuksilla|Logga in med banken i stället"
       - extendedWaitUntil:
-          visible: "Sign in with your bank|Kirjaudu pankkitunnuksilla|Logga in med din bank|Before you sign in|Ennen kuin kirjaudut|Innan du loggar in"
+          visible: "Sign in with your bank|Kirjaudu pankkitunnuksilla|Logga in med din bank|How we do things here|Näin täällä toimitaan|Så här gör vi här"
           timeout: 15000
+# Signed in: home, or an onboarding step, known by its number or, for the two
+# that count none, by its heading (#581). The welcome step is the screen before
+# the bank to the letter, and that one has no session: only Settings tells them
+# apart, so that screen comes this way too, and finds no row there.
 - runFlow:
     when:
-      visible: "People on Kuutti|Ihmiset Kuutissa|Människor på Kuutti|Welcome to Kuutti|Tervetuloa Kuuttiin|Välkommen till Kuutti"
+      visible: "People on Kuutti|Ihmiset Kuutissa|Människor på Kuutti|Step \\d+ of \\d+|Vaihe \\d+ / \\d+|Steg \\d+ av \\d+|Did a friend invite you\\?|Kutsuiko ystävä sinut\\?|Bjöd en vän in dig\\?|How we do things here|Näin täällä toimitaan|Så här gör vi här"
     commands:
       # Logging out opens under its row (#511), by a link that names it rather
       # than a scroll to it: a swipe through Settings could pass over its row
@@ -42,10 +47,10 @@ appId: fi.kuutti.app
       # out everywhere, which puts both buttons in sight (the row is the list's
       # foot, where nothing can be centred), and the list's own scroll ends
       # before the tap. The row is there only with a session (#581): a session
-      # the reset erased leaves no line to find, so the scroll is optional; it
-      # keeps the minute a scroll has elsewhere for a slow emulator, and that
-      # case, the first flow after a reset at most, spends it. The tap below
-      # asks for the button itself.
+      # the reset erased, or the screen before the bank, leaves no line to find,
+      # so the scroll is optional; it keeps the minute a scroll has elsewhere for
+      # a slow emulator, and those cases, the first flow after a reset or on a
+      # fresh phone at most, spend it. The tap below asks for the button itself.
       - openLink: kuutti://settings?open=device
       - extendedWaitUntil:
           visible: "Settings|Asetukset|Inställningar"
@@ -56,7 +61,7 @@ appId: fi.kuutti.app
           timeout: 60000
           optional: true
       - waitForAnimationToEnd
-      # A session the reset erased is already gone: Settings has no row and no button.
+      # With no session, Settings has no row and no button.
       - runFlow:
           when:
             visible: "Log out|Kirjaudu ulos|Logga ut"
@@ -64,9 +69,9 @@ appId: fi.kuutti.app
             - tapOn: "Log out|Kirjaudu ulos|Logga ut"
       # Opened over an onboarding step, Settings stays on screen after the
       # logout, its account rows gone: the root route is the sign-in screen, or
-      # on a phone that has not recorded the current wordings the screens
+      # on a phone that has not recorded the current wordings the screen
       # before the bank (#418), which bank-login.yaml taps through.
       - openLink: kuutti://
       - extendedWaitUntil:
-          visible: "Sign in with your bank|Kirjaudu pankkitunnuksilla|Logga in med din bank|Before you sign in|Ennen kuin kirjaudut|Innan du loggar in"
+          visible: "Sign in with your bank|Kirjaudu pankkitunnuksilla|Logga in med din bank|How we do things here|Näin täällä toimitaan|Så här gör vi här"
           timeout: 15000

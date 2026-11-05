@@ -124,7 +124,7 @@ What the bed returned when each test user logged in to staging (#139, the simula
 | Danske `88888888` / `4545` | `010108-000Z` | 1.1.1908 | refused: not a valid code (individual number 000) |
 | Mobiilivarmenne emulator, `0401234567` | `010132-998W` | 1.1.1932 | completed (a new account, 94 years old) |
 
-Two things changed on the bed since the published list: Danske now returns `010108-000Z` (not `280453-111A`), and Ålandsbanken and S-Pankki return codes with impossible days, so neither is Mikael (`010170-960x`) any more; the mock bank's Mikael has no working test user on staging. Every refusal of an invalid code reaches the person as "the identification service did not complete the login; try again in a while", which promises a retry that cannot help.
+Two things changed on the bed since the published list: Danske now returns `010108-000Z` (not `280453-111A`), and Ålandsbanken and S-Pankki return codes with impossible days, so neither is Mikael (`010170-960x`) any more; the mock bank's Mikael has no working test user on staging. Every refusal of an invalid code reaches the person as the sign-in card's title, "Sign-in did not complete", over Try again (#581), which promises a retry that cannot help.
 
 ## The four confirmations we need in writing
 

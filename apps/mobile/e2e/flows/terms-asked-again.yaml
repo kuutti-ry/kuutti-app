@@ -33,8 +33,10 @@ name: A person who accepted an older wording of the terms is asked for the curre
     when:
       true: ${output.welcomeStep}
     commands:
-      # Under onboarding's title, with no step line: nothing else is asked.
-      - assertVisible: "Welcome to Kuutti|Tervetuloa Kuuttiin|Välkommen till Kuutti"
+      # The norms under their one heading, which greets nobody months in (#581),
+      # with no step line: nothing else is asked.
+      - assertVisible: "No contact details before a match\\.|Ei yhteystietoja ennen matchia\\.|Inga kontaktuppgifter före en match\\."
+      - assertNotVisible: "Welcome to Kuutti|Tervetuloa Kuuttiin|Välkommen till Kuutti"
       - assertNotVisible: "Step \\d+ of \\d+|Vaihe \\d+ / \\d+|Steg \\d+ av \\d+"
       - scrollUntilVisible:
           element: "I'm in, and I accept both|Olen mukana ja hyväksyn molemmat|Jag är med och godkänner båda"

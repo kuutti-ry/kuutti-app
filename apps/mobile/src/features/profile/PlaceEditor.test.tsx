@@ -491,7 +491,7 @@ describe("PlaceChoice", () => {
 
     it.each([
       ["a level under the screen's title by default, as Home has it", undefined, "3"],
-      ["the step's own where onboarding says so", "h2", "2"],
+      ["the step's own where onboarding says so", "h1", "1"],
     ] as const)("over a choice, %s", async (_what, heading, level) => {
       await show(<PlaceChoice home={home()} busy={false} onChoose={jest.fn()} heading={heading} />);
       expect(screen.getByRole("heading", { name: QUESTION }).props["aria-level"]).toBe(level);
@@ -499,7 +499,7 @@ describe("PlaceChoice", () => {
 
     it.each([
       ["a level under the screen's title by default, as Home has it", undefined, "3"],
-      ["the step's own where onboarding says so", "h2", "2"],
+      ["the step's own where onboarding says so", "h1", "1"],
     ] as const)("in its place, %s", async (_what, heading, level) => {
       await show(<PlaceChoice home={alone} busy={false} onChoose={jest.fn()} heading={heading} />);
       expect(
