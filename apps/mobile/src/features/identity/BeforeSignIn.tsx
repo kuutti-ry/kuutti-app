@@ -10,22 +10,23 @@ import { type Agreements, agreementsOf } from "./agreements";
 import { LegalTextLink } from "./LegalTextLink";
 
 /**
- * The norms and the two consents a person accepts before anything else: the
- * terms and the privacy summary, each as the exact version this app carries
- * with its link to the full text, and outside Finnish the line that the
- * Finnish text is the one that counts (ADR-010 §4, §9). Shown before the bank
- * login (#418) and on onboarding's welcome step after it.
+ * The norms and the two consents a person accepts before anything else, under
+ * the screen's one heading (#581): the terms and the privacy summary, each as
+ * the exact version this app carries with its link to the full text, and
+ * outside Finnish the line that the Finnish text is the one that counts
+ * (ADR-010 §4, §9). Shown before the bank login (#418) and on onboarding's
+ * welcome step after it.
  */
 export function NormsAndConsents() {
   const { t, locale } = useT();
   return (
     <>
-      <Text variant="h2">{t("onboarding.welcome.title")}</Text>
+      <Text variant="h1" accessibilityRole="header">
+        {t("onboarding.welcome.title")}
+      </Text>
       <View className="gap-2">
         <Text>{t("onboarding.welcome.norm1")}</Text>
         <Text>{t("onboarding.welcome.norm2")}</Text>
-        <Text>{t("onboarding.welcome.norm3")}</Text>
-        <Text>{t("onboarding.welcome.norm4")}</Text>
       </View>
       <Text>{t("onboarding.consents.explain")}</Text>
       {realLocale(locale) !== "fi" && (
@@ -61,21 +62,16 @@ export function BeforeSignIn({ onAgreed }: { onAgreed: (agreements: Agreements) 
   const tap = useHapticTap();
   return (
     <SafeAreaView className="flex-1 bg-background">
-      <ScrollView contentContainerClassName="flex-grow gap-6 p-6">
-        <Text variant="h1" accessibilityRole="header">
-          {t("signIn.agreements.title")}
-        </Text>
-        <View className="gap-4">
-          <NormsAndConsents />
-          <Button
-            onPress={() => {
-              tap();
-              onAgreed(agreementsOf(locale));
-            }}
-          >
-            {t("onboarding.welcome.accept")}
-          </Button>
-        </View>
+      <ScrollView contentContainerClassName="flex-grow gap-4 p-6">
+        <NormsAndConsents />
+        <Button
+          onPress={() => {
+            tap();
+            onAgreed(agreementsOf(locale));
+          }}
+        >
+          {t("onboarding.welcome.accept")}
+        </Button>
       </ScrollView>
     </SafeAreaView>
   );

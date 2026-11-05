@@ -7,9 +7,9 @@ import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
 import { renderWithTheme } from "@/test/render";
 import { BeforeSignIn, NormsAndConsents } from "./BeforeSignIn";
 
-// The screen before the bank login (#418, ADR-010 §15): the norms with the
-// terms and the privacy summary, which must be accepted to go on. Nothing is
-// sent from here: there is no account yet.
+// The screen before the bank login (#418, ADR-010 §15): the norms under the
+// screen's one heading (#581), with the terms and the privacy summary, which
+// must be accepted to go on. Nothing is sent from here: there is no account yet.
 
 const TERMS = String(CONSENT_VERSIONS.terms);
 const PRIVACY = String(CONSENT_VERSIONS.privacy);
@@ -19,6 +19,14 @@ const checkA11y = () =>
   expect(pressables(screen.toJSON() as HostNode).flatMap((node) => a11yProblems(node))).toEqual([]);
 const onPhone = (languageTag: string) =>
   (useLocales as jest.Mock).mockReturnValue([{ languageTag }]);
+/** Every text on the screen, in order. */
+const drawn = () => screen.queryAllByText(/./).map((node) => node.props.children as unknown);
+/** The headings at the top of the screen: its title alone, each card's own being a level under it. */
+const titles = () =>
+  screen
+    .getAllByRole("heading")
+    .filter((heading) => heading.props["aria-level"] === "1")
+    .map((heading) => heading.props.children as unknown);
 
 beforeEach(() => {
   fetchMock.mockReset();
@@ -34,9 +42,17 @@ afterEach(() => {
 describe("BeforeSignIn: the terms and the privacy summary", () => {
   it("shows the norms and both summaries with their versions, and one way on, with no accessibility problems", async () => {
     await renderWithTheme(<BeforeSignIn onAgreed={jest.fn()} />);
-    expect(screen.getByRole("heading", { name: "Before you sign in" })).toBeTruthy();
-    expect(screen.getByText("How we do things here")).toBeTruthy();
-    expect(screen.getByText(/Nothing here is for sale/)).toBeTruthy();
+    expect(titles()).toEqual(["How we do things here"]);
+    expect(
+      screen.getByRole("heading", { name: "How we do things here" }).props.accessibilityRole,
+    ).toBe("header");
+    // The two norms, then the consent's own lead: nothing stacks over them, and no third stands.
+    expect(drawn().slice(0, 4)).toEqual([
+      "How we do things here",
+      "Everybody here has shown a bank ID. Be the person you are.",
+      "No contact details before a match.",
+      "Read both. You accept exactly this version of each text; if one changes, we ask you again.",
+    ]);
     expect(screen.getByText("Terms of use")).toBeTruthy();
     expect(screen.getByText("Privacy")).toBeTruthy();
     // Both wordings carry the same version today; each card has its own link.
@@ -80,16 +96,34 @@ describe("BeforeSignIn: the terms and the privacy summary", () => {
   it("says nothing of a binding text on a Finnish phone, whose text is the binding one", async () => {
     onPhone("fi-FI");
     await renderWithTheme(<BeforeSignIn onAgreed={jest.fn()} />);
-    expect(screen.getByRole("heading", { name: "Ennen kuin kirjaudut" })).toBeTruthy();
-    expect(screen.getByText("Näin täällä toimitaan")).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Näin täällä toimitaan" })).toBeTruthy();
     expect(screen.queryByText(/Suomenkielinen teksti on sitova/)).toBeNull();
+  });
+
+  it.each([
+    [
+      "fi-FI",
+      "Näin täällä toimitaan",
+      "Jokainen täällä on tunnistautunut pankkitunnuksilla. Ole se, joka olet.",
+      "Ei yhteystietoja ennen matchia.",
+    ],
+    [
+      "sv-FI",
+      "Så här gör vi här",
+      "Alla här har visat bank-ID. Var den du är.",
+      "Inga kontaktuppgifter före en match.",
+    ],
+  ])("says its heading and its two norms on a %s phone (#581)", async (languageTag, ...lines) => {
+    onPhone(languageTag);
+    await renderWithTheme(<BeforeSignIn onAgreed={jest.fn()} />);
+    expect(drawn().slice(0, 3)).toEqual(lines);
+    expect(titles()).toEqual([lines[0]]);
   });
 
   it("shows the same norms and summaries on its own, as the welcome step uses it", async () => {
     await renderWithTheme(<NormsAndConsents />);
-    expect(screen.getByText("How we do things here")).toBeTruthy();
+    expect(titles()).toEqual(["How we do things here"]);
     expect(screen.getAllByRole("link")).toHaveLength(2);
-    expect(screen.queryByRole("heading", { name: "Before you sign in" })).toBeNull();
     expect(screen.queryByRole("button", { name: "I'm in, and I accept both" })).toBeNull();
   });
 });

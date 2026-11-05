@@ -209,6 +209,11 @@ describe("the screens without params", () => {
     expect(propsOf("Stack.Screen")).toEqual({ options: { gestureEnabled: false } });
   });
 
+  it("/onboarding turns it off too: its photos step holds the same grid, and nothing under it is a step to go back to (#581)", async () => {
+    await render(<OnboardingRoute />);
+    expect(propsOf("Stack.Screen")).toEqual({ options: { gestureEnabled: false } });
+  });
+
   it("sends a link it has no screen for to the start", async () => {
     await render(<NotFoundRoute />);
     expect(screen.getByTestId("Redirect").props.children).toBe("/");
@@ -323,23 +328,8 @@ describe("the bank login's return, /auth", () => {
 });
 
 describe("the photos screen, /photos", () => {
-  it("hands the onboarding's step as numbers when it opened the screen (#146)", async () => {
-    params({ step: "8", total: "10" });
-    await render(<PhotosRoute />);
-    expect(propsOf("PhotosScreen")).toEqual({ progress: { step: 8, total: 10 } });
-  });
-
-  it.each<Record<string, string | readonly string[]>>([
-    { step: "8" },
-    { total: "10" },
-    { step: "", total: "10" },
-    { step: "eight", total: "10" },
-    { step: "11", total: "10" },
-    { step: "0", total: "10" },
-    { step: "1.5", total: "10" },
-    { step: ["8", "9"], total: "10" },
-  ])("hands no step for %j, which no onboarding sends", async (value) => {
-    params(value);
+  it("hands no step, whatever a link says: onboarding's photos step is its own screen now (#581)", async () => {
+    params({ step: "7", total: "8" });
     await render(<PhotosRoute />);
     expect(propsOf("PhotosScreen")).toEqual({});
   });

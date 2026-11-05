@@ -10,7 +10,7 @@ Feature: Onboarding and consents
   same flow and keep it incomplete until done (#46, #146, ADR-010). The home,
   and the pond its write sets, are features/pond/home.feature's (ADR-061).
 
-  The app asks the four norms, the terms and the privacy summary before the
+  The app asks the norms, the terms and the privacy summary before the
   bank login (#418, ADR-010 §15). With no account yet, it holds the answers in
   memory and posts them through the same route right after the exchange, and
   a phone that recorded the current wordings goes straight to the bank.

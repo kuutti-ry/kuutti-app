@@ -53,32 +53,32 @@ The screen before the bank (#418, ADR-010 §15) shows on a phone that has not re
 
 | screen or step | route | listen for in particular | iOS, VoiceOver | Android, TalkBack |
 |---|---|---|---|---|
-| Before you sign in: the norms and the consents (#418) | `/` (Aino, on a phone's first sign-in) | Before you sign in a header; the four lines on how Kuutti does things; the explanation; outside Finnish the line that the Finnish text counts; the terms and privacy cards, each title, summary and version link in order; I'm in, and I accept both named; no bank button anywhere before it; after it, the bank button, with no research question on the way (#545) | | |
-| Start, signed out | `/` | the loading line said; the title a header; the explanation; Sign in with your bank, straight away on a phone that has recorded the current versions | | |
-| Back from the bank | `/auth?code=…` | the system browser and the bank's pages are not ours, so the walk resumes at the return; opening, signing in and done said as they change | | |
-| Refused | `/auth?error=…` (Tapio, Ilona, Lauri, Venla) | the card's title and its sentence, with the date where there is one; Sign in with your bank named, as these four's refusals last (#466); Try again named instead after one that may pass, such as a cancel at the bank | | |
+| How we do things here: the norms and the consents (#418, #581) | `/` (Aino, on a phone's first sign-in) | How we do things here the header, nothing over it, and each card's title a heading under it; the two lines on how Kuutti does things; the explanation; outside Finnish the line that the Finnish text counts; the terms and privacy cards, each title, summary and version link in order; I'm in, and I accept both named; no bank button anywhere before it; after it, the bank button, with no research question on the way (#545) | | |
+| Start, signed out | `/` | the loading line said; the title a header, no line under it; Sign in with your bank, straight away on a phone that has recorded the current versions; nothing said as the browser opens | | |
+| Back from the bank | `/auth?code=…` | the system browser and the bank's pages are not ours, so the walk resumes at the return; Signing you in… said, with no button, until the next screen takes over, home or the first open step, with no line between | | |
+| Refused | `/auth?error=…` (Tapio, Ilona, Lauri, Venla) | the card's title and its sentence, with the date where there is one; Sign in with your bank named, as these four's refusals last (#466); Try again named instead after one that may pass, such as a cancel at the bank, whose sentence is Nothing was saved.; a link gone stale or a failure on the way: the card's title alone, no sentence, over Try again (#581); a press takes the refusal away as the browser opens | | |
 | Right after a break | `/` (Helmi, after Take a break) | the sign-in with the paused card: its title alone | | |
-| Signed out by the lock (#418) | `/` (Sanna, after Sign in with the bank instead on the lock screen, or five wrong passcodes) | the sign-in with the lock's card: its title and text, that the lock is off now; then Sign in with your bank | | |
+| Signed out by the lock (#418) | `/` (Sanna, after Sign in with the bank instead on the lock screen, or five wrong passcodes) | the sign-in with the lock's card: its title and text, that nothing on the account changed and that the lock is off now; then Sign in with your bank | | |
 
 ### Onboarding
 
-`/onboarding`, Aino (ADR-010). On every step but the welcome: the title a header, "Step x of n" said as it changes, a refused step said, and Continue heard as dimmed until the step is answered.
+`/onboarding`, Aino (ADR-010). On every step its title the header, nothing over it (#581), and a refused step said. On every step but the welcome and the invitation code: "Step x of n" heard before the title and said as it changes, and Continue heard as dimmed until the step is answered.
 
 | screen or step | route | listen for in particular | iOS, VoiceOver | Android, TalkBack |
 |---|---|---|---|---|
 | Loading, or not loaded | `/onboarding` | the loading line said; the failure and Try again | | |
-| Welcome, the fallback (#418) | `/onboarding` (Kerttu, signed in on a phone that has already passed the screens before the bank, so it goes straight to the bank) | no "Step x of n" line; the four lines on how Kuutti does things; the terms and privacy cards with their versions in order; the accept button, and the step asked again for a wording accepted before (Kerttu); the line that says the app is older than the wording shows only on a build older than the API's wording, so a current build does not meet it | | |
-| Invitation code (#107) | `/onboarding`, first for a newcomer who may still use a code, after Welcome when that comes (Aino after a reset) | no "Step x of n" line, as on Welcome (#418); the title a header; what the code earns the person heard after the explanation, where it earns them a fish (#503); the field named Invitation code; Use the code heard as dimmed until the code reads as one; a refused code said in words (VoiceOver is told, TalkBack reads the region); after a code that works, The code is in. said and Continue named; Skip named; not offered again on the same walk, nor on a walk resumed past the name | | |
-| Name | `/onboarding` | the field named as the display name | | |
+| Welcome, the fallback (#418) | `/onboarding` (Kerttu, signed in on a phone that has already passed the screens before the bank, so it goes straight to the bank) | no "Step x of n" line; How we do things here the header; the two lines on how Kuutti does things; the terms and privacy cards with their versions in order; the accept button, and the step asked again for a wording accepted before (Kerttu); the line that says the app is older than the wording shows only on a build older than the API's wording, so a current build does not meet it | | |
+| Invitation code (#107) | `/onboarding`, first for a newcomer who may still use a code, after Welcome when that comes (Aino after a reset) | One moment… said while the API is asked, with no title yet; no "Step x of n" line, as on Welcome (#418); the title a header, no explanation under it (#581); what the code earns the person heard next, where it earns them a fish (#503); the field named Invitation code; Use the code heard as dimmed until the code reads as one; a refused code said in words (VoiceOver is told, TalkBack reads the region); after a code that works, The code is in. said and Continue named; Skip named; not offered again on the same walk, nor on a walk resumed past the name | | |
+| Name | `/onboarding` | Name on your card read over the field, and the field named the same; no other line | | |
 | Gender | `/onboarding` | three whole-width rows as a radio group, the chosen one heard as selected, with ✓ in its words | | |
 | Identity label | `/onboarding`, after non-binary only | the label's whole-width rows as a radio group, the chosen one heard as selected, a second press taking it back; Continue and the skip | | |
 | Whom you seek | `/onboarding` | three whole-width rows and Anyone, each heard as a checkbox, checked or not, Anyone selecting all three; the sensitive-answers card with its switch, on or off, dimmed once given | | |
-| Intent | `/onboarding` | the choices, one selected | | |
-| Age window | `/onboarding` | two steppers, one above the other: each value heard in years as it changes, the four buttons named, dimmed at a bound | | |
+| Intent | `/onboarding` | the line that one is shown only to people who want the same thing read; the choices whole-width rows as a radio group named by the question, the chosen one heard as selected, with ✓ in its words | | |
+| Age window | `/onboarding` | no line over the steppers; two steppers, one above the other: each value heard in years as it changes, the four buttons named, dimmed at a bound | | |
 | Home | `/onboarding` | the question and the explanation read; the postal code field named, the number pad, nothing focused until it is tapped; how many areas match said aloud on both platforms as the digits go in, with no such line drawn; that the code cannot be found drawn and said; each area a named button, its code a digit at a time and its name; at the largest text every row reachable above the keyboard; a refused save said | | |
 | What the card shows | `/onboarding`, after the home | still step 6; where an area is kept, What should your card show? a header, then the town and the area as whole-width rows, a radio group of that name, the chosen one heard as selected; where none is, or the area bears the town's name, On your card and the place a header in the question's place, and no choice; Continue | | |
-| Photos | `/onboarding` | one button to the photos screen (Photos, below), and back to this step | | |
-| A few words | `/onboarding` | the bio field, no line under it; Or pick a line instead read, then heard as the name of the radio group of ready lines, each a whole-width row, whole at the largest text; Questions read, each question picked under Add a question and answered; the save heard as dimmed until the words count; then the done line, and home, with no research step (#545: it is not asked) | | |
+| Photos | `/onboarding` | the photos screen itself (Photos, below), no second screen: Step 7 of 8 heard first; Two photos of you the header; the line that profiles with a face photo get seen, then the line on holding and dragging; the grid and Add a photo, with no Your photos and no Done; Continue, heard as dimmed while the list loads, while a photo action runs and until two photos count, one in review counting and a refused one not, and named after a list that did not load, where it reads the list again; a photo refused meanwhile keeps the step, and its tile says why; back from a photo full size, the same step; the edge swipe off, so Continue is the way on | | |
+| A few words | `/onboarding` | the bio field, no line under it; Or pick a line instead read, then heard as the name of the radio group of ready lines, each a whole-width row, whole at the largest text; Questions read, each question picked under Add a question and answered; the save heard as dimmed until the words count; then home's heading, with no line before it and no research step (#545: it is not asked) | | |
 
 ### Home
 
@@ -185,7 +185,7 @@ Sanna; Helmi and Noa where it says.
 
 ### Photos
 
-`/photos`, Sanna; Noa for a rejected photo, and locally for one in review; Aino from onboarding for the first upload.
+`/photos`, Sanna, from the profile's Photos row; Noa for a rejected photo, and locally for one in review. Aino's first upload is on onboarding's Photos step (above), the same screen under that step's heading.
 
 | screen or step | route | listen for in particular | iOS, VoiceOver | Android, TalkBack |
 |---|---|---|---|---|

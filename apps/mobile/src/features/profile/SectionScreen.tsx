@@ -27,7 +27,8 @@ import { useRefusedDraft, useSaveOnLeave } from "./useSaveOnLeave";
 
 type Update = (patch: Partial<ProfileUpdate>) => void;
 
-function NameEditor({ draft, update }: { draft: ProfileUpdate; update: Update }) {
+/** The field's own name over it: the basics' and onboarding's name step (#581). */
+export function NameEditor({ draft, update }: { draft: ProfileUpdate; update: Update }) {
   const { t } = useT();
   return (
     <View className="gap-2">

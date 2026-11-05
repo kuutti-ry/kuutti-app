@@ -12,13 +12,15 @@ appId: fi.kuutti.app
 - evalScript: ${output.beforeSignIn = true}
 - runFlow:
     when:
-      notVisible: "Before you sign in|Ennen kuin kirjaudut|Innan du loggar in|I'm in, and I accept both|Olen mukana ja hyväksyn molemmat|Jag är med och godkänner båda"
+      notVisible: "How we do things here|Näin täällä toimitaan|Så här gör vi här|I'm in, and I accept both|Olen mukana ja hyväksyn molemmat|Jag är med och godkänner båda"
     commands:
       - evalScript: ${output.beforeSignIn = false}
 - runFlow:
     when:
       true: ${output.beforeSignIn}
     commands:
+      # The norms' heading is the screen's one (#581).
+      - assertNotVisible: "Before you sign in|Ennen kuin kirjaudut|Innan du loggar in"
       # Below the norms and both texts, under the fold on a phone.
       - scrollUntilVisible:
           element: "I'm in, and I accept both|Olen mukana ja hyväksyn molemmat|Jag är med och godkänner båda"
