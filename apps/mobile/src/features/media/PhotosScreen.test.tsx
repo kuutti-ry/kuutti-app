@@ -443,7 +443,7 @@ describe("PhotosScreen", () => {
     const EXPLAIN =
       "Hold a photo and drag it to change the order. A new photo is checked before anyone else sees it.";
     const REFUSED = "Not accepted. This photo does not fit Kuutti; try another one.";
-    const FAILED = "The photo could not be uploaded. Try again.";
+    const FAILED = "That did not go through. Try again.";
     const showStep = async () => {
       const onContinue = jest.fn();
       await show(<PhotosScreen step={{ position: 7, total: 8, reading: false, onContinue }} />);
@@ -1133,7 +1133,7 @@ describe("PhotosScreen", () => {
     FakeXhr.answers = [{ status: 502, body: "<html>Bad gateway</html>" }];
     await show(<PhotosScreen />);
     await press(await screen.findByRole("button", { name: "Add a photo" }));
-    expect(await screen.findByText("The photo could not be uploaded. Try again.")).toBeTruthy();
+    expect(await screen.findByText("That did not go through. Try again.")).toBeTruthy();
   });
 
   it("holds the buttons and the moves while the picker is open, with no line: the picker covers the screen (#581)", async () => {
@@ -1324,7 +1324,7 @@ describe("PhotosScreen", () => {
 
     await press(screen.getByRole("button", { name: "Caption of photo 1" }));
     await press(await screen.findByRole("radio", { name: "No caption" }));
-    expect(await screen.findByText("The caption could not be saved. Try again.")).toBeTruthy();
+    expect(await screen.findByText("That did not go through. Try again.")).toBeTruthy();
     // The photo keeps the line it had.
     expect(screen.getByText("Travelling")).toBeTruthy();
     expect(screen.getByLabelText("Photo 1 / 1. Travelling")).toBeTruthy();

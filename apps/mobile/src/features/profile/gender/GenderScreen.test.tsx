@@ -8,6 +8,7 @@ import { hasCutText } from "@/test/layout";
 import { renderWithTheme } from "@/test/render";
 import { MAX_FONT_SCALE } from "@/theme/a11y";
 import { GENDER_PATH, GenderScreen } from "./GenderScreen";
+import { FAILED_TO_LOAD } from "@/test/failed";
 
 // The person's own gender after sign-up (#552): the three genders from the
 // stored answer as whole-width rows (#581), saved on leaving, the limit said up
@@ -345,7 +346,7 @@ describe("GenderScreen", () => {
       await leaveAndGo(view);
       const again = await show();
       expect(selected("Man")).toBe(true);
-      expect(screen.getByText("It could not be saved. Try again.")).toBeTruthy();
+      expect(screen.getByText("That did not go through. Try again.")).toBeTruthy();
       await press(screen.getByRole("button", { name: "Keep editing" }));
       api.server.genderRefusal = null;
       router.push.mockClear();
@@ -364,7 +365,7 @@ describe("GenderScreen", () => {
       await leaveAndGo(view);
       await show();
       expect(selected("Man")).toBe(true);
-      expect(screen.getByText("It could not be saved. Try again.")).toBeTruthy();
+      expect(screen.getByText("That did not go through. Try again.")).toBeTruthy();
     });
 
     it("keeps a held change through a read that failed too, and tries it again on leaving", async () => {
@@ -375,7 +376,7 @@ describe("GenderScreen", () => {
       await leaveAndGo(view);
       api.server.statusFails = true;
       const again = await show();
-      expect(screen.queryByText("Your profile could not be loaded.")).toBeNull();
+      expect(screen.queryByText(FAILED_TO_LOAD)).toBeNull();
       expect(selected("Man")).toBe(true);
       expect(screen.getByRole("button", { name: "Leave without saving" })).toBeTruthy();
       await press(screen.getByRole("button", { name: "Keep editing" }));
@@ -466,7 +467,7 @@ describe("GenderScreen", () => {
         answer = resolve;
       });
       const again = await show();
-      expect(screen.getByText("Loading your profile…")).toBeTruthy();
+      expect(screen.getByText("Loading…")).toBeTruthy();
       api.server.genderRefusal = null;
       await leaveAndGo(again);
       await act(async () => {
@@ -625,7 +626,7 @@ describe("GenderScreen", () => {
     it("says so while the answers are on their way", async () => {
       globalThis.fetch = jest.fn(() => new Promise(() => undefined)) as unknown as typeof fetch;
       await show();
-      expect(screen.getByText("Loading your profile…")).toBeTruthy();
+      expect(screen.getByText("Loading…")).toBeTruthy();
     });
 
     it.each([
@@ -634,7 +635,7 @@ describe("GenderScreen", () => {
     ])("says when %s could not be read, and Try again reads it", async (_, failing) => {
       fakeApi(failing);
       await show();
-      expect(screen.getByText("Your profile could not be loaded.")).toBeTruthy();
+      expect(screen.getByText(FAILED_TO_LOAD)).toBeTruthy();
       await press(screen.getByRole("button", { name: /try again/i }));
       await waitFor(() => expect(selected("Woman")).toBe(true));
     });

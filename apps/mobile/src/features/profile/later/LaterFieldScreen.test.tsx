@@ -8,6 +8,7 @@ import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
 import { expectPinnedHeader } from "@/test/layout";
 import { renderWithTheme, underProviders } from "@/test/render";
 import { LaterFieldScreen, laterProgress, screenOpen } from "./LaterFieldScreen";
+import { FAILED_TO_LOAD } from "@/test/failed";
 
 /** The names of the radio groups on the screen, each a plain view that a role query would leave out. */
 const radioGroups = () =>
@@ -464,7 +465,7 @@ describe("LaterFieldScreen", () => {
         : json({ profile: null, completeness: { complete: false, missing: [] }, home: null }),
     ) as unknown as typeof fetch;
     await show(<LaterFieldScreen field="smoking" />);
-    expect(screen.getByText("Your profile could not be loaded.")).toBeTruthy();
+    expect(screen.getByText(FAILED_TO_LOAD)).toBeTruthy();
     // Why, in words: the API answered 500.
     expect(screen.getByText("Kuutti's server had a problem. Try again in a moment.")).toBeTruthy();
     failing = false;

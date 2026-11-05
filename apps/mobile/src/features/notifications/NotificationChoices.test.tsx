@@ -5,6 +5,7 @@ import { clearSession, saveSession } from "@/lib/session";
 import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
 import { renderWithTheme } from "@/test/render";
 import { NotificationChoices } from "./NotificationChoices";
+import { FAILED_TO_LOAD } from "@/test/failed";
 
 // What a person may be notified of (#176, ADR-032): what this phone's answer
 // leaves to do first (#102), then what a notification says, then the switches
@@ -149,7 +150,7 @@ describe("NotificationChoices", () => {
       fireEvent(screen.getByRole("switch", { name: "Matches" }), "onCheckedChange", false),
     );
     await settle();
-    expect(screen.getByText("The change was not saved. Try again.")).toBeTruthy();
+    expect(screen.getByText("That did not go through. Try again.")).toBeTruthy();
     expect(checked("Matches")).toBe(true);
   });
 
@@ -163,7 +164,7 @@ describe("NotificationChoices", () => {
       return json(choices());
     });
     await renderWithTheme(<NotificationChoices />);
-    expect(await screen.findByText("Your choices could not be loaded.")).toBeTruthy();
+    expect(await screen.findByText(FAILED_TO_LOAD)).toBeTruthy();
     await act(async () => fireEvent.press(screen.getByRole("button", { name: "Try again" })));
     expect(await screen.findByRole("switch", { name: "Messages" })).toBeTruthy();
   });

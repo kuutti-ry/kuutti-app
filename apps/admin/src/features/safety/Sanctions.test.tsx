@@ -442,7 +442,7 @@ describe("the actions on a person", () => {
     expect(asked(calls)[3]).toBe(`GET ${PAGE}`);
     // While the page is read again, it stays as it was, with no loading words.
     expect(status).toHaveFocus();
-    expect(screen.queryByText("Loading the page…")).toBeNull();
+    expect(screen.queryByText("Loading…")).toBeNull();
     expect(screen.getByRole("heading", { level: 3, name: "Sanctions" })).toBeInTheDocument();
     expect(screen.queryByText(TEXT)).toBeNull();
     again.release(json(page));

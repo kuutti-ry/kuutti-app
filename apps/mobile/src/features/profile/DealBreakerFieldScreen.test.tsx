@@ -7,6 +7,7 @@ import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
 import { expectPinnedHeader, hasCutText } from "@/test/layout";
 import { renderWithTheme } from "@/test/render";
 import { DealBreakerFieldScreen } from "./DealBreakerFieldScreen";
+import { FAILED_TO_LOAD } from "@/test/failed";
 
 // One deal-breaker on a screen of its own (#551): Everyone first, then what is
 // fine, as whole-width rows unless the list is long (#581), saved on leaving as
@@ -166,10 +167,10 @@ const AGAIN = "Back to Everyone.";
 const GATED = "To filter on this, share yours first.";
 const PAUSED = "Paused until you answer it yourself.";
 const ANSWER = "Answer it";
-const FAILED = "It could not be saved. Try again.";
-const LOAD_FAILED = "Your profile could not be loaded.";
+const FAILED = "That did not go through. Try again.";
+const LOAD_FAILED = FAILED_TO_LOAD;
 const THE_QUESTION = "Leave without saving?";
-const LOADING = "Loading your profile…";
+const LOADING = "Loading…";
 
 const button = (name: string) => screen.getByRole("button", { name });
 /** A chip of the long list: the languages, whose chosen one says so in its state. */
@@ -1020,8 +1021,8 @@ describe("DealBreakerFieldScreen", () => {
     });
 
     it.each([
-      ["fi-FI", "Kaikki", "Ei koskaan", "Tallentaminen ei onnistunut. Yritä uudelleen."],
-      ["sv-FI", "Alla", "Aldrig", "Det gick inte att spara. Försök igen."],
+      ["fi-FI", "Kaikki", "Ei koskaan", "Se ei onnistunut. Yritä uudelleen."],
+      ["sv-FI", "Alla", "Aldrig", "Det gick inte. Försök igen."],
     ])("says in %s that it could not be saved", async (tag, everyone, never, failed) => {
       (useLocales as jest.Mock).mockReturnValue([{ languageTag: tag }]);
       try {

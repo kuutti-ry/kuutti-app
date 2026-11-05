@@ -9,6 +9,7 @@ import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
 import { renderWithTheme } from "@/test/render";
 import { HomeRoute } from "./HomeRoute";
 import { HomeScreen } from "./HomeScreen";
+import { FAILED_TO_LOAD } from "@/test/failed";
 
 // The onboarding gate (#46) is the identity slice's; here it says what the
 // test needs, so the screen can be seen complete, checking or unknown.
@@ -124,7 +125,7 @@ describe("HomeScreen", () => {
   it("offers to check again when the account setup could not be read, and shows nothing that needs it", async () => {
     mockGate = { status: "unknown" };
     await renderWithTheme(<HomeScreen />);
-    expect(screen.getByText("Your account setup could not be checked.")).toBeTruthy();
+    expect(screen.getByText(FAILED_TO_LOAD)).toBeTruthy();
     fireEvent.press(screen.getByRole("button", { name: "Try again" }));
     expect(mockRetry).toHaveBeenCalledTimes(1);
     expect(screen.queryByRole("button", { name: "Your profile" })).toBeNull();
@@ -292,7 +293,7 @@ describe("HomeScreen", () => {
   it("says that it is checking while the status is in flight", async () => {
     mockGate = { status: "checking" };
     await renderWithTheme(<HomeScreen />);
-    expect(screen.getByText("Checking your account setup…")).toBeTruthy();
+    expect(screen.getByText("Loading…")).toBeTruthy();
   });
 });
 

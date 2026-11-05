@@ -8,6 +8,7 @@ import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
 import { renderWithTheme, underProviders } from "@/test/render";
 import { TOUCH_TARGET } from "@/theme/a11y";
 import { RoundScreen } from "./RoundScreen";
+import { FAILED_TO_LOAD } from "@/test/failed";
 
 // The queue on the phone (#379, #502, ADR-034, ADR-062): one card at a time
 // with its reason, like, pass and Later as buttons, Undo on the last decision,
@@ -881,7 +882,7 @@ describe("the queue", () => {
       });
       await show();
       await press("Like");
-      expect(screen.getByText("That was not saved. Try again.")).toBeTruthy();
+      expect(screen.getByText("That did not go through. Try again.")).toBeTruthy();
       expect(heading("Henna, 31")).toBeTruthy();
       await press("Like");
       expect(heading("Katja, 32")).toBeTruthy();
@@ -908,7 +909,7 @@ describe("the queue", () => {
         return reads === 1 ? failure() : json(ROUND);
       });
       await show();
-      expect(screen.getByText("People did not load.")).toBeTruthy();
+      expect(screen.getByText(FAILED_TO_LOAD)).toBeTruthy();
       expect(screen.getByText(new RegExp(`^${why}`))).toBeTruthy();
       await press("Try again");
       expect(heading("Henna, 31")).toBeTruthy();
@@ -1324,7 +1325,7 @@ describe("reading on past the last card (ADR-062 §1)", () => {
     const sent = api(reading(page(entry(1, "Henna")), next.read));
     await show();
     await press("Pass");
-    expect(screen.getByText("Loading people…").props.accessibilityLiveRegion).toBe("polite");
+    expect(screen.getByText("Loading…").props.accessibilityLiveRegion).toBe("polite");
     noProblems();
     expect(screen.queryByText("That's everybody for now.")).toBeNull();
     expect(screen.queryByRole("button", { name: "What you seek" })).toBeNull();
@@ -1334,7 +1335,7 @@ describe("reading on past the last card (ADR-062 §1)", () => {
     await next.answer(json(page()));
     await settle();
     expect(screen.getByText("That's everybody for now.")).toBeTruthy();
-    expect(screen.queryByText("Loading people…")).toBeNull();
+    expect(screen.queryByText("Loading…")).toBeNull();
     expect(sent.calls.filter((c) => c.path.endsWith("/relaxations"))).toHaveLength(1);
   });
 
@@ -1343,10 +1344,10 @@ describe("reading on past the last card (ADR-062 §1)", () => {
     api(reading(page(entry(1, "Henna")), next.read));
     await show();
     await press("Pass");
-    expect(screen.getByText("Loading people…")).toBeTruthy();
+    expect(screen.getByText("Loading…")).toBeTruthy();
     await press("Undo your last decision");
     expect(heading("Henna, 31")).toBeTruthy();
-    expect(screen.queryByText("Loading people…")).toBeNull();
+    expect(screen.queryByText("Loading…")).toBeNull();
     await next.answer(json(page(entry(2, "Katja"))));
     await settle();
     expect(heading("Henna, 31")).toBeTruthy();
@@ -1369,13 +1370,13 @@ describe("reading on past the last card (ADR-062 §1)", () => {
       const sent = api(reading(page(entry(1, "Henna")), failure, page(entry(2, "Katja"))));
       await show();
       await press("Like");
-      expect(screen.getByText("People did not load.")).toBeTruthy();
+      expect(screen.getByText(FAILED_TO_LOAD)).toBeTruthy();
       expect(screen.getByText(new RegExp(`^${why}`))).toBeTruthy();
       expect(screen.queryByText("That's everybody for now.")).toBeNull();
       noProblems();
       await press("Try again");
       expect(heading("Katja, 32")).toBeTruthy();
-      expect(screen.queryByText("People did not load.")).toBeNull();
+      expect(screen.queryByText(FAILED_TO_LOAD)).toBeNull();
       expect(sent.reads()).toBe(3);
       await press("Undo your last decision");
       expect(heading("Henna, 31")).toBeTruthy();
@@ -1383,7 +1384,7 @@ describe("reading on past the last card (ADR-062 §1)", () => {
   );
 
   it.each([
-    ["ios", ["Loading people…"]],
+    ["ios", ["Loading…"]],
     ["android", []],
   ] as const)(
     "says a read past the last card aloud on %s, and not the first read of the screen",
@@ -1394,7 +1395,7 @@ describe("reading on past the last card (ADR-062 §1)", () => {
       await show();
       expect(announced()).toEqual([]);
       await press("Pass");
-      expect(screen.getByText("Loading people…")).toBeTruthy();
+      expect(screen.getByText("Loading…")).toBeTruthy();
       expect(announced()).toEqual(said);
       await next.answer(json(page()));
       await settle();
@@ -1402,19 +1403,26 @@ describe("reading on past the last card (ADR-062 §1)", () => {
   );
 
   it.each([
-    ["ios", ["Loading people…", "People did not load."]],
-    ["android", []],
+    ["ios", ["Loading…"], ["Kuutti's server had a problem. Try again in a moment."]],
+    ["android", [], []],
   ] as const)(
     "says a read that failed aloud on %s, where the button the focus was on has gone",
-    async (os, said) => {
+    async (os, said, queued) => {
       jest.replaceProperty(Platform, "OS", os);
+      (AccessibilityInfo.announceForAccessibilityWithOptions as jest.Mock).mockClear();
       api(reading(page(entry(1, "Henna")), () => refusal("internal", 500)));
       await show();
       await press("Pass");
-      expect(screen.getByText("People did not load.").props.accessibilityLiveRegion).toBe(
+      expect(screen.getByText(FAILED_TO_LOAD).props.accessibilityLiveRegion).toBe(
         "assertive",
       );
       expect(announced()).toEqual(said);
+      // The reason itself says it, queued behind what is being said (`LoadFailed`).
+      expect(
+        (AccessibilityInfo.announceForAccessibilityWithOptions as jest.Mock).mock.calls.map(
+          ([words]) => words,
+        ),
+      ).toEqual(queued);
     },
   );
 
@@ -1424,9 +1432,9 @@ describe("reading on past the last card (ADR-062 §1)", () => {
     await press("Pass");
     await press("Undo your last decision");
     expect(heading("Henna, 31")).toBeTruthy();
-    expect(screen.queryByText("People did not load.")).toBeNull();
+    expect(screen.queryByText(FAILED_TO_LOAD)).toBeNull();
     await press("Like");
-    expect(screen.getByText("People did not load.")).toBeTruthy();
+    expect(screen.getByText(FAILED_TO_LOAD)).toBeTruthy();
     expect(sent.reads()).toBe(2);
   });
 
@@ -1457,7 +1465,7 @@ describe("reading on past the last card (ADR-062 §1)", () => {
     expect(heading("Riikka, 31")).toBeTruthy();
     expect(liveLines()).toEqual([]);
     // The read past the last card is told, as any is; nothing after it.
-    expect(announced()).toEqual(["Loading people…"]);
+    expect(announced()).toEqual(["Loading…"]);
     expect(takenTo()).toEqual({ event: "focus", words: ["Matches your filters"] });
     expect(screen.queryByRole("button", { name: "Undo your last decision" })).toBeNull();
     // The new day's card at the same place is a card of its own.
@@ -1490,7 +1498,7 @@ describe("reading on past the last card (ADR-062 §1)", () => {
       await earlier.answer(late());
       await settle();
       expect(heading("Riikka, 31")).toBeTruthy();
-      expect(screen.queryByText("People did not load.")).toBeNull();
+      expect(screen.queryByText(FAILED_TO_LOAD)).toBeNull();
       await press("Pass");
       expect(screen.queryByRole("heading", { name: "Minna, 32" })).toBeNull();
       expect(screen.getByText("That's everybody for now.")).toBeTruthy();
@@ -1512,7 +1520,7 @@ describe("reading on past the last card (ADR-062 §1)", () => {
       await show();
       await press("Like");
       expect(heading("It's a match")).toBeTruthy();
-      expect(screen.queryByText("Loading people…")).toBeNull();
+      expect(screen.queryByText("Loading…")).toBeNull();
       expect(sent.reads()).toBe(1);
       await press(button);
       if (away) {
@@ -1602,7 +1610,7 @@ describe("the queue's end (ADR-062 §11)", () => {
     const sent = api(reading(page(), next.read));
     await show();
     await act(async () => focusRound());
-    expect(screen.getByText("Loading people…")).toBeTruthy();
+    expect(screen.getByText("Loading…")).toBeTruthy();
     expect(screen.queryByText("That's everybody for now.")).toBeNull();
     await next.answer(json(page()));
     await settle();
@@ -1803,7 +1811,7 @@ describe("the your-turn limit (ADR-062 §5)", () => {
       await press("Like");
       expect(screen.getByText(WAITING(3))).toBeTruthy();
       expect(heading("Katja, 32")).toBeTruthy();
-      expect(screen.queryByText("People did not load.")).toBeNull();
+      expect(screen.queryByText(FAILED_TO_LOAD)).toBeNull();
     },
   );
 
@@ -3186,7 +3194,7 @@ describe("a star on a card (#575, ADR-064)", () => {
 
     await press("Star: Katja");
 
-    expect(screen.getByText("The star was not saved. Try again.")).toBeTruthy();
+    expect(screen.getByText("That did not go through. Try again.")).toBeTruthy();
     expect(isOn()).toBe(false);
   });
 
@@ -3460,7 +3468,7 @@ describe("a card opened from the Starred list (#575, ADR-064 §2)", () => {
       return failing ? refusal("internal", 500) : json(OPENED);
     });
     await showStar();
-    expect(screen.getByText("People did not load.")).toBeTruthy();
+    expect(screen.getByText(FAILED_TO_LOAD)).toBeTruthy();
 
     failing = false;
     await press("Try again");

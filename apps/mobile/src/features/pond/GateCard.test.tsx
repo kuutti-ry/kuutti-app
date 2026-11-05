@@ -5,6 +5,7 @@ import { AppState, View } from "react-native";
 import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
 import { renderWithTheme } from "@/test/render";
 import { GateCard } from "./GateCard";
+import { FAILED_TO_LOAD } from "@/test/failed";
 
 // The gate card (#500, ADR-060 §4): whether matching is open for the person, in
 // words. Each sentence says Matching, so the card's name is a label and never a
@@ -68,11 +69,11 @@ describe("GateCard", () => {
         }),
     ) as unknown as typeof fetch;
     const screen = await renderWithTheme(<GateCard />);
-    expect(screen.getByText("Looking…").props.accessibilityLiveRegion).toBe("polite");
+    expect(screen.getByText("Loading…").props.accessibilityLiveRegion).toBe("polite");
     expect(screen.queryByText("Matching")).toBeNull();
     await act(async () => answer(json(gate("open"))));
     await settle();
-    expect(screen.queryByText("Looking…")).toBeNull();
+    expect(screen.queryByText("Loading…")).toBeNull();
     expect(screen.getByText("Matching is open for you.")).toBeTruthy();
   });
 
@@ -123,7 +124,7 @@ describe("GateCard", () => {
     ]);
     const screen = await renderWithTheme(<GateCard />);
     await settle();
-    expect(screen.getByText("Matching could not be checked.")).toBeTruthy();
+    expect(screen.getByText(FAILED_TO_LOAD)).toBeTruthy();
     const retry = screen.getByRole("button", { name: "Try again" });
     expect(retry.props.accessibilityRole).toBe("button");
     await act(async () => {
@@ -160,7 +161,7 @@ describe("GateCard", () => {
     await settle();
     expect(asked).toBe(2);
     expect(screen.getByText(unfinished)).toBeTruthy();
-    expect(screen.queryByText("Looking…")).toBeNull();
+    expect(screen.queryByText("Loading…")).toBeNull();
 
     await act(async () => {
       arrive();
@@ -211,14 +212,14 @@ describe("GateCard", () => {
     });
     await settle();
     expect(screen.getByText("Your profile is finished. Matching has not opened yet.")).toBeTruthy();
-    expect(screen.queryByText("Matching could not be checked.")).toBeNull();
+    expect(screen.queryByText(FAILED_TO_LOAD)).toBeNull();
   });
 
   it("refuses an answer that carries a number", async () => {
     answering([() => json({ state: "closed", needed: 10 })]);
     const screen = await renderWithTheme(<GateCard />);
     await settle();
-    expect(screen.getByText("Matching could not be checked.")).toBeTruthy();
+    expect(screen.getByText(FAILED_TO_LOAD)).toBeTruthy();
   });
 
   it("has a label and a role on everything that can be pressed", async () => {

@@ -26,7 +26,7 @@ describe("profileErrorText", () => {
   });
 
   it("says a screen's own line for the rest where it names one, and its words still for what has them", () => {
-    const fallback = "profile.seek.failed";
+    const fallback = "load.failed.press";
     expect(profileErrorText({ kind: "error", code: "validation_failed" }, t, fallback)).toBe(
       fallback,
     );

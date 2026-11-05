@@ -289,11 +289,13 @@ describe("PhotoQueue", () => {
           : null,
     ]);
     show();
-    const loading = await screen.findByText("Loading the photo…");
+    // The queue itself says the same word while it loads: past that, it is the photo's.
+    await screen.findByRole("button", { name: "Approve" });
+    const loading = await screen.findByText("Loading…");
     expect(loading).toHaveAttribute("aria-busy", "true");
     await new Promise((resolve) => setTimeout(resolve, 0));
     expect(screen.queryByRole("img")).toBeNull();
-    expect(screen.getByText("Loading the photo…")).toBeInTheDocument();
+    expect(screen.getByText("Loading…")).toBeInTheDocument();
     cleanup();
     vi.unstubAllGlobals();
     // A network failure rejects the request outright: still loading, and no
@@ -306,11 +308,12 @@ describe("PhotoQueue", () => {
       },
     ]);
     show();
-    expect(await screen.findByText("Loading the photo…")).toBeInTheDocument();
+    await screen.findByRole("button", { name: "Approve" });
+    expect(await screen.findByText("Loading…")).toBeInTheDocument();
     await waitFor(() => expect(calls.filter((c) => /\/card$/.test(path(c)))).toHaveLength(1));
     await new Promise((resolve) => setTimeout(resolve, 0));
     expect(screen.queryByRole("img")).toBeNull();
-    expect(screen.getByText("Loading the photo…")).toBeInTheDocument();
+    expect(screen.getByText("Loading…")).toBeInTheDocument();
   });
 
   it("cancels the photo's request when the item goes away before the answer", async () => {
@@ -410,7 +413,7 @@ describe("PhotoQueue", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Approve" }));
     await waitFor(() => expect(answerDecision).toBeDefined());
     fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
-    expect(await screen.findByText("Loading the queue…")).toBeInTheDocument();
+    expect(await screen.findByText("Loading…")).toBeInTheDocument();
     answerDecision?.(json({ photoId: item(1).photoId, state: "approved", rejectionReason: null }));
     await waitFor(() => expect(answerQueue).toBeDefined());
     answerQueue?.(json({ items: [item(2)], total: 1 }));

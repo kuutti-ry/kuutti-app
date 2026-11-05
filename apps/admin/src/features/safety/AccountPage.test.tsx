@@ -289,7 +289,7 @@ describe("a person's page", () => {
     fetchMock([on(`/admin/accounts/${ID}`, () => new Promise<Response>(() => {}))]);
     show();
     expect(screen.getByRole("heading", { level: 2, name: "Account 6f1c1c4e" })).toBeInTheDocument();
-    expect(screen.getByText("Loading the page…")).toHaveAttribute("aria-busy", "true");
+    expect(screen.getByText("Loading…")).toHaveAttribute("aria-busy", "true");
     expect(screen.queryByRole("alert")).toBeNull();
   });
 
@@ -297,7 +297,7 @@ describe("a person's page", () => {
     const calls = fetchMock([pageOf(page()), sanctionsOf(sanctions)]);
     show();
     expect(await screen.findByText(ID, { selector: "code" })).toBeInTheDocument();
-    expect(screen.queryByText("Loading the page…")).toBeNull();
+    expect(screen.queryByText("Loading…")).toBeNull();
     expect(sectionTitles()).toEqual([
       "State",
       "As the card shows them",
@@ -516,7 +516,7 @@ describe("a person's page", () => {
       show();
       expect(await screen.findByText("No account has this id.")).toBeInTheDocument();
       expect(screen.queryByRole("alert")).toBeNull();
-      expect(screen.queryByText("Loading the page…")).toBeNull();
+      expect(screen.queryByText("Loading…")).toBeNull();
       expect(asked(calls)).toEqual([`GET /admin/accounts/${ID}`]);
     },
   );
@@ -532,7 +532,7 @@ describe("a person's page", () => {
       const calls = fetchMock([on(`/admin/accounts/${ID}`, answer)]);
       show();
       expect(await screen.findByRole("alert")).toHaveTextContent(/^Could not be loaded\.$/);
-      expect(screen.queryByText("Loading the page…")).toBeNull();
+      expect(screen.queryByText("Loading…")).toBeNull();
       expect(screen.queryByText("No account has this id.")).toBeNull();
       // Under the page's own heading, with no section of it standing.
       expect(screen.queryByRole("heading", { level: 3 })).toBeNull();
@@ -545,7 +545,7 @@ describe("a person's page", () => {
   it("leaves a refused page to the shell: no words of its own and nothing more asked (#302)", async () => {
     const calls = fetchMock([on(`/admin/accounts/${ID}`, () => failure(403, "admin_forbidden"))]);
     show();
-    await waitFor(() => expect(screen.queryByText("Loading the page…")).toBeNull());
+    await waitFor(() => expect(screen.queryByText("Loading…")).toBeNull());
     expect(screen.getByRole("heading", { level: 2, name: "Account 6f1c1c4e" })).toBeInTheDocument();
     expect(screen.queryByRole("alert")).toBeNull();
     expect(screen.queryByText("No account has this id.")).toBeNull();

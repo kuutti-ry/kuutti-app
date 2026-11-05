@@ -179,7 +179,7 @@ describe("App", () => {
   it("is busy while a sign-in is being completed", () => {
     window.history.replaceState(null, "", `/#code=${"c".repeat(43)}`);
     renderApp(() => new Promise<Response>(() => {}));
-    expect(screen.getByText("Loading the queue…")).toHaveAttribute("aria-busy", "true");
+    expect(screen.getByText("Loading…")).toHaveAttribute("aria-busy", "true");
     expect(screen.queryByRole("button", { name: "Sign in with your bank" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Sign out" })).toBeNull();
   });
@@ -467,7 +467,7 @@ describe("App", () => {
       "page",
     );
     await waitFor(() => expect(calls).toContain("GET /admin/config"));
-    await waitFor(() => expect(screen.queryByText("Loading the tunables…")).toBeNull());
+    await waitFor(() => expect(screen.queryByText("Loading…")).toBeNull());
     expect(screen.queryByRole("alert")).toBeNull();
     expect(document.title).toBe("Tunables · Kuutti admin");
   });
@@ -484,7 +484,7 @@ describe("App", () => {
     );
     expect(await screen.findByRole("heading", { level: 2, name: "Tunables" })).toBeInTheDocument();
     await waitFor(() => expect(calls).toContain("GET /admin/config"));
-    await waitFor(() => expect(screen.queryByText("Loading the tunables…")).toBeNull());
+    await waitFor(() => expect(screen.queryByText("Loading…")).toBeNull());
     expect(screen.queryByRole("alert")).toBeNull();
     expect(calls).not.toContain("GET /admin/photos/queue");
     expect(screen.queryByText("Your role does not allow this.")).toBeNull();
@@ -507,7 +507,7 @@ describe("App", () => {
         .map((link) => link.textContent),
     ).toEqual(["Overview", "Reports", "Automatic shadow bans", "Photos", "Feedback", "A person"]);
     expect(within(menu).queryByRole("link", { name: "Tunables" })).toBeNull();
-    expect(screen.queryByText("Loading the tunables…")).toBeNull();
+    expect(screen.queryByText("Loading…")).toBeNull();
     expect(document.title).toBe("Tunables · Kuutti admin");
     // The menu still works from here, and the panel never asked for the tunables.
     fireEvent.click(within(menu).getByRole("link", { name: "Feedback" }));
@@ -748,7 +748,7 @@ describe("App", () => {
     expect(screen.queryByText("Could not be loaded.")).toBeNull();
     // A second refusal on the same visit says nothing new.
     fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
-    await waitFor(() => expect(screen.queryByText("Loading the queue…")).toBeNull());
+    await waitFor(() => expect(screen.queryByText("Loading…")).toBeNull());
     expect(screen.getAllByRole("alert")).toHaveLength(1);
     // The session is not ended by a 403: the person is still signed in.
     expect(screen.getByText(/Signed in as moderator/)).toBeInTheDocument();
@@ -765,7 +765,7 @@ describe("App", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("Your role does not allow this.");
     expect(screen.getAllByRole("alert")).toHaveLength(1);
     expect(screen.queryByText("Could not be loaded.")).toBeNull();
-    expect(screen.queryByText("Loading what waits…")).toBeNull();
+    expect(screen.queryByText("Loading…")).toBeNull();
     expect(screen.getByRole("heading", { level: 2, name: "Overview" })).toBeInTheDocument();
   });
 

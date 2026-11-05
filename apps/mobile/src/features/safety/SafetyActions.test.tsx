@@ -457,7 +457,7 @@ describe("SafetyActions", () => {
     await press(SECOND_HEARD, "radio");
     await press("Something else", "radio");
     await press("Send report");
-    expect(await screen.findByText("The report could not be sent. Try again.")).toBeTruthy();
+    expect(await screen.findByText("That did not go through. Try again.")).toBeTruthy();
     expect(checked(`✓ ${SECOND_HEARD}`)).toBe(true);
     // Every option waits while a report is on its way, the photos' too.
     answer = () => new Promise<Response>(() => undefined);
@@ -556,7 +556,7 @@ describe("SafetyActions", () => {
     await press("Seems automated, or collects people's details", "radio");
     await type("Sent the same opener to my friend.");
     await press("Send report");
-    expect(await screen.findByText("The report could not be sent. Try again.")).toBeTruthy();
+    expect(await screen.findByText("That did not go through. Try again.")).toBeTruthy();
     expect(
       screen.getByRole("radio", { name: "✓ Seems automated, or collects people's details" }),
     ).toBeTruthy();
@@ -566,7 +566,7 @@ describe("SafetyActions", () => {
     // A 429 that is not the day's reports is no cap to explain: a failure like another.
     answer = () => refusal("rate_limited", 429);
     await press("Send report");
-    expect(screen.getByText("The report could not be sent. Try again.")).toBeTruthy();
+    expect(screen.getByText("That did not go through. Try again.")).toBeTruthy();
     expect(screen.queryByText(/enough reports for today/)).toBeNull();
     // Cancel forgets it all: the next report starts empty.
     await press("Cancel");
@@ -574,7 +574,7 @@ describe("SafetyActions", () => {
     await press("Report and block");
     expect(screen.queryByRole("radio", { name: /✓/ })).toBeNull();
     expect(screen.getByLabelText(NOTE_LABEL).props.value).toBe("");
-    expect(screen.queryByText("The report could not be sent. Try again.")).toBeNull();
+    expect(screen.queryByText("That did not go through. Try again.")).toBeNull();
   });
 
   it.each([
@@ -649,7 +649,7 @@ describe("SafetyActions", () => {
       land(refusal("internal_error", 500));
       await new Promise<void>((resolve) => setTimeout(resolve, 20));
     });
-    expect(screen.getByText("The report could not be sent. Try again.")).toBeTruthy();
+    expect(screen.getByText("That did not go through. Try again.")).toBeTruthy();
     expect(screen.getByRole("radio", { name: "✓ May be under 18" })).toBeTruthy();
     expect(screen.getByLabelText(NOTE_LABEL).props.value).toBe("Says she is in year nine.");
     expect(disabled("Send report")).toBe(false);
@@ -956,7 +956,7 @@ describe("ConversationActions", () => {
     ).toBeTruthy();
     expect(unmatch).not.toHaveBeenCalled();
     await press("End conversation");
-    expect(screen.getByText("The conversation could not be ended. Try again.")).toBeTruthy();
+    expect(screen.getByText("That did not go through. Try again.")).toBeTruthy();
     expect(onDone).not.toHaveBeenCalled();
     await press("End conversation");
     expect(unmatch).toHaveBeenCalledTimes(2);
@@ -1013,7 +1013,7 @@ describe("ConversationActions", () => {
     await type("Kept writing after I said no.");
     await press("Send report");
     // No promise about this conversation, whose window may close first.
-    const limited = "That is enough reports for today. You can send more after midnight.";
+    const limited = "That is enough for today. You can try again after midnight.";
     expect(screen.getByText(limited)).toBeTruthy();
     expect(screen.queryByText(CAP)).toBeNull();
     expect(screen.queryByRole("button", { name: "Block" })).toBeNull();
@@ -1152,7 +1152,7 @@ describe("ConversationActions", () => {
 // saying first that the report points the moderators to the photo, then the
 // copy and the block as from More, and the report names the photo's place.
 
-const LIMITED = "That is enough reports for today. You can send more after midnight.";
+const LIMITED = "That is enough for today. You can try again after midnight.";
 const LATE = "This conversation can no longer be reported.";
 
 function PhotoHost({
@@ -1306,7 +1306,7 @@ describe("ConversationPhotoReport", () => {
       release(refusal("internal_error", 500));
       await new Promise<void>((resolve) => setTimeout(resolve, 20));
     });
-    expect(await screen.findByText("The report could not be sent. Try again.")).toBeTruthy();
+    expect(await screen.findByText("That did not go through. Try again.")).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Report this photo" })).toBeNull();
   });
 

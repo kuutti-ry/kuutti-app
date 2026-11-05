@@ -14,6 +14,7 @@ import { ConversationsScreen } from "./ConversationsScreen";
 import { leaveNotice } from "./notice";
 import { ChatLiveProvider } from "./store";
 import { dayOf, timeOf } from "./time";
+import { FAILED_TO_LOAD } from "@/test/failed";
 
 // The list of conversations and the home screen's way to it (#348): the
 // groups by whose turn it is and the archive, the banner near the limit (ADR-062
@@ -323,7 +324,7 @@ describe("the list of conversations", () => {
       () => json({ open: [summary(ID(1))], archived: [], yourTurn: COUNT(1) }),
     );
     await renderWithTheme(<ConversationsScreen />);
-    expect(await screen.findByText("Your conversations could not be loaded.")).toBeTruthy();
+    expect(await screen.findByText(FAILED_TO_LOAD)).toBeTruthy();
     await userEvent.setup().press(screen.getByRole("button", { name: "Try again" }));
     expect(await screen.findByRole("heading", { name: "Your turn: 1" })).toBeTruthy();
   });

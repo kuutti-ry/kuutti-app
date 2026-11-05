@@ -8,6 +8,7 @@ import { expectPinnedHeader, hasCutText } from "@/test/layout";
 import { renderWithTheme } from "@/test/render";
 import { MAX_FONT_SCALE } from "@/theme/a11y";
 import { PlaceScreen } from "./PlaceScreen";
+import { FAILED_TO_LOAD } from "@/test/failed";
 
 // The home after onboarding (ADR-061): what the card shows of it, and a new
 // postal code, as often as the person likes. In words only, and what was typed
@@ -217,7 +218,7 @@ describe("PlaceScreen", () => {
     fakeApi(IN_KALLIO, answer);
     await show();
     await press(option("Kallio"));
-    await waitFor(() => expect(screen.getByText("It could not be saved. Try again.")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("That did not go through. Try again.")).toBeTruthy());
     expect(checked("Helsinki")).toBe(true);
     expect(checked("Kallio")).toBe(false);
   });
@@ -258,10 +259,10 @@ describe("PlaceScreen", () => {
     );
     await show();
     await press(option("Kallio"));
-    await waitFor(() => expect(screen.getByText("It could not be saved. Try again.")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("That did not go through. Try again.")).toBeTruthy());
     refuse = false;
     await press(option("Kallio"));
-    expect(screen.queryByText("It could not be saved. Try again.")).toBeNull();
+    expect(screen.queryByText("That did not go through. Try again.")).toBeNull();
     expect(checked("Kallio")).toBe(true);
   });
 
@@ -319,7 +320,7 @@ describe("PlaceScreen", () => {
       await show();
       await press(option("Kallio"));
       await waitFor(() =>
-        expect(screen.getByText("It could not be saved. Try again.")).toBeTruthy(),
+        expect(screen.getByText("That did not go through. Try again.")).toBeTruthy(),
       );
       expect(announce.mock.calls).toEqual([["Saving…"]]);
     });
@@ -346,7 +347,7 @@ describe("PlaceScreen", () => {
       fakeApi(IN_KALLIO, () => refusal("internal_error", 500));
       await show();
       await press(option("Kallio"));
-      const words = "It could not be saved. Try again.";
+      const words = "That did not go through. Try again.";
       await waitFor(() => expect(screen.getByText(words)).toBeTruthy());
       expect(screen.getByText(words).props.accessibilityLiveRegion).toBe("assertive");
       expect(announce).not.toHaveBeenCalledWith(words);
@@ -359,7 +360,7 @@ describe("PlaceScreen", () => {
       await show();
       await press(option("Kallio"));
       await waitFor(() =>
-        expect(announce).toHaveBeenCalledWith("It could not be saved. Try again."),
+        expect(announce).toHaveBeenCalledWith("That did not go through. Try again."),
       );
     });
   });
@@ -422,12 +423,12 @@ describe("PlaceScreen", () => {
         }),
     ) as unknown as typeof fetch;
     await show();
-    expect(screen.getByText("Loading your profile…")).toBeTruthy();
+    expect(screen.getByText("Loading…")).toBeTruthy();
     await act(async () => {
       answer?.(refusal("internal_error", 500));
       await settle();
     });
-    expect(screen.getByText("Your profile could not be loaded.")).toBeTruthy();
+    expect(screen.getByText(FAILED_TO_LOAD)).toBeTruthy();
     fakeApi(IN_KALLIO);
     await press(screen.getByRole("button", { name: "Try again" }));
     await waitFor(() => expect(checked("Helsinki")).toBe(true));

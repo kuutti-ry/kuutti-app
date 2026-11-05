@@ -168,13 +168,13 @@ describe("the feedback form, under its row in Settings (#511)", () => {
     await press("Send");
     await waitFor(() =>
       expect(
-        screen.getByText("That is enough feedback for today. You can send more after midnight."),
+        screen.getByText("That is enough for today. You can try again after midnight."),
       ).toBeTruthy(),
     );
     expect(screen.getByLabelText("Your feedback").props.value).toBe("The onboarding was quick.");
     status = 500;
     await press("Send");
-    await waitFor(() => expect(screen.getByText("Sending did not work. Try again.")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("That did not go through. Try again.")).toBeTruthy());
     expect(screen.queryByRole("heading", { name: "Thank you" })).toBeNull();
     // No thanks is said for what did not go.
     expect(words(AccessibilityInfo.announceForAccessibilityWithOptions)).not.toContain("Thank you");

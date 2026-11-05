@@ -6,6 +6,7 @@ import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
 import { renderWithTheme } from "@/test/render";
 import { StarredScreen } from "./StarredScreen";
 import { StarsButton } from "./StarsButton";
+import { FAILED_TO_LOAD } from "@/test/failed";
 
 // The Starred list on the phone (#575, ADR-064 §6): the people as the API gives them
 // and in its order, a row that opens the card and a star that takes the star off,
@@ -157,7 +158,7 @@ describe("the Starred list", () => {
     await press("Take the star off: Henna");
 
     expect(screen.queryByRole("button", { name: "Henna, 31" })).toBeNull();
-    expect(screen.queryByText("The star was not taken off. Try again.")).toBeNull();
+    expect(screen.queryByText("That did not go through. Try again.")).toBeNull();
   });
 
   it("says a star that was not taken off, and keeps the row", async () => {
@@ -166,7 +167,7 @@ describe("the Starred list", () => {
 
     await press("Take the star off: Henna");
 
-    expect(screen.getByText("The star was not taken off. Try again.")).toBeTruthy();
+    expect(screen.getByText("That did not go through. Try again.")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Henna, 31" })).toBeTruthy();
   });
 
@@ -193,7 +194,7 @@ describe("the Starred list", () => {
         }),
     ) as unknown as typeof fetch;
     await renderWithTheme(<StarredScreen />);
-    expect(screen.getByText("Loading your stars…").props.accessibilityLiveRegion).toBe("polite");
+    expect(screen.getByText("Loading…").props.accessibilityLiveRegion).toBe("polite");
     await act(async () => {
       answer(json({ items: [] }));
     });
@@ -207,7 +208,7 @@ describe("the Starred list", () => {
       return failing ? refusal("internal", 500) : json({ items: [HENNA] });
     });
     await show();
-    expect(screen.getByText("Your stars did not load.")).toBeTruthy();
+    expect(screen.getByText(FAILED_TO_LOAD)).toBeTruthy();
 
     failing = false;
     await press("Try again");
@@ -245,7 +246,7 @@ describe("the Starred list", () => {
     await settle();
 
     expect(screen.getByRole("button", { name: "Henna, 31" })).toBeTruthy();
-    expect(screen.queryByText("Your stars did not load.")).toBeNull();
+    expect(screen.queryByText(FAILED_TO_LOAD)).toBeNull();
   });
 
   it("leads back home", async () => {

@@ -8,6 +8,7 @@ import { UnsavedRow } from "@/lib/unsaved";
 import { a11yProblems, type HostNode, markBefore, pressables } from "@/test/a11y";
 import { renderWithTheme, underProviders } from "@/test/render";
 import { YourContacts } from "./YourContacts";
+import { FAILED_TO_LOAD } from "@/test/failed";
 
 // The contacts a person keeps (#103), under Settings' Ways to reach you row
 // (#511): the read with its loading line and its failure, a part per kind
@@ -103,7 +104,7 @@ const show = async () => {
   await renderWithTheme(<YourContacts />);
   await screen.findByText(/Nobody sees them/);
 };
-const FAILED = "Nothing changed. Check your connection and try again.";
+const FAILED = "That did not go through. Try again.";
 const PACE = "That was a lot in a short time. Wait a moment and try again.";
 /** How a write fails, as a test's name says it, with what the card then says. */
 type Failure = { how: string; answer: () => Response | Error; words: string };
@@ -156,7 +157,7 @@ describe("Ways to reach you", () => {
       }) as unknown as Response,
     ]);
     await renderWithTheme(<YourContacts />);
-    expect(screen.getByText("Loading your contact details…").props.accessibilityLiveRegion).toBe(
+    expect(screen.getByText("Loading…").props.accessibilityLiveRegion).toBe(
       "polite",
     );
     await act(async () =>
@@ -437,7 +438,7 @@ describe("Ways to reach you", () => {
     await leave("Your Telegram username");
     for (let i = 0; i < 2; i += 1) {
       expect(
-        screen.getByText("Nothing changed. Check your connection and try again."),
+        screen.getByText("That did not go through. Try again."),
       ).toBeTruthy();
       expect(field("Your Telegram username").props.value).toBe("aino_k2");
       if (i === 0) await press("Try again");
@@ -503,7 +504,7 @@ describe("Ways to reach you", () => {
     ]);
     await show();
     await press("Remove your phone number");
-    expect(screen.getByText("Nothing changed. Check your connection and try again.")).toBeTruthy();
+    expect(screen.getByText("That did not go through. Try again.")).toBeTruthy();
     expect(told().queued).not.toContain(REMOVED);
     expect(field("Your phone number").props.value).toBe("40 1234567");
     expect(button("Remove your phone number")).toBeTruthy();
@@ -708,7 +709,7 @@ describe("Ways to reach you", () => {
   it("says the read failed, why, and reads again with Try again", async () => {
     contactsApi({ instagram: "aino.k" }, [refusal("internal_error", 500)]);
     await renderWithTheme(<YourContacts />);
-    expect(await screen.findByText("Your contact details could not be loaded.")).toBeTruthy();
+    expect(await screen.findByText(FAILED_TO_LOAD)).toBeTruthy();
     noProblems();
     await press("Try again");
     await waitFor(() => expect(field("Your Instagram username").props.value).toBe("aino.k"));

@@ -7,6 +7,7 @@ import { expectPinnedHeader, hasCutText } from "@/test/layout";
 import { renderWithTheme } from "@/test/render";
 import { SectionScreen } from "./SectionScreen";
 import { PROFILE_SECTIONS } from "./sections";
+import { FAILED_TO_LOAD } from "@/test/failed";
 
 const settle = () => new Promise<void>((resolve) => setTimeout(resolve, 10));
 const show = async (ui: React.ReactElement) => {
@@ -139,7 +140,7 @@ describe("SectionScreen", () => {
     async (id) => {
       fakeApi();
       await show(<SectionScreen section={id} />);
-      await waitFor(() => expect(screen.queryByText("Loading your profile…")).toBeNull());
+      await waitFor(() => expect(screen.queryByText("Loading…")).toBeNull());
       // A text that is still its key means the catalogue and the registry disagree.
       expect(screen.queryAllByText(/^profile\./)).toEqual([]);
       expect(screen.queryByRole("button", { name: "Save" })).toBeNull();
@@ -520,7 +521,7 @@ describe("SectionScreen", () => {
         : json({ profile: null, completeness: { complete: false, missing }, home: null }),
     ) as unknown as typeof fetch;
     await show(<SectionScreen section="lifestyle" />);
-    expect(screen.getByText("Your profile could not be loaded.")).toBeTruthy();
+    expect(screen.getByText(FAILED_TO_LOAD)).toBeTruthy();
     // Why, in words: the API answered 500.
     expect(screen.getByText("Kuutti's server had a problem. Try again in a moment.")).toBeTruthy();
     failing = false;

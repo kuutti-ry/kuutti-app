@@ -178,7 +178,7 @@ describe("AccountActions", () => {
     await waitFor(() => expect(share).toHaveBeenCalled());
     await settle();
     expect(screen.queryByText(SAVED)).toBeNull();
-    expect(screen.queryByText("The download did not work. Try again.")).toBeNull();
+    expect(screen.queryByText("That did not go through. Try again.")).toBeNull();
     expect(screen.queryByText("Preparing your data…")).toBeNull();
     expect(announced()).toEqual([]);
     expect(cache.has(`file:///cache/${ZIP_NAME}`)).toBe(false);
@@ -191,7 +191,7 @@ describe("AccountActions", () => {
     });
     await show(<ExportData share={share as never} />);
     await fireEvent.press(screen.getByRole("button", { name: "Download my data" }));
-    expect(await screen.findByText("The download did not work. Try again.")).toBeTruthy();
+    expect(await screen.findByText("That did not go through. Try again.")).toBeTruthy();
     expect(cache.has(`file:///cache/${ZIP_NAME}`)).toBe(false);
   });
 
@@ -207,11 +207,11 @@ describe("AccountActions", () => {
     await fireEvent.press(screen.getByRole("button", { name: "Download my data" }));
     expect(
       await screen.findByText(
-        "That is enough copies for today. You can download your data again after midnight.",
+        "That is enough for today. You can try again after midnight.",
       ),
     ).toBeTruthy();
     expect(share).not.toHaveBeenCalled();
-    expect(screen.queryByText("The download did not work. Try again.")).toBeNull();
+    expect(screen.queryByText("That did not go through. Try again.")).toBeNull();
   });
 
   it("says so when the export fails", async () => {
@@ -223,9 +223,9 @@ describe("AccountActions", () => {
     ]);
     await show(<ExportData share={jest.fn() as never} />);
     await fireEvent.press(screen.getByRole("button", { name: "Download my data" }));
-    const line = await screen.findByText("The download did not work. Try again.");
+    const line = await screen.findByText("That did not go through. Try again.");
     expect(line.props.accessibilityLiveRegion).toBe("assertive");
-    expect(announced()).toEqual(["The download did not work. Try again."]);
+    expect(announced()).toEqual(["That did not go through. Try again."]);
     expect(screen.queryByText(SAVED)).toBeNull();
   });
 
@@ -350,7 +350,7 @@ describe("ExportData on Android", () => {
     expect(exportRequests(requests)).toHaveLength(0);
     expect(cache.size).toBe(0);
     expect(screen.queryByText(SAVED)).toBeNull();
-    expect(screen.queryByText("The download did not work. Try again.")).toBeNull();
+    expect(screen.queryByText("That did not go through. Try again.")).toBeNull();
     expect(screen.queryByText("Preparing your data…")).toBeNull();
   });
 
@@ -410,7 +410,7 @@ describe("ExportData on Android", () => {
     await fireEvent.press(screen.getByRole("button", { name: "Download my data" }));
     expect(
       await screen.findByText(
-        "That is enough copies for today. You can download your data again after midnight.",
+        "That is enough for today. You can try again after midnight.",
       ),
     ).toBeTruthy();
     expect(cache.size).toBe(0);

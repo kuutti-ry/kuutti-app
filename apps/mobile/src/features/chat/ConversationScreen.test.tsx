@@ -15,6 +15,7 @@ import { ConversationScreen } from "./ConversationScreen";
 import { takeNotice } from "./notice";
 import { ChatLiveProvider } from "./store";
 import { dayOf, timeOf } from "./time";
+import { FAILED_TO_LOAD } from "@/test/failed";
 
 // One conversation (#348): the header, the messages by day with who, when and
 // what, "Read", the read mark, the composer, Send, the
@@ -797,7 +798,7 @@ describe("one conversation", () => {
       return ok(input, init);
     }) as unknown as typeof fetch;
     await renderWithTheme(<ConversationScreen id={ID} />);
-    expect(await screen.findByText("The conversation could not be loaded.")).toBeTruthy();
+    expect(await screen.findByText(FAILED_TO_LOAD)).toBeTruthy();
     await press("Try again");
     expect(said("Sanna", DAY_1, "Moi")).toBeTruthy();
   });
@@ -1030,7 +1031,7 @@ describe("contacts in a conversation (#103)", () => {
     for (let i = 0; i < 2; i += 1) {
       await press("Share your Instagram");
       expect(
-        screen.getByText("Nothing changed. Check your connection and try again."),
+        screen.getByText("That did not go through. Try again."),
       ).toBeTruthy();
     }
     expect(detailReads()).toBe(before);
@@ -1744,14 +1745,14 @@ describe("one conversation, live over the socket", () => {
       </ChatLiveProvider>,
     );
     await waitFor(() => expect(FakeWebSocket.instances).toHaveLength(1));
-    expect(await screen.findByText("The conversation could not be loaded.")).toBeTruthy();
+    expect(await screen.findByText(FAILED_TO_LOAD)).toBeTruthy();
     fails = false;
     await ready();
     await frame({ type: "contacts", conversationId: ID });
     await settle();
     expect([contactsReads(), detailReads()]).toEqual([2, 0]);
     // Read, but not shown over the failure: the messages were never read.
-    expect(screen.getByText("The conversation could not be loaded.")).toBeTruthy();
+    expect(screen.getByText(FAILED_TO_LOAD)).toBeTruthy();
     expect(screen.queryByText("Instagram: ville.k")).toBeNull();
     await press("Try again");
     expect(said("Sanna", DAY_1, "Moi")).toBeTruthy();
@@ -2120,7 +2121,7 @@ describe("one conversation, live over the socket", () => {
       set(detail({ contacts: VILLE_SHARES }));
       await ready();
       await settle();
-      expect(screen.getByText("Loading the conversation…")).toBeTruthy();
+      expect(screen.getByText("Loading…")).toBeTruthy();
       await page();
       expect(screen.getByLabelText("Message")).toBeTruthy();
       expect(screen.getByText("Instagram: ville.k")).toBeTruthy();

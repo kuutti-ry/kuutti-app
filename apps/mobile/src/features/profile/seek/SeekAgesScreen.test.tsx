@@ -6,6 +6,7 @@ import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
 import { expectPinnedHeader } from "@/test/layout";
 import { renderWithTheme } from "@/test/render";
 import { SeekAgesScreen } from "./SeekAgesScreen";
+import { FAILED_TO_LOAD } from "@/test/failed";
 
 // The age window (#542): the bounds of onboarding, from the stored answer, two
 // steppers that never cross, saved on leaving. Every answer is a button.
@@ -124,8 +125,8 @@ const OLDER_YOUNGEST = "Youngest, one year older";
 const YOUNGER_OLDEST = "Oldest, one year younger";
 const OLDER_OLDEST = "Oldest, one year older";
 const STEPS = [YOUNGER_YOUNGEST, OLDER_YOUNGEST, YOUNGER_OLDEST, OLDER_OLDEST];
-const FAILED = "It could not be saved. Try again.";
-const LOAD_FAILED = "Your profile could not be loaded.";
+const FAILED = "That did not go through. Try again.";
+const LOAD_FAILED = FAILED_TO_LOAD;
 const THE_QUESTION = "Leave without saving?";
 const BACK = "Back to what you seek";
 
@@ -322,8 +323,8 @@ describe("SeekAgesScreen", () => {
   });
 
   it.each([
-    ["fi-FI", "Nuorin, vuotta vanhempi", "Tallentaminen ei onnistunut. Yritä uudelleen."],
-    ["sv-FI", "Yngsta, ett år äldre", "Det gick inte att spara. Försök igen."],
+    ["fi-FI", "Nuorin, vuotta vanhempi", "Se ei onnistunut. Yritä uudelleen."],
+    ["sv-FI", "Yngsta, ett år äldre", "Det gick inte. Försök igen."],
   ])("says in %s that a refused change could not be saved", async (tag, older, failed) => {
     (useLocales as jest.Mock).mockReturnValue([{ languageTag: tag }]);
     try {
@@ -449,7 +450,7 @@ describe("SeekAgesScreen", () => {
   it("says it is loading until the window is read, and leaving then sends nothing", async () => {
     const { writes } = fakeApi({ wait: new Promise(() => {}) });
     await show(<SeekAgesScreen />);
-    expect(screen.getByText("Loading your profile…").props.accessibilityLiveRegion).toBe("polite");
+    expect(screen.getByText("Loading…").props.accessibilityLiveRegion).toBe("polite");
     expect(screen.queryByRole("button", { name: OLDER_YOUNGEST })).toBeNull();
     await leave();
     expect(writes).toEqual([]);
@@ -458,7 +459,7 @@ describe("SeekAgesScreen", () => {
   it("says when the window could not be read, and tries again", async () => {
     const { server } = fakeApi({ failing: true });
     await show(<SeekAgesScreen />);
-    await waitFor(() => expect(screen.getByText("Your profile could not be loaded.")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText(FAILED_TO_LOAD)).toBeTruthy());
     // Why, in words: the API answered 500.
     expect(screen.getByText("Kuutti's server had a problem. Try again in a moment.")).toBeTruthy();
     const found = pressables(screen.toJSON() as HostNode);
@@ -466,7 +467,7 @@ describe("SeekAgesScreen", () => {
     server.failing = false;
     await press(button("Try again"));
     await waitFor(() => expect(shownAges()).toEqual([25, 40]));
-    expect(screen.queryByText("Your profile could not be loaded.")).toBeNull();
+    expect(screen.queryByText(FAILED_TO_LOAD)).toBeNull();
   });
 
   it("says it is loading again while Try again reads", async () => {
@@ -479,7 +480,7 @@ describe("SeekAgesScreen", () => {
     });
     server.failing = false;
     await press(button("Try again"));
-    expect(screen.getByText("Loading your profile…").props.accessibilityLiveRegion).toBe("polite");
+    expect(screen.getByText("Loading…").props.accessibilityLiveRegion).toBe("polite");
     expect(screen.queryByText(LOAD_FAILED)).toBeNull();
     await act(async () => {
       answer?.();
@@ -494,7 +495,7 @@ describe("SeekAgesScreen", () => {
     await waitFor(() => expect(router.dismissTo).toHaveBeenCalledWith("/"));
     expect(router.replace).not.toHaveBeenCalled();
     expect(screen.queryByRole("button", { name: OLDER_YOUNGEST })).toBeNull();
-    expect(screen.queryByText("Your profile could not be loaded.")).toBeNull();
+    expect(screen.queryByText(FAILED_TO_LOAD)).toBeNull();
   });
 
   it.each([

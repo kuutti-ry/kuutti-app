@@ -46,7 +46,7 @@ name: The messages switch in Settings, Notifications, goes off, is kept on the s
       below: "A notification says that there is a new message or a new match, never what it says or from whom\\.|Ilmoitus kertoo, että sinulle on uusi viesti tai uusi mätsi, ei koskaan mitä siinä lukee tai keneltä se on\\.|En avisering säger att det finns ett nytt meddelande eller en ny matchning, aldrig vad det står eller från vem\\."
       above: "Matches|Mätsit|Matchningar"
     timeout: 15000
-- assertNotVisible: "The change was not saved\\. Try again\\.|Muutosta ei tallennettu\\. Yritä uudelleen\\.|Ändringen sparades inte\\. Försök igen\\."
+- assertNotVisible: "That did not go through\\. Try again\\.|Se ei onnistunut\\. Yritä uudelleen\\.|Det gick inte\\. Försök igen\\."
 
 # Kept on the server: home first, so Settings is read again rather than shown
 # as it was; the row comes back open, as it was left.
@@ -73,7 +73,7 @@ name: The messages switch in Settings, Notifications, goes off, is kept on the s
       below: "A notification says that there is a new message or a new match, never what it says or from whom\\.|Ilmoitus kertoo, että sinulle on uusi viesti tai uusi mätsi, ei koskaan mitä siinä lukee tai keneltä se on\\.|En avisering säger att det finns ett nytt meddelande eller en ny matchning, aldrig vad det står eller från vem\\."
       above: "Matches|Mätsit|Matchningar"
     timeout: 15000
-- assertNotVisible: "The change was not saved\\. Try again\\.|Muutosta ei tallennettu\\. Yritä uudelleen\\.|Ändringen sparades inte\\. Försök igen\\."
+- assertNotVisible: "That did not go through\\. Try again\\.|Se ei onnistunut\\. Yritä uudelleen\\.|Det gick inte\\. Försök igen\\."
 - runFlow:
     file: ../common/close-settings-row.yaml
     env:
