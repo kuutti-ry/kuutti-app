@@ -9,6 +9,7 @@ For everyone who writes or reviews `packages/i18n/messages.yaml`, and sent with 
 - Calm, not urgent. Nothing in the app hurries anyone: no "don't miss out", no countdowns in words, no streak or score language (CLAUDE.md, Product constraints).
 - Say what happened and what the person can do next. Never blame ("you entered an invalid…"); describe ("that date is not valid").
 - Rejection-adjacent moments (a pass, no match, the end of a round) are neutral and kind. They never judge the reader or the other person.
+- A screen does not explain itself in words. No tagline, helper line or secondary label where the layout could say it (#581). A fact that protects a person keeps its words.
 
 ## Finnish and Swedish
 
