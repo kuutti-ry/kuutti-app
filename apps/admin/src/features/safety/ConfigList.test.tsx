@@ -131,21 +131,25 @@ describe("the tunables", () => {
     await waitFor(() => expect(lists(calls)).toHaveLength(1));
     expect(screen.getByText("Loading the tunables…")).toBeInTheDocument();
     answer(json({ items: [feedback, word, fetches, tips] }));
-    expect(await screen.findByText("4 tunables")).toBeInTheDocument();
+    const at = await item("feedback_per_day");
     expect(screen.queryByText("Loading the tunables…")).toBeNull();
     expect(screen.getByRole("heading", { level: 2, name: "Tunables" })).toBeInTheDocument();
     expect(calls[0]?.authorization).toBe(`Bearer ${"t".repeat(43)}`);
+    // The whole list is on the page: nothing counts it (#581).
+    expect(screen.queryByText(/tunables?$/)).toBeNull();
 
+    // A closed row is its key and its value; the version is the first column once it is open (#581).
     const lines = screen.getAllByRole("listitem").map((li) => li.querySelector("summary"));
     expect(lines.map((line) => line?.textContent)).toEqual([
-      "feedback_per_day version 2: 5",
-      "sample_word version 1: first",
-      'photo_fetches_per_day version 1: {"thumb":600,"card":300,"full":60}',
-      "photo_tips_on version 1: true",
+      "feedback_per_day 5",
+      "sample_word first",
+      'photo_fetches_per_day {"thumb":600,"card":300,"full":60}',
+      "photo_tips_on true",
     ]);
 
-    const at = await item("feedback_per_day");
+    // The table keeps its name for a screen reader; the columns and the falling numbers say it to the eye (#581).
     const table = at.getByRole("table", { name: "Versions, newest first" });
+    expect(within(table).getByText("Versions, newest first")).toHaveClass("sr-only");
     const header = within(table)
       .getAllByRole("columnheader")
       .map((cell) => cell.textContent);
@@ -171,18 +175,13 @@ describe("the tunables", () => {
         "3",
         formatDateTime("en", new Date("2026-10-01T09:30:00.000Z")),
         "migration",
-        "Before reasons were kept",
+        // A version with no reason shows the panel's dash (#581).
+        "–",
       ],
     ]);
     // An object's versions show as JSON, like its value line.
     const objectTable = (await item("photo_fetches_per_day")).getByRole("table");
     expect(within(objectTable).getByText('{"thumb":600,"card":300,"full":60}')).toBeInTheDocument();
-  });
-
-  it("says one tunable in the singular", async () => {
-    fetchMock([listOf(word)]);
-    show();
-    expect(await screen.findByText("1 tunable")).toBeInTheDocument();
   });
 
   it("reloads on refresh", async () => {
@@ -191,17 +190,17 @@ describe("the tunables", () => {
       (req) => (isList(req) ? json({ items: page++ === 0 ? [word] : [word, tips] }) : null),
     ]);
     show();
-    expect(await screen.findByText("1 tunable")).toBeInTheDocument();
+    expect(await screen.findByText("sample_word", { selector: "code" })).toBeInTheDocument();
+    expect(screen.queryByText("photo_tips_on", { selector: "code" })).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
-    expect(await screen.findByText("2 tunables")).toBeInTheDocument();
-    expect(screen.getByText("photo_tips_on", { selector: "code" })).toBeInTheDocument();
+    expect(await screen.findByText("photo_tips_on", { selector: "code" })).toBeInTheDocument();
     expect(lists(calls)).toHaveLength(2);
   });
 
   it("says when the tunables could not be loaded", async () => {
     fetchMock([(req) => (isList(req) ? failure("internal_error", 500) : null)]);
     show();
-    expect(await screen.findByRole("alert")).toHaveTextContent("The tunables could not be loaded.");
+    expect(await screen.findByRole("alert")).toHaveTextContent(/^Could not be loaded\.$/);
     expect(screen.queryByText("Loading the tunables…")).toBeNull();
     expect(screen.queryByRole("list")).toBeNull();
   });
@@ -253,8 +252,8 @@ describe("the tunables", () => {
     fireEvent.click(at.getByRole("button", { name: "Change it" }));
     await waitFor(() =>
       expect(
-        screen.getByText("feedback_per_day", { selector: "code" }).closest("summary"),
-      ).toHaveTextContent("feedback_per_day version 3: 7"),
+        screen.getByText("feedback_per_day", { selector: "code" }).closest("summary")?.textContent,
+      ).toBe("feedback_per_day 7"),
     );
     expect(posts(calls)).toEqual([
       {
@@ -271,7 +270,7 @@ describe("the tunables", () => {
       within(at.getAllByRole("row")[1] as HTMLElement).getByText("More room in the pilot"),
     ).toBeInTheDocument();
     expect(at.getByLabelText("Why the change")).toHaveValue("");
-    expect(screen.getByText("Saved. feedback_per_day, version 3: 7")).toBeInTheDocument();
+    expect(screen.getByText("Saved. feedback_per_day: 7")).toBeInTheDocument();
   });
 
   it("keeps every other key open and its draft as it was after a change", async () => {
@@ -283,7 +282,7 @@ describe("the tunables", () => {
     const at = await item("feedback_per_day");
     review(at, "7", "More room in the pilot");
     fireEvent.click(at.getByRole("button", { name: "Change it" }));
-    expect(await screen.findByText("Saved. feedback_per_day, version 3: 7")).toBeInTheDocument();
+    expect(await screen.findByText("Saved. feedback_per_day: 7")).toBeInTheDocument();
     expect(lists(calls)).toHaveLength(1);
     expect(other.getByLabelText("New value")).toHaveValue("helsinki");
     expect(other.getByLabelText("Why the change")).toHaveValue("A draft");
@@ -297,7 +296,12 @@ describe("the tunables", () => {
     expect(region).toBeInTheDocument();
     review(at, "7", "More room in the pilot");
     fireEvent.click(at.getByRole("button", { name: "Change it" }));
-    await waitFor(() => expect(region).toHaveTextContent("Saved. feedback_per_day, version 3: 7"));
+    await waitFor(() => expect(region).toHaveTextContent(/^Saved\. feedback_per_day: 7$/));
+    // The same value again: the line clears as the step opens, so the second save is heard too.
+    review(at, "7", "Once more");
+    expect(region).toBeEmptyDOMElement();
+    fireEvent.click(at.getByRole("button", { name: "Change it" }));
+    await waitFor(() => expect(region).toHaveTextContent(/^Saved\. feedback_per_day: 7$/));
   });
 
   it("moves the focus with each step: the confirm sentence, then back to the value", async () => {
@@ -588,10 +592,11 @@ describe("the tunables", () => {
 
   describe("says what the API refused, back at the form, without reloading", () => {
     it.each([
+      // The same words as the form's own check: one text serves both (#581).
       [
         "config_shape",
         () => failure("config_shape", 400),
-        "The value must keep the current one's type and keys.",
+        "This is not a value of the key's type.",
       ],
       [
         "config_conflict",

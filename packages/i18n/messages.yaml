@@ -5633,10 +5633,6 @@ admin.signIn.title:
   en: Sign in
   description: Admin panel, heading of the sign-in screen. English only (TD-17).
 
-admin.signIn.explain:
-  en: Moderators sign in with their bank, like everyone. The panel opens only for a bank login that has a moderator role.
-  description: Admin panel, sign-in screen paragraph.
-
 admin.signIn.button:
   en: Sign in with your bank
   description: Admin panel, the button that starts the staff bank login.
@@ -5665,29 +5661,21 @@ admin.session.role:
   en: "Signed in as {role}"
   description: Admin panel header. {role} is the role word from the API (moderator, admin, researcher), not translated.
 
-admin.session.expires:
-  en: "Session ends: {time}"
-  description: Admin panel header. {time} is a clock time formatted for the locale, after a colon so nothing inflects it.
-
 admin.signOut:
   en: Sign out
   description: Admin panel header button.
 
 admin.queue.title:
-  en: Photo review queue
-  description: Admin panel, heading of the photo queue screen.
+  en: "Photos"
+  description: "Admin panel, heading of the photo queue screen. The same name as its menu entry and the front page's (#581)."
 
 admin.queue.total:
-  en: "{total, plural, =0 {Nothing waiting} one {# photo waiting} other {# photos waiting}}"
-  description: Admin panel, how many photos wait for a decision.
+  en: "{total, plural, =0 {Nothing waiting} one {# waiting} other {# waiting}}"
+  description: "Admin panel, on Reports, Automatic shadow bans, Photos and Feedback: how many wait in all, past the list's first page too; on Automatic shadow bans, Photos and Feedback said again when one is decided; the screen's heading says of what (#581)."
 
 admin.queue.loading:
   en: Loading the queue…
   description: Admin panel, while the queue is fetched.
-
-admin.queue.error:
-  en: The queue could not be loaded.
-  description: Admin panel, the queue request failed.
 
 admin.feedback.title:
   en: Feedback
@@ -5700,14 +5688,6 @@ admin.feedback.refresh:
 admin.feedback.loading:
   en: Loading the feedback…
   description: "Admin panel, while the feedback list is fetched (#171)."
-
-admin.feedback.error:
-  en: The feedback could not be loaded.
-  description: "Admin panel, the feedback request failed (#171)."
-
-admin.feedback.total:
-  en: "{total, plural, =0 {Nothing waiting.} one {# waiting.} other {# waiting.}}"
-  description: "Admin panel, how many feedback rows wait for a moderator beyond this page (#171)."
 
 admin.feedback.kind.bug:
   en: Bug
@@ -5726,8 +5706,8 @@ admin.feedback.kind.praise:
   description: "Admin panel, the kind of a feedback row (#171)."
 
 admin.feedback.meta:
-  en: "Version {version}, {platform}, {locale} · {time} · account {account}"
-  description: "Admin panel, the line under a feedback row's text (#171): the app's version, the platform and the language the app read, when it was sent, and the sender's account id shortened."
+  en: "Version {version}, {platform}, {locale} · {time}"
+  description: "Admin panel, the line under a feedback row's text (#171): the app's version, the platform and the language the app read, and when it was sent. The sender's account follows it as a link (admin.queue.account)."
 
 admin.feedback.handle:
   en: Mark as handled
@@ -5751,7 +5731,7 @@ admin.queue.uploaded:
 
 admin.queue.account:
   en: "Account {account}"
-  description: Admin panel, one queue item. {account} is the first characters of the pseudonymous account id.
+  description: "Admin panel, a link to the person's page, under a photo of the queue and on a feedback row (#306). {account} is the first characters of the pseudonymous account id."
 
 admin.queue.image:
   en: "Photo under review"
@@ -5763,27 +5743,19 @@ admin.queue.imageLoading:
 
 admin.queue.labels:
   en: What the automatic check saw
-  description: Admin panel, heading above the label list of one item.
-
-admin.queue.noLabels:
-  en: The automatic check found no moderation label.
-  description: Admin panel, when the automatic check returned no moderation label for a queued photo (it waits for another reason, such as an uncertain face; the list of what was flagged says which).
+  description: "Admin panel, heading above what the check found on one item: its face count and any labels."
 
 admin.queue.notChecked:
   en: Not checked automatically.
   description: Admin panel, the item was queued without an automatic check (no Rekognition where the API runs).
 
 admin.queue.appealed:
-  en: The owner asked a person to look at the automatic rejection.
-  description: Admin panel, the photo is in the queue because its owner appealed the automatic check's rejection (#253).
+  en: "Appealed"
+  description: "Admin panel, the badge on a photo in the queue because its owner appealed the automatic check's rejection (#253)."
 
 admin.queue.sensitive:
-  en: Hidden until you choose to look. The check saw something sensitive.
+  en: "The check saw something sensitive."
   description: Admin panel, in place of a picture with a hard label (nudity, violence, disturbing, hate) at or above its review line; not loaded until the moderator asks (#253).
-
-admin.queue.show:
-  en: Show the picture
-  description: Admin panel, button that loads and shows a hidden sensitive picture (#253).
 
 admin.queue.faces:
   en: "{faces, plural, =0 {No face found} one {# face found} other {# faces found}}"
@@ -5873,21 +5845,9 @@ admin.config.loading:
   en: "Loading the tunables…"
   description: "Admin panel, while the tunables are fetched (#304)."
 
-admin.config.error:
-  en: "The tunables could not be loaded."
-  description: "Admin panel, the tunables request failed (#304)."
-
-admin.config.total:
-  en: "{total, plural, one {# tunable} other {# tunables}}"
-  description: "Admin panel, how many keys the tunables screen lists (#304)."
-
-admin.config.current:
-  en: "version {version}: {value}"
-  description: "Admin panel, one key's line, after its name: the version every reader uses and its value (#304)."
-
 admin.config.history:
   en: "Versions, newest first"
-  description: "Admin panel, the caption of one key's history table (#304)."
+  description: "Admin panel, the name of one key's history table (#304), heard by a screen reader and never drawn: the columns and the falling version numbers say it (#581)."
 
 admin.config.col.version:
   en: "Version"
@@ -5907,11 +5867,7 @@ admin.config.col.by:
 
 admin.config.col.why:
   en: "Why"
-  description: "Admin panel, history table column: the reason given with the change (#305)."
-
-admin.config.noReason:
-  en: "Before reasons were kept"
-  description: "Admin panel, history table: a version the seed or a migration wrote, with no reason (#305)."
+  description: "Admin panel, history table column: the reason given with the change (#305). A version the seed or a migration wrote has none, and shows the panel's dash."
 
 admin.config.newValue:
   en: "New value"
@@ -5938,16 +5894,12 @@ admin.config.cancel:
   description: "Admin panel, back from the confirm step to the form, nothing sent (#305)."
 
 admin.config.changed:
-  en: "Saved. {key}, version {version}: {value}"
+  en: "Saved. {key}: {value}"
   description: "Admin panel, said after a change was saved (#305)."
 
 admin.config.invalid:
   en: "This is not a value of the key's type."
-  description: "Admin panel, the form could not read the input as the current value's type (#305)."
-
-admin.config.shape:
-  en: "The value must keep the current one's type and keys."
-  description: "Admin panel, the API refused a value of another type or with other keys (#305)."
+  description: "Admin panel, the form could not read the input as a value of the key's type, or the API refused one of another type or with other keys (#305)."
 
 admin.config.conflict:
   en: "Another admin changed this key meanwhile. Refresh and look again."
@@ -5962,8 +5914,8 @@ admin.nav.overview:
   description: "Admin panel, the menu entry of the front page (#303)."
 
 admin.overview.title:
-  en: "What waits"
-  description: "Admin panel, the heading of the front page: every queue with its count and the age of its oldest (#303)."
+  en: "Overview"
+  description: "Admin panel, the heading of the front page: every queue with its count and the age of its oldest (#303). The same name as its menu entry (#581)."
 
 admin.overview.refresh:
   en: "Refresh"
@@ -5973,21 +5925,9 @@ admin.overview.loading:
   en: "Loading what waits…"
   description: "Admin panel, while the front page is fetched (#303)."
 
-admin.overview.error:
-  en: "What waits could not be loaded."
-  description: "Admin panel, the front page's request failed (#303)."
-
-admin.overview.empty:
-  en: "Nothing waits in any queue."
-  description: "Admin panel, every queue on the front page is empty (#303)."
-
 admin.overview.foundThem.title:
   en: "Told Kuutti they found someone"
   description: "Admin panel, front page: the heading of the association's measure (#83, ADR-040), how many said they found somebody, by reason."
-
-admin.overview.foundThem.note:
-  en: "Counted by day and reason, with nobody's name: the count stays when an account is deleted."
-  description: "Admin panel, front page, under the found-them heading (#83): the count names no person (ADR-040)."
 
 admin.overview.foundThem.reason:
   en: "Reason"
@@ -6022,8 +5962,8 @@ admin.overview.queue.automaticBans:
   description: "Admin panel, the name on the front page of the shadow bans an automatic rule applied, waiting for a moderator to confirm or reverse each; a link to them (#105)."
 
 admin.overview.queue.photos:
-  en: "Photo review queue"
-  description: "Admin panel, the photo queue's name on the front page, a link to it (#303)."
+  en: "Photos"
+  description: "Admin panel, the photo queue's name on the front page, a link to it (#303). The same name as its menu entry and its heading (#581)."
 
 admin.overview.queue.feedback:
   en: "Feedback"
@@ -6053,29 +5993,29 @@ admin.late:
   en: "Late (response time: {hours} h)"
   description: "Admin panel, after a queue on the front page whose oldest (#303), or a report in the queue (#311), has waited longer than matching_config moderation_response_hours, the time the association promises (#299); for the automatic shadow bans, on the front page and in their list, longer than matching_config auto_shadow_ban_review_hours (#105). Said in words and bold, never by colour alone."
 
+admin.loadFailed:
+  en: "Could not be loaded."
+  description: "Admin panel, in place of what a screen or a section shows when it failed to load; the screen's or the section's heading says of what (#581)."
+
+admin.showPhoto:
+  en: "Show photo"
+  description: "Admin panel, the button that fetches a photo hidden until asked: a sensitive picture in the photo queue (#253), a photo on a person's page (#306), a photo a line of a report's frozen copy held (#312) or the photo a card's report points at (#476). The fetch is an audit row."
+
 admin.automaticBans.title:
   en: "Automatic shadow bans"
   description: "Admin panel, the heading of the shadow bans an automatic rule applied, waiting for a moderator to confirm or reverse each (#105)."
 
 admin.automaticBans.explain:
-  en: "A rule hid these people from everyone else, and they are not told. Confirm or reverse each within {hours, plural, one {# hour} other {# hours}}. Past that the shadow ban stays as it is, and says Late."
-  description: "Admin panel, the automatic shadow bans (#105): what the list is; {hours} is matching_config auto_shadow_ban_review_hours."
+  en: "Confirm or reverse each within {hours, plural, one {# hour} other {# hours}}."
+  description: "Admin panel, the automatic shadow bans (#105), under the heading: how long a moderator has for each, which a row otherwise shows only once it is late (#581); {hours} is matching_config auto_shadow_ban_review_hours."
 
 admin.automaticBans.loading:
   en: "Loading the automatic shadow bans…"
   description: "Admin panel, the automatic shadow bans while the list loads (#105)."
 
-admin.automaticBans.error:
-  en: "The automatic shadow bans could not be loaded. Try Refresh."
-  description: "Admin panel, the automatic shadow bans when the list failed to load (#105)."
-
 admin.automaticBans.refresh:
   en: "Refresh"
   description: "Admin panel, the automatic shadow bans: reload the list (#105)."
-
-admin.automaticBans.total:
-  en: "{total, plural, =0 {No automatic shadow ban waits.} one {# automatic shadow ban waits.} other {# automatic shadow bans wait.}}"
-  description: "Admin panel, the automatic shadow bans: how many wait for a moderator in all, said again when one is decided (#105)."
 
 admin.automaticBans.shown:
   en: "Showing the first {shown} of them."
@@ -6138,7 +6078,7 @@ admin.automaticBans.reverseEffect:
   description: "Admin panel, the automatic shadow bans (#105): what reversing one does, in words."
 
 admin.automaticBans.done.confirm:
-  en: "Confirmed: the shadow ban on account {account} stays. The reports filed before it can now be closed with it, one by one."
+  en: "Confirmed: the shadow ban on account {account} stays."
   description: "Admin panel, the automatic shadow bans (#105): the status after a moderator confirmed one, followed by a link to the report queue; {account} is the account id shortened."
 
 admin.automaticBans.done.reverse:
@@ -6161,13 +6101,9 @@ admin.reports.loading:
   en: "Loading the reports…"
   description: "Admin panel, the report queue while the list loads (#311)."
 
-admin.reports.error:
-  en: "The reports could not be loaded. Try Refresh."
-  description: "Admin panel, the report queue when the list failed to load (#311)."
-
 admin.reports.show:
   en: "Show"
-  description: "Admin panel, the report queue: the legend of the filter between the reports waiting and those decided (#311)."
+  description: "Admin panel, the report queue: the name of the filter between the reports waiting and those decided (#311), heard by a screen reader and never drawn: the two choices say what they choose between (#581)."
 
 admin.reports.show.open:
   en: "Waiting for a decision"
@@ -6177,12 +6113,8 @@ admin.reports.show.closed:
   en: "Decided"
   description: "Admin panel, the report queue's filter: the reports a moderator decided, the newest decision first, for the record (#311)."
 
-admin.reports.total.open:
-  en: "{total, plural, =0 {Nothing waits.} one {# report waits.} other {# reports wait.}}"
-  description: "Admin panel, the report queue: how many reports wait for a decision in all (#311)."
-
 admin.reports.total.closed:
-  en: "{total, plural, =0 {No report has been decided yet.} one {# report decided.} other {# reports decided.}}"
+  en: "{total, plural, =0 {Nothing decided} one {# decided} other {# decided}}"
   description: "Admin panel, the report queue's decided filter: how many reports were decided in all (#311)."
 
 admin.reports.shown:
@@ -6240,10 +6172,6 @@ admin.report.title:
 admin.report.loading:
   en: "Loading the report…"
   description: "Admin panel, one report's page (#312): while the report loads."
-
-admin.report.error:
-  en: "The report could not be loaded."
-  description: "Admin panel, one report's page (#312): the report failed to load."
 
 admin.report.missing:
   en: "No such report."
@@ -6313,10 +6241,6 @@ admin.report.side.reported:
   en: "Reported person"
   description: "Admin panel, one report's page (#312), the frozen copy: a line the reported person sent; said in words, never by colour or alignment alone."
 
-admin.report.showPhoto:
-  en: "Show photo"
-  description: "Admin panel, one report's page (#312): the button that fetches a photo a line of the frozen copy held, or the photo a card's report points at (#476); the fetch is an audit row."
-
 admin.report.photoRemoved:
   en: "Photo removed"
   description: "Admin panel, one report's page (#312): the line of the frozen copy held a photo removed before the report, or the photo a card's report points at was deleted since (#476)."
@@ -6345,21 +6269,17 @@ admin.report.decisionTitle:
   en: "Decision"
   description: "Admin panel, one report's page (#312): the heading of the decision, its actions while the report waits."
 
-admin.report.reportedFor:
-  en: "Reported for: {reason}"
-  description: "Admin panel, one report's page (#312), the decision: the reason the reporter chose, beside the actions, since a sanction's reason is chosen on purpose."
-
 admin.report.act:
   en: "Act on the reported person"
   description: "Admin panel, one report's page (#312), the decision: the legend of the sanctions' buttons (#308)."
 
 admin.report.actAlso:
-  en: "Applying one also closes this report as acted on; the reporter's export will say it was acted on, never which action."
+  en: "Applying one also closes this report as acted on."
   description: "Admin panel, one report's page (#312), the decision: a line in a sanction's confirm step, saying the rest of its effect."
 
 admin.report.closeWithTitle:
-  en: "Close as acted on with a sanction applied since the report"
-  description: "Admin panel, one report's page (#312), the decision: the heading of the sanctions that may close the report."
+  en: "Applied since the report"
+  description: "Admin panel, one report's page (#312), the decision: the heading of the sanctions applied since the filing, any of which may close the report."
 
 admin.report.closeWith:
   en: "Close with this"
@@ -6370,7 +6290,7 @@ admin.report.closeTitle:
   description: "Admin panel, one report's page (#312), the decision: the heading of the step that closes the report naming a sanction."
 
 admin.report.closeEffect:
-  en: "The report closes as acted on, naming this sanction: {kind}, applied {time}. Nothing more happens to the reported person; the reporter's export will say it was acted on, never which action."
+  en: "The report closes as acted on, naming this sanction: {kind}, applied {time}. Nothing more happens to the reported person."
   description: "Admin panel, one report's page (#312), the decision: the effect of closing the report with a sanction, {kind} being the sanction's kind."
 
 admin.report.closeConfirm:
@@ -6386,7 +6306,7 @@ admin.report.dismissTitle:
   description: "Admin panel, one report's page (#312), the decision: the heading of the step that dismisses the report."
 
 admin.report.dismissEffect:
-  en: "The report closes with no action on the reported person. The block between the two stays. The reporter's export will say it was dismissed."
+  en: "The report closes with no action on the reported person. The block between the two stays."
   description: "Admin panel, one report's page (#312), the decision: the effect of dismissing the report."
 
 admin.report.dismissConfirm:
@@ -6422,8 +6342,8 @@ admin.report.decidedMeanwhile:
   description: "Admin panel, one report's page (#312), the decision: a sanction was applied, but somebody else had decided the report; a link to the person's page follows."
 
 admin.report.personPage:
-  en: "The reported person's page, where it can be lifted"
-  description: "Admin panel, one report's page (#312), the decision: after admin.report.decidedMeanwhile, the link to the reported person's page."
+  en: "The reported person's page"
+  description: "Admin panel, one report's page (#312), the decision: after admin.report.decidedMeanwhile, the link to the reported person's page, which offers Lift."
 
 admin.report.lifted:
   en: "lifted"
@@ -6450,12 +6370,8 @@ admin.nav.accounts:
   description: "Admin panel, the menu entry of the way to a person's page by account id (#306)."
 
 admin.account.lookupTitle:
-  en: "A person's page"
-  description: "Admin panel, the heading of the screen that opens a person's page by account id (#306)."
-
-admin.account.lookupExplain:
-  en: "Paste the account id from a report, a photo or a feedback row. There is no search by name or anything else."
-  description: "Admin panel, under the lookup's heading (#306): the id is the only way, by design."
+  en: "A person"
+  description: "Admin panel, the heading of the screen that opens a person's page by account id (#306). The same name as its menu entry (#581)."
 
 admin.account.id:
   en: "Account id"
@@ -6469,10 +6385,6 @@ admin.account.notAnId:
   en: "This is not an account id."
   description: "Admin panel, the lookup's field holds something that is not a uuid (#306)."
 
-admin.account.pageLink:
-  en: "The person's page"
-  description: "Admin panel, a link from a queue item or a feedback row to the person's page (#306)."
-
 admin.account.title:
   en: "Account {account}"
   description: "Admin panel, the heading of a person's page; {account} is the first characters of the account id (#306)."
@@ -6480,10 +6392,6 @@ admin.account.title:
 admin.account.loading:
   en: "Loading the page…"
   description: "Admin panel, while a person's page is fetched (#306)."
-
-admin.account.error:
-  en: "The page could not be loaded."
-  description: "Admin panel, a person's page failed to load (#306)."
 
 admin.account.missing:
   en: "No account has this id."
@@ -6545,10 +6453,6 @@ admin.account.photosTitle:
   en: "Photos"
   description: "Admin panel, a person's page, the heading of the photos (#306)."
 
-admin.account.showPhoto:
-  en: "Show the photo"
-  description: "Admin panel, a person's page, the button that fetches one photo; the fetch is an audit row (#306)."
-
 admin.account.image:
   en: "Photo: {state}. Uploaded: {time}"
   description: "Admin panel, a person's page, the alt text of a photo a moderator asked to see: its state and upload time (#306)."
@@ -6566,7 +6470,7 @@ admin.takeDown.title:
   description: "Admin panel, the title of the take-down's confirm step (#477)."
 
 admin.takeDown.effect:
-  en: "Nobody else is given this photo from now on; a link to it already given ends within fifteen minutes. The person keeps it in their own list with the reason you choose, and cannot appeal. Nothing is deleted, and it is not a sanction: their standing stays as it is. Should they upload the same picture again, the automatic check looks at it, not a person."
+  en: "Nobody else is given this photo from now on. The person keeps it in their own list with the reason you choose, and cannot appeal. Nothing is deleted, and it is not a sanction. Should they upload the same picture again, the automatic check looks at it, not a person."
   description: "Admin panel, the take-down's confirm step (#477, ADR-006 §2): what taking down an approved photo does, in words."
 
 admin.takeDown.tooFew:
@@ -6578,7 +6482,7 @@ admin.takeDown.confirm:
   description: "Admin panel, the confirming button of the take-down's step (#477)."
 
 admin.takeDown.done:
-  en: "Taken down. Nobody else is given the photo from now on."
+  en: "Taken down."
   description: "Admin panel, the status after a photo was taken down (#477), on a person's page or beside the photo a card's report points at (#476)."
 
 admin.takeDown.error.photo_not_approved:
@@ -6597,10 +6501,6 @@ admin.account.sanctionsTitle:
   en: "Sanctions"
   description: "Admin panel, a person's page, the heading of the sanctions (#306, #307)."
 
-admin.account.sanctionsError:
-  en: "The sanctions could not be loaded."
-  description: "Admin panel, a person's page, the sanctions' own request failed (#306)."
-
 admin.account.feedbackTitle:
   en: "Feedback sent"
   description: "Admin panel, a person's page, the heading of the feedback the person sent (#306)."
@@ -6614,8 +6514,8 @@ admin.account.auditTitle:
   description: "Admin panel, a person's page, the heading of the audit rows about the person and their photos (#306)."
 
 admin.account.auditCaption:
-  en: "Newest first, at most fifty"
-  description: "Admin panel, a person's page, the audit table's caption (#306)."
+  en: "At most fifty"
+  description: "Admin panel, a person's page, the audit table's caption (#306): past fifty rows nothing else says that older ones exist (#581)."
 
 admin.account.col.when:
   en: "When"
@@ -6653,10 +6553,6 @@ admin.matching.title:
   en: "Matching"
   description: "Admin panel, the heading of the switch that opens matching (#500)."
 
-admin.matching.explain:
-  en: "Matching opens for the whole country when an admin turns it on here, and nothing else opens or closes it. Until then, people with a finished profile are told that it has not opened yet."
-  description: "Admin panel, matching: what the switch is (#500, ADR-060 §1, ADR-061 §8)."
-
 admin.matching.refresh:
   en: "Refresh"
   description: "Admin panel, matching: reads the switch again."
@@ -6664,14 +6560,6 @@ admin.matching.refresh:
 admin.matching.loading:
   en: "Loading…"
   description: "Admin panel, matching: while the switch loads."
-
-admin.matching.error:
-  en: "Whether matching is open could not be read."
-  description: "Admin panel, matching: when the switch could not be read."
-
-admin.matching.where:
-  en: "All of Finland"
-  description: "Admin panel, matching: what the switch covers, beside its state. There is one pond, the country (ADR-061 §8)."
 
 admin.matching.open:
   en: "Open"
@@ -6715,11 +6603,11 @@ admin.matching.failed:
 
 admin.matching.opened:
   en: "Matching is now open."
-  description: "Admin panel, matching: said once matching is open, in a live region."
+  description: "Admin panel, matching: said once matching is open, in a live region, heard by a screen reader and never drawn: the badge and the button's name show it (#581)."
 
 admin.matching.closedNow:
   en: "Matching is now closed."
-  description: "Admin panel, matching: said once matching is closed, in a live region."
+  description: "Admin panel, matching: said once matching is closed, in a live region, heard by a screen reader and never drawn: the badge and the button's name show it (#581)."
 
 admin.audit.title:
   en: "Audit log"
@@ -6730,15 +6618,15 @@ admin.audit.filters:
   description: "Admin panel, the accessible name of the audit log's filter form (#309)."
 
 admin.audit.actor:
-  en: "Who (identity id)"
+  en: "Who"
   description: "Admin panel, audit log filter label (#309)."
 
 admin.audit.action:
-  en: "What (such as sanction.apply)"
+  en: "What"
   description: "Admin panel, audit log filter label (#309)."
 
 admin.audit.subjectType:
-  en: "Subject type (account, photo, feedback, config)"
+  en: "Subject type"
   description: "Admin panel, audit log filter label (#309)."
 
 admin.audit.subjectId:
@@ -6761,33 +6649,21 @@ admin.audit.loading:
   en: "Loading the audit log…"
   description: "Admin panel, while a page of the audit log is fetched (#309)."
 
-admin.audit.error:
-  en: "The audit log could not be loaded."
-  description: "Admin panel, a page of the audit log failed to load (#309)."
-
 admin.audit.invalid:
-  en: "A filter is not valid: an id is a uuid, an action is two words with a dot."
+  en: "A filter is not valid: an id is a uuid, an action is two words with a dot, a subject type is one word in small letters."
   description: "Admin panel, the API refused the filters (#309)."
 
 admin.audit.none:
   en: "Nothing matches."
   description: "Admin panel, the audit log's page is empty (#309)."
 
-admin.audit.caption:
-  en: "Newest first, fifty a page"
-  description: "Admin panel, the audit log table's caption (#309)."
-
 admin.audit.role:
   en: "Role now"
-  description: "Admin panel, the audit log, the column of the actor's current role (#309)."
+  description: "Admin panel, the audit log, the column of the actor's current role (#309). A row the automatic rules wrote shows the panel's dash: they hold no role, and never held one (#105)."
 
 admin.audit.noRole:
   en: "None now"
   description: "Admin panel, the audit log: the actor holds no role any more (#309)."
-
-admin.audit.roleAutomatic:
-  en: "Not a person"
-  description: "Admin panel, the audit log (#309), the role column of a row the automatic rules wrote (#105): they hold no role, and never held one."
 
 admin.audit.actorAutomatic:
   en: "The automatic rules"
@@ -6813,21 +6689,9 @@ admin.staff.refresh:
   en: "Refresh"
   description: "Admin panel, the button that reloads the staff list (#310)."
 
-admin.staff.explain:
-  en: "Roles are granted and revoked by the maintainer's moderator tool, not here."
-  description: "Admin panel, under the staff list's heading (#310)."
-
 admin.staff.loading:
   en: "Loading the staff…"
   description: "Admin panel, while the staff list is fetched (#310)."
-
-admin.staff.error:
-  en: "The staff could not be loaded."
-  description: "Admin panel, the staff list failed to load (#310)."
-
-admin.staff.caption:
-  en: "{total, plural, one {# member of staff} other {# members of staff}}"
-  description: "Admin panel, the staff table's caption (#310)."
 
 admin.staff.col.identity:
   en: "Identity"
@@ -6855,18 +6719,18 @@ admin.staff.never:
 
 admin.sanction.actions:
   en: "Actions on this person"
-  description: "Admin panel, a person's page, the sanctions (#308): the label of the group of action buttons."
+  description: "Admin panel, a person's page, the sanctions (#308): the name of the group of action buttons, heard by a screen reader and never drawn: the heading Sanctions stands right above them (#581)."
 
 admin.sanction.action.warn:
   en: "Warn"
   description: "Admin panel, a person's page, the sanctions (#308): the button that opens a warning."
 
 admin.sanction.action.shadow_ban:
-  en: "Hide from others (shadow ban)"
+  en: "Shadow ban"
   description: "Admin panel, a person's page, the sanctions (#308): the button that opens a shadow ban."
 
 admin.sanction.action.suspend:
-  en: "Suspend until a day"
+  en: "Suspend"
   description: "Admin panel, a person's page, the sanctions (#308): the button that opens a suspension."
 
 admin.sanction.action.ban:
@@ -6954,7 +6818,7 @@ admin.sanction.reason.other:
   description: "Admin panel, a person's page, the sanctions (#308): a reason of the closed list."
 
 admin.sanction.note:
-  en: "Note: what happened, in a few words"
+  en: "Note"
   description: "Admin panel, a person's page, the sanctions (#308): the label of staff's note."
 
 admin.sanction.noteCount:
@@ -6962,7 +6826,7 @@ admin.sanction.noteCount:
   description: "Admin panel, a person's page, the sanctions (#308): how long the note is, against its limit."
 
 admin.sanction.endsOn:
-  en: "Suspended until the start of this day"
+  en: "Suspended until"
   description: "Admin panel, a person's page, the sanctions (#308): the label of a suspension's end day."
 
 admin.sanction.apply:
@@ -6987,27 +6851,23 @@ admin.sanction.liftTitle:
 
 admin.sanction.liftEffect.warn:
   en: "The warning is marked lifted. Nothing else changes for the person."
-  description: "Admin panel, a person's page, the sanctions (#308): what lifting a warning does, in words (ADR-024 §4)."
+  description: "Admin panel, a person's page, the sanctions (#308): what lifting a warning does, in words (ADR-024 §4): in the lift step, and beside Lift it in a second look."
 
 admin.sanction.liftEffect.shadow_ban:
-  en: "Others see the person again, unless something else still open hides them. Their sessions are not touched."
-  description: "Admin panel, a person's page, the sanctions (#308): what lifting a shadow ban does, in words (ADR-024 §4)."
+  en: "Others see the person again, unless something else still open hides them."
+  description: "Admin panel, a person's page, the sanctions (#308): what lifting a shadow ban does, in words (ADR-024 §4): in the lift step, and beside Lift it in a second look."
 
 admin.sanction.liftEffect.suspend:
-  en: "The person may sign in again, unless something else still open stops them. No session comes back: they sign in anew."
-  description: "Admin panel, a person's page, the sanctions (#308): what lifting a suspension does, in words (ADR-024 §4)."
+  en: "The person may sign in again, unless something else still open stops them."
+  description: "Admin panel, a person's page, the sanctions (#308): what lifting a suspension does, in words (ADR-024 §4): in the lift step, and beside Lift it in a second look."
 
 admin.sanction.liftEffect.ban:
-  en: "The person may sign in again, unless something else still open stops them. No session comes back: they sign in anew."
-  description: "Admin panel, a person's page, the sanctions (#308): what lifting a ban does, in words (ADR-024 §4)."
+  en: "The person may sign in again, unless something else still open stops them."
+  description: "Admin panel, a person's page, the sanctions (#308): what lifting a ban does, in words (ADR-024 §4): in the lift step, and beside Lift it in a second look."
 
 admin.sanction.reviewTitle:
   en: "Look at it again: {kind}"
   description: "Admin panel, a person's page, the sanctions (#308): the second look's title; {kind} is the sanction's kind in words."
-
-admin.sanction.reviewExplain:
-  en: "A second member of staff's look: a note, and keep it or lift it. Whoever applied it cannot."
-  description: "Admin panel, a person's page, the sanctions (#308): what the second look is."
 
 admin.sanction.reviewNote:
   en: "Your note"
@@ -7034,7 +6894,7 @@ admin.sanction.noRole:
   description: "Admin panel, a person's page, the sanctions (#308): the member of staff holds no role any more."
 
 admin.sanction.nobody:
-  en: "Kuutti itself, by no person"
+  en: "Kuutti itself"
   description: "Admin panel, a person's page, the sanctions (#308): a sanction no person applied (automatic)."
 
 admin.sanction.appliedBy:
@@ -7114,8 +6974,8 @@ admin.nav.reports:
   description: "Admin panel, the menu entry of the report queue (#311)."
 
 admin.nav.automaticBans:
-  en: Automatic bans
-  description: "Admin panel, the menu entry of the shadow bans an automatic rule applied, waiting for a moderator to confirm or reverse each (#105)."
+  en: "Automatic shadow bans"
+  description: "Admin panel, the menu entry of the shadow bans an automatic rule applied, waiting for a moderator to confirm or reverse each (#105). The same name as the heading and the front page's: a rule never bans (#581)."
 
 admin.nav.photos:
   en: Photos
@@ -7865,42 +7725,42 @@ account.email.done:
 
 pond.counter.title:
   en: "People on Kuutti"
-  description: "Home screen, the heading of the card that says how many people are on Kuutti (#54, ADR-013), and its accessible name. There is one pond, the whole of Finland (ADR-061 §8), so the card names no area (#500)."
+  description: "Home screen, the heading of the card that says how many people have completed their profiles on Kuutti (#54, #581, ADR-013), and its accessible name. There is one pond, the whole of Finland (ADR-061 §8), so the card names no area (#500)."
   fi: "Ihmiset Kuutissa"
   sv: "Människor på Kuutti"
   machine: { fi: true, sv: true }
 
-pond.counter.verified:
-  en: "{people, plural, one {# person has identified with their bank} other {# people have identified with their bank}}"
-  description: "Pond card: how many bank-verified people are on Kuutti. {people} is at least the threshold k (ten), so never small."
-  fi: "{people, plural, one {# ihminen on tunnistautunut pankkitunnuksilla} other {# ihmistä on tunnistautunut pankkitunnuksilla}}"
-  sv: "{people, plural, one {# person har identifierat sig med bank-id} other {# personer har identifierat sig med bank-id}}"
+pond.counter.finished:
+  en: "{people, plural, one {# person has completed their profile.} other {# people have completed their profiles.}}"
+  description: "Pond card, under the heading, when there is no bar to show: how many people have completed their profiles (#581). {people} is at least the threshold k (ten), so never small; the one form exists for the grammar, not for use."
+  fi: "{people, plural, one {# ihminen on saanut profiilinsa valmiiksi.} other {# ihmistä on saanut profiilinsa valmiiksi.}}"
+  sv: "{people, plural, one {# person har gjort klart sin profil.} other {# personer har gjort klart sina profiler.}}"
   machine: { fi: true, sv: true }
 
-pond.counter.seeks.title:
-  en: "Whom people with a finished profile are looking for"
-  description: "Pond card, the line above the bar of whom people on Kuutti seek (#507). The bar is drawn from finished profiles only."
-  fi: "Ketä valmiin profiilin tehneet etsivät"
-  sv: "Vem personer med färdig profil söker"
+pond.counter.seeks.finished:
+  en: "{people, plural, one {# person has completed their profile and is looking for:} other {# people have completed their profiles and are looking for:}}"
+  description: "Pond card, under the heading, when the bar stands right below it: how many people have completed their profiles, leading into the bar of whom they seek (#507, #581). The labels under the bar finish the sentence, as in '35 % men', so the colon stays. {people} is at least the threshold k (ten), so never small; the one form exists for the grammar, not for use."
+  fi: "{people, plural, one {# ihminen on saanut profiilinsa valmiiksi ja etsii:} other {# ihmistä on saanut profiilinsa valmiiksi ja etsii:}}"
+  sv: "{people, plural, one {# person har gjort klart sin profil och söker:} other {# personer har gjort klart sina profiler och söker:}}"
   machine: { fi: true, sv: true }
 
 pond.counter.seeks.men:
   en: "{share, number} % men"
-  description: "Pond card, the bar's label for the people who seek men and not women. {share} is a share of the three bands together, in steps of five."
+  description: "Pond card, under the bar, in small type beside a swatch of its band's colour: the first of three labels, for the people who seek men and not women. It reads on from the sentence above the bar, which ends 'are looking for:'. {share} is a share of the three bands together, in steps of five."
   fi: "{share, number} % miehiä"
   sv: "{share, number} % män"
   machine: { fi: true, sv: true }
 
 pond.counter.seeks.everyone:
   en: "{share, number} % everyone"
-  description: "Pond card, the bar's label for the people who seek both women and men. It stands in the middle of the bar, as the overlap of the two others. {share} is a share of the three bands together, in steps of five."
+  description: "Pond card, under the bar, in small type beside a swatch of its band's colour: the middle of three labels, as its band is the middle of the bar, for the people who seek both women and men. It reads on from the sentence above the bar, which ends 'are looking for:'. {share} is a share of the three bands together, in steps of five."
   fi: "{share, number} % kaikkia"
   sv: "{share, number} % alla"
   machine: { fi: true, sv: true }
 
 pond.counter.seeks.women:
   en: "{share, number} % women"
-  description: "Pond card, the bar's label for the people who seek women and not men. {share} is a share of the three bands together, in steps of five."
+  description: "Pond card, under the bar, in small type beside a swatch of its band's colour: the last of three labels, for the people who seek women and not men. It reads on from the sentence above the bar, which ends 'are looking for:'. {share} is a share of the three bands together, in steps of five."
   fi: "{share, number} % naisia"
   sv: "{share, number} % kvinnor"
   machine: { fi: true, sv: true }
@@ -7912,25 +7772,11 @@ pond.counter.seeks.label:
   sv: "Av personerna med färdig profil som söker män eller kvinnor söker {men, number} procent män. {everyone, number} procent söker alla. {women, number} procent söker kvinnor."
   machine: { fi: true, sv: true }
 
-pond.counter.finishing:
-  en: "{people, plural, =0 {Everyone has finished their profile.} one {# person is still finishing their profile.} other {# people are still finishing their profile.}}"
-  description: "Pond card: how many of the verified people have not completed their profile yet. Shown only when the number is zero or at least k (ten); the one form exists for the grammar, not for use."
-  fi: "{people, plural, =0 {Kaikki ovat saaneet profiilinsa valmiiksi.} one {# ihminen viimeistelee vielä profiiliaan.} other {# ihmistä viimeistelee vielä profiiliaan.}}"
-  sv: "{people, plural, =0 {Alla har gjort klart sin profil.} one {# person håller fortfarande på med sin profil.} other {# personer håller fortfarande på med sin profil.}}"
-  machine: { fi: true, sv: true }
-
 pond.counter.small:
-  en: "Kuutti is just getting started. Numbers are shown only when at least {k, number} people are here."
-  description: "Pond card, below the threshold: no number is said while few people are here. {k} is the threshold. It names a condition, not a promise: numbers are never shown below {k}, and they may come a little later than at exactly {k}."
-  fi: "Kuutti on vasta alussa. Luvut näytetään vain, kun täällä on vähintään {k, number} ihmistä."
-  sv: "Kuutti har precis kommit igång. Siffror visas bara när minst {k, number} personer finns här."
-  machine: { fi: true, sv: true }
-
-pond.counter.steps:
-  en: "The numbers change only in steps of at least {k, number} people, so that one person does not show."
-  description: "Pond card, under the figures and the bar: why they stand still for a while. {k} is the threshold (ten): the figures move in steps of at least that many people, the total as people come and go, the bar as they finish a profile or change whom they seek, so one person changes nothing in them. It says what the numbers do, not that nothing can ever be inferred."
-  fi: "Luvut muuttuvat vain vähintään {k, number} ihmisen askelin, jotta yksittäinen ihminen ei näy niistä."
-  sv: "Siffrorna ändras bara i steg om minst {k, number} personer, så att en enskild person inte syns i dem."
+  en: "Kuutti is just getting started."
+  description: "Pond card: the whole of what it says while fewer people than the threshold k (ten) have completed their profiles. No number, and no word of a condition (#581)."
+  fi: "Kuutti on vasta alussa."
+  sv: "Kuutti har precis kommit igång."
   machine: { fi: true, sv: true }
 
 pond.counter.loading:

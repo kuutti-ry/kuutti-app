@@ -691,6 +691,7 @@ describe("migrate", () => {
 
   it("migrations 0098 and 0099 rename the counter's table and key, every row and version as it stood (#500)", async () => {
     const before0098 = migrationsBefore("0098_pond_counter");
+    const through0099 = migrationsBefore("0100_pond_one_row");
     try {
       await withTemporaryDatabase(async (url) => {
         const pool = createPool({ connectionString: url, max: 2 });
@@ -719,7 +720,7 @@ describe("migrate", () => {
           expect(figures).toHaveLength(1);
           expect(kept).toHaveLength(2);
 
-          expect((await migrate(pool, MIGRATIONS)).state).toBe("applied");
+          expect((await migrate(pool, through0099)).state).toBe("applied");
 
           const old = await pool.query("SELECT to_regclass('public.waitlist_snapshot') AS old");
           expect(old.rows).toEqual([{ old: null }]);
@@ -740,6 +741,61 @@ describe("migrate", () => {
       });
     } finally {
       rmSync(before0098, { recursive: true, force: true });
+      rmSync(through0099, { recursive: true, force: true });
+    }
+  });
+
+  it("migration 0109 takes the total, the gender split and the number finishing away, and leaves the number at zero, the day and the bands as they stood (#581)", async () => {
+    const before0109 = migrationsBefore("0109_pond_counter_finished");
+    try {
+      await withTemporaryDatabase(async (url) => {
+        const pool = createPool({ connectionString: url, max: 2 });
+        try {
+          await migrate(pool, before0109);
+          await pool.query(
+            `INSERT INTO pond_counter
+               (pond_id, day, verified, woman, man, non_binary, finishing, seeks_men, seeks_everyone, seeks_women)
+             SELECT id, '2026-10-30', 40, 12, 14, 11, 3, 10, 11, 12 FROM ponds WHERE slug = 'suomi'`,
+          );
+          const [stood] = (await pool.query("SELECT * FROM pond_counter")).rows;
+          expect(stood).toMatchObject({ verified: 40, woman: 12, finishing: 3 });
+
+          expect((await migrate(pool, MIGRATIONS)).state).toBe("applied");
+
+          // Every column by name: nothing of the old figures is left to read.
+          expect((await pool.query("SELECT * FROM pond_counter")).rows).toEqual([
+            {
+              pond_id: stood.pond_id,
+              day: stood.day,
+              finished: 0,
+              seeks_men: 10,
+              seeks_everyone: 11,
+              seeks_women: 12,
+              taken_at: stood.taken_at,
+            },
+          ]);
+          // Not null, with its default: a row that names no number stands at zero, below the floor.
+          await pool.query(
+            `INSERT INTO ponds (slug, name_nominative) VALUES ('uusi', 'Uusi');
+             INSERT INTO pond_counter (pond_id, day)
+               SELECT id, '2026-11-04' FROM ponds WHERE slug = 'uusi'`,
+          );
+          const { rows } = await pool.query<{ finished: number }>(
+            `SELECT finished FROM pond_counter
+             WHERE pond_id = (SELECT id FROM ponds WHERE slug = 'uusi')`,
+          );
+          expect(rows).toEqual([{ finished: 0 }]);
+          await expect(
+            pool.query("UPDATE pond_counter SET finished = NULL WHERE pond_id = $1", [
+              stood.pond_id,
+            ]),
+          ).rejects.toMatchObject({ code: "23502" });
+        } finally {
+          await pool.end();
+        }
+      });
+    } finally {
+      rmSync(before0109, { recursive: true, force: true });
     }
   });
 

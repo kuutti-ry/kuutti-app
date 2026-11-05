@@ -5,7 +5,7 @@ import { fetchPondCounter } from "./client";
 export type PondCounterState =
   | { status: "loading" }
   /** What the counter says; `figures` is null when it lists no pond. */
-  | { status: "ready"; k: number; figures: PondCounterPond | null }
+  | { status: "ready"; figures: PondCounterPond | null }
   /** `error` says why, for the card to say so (LoadFailed). */
   | { status: "failed"; error: unknown };
 
@@ -18,7 +18,7 @@ export function usePondCounter(): PondCounterState & { retry: () => void } {
     setState({ status: "loading" });
     fetchPondCounter()
       .then((counter) => {
-        if (live) setState({ status: "ready", k: counter.k, figures: counter.ponds[0] ?? null });
+        if (live) setState({ status: "ready", figures: counter.ponds[0] ?? null });
       })
       .catch((error: unknown) => {
         if (live) setState({ status: "failed", error });

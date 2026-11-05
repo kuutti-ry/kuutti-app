@@ -7,10 +7,12 @@ test("a moderator signs in at the bank and sees what waits", async ({ page }) =>
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "Sign in" })).toBeVisible();
   await signInAsModerator(page);
-  await expect(page.getByRole("heading", { name: "What waits" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Overview" })).toBeVisible();
   // Each queue says how many wait and since when, whatever the other flows have decided already.
-  const queues = page.getByRole("main").getByRole("listitem");
-  for (const queue of ["Reports", "Automatic shadow bans", "Photo review queue", "Feedback"]) {
+  const main = page.getByRole("main");
+  const queues = main.getByRole("listitem");
+  const names = ["Reports", "Automatic shadow bans", "Photos", "Feedback"];
+  for (const queue of names) {
     await expect(queues.filter({ has: page.getByRole("link", { name: queue }) })).toHaveText(
       new RegExp(`^${queue} (\\d+ waits?\\. Oldest: .+|nothing waits\\.)$`),
     );
@@ -18,15 +20,30 @@ test("a moderator signs in at the bank and sees what waits", async ({ page }) =>
   // The menu offers what the role opens and nothing else (#302).
   const menu = page.getByRole("navigation", { name: "Screens" });
   await expect(menu.getByRole("link", { name: "Tunables" })).toHaveCount(0);
-  // A queue's name leads to it.
-  await page.getByRole("link", { name: "Photo review queue" }).click();
-  await expect(page.getByRole("heading", { level: 2, name: "Photo review queue" })).toBeFocused();
+  // One name each (#581): a queue's name leads to a heading of that name, the menu's current entry
+  // says it too, and every queue counts what waits in the same words. A person is the menu's alone.
+  const arrivesAt = async (name: string) => {
+    await expect(page.getByRole("heading", { level: 2, name, exact: true })).toBeFocused();
+    await expect(menu.getByRole("link", { name, exact: true })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+  };
+  for (const queue of names) {
+    await main.getByRole("link", { name: queue, exact: true }).click();
+    await arrivesAt(queue);
+    await expect(main.getByText(/^(\d+ waiting|Nothing waiting)$/)).toBeVisible();
+    await menu.getByRole("link", { name: "Overview", exact: true }).click();
+    await arrivesAt("Overview");
+  }
+  await menu.getByRole("link", { name: "A person", exact: true }).click();
+  await arrivesAt("A person");
 });
 
 test("the bank returns staff to the screen they asked for (#302)", async ({ page }) => {
   await signInAsModerator(page, "/photos");
   await expect(page).toHaveURL(/\/photos$/);
-  await expect(page.getByRole("heading", { name: "Photo review queue" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 2, name: "Photos" })).toBeVisible();
 });
 
 test("a bank login without a staff role is refused in words", async ({ page }) => {

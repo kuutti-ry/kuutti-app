@@ -352,7 +352,7 @@ describe("opening a report", () => {
     vi.spyOn(console, "error").mockImplementation(() => undefined);
     fetchMock([on("GET", REPORT, answer)]);
     show();
-    expect(await screen.findByRole("alert")).toHaveTextContent("The report could not be loaded.");
+    expect(await screen.findByRole("alert")).toHaveTextContent(/^Could not be loaded\.$/);
     expect(screen.queryByRole("heading", { level: 3 })).toBeNull();
   });
 
@@ -387,7 +387,6 @@ describe("opening a report", () => {
     expect(termValue("State")).toBe(state);
     expect(screen.queryByRole("group", { name: ACT })).toBeNull();
     expect(screen.queryByRole("button", { name: "Dismiss" })).toBeNull();
-    expect(screen.queryByText(/Reported for/)).toBeNull();
     expect(status()).toBeEmptyDOMElement();
   });
 
@@ -504,18 +503,26 @@ describe("a photo of the conversation", () => {
 
 describe("acting on the reported person", () => {
   it.each<[ModeratorRole, string[]]>([
-    ["moderator", ["Warn", "Hide from others (shadow ban)", "Suspend until a day"]],
-    ["admin", ["Warn", "Hide from others (shadow ban)", "Suspend until a day", "Ban"]],
-  ])("offers a %s these actions, beside the report's reason", async (role, buttons) => {
-    fetchMock([theReport()]);
-    show({ role });
-    expect(
-      within(await actions())
-        .getAllByRole("button")
-        .map((button) => button.textContent),
-    ).toEqual(buttons);
-    expect(screen.getByText("Reported for: Harassment")).toBeInTheDocument();
-  });
+    ["moderator", ["Warn", "Shadow ban", "Suspend"]],
+    ["admin", ["Warn", "Shadow ban", "Suspend", "Ban"]],
+  ])(
+    "offers a %s these actions, under a drawn name that says on whom (#581)",
+    async (role, buttons) => {
+      fetchMock([theReport()]);
+      show({ role });
+      const group = await actions();
+      expect(
+        within(group)
+          .getAllByRole("button")
+          .map((button) => button.textContent),
+      ).toEqual(buttons);
+      // The page shows two people: this is what says on which of them the buttons act.
+      expect(within(group).getByText(ACT)).not.toHaveClass("sr-only");
+      // The report's reason is said once, at the page's top, and not again beside the actions.
+      expect(termValue("Reason")).toBe("Harassment");
+      expect(screen.queryByText(/Reported for/)).toBeNull();
+    },
+  );
 
   it("applies the sanction, then closes the report naming it, and says so where the focus goes, reading nothing again", async () => {
     const calls = fetchMock([
@@ -525,9 +532,7 @@ describe("acting on the reported person", () => {
     ]);
     show({ strict: true });
     const { dialog, send } = await warn();
-    expect(dialog).toHaveTextContent(
-      "Applying one also closes this report as acted on; the reporter's export will say it was acted on, never which action.",
-    );
+    expect(dialog).toHaveTextContent("Applying one also closes this report as acted on.");
     fireEvent.click(send);
     await waitFor(() =>
       expect(status()).toHaveTextContent("Applied: Warning. The report is closed as acted on."),
@@ -563,17 +568,13 @@ describe("acting on the reported person", () => {
     fireEvent.click(send);
     await waitFor(() =>
       expect(status()).toHaveTextContent(
-        "Applied: Warning, and it stands. Another member of staff decided this report meanwhile. The reported person's page, where it can be lifted",
+        /^Applied: Warning, and it stands\. Another member of staff decided this report meanwhile\. The reported person's page$/,
       ),
     );
     await waitFor(() => expect(status()).toHaveFocus());
     expect(asked(calls)).toEqual([`GET ${REPORT}`, `POST ${SANCTIONS}`, `POST ${DECISION}`]);
     expect(screen.queryByRole("heading", { level: 4 })).toBeNull();
-    fireEvent.click(
-      within(status()).getByRole("link", {
-        name: "The reported person's page, where it can be lifted",
-      }),
-    );
+    fireEvent.click(within(status()).getByRole("link", { name: "The reported person's page" }));
     expect(await screen.findByText(`the page of ${REPORTED}`)).toBeInTheDocument();
   });
 
@@ -642,7 +643,7 @@ describe("acting on the reported person", () => {
       expect(within(status()).queryByRole("link")).toBeNull();
       const list = screen.getByRole("heading", {
         level: 4,
-        name: "Close as acted on with a sanction applied since the report",
+        name: "Applied since the report",
       }).nextElementSibling as HTMLElement;
       expect(
         within(list)
@@ -743,7 +744,7 @@ describe("closing the report with a sanction applied since", () => {
       within(dialog).getByRole("heading", { name: "Close the report as acted on" }),
     ).toBeInTheDocument();
     expect(dialog).toHaveTextContent(
-      `The report closes as acted on, naming this sanction: Suspension, applied ${when(APPLIED)}. Nothing more happens to the reported person; the reporter's export will say it was acted on, never which action.`,
+      `The report closes as acted on, naming this sanction: Suspension, applied ${when(APPLIED)}. Nothing more happens to the reported person.`,
     );
     fireEvent.click(within(dialog).getByRole("button", { name: "Close report" }));
     await waitFor(() => expect(status()).toHaveTextContent("Report closed as acted on."));
@@ -832,7 +833,7 @@ describe("dismissing the report", () => {
         within(dialog).getByRole("heading", { name: "Dismiss the report" }),
       ).toBeInTheDocument();
       expect(dialog).toHaveTextContent(
-        "The report closes with no action on the reported person. The block between the two stays. The reporter's export will say it was dismissed.",
+        "The report closes with no action on the reported person. The block between the two stays.",
       );
       if (how === "Cancel") fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
       else fireEvent.keyDown(document.activeElement as Element, { key: "Escape" });
@@ -855,7 +856,6 @@ describe("dismissing the report", () => {
     expect(termValue("State")).toBe(`Dismissed · ${when(DECIDED)} · Who: a1b2c3d4`);
     expect(screen.queryByRole("group", { name: ACT })).toBeNull();
     expect(screen.queryByRole("button", { name: "Dismiss" })).toBeNull();
-    expect(screen.queryByText(/Reported for/)).toBeNull();
   });
 
   it("sends a dismissal pressed twice before its answer once", async () => {
@@ -931,7 +931,7 @@ describe("the photo a card's report points at", () => {
   const POINTED = `${REPORT}/photo`;
   const TAKE_DOWN = `/admin/photos/${PHOTO}/decision`;
   const TITLE = "The photo the reporter pointed at";
-  const DONE = "Taken down. Nobody else is given the photo from now on.";
+  const DONE = "Taken down.";
   const cardUrl = "https://media.test/media/k/p/card.webp?Signature=s";
   const card = () => json({ url: cardUrl, variant: "card", expiresAt: "2030-01-01T00:00:00.000Z" });
   const pointed = (extra: Record<string, unknown> = {}) => ({

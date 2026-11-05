@@ -79,8 +79,7 @@ export async function lockHomeOfAccount(
 
 /**
  * The write of a home, and the one write of a pond (ADR-061 §8): in one
- * statement, so that nobody has a home without one and the counter's
- * `verified` still starts after a gender is declared. The slug is the row every
+ * statement, so that nobody has a home without one. The slug is the row every
  * database has (migration 0027, kept by 0095); a pond already held stays.
  * `place` null leaves the kept place as it is.
  */

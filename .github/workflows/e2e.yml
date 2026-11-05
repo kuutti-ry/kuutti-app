@@ -215,7 +215,7 @@ jobs:
       - name: The cast's stories
         run: pnpm demo:reset
 
-      # The home screen shows an area's numbers from ten people up.
+      # Home's card says its number from ten finished profiles and its bar from ten in each band.
       - name: The synthetic population
         run: pnpm demo:population
 

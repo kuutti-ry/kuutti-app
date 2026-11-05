@@ -1,4 +1,3 @@
-import { formatTime } from "@kuutti/i18n";
 import { I18nProvider } from "@kuutti/i18n/react";
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { BrowserRouter } from "react-router";
@@ -109,6 +108,10 @@ const refused = () =>
     { status: 403, headers: { "content-type": "application/json" } },
   );
 
+/** A queue's link on the front page: the screen's, as the menu beside it has one of the same name. */
+const frontPageLink = (name: string) =>
+  within(screen.getByRole("main")).findByRole("link", { name });
+
 /** The API a signed-in panel talks to, by method and path; records what was asked. */
 function staffApi(
   role = "moderator",
@@ -181,16 +184,13 @@ describe("App", () => {
     expect(screen.queryByRole("button", { name: "Sign out" })).toBeNull();
   });
 
-  it("signed in as a moderator, names the role and the session's end and opens the front page (#303)", async () => {
+  it("signed in as a moderator, names the role and nothing beside it, and opens the front page (#303, #581)", async () => {
     window.sessionStorage.setItem("kuutti.admin.session", JSON.stringify(staff));
     renderApp(staffApi());
-    expect(await screen.findByText(/Signed in as moderator/)).toHaveTextContent(
-      `Session ends: ${formatTime("en", new Date(staff.expiresAt))}`,
-    );
-    expect(
-      await screen.findByRole("heading", { level: 2, name: "What waits" }),
-    ).toBeInTheDocument();
-    expect(await screen.findByText("Nothing waits in any queue.")).toBeInTheDocument();
+    // The whole line: the session's end is not said beside the role.
+    expect(await screen.findByText("Signed in as moderator")).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { level: 2, name: "Overview" })).toBeInTheDocument();
+    expect(await frontPageLink("Photos")).toBeInTheDocument();
     expect(screen.queryByText("Your role does not open any screen of this panel.")).toBeNull();
   });
 
@@ -206,8 +206,8 @@ describe("App", () => {
     ).toBeInTheDocument();
     expect(screen.getByText(/Signed in as researcher/)).toBeInTheDocument();
     expect(screen.queryByRole("navigation")).toBeNull();
-    expect(screen.queryByRole("heading", { name: "Photo review queue" })).toBeNull();
-    expect(screen.queryByRole("heading", { name: "What waits" })).toBeNull();
+    expect(screen.queryByRole("heading", { name: "Photos" })).toBeNull();
+    expect(screen.queryByRole("heading", { name: "Overview" })).toBeNull();
     expect(calls).not.toContain("GET /admin/overview");
     expect(calls).not.toContain("GET /admin/photos/queue");
     expect(calls).not.toContain("GET /admin/feedback");
@@ -230,7 +230,7 @@ describe("App", () => {
     });
     expect(await screen.findByText("Your session has ended. Sign in again.")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Sign in with your bank" })).toBeInTheDocument();
-    expect(screen.queryByText("The queue could not be loaded.")).toBeNull();
+    expect(screen.queryByText("Could not be loaded.")).toBeNull();
     expect(window.sessionStorage.getItem("kuutti.admin.session")).toBeNull();
   });
 
@@ -261,14 +261,14 @@ describe("App", () => {
     window.sessionStorage.setItem("kuutti.admin.session", JSON.stringify(staff));
     const calls: string[] = [];
     renderApp(staffApi("moderator", calls));
-    const front = await screen.findByRole("heading", { level: 2, name: "What waits" });
+    const front = await screen.findByRole("heading", { level: 2, name: "Overview" });
     expect(window.location.pathname).toBe("/");
     const menu = screen.getByRole("navigation", { name: "Screens" });
     const links = within(menu).getAllByRole("link");
     expect(links.map((link) => link.textContent)).toEqual([
       "Overview",
       "Reports",
-      "Automatic bans",
+      "Automatic shadow bans",
       "Photos",
       "Feedback",
       "A person",
@@ -284,17 +284,15 @@ describe("App", () => {
     );
     // Loading the panel is not the person's move: nothing takes the focus.
     expect(front).not.toHaveFocus();
-    expect(document.title).toBe("What waits · Kuutti admin");
-    expect(await screen.findByText("Nothing waits in any queue.")).toBeInTheDocument();
+    expect(document.title).toBe("Overview · Kuutti admin");
+    expect(await frontPageLink("Photos")).toBeInTheDocument();
     expect(calls).toContain("GET /admin/overview");
     expect(calls).not.toContain("GET /admin/photos/queue");
     expect(calls).not.toContain("GET /admin/feedback");
 
     // Every path starts with "/": the overview is current at "/" alone, not under another screen.
     fireEvent.click(within(menu).getByRole("link", { name: "Photos" }));
-    expect(
-      await screen.findByRole("heading", { level: 2, name: "Photo review queue" }),
-    ).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { level: 2, name: "Photos" })).toBeInTheDocument();
     expect(within(menu).getByRole("link", { name: "Photos" })).toHaveAttribute(
       "aria-current",
       "page",
@@ -305,7 +303,7 @@ describe("App", () => {
 
     // And back again by the menu: the overview's heading takes the focus.
     fireEvent.click(within(menu).getByRole("link", { name: "Overview" }));
-    const again = await screen.findByRole("heading", { level: 2, name: "What waits" });
+    const again = await screen.findByRole("heading", { level: 2, name: "Overview" });
     expect(window.location.pathname).toBe("/");
     await waitFor(() => expect(again).toHaveFocus());
     expect(within(menu).getByRole("link", { name: "Overview" })).toHaveAttribute(
@@ -319,12 +317,44 @@ describe("App", () => {
     window.sessionStorage.setItem("kuutti.admin.session", JSON.stringify(staff));
     const calls: string[] = [];
     renderApp(staffApi("moderator", calls));
-    await screen.findByText("Nothing waits in any queue.");
-    fireEvent.click(screen.getByRole("link", { name: "Photo review queue" }));
-    const heading = await screen.findByRole("heading", { level: 2, name: "Photo review queue" });
+    fireEvent.click(await frontPageLink("Photos"));
+    const heading = await screen.findByRole("heading", { level: 2, name: "Photos" });
     expect(window.location.pathname).toBe("/photos");
     await waitFor(() => expect(heading).toHaveFocus());
     expect(calls).toContain("GET /admin/photos/queue");
+  });
+
+  it("calls each screen by one name: in the menu, as its heading, in the page's title and on the front page (#581)", async () => {
+    window.sessionStorage.setItem("kuutti.admin.session", JSON.stringify(staff));
+    const waiting = { waiting: 1, oldestSince: "2026-09-25T10:00:00.000Z" };
+    renderApp(
+      staffApi("moderator", [], {
+        answers: {
+          "GET /admin/overview": () =>
+            json({
+              ...overview,
+              queues: [
+                { queue: "reports", ...waiting },
+                { queue: "automatic_bans", ...waiting },
+                { queue: "photos", ...waiting },
+                { queue: "feedback", ...waiting },
+              ],
+            }),
+          "GET /admin/reports": () =>
+            json({ now: overview.now, responseHours: 24, items: [], total: 0 }),
+          "GET /admin/sanctions/automatic": () =>
+            json({ now: overview.now, reviewHours: 48, items: [], total: 0 }),
+        },
+      }),
+    );
+    const queues = ["Reports", "Automatic shadow bans", "Photos", "Feedback"];
+    for (const name of queues) expect(await frontPageLink(name)).toBeInTheDocument();
+    const menu = screen.getByRole("navigation", { name: "Screens" });
+    for (const name of [...queues, "A person", "Overview"]) {
+      fireEvent.click(within(menu).getByRole("link", { name }));
+      expect(await screen.findByRole("heading", { level: 2, name })).toBeInTheDocument();
+      await waitFor(() => expect(document.title).toBe(`${name} · Kuutti admin`));
+    }
   });
 
   it("moves between screens by the menu, and the new screen's heading takes the focus (#302)", async () => {
@@ -340,7 +370,7 @@ describe("App", () => {
       "aria-current",
       "page",
     );
-    expect(screen.queryByRole("heading", { name: "Photo review queue" })).toBeNull();
+    expect(screen.queryByRole("heading", { name: "Photos" })).toBeNull();
     expect(calls).toContain("GET /admin/feedback");
   });
 
@@ -379,14 +409,14 @@ describe("App", () => {
     );
     const menu = await screen.findByRole("navigation", { name: "Screens" });
     expect(calls).not.toContain("GET /admin/sanctions/automatic");
-    const link = within(menu).getByRole("link", { name: "Automatic bans" });
+    const link = within(menu).getByRole("link", { name: "Automatic shadow bans" });
     expect(link).toHaveAttribute("href", "/automatic-bans");
     fireEvent.click(link);
     const heading = await screen.findByRole("heading", { level: 2, name: "Automatic shadow bans" });
     expect(window.location.pathname).toBe("/automatic-bans");
     await waitFor(() => expect(heading).toHaveFocus());
     expect(link).toHaveAttribute("aria-current", "page");
-    expect(await screen.findByText("No automatic shadow ban waits.")).toBeInTheDocument();
+    expect(await screen.findByText("Nothing waiting")).toBeInTheDocument();
     expect(document.title).toBe("Automatic shadow bans · Kuutti admin");
     expect(calls.filter((call) => call === "GET /admin/sanctions/automatic")).toHaveLength(1);
   });
@@ -418,7 +448,7 @@ describe("App", () => {
     ).toEqual([
       "Overview",
       "Reports",
-      "Automatic bans",
+      "Automatic shadow bans",
       "Photos",
       "Feedback",
       "A person",
@@ -436,8 +466,9 @@ describe("App", () => {
       "aria-current",
       "page",
     );
-    expect(await screen.findByText("0 tunables")).toBeInTheDocument();
-    expect(calls).toContain("GET /admin/config");
+    await waitFor(() => expect(calls).toContain("GET /admin/config"));
+    await waitFor(() => expect(screen.queryByText("Loading the tunables…")).toBeNull());
+    expect(screen.queryByRole("alert")).toBeNull();
     expect(document.title).toBe("Tunables · Kuutti admin");
   });
 
@@ -452,8 +483,9 @@ describe("App", () => {
       staffApi("admin", calls, { answers: { "GET /admin/config": () => json({ items: [] }) } }),
     );
     expect(await screen.findByRole("heading", { level: 2, name: "Tunables" })).toBeInTheDocument();
-    expect(await screen.findByText("0 tunables")).toBeInTheDocument();
-    expect(calls).toContain("GET /admin/config");
+    await waitFor(() => expect(calls).toContain("GET /admin/config"));
+    await waitFor(() => expect(screen.queryByText("Loading the tunables…")).toBeNull());
+    expect(screen.queryByRole("alert")).toBeNull();
     expect(calls).not.toContain("GET /admin/photos/queue");
     expect(screen.queryByText("Your role does not allow this.")).toBeNull();
   });
@@ -473,7 +505,7 @@ describe("App", () => {
       within(menu)
         .getAllByRole("link")
         .map((link) => link.textContent),
-    ).toEqual(["Overview", "Reports", "Automatic bans", "Photos", "Feedback", "A person"]);
+    ).toEqual(["Overview", "Reports", "Automatic shadow bans", "Photos", "Feedback", "A person"]);
     expect(within(menu).queryByRole("link", { name: "Tunables" })).toBeNull();
     expect(screen.queryByText("Loading the tunables…")).toBeNull();
     expect(document.title).toBe("Tunables · Kuutti admin");
@@ -526,7 +558,7 @@ describe("App", () => {
     expect(within(menu).getByRole("link", { name: "Audit log" })).not.toHaveAttribute(
       "aria-current",
     );
-    expect(await screen.findByText("0 members of staff")).toBeInTheDocument();
+    expect(await screen.findByRole("table", { name: "Staff" })).toBeInTheDocument();
     expect(calls).toContain("GET /admin/staff");
     expect(document.title).toBe("Staff · Kuutti admin");
     expect(screen.queryByText("Your role does not allow this.")).toBeNull();
@@ -553,7 +585,7 @@ describe("App", () => {
         within(menu)
           .getAllByRole("link")
           .map((link) => link.textContent),
-      ).toEqual(["Overview", "Reports", "Automatic bans", "Photos", "Feedback", "A person"]);
+      ).toEqual(["Overview", "Reports", "Automatic shadow bans", "Photos", "Feedback", "A person"]);
       expect(within(menu).queryByRole("link", { name: "Audit log" })).toBeNull();
       expect(within(menu).queryByRole("link", { name: "Staff" })).toBeNull();
       expect(within(menu).queryByRole("link", { name: "Matching" })).toBeNull();
@@ -577,14 +609,14 @@ describe("App", () => {
     renderApp(staffApi("moderator", calls, { answers: accountAnswers }));
     const menu = await screen.findByRole("navigation", { name: "Screens" });
     fireEvent.click(within(menu).getByRole("link", { name: "A person" }));
-    const lookup = await screen.findByRole("heading", { level: 2, name: "A person's page" });
+    const lookup = await screen.findByRole("heading", { level: 2, name: "A person" });
     expect(window.location.pathname).toBe("/accounts");
     await waitFor(() => expect(lookup).toHaveFocus());
     expect(within(menu).getByRole("link", { name: "A person" })).toHaveAttribute(
       "aria-current",
       "page",
     );
-    expect(document.title).toBe("A person's page · Kuutti admin");
+    expect(document.title).toBe("A person · Kuutti admin");
     expect(calls.filter((call) => call.includes("/admin/accounts"))).toEqual([]);
 
     fireEvent.change(screen.getByLabelText("Account id"), { target: { value: accountId } });
@@ -613,15 +645,15 @@ describe("App", () => {
       within(menu)
         .getAllByRole("link")
         .map((link) => link.textContent),
-    ).toEqual(["Overview", "Reports", "Automatic bans", "Photos", "Feedback", "A person"]);
+    ).toEqual(["Overview", "Reports", "Automatic shadow bans", "Photos", "Feedback", "A person"]);
     expect(screen.queryByText("Nothing at this address")).toBeNull();
     expect(calls).toContain(`GET /admin/accounts/${accountId}`);
     expect(calls).not.toContain("GET /admin/overview");
   });
 
   it.each([
-    ["an admin", "admin", ["Warn", "Hide from others (shadow ban)", "Suspend until a day", "Ban"]],
-    ["a moderator", "moderator", ["Warn", "Hide from others (shadow ban)", "Suspend until a day"]],
+    ["an admin", "admin", ["Warn", "Shadow ban", "Suspend", "Ban"]],
+    ["a moderator", "moderator", ["Warn", "Shadow ban", "Suspend"]],
   ])(
     "gives the signed-in role to a person's page: %s sees these actions (#308)",
     async (_who, role, actions) => {
@@ -649,7 +681,7 @@ describe("App", () => {
     );
     expect(await screen.findByRole("alert")).toHaveTextContent("Your role does not allow this.");
     expect(screen.getAllByRole("alert")).toHaveLength(1);
-    expect(screen.queryByText("The page could not be loaded.")).toBeNull();
+    expect(screen.queryByText("Could not be loaded.")).toBeNull();
     expect(screen.queryByText("No account has this id.")).toBeNull();
     expect(screen.getByRole("heading", { level: 2, name: "Account 6f1c1c4e" })).toBeInTheDocument();
     expect(calls).not.toContain(`GET /admin/accounts/${accountId}/sanctions`);
@@ -669,7 +701,7 @@ describe("App", () => {
       within(menu)
         .getAllByRole("link")
         .map((link) => link.textContent),
-    ).toEqual(["Overview", "Reports", "Automatic bans", "Photos", "Feedback", "A person"]);
+    ).toEqual(["Overview", "Reports", "Automatic shadow bans", "Photos", "Feedback", "A person"]);
     expect(calls.filter((call) => call.includes("/admin/reports"))).toEqual([
       `GET /admin/reports/${reportId}`,
     ]);
@@ -684,7 +716,7 @@ describe("App", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("Your role does not allow this.");
     expect(screen.getAllByRole("alert")).toHaveLength(1);
     expect(screen.queryByText("No such report.")).toBeNull();
-    expect(screen.queryByText("The report could not be loaded.")).toBeNull();
+    expect(screen.queryByText("Could not be loaded.")).toBeNull();
     expect(screen.getByRole("heading", { level: 2, name: "Report 0b1c1c4e" })).toBeInTheDocument();
   });
 
@@ -696,11 +728,9 @@ describe("App", () => {
       await screen.findByRole("heading", { level: 2, name: "Nothing at this address" }),
     ).toBeInTheDocument();
     fireEvent.click(screen.getByRole("link", { name: "Back to the start" }));
-    expect(
-      await screen.findByRole("heading", { level: 2, name: "What waits" }),
-    ).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { level: 2, name: "Overview" })).toBeInTheDocument();
     expect(window.location.pathname).toBe("/");
-    expect(await screen.findByText("Nothing waits in any queue.")).toBeInTheDocument();
+    expect(await frontPageLink("Photos")).toBeInTheDocument();
   });
 
   it("says once that the role does not allow it when the API answers 403, never as the screen's failure, and not again once the role is honoured (#302)", async () => {
@@ -715,7 +745,7 @@ describe("App", () => {
       }),
     );
     expect(await screen.findByRole("alert")).toHaveTextContent("Your role does not allow this.");
-    expect(screen.queryByText("The queue could not be loaded.")).toBeNull();
+    expect(screen.queryByText("Could not be loaded.")).toBeNull();
     // A second refusal on the same visit says nothing new.
     fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
     await waitFor(() => expect(screen.queryByText("Loading the queue…")).toBeNull());
@@ -734,9 +764,9 @@ describe("App", () => {
     renderApp(staffApi("moderator", [], { answers: { "GET /admin/overview": refused } }));
     expect(await screen.findByRole("alert")).toHaveTextContent("Your role does not allow this.");
     expect(screen.getAllByRole("alert")).toHaveLength(1);
-    expect(screen.queryByText("What waits could not be loaded.")).toBeNull();
+    expect(screen.queryByText("Could not be loaded.")).toBeNull();
     expect(screen.queryByText("Loading what waits…")).toBeNull();
-    expect(screen.getByRole("heading", { level: 2, name: "What waits" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 2, name: "Overview" })).toBeInTheDocument();
   });
 
   it("does not bring a refusal back when the person returns to the screen it was said on (#302)", async () => {

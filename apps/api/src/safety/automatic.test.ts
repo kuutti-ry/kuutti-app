@@ -138,6 +138,7 @@ const send = (app: App, who: SignedIn, conversationId: string, body: string) =>
 type SanctionRow = {
   kind: string;
   reason: string;
+  note: string;
   created_by: string | null;
   rule: string | null;
   rule_count: number | null;
@@ -147,16 +148,24 @@ type SanctionRow = {
 async function sanctionsOf(db: Queryable, accountId: string): Promise<SanctionRow[]> {
   return (
     await db.query<SanctionRow>(
-      `SELECT kind, reason, created_by, rule, rule_count, lifted_at FROM sanction
+      `SELECT kind, reason, note, created_by, rule, rule_count, lifted_at FROM sanction
         WHERE account_id = $1 ORDER BY created_at, id`,
       [accountId],
     )
   ).rows;
 }
 
+/** Staff's words on a rule's ban: which rule applied it and no more, since by the time anybody reads them a moderator may have confirmed it (#581). */
+const RULE_NOTE: Record<string, string> = {
+  reports: "Applied by the automatic rule on reports by different people",
+  first_messages: "Applied by the automatic rule on first messages within the window",
+  same_first_message: "Applied by the automatic rule on the same first message to several people",
+};
+
 const byRule = (rule: string, count: number) => ({
   kind: "shadow_ban",
   reason: "other",
+  note: RULE_NOTE[rule],
   created_by: null,
   rule,
   rule_count: count,
