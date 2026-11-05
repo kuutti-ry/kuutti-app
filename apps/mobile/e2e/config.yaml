@@ -46,7 +46,7 @@ executionOrder:
     - The Like and Pass setting places them for either hand, and one-handed
     - The session, the theme and the language survive closing and reopening the app
     - A passcode set in Settings locks the app at a cold start and back from the background, and the bank is the way out
-    - A sign-in link not asked for is refused without touching the session, and every refusal is said in its own words
+    - A sign-in link not asked for is refused without touching the session, and a refusal has words only for a fact of its own
     - Log out everywhere ends this device's session, and reopening the app does not bring it back
     # Helmi, who takes a break and comes back.
     - Taking a break signs the person out everywhere, and the next bank login brings them back

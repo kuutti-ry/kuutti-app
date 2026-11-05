@@ -702,7 +702,7 @@ describe("the phone's face or fingerprint on the lock", () => {
     expect(screen.getByText(LOCKED)).toBeTruthy();
     expect(
       screen.getByText(
-        "The phone has paused face unlock after too many tries. Lock the phone and open it with its own code, then try again, or use another way below.",
+        "The phone has paused face unlock after too many tries. Lock the phone and open it with its own code, then try again.",
       ),
     ).toBeTruthy();
     expect(screen.queryByText(/did not unlock/)).toBeNull();

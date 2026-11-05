@@ -1,6 +1,7 @@
 import { CONSENT_VERSIONS } from "@kuutti/i18n";
-import type { HomeSummary } from "@kuutti/schema";
+import { DISPLAY_NAME_MAX, type HomeSummary, PHOTOS_FOR_COMPLETENESS } from "@kuutti/schema";
 import { act, fireEvent, screen, waitFor } from "@testing-library/react-native";
+import * as ImagePicker from "expo-image-picker";
 import { useLocales } from "expo-localization";
 import type * as React from "react";
 import { AccessibilityInfo, PixelRatio, Platform } from "react-native";
@@ -8,6 +9,7 @@ import { saveSession } from "@/lib/session";
 import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
 import { hasCutText } from "@/test/layout";
 import { renderWithTheme } from "@/test/render";
+import { FakeXhr } from "@/test/xhr";
 import { MAX_FONT_SCALE } from "@/theme/a11y";
 import { defaultAgeWindow, OnboardingScreen } from "./OnboardingScreen";
 
@@ -67,6 +69,19 @@ const HOMES: Readonly<Record<string, HomeSummary>> = {
 };
 const IN_KALLIO = HOMES["00530"] as HomeSummary;
 const ACTIVATION = ["gender", "seeks", "age_window", "home", "terms", "privacy"];
+/** A photo as the API lists it: in review, unless the check refused it. */
+const aPhoto = (position: number, state: "pending" | "rejected") => ({
+  id: `0b1c1c4e-9a8e-4a0b-9c3a-0c8d1e2f3a${position.toString(16).padStart(2, "0")}`,
+  blurhash: "LEHV6nWB2yk8pyo0adR*.7kCMdnj",
+  width: 1600,
+  height: 1200,
+  state,
+  rejectionReason: state === "rejected" ? "other" : null,
+  appealable: false,
+  position,
+  createdAt: "2026-09-25T12:00:00.000Z",
+  caption: null,
+});
 
 type Profile = {
   displayName: string;
@@ -100,7 +115,10 @@ function fakeApi(
     /** Every row given; a withdrawn one keeps its row with the time (ADR-010 §4). */
     consents: { kind: string; version: string; locale: string; withdrawnAt?: string }[];
     profile: Profile | null;
+    /** The photos that count, as the API counts them: any but a refused one. */
     photos: number;
+    /** The photos the check refused, after those on the list: they count for nothing. */
+    refusedPhotos: number;
     /** From when a gender change is possible again; set, the API refuses one with 429 (#147). */
     genderFrom: string | null;
     /** The API refuses whom one seeks: the consent went while the step was open (ADR-010 §16). */
@@ -114,6 +132,7 @@ function fakeApi(
     consents: [],
     profile: null,
     photos: 0,
+    refusedPhotos: 0,
     genderFrom: null,
     seeksRefused: false,
     home: null,
@@ -133,7 +152,7 @@ function fakeApi(
       ...(server.profile?.fields.intent ? [] : ["intent"]),
       ...(server.ageWindow ? [] : ["age_window"]),
       ...(server.home ? [] : ["home"]),
-      ...(server.photos >= 3 ? [] : ["photos"]),
+      ...(server.photos >= PHOTOS_FOR_COMPLETENESS ? [] : ["photos"]),
       // A ready line counts like a bio (#239), as the API's completeness has it.
       ...(bio.length >= 50 || server.profile?.bioPreset || prompts >= 2 ? [] : ["prompts_or_bio"]),
     ];
@@ -174,6 +193,21 @@ function fakeApi(
     const body = request.method === "GET" ? undefined : await request.json();
     calls.push({ method: request.method, path, body });
     if (path === "/onboarding") return json(status());
+    if (path === "/photos" && request.method === "GET") {
+      const photos = Array.from({ length: server.photos + server.refusedPhotos }, (_, position) =>
+        aPhoto(position, position < server.photos ? "pending" : "rejected"),
+      );
+      return json({ photos, maxPhotos: 6, tips: [] });
+    }
+    const thumb = /^\/photos\/([^/]+)\/thumb$/.exec(path);
+    if (thumb) {
+      return json({
+        id: thumb[1],
+        variant: "thumb",
+        url: "https://media.test/media/k/thumb.webp?Signature=s",
+        expiresAt: "2030-01-01T00:15:00.000Z",
+      });
+    }
     if (path === "/invitations" && options.redeemable !== undefined) {
       return json({
         canInvite: false,
@@ -254,6 +288,43 @@ const checkA11y = () => {
   const found = pressables(screen.toJSON() as HostNode);
   expect(found.flatMap((node) => a11yProblems(node))).toEqual([]);
 };
+/** Every text on the screen, in order. */
+const drawn = () => screen.queryAllByText(/./).map((node) => node.props.children as unknown);
+/**
+ * The question as the screen's one heading, heard as one and over everything
+ * but the step's number, which goes first where the step has one (#581).
+ */
+const asked = (question: string, number?: string) => {
+  const top = number === undefined ? [question] : [number, question];
+  expect(drawn().slice(0, top.length)).toEqual(top);
+  const heading = screen.getByRole("heading", { name: question });
+  expect(heading.props.accessibilityRole).toBe("header");
+  expect(heading.props["aria-level"]).toBe("1");
+  const titles = screen.getAllByRole("heading").filter((h) => h.props["aria-level"] === "1");
+  expect(titles).toHaveLength(1);
+  if (number !== undefined) {
+    expect(screen.getByText(number).props.accessibilityLiveRegion).toBe("polite");
+  }
+};
+const onward = () => screen.getByRole("button", { name: "Continue" });
+const readOnly = () => onward().props.accessibilityState?.disabled;
+const launch = ImagePicker.launchImageLibraryAsync as jest.Mock;
+/** A photo through the step's own button: the picker, the upload, and the API counting it. */
+const addPhoto = async (server: ReturnType<typeof fakeApi>["server"]) => {
+  launch.mockResolvedValueOnce({
+    canceled: false,
+    assets: [{ uri: "file:///a.heic", width: 4032, height: 3024 }],
+  });
+  const next = server.photos + server.refusedPhotos;
+  FakeXhr.answers = [{ status: 201, body: JSON.stringify(aPhoto(next, "pending")) }];
+  const tiles = screen.queryAllByRole("button", { name: /^Open photo/ }).length;
+  server.photos += 1;
+  await press(screen.getByRole("button", { name: "Add a photo" }));
+  await flush();
+  await waitFor(() =>
+    expect(screen.getAllByRole("button", { name: /^Open photo/ })).toHaveLength(tiles + 1),
+  );
+};
 /** An answer that is a whole-width row (#581) by its word, chosen or not: the chosen one's name carries its mark. */
 const row = (name: string) =>
   screen.getByRole(/^(radio|checkbox)$/, { name: new RegExp(`^(✓ )?${name}$`) });
@@ -276,6 +347,8 @@ afterEach(() => jest.restoreAllMocks());
 beforeEach(async () => {
   router.replace.mockReset();
   router.push.mockReset();
+  launch.mockReset();
+  FakeXhr.install();
   store.delete(AGREED);
   await saveSession({
     sessionId: "6f1c1c4e-9a8e-4a0b-9c3a-0c8d1e2f3a4b",
@@ -329,7 +402,7 @@ describe("OnboardingScreen", () => {
     expect(server.seeks).toEqual(["man", "non_binary"]);
     expect(server.ageWindow).toBeNull();
     checkA11y();
-    await press(screen.getByRole("button", { name: "Something casual" }));
+    await press(row("Something casual"));
     await press(screen.getByRole("button", { name: "Continue" }));
     await flush();
     await waitFor(() => expect(screen.getByText("What ages?")).toBeTruthy());
@@ -359,21 +432,18 @@ describe("OnboardingScreen", () => {
     await press(screen.getByRole("button", { name: "Continue" }));
     await waitFor(() => expect(screen.getByText("Two photos of you")).toBeTruthy());
     expect(server.home?.showArea).toBe(true);
+    await flush();
     checkA11y();
     expect(screen.getByText("Step 7 of 8")).toBeTruthy();
-    await press(screen.getByRole("button", { name: "Add photos" }));
-    // The photos screen says the same step as every other one (#146).
-    expect(router.push).toHaveBeenCalledWith({
-      pathname: "/photos",
-      params: { step: "7", total: "8" },
-    });
-    // Back from the photos screen with three photos: the focus reads the status again.
-    server.photos = 3;
-    await act(async () => {
-      focus();
-      await settle(120);
-    });
+    // The step is the grid itself: two photos added on it, and on with its Continue (#581).
+    await addPhoto(server);
+    expect(readOnly()).toBe(true);
+    await addPhoto(server);
+    checkA11y();
+    await press(onward());
+    await flush();
     await waitFor(() => expect(screen.getByText("A few words")).toBeTruthy());
+    expect(router.push).not.toHaveBeenCalled();
     expect(screen.getByText("Step 8 of 8")).toBeTruthy();
     checkA11y();
     await type(
@@ -409,13 +479,17 @@ describe("OnboardingScreen", () => {
     await flush();
     await waitFor(() => expect(screen.getByText("Did a friend invite you?")).toBeTruthy());
     // Offered once and never required: no number, as the welcome step has none.
+    asked("Did a friend invite you?");
     expect(screen.queryByText(/^Step \d+ of \d+$/)).toBeNull();
     expect(screen.getByLabelText("Invitation code")).toBeTruthy();
-    expect(
-      screen.getByText(
-        "The code earns you a fish and your friend a fish once your profile is complete.",
-      ),
-    ).toBeTruthy();
+    // What it earns, the field and the way past it: nothing explains them, and nothing points to Settings (#581).
+    expect(drawn()).toEqual([
+      "Did a friend invite you?",
+      "The code earns you a fish and your friend a fish once your profile is complete.",
+      "Invitation code",
+      "Use the code",
+      "Skip",
+    ]);
     checkA11y();
     await press(screen.getByRole("button", { name: "Skip" }));
     await waitFor(() => expect(screen.getByText("What should we call you?")).toBeTruthy());
@@ -430,7 +504,7 @@ describe("OnboardingScreen", () => {
     expect(calls.filter((c) => c.path === "/invitations/redeem")).toEqual([]);
   });
 
-  it("says one moment while the invitations are read, and the step comes with their answer (#503)", async () => {
+  it("says one moment and nothing else while the invitations are read, and the step comes with their answer (#503, #581)", async () => {
     const { server } = fakeApi({ redeemable: true });
     server.consents.push(consented("terms"), consented("privacy"));
     // The server above, but the invitations wait for the test.
@@ -446,12 +520,15 @@ describe("OnboardingScreen", () => {
     }) as unknown as typeof fetch;
     await show(<OnboardingScreen />);
     await waitFor(() => expect(screen.getByText("One moment…")).toBeTruthy());
-    expect(screen.queryByText("Did a friend invite you?")).toBeNull();
+    // Centred, as the status's own wait: no heading until there is an offer, and no number.
+    expect(drawn()).toEqual(["One moment…"]);
+    expect(screen.getByText("One moment…").props.accessibilityLiveRegion).toBe("polite");
     await act(async () => {
       release();
       await settle();
     });
     await waitFor(() => expect(screen.getByText("Did a friend invite you?")).toBeTruthy());
+    asked("Did a friend invite you?");
     expect(screen.queryByText("One moment…")).toBeNull();
   });
 
@@ -551,7 +628,7 @@ describe("OnboardingScreen", () => {
     await show(<OnboardingScreen />);
     await waitFor(() => expect(screen.getByText("What are you here for?")).toBeTruthy());
     expect(screen.queryByText("Whom are you looking for?")).toBeNull();
-    await press(screen.getByRole("button", { name: "Something long-term" }));
+    await press(row("Something long-term"));
     await press(screen.getByRole("button", { name: "Continue" }));
     await flush();
     await waitFor(() => expect(screen.getByText("What ages?")).toBeTruthy());
@@ -572,26 +649,437 @@ describe("OnboardingScreen", () => {
     server.seeks = ["woman"];
     await show(<OnboardingScreen />);
     await waitFor(() => expect(screen.getByText("What are you here for?")).toBeTruthy());
-    expect(
-      screen.getByText(
-        "You're shown only to people who want the same thing. Open to either covers long-term and casual. You can change this later.",
-      ),
-    ).toBeTruthy();
     for (const name of [
       "Something long-term",
       "Something casual",
       "Open to either",
       "A dance partner",
     ]) {
-      expect(screen.getByRole("button", { name, selected: false })).toBeTruthy();
+      expect(checked(name)).toBe(false);
     }
     checkA11y();
-    await press(screen.getByRole("button", { name: "A dance partner" }));
-    expect(screen.getByRole("button", { name: "A dance partner", selected: true })).toBeTruthy();
+    await press(row("A dance partner"));
+    expect(checked("A dance partner")).toBe(true);
     await press(screen.getByRole("button", { name: "Continue" }));
     await flush();
     await waitFor(() => expect(screen.getByText("What ages?")).toBeTruthy());
     expect(server.profile?.fields).toEqual({ intent: "dance_partner" });
+  });
+
+  /** What comes before a step answered, so that the step is next, in the sheet's order. */
+  const answeredBefore = (server: ReturnType<typeof fakeApi>["server"], step: string) => {
+    const order = ["name", "gender", "seeks", "intent", "age", "home", "photos", "prompts"];
+    const past = (answer: string) => order.indexOf(answer) < order.indexOf(step);
+    server.consents.push(consented("terms"), consented("privacy"));
+    if (past("name")) {
+      server.profile = {
+        displayName: "Onni",
+        bio: null,
+        bioPreset: null,
+        fields: past("intent") ? { intent: "long_term" } : {},
+        prompts: [],
+      };
+    }
+    if (past("gender")) server.gender = "man";
+    if (past("seeks")) {
+      server.seeks = ["woman"];
+      server.consents.push(consented("special_category"));
+    }
+    if (past("age")) server.ageWindow = { min: 30, max: 42 };
+    if (past("home")) server.home = IN_KALLIO;
+    if (past("photos")) server.photos = PHOTOS_FOR_COMPLETENESS;
+  };
+
+  describe("each question, the screen's one heading under its number, with at most one line under it (#581)", () => {
+    it.each([
+      ["en-US", "name", "Step 1 of 8", "What should we call you?", "Name on your card"],
+      ["fi-FI", "name", "Vaihe 1 / 8", "Miksi sinua kutsutaan?", "Nimi kortillasi"],
+      ["sv-FI", "name", "Steg 1 av 8", "Vad ska vi kalla dig?", "Namn på ditt kort"],
+      [
+        "en-US",
+        "gender",
+        "Step 2 of 8",
+        "How do you describe yourself?",
+        "Yours to choose, not the bank's. This is shown on your card.",
+      ],
+      [
+        "fi-FI",
+        "gender",
+        "Vaihe 2 / 8",
+        "Miten kuvailet itseäsi?",
+        "Sinun valintasi, ei pankin. Tämä näkyy kortillasi.",
+      ],
+      [
+        "sv-FI",
+        "gender",
+        "Steg 2 av 8",
+        "Hur beskriver du dig själv?",
+        "Ditt val, inte bankens. Det här visas på ditt kort.",
+      ],
+      [
+        "en-US",
+        "seeks",
+        "Step 3 of 8",
+        "Whom are you looking for?",
+        "Nobody outside your choice is ever shown to you, and you are never shown to anyone who did not pick you.",
+      ],
+      [
+        "fi-FI",
+        "seeks",
+        "Vaihe 3 / 8",
+        "Ketä etsit?",
+        "Ketään valintasi ulkopuolelta ei koskaan näytetä sinulle, eikä sinua näytetä kenellekään, joka ei valinnut sinua.",
+      ],
+      [
+        "sv-FI",
+        "seeks",
+        "Steg 3 av 8",
+        "Vem söker du?",
+        "Ingen utanför ditt val visas någonsin för dig, och du visas aldrig för någon som inte valde dig.",
+      ],
+      [
+        "en-US",
+        "intent",
+        "Step 4 of 8",
+        "What are you here for?",
+        "You're shown only to people who want the same thing.",
+      ],
+      [
+        "fi-FI",
+        "intent",
+        "Vaihe 4 / 8",
+        "Mitä etsit täältä?",
+        "Sinut näytetään vain niille, jotka haluavat samaa.",
+      ],
+      [
+        "sv-FI",
+        "intent",
+        "Steg 4 av 8",
+        "Vad är du här för?",
+        "Du visas bara för dem som vill samma sak.",
+      ],
+      // The ages' line is gone: the steppers' own names come right under the question.
+      ["en-US", "age", "Step 5 of 8", "What ages?", "Youngest"],
+      ["fi-FI", "age", "Vaihe 5 / 8", "Minkä ikäisiä?", "Nuorin"],
+      ["sv-FI", "age", "Steg 5 av 8", "Vilka åldrar?", "Yngsta"],
+      [
+        "en-US",
+        "home",
+        "Step 6 of 8",
+        "Where do you live?",
+        "Your postal code tells Kuutti how far people are. Others see a town or your area by name, never the digits.",
+      ],
+      [
+        "fi-FI",
+        "home",
+        "Vaihe 6 / 8",
+        "Missä asut?",
+        "Postinumerosi kertoo Kuutille, kuinka kaukana ihmiset ovat. Muut näkevät kaupungin tai alueesi nimen, eivät koskaan numeroita.",
+      ],
+      [
+        "sv-FI",
+        "home",
+        "Steg 6 av 8",
+        "Var bor du?",
+        "Ditt postnummer berättar för Kuutti hur långt bort folk är. Andra ser en stad eller ditt område med namn, aldrig siffrorna.",
+      ],
+      [
+        "en-US",
+        "photos",
+        "Step 7 of 8",
+        "Two photos of you",
+        "Profiles with a face photo get seen.",
+      ],
+      [
+        "fi-FI",
+        "photos",
+        "Vaihe 7 / 8",
+        "Kaksi kuvaa sinusta",
+        "Profiilit, joissa on kasvokuva, tulevat nähdyiksi.",
+      ],
+      [
+        "sv-FI",
+        "photos",
+        "Steg 7 av 8",
+        "Två bilder på dig",
+        "Profiler med en ansiktsbild blir sedda.",
+      ],
+      [
+        "en-US",
+        "prompts",
+        "Step 8 of 8",
+        "A few words",
+        "Answer two questions, write a bio of at least 50 characters, or pick a ready line.",
+      ],
+      [
+        "fi-FI",
+        "prompts",
+        "Vaihe 8 / 8",
+        "Muutama sana",
+        "Vastaa kahteen kysymykseen, kirjoita vähintään 50 merkin esittely tai valitse valmis rivi.",
+      ],
+      [
+        "sv-FI",
+        "prompts",
+        "Steg 8 av 8",
+        "Några ord",
+        "Svara på två frågor, skriv en presentation på minst 50 tecken eller välj en färdig rad.",
+      ],
+    ])("on a %s phone, the %s step", async (tag, step, number, question, line) => {
+      (useLocales as jest.Mock).mockReturnValue([{ languageTag: tag }]);
+      try {
+        const { server } = fakeApi();
+        answeredBefore(server, step);
+        await show(<OnboardingScreen />);
+        await waitFor(() => expect(screen.getByText(question)).toBeTruthy());
+        asked(question, number);
+        expect(drawn()[2]).toBe(line);
+      } finally {
+        (useLocales as jest.Mock).mockReturnValue([{ languageTag: "en-US" }]);
+      }
+    });
+
+    it.each([
+      [
+        "en-US",
+        "Non-binary",
+        "Continue",
+        "Step 2 of 8",
+        "A word for it, if you like",
+        "Shown on your card, never used for matching.",
+      ],
+      [
+        "fi-FI",
+        "Muunsukupuolinen",
+        "Jatka",
+        "Vaihe 2 / 8",
+        "Sana sille, jos haluat",
+        "Näytetään kortillasi, ei koskaan käytetä yhdistämiseen.",
+      ],
+      [
+        "sv-FI",
+        "Icke-binär",
+        "Fortsätt",
+        "Steg 2 av 8",
+        "Ett ord för det, om du vill",
+        "Visas på ditt kort, används aldrig för matchning.",
+      ],
+    ])("on a %s phone, the word after %s", async (tag, gender, go, number, question, line) => {
+      (useLocales as jest.Mock).mockReturnValue([{ languageTag: tag }]);
+      try {
+        const { server } = fakeApi();
+        answeredBefore(server, "gender");
+        await show(<OnboardingScreen />);
+        await press(await screen.findByRole("radio", { name: gender }));
+        await press(screen.getByRole("button", { name: go }));
+        await flush();
+        await waitFor(() => expect(screen.getByText(question)).toBeTruthy());
+        asked(question, number);
+        expect(drawn()[2]).toBe(line);
+      } finally {
+        (useLocales as jest.Mock).mockReturnValue([{ languageTag: "en-US" }]);
+      }
+    });
+
+    it("names the name's field over it, as The basics does, and says no more", async () => {
+      const { server } = fakeApi();
+      answeredBefore(server, "name");
+      await show(<OnboardingScreen />);
+      await waitFor(() => expect(screen.getByText("What should we call you?")).toBeTruthy());
+      expect(drawn()).toEqual([
+        "Step 1 of 8",
+        "What should we call you?",
+        "Name on your card",
+        "Continue",
+      ]);
+      const field = screen.getByLabelText("Name on your card");
+      expect(field.props.maxLength).toBe(DISPLAY_NAME_MAX);
+      expect(field.props.autoCapitalize).toBe("words");
+      expect(readOnly()).toBe(true);
+      await type(field, "   ");
+      expect(readOnly()).toBe(true);
+      await type(screen.getByLabelText("Name on your card"), " Aino ");
+      expect(readOnly()).toBe(false);
+      checkA11y();
+      await press(onward());
+      await flush();
+      await waitFor(() => expect(screen.getByText("How do you describe yourself?")).toBeTruthy());
+      expect(server.profile?.displayName).toBe("Aino");
+    });
+  });
+
+  describe("the photos step, the grid itself (#581)", () => {
+    const LEAD =
+      "Hold a photo and drag it to change the order. A new photo is checked before anyone else sees it.";
+    /** Everything but the photos answered, the words still to come: the step is next, and in reach of what follows it. */
+    const atPhotos = async () => {
+      const api = fakeApi();
+      answeredBefore(api.server, "photos");
+      await show(<OnboardingScreen />);
+      await waitFor(() => expect(screen.getByText(LEAD)).toBeTruthy());
+      return api;
+    };
+    const reads = (calls: ReturnType<typeof fakeApi>["calls"], path: string) =>
+      calls.filter((c) => c.method === "GET" && c.path === path).length;
+    const backFromAPhoto = () =>
+      act(async () => {
+        focus();
+        await settle(120);
+      });
+
+    it("opens on the grid with nothing to press first, and no screen of its own to go to", async () => {
+      await atPhotos();
+      asked("Two photos of you", "Step 7 of 8");
+      expect(drawn()).toEqual([
+        "Step 7 of 8",
+        "Two photos of you",
+        "Profiles with a face photo get seen.",
+        LEAD,
+        "Add a photo",
+        "Continue",
+      ]);
+      expect(router.push).not.toHaveBeenCalled();
+      expect(readOnly()).toBe(true);
+      checkA11y();
+    });
+
+    it("waits for two photos, and even then for its Continue, and does not come back after it", async () => {
+      const { server } = await atPhotos();
+      await addPhoto(server);
+      expect(readOnly()).toBe(true);
+      await addPhoto(server);
+      expect(readOnly()).toBe(false);
+      await flush();
+      // Two photos answer the step to the API, and nothing has moved.
+      expect(screen.getByText("Two photos of you")).toBeTruthy();
+      await press(onward());
+      await flush();
+      await waitFor(() => expect(screen.getByText("A few words")).toBeTruthy());
+      asked("A few words", "Step 8 of 8");
+      await backFromAPhoto();
+      expect(screen.getByText("A few words")).toBeTruthy();
+      expect(screen.queryByText("Two photos of you")).toBeNull();
+    });
+
+    it("stands while a photo is looked at full size and after, though the status read on the way back says two are enough", async () => {
+      const { server } = await atPhotos();
+      await addPhoto(server);
+      await addPhoto(server);
+      await press(screen.getByRole("button", { name: "Open photo 1" }));
+      expect(router.push).toHaveBeenCalledWith(
+        expect.objectContaining({ pathname: "/photos/[id]" }),
+      );
+      await backFromAPhoto();
+      expect(screen.getByText("Two photos of you")).toBeTruthy();
+      expect(screen.getAllByRole("button", { name: /^Open photo/ })).toHaveLength(2);
+      await press(onward());
+      await flush();
+      await waitFor(() => expect(screen.getByText("A few words")).toBeTruthy());
+    });
+
+    it("reads both the list and the status again at its press", async () => {
+      const { server, calls } = await atPhotos();
+      await addPhoto(server);
+      await addPhoto(server);
+      const list = reads(calls, "/photos");
+      const status = reads(calls, "/onboarding");
+      await press(onward());
+      await flush();
+      expect(reads(calls, "/photos")).toBe(list + 1);
+      expect(reads(calls, "/onboarding")).toBe(status + 1);
+    });
+
+    it("stays when a photo was refused since the list was read, says why on its tile, and goes on with another", async () => {
+      const { server } = await atPhotos();
+      await addPhoto(server);
+      await addPhoto(server);
+      expect(readOnly()).toBe(false);
+      // The check's answer came after the last read: two on the phone, one to the API.
+      server.photos = 1;
+      server.refusedPhotos = 1;
+      await press(onward());
+      await flush();
+      expect(screen.getByText("Two photos of you")).toBeTruthy();
+      expect(
+        screen.getByText("Not accepted. This photo does not fit Kuutti; try another one."),
+      ).toBeTruthy();
+      expect(readOnly()).toBe(true);
+      await addPhoto(server);
+      expect(readOnly()).toBe(false);
+      await press(onward());
+      await flush();
+      await waitFor(() => expect(screen.getByText("A few words")).toBeTruthy());
+    });
+
+    it("shows the upload's words for a list that could not be read, reads it again at Continue, and stays while the API says so", async () => {
+      const { server, calls } = fakeApi();
+      answeredBefore(server, "photos");
+      const api = failingUntilOk("/photos");
+      await show(<OnboardingScreen />);
+      await waitFor(() =>
+        expect(screen.getByText("The photo could not be uploaded. Try again.")).toBeTruthy(),
+      );
+      expect(screen.getByText("Step 7 of 8")).toBeTruthy();
+      expect(readOnly()).toBe(false);
+      api.ok();
+      const status = reads(calls, "/onboarding");
+      await press(onward());
+      await flush();
+      await waitFor(() => expect(screen.getByText(LEAD)).toBeTruthy());
+      expect(reads(calls, "/onboarding")).toBe(status + 1);
+      expect(screen.getByText("Two photos of you")).toBeTruthy();
+      expect(screen.queryByText("The photo could not be uploaded. Try again.")).toBeNull();
+      expect(readOnly()).toBe(true);
+    });
+
+    it("says a status that could not be read at Continue, and goes on once it can", async () => {
+      const { server } = await atPhotos();
+      await addPhoto(server);
+      await addPhoto(server);
+      const api = failingUntilOk("/onboarding");
+      await press(onward());
+      await flush();
+      await waitFor(() =>
+        expect(
+          screen.getByText("Where you are in getting started could not be loaded."),
+        ).toBeTruthy(),
+      );
+      api.ok();
+      await press(screen.getByRole("button", { name: "Try again" }));
+      await flush();
+      // A read is no Continue: the step is still the person's to end.
+      await waitFor(() => expect(screen.getByText("Two photos of you")).toBeTruthy());
+      await press(onward());
+      await flush();
+      await waitFor(() => expect(screen.getByText("A few words")).toBeTruthy());
+    });
+
+    it("leaves for home, drawing nothing on the way, when the photos were all that was missing", async () => {
+      const { server } = fakeApi();
+      allAnswered(server);
+      server.photos = 1;
+      await show(<OnboardingScreen />);
+      await waitFor(() => expect(screen.getByText(LEAD)).toBeTruthy());
+      await addPhoto(server);
+      await press(onward());
+      await flush();
+      await waitFor(() => expect(router.replace).toHaveBeenCalledWith("/"));
+      expect(drawn()).toEqual([]);
+    });
+
+    it("stands until its Continue after a refusal too, once another photo makes it two", async () => {
+      const { server } = await atPhotos();
+      await addPhoto(server);
+      await addPhoto(server);
+      server.photos = 1;
+      server.refusedPhotos = 1;
+      await press(onward());
+      await flush();
+      expect(readOnly()).toBe(true);
+      await addPhoto(server);
+      await backFromAPhoto();
+      expect(screen.getByText("Two photos of you")).toBeTruthy();
+    });
   });
 
   describe("the steps that ask one thing, as whole-width rows (#581)", () => {
@@ -618,12 +1106,41 @@ describe("OnboardingScreen", () => {
       checkA11y();
     });
 
+    it("the intent as radios in a group, a row each, one chosen at a time, and no way on until one is", async () => {
+      const { server } = fakeApi();
+      answeredBefore(server, "intent");
+      await show(<OnboardingScreen />);
+      await waitFor(() => expect(screen.getByText("What are you here for?")).toBeTruthy());
+      const group = screen.getByLabelText("What are you here for?");
+      expect(group.props.accessibilityRole).toBe("radiogroup");
+      expect(group.props.className).not.toMatch(/\bflex-row\b/);
+      expect(screen.getAllByRole("radio").map((r) => r.props.accessibilityLabel)).toEqual([
+        "Something long-term",
+        "Something casual",
+        "Open to either",
+        "A dance partner",
+      ]);
+      expect(row("Something casual").parent).toBe(group);
+      expect(readOnly()).toBe(true);
+      await press(row("Something casual"));
+      expect(checked("Something casual")).toBe(true);
+      expect(screen.getByText("✓ Something casual")).toBeTruthy();
+      expect(readOnly()).toBe(false);
+      await press(row("Open to either"));
+      expect(checked("Open to either")).toBe(true);
+      expect(checked("Something casual")).toBe(false);
+      expect(screen.queryByText("✓ Something casual")).toBeNull();
+      checkA11y();
+    });
+
     it("the identity label as radios in a group of its own", async () => {
       await atGender();
       await press(row("Non-binary"));
       await press(screen.getByRole("button", { name: "Continue" }));
       await flush();
       await waitFor(() => expect(screen.getByText("A word for it, if you like")).toBeTruthy());
+      asked("A word for it, if you like", "Step 2 of 8");
+      expect(drawn()[2]).toBe("Shown on your card, never used for matching.");
       const group = screen.getByLabelText("A word for it, if you like");
       expect(group.props.accessibilityRole).toBe("radiogroup");
       expect(screen.getAllByRole("radio")).toHaveLength(7);
@@ -658,7 +1175,7 @@ describe("OnboardingScreen", () => {
       // The step's own line says the bio's length, and the two questions.
       expect(
         screen.getByText(
-          "Answer two questions, write a bio of at least 50 characters, or pick a ready line. Your card leads with a photo and one answer.",
+          "Answer two questions, write a bio of at least 50 characters, or pick a ready line.",
         ),
       ).toBeTruthy();
       expect(screen.getByText("Questions")).toBeTruthy();
@@ -803,7 +1320,12 @@ describe("OnboardingScreen", () => {
     const { server, calls } = fakeApi();
     await show(<OnboardingScreen />);
     await waitFor(() => expect(screen.getByText("How we do things here")).toBeTruthy());
-    expect(screen.getByText(/Nothing here is for sale/)).toBeTruthy();
+    // The one heading, nothing over it, and the two norms under it (#581).
+    asked("How we do things here");
+    expect(drawn().slice(1, 3)).toEqual([
+      "Everybody here has shown a bank ID. Be the person you are.",
+      "No contact details before a match.",
+    ]);
     expect(screen.getByText("Terms of use")).toBeTruthy();
     expect(screen.getByText("Privacy")).toBeTruthy();
     // English is a translation: the Finnish text is the binding one.
@@ -1163,7 +1685,8 @@ describe("OnboardingScreen", () => {
     await waitFor(() => expect(router.replace).toHaveBeenCalledWith("/"));
     expect(screen.queryByText("Help us learn how matching works")).toBeNull();
     expect(screen.queryByRole("button", { name: "Yes, I take part" })).toBeNull();
-    expect(screen.getByText("All set. The home screen shows what comes next.")).toBeTruthy();
+    // Home takes over at once and says what comes next: nothing is drawn for the moment before it (#581).
+    expect(drawn()).toEqual([]);
     // The words are the last thing saved, and nothing asks about research (#545).
     expect(calls.filter((c) => c.method !== "GET").map((c) => c.path)).toEqual(["/profile"]);
     expect(server.consents.some((c) => c.kind === "research")).toBe(false);
@@ -1291,9 +1814,8 @@ describe("OnboardingScreen", () => {
       await waitFor(() => expect(screen.getByText("What should your card show?")).toBeTruthy());
       expect(screen.queryByText(/^Step 0/)).toBeNull();
       expect(screen.getByText("Step 6 of 8")).toBeTruthy();
-      // The step's own heading, a level above the home screen's, once.
-      const question = screen.getByRole("heading", { name: "What should your card show?" });
-      expect(question.props["aria-level"]).toBe("2");
+      // The step's own heading, the screen's one, a level above the home screen's, once.
+      asked("What should your card show?", "Step 6 of 8");
       expect(screen.getAllByText("What should your card show?")).toHaveLength(1);
       expect(screen.getByLabelText("What should your card show?").props.accessibilityRole).toBe(
         "radiogroup",
@@ -1334,8 +1856,8 @@ describe("OnboardingScreen", () => {
       await atHome();
       await pick("83960", "8 3 9 6 0, Koli");
       // What the card says, in the question's place and role: the step still leads with a heading (#581).
-      const line = await screen.findByRole("heading", { name: "On your card: Joensuu" });
-      expect(line.props["aria-level"]).toBe("2");
+      await screen.findByRole("heading", { name: "On your card: Joensuu" });
+      asked("On your card: Joensuu", "Step 6 of 8");
       expect(screen.queryByText("What should your card show?")).toBeNull();
       expect(screen.queryByText("Your card shows the nearest town.")).toBeNull();
       expect(screen.queryAllByRole("radio")).toEqual([]);
@@ -1573,7 +2095,7 @@ describe("OnboardingScreen", () => {
     };
     await show(<OnboardingScreen />);
     await waitFor(() => expect(screen.getByText("A few words")).toBeTruthy());
-    expect(screen.getByText(/characters, or pick a ready line\. Your card/)).toBeTruthy();
+    expect(screen.getByText(/characters, or pick a ready line\.$/)).toBeTruthy();
     checkA11y();
     await press(row("The photos say it. The rest over coffee."));
     await press(screen.getByRole("button", { name: "Save and continue" }));
@@ -1645,6 +2167,31 @@ describe("OnboardingScreen", () => {
     expect(saveDisabled()).toBe(false);
     checkA11y();
     expect(calls.filter((c) => c.method === "PUT" && c.path === "/profile")).toEqual([]);
+  });
+
+  it("takes two answered questions, the third way the step's line names, and counts neither one nor blanks (#581)", async () => {
+    const { server } = fakeApi();
+    atWords(server);
+    await show(<OnboardingScreen />);
+    await waitFor(() => expect(screen.getByText("A few words")).toBeTruthy());
+    const saveDisabled = () =>
+      screen.getByRole("button", { name: "Save and continue" }).props.accessibilityState?.disabled;
+    await press(screen.getByRole("button", { name: "My ideal Sunday" }));
+    await type(screen.getByLabelText("Your answer to: My ideal Sunday"), "Long walks.");
+    expect(saveDisabled()).toBe(true);
+    await press(screen.getByRole("button", { name: "Teach me" }));
+    await type(screen.getByLabelText("Your answer to: Teach me"), "   ");
+    expect(saveDisabled()).toBe(true);
+    await type(screen.getByLabelText("Your answer to: Teach me"), "To sail.");
+    expect(saveDisabled()).toBe(false);
+    checkA11y();
+    await press(screen.getByRole("button", { name: "Save and continue" }));
+    await flush();
+    await waitFor(() => expect(router.replace).toHaveBeenCalledWith("/"));
+    expect(server.profile?.prompts.map((prompt) => prompt.answer)).toEqual([
+      "Long walks.",
+      "To sail.",
+    ]);
   });
 
   it("says why a bio was refused, in the profile's words, and stays at the step (#223)", async () => {

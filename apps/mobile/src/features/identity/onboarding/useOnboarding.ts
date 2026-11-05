@@ -12,9 +12,9 @@ export type OnboardingState =
 
 /**
  * The onboarding status, reloaded after every step and whenever the screen
- * gets the focus back (#46, #146): the API decides what is still missing, the
- * screen only shows the next question, and the photos are added on their own
- * screen. A step that fails leaves the status as it was and says so.
+ * gets the focus back (#46, #146): the API decides what is still missing, and
+ * the screen only shows the next question. A step that fails leaves the status
+ * as it was and says so.
  */
 export function useOnboarding() {
   const [state, setState] = useState<OnboardingState>({ status: "loading" });
@@ -29,12 +29,15 @@ export function useOnboarding() {
     };
   }, []);
 
-  const reload = useCallback(async () => {
+  /** Reads the status, and hands back what it read: null if that failed. */
+  const reload = useCallback(async (): Promise<OnboardingStatus | null> => {
     try {
       const onboarding = await fetchOnboarding();
       if (mounted.current) setState({ status: "ready", onboarding });
+      return onboarding;
     } catch (error) {
       if (mounted.current) setState({ status: "error", error });
+      return null;
     }
   }, []);
   useFocusEffect(
@@ -43,20 +46,21 @@ export function useOnboarding() {
     }, [reload]),
   );
 
-  /** Runs one step's call, then reads the status again. */
+  /** Runs one step's call, then reads the status again, and hands back what it read. */
   const step = useCallback(
-    async (call: () => Promise<unknown>) => {
+    async (call: () => Promise<unknown>): Promise<OnboardingStatus | null> => {
       setBusy(true);
       setFailedCode(null);
       try {
         await call();
-        await reload();
+        return await reload();
       } catch (error) {
         const code = error instanceof ApiError ? (error.code ?? "unknown") : "unknown";
         if (mounted.current) setFailedCode(code);
         // The consent is gone (taken back on another device, or a new wording):
         // the status says so, and the step's switch can be given again (ADR-010 §16).
         if (code === "consent_required") await reload();
+        return null;
       } finally {
         if (mounted.current) setBusy(false);
       }

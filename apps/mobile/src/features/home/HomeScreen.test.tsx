@@ -241,7 +241,7 @@ describe("HomeRoute", () => {
 
   it("is the screens before the bank for a signed-out person on a phone that never answered them", async () => {
     await renderWithTheme(<HomeRoute />);
-    expect(await screen.findByRole("heading", { name: "Before you sign in" })).toBeTruthy();
+    expect(await screen.findByRole("heading", { name: "How we do things here" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "I'm in, and I accept both" })).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Sign in with your bank" })).toBeNull();
     expect(screen.queryByRole("heading", { name: "Kuutti" })).toBeNull();

@@ -12,16 +12,15 @@ import { LockScreen, type PasscodeAnswer } from "./LockScreen";
 
 const FIELD = "Your Kuutti passcode";
 const BANK = "Sign in with the bank instead";
-const FAILED = "Your face did not unlock Kuutti. Try again, or use another way below.";
+const FAILED = "Your face did not unlock Kuutti.";
 /** The way back from the phone's pause, the same for every kind. */
-const PAUSED_UNTIL =
-  "Lock the phone and open it with its own code, then try again, or use another way below.";
+const PAUSED_UNTIL = "Lock the phone and open it with its own code, then try again.";
 /** A refusal in the words of the kind the button names (#464). */
 const REFUSAL = {
   failed: {
     face: FAILED,
-    fingerprint: "Your fingerprint did not unlock Kuutti. Try again, or use another way below.",
-    either: "Your face or fingerprint did not unlock Kuutti. Try again, or use another way below.",
+    fingerprint: "Your fingerprint did not unlock Kuutti.",
+    either: "Your face or fingerprint did not unlock Kuutti.",
   },
   lockout: {
     face: `The phone has paused face unlock after too many tries. ${PAUSED_UNTIL}`,
@@ -30,7 +29,7 @@ const REFUSAL = {
   },
 } as const;
 const DENIED =
-  "This iPhone does not let Kuutti use Face ID. You can allow it in the phone's settings, or use another way below.";
+  "This iPhone does not let Kuutti use Face ID. You can allow it in the phone's settings.";
 const UNLOCK = {
   face: "Unlock with your face",
   fingerprint: "Unlock with your fingerprint",
@@ -261,23 +260,30 @@ describe("LockScreen", () => {
       expect(screen.queryByText(REFUSAL.lockout.face)).toBeNull();
     });
 
-    it("speaks the person's language, in the agreement of the kind", async () => {
-      (useLocales as jest.Mock).mockReturnValue([{ languageTag: "fi-FI" }]);
+    it.each([
+      [
+        "fi-FI",
+        "Avaa sormenjäljelläsi",
+        "Sormenjälkesi ei avannut Kuuttia.",
+        "Puhelin on keskeyttänyt sormenjäljentunnistuksen liian monen yrityksen jälkeen. Lukitse puhelin ja avaa se puhelimen omalla koodilla. Yritä sitten uudelleen.",
+      ],
+      [
+        "sv-FI",
+        "Lås upp med fingeravtrycket",
+        "Ditt fingeravtryck låste inte upp Kuutti.",
+        "Telefonen har pausat upplåsning med fingeravtryck efter för många försök. Lås telefonen och öppna den med telefonens egen kod. Försök sedan igen.",
+      ],
+    ])("speaks %s, in the agreement of the kind", async (languageTag, unlock, failed, paused) => {
+      (useLocales as jest.Mock).mockReturnValue([{ languageTag }]);
       const onBiometrics = jest
         .fn<Promise<BiometricAnswer>, []>()
         .mockResolvedValueOnce("failed")
         .mockResolvedValueOnce("lockout");
       await show({ biometrics: "fingerprint", onBiometrics });
-      expect(
-        screen.getByText(
-          "Sormenjälkesi ei avannut Kuuttia. Yritä uudelleen tai käytä toista alla olevaa tapaa.",
-        ),
-      ).toBeTruthy();
-      await fireEvent.press(button("Avaa sormenjäljelläsi"));
+      expect(screen.getByText(failed)).toBeTruthy();
+      await fireEvent.press(button(unlock));
       await act(async () => undefined);
-      expect(
-        screen.getByText(/^Puhelin on keskeyttänyt sormenjäljentunnistuksen liian monen/),
-      ).toBeTruthy();
+      expect(screen.getByText(paused)).toBeTruthy();
     });
 
     it("says a second failure in a fresh live region, so Android says it again", async () => {
@@ -344,11 +350,11 @@ describe("LockScreen", () => {
     it.each([
       [
         "fi-FI",
-        "Tämä iPhone ei anna Kuutin käyttää Face ID:tä. Voit sallia sen puhelimen asetuksista tai käyttää toista alla olevaa tapaa.",
+        "Tämä iPhone ei anna Kuutin käyttää Face ID:tä. Voit sallia sen puhelimen asetuksista.",
       ],
       [
         "sv-FI",
-        "Den här iPhonen låter inte Kuutti använda Face ID. Du kan tillåta det i telefonens inställningar eller använda ett annat sätt nedan.",
+        "Den här iPhonen låter inte Kuutti använda Face ID. Du kan tillåta det i telefonens inställningar.",
       ],
     ])("speaks %s", async (languageTag, words) => {
       (useLocales as jest.Mock).mockReturnValue([{ languageTag }]);

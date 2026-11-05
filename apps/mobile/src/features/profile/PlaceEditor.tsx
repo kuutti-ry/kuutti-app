@@ -175,7 +175,7 @@ export function PlaceChoice({
   busy: boolean;
   onChoose: (showArea: boolean) => void;
   /** Its heading's level on the screen that holds it. */
-  heading?: "h2" | "h3";
+  heading?: "h1" | "h3";
 }) {
   const { t, locale } = useT();
   const tap = useHapticTap();

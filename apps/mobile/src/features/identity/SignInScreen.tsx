@@ -29,25 +29,22 @@ export type SignInParams = { code?: string; error?: string; until?: string };
 
 type Phase =
   | { kind: "idle" }
-  | { kind: "opening" }
   | { kind: "exchanging" }
-  | { kind: "done" }
   | { kind: "error"; code: string; until?: string };
 
 /**
- * The refusals the API can send back through the deep link, each with its
- * own text, plus the app's own. A Map, so a crafted link (`?error=toString`)
+ * The refusals with a fact of their own, the API's through the deep link and
+ * the app's own, each with its text. Anything else, a link gone stale or a
+ * failure on the way, is one thing, it did not work, go again, which the card's
+ * title and Try again say (#581). A Map, so a crafted link (`?error=toString`)
  * finds nothing rather than a prototype member. The sign-in's rate limit
  * refuses a start through the link and an exchange with a 429 (ADR-026 §4):
  * one text for both, since both ask for the same wait.
  */
 const REFUSALS: ReadonlyMap<string, PlainMessageKey> = new Map([
-  ["auth_code_used", "signIn.error.auth_code_used"],
-  ["auth_state_mismatch", "signIn.error.auth_state_mismatch"],
   ["auth_under_18", "signIn.error.auth_under_18"],
   ["auth_banned", "signIn.error.auth_banned"],
   ["auth_suspended", "signIn.error.auth_suspended"],
-  ["auth_provider_error", "signIn.error.auth_provider_error"],
   ["auth_cancelled", "signIn.error.auth_cancelled"],
   ["auth_rate_limited", "signIn.error.auth_rate_limited"],
   ["rate_limited", "signIn.error.auth_rate_limited"],
@@ -120,7 +117,7 @@ export function SignInScreen({ code, error, until }: SignInParams) {
 
   // A refusal can arrive while this screen is shown: the button opens the
   // browser from here, and the link comes back to the same screen with its
-  // answer. The first state alone would go on saying that the bank is open.
+  // answer, which the first state alone would miss.
   // A refusal also ends the answers held for that attempt (#418): the phone
   // is asked again whether it has recorded them.
   useEffect(() => {
@@ -146,7 +143,7 @@ export function SignInScreen({ code, error, until }: SignInParams) {
         // Before the status is read: onboarding then finds them given.
         const agreements = takeAgreements(challengeOf(verifier));
         if (agreements) await recordAgreements(agreements);
-        setPhase({ kind: "done" });
+        // "Signing you in…" stands until the next screen takes over, home or the first open step (#581).
         router.replace("/");
       } catch (failure: unknown) {
         setPhase({
@@ -168,7 +165,8 @@ export function SignInScreen({ code, error, until }: SignInParams) {
       setPhase({ kind: "idle" });
       return;
     }
-    setPhase({ kind: "opening" });
+    // The browser covers the screen as it opens, so a refusal shown just goes (#581).
+    setPhase({ kind: "idle" });
     // What the last link said is put away, so that the next one is news even
     // when it says the same: the same refusal twice is two refusals.
     router.setParams({ code: undefined, error: undefined, until: undefined });
@@ -181,7 +179,6 @@ export function SignInScreen({ code, error, until }: SignInParams) {
       // are asked again, and so is the bank's button on a phone that recorded them.
       if (heldAgreements() !== null && !bindAgreements(challengeOf(verifier), now)) {
         setAgreed(null);
-        setPhase({ kind: "idle" });
         return;
       }
       await markLoginStarted(verifier, now);
@@ -197,7 +194,7 @@ export function SignInScreen({ code, error, until }: SignInParams) {
     }
   };
 
-  const refusalText = (failure: { code: string; until?: string }): string => {
+  const refusalText = (failure: { code: string; until?: string }): string | null => {
     const day = failure.until ? new Date(failure.until) : null;
     const valid = day !== null && !Number.isNaN(day.getTime());
     if (failure.code === "auth_cooldown") {
@@ -211,8 +208,10 @@ export function SignInScreen({ code, error, until }: SignInParams) {
         date: formatDate(locale, day, { timeZone: "Europe/Helsinki" }),
       });
     }
-    return t(REFUSALS.get(failure.code) ?? "signIn.error.generic");
+    const words = REFUSALS.get(failure.code);
+    return words ? t(words) : null;
   };
+  const refusal = phase.kind === "error" ? refusalText(phase) : null;
 
   const buttonText =
     phase.kind === "error" && !LASTING_REFUSALS.has(phase.code)
@@ -236,7 +235,6 @@ export function SignInScreen({ code, error, until }: SignInParams) {
         <Text variant="h1" accessibilityRole="header">
           {t("signIn.title")}
         </Text>
-        <Text className="w-full max-w-md text-center">{t("signIn.explain")}</Text>
 
         {/* Right after a break began on this device (#170): why the sign-in is back. */}
         {/* Right after the lock signed this phone out (#418): why, and that the lock is off now. */}
@@ -267,22 +265,16 @@ export function SignInScreen({ code, error, until }: SignInParams) {
             <View accessibilityLabel={t("signIn.error.title")} className="gap-6">
               <CardHeader>
                 <CardTitle className="text-destructive">{t("signIn.error.title")}</CardTitle>
-                <CardDescription>{refusalText(phase)}</CardDescription>
+                {refusal !== null && <CardDescription>{refusal}</CardDescription>}
               </CardHeader>
             </View>
           </Card>
         )}
 
-        {(phase.kind === "opening" || phase.kind === "exchanging" || phase.kind === "done") && (
+        {phase.kind === "exchanging" && (
           <Card className="w-full max-w-md">
             <CardContent>
-              <Text accessibilityLiveRegion="polite">
-                {phase.kind === "opening"
-                  ? t("signIn.opening")
-                  : phase.kind === "exchanging"
-                    ? t("signIn.exchanging")
-                    : t("signIn.done")}
-              </Text>
+              <Text accessibilityLiveRegion="polite">{t("signIn.exchanging")}</Text>
             </CardContent>
           </Card>
         )}
@@ -293,20 +285,17 @@ export function SignInScreen({ code, error, until }: SignInParams) {
           <Text className="w-full max-w-md text-center">{t("signIn.unavailable")}</Text>
         )}
 
-        {Platform.OS !== "web" &&
-          agreed !== null &&
-          phase.kind !== "exchanging" &&
-          phase.kind !== "done" && (
-            <Button
-              accessibilityLabel={buttonText}
-              className="w-full max-w-md"
-              // Never past the screens before the bank: a refusal shown on a
-              // phone that has not answered them goes back to them first.
-              onPress={() => (agreed ? void open() : setPhase({ kind: "idle" }))}
-            >
-              <Text>{buttonText}</Text>
-            </Button>
-          )}
+        {Platform.OS !== "web" && agreed !== null && phase.kind !== "exchanging" && (
+          <Button
+            accessibilityLabel={buttonText}
+            className="w-full max-w-md"
+            // Never past the screens before the bank: a refusal shown on a
+            // phone that has not answered them goes back to them first.
+            onPress={() => (agreed ? void open() : setPhase({ kind: "idle" }))}
+          >
+            <Text>{buttonText}</Text>
+          </Button>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
