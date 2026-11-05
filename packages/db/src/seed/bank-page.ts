@@ -36,7 +36,7 @@ const GROUPS: ReadonlyArray<{ group: DemoPersona["group"]; title: string; lead: 
   {
     group: "cards",
     title: "In Iida's round",
-    lead: "The four people of Iida's round, there to be shown to her: pnpm demo:reset gives them their profiles. Nobody needs to sign in as them, so their names are not in the list at the top.",
+    lead: "The four people of Iida's round, there to be shown to her: pnpm demo:reset gives them their profiles. A demo does not sign in as them, so their names are not in the list at the top.",
   },
 ];
 
@@ -74,7 +74,7 @@ export function renderBankPage(personas: readonly DemoPersona[]): string {
   // last button ends 699 CSS px down the page at 375 to 411 px wide; an iPhone 17's Safari shows
   // about 728 above its floating bar, a Pixel 7's Chrome about 780. The eleventh row took a shorter
   // warning, less room above the list and a narrower gap between its rows. The people of Iida's
-  // round are cards nobody signs in as, so they are not listed. A twenty-second name needs a third
+  // round are cards a demo does not sign in as, so they are not listed. A twenty-second name needs a third
   // column, and every name must stay on one line, as Mikael Lindqvist's does.
   const names = personas
     .filter((p) => p.group !== "cards")
