@@ -252,7 +252,7 @@ Then revoke the old token on expo.dev.
 
 **What breaks meanwhile:** the EAS steps of `deploy.yml` (after the API is already deployed), `eas-build.yml`, the preview lanes and the sweep's EAS removals fail until the new token is set. The sweep retries.
 
-**If it leaked:** revoke first, before setting the new one. Then look at what was published to the `staging` and `production` channels since the leak (the project's updates on expo.dev). Roll a bad one back as ADR-004 says: republish the previous commit, or `eas update:republish`. Channel edits stay the maintainer's. The token also reached Google Play through EAS, which uses the Play key for any holder and hands the upload key to every cloud build (ADR-057 §3): in Play Console, read each testing track's history; halt on a closed or open track what nobody started, and replace an internal release, which cannot be halted, with a staging build from a known-good `main`. Then replace the Play key and reset the upload key (section 14). It also reached App Store Connect through EAS (ADR-063 §3): read the app's TestFlight builds, expire any nobody started, and replace the App Store Connect key (section 15).
+**If it leaked:** revoke first, before setting the new one. Then look at what was published to the `staging` and `production` channels since the leak (the project's updates on expo.dev). Roll a bad one back as ADR-004 says: republish the previous commit, or `eas update:republish`. Channel edits stay the maintainer's. The token also reached Google Play through EAS, which uses the Play key for any holder and hands the upload key to every cloud build (ADR-057 §3): in Play Console, read each testing track's history; halt on a closed or open track what nobody started, and replace an internal release, which cannot be halted, with a staging build from a known-good `main`. Then replace the Play key and reset the upload key (section 14). It also reached App Store Connect through EAS (ADR-063 §3): read the app's TestFlight builds, expire any nobody started, and replace the App Store Connect key (section 15). Every cloud build is also handed the team's distribution certificate, so replace that too (section 16).
 
 ## 11. Sentry DSNs and the source-map token
 
@@ -265,7 +265,7 @@ Then revoke the old token on expo.dev.
 3. The EAS environments `preview` and `production`, visibility secret: replace the value as for the DSN above.
 4. Revoke the old token in Sentry.
 
-**Check.** The next deploy's step "Upload the update's source maps to Sentry" passes, and the next EAS build uploads its maps (`devices.md`: a build without readable stack traces fails).
+**Check.** The next deploy's step "Upload the update's source maps to Sentry" passes, and the next EAS build uploads its maps. A `production` build without them fails, but a `preview` environment build goes on (`devices.md`), so read its log for a `warning: sentry-cli` line: a dead token shows nowhere else.
 
 **What breaks meanwhile:** revoke the old token before the new one is in place and the upload step fails the deploy job (the update is already out), and EAS builds fail. Set first, revoke last.
 
@@ -321,7 +321,9 @@ Personal Sentry tokens made for settings work are revoked when the work is done 
 
 **If it leaked:** revoke it in App Store Connect first. With App Manager it can create versions of every app of the team and submit them for Apple's review, change their listings and prices, and manage TestFlight's groups and testers; only Apple's review stands between a version and the App Store. With Admin, which the one in use reads on EAS, it can also manage the team's users and keys and remove apps. Read the app's versions, its TestFlight builds and groups, and Users and Access for anything nobody started.
 
-**The APNs key** lets Expo's push service wake iPhones for `fi.kuutti.app` (ADR-055). It lives in EAS's credentials of the app, with no copy. Make a new one at developer.apple.com (Certificates, Identifiers & Profiles, Keys, Apple Push Notifications service), or let `eas credentials -p ios`, Push Notifications, make it; upload it there, then revoke the old one at Apple. A push between the revocation and the upload fails, and its receipt says so (`docs/vendors/expo.md`). Apple caps how many keys a team holds, so an unused one is revoked rather than kept.
+**The maintainer's own App Store Connect key**, for the `asc` command-line tool, is in the maintainer's Keychain and not at EAS. Nothing depends on it but that tool: make a new one in App Store Connect (Users and Access, Integrations) if it is still wanted, and revoke the old one. Its role has not been read (ADR-063, Open 7).
+
+**The APNs key** lets Expo's push service wake iPhones for `fi.kuutti.app` (ADR-055). It lives in EAS's credentials of the app, with no copy. Make a new one at developer.apple.com (Certificates, Identifiers & Profiles, Keys, Apple Push Notifications service), or let `eas credentials -p ios`, Push Notifications, make it; upload it there, then revoke the old one at Apple. A push between the revocation and the upload fails, and its receipt says so (`docs/vendors/expo.md`). Apple caps how many keys a team holds, so an unused one is revoked rather than kept. **If it leaked:** with a phone's device token it can send that phone a notification that reads as Kuutti's, so upload the new key and revoke the old one at once.
 
 The distribution certificate and the provisioning profiles are section 16's.
 

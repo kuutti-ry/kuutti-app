@@ -25,7 +25,7 @@ With a cable instead (useful for logs): Settings, About phone, tap the MIUI or O
 
 ## iPhone
 
-For the development and preview builds, which install ad hoc. The staging app needs none of this: it comes from TestFlight to the team's Apple Accounts (`docs/vendors/app-store.md`). Builds are signed on the association's Apple team, Kuutti ry (`2NC5W5B372`, since 2026-11-02; until `fi.kuutti.app` moves there, the maintainer's individual team `HM4J7X495K`, ADR-063 §4). Apple allows ad hoc installs only on registered devices, 100 a year per team, so a phone registered on the old team is registered again on the new one.
+For the development and preview builds, which install ad hoc. The staging app needs none of this: it comes from TestFlight to the team's Apple Accounts (`docs/vendors/app-store.md`). Builds are signed on the association's Apple team, Kuutti ry (`2NC5W5B372`, these ad hoc builds since 2026-11-04; before that the maintainer's individual team `HM4J7X495K`, ADR-063 §4). Apple allows ad hoc installs only on registered devices, 100 a year per team, so a phone registered on the old team is registered again on the new one.
 
 1. **On the iPhone:** Settings, Privacy & Security, **Developer Mode**, on; the phone restarts. Without it an internal build installs but will not open.
 2. **Register the phone**, on the Mac, as the Expo admin member (never the owner login):
