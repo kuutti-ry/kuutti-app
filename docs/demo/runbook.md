@@ -35,7 +35,7 @@ Locally, `pnpm demo:reset` again if anybody went through scene 5 since the last 
 |---|---|---|
 | the API answers | `curl -s localhost:3000/health` | `curl -s https://api.staging.kuutti.app/health`: the commit is `main`'s |
 | the build | the dev client opens Metro | the tech config screen: channel `staging`, the API above, the runtime's fingerprint matches the installed build |
-| the counter | `curl -s localhost:3000/ponds/counter`: Suomi with a total and a split | the same against staging |
+| the counter | `curl -s localhost:3000/ponds/counter`: Suomi with its number, `finished` | the same against staging |
 | matching | sign in as Sanna: "Matching is open for you." | the same, through Nordea `DEMOUSER4` |
 | the queue | sign in as Iida, See people: Henna first, "Liked you" and Nearby, and three more nearest first, Katja Close, Minna Around and Riikka Far (with a population whose pool has faces, which v2 does not give, women of it may come among them, in the order of their bands); look, decide nothing (a decision stands until midnight, and a match or a report for good). "Seen before" on a card, or fewer people: somebody went through it on an earlier day, so reset again. No See people on home: the reset did not reach the day; read its log (a cache of a release older than v3 stops it at Iida, step 2) | none: scene 5 runs locally only |
 | the queue | the panel lists Noa's four negatives and her second face | empty: the check decides Noa's pictures itself (her faces and the EXIF one approved, the landscape, the text and the group picture rejected with their reasons) |

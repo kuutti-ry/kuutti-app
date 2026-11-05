@@ -12,11 +12,11 @@ pnpm demo:population
 
 Writes three hundred people into the database of the local environment, replacing the synthetic population that was there. The pond is the one every database has (migration 0027). The pictures are a release of the public photos repository (`docs/demo/photo-prompts.md`), fetched and verified by `pnpm demo:assets` into `~/.cache/kuutti-demo-photos/v3`; this repository holds the manifest (`packages/db/src/seed/photos-manifest.ts`) and never a picture.
 
-After a write or a removal the public counter (#54) is counted anew over what is in the database now, so `GET /ponds/counter` and the card in the app show the population at once. Left to itself the counter would not move: it counts once a day and moves in steps of ten people, which is right among people and would leave a demo showing yesterday's figures. What may be said of a pond is decided as ever; the app keeps an answer for up to an hour.
+After a write or a removal the public counter (#54) is counted anew over what is in the database now, so `GET /ponds/counter` and the card in the app show the population at once. Left to itself the counter would not move: it counts once a day and moves in steps of ten people, which is right among people and would leave a demo showing yesterday's figures. What may be said of a pond is decided as ever.
 
 | option | what it does |
 |---|---|
-| `-- --size 5000` | as many people as asked, 1 to 5,000. From 235 people up the population shows everything it is there for; a smaller one is written too, and the command says what it does not show (`notShown`) |
+| `-- --size 5000` | as many people as asked, 1 to 5,000. From 250 people up the population shows everything it is there for, the bar among it, whatever the seed; a smaller one is written too, and may show no bar (the command's `bar` says what it filled, below) |
 | `-- --seed 7` | other people in the same pond, in other homes |
 | `-- --photos` | faces of the release for the people, drawn by seed (none, a few or the whole grid), through the upload pipeline like anybody's; `pnpm demo:assets` fetches the release first. Locally the faces are approved as a moderator would (the local check queues everything); on staging Rekognition decides |
 | `-- --dry-run` | prints the counts per pond and writes nothing; it does not connect |
@@ -34,14 +34,14 @@ Three hundred accounts that look bank-verified, among real people, would enter t
 
 ## Who lives where, and why
 
-One pond, the whole country (ADR-061 §8): everybody who onboarded is in Suomi, and the pond has to show everything at once. Where in the country each of them lives is their home, below.
+One pond, the whole country (ADR-061 §8): everybody who onboarded is in Suomi. Where in the country each of them lives is their home, below.
 
 | pond | people | women | men | non-binary | why |
 |---|---|---|---|---|---|
-| Suomi | 276 | 88 | 171 | 17 | every cell at ten or more, so the counter shows the split |
+| Suomi | 276 | 88 | 171 | 17 | the whole country, so everybody who onboarded is here |
 | none | 24 | | | | registered at the bank and gone before the first onboarding step: no gender, no pond, no home, no consent |
 
-These are exact counts, apportioned from shares by largest remainder, not draws: the thresholds are crossed by construction, from a population of 174 up (a test goes through every size; below that the non-binary cell is under the counter's k). At another size 8 % never onboarded and the rest is in Suomi with the same gender shares.
+These are exact counts, apportioned from shares by largest remainder, not draws. At another size 8 % never onboarded and the rest is in Suomi with the same gender shares.
 
 Everybody with a pond has a gender and a home: the app asks for the gender before the home, and writing the home is what sets the pond (ADR-061 §8).
 
@@ -93,7 +93,7 @@ The home card's bar of whom people seek (#507, ADR-013 §12) counts finished pro
 | a terms consent of an older wording | it reads as none, as a real person's does until they accept the new one. So they are not complete: they are in nobody's pool, on nobody's card and in no queue, and the personas' queues and the e2e flows stand as they were |
 | everything else as drawn | their seek answers, consents and profiles are the population's own |
 
-They take the pond's finished figure with them: 50 people fewer are finishing. A test in `apps/api/src/pond/counter.test.ts` holds the whole of it, from the write to the shares, and that none of them is in anybody's pool. The bar shows after a write, and in production never (ADR-013 §16, and the command refuses production anyway). The command's line says how many it filled (`bar`). From 250 people up every band is full whatever the seed, which a test holds; smaller populations may fall short in the middle band and then show no bar.
+They are the pond's number too: the card says these fifty, with anybody else whose profile is finished, a persona or somebody the pictures finish. A test in `apps/api/src/pond/counter.test.ts` holds the whole of it, from the write to the shares, and that none of them is in anybody's pool. The bar shows after a write; the command refuses production. The command's line says how many it filled (`bar`). From 250 people up every band is full whatever the seed, which a test holds; smaller populations may fall short in the middle band and then show no bar.
 
 ## What makes a synthetic person unmistakable
 

@@ -205,7 +205,7 @@ const REGISTER: Record<string, Entry> = {
   },
   session: { erasure: "goes", by: "deleteAccountSessions", exported: ["sessions"] },
   star: { erasure: "goes", by: "eraseStarsOf", exported: ["stars"] },
-  pond_counter: { erasure: "nobody", why: "A pond's counts by day (ADR-013)." },
+  pond_counter: { erasure: "nobody", why: "A pond's counts, one row each, no history (ADR-013)." },
 };
 
 /** The calls of eraseAccount that erase nothing themselves. */

@@ -14,18 +14,16 @@ import { ponds } from "./ponds.ts";
  * One row per pond and no history, on purpose: a series of daily exact counts
  * would say, next to a tombstone's `deleted_at`, which pond and which cell
  * lost one that day, which is what erasure removed (TD-7). Aggregates only:
- * no account, no identity, nothing finer than a day.
+ * no account, no identity, nobody's gender, nothing finer than a day.
  */
 export const pondCounter = pgTable("pond_counter", {
   pondId: uuid("pond_id")
     .primaryKey()
     .references(() => ponds.id),
   day: date("day", { mode: "string" }).notNull(),
-  verified: integer("verified").notNull(),
-  woman: integer("woman").notNull(),
-  man: integer("man").notNull(),
-  nonBinary: integer("non_binary").notNull(),
-  finishing: integer("finishing").notNull(),
+  // The finished profiles (#581). A row written before it stands at zero, which
+  // says nothing, and the next count replaces it: it is below the floor.
+  finished: integer("finished").notNull().default(0),
   // Finished profiles by whom they seek (#507): moved by their own sum, read only
   // as shares. A row written before them stands at zero, which says nothing.
   seeksMen: integer("seeks_men").notNull().default(0),

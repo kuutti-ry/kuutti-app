@@ -24,6 +24,9 @@ exports[`tokens match the reviewed values in every set 1`] = `
     "ring": "212 96% 78%",
     "secondary": "217 33% 20%",
     "secondary-foreground": "220 14% 96%",
+    "seeks-everyone": "175 77% 26%",
+    "seeks-men": "212 96% 78%",
+    "seeks-women": "269 100% 92%",
   },
   ".high-contrast": {
     "accent": "0 0% 100%",
@@ -47,6 +50,9 @@ exports[`tokens match the reviewed values in every set 1`] = `
     "ring": "224 90% 25%",
     "secondary": "0 0% 100%",
     "secondary-foreground": "0 0% 0%",
+    "seeks-everyone": "175 80% 32%",
+    "seeks-men": "224 90% 25%",
+    "seeks-women": "273 80% 22%",
   },
   ".high-contrast-dark": {
     "accent": "0 0% 0%",
@@ -70,6 +76,9 @@ exports[`tokens match the reviewed values in every set 1`] = `
     "ring": "212 100% 85%",
     "secondary": "0 0% 0%",
     "secondary-foreground": "0 0% 100%",
+    "seeks-everyone": "175 80% 24%",
+    "seeks-men": "212 100% 85%",
+    "seeks-women": "269 100% 92%",
   },
   ":root": {
     "accent": "214 32% 91%",
@@ -94,6 +103,9 @@ exports[`tokens match the reviewed values in every set 1`] = `
     "ring": "224 76% 48%",
     "secondary": "214 32% 91%",
     "secondary-foreground": "222 47% 11%",
+    "seeks-everyone": "174 55% 59%",
+    "seeks-men": "224 76% 48%",
+    "seeks-women": "273 67% 39%",
   },
 }
 `;
