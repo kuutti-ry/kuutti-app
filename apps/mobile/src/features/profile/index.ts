@@ -15,7 +15,7 @@ export { PlaceScreen } from "./PlaceScreen";
 export { ProfileCardView } from "./ProfileCardView";
 export { ProfileScreen } from "./ProfileScreen";
 export { PromptsEditor } from "./PromptsEditor";
-export { SectionScreen } from "./SectionScreen";
+export { NameEditor, SectionScreen } from "./SectionScreen";
 export { SeekAgesScreen } from "./seek/SeekAgesScreen";
 export { SEEK_PATH, SeekScreen } from "./seek/SeekScreen";
 export { SeeksChips } from "./seek/SeeksChips";

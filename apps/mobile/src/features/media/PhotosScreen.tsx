@@ -1,5 +1,10 @@
 import type { PlainMessageKey } from "@kuutti/i18n";
-import type { Photo, PhotoRejectionReason, PhotoState } from "@kuutti/schema";
+import {
+  PHOTOS_FOR_COMPLETENESS,
+  type Photo,
+  type PhotoRejectionReason,
+  type PhotoState,
+} from "@kuutti/schema";
 import { useRouter } from "expo-router";
 import Hourglass from "lucide-react-native/icons/hourglass";
 import Trash from "lucide-react-native/icons/trash";
@@ -100,10 +105,19 @@ const ONE_COLUMN_FONT_SCALE = 1.3;
  * progress is in words. The count is drawn only at the limit, where Add a photo
  * stops and needs a reason; below it the grid shows the count, and each change
  * of it is said to a screen reader, the one word that a photo landed (#581).
- * Opened from onboarding, it says that step's "Step x of n" as every other
- * step does (#146).
+ * It is onboarding's photos step too (#146, #581): under that step's number,
+ * heading and line, with the step's Continue in place of Done.
  */
-export function PhotosScreen({ progress }: { progress?: { step: number; total: number } }) {
+export function PhotosScreen({
+  step,
+}: {
+  /**
+   * Onboarding's step, when this is it: where it stands, whether the status its
+   * Continue asked for is still being read, and that Continue, the way on once
+   * two photos count as the API counts them.
+   */
+  step?: { position: number; total: number; reading: boolean; onContinue: () => void };
+}) {
   const { t } = useT();
   const router = useRouter();
   const tap = useHapticTap();
@@ -127,6 +141,10 @@ export function PhotosScreen({ progress }: { progress?: { step: number; total: n
   const { fontScale } = useWindowDimensions();
   const busy = photos.busy.kind !== "idle";
   const atMax = list !== null && total >= list.maxPhotos;
+  // The API's rule for the step: a refused photo does not count, one in review does.
+  const enough =
+    (list?.photos.filter((photo) => photo.state !== "rejected").length ?? 0) >=
+    PHOTOS_FOR_COMPLETENESS;
   const count = list && t("photos.count", { photos: total, max: list.maxPhotos });
   const countSaid = useRef<string | null>(null);
   useEffect(() => {
@@ -159,14 +177,15 @@ export function PhotosScreen({ progress }: { progress?: { step: number; total: n
         contentContainerClassName="flex-grow gap-4 p-6"
         scrollEnabled={drag.active === null}
       >
-        <Text variant="h1" accessibilityRole="header">
-          {t("photos.title")}
-        </Text>
-        {progress && (
+        {step && (
           <Text variant="muted" accessibilityLiveRegion="polite">
-            {t("onboarding.progress", progress)}
+            {t("onboarding.progress", { step: step.position, total: step.total })}
           </Text>
         )}
+        <Text variant="h1" accessibilityRole="header">
+          {t(step ? "onboarding.photos.title" : "photos.title")}
+        </Text>
+        {step && <Text>{t("onboarding.photos.explain")}</Text>}
         {list && <Text>{t("photos.explain")}</Text>}
 
         {photos.notice && (
@@ -360,16 +379,32 @@ export function PhotosScreen({ progress }: { progress?: { step: number; total: n
         >
           <Text>{t("photos.add")}</Text>
         </Button>
-        {/* Headers are hidden app-wide; from onboarding this is the way on to the next step. */}
-        <Button
-          variant="outline"
-          onPress={() => {
-            tap();
-            router.back();
-          }}
-        >
-          {t("photos.done")}
-        </Button>
+        {step ? (
+          <Button
+            // A failed read shows the upload's fallback above, and this reads the list again.
+            disabled={busy || step.reading || (photos.status !== "error" && !enough)}
+            onPress={() => {
+              tap();
+              // A photo refused since the list was read keeps the step here: the tile says why.
+              photos.dismissNotice();
+              void photos.reload();
+              step.onContinue();
+            }}
+          >
+            {t("onboarding.continue")}
+          </Button>
+        ) : (
+          // Headers are hidden app-wide: this is the way back to the profile.
+          <Button
+            variant="outline"
+            onPress={() => {
+              tap();
+              router.back();
+            }}
+          >
+            {t("photos.done")}
+          </Button>
+        )}
       </ScrollView>
 
       <CaptionDialog

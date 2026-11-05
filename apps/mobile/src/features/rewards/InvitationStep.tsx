@@ -31,8 +31,9 @@ export function InvitationStep({
   };
   return (
     <View className="gap-4">
-      <Text variant="h2">{t("invite.step.title")}</Text>
-      <Text>{t("invite.step.explain")}</Text>
+      <Text variant="h1" accessibilityRole="header">
+        {t("invite.step.title")}
+      </Text>
       {reward.friendFish > 0 && <Text>{t("invite.redeem.earns", rewardParams(reward))}</Text>}
       {redeemed ? (
         <>

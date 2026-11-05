@@ -293,7 +293,7 @@ profile.error.text_contact_details:
 
 profile.displayName.label:
   en: "Name on your card"
-  description: "Label of the display name field."
+  description: "Label of the display name field, drawn over it on the basics and on onboarding's name step (#581)."
   fi: "Nimi kortillasi"
   sv: "Namn på ditt kort"
   machine: { fi: true, sv: true }
@@ -790,7 +790,7 @@ profile.seek.failed:
 
 profile.seek.intent.explain:
   en: "This also decides who sees you: people who want the same thing."
-  description: "Lead text of the screen that changes what one is here for (#542, #581): the both-ways words beside this one-field section. Not the intent step's text, which says it can be changed later."
+  description: "Lead text of the screen that changes what one is here for (#542, #581): the both-ways words beside this one-field section."
   fi: "Tämä ratkaisee myös, ketkä näkevät sinut: ne, jotka haluavat samaa."
   sv: "Det här avgör också vilka som ser dig: de som vill samma sak."
   machine: { fi: true, sv: true }
@@ -3557,13 +3557,6 @@ signIn.title:
   sv: Logga in
   machine: { fi: true, sv: true }
 
-signIn.explain:
-  en: Kuutti verifies every account through a Finnish bank. Your bank confirms who you are; Kuutti keeps only your year and month of birth and a code that cannot be turned back into you.
-  description: Sign-in screen, the paragraph above the button; what the bank login is for and what is kept (rules 1 and 3).
-  fi: Kuutti varmentaa jokaisen tilin suomalaisen pankin kautta. Pankkisi vahvistaa, kuka olet; Kuutti säilyttää vain syntymävuotesi ja -kuukautesi sekä koodin, josta sinua ei voi tunnistaa.
-  sv: Kuutti verifierar varje konto via en finländsk bank. Din bank bekräftar vem du är; Kuutti sparar bara ditt födelseår och din födelsemånad samt en kod som inte kan spåras tillbaka till dig.
-  machine: { fi: true, sv: true }
-
 signIn.button:
   en: Sign in with your bank
   description: Sign-in screen, the button that opens the bank chooser in the system browser. Also the button after a refusal that lasts (deletion cooldown, ban, suspension, under 18), where trying again would only repeat it, but the phone may be somebody else's (#466).
@@ -3571,46 +3564,18 @@ signIn.button:
   sv: Logga in med din bank
   machine: { fi: true, sv: true }
 
-signIn.opening:
-  en: Your bank opens in the browser. Come back here when it is done.
-  description: Sign-in screen, shown after the button was pressed and the browser opened.
-  fi: Pankkisi avautuu selaimessa. Palaa tänne, kun olet valmis.
-  sv: Din bank öppnas i webbläsaren. Kom tillbaka hit när det är klart.
-  machine: { fi: true, sv: true }
-
 signIn.exchanging:
   en: Signing you in…
-  description: Sign-in screen, while the one-time code from the deep link is exchanged for a session.
+  description: "Sign-in screen, while the one-time code from the deep link is exchanged for a session, until the next screen takes over, home or the first open step (#581)."
   fi: Kirjaudutaan sisään…
   sv: Loggar in dig…
   machine: { fi: true, sv: true }
 
-signIn.done:
-  en: You are signed in.
-  description: Sign-in screen, after the exchange succeeded.
-  fi: Olet kirjautunut sisään.
-  sv: Du är inloggad.
-  machine: { fi: true, sv: true }
-
 signIn.error.title:
   en: Sign-in did not complete
-  description: Sign-in screen, heading of the error state (the text below says why).
+  description: "Sign-in screen, heading of the error state. A refusal with a fact of its own says it below; a link gone stale or a failure on the way has this alone, over Try again (#581)."
   fi: Kirjautuminen ei onnistunut
   sv: Inloggningen slutfördes inte
-  machine: { fi: true, sv: true }
-
-signIn.error.auth_code_used:
-  en: That sign-in link was already used or has expired. Start again.
-  description: Sign-in screen, the deep link's code was used, unknown or older than a minute.
-  fi: Tämä kirjautumislinkki on jo käytetty tai vanhentunut. Aloita alusta.
-  sv: Den här inloggningslänken har redan använts eller gått ut. Börja om.
-  machine: { fi: true, sv: true }
-
-signIn.error.auth_state_mismatch:
-  en: That sign-in attempt is unknown or has expired. Start again.
-  description: Sign-in screen, the bank came back for an attempt the API does not know (older than ten minutes, or forged).
-  fi: Tätä kirjautumisyritystä ei tunnisteta tai se on vanhentunut. Aloita alusta.
-  sv: Det här inloggningsförsöket är okänt eller har gått ut. Börja om.
   machine: { fi: true, sv: true }
 
 signIn.error.auth_under_18:
@@ -3648,13 +3613,6 @@ signIn.paused.title:
   sv: "Ditt konto är på paus"
   machine: { fi: true, sv: true }
 
-signIn.agreements.title:
-  en: "Before you sign in"
-  description: "Heading of the screen before the bank login (#418, ADR-010 §15): the norms with the terms and the privacy summary, which must be accepted before the bank button can be reached."
-  fi: "Ennen kuin kirjaudut"
-  sv: "Innan du loggar in"
-  machine: { fi: true, sv: true }
-
 signIn.agreements.research:
   en: "Either answer takes you on to the sign-in with your bank."
   description: "Not shown until there is a researcher (#545, ADR-010 §19). Before the bank login, under the research question (#418): a yes and a no both lead on to the sign-in, and a no costs nothing (GDPR art. 7(4))."
@@ -3670,10 +3628,10 @@ signIn.lock.title:
   machine: { fi: true, sv: true }
 
 signIn.lock.body:
-  en: "Sign in with your bank to come back. Nothing on your account changed. The lock is off until you turn it on again in Settings."
+  en: "Nothing on your account changed. The lock is off until you turn it on again in Settings."
   description: "Sign-in screen, under the lock card's title (#418)."
-  fi: "Kirjaudu pankkitunnuksilla palataksesi. Tilillesi ei muuttunut mitään. Lukitus on pois päältä, kunnes otat sen taas käyttöön asetuksista."
-  sv: "Logga in med din bank för att komma tillbaka. Ingenting ändrades på ditt konto. Låset är av tills du slår på det igen i inställningarna."
+  fi: "Tilillesi ei muuttunut mitään. Lukitus on pois päältä, kunnes otat sen taas käyttöön asetuksista."
+  sv: "Ingenting ändrades på ditt konto. Låset är av tills du slår på det igen i inställningarna."
   machine: { fi: true, sv: true }
 
 lock.title:
@@ -3726,52 +3684,52 @@ lock.biometrics.cancel:
   machine: { fi: true, sv: true }
 
 lock.failed.face:
-  en: "Your face did not unlock Kuutti. Try again, or use another way below."
+  en: "Your face did not unlock Kuutti."
   description: "Lock screen, after the phone's face prompt refused or could not run (#418, #464), on a phone whose button says 'Unlock with your face'; a cancel says nothing."
-  fi: "Kasvosi eivät avanneet Kuuttia. Yritä uudelleen tai käytä toista alla olevaa tapaa."
-  sv: "Ditt ansikte låste inte upp Kuutti. Försök igen eller använd ett annat sätt nedan."
+  fi: "Kasvosi eivät avanneet Kuuttia."
+  sv: "Ditt ansikte låste inte upp Kuutti."
   machine: { fi: true, sv: true }
 
 lock.failed.fingerprint:
-  en: "Your fingerprint did not unlock Kuutti. Try again, or use another way below."
+  en: "Your fingerprint did not unlock Kuutti."
   description: "Lock screen, after the phone's fingerprint prompt refused or could not run (#418, #464), on a phone whose button says 'Unlock with your fingerprint'; a cancel says nothing."
-  fi: "Sormenjälkesi ei avannut Kuuttia. Yritä uudelleen tai käytä toista alla olevaa tapaa."
-  sv: "Ditt fingeravtryck låste inte upp Kuutti. Försök igen eller använd ett annat sätt nedan."
+  fi: "Sormenjälkesi ei avannut Kuuttia."
+  sv: "Ditt fingeravtryck låste inte upp Kuutti."
   machine: { fi: true, sv: true }
 
 lock.failed.biometrics:
-  en: "Your face or fingerprint did not unlock Kuutti. Try again, or use another way below."
+  en: "Your face or fingerprint did not unlock Kuutti."
   description: "Lock screen, after the phone's biometric prompt refused or could not run (#418, #464), on a phone whose button says 'Unlock with your face or fingerprint'; a cancel says nothing. On Android such a phone may take only the finger, so the words promise neither."
-  fi: "Kasvosi tai sormenjälkesi eivät avanneet Kuuttia. Yritä uudelleen tai käytä toista alla olevaa tapaa."
-  sv: "Ditt ansikte eller fingeravtryck låste inte upp Kuutti. Försök igen eller använd ett annat sätt nedan."
+  fi: "Kasvosi tai sormenjälkesi eivät avanneet Kuuttia."
+  sv: "Ditt ansikte eller fingeravtryck låste inte upp Kuutti."
   machine: { fi: true, sv: true }
 
 lock.lockout.face:
-  en: "The phone has paused face unlock after too many tries. Lock the phone and open it with its own code, then try again, or use another way below."
+  en: "The phone has paused face unlock after too many tries. Lock the phone and open it with its own code, then try again."
   description: "Lock screen, when the phone has paused its face unlock after too many failed tries (#464): the try that brings the pause ends the prompt, and each ask during it answers with no prompt, on a phone whose button says 'Unlock with your face'. Opening the phone with its own code (PIN, pattern, password or iPhone passcode, never Kuutti's passcode) ends every pause on both platforms; Android's first pauses also end after 30 seconds, iOS's never by waiting, so the line names the code alone."
-  fi: "Puhelin on keskeyttänyt kasvojentunnistuksen liian monen yrityksen jälkeen. Lukitse puhelin ja avaa se puhelimen omalla koodilla. Yritä sitten uudelleen tai käytä toista alla olevaa tapaa."
-  sv: "Telefonen har pausat upplåsning med ansikte efter för många försök. Lås telefonen och öppna den med telefonens egen kod. Försök sedan igen eller använd ett annat sätt nedan."
+  fi: "Puhelin on keskeyttänyt kasvojentunnistuksen liian monen yrityksen jälkeen. Lukitse puhelin ja avaa se puhelimen omalla koodilla. Yritä sitten uudelleen."
+  sv: "Telefonen har pausat upplåsning med ansikte efter för många försök. Lås telefonen och öppna den med telefonens egen kod. Försök sedan igen."
   machine: { fi: true, sv: true }
 
 lock.lockout.fingerprint:
-  en: "The phone has paused fingerprint unlock after too many tries. Lock the phone and open it with its own code, then try again, or use another way below."
+  en: "The phone has paused fingerprint unlock after too many tries. Lock the phone and open it with its own code, then try again."
   description: "Lock screen, when the phone has paused its fingerprint unlock after too many failed tries (#464): the try that brings the pause ends the prompt, and each ask during it answers with no prompt, on a phone whose button says 'Unlock with your fingerprint'. Opening the phone with its own code (PIN, pattern, password or iPhone passcode, never Kuutti's passcode) ends every pause on both platforms; Android's first pauses also end after 30 seconds, iOS's never by waiting, so the line names the code alone."
-  fi: "Puhelin on keskeyttänyt sormenjäljentunnistuksen liian monen yrityksen jälkeen. Lukitse puhelin ja avaa se puhelimen omalla koodilla. Yritä sitten uudelleen tai käytä toista alla olevaa tapaa."
-  sv: "Telefonen har pausat upplåsning med fingeravtryck efter för många försök. Lås telefonen och öppna den med telefonens egen kod. Försök sedan igen eller använd ett annat sätt nedan."
+  fi: "Puhelin on keskeyttänyt sormenjäljentunnistuksen liian monen yrityksen jälkeen. Lukitse puhelin ja avaa se puhelimen omalla koodilla. Yritä sitten uudelleen."
+  sv: "Telefonen har pausat upplåsning med fingeravtryck efter för många försök. Lås telefonen och öppna den med telefonens egen kod. Försök sedan igen."
   machine: { fi: true, sv: true }
 
 lock.lockout.biometrics:
-  en: "The phone has paused face or fingerprint unlock after too many tries. Lock the phone and open it with its own code, then try again, or use another way below."
+  en: "The phone has paused face or fingerprint unlock after too many tries. Lock the phone and open it with its own code, then try again."
   description: "Lock screen, when the phone has paused its biometrics after too many failed tries (#464): the try that brings the pause ends the prompt, and each ask during it answers with no prompt, on a phone whose button says 'Unlock with your face or fingerprint'. On Android such a phone may take only the finger, so the words say 'or', never that both were paused. Opening the phone with its own code (PIN, pattern, password or iPhone passcode, never Kuutti's passcode) ends every pause on both platforms; Android's first pauses also end after 30 seconds, iOS's never by waiting, so the line names the code alone."
-  fi: "Puhelin on keskeyttänyt kasvojen- tai sormenjäljentunnistuksen liian monen yrityksen jälkeen. Lukitse puhelin ja avaa se puhelimen omalla koodilla. Yritä sitten uudelleen tai käytä toista alla olevaa tapaa."
-  sv: "Telefonen har pausat upplåsning med ansikte eller fingeravtryck efter för många försök. Lås telefonen och öppna den med telefonens egen kod. Försök sedan igen eller använd ett annat sätt nedan."
+  fi: "Puhelin on keskeyttänyt kasvojen- tai sormenjäljentunnistuksen liian monen yrityksen jälkeen. Lukitse puhelin ja avaa se puhelimen omalla koodilla. Yritä sitten uudelleen."
+  sv: "Telefonen har pausat upplåsning med ansikte eller fingeravtryck efter för många försök. Lås telefonen och öppna den med telefonens egen kod. Försök sedan igen."
   machine: { fi: true, sv: true }
 
 lock.denied:
-  en: "This iPhone does not let Kuutti use Face ID. You can allow it in the phone's settings, or use another way below."
+  en: "This iPhone does not let Kuutti use Face ID. You can allow it in the phone's settings."
   description: "Lock screen, on an iPhone only, where the unlock button would be, when the person chose the face and iOS answers that Face ID is not available to Kuutti (#505): after Don't Allow at iOS's question, with Kuutti's Face ID switch off in the iPhone's settings, and now and then for neither, so the words never say the person refused it. Below it are the passcode, if one is set, and the bank."
-  fi: "Tämä iPhone ei anna Kuutin käyttää Face ID:tä. Voit sallia sen puhelimen asetuksista tai käyttää toista alla olevaa tapaa."
-  sv: "Den här iPhonen låter inte Kuutti använda Face ID. Du kan tillåta det i telefonens inställningar eller använda ett annat sätt nedan."
+  fi: "Tämä iPhone ei anna Kuutin käyttää Face ID:tä. Voit sallia sen puhelimen asetuksista."
+  sv: "Den här iPhonen låter inte Kuutti använda Face ID. Du kan tillåta det i telefonens inställningar."
   machine: { fi: true, sv: true }
 
 lock.passcode.label:
@@ -3964,17 +3922,10 @@ signIn.error.auth_cooldown:
   machine: { fi: true, sv: true }
 
 signIn.error.auth_cancelled:
-  en: You cancelled the sign-in at your bank. Nothing was saved.
-  description: Sign-in screen, the person backed out at the bank.
-  fi: Peruutit kirjautumisen pankissasi. Mitään ei tallennettu.
-  sv: Du avbröt inloggningen hos din bank. Inget sparades.
-  machine: { fi: true, sv: true }
-
-signIn.error.auth_provider_error:
-  en: The identification service did not complete the sign-in. Try again in a moment.
-  description: Sign-in screen, the broker (Telia) failed or is not configured.
-  fi: Tunnistuspalvelu ei saanut kirjautumista valmiiksi. Yritä hetken kuluttua uudelleen.
-  sv: Identifieringstjänsten slutförde inte inloggningen. Försök igen om en stund.
+  en: "Nothing was saved."
+  description: "Sign-in screen, the person backed out at the bank: under the card's title, what they cannot see, that nothing stayed of the attempt, the answers given before the bank included (#581)."
+  fi: "Mitään ei tallennettu."
+  sv: "Inget sparades."
   machine: { fi: true, sv: true }
 
 signIn.error.auth_rate_limited:
@@ -3985,10 +3936,10 @@ signIn.error.auth_rate_limited:
   machine: { fi: true, sv: true }
 
 signIn.error.unexpected_link:
-  en: This sign-in link was not requested from this phone. Start the sign-in here, with the button.
+  en: "This sign-in link was not requested from this phone."
   description: Sign-in screen, a deep link with a code arrived although this device did not open the bank login (or is already signed in); the link is refused.
-  fi: Tätä kirjautumislinkkiä ei pyydetty tältä puhelimelta. Aloita kirjautuminen tästä painikkeella.
-  sv: Den här inloggningslänken begärdes inte från den här telefonen. Starta inloggningen här med knappen.
+  fi: "Tätä kirjautumislinkkiä ei pyydetty tältä puhelimelta."
+  sv: "Den här inloggningslänken begärdes inte från den här telefonen."
   machine: { fi: true, sv: true }
 
 signIn.unavailable:
@@ -3996,13 +3947,6 @@ signIn.unavailable:
   description: Sign-in screen where no bank login exists at all, so only testers see it. The web target shows it instead of the button; a pull-request preview, whose API has no broker (ADR-014 §1), sends the deep link's auth_unavailable. "The mock bank" is the local stand-in for the bank login (services/mock-idp).
   fi: "Pankkitunnistusta ei ole täällä: verkkoversiossa ja pull requestien esikatseluissa sitä ei ole. Kokeile muutosta paikallisesti testipankilla."
   sv: "Här finns ingen bankinloggning: webbversionen och förhandsversionerna av pull requests har ingen. Prova ändringen lokalt med testbanken."
-  machine: { fi: true, sv: true }
-
-signIn.error.generic:
-  en: Something went wrong. Try again.
-  description: Sign-in screen, any other failure (network, an unexpected answer).
-  fi: Jokin meni pieleen. Yritä uudelleen.
-  sv: Något gick fel. Försök igen.
   machine: { fi: true, sv: true }
 
 signIn.tryAgain:
@@ -4114,13 +4058,6 @@ admin.licenses.link:
 
 # --- Onboarding (#46) ---
 
-onboarding.title:
-  en: "Welcome to Kuutti"
-  description: "Heading of the onboarding flow (#46)."
-  fi: "Tervetuloa Kuuttiin"
-  sv: "Välkommen till Kuutti"
-  machine: { fi: true, sv: true }
-
 onboarding.progress:
   en: "Step {step, number} of {total, number}"
   description: "Progress line above each onboarding step."
@@ -4130,7 +4067,7 @@ onboarding.progress:
 
 onboarding.loading:
   en: "One moment…"
-  description: "Shown while the onboarding status loads."
+  description: "Shown while the onboarding status loads, and while the API is asked whether a code may still be typed."
   fi: "Hetki…"
   sv: "Ett ögonblick…"
   machine: { fi: true, sv: true }
@@ -4158,7 +4095,7 @@ onboarding.failed:
 
 onboarding.continue:
   en: "Continue"
-  description: "The button that saves a step and moves on."
+  description: "The button that saves a step and moves on; on the photos step, where each photo saved itself, it only moves on (#581)."
   fi: "Jatka"
   sv: "Fortsätt"
   machine: { fi: true, sv: true }
@@ -4171,10 +4108,10 @@ onboarding.gender.title:
   machine: { fi: true, sv: true }
 
 onboarding.gender.explain:
-  en: "Your own words, not the bank's. This is shown on your card."
-  description: "Gender step lead text."
-  fi: "Omin sanoin, ei pankin. Tämä näkyy kortillasi."
-  sv: "Dina egna ord, inte bankens. Det här visas på ditt kort."
+  en: "Yours to choose, not the bank's. This is shown on your card."
+  description: "Gender step, under the question (#581): the bank plays no part in the answer, and others see it."
+  fi: "Sinun valintasi, ei pankin. Tämä näkyy kortillasi."
+  sv: "Ditt val, inte bankens. Det här visas på ditt kort."
   machine: { fi: true, sv: true }
 
 onboarding.gender.woman:
@@ -4206,10 +4143,10 @@ onboarding.seeks.title:
   machine: { fi: true, sv: true }
 
 onboarding.seeks.explain:
-  en: "Pick everyone you want to see. Nobody outside your choice is ever shown to you, and you are never shown to anyone who did not pick you."
+  en: "Nobody outside your choice is ever shown to you, and you are never shown to anyone who did not pick you."
   description: "Seeks step lead text: the hard filter in both directions (rule 7)."
-  fi: "Valitse kaikki, joita haluat nähdä. Ketään valintasi ulkopuolelta ei koskaan näytetä sinulle, eikä sinua näytetä kenellekään, joka ei valinnut sinua."
-  sv: "Välj alla du vill se. Ingen utanför ditt val visas någonsin för dig, och du visas aldrig för någon som inte valde dig."
+  fi: "Ketään valintasi ulkopuolelta ei koskaan näytetä sinulle, eikä sinua näytetä kenellekään, joka ei valinnut sinua."
+  sv: "Ingen utanför ditt val visas någonsin för dig, och du visas aldrig för någon som inte valde dig."
   machine: { fi: true, sv: true }
 
 onboarding.seeks.woman:
@@ -4245,13 +4182,6 @@ onboarding.age.title:
   description: "Age window step heading."
   fi: "Minkä ikäisiä?"
   sv: "Vilka åldrar?"
-  machine: { fi: true, sv: true }
-
-onboarding.age.explain:
-  en: "Between {min, number} and {max, number}. We start around your own age; move the ends as you like."
-  description: "Age window lead text; {min} and {max} are the bounds."
-  fi: "Väliltä {min, number}–{max, number}. Aloitamme oman ikäsi ympäriltä; siirrä päitä kuten haluat."
-  sv: "Mellan {min, number} och {max, number}. Vi börjar kring din egen ålder; flytta ändarna som du vill."
   machine: { fi: true, sv: true }
 
 onboarding.age.youngest:
@@ -4324,16 +4254,9 @@ onboarding.research.later:
   sv: "Du kan ändra det här senare, när som helst."
   machine: { fi: true, sv: true }
 
-onboarding.done:
-  en: "All set. The home screen shows what comes next."
-  description: "Last line before the flow closes. No line and no place: nobody waits at the pond (#500, ADR-060)."
-  fi: "Valmista. Etusivulla näet, mitä seuraavaksi tapahtuu."
-  sv: "Klart. Startsidan visar vad som händer härnäst."
-  machine: { fi: true, sv: true }
-
 onboarding.welcome.title:
   en: "How we do things here"
-  description: "Heading of the norms with the two consents: first on the screen before the bank login (#418, ADR-010 §15), and again on the welcome step after it when a wording changed or the rows did not land (#146)."
+  description: "The screen's one heading, over the norms with the two consents (#581): first on the screen before the bank login (#418, ADR-010 §15), and again on the welcome step after it when a wording changed or the rows did not land (#146)."
   fi: "Näin täällä toimitaan"
   sv: "Så här gör vi här"
   machine: { fi: true, sv: true }
@@ -4346,24 +4269,10 @@ onboarding.welcome.norm1:
   machine: { fi: true, sv: true }
 
 onboarding.welcome.norm2:
-  en: "You decide with buttons, one person at a time. Nobody here is swiped through."
-  description: "Second norm of the welcome screen (#146)."
-  fi: "Päätät painikkeilla, yksi ihminen kerrallaan. Ketään ei pyyhkäistä ohi."
-  sv: "Du bestämmer med knappar, en person i taget. Ingen här sveps förbi."
-  machine: { fi: true, sv: true }
-
-onboarding.welcome.norm3:
-  en: "No contact details before a match. Your photos stay inside Kuutti."
-  description: "Third norm of the welcome screen (#146)."
-  fi: "Ei yhteystietoja ennen matchia. Kuvasi pysyvät Kuutin sisällä."
-  sv: "Inga kontaktuppgifter före en match. Dina bilder stannar inne i Kuutti."
-  machine: { fi: true, sv: true }
-
-onboarding.welcome.norm4:
-  en: "Nothing here is for sale."
-  description: "Fourth norm of the welcome screen (#146)."
-  fi: "Täällä ei myydä mitään."
-  sv: "Ingenting här är till salu."
+  en: "No contact details before a match."
+  description: "Second and last norm, on the screen before the bank login and on the welcome step (#146, #581): the one norm a person can break and be refused for."
+  fi: "Ei yhteystietoja ennen matchia."
+  sv: "Inga kontaktuppgifter före en match."
   machine: { fi: true, sv: true }
 
 onboarding.welcome.accept:
@@ -4380,13 +4289,6 @@ onboarding.name.title:
   sv: "Vad ska vi kalla dig?"
   machine: { fi: true, sv: true }
 
-onboarding.name.explain:
-  en: "The name on your card. Yours to choose, not the bank's."
-  description: "Explanation under the name step's heading (#146): typed, never prefilled from the bank."
-  fi: "Nimi kortillasi. Sinun valintasi, ei pankin."
-  sv: "Namnet på ditt kort. Ditt val, inte bankens."
-  machine: { fi: true, sv: true }
-
 onboarding.identityLabel.title:
   en: "A word for it, if you like"
   description: "Heading of the identity label step, shown after a non-binary gender only (#146), and of the same offer on the gender screen (#552)."
@@ -4395,10 +4297,10 @@ onboarding.identityLabel.title:
   machine: { fi: true, sv: true }
 
 onboarding.identityLabel.explain:
-  en: "Shown on your card, never used for matching. Skip it if non-binary says it."
+  en: "Shown on your card, never used for matching."
   description: "Explanation under the identity label step's heading (#146, ADR-019)."
-  fi: "Näytetään kortillasi, ei koskaan käytetä yhdistämiseen. Ohita, jos muunsukupuolinen riittää."
-  sv: "Visas på ditt kort, används aldrig för matchning. Hoppa över om ickebinär säger det."
+  fi: "Näytetään kortillasi, ei koskaan käytetä yhdistämiseen."
+  sv: "Visas på ditt kort, används aldrig för matchning."
   machine: { fi: true, sv: true }
 
 onboarding.identityLabel.skip:
@@ -4430,10 +4332,10 @@ onboarding.intent.title:
   machine: { fi: true, sv: true }
 
 onboarding.intent.explain:
-  en: "You're shown only to people who want the same thing. Open to either covers long-term and casual. You can change this later."
-  description: "Explanation under the intent step's heading (#146, #147, #175): intent is a hard filter both ways; the second sentence names the option Open to either, which does not reach a dance partner."
-  fi: "Sinut näytetään vain niille, jotka haluavat samaa. Avoin kummallekin kattaa pitkäaikaisen ja rennon. Voit muuttaa tätä myöhemmin."
-  sv: "Du visas bara för dem som vill samma sak. Öppen för båda omfattar långvarigt och avslappnat. Du kan ändra det här senare."
+  en: "You're shown only to people who want the same thing."
+  description: "Under the intent step's heading, over its whole-width rows (#146, #147, #581): intent is a hard filter both ways."
+  fi: "Sinut näytetään vain niille, jotka haluavat samaa."
+  sv: "Du visas bara för dem som vill samma sak."
   machine: { fi: true, sv: true }
 
 onboarding.age.youngestDown:
@@ -4473,23 +4375,16 @@ onboarding.age.years:
 
 onboarding.photos.title:
   en: "Two photos of you"
-  description: "Heading of the photos step (#146)."
+  description: "Heading of the photos step, over the grid (#146, #581)."
   fi: "Kaksi kuvaa sinusta"
   sv: "Två bilder på dig"
   machine: { fi: true, sv: true }
 
 onboarding.photos.explain:
-  en: "Profiles with a face photo get seen; that is the honest reason. At least two, your face in each. They stay inside Kuutti."
-  description: "Explanation under the photos step's heading (#146): the honest reason first, as the sheet asks."
-  fi: "Profiilit, joissa on kasvokuva, tulevat nähdyiksi; se on rehellinen syy. Vähintään kaksi, kasvosi jokaisessa. Ne pysyvät Kuutin sisällä."
-  sv: "Profiler med en ansiktsbild blir sedda; det är den ärliga orsaken. Minst två, ditt ansikte i var och en. De stannar inne i Kuutti."
-  machine: { fi: true, sv: true }
-
-onboarding.photos.open:
-  en: "Add photos"
-  description: "Button of the photos step that opens the photos screen (#146)."
-  fi: "Lisää kuvia"
-  sv: "Lägg till bilder"
+  en: "Profiles with a face photo get seen."
+  description: "Under the photos step's heading, over the grid (#146, #581): the honest reason, as the field sheet asks."
+  fi: "Profiilit, joissa on kasvokuva, tulevat nähdyiksi."
+  sv: "Profiler med en ansiktsbild blir sedda."
   machine: { fi: true, sv: true }
 
 onboarding.prompts.title:
@@ -4500,10 +4395,10 @@ onboarding.prompts.title:
   machine: { fi: true, sv: true }
 
 onboarding.prompts.explain:
-  en: "Answer two questions, write a bio of at least {min, number} characters, or pick a ready line. Your card leads with a photo and one answer."
-  description: "Explanation under the prompts step's heading (#146, ADR-009 §4); a ready line finishes the step too (#239)."
-  fi: "Vastaa kahteen kysymykseen, kirjoita vähintään {min, number} merkin esittely tai valitse valmis rivi. Korttisi alkaa kuvalla ja yhdellä vastauksella."
-  sv: "Svara på två frågor, skriv en presentation på minst {min, number} tecken eller välj en färdig rad. Ditt kort inleds med en bild och ett svar."
+  en: "Answer two questions, write a bio of at least {min, number} characters, or pick a ready line."
+  description: "Under the prompts step's heading (#146, ADR-009 §4, #581): the one place on the step that says what Save and continue waits for; a ready line finishes the step too (#239)."
+  fi: "Vastaa kahteen kysymykseen, kirjoita vähintään {min, number} merkin esittely tai valitse valmis rivi."
+  sv: "Svara på två frågor, skriv en presentation på minst {min, number} tecken eller välj en färdig rad."
   machine: { fi: true, sv: true }
 
 onboarding.prompts.save:
@@ -4515,14 +4410,14 @@ onboarding.prompts.save:
 
 photos.title:
   en: Your photos
-  description: Photos screen heading.
+  description: "Photos screen heading; on onboarding's step, that step's own heading stands in its place (#581)."
   fi: Kuvasi
   sv: Dina foton
   machine: { fi: true, sv: true }
 
 photos.explain:
   en: "Hold a photo and drag it to change the order. A new photo is checked before anyone else sees it."
-  description: "Photos screen, the paragraph under the heading: the two things the screen cannot show (#581). The order is changed by holding a tile and dragging it (#179)."
+  description: "Photos screen, the paragraph under the heading: the two things the screen cannot show (#581). On onboarding's step it follows that step's own line. The order is changed by holding a tile and dragging it (#179)."
   fi: "Vaihda järjestystä pitämällä kuvaa painettuna ja vetämällä se uuteen paikkaan. Uusi kuva tarkistetaan, ennen kuin kukaan muu näkee sen."
   sv: "Håll ett foto nedtryckt och dra det för att ändra ordningen. Ett nytt foto granskas innan någon annan ser det."
   machine: { fi: true, sv: true }
@@ -4543,7 +4438,7 @@ photos.add:
 
 photos.done:
   en: Done
-  description: Photos screen, the button at the end that returns to where the person came from (onboarding, which then moves to its next step, or the profile list, whose Photos row opened it, #239). Headers are hidden, so without it the only way back on iOS is the edge swipe.
+  description: "Photos screen, the button at the end that returns to the profile list, whose Photos row opened it (#239); onboarding's step has Continue in its place (#581). Headers are hidden and the route has no back gesture, so this button is the screen's way back."
   fi: Valmis
   sv: Klar
   machine: { fi: true, sv: true }
@@ -9996,13 +9891,6 @@ invite.step.title:
   description: "Onboarding, the optional step right after the welcome (#107), offered once to a person who may still use a code."
   fi: "Kutsuiko ystävä sinut?"
   sv: "Bjöd en vän in dig?"
-  machine: { fi: true, sv: true }
-
-invite.step.explain:
-  en: "If a friend gave you an invitation code, type it here. You can also skip this and type it later in Settings, until your profile is complete."
-  description: "Onboarding's invitation step, under its title (#107): optional; Settings › Invitations takes the code while the profile is not complete."
-  fi: "Jos ystävä antoi sinulle kutsukoodin, kirjoita se tähän. Voit myös ohittaa tämän ja kirjoittaa koodin myöhemmin asetuksissa, kunnes profiilisi on valmis."
-  sv: "Om en vän gav dig en inbjudningskod, skriv in den här. Du kan också hoppa över det här och skriva in koden senare i inställningarna, tills din profil är klar."
   machine: { fi: true, sv: true }
 
 invite.step.skip:

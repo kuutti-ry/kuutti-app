@@ -420,9 +420,11 @@ describe("PhotosScreen", () => {
     expect(screen.queryByText(withoutObjects)).toBeNull();
   });
 
-  it("says the onboarding's step when opened from it, as every other step does, and none otherwise (#146)", async () => {
+  it("says the onboarding's step when it is that step, as every other step does, and none otherwise (#146)", async () => {
     fetchMock([answersList(list(2)), answersUrls]);
-    await show(<PhotosScreen progress={{ step: 8, total: 10 }} />);
+    await show(
+      <PhotosScreen step={{ position: 8, total: 10, reading: false, onContinue: jest.fn() }} />,
+    );
     expect(await screen.findByText("Step 8 of 10")).toBeTruthy();
     expect(screen.getByText("Step 8 of 10").props.accessibilityLiveRegion).toBe("polite");
     await show(<PhotosScreen />);
@@ -435,6 +437,249 @@ describe("PhotosScreen", () => {
     await show(<PhotosScreen />);
     await press(await screen.findByRole("button", { name: "Done" }));
     expect(router.back).toHaveBeenCalledTimes(1);
+  });
+
+  describe("as onboarding's photos step (#581)", () => {
+    const EXPLAIN =
+      "Hold a photo and drag it to change the order. A new photo is checked before anyone else sees it.";
+    const REFUSED = "Not accepted. This photo does not fit Kuutti; try another one.";
+    const FAILED = "The photo could not be uploaded. Try again.";
+    const showStep = async () => {
+      const onContinue = jest.fn();
+      await show(<PhotosScreen step={{ position: 7, total: 8, reading: false, onContinue }} />);
+      return onContinue;
+    };
+    const onward = () => screen.getByRole("button", { name: "Continue" });
+    const readOnly = () => onward().props.accessibilityState?.disabled;
+    /** Photos in these states, in this order; a refused one with its reason, as the API sends it. */
+    const inStates = (...states: string[]) => ({
+      photos: states.map((state, index) => ({
+        ...photo(index + 1),
+        state,
+        rejectionReason: state === "rejected" ? "other" : null,
+      })),
+      maxPhotos: 6,
+      tips: [],
+    });
+    const isList = (req: Request) =>
+      req.method === "GET" && new URL(req.url).pathname === "/photos";
+    const reads = (calls: Request[]) => calls.filter(isList).length;
+    /** The list read: refused as many times as given, then as `answer` says. */
+    const failingReads = (times: number, answer: unknown) => {
+      let failed = 0;
+      return (req: Request) => {
+        if (!isList(req)) return null;
+        failed += 1;
+        return failed <= times
+          ? json({ error: { code: "internal_error", message: "x", requestId: "r" } }, 500)
+          : json(answer);
+      };
+    };
+
+    it("stands on the grid, under its number, its question as the heading and its line, with Continue in Done's place", async () => {
+      fetchMock([answersList(inStates()), answersUrls]);
+      await showStep();
+      await screen.findByText(EXPLAIN);
+      expect(drawn()).toEqual([
+        "Step 7 of 8",
+        "Two photos of you",
+        "Profiles with a face photo get seen.",
+        EXPLAIN,
+        "Add a photo",
+        "Continue",
+      ]);
+      const heading = screen.getByRole("heading", { name: "Two photos of you" });
+      expect(heading.props.accessibilityRole).toBe("header");
+      expect(heading.props["aria-level"]).toBe("1");
+      expect(screen.getByText("Step 7 of 8").props.accessibilityLiveRegion).toBe("polite");
+      expect(pressables(screen.toJSON() as HostNode).flatMap((node) => a11yProblems(node))).toEqual(
+        [],
+      );
+    });
+
+    it.each([
+      [
+        "fi-FI",
+        "Vaihe 7 / 8",
+        "Kaksi kuvaa sinusta",
+        "Profiilit, joissa on kasvokuva, tulevat nähdyiksi.",
+        "Jatka",
+      ],
+      [
+        "sv-FI",
+        "Steg 7 av 8",
+        "Två bilder på dig",
+        "Profiler med en ansiktsbild blir sedda.",
+        "Fortsätt",
+      ],
+    ])("says it in %s", async (tag, step, question, line, onwardWord) => {
+      (useLocales as jest.Mock).mockReturnValue([{ languageTag: tag }]);
+      try {
+        fetchMock([answersList(inStates()), answersUrls]);
+        await showStep();
+        expect(await screen.findByRole("heading", { name: question })).toBeTruthy();
+        expect(drawn().slice(0, 3)).toEqual([step, question, line]);
+        expect(screen.getByRole("button", { name: onwardWord })).toBeTruthy();
+      } finally {
+        (useLocales as jest.Mock).mockReturnValue([{ languageTag: "en-US" }]);
+      }
+    });
+
+    it("keeps its own title and Done where it is no step, with no line and no Continue", async () => {
+      fetchMock([answersList(approvedList(2)), answersUrls]);
+      await show(<PhotosScreen />);
+      await screen.findByText("Main photo");
+      expect(screen.getByRole("heading", { name: "Your photos" })).toBeTruthy();
+      expect(screen.getByRole("button", { name: "Done" })).toBeTruthy();
+      expect(screen.queryByRole("button", { name: "Continue" })).toBeNull();
+      expect(screen.queryByText("Two photos of you")).toBeNull();
+      expect(screen.queryByText("Profiles with a face photo get seen.")).toBeNull();
+    });
+
+    it.each<[string, boolean, string[]]>([
+      ["no photo", true, []],
+      ["one through", true, ["approved"]],
+      ["one in review", true, ["pending"]],
+      ["one through and one refused", true, ["approved", "rejected"]],
+      ["two refused", true, ["rejected", "rejected"]],
+      ["one through and one with a person", false, ["approved", "queued"]],
+      ["two in review", false, ["pending", "pending"]],
+      ["two through", false, ["approved", "approved"]],
+      ["two through and one refused", false, ["approved", "approved", "rejected"]],
+    ])("counts %s as the API counts: Continue read-only, %s", async (_what, held, states) => {
+      fetchMock([answersList(inStates(...states)), answersUrls]);
+      const onContinue = await showStep();
+      await screen.findByText(EXPLAIN);
+      expect(readOnly()).toBe(held);
+      await press(onward());
+      expect(onContinue).toHaveBeenCalledTimes(held ? 0 : 1);
+    });
+
+    it("holds Continue until the list is read, with the grid's lead left for then", async () => {
+      let answer = () => {};
+      fetchMock([
+        (req) =>
+          isList(req)
+            ? new Promise<Response>((resolve) => {
+                answer = () => resolve(json(inStates("approved", "approved")));
+              })
+            : null,
+        answersUrls,
+      ]);
+      await showStep();
+      expect(readOnly()).toBe(true);
+      expect(drawn()).toEqual([
+        "Step 7 of 8",
+        "Two photos of you",
+        "Profiles with a face photo get seen.",
+        "Add a photo",
+        "Continue",
+      ]);
+      await act(async () => {
+        answer();
+        await settle();
+      });
+      expect(readOnly()).toBe(false);
+      expect(screen.getByText(EXPLAIN)).toBeTruthy();
+    });
+
+    it("holds Continue while a photo action runs, and gives it back when that ends", async () => {
+      fetchMock([answersList(inStates("approved", "approved")), answersUrls]);
+      let answer: (result: { canceled: true }) => void = () => undefined;
+      launch.mockReturnValueOnce(
+        new Promise((resolve) => {
+          answer = resolve;
+        }),
+      );
+      const onContinue = await showStep();
+      await press(await screen.findByRole("button", { name: "Add a photo" }));
+      expect(readOnly()).toBe(true);
+      await press(onward());
+      expect(onContinue).not.toHaveBeenCalled();
+      await act(async () => {
+        answer({ canceled: true });
+        await settle();
+      });
+      expect(readOnly()).toBe(false);
+    });
+
+    it("reads the list again at a press of Continue, and goes on", async () => {
+      const { calls } = fetchMock([answersList(inStates("approved", "pending")), answersUrls]);
+      const onContinue = await showStep();
+      await screen.findByText(EXPLAIN);
+      expect(reads(calls)).toBe(1);
+      expect(onContinue).not.toHaveBeenCalled();
+      await press(onward());
+      expect(reads(calls)).toBe(2);
+      expect(onContinue).toHaveBeenCalledTimes(1);
+    });
+
+    it("shows a photo refused since the list was read on its tile, and holds Continue", async () => {
+      fetchMock([
+        answersLists(inStates("approved", "pending"), inStates("approved", "rejected")),
+        answersUrls,
+      ]);
+      await showStep();
+      await screen.findByText("In review");
+      expect(readOnly()).toBe(false);
+      await press(onward());
+      expect(await screen.findByText(REFUSED)).toBeTruthy();
+      expect(screen.queryByText("In review")).toBeNull();
+      expect(readOnly()).toBe(true);
+    });
+
+    it("holds Continue while the status it asked for is read", async () => {
+      fetchMock([answersList(inStates("approved", "approved")), answersUrls]);
+      const onContinue = jest.fn();
+      await show(<PhotosScreen step={{ position: 7, total: 8, reading: true, onContinue }} />);
+      await screen.findByText(EXPLAIN);
+      expect(readOnly()).toBe(true);
+      await press(onward());
+      expect(onContinue).not.toHaveBeenCalled();
+    });
+
+    it("shows the upload's words for a list that could not be read, leaves Continue pressable, and a press reads it again, and they go", async () => {
+      const { calls } = fetchMock([failingReads(1, inStates("approved")), answersUrls]);
+      const onContinue = await showStep();
+      expect(await screen.findByText(FAILED)).toBeTruthy();
+      // No list, so no way to tell two photos from none: the press is what asks again.
+      expect(screen.queryByText(EXPLAIN)).toBeNull();
+      expect(readOnly()).toBe(false);
+      expect(
+        screen.getByRole("button", { name: "Add a photo" }).props.accessibilityState?.disabled,
+      ).toBe(true);
+      await press(onward());
+      expect(reads(calls)).toBe(2);
+      expect(onContinue).toHaveBeenCalledTimes(1);
+      await screen.findByText(EXPLAIN);
+      expect(screen.queryByText(FAILED)).toBeNull();
+      // Read, the list decides again: one photo holds the step.
+      expect(readOnly()).toBe(true);
+      expect(
+        screen.getByRole("button", { name: "Add a photo" }).props.accessibilityState?.disabled,
+      ).toBe(false);
+    });
+
+    it("keeps the list it has, and Continue pressable, when the read at a press fails", async () => {
+      let refuse = false;
+      const answers = answersList(inStates("approved", "approved"));
+      fetchMock([
+        (req) =>
+          refuse && isList(req)
+            ? json({ error: { code: "internal_error", message: "x", requestId: "r" } }, 500)
+            : null,
+        answers,
+        answersUrls,
+      ]);
+      const onContinue = await showStep();
+      await screen.findByText(EXPLAIN);
+      refuse = true;
+      await press(onward());
+      expect(await screen.findByText(FAILED)).toBeTruthy();
+      expect(tile(2)).toBeTruthy();
+      expect(readOnly()).toBe(false);
+      expect(onContinue).toHaveBeenCalledTimes(1);
+    });
   });
 
   it("the move-later action sends the new order and renumbers", async () => {
