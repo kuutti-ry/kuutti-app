@@ -6,19 +6,20 @@ import type { SyntheticPerson } from "./population.ts";
 import { createRandom } from "./rng.ts";
 
 /**
- * The demo's pictures (#142, ADR-014 §7): generated faces for the personas
- * and a pool for the population, and the negatives the moderation queue is
- * meant to refuse, in a public repository of their own, released by tag.
+ * The demo's pictures (#142, ADR-014 §7): generated faces for the personas,
+ * the cast (#560) and a pool for the population, and the negatives the
+ * moderation queue is meant to refuse, in a public repository of their own,
+ * released by tag.
  * This repository holds the manifest (path, SHA-256, purpose) and nothing
  * binary; `pnpm demo:assets` fetches a release into the cache and refuses a
  * file whose checksum differs, and the loaders push every picture through
  * the real upload pipeline (rule 4).
  */
 export const PHOTOS_REPO = "kuutti-ry/kuutti-app-demo-photos";
-export const PHOTOS_RELEASE = "v3";
+export const PHOTOS_RELEASE = "v4";
 
-/** `persona:<key>` the persona's own set, `pool` a face of the population, `negative:<name>` a picture the check refuses. */
-export type AssetPurpose = `persona:${string}` | "pool" | `negative:${string}`;
+/** `persona:<key>` the persona's own set, `cast:<key>` the set of somebody nobody signs in as (#560), `pool` a face of the population, `negative:<name>` a picture the check refuses. */
+export type AssetPurpose = `persona:${string}` | `cast:${string}` | "pool" | `negative:${string}`;
 
 export type PhotoAsset = {
   /** Relative to the release's root, with forward slashes: `faces/sanna/1.jpg`. */
@@ -39,6 +40,9 @@ const PICTURE = /\.(jpe?g|png|webp)$/i;
 export function purposeOf(path: string): AssetPurpose | null {
   const parts = path.split("/");
   if (!PICTURE.test(path)) return null;
+  if (parts[0] === "faces" && parts[1] === "cast") {
+    return parts.length === 4 ? `cast:${parts[2]}` : null;
+  }
   if (parts.length === 3 && parts[0] === "faces") {
     return parts[1] === "pool" ? "pool" : `persona:${parts[1]}`;
   }
@@ -82,7 +86,7 @@ export type AssetProblem = { path: string; problem: "missing" | "tampered" | "un
 /**
  * Every listed file present with its checksum, and no picture that is not
  * listed: a tampered or added file is named, never used. Reads every byte of
- * every file; a release is a few dozen pictures.
+ * every file; a release is some two hundred pictures.
  */
 export function verifyAssets(dir: string, manifest: readonly PhotoAsset[]): AssetProblem[] {
   const problems: AssetProblem[] = [];

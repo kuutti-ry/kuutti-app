@@ -55,6 +55,32 @@ describe("the release's layout", () => {
     expect(purposeOf("elsewhere/1.jpg")).toBeNull();
   });
 
+  it("keeps somebody of the cast's pictures under their key, and refuses a picture beside the keys or deeper", () => {
+    expect(purposeOf("faces/cast/jere/1.jpg")).toBe("cast:jere");
+    expect(purposeOf("faces/cast/jere/notes.txt")).toBeNull();
+    expect(purposeOf("faces/cast/1.jpg")).toBeNull();
+    expect(purposeOf("faces/cast/jere/old/1.jpg")).toBeNull();
+
+    const dir = release({
+      ...PICTURES,
+      "faces/cast/jere/2.jpg": "b",
+      "faces/cast/jere/1.jpg": "a",
+    });
+    const manifest = manifestOf(dir);
+    expect(assetsFor(manifest, "cast:jere").map((a) => a.path)).toEqual([
+      "faces/cast/jere/1.jpg",
+      "faces/cast/jere/2.jpg",
+    ]);
+    // The cast's set is nobody's persona, and no face of the pool.
+    expect(assetsFor(manifest, "persona:jere")).toEqual([]);
+    expect(assetsFor(manifest, "pool").map((a) => a.path)).toEqual([
+      "faces/pool/001.jpg",
+      "faces/pool/002.png",
+    ]);
+    const misplaced = release({ ...PICTURES, "faces/cast/1.jpg": "x" });
+    expect(() => manifestOf(misplaced)).toThrow(/faces\/cast\/1\.jpg: a picture outside/);
+  });
+
   it("lists a directory of pictures, sorted, with the checksum of every one, and refuses a misplaced picture", () => {
     const dir = release(PICTURES);
     const manifest = manifestOf(dir);
