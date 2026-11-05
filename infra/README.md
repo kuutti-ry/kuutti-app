@@ -780,11 +780,11 @@ It prints the swap and where the metric goes, and fails, saying so, when the fir
 
 1. On the box: `free -m` shows 2 GB of swap.
 2. The API keeps answering while Dokploy dies and is started again: seen for real on 2026-10-24, when Dokploy crashed every 25 seconds under the limit ADR-046 has since withdrawn and `/health` answered throughout.
-3. The alarm. From your machine, `aws cloudwatch describe-alarms --alarm-names kuutti-staging-memory-low --query 'MetricAlarms[0].StateValue'` says `OK` a few minutes after the document ran. To see it fire, hold the box's memory for seven minutes in a container of its own on the box, with no network, so the image never reaches the instance role. The mail says ALARM after about five minutes, and OK a few minutes after the container ends:
+3. The alarm. From your machine, `aws cloudwatch describe-alarms --alarm-names kuutti-staging-memory-low --query 'MetricAlarms[0].StateValue'` says `OK` a few minutes after the document ran. To see it fire, hold more memory than the box has available, for seven minutes, in a container of its own on the box, with no network, so the image never reaches the instance role, and keep every page of it written. Less does not fire it on a box with swap (tried on 2026-11-05, #77): a buffer written once is paged out within the minute and `MemAvailable` barely moves, and a buffer smaller than `MemAvailable`, even one kept written, leaves the kernel room to page everything else out and settle at 200 to 280 MB, just over the threshold. With `MemAvailable + 60` MB written twice a second, `MemAvailable` sat at 110 to 130 MB, the alarm said ALARM 5 min 37 s after the hold began and OK 1 min 35 s after it ended, and `/health` answered 200 throughout. That the box settles just over 200 MB while swap carries the load is open on #77: whether the threshold moves, or a second alarm reads swap in use (ADR-046).
 
    ```sh
-   mb=$(awk '/^MemAvailable:/ { printf "%d", $2 / 1024 - 100 }' /proc/meminfo)
-   docker run --rm --network none --name memory-alarm-test python:3.13-alpine python -c "import time; b = b'x' * ($mb * 1048576); time.sleep(420)"
+   mb=$(awk '/^MemAvailable:/ { printf "%d", $2 / 1024 + 60 }' /proc/meminfo)
+   docker run --rm --network none --name memory-alarm-test -e MB=$mb python:3.13-alpine python -c "import os, time; n = int(os.environ['MB']) * 1048576; b = bytearray(n); z = bytes(len(range(0, n, 4096))); end = time.time() + 420; [(b.__setitem__(slice(None, None, 4096), z), time.sleep(0.5)) for _ in iter(lambda: time.time() < end, False)]"
    ```
 
 If Dokploy ever has to lose a memory limit again, `docker service update --limit-memory 0 dokploy` is the form to use: `docker service rollback` swaps to the previous settings, whichever they are.

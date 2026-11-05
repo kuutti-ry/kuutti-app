@@ -18,7 +18,15 @@ Sales entry, for the record: https://www.telia.fi/yrityksille/palvelut/tietoturv
 
 ## The bill (#471)
 
-Production is billed from its first traffic; the pre-production bed is free. The 2025 offer was the S package, 55 € a month with 200 logins; the agreement signed on 20.10.2026 (TVP00648) is the one to read for what holds now (#25). In the trust network the law caps what a bank may charge a broker at 3 cents for each identification it passes on (Act 617/2009 §12 c); what Telia charges Kuutti, and for which events, is not public.
+Production is billed from the move to production, not from the signature: the offer of 07.10.2026 says invoicing starts once the service has been transferred to production, and the pre-production bed is free. No production connection has been requested yet (#25). The agreement is Telia's service agreement 5261020255146 of 20.10.2026 (*Palvelusopimus*, with its price list annex, Telia Tunnistus version 12.0), e-signed on 20 to 22 October by Mika Loukola for Telia and by the chair and the vice-chair for Kuutti ry; TVP00648 is Telia's reference for it, the one to quote to id-maintenance. Its prices, excluding VAT, bank and Mobiilivarmenne alike:
+
+| package | a month | events included | each event past them |
+|---|---|---|---|
+| S (the one ordered) | 60 € | 200 | 0.20 € |
+| L | 220 € | 1,000 | 0.05 € |
+| XL | 500 € | 10,000 | 0.045 € |
+
+No set-up fee. The package can be changed at a month boundary, asked for two weeks ahead (before the middle of the month, to mika.loukola@teliacompany.com, for the first of the next). S and L cost the same at 1,000 events a month, so past that L is cheaper; the alarm's 50 a day is a 1,500-a-month pace. Telia may change these prices mid-term only when law or a regulator forces it, with 14 days' notice; the service ends on two months' notice. No support or discount exists for a non-profit (Mika Loukola, 07.10.2026). In the trust network the law caps what a bank may charge a broker at 3 cents for each identification it passes on (Act 617/2009 §12 c).
 
 What Kuutti counts: one API line `identified at the bank` for each callback whose broker answer is verified and fresh, before the rule decides anything, so a new account, a resume, the end of a break, a staff sign-in and a refusal each count once; a cancel at the bank, a failed token call and an answer older than its attempt (ADR-016 §2) do not. The observability module sums the lines as `BankIdentifications` in `Kuutti/<env>` and mails when a day reaches `bank_identifications_per_day` (`docs/runbooks/alerts.md`). The month's count, to choose the package from, is the metric's sum over the month (the alarm's row has the command); a package change asked for before the middle of a month applies from the next.
 
@@ -26,11 +34,11 @@ Questions for the commercial contact, with the date and the answer once they com
 
 | question | why it matters | answer |
 |---|---|---|
-| Which events are billed: only an identification whose data reaches us, or also a chooser opened and left, a cancel at the bank, or an answer from Telia's own web session? | whether the count above is the bill, or a starting point; if starts or cancels are billed, the doors' numbers (ADR-026 §5) and the WAF rule of #41 are the bound to revisit | |
-| What does a login past the package cost, and what are the larger packages? | the price of a day the alarm mails about | |
-| Did TVP00648 change anything in the 2025 offer? | the figures above | |
+| Which events are billed: only an identification whose data reaches us, or also a chooser opened and left, a cancel at the bank, or an answer from Telia's own web session? | whether the count above is the bill, or a starting point; if starts or cancels are billed, the doors' numbers (ADR-026 §5) and the WAF rule of #41 are the bound to revisit | Not in the agreement (read 05.11.2026). It defines an identification event as the chain in which the holder identifies themselves to the service and the service uses the broker to establish their identity, and says a request the person rejects or leaves unaccepted is reported to us as a failure; whether such a failure is billed it does not say, and it names neither a chooser left open nor Telia's web session. Still to ask, as one question: does a request the person rejects or abandons at the bank count. |
+| What does a login past the package cost, and what are the larger packages? | the price of a day the alarm mails about | The price list of 20.10.2026, above: 0.20 € past the S package's 200, and L and XL at 220 € and 500 € a month. |
+| Did TVP00648 change anything in the 2025 offer? | the figures above | Yes (the offer of 07.10.2026, the agreement of 20.10.2026): S is 60 € a month, not 55; the 200 events and the shape of the packages are unchanged. |
 
-Months counted, once production has bank identification: none yet.
+Months counted: none, since billing starts at the move to production and none has been requested.
 
 ## What Telia needs from us (guide section 2.1)
 
