@@ -46,7 +46,7 @@ export function PhotoQueue() {
           {t("admin.queue.refresh")}
         </Button>
       </header>
-      {state.kind === "loading" && <Loading>{t("admin.queue.loading")}</Loading>}
+      {state.kind === "loading" && <Loading>{t("load.loading")}</Loading>}
       {state.kind === "error" && <Alert>{t("admin.loadFailed")}</Alert>}
       {state.kind === "ready" && (
         <>
@@ -164,7 +164,7 @@ function QueueItem({ item, onDecided }: { item: PhotoReviewItem; onDecided: () =
               />
             ) : (
               <div className="flex aspect-3/4 items-center justify-center rounded-md bg-muted">
-                <Loading>{t("admin.queue.imageLoading")}</Loading>
+                <Loading>{t("load.loading")}</Loading>
               </div>
             )}
             {/* Two lines: the link's 44 px target (M43) does not fit beside the date under a photo, and a dot would hang at the line's end. */}

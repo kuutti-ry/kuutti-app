@@ -45,6 +45,6 @@ name: Download my data hands the person's file over
 - extendedWaitUntil:
     visible: "Download my data|Lataa tietoni|Ladda ner mina uppgifter"
     timeout: 15000
-- assertNotVisible: "The download did not work\\. Try again\\.|Lataus ei onnistunut\\. Yritä uudelleen\\.|Nedladdningen misslyckades\\. Försök igen\\."
-- assertNotVisible: "That is enough copies for today\\..*|Tältä päivältä kopioita on jo tarpeeksi\\..*|Det räcker med kopior för i dag\\..*"
+- assertNotVisible: "That did not go through\\. Try again\\.|Se ei onnistunut\\. Yritä uudelleen\\.|Det gick inte\\. Försök igen\\."
+- assertNotVisible: "That is enough for today\\..*|Tältä päivältä riittää\\..*|Det räcker för i dag\\..*"
 - assertNotVisible: "Done\\.|Valmis\\.|Klart\\."

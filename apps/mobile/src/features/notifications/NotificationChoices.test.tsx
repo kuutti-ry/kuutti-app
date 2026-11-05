@@ -3,6 +3,7 @@ import { useLocales } from "expo-localization";
 import * as Notifications from "expo-notifications";
 import { clearSession, saveSession } from "@/lib/session";
 import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
+import { FAILED_TO_LOAD } from "@/test/failed";
 import { renderWithTheme } from "@/test/render";
 import { NotificationChoices } from "./NotificationChoices";
 
@@ -149,7 +150,7 @@ describe("NotificationChoices", () => {
       fireEvent(screen.getByRole("switch", { name: "Matches" }), "onCheckedChange", false),
     );
     await settle();
-    expect(screen.getByText("The change was not saved. Try again.")).toBeTruthy();
+    expect(screen.getByText("That did not go through. Try again.")).toBeTruthy();
     expect(checked("Matches")).toBe(true);
   });
 
@@ -163,7 +164,7 @@ describe("NotificationChoices", () => {
       return json(choices());
     });
     await renderWithTheme(<NotificationChoices />);
-    expect(await screen.findByText("Your choices could not be loaded.")).toBeTruthy();
+    expect(await screen.findByText(FAILED_TO_LOAD)).toBeTruthy();
     await act(async () => fireEvent.press(screen.getByRole("button", { name: "Try again" })));
     expect(await screen.findByRole("switch", { name: "Messages" })).toBeTruthy();
   });

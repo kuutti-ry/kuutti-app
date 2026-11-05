@@ -227,7 +227,7 @@ describe("Notices", () => {
     await screen.findByText(BODY);
     await act(async () => fireEvent.press(screen.getByRole("button", { name: "Got it" })));
     await settle();
-    const words = "The notice could not be marked as read. Try again.";
+    const words = "That did not go through. Try again.";
     expect(screen.getByText(words)).toBeTruthy();
     expect(screen.getByText(BODY)).toBeTruthy();
     expect(AccessibilityInfo.announceForAccessibility).toHaveBeenCalledWith(words);

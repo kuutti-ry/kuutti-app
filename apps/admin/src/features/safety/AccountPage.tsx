@@ -169,7 +169,7 @@ export function AccountPage() {
     return (
       <section aria-labelledby="account-title" className="space-y-6">
         <ScreenTitle id="account-title">{title}</ScreenTitle>
-        {state.kind === "loading" && <Loading>{t("admin.account.loading")}</Loading>}
+        {state.kind === "loading" && <Loading>{t("load.loading")}</Loading>}
         {state.kind === "error" && <Alert>{t("admin.loadFailed")}</Alert>}
         {state.kind === "missing" && (
           <p className="text-muted-foreground">{t("admin.account.missing")}</p>

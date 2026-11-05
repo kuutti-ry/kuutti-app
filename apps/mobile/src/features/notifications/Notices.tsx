@@ -79,8 +79,7 @@ export function Notices() {
     } catch {
       setFailed(notice.id);
       // Android's live region speaks it; iOS has none.
-      if (Platform.OS === "ios")
-        AccessibilityInfo.announceForAccessibility(t("notices.readFailed"));
+      if (Platform.OS === "ios") AccessibilityInfo.announceForAccessibility(t("load.failed.press"));
     }
   };
 
@@ -97,7 +96,7 @@ export function Notices() {
             <Text className="font-semibold">{words.title}</Text>
             <Text>{words.body}</Text>
             {failed === notice.id && (
-              <Text accessibilityLiveRegion="assertive">{t("notices.readFailed")}</Text>
+              <Text accessibilityLiveRegion="assertive">{t("load.failed.press")}</Text>
             )}
             <Button variant="outline" onPress={() => void read(notice)}>
               {t("notices.read")}

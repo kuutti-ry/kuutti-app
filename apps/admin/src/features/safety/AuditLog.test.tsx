@@ -117,19 +117,19 @@ describe("the audit log", () => {
     const second = deferred<Response>();
     fetchMock([answer(({ before }) => (before ? second.promise : json(numbered(1, "c1"))))]);
     show();
-    expect(screen.getByText("Loading the audit log…")).toHaveAttribute("aria-busy", "true");
+    expect(screen.getByText("Loading…")).toHaveAttribute("aria-busy", "true");
     expect(screen.queryByRole("table")).toBeNull();
     expect(screen.queryByRole("button", { name: "Older" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Newer" })).toBeNull();
     await shown();
-    expect(screen.queryByText("Loading the audit log…")).toBeNull();
+    expect(screen.queryByText("Loading…")).toBeNull();
 
     fireEvent.click(older());
-    expect(await screen.findByText("Loading the audit log…")).toBeInTheDocument();
+    expect(await screen.findByText("Loading…")).toBeInTheDocument();
     expect(screen.queryByRole("table")).toBeNull();
     second.resolve(json(numbered(2, null)));
     expect(await screen.findByText("page 2")).toBeInTheDocument();
-    expect(screen.queryByText("Loading the audit log…")).toBeNull();
+    expect(screen.queryByText("Loading…")).toBeNull();
   });
 
   it("asks for the first page with no filter and the admin's token", async () => {
@@ -505,7 +505,7 @@ describe("the audit log", () => {
     show();
     await screen.findByText("page 1");
     fireEvent.click(older());
-    expect(await screen.findByText("Loading the audit log…")).toBeInTheDocument();
+    expect(await screen.findByText("Loading…")).toBeInTheDocument();
     const apply = filters().getByRole("button", { name: "Show" });
     apply.focus();
     fireEvent.click(apply);
@@ -566,7 +566,7 @@ describe("the audit log", () => {
       show();
       expect(await screen.findByRole("alert")).toHaveTextContent(/^Could not be loaded\.$/);
       expect(screen.queryByText(/A filter is not valid/)).toBeNull();
-      expect(screen.queryByText("Loading the audit log…")).toBeNull();
+      expect(screen.queryByText("Loading…")).toBeNull();
       expect(screen.queryByRole("table")).toBeNull();
       if (logs) expect(logged).toHaveBeenCalledWith("audit load failed", expect.anything());
       else expect(logged).not.toHaveBeenCalled();
@@ -579,7 +579,7 @@ describe("the audit log", () => {
   it("leaves a refused log to the shell: no rows, no paging and no failure of its own (#302)", async () => {
     const calls = fetchMock([answer(() => failure("admin_forbidden", 403))]);
     show();
-    await waitFor(() => expect(screen.queryByText("Loading the audit log…")).toBeNull());
+    await waitFor(() => expect(screen.queryByText("Loading…")).toBeNull());
     expect(screen.getByRole("heading", { level: 2, name: "Audit log" })).toBeInTheDocument();
     expect(screen.queryByRole("alert")).toBeNull();
     expect(screen.queryByRole("table")).toBeNull();

@@ -4,6 +4,7 @@ import * as SecureStore from "expo-secure-store";
 import { AccessibilityInfo } from "react-native";
 import { clearSession, saveSession } from "@/lib/session";
 import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
+import { FAILED_TO_LOAD } from "@/test/failed";
 import { renderWithTheme } from "@/test/render";
 import { FakeWebSocket } from "@/test/websocket";
 import { ChatPhotoScreen } from "./ChatPhotoScreen";
@@ -141,7 +142,7 @@ describe("a conversation's photo full size", () => {
         }),
     );
     await renderWithTheme(<ChatPhotoScreen {...props} />);
-    expect(screen.getByText("Loading the photo…").props.accessibilityLiveRegion).toBe("polite");
+    expect(screen.getByText("Loading…").props.accessibilityLiveRegion).toBe("polite");
     expect(screen.getByRole("heading", { name: "Photo" })).toBeTruthy();
     await act(async () => answer(json({ messages: [photoMessage()] })));
     await waitFor(() => expect(full().source?.[0]?.uri).toBe(urls(1).full));
@@ -215,7 +216,7 @@ describe("a conversation's photo full size", () => {
       () => json({ messages: [photoMessage()] }),
     );
     await renderWithTheme(<ChatPhotoScreen {...props} />);
-    expect(await screen.findByText("The photo could not be loaded.")).toBeTruthy();
+    expect(await screen.findByText(FAILED_TO_LOAD)).toBeTruthy();
     await userEvent.setup().press(screen.getByRole("button", { name: "Try again" }));
     await waitFor(() => expect(full().source?.[0]?.uri).toBe(urls(1).full));
   });
@@ -348,7 +349,7 @@ describe("Report this photo (#476)", () => {
     await renderWithTheme(<ChatPhotoScreen {...props} report={report} />);
     await settle();
     await settle();
-    expect(screen.queryByText("Loading the photo…")).toBeNull();
+    expect(screen.queryByText("Loading…")).toBeNull();
     expect(screen.queryByRole("button", { name: "Report this photo" })).toBeNull();
     expect(screen.queryByText("Report this photo")).toBeNull();
   });

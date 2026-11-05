@@ -109,7 +109,7 @@ describe("the front page", () => {
     ]);
     show();
     expect(screen.getByRole("heading", { level: 2, name: "Overview" })).toBeInTheDocument();
-    expect(screen.getByText("Loading what waits…")).toHaveAttribute("aria-busy", "true");
+    expect(screen.getByText("Loading…")).toHaveAttribute("aria-busy", "true");
     expect(screen.queryByRole("list")).toBeNull();
 
     // The request is out before it is answered.
@@ -123,7 +123,7 @@ describe("the front page", () => {
       ),
     );
     const lines = await screen.findAllByRole("listitem");
-    expect(screen.queryByText("Loading what waits…")).toBeNull();
+    expect(screen.queryByText("Loading…")).toBeNull();
     expect(lines.map((line) => line.textContent)).toEqual([
       "Feedback 1 waits. Oldest: 2 hours",
       "Photos 3 wait. Oldest: 5 hours",
@@ -396,7 +396,7 @@ describe("the front page", () => {
     show();
     expect(await screen.findByRole("alert")).toHaveTextContent(/^Could not be loaded\.$/);
     expect(screen.queryByRole("list")).toBeNull();
-    expect(screen.queryByText("Loading what waits…")).toBeNull();
+    expect(screen.queryByText("Loading…")).toBeNull();
   });
 
   it("says the page could not be loaded when the answer is not the contract, and logs why", async () => {
@@ -434,7 +434,7 @@ describe("the front page", () => {
     fetchMock([answer({ error: { code: "admin_forbidden", message: "x", requestId: "r" } }, 403)]);
     show();
     await waitFor(() => expect(role).toHaveBeenCalledWith(false));
-    await waitFor(() => expect(screen.queryByText("Loading what waits…")).toBeNull());
+    await waitFor(() => expect(screen.queryByText("Loading…")).toBeNull());
     expect(screen.queryByRole("alert")).toBeNull();
     expect(screen.queryByRole("list")).toBeNull();
     // The heading and the refresh stay, for when the role is given back.
@@ -471,7 +471,7 @@ describe("the front page", () => {
     );
 
     fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
-    expect(await screen.findByText("Loading what waits…")).toBeInTheDocument();
+    expect(await screen.findByText("Loading…")).toBeInTheDocument();
     expect(screen.queryByRole("list")).toBeNull();
     await waitFor(() => expect(calls.filter(isOverview)).toHaveLength(3));
     pending(json(overview([empty("photos"), empty("feedback")])));

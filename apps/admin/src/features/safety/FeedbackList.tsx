@@ -43,7 +43,7 @@ export function FeedbackList() {
           {t("admin.feedback.refresh")}
         </Button>
       </div>
-      {state.kind === "loading" && <Loading>{t("admin.feedback.loading")}</Loading>}
+      {state.kind === "loading" && <Loading>{t("load.loading")}</Loading>}
       {state.kind === "error" && <Alert>{t("admin.loadFailed")}</Alert>}
       {state.kind === "ready" && (
         <>

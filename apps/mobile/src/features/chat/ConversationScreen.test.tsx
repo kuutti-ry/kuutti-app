@@ -3,10 +3,18 @@ import { act, fireEvent, screen, userEvent, waitFor } from "@testing-library/rea
 import * as ImagePicker from "expo-image-picker";
 import { useLocales } from "expo-localization";
 import * as SecureStore from "expo-secure-store";
-import { AccessibilityInfo, AppState, Clipboard, Linking, Platform } from "react-native";
+import {
+  AccessibilityInfo,
+  AppState,
+  Clipboard,
+  Linking,
+  Platform,
+  ScrollView,
+} from "react-native";
 import { pickPrepared } from "@/features/media";
 import { clearSession, saveSession } from "@/lib/session";
 import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
+import { FAILED_TO_LOAD } from "@/test/failed";
 import { expectPinnedHeader } from "@/test/layout";
 import { renderWithTheme } from "@/test/render";
 import { FakeWebSocket } from "@/test/websocket";
@@ -393,13 +401,30 @@ describe("one conversation", () => {
       ]),
     );
     noProblems();
-    // A new size of the list keeps the newest in sight.
-    const scroll = screen.getByTestId("messages");
+    await press("Back");
+    expect(router.back).toHaveBeenCalled();
+  });
+
+  it("keeps the newest in sight as the list grows, and once more a frame later, when the new size has reached the screen", async () => {
+    conversation(detail(), [[message(1, "theirs", "Moi", DAY_1)]]);
+    await renderWithTheme(<ConversationScreen id={ID} />);
+    const scroll = await screen.findByTestId("messages");
+    // Frames held back until the test runs them, so the two scrolls can be told apart.
+    const frames: FrameRequestCallback[] = [];
+    jest.spyOn(globalThis, "requestAnimationFrame").mockImplementation((run) => {
+      frames.push(run);
+      return frames.length;
+    });
+    const toEnd = jest.spyOn(ScrollView.prototype, "scrollToEnd");
+    toEnd.mockClear();
     await act(async () => {
       fireEvent(scroll, "contentSizeChange", 390, 2000);
     });
-    await press("Back");
-    expect(router.back).toHaveBeenCalled();
+    expect(toEnd).toHaveBeenCalledTimes(1);
+    expect(toEnd).toHaveBeenLastCalledWith({ animated: false });
+    for (const run of frames.splice(0)) run(0);
+    expect(toEnd).toHaveBeenCalledTimes(2);
+    expect(toEnd).toHaveBeenLastCalledWith({ animated: false });
   });
 
   it("shows a message at once as sending, swaps it for the answer, and leaves the composer empty", async () => {
@@ -797,7 +822,7 @@ describe("one conversation", () => {
       return ok(input, init);
     }) as unknown as typeof fetch;
     await renderWithTheme(<ConversationScreen id={ID} />);
-    expect(await screen.findByText("The conversation could not be loaded.")).toBeTruthy();
+    expect(await screen.findByText(FAILED_TO_LOAD)).toBeTruthy();
     await press("Try again");
     expect(said("Sanna", DAY_1, "Moi")).toBeTruthy();
   });
@@ -1029,9 +1054,7 @@ describe("contacts in a conversation (#103)", () => {
     expect(screen.getByRole("button", { name: "Share your Instagram" })).toBeTruthy();
     for (let i = 0; i < 2; i += 1) {
       await press("Share your Instagram");
-      expect(
-        screen.getByText("Nothing changed. Check your connection and try again."),
-      ).toBeTruthy();
+      expect(screen.getByText("That did not go through. Try again.")).toBeTruthy();
     }
     expect(detailReads()).toBe(before);
     // Removed on another phone meanwhile: said, read again, and gone from the dialog and the header.
@@ -1744,14 +1767,14 @@ describe("one conversation, live over the socket", () => {
       </ChatLiveProvider>,
     );
     await waitFor(() => expect(FakeWebSocket.instances).toHaveLength(1));
-    expect(await screen.findByText("The conversation could not be loaded.")).toBeTruthy();
+    expect(await screen.findByText(FAILED_TO_LOAD)).toBeTruthy();
     fails = false;
     await ready();
     await frame({ type: "contacts", conversationId: ID });
     await settle();
     expect([contactsReads(), detailReads()]).toEqual([2, 0]);
     // Read, but not shown over the failure: the messages were never read.
-    expect(screen.getByText("The conversation could not be loaded.")).toBeTruthy();
+    expect(screen.getByText(FAILED_TO_LOAD)).toBeTruthy();
     expect(screen.queryByText("Instagram: ville.k")).toBeNull();
     await press("Try again");
     expect(said("Sanna", DAY_1, "Moi")).toBeTruthy();
@@ -2120,7 +2143,7 @@ describe("one conversation, live over the socket", () => {
       set(detail({ contacts: VILLE_SHARES }));
       await ready();
       await settle();
-      expect(screen.getByText("Loading the conversation…")).toBeTruthy();
+      expect(screen.getByText("Loading…")).toBeTruthy();
       await page();
       expect(screen.getByLabelText("Message")).toBeTruthy();
       expect(screen.getByText("Instagram: ville.k")).toBeTruthy();

@@ -20,7 +20,7 @@ name: Withdrawing the sensitive-answers consent asks whom one seeks again with t
     file: ../common/open-settings-row.yaml
     env:
       ROW: "(Sensitive answers|Arkaluonteiset vastaukset|Känsliga svar)(, .*)?"
-      INSIDE: "Reading your choice…|Luetaan valintaasi…|Läser ditt val…|Store my sensitive answers|Tallenna arkaluonteiset vastaukseni|Spara mina känsliga svar"
+      INSIDE: "Loading…|Ladataan…|Laddar…|Store my sensitive answers|Tallenna arkaluonteiset vastaukseni|Spara mina känsliga svar"
 # A switch's text, to Maestro, is its value ("1" on, "0" off), right of its words.
 - extendedWaitUntil:
     visible:
@@ -99,4 +99,4 @@ name: Withdrawing the sensitive-answers consent asks whom one seeks again with t
     file: ../common/close-settings-row.yaml
     env:
       ROW: "(Sensitive answers|Arkaluonteiset vastaukset|Känsliga svar)(, .*)?"
-      INSIDE: "Reading your choice…|Luetaan valintaasi…|Läser ditt val…|Store my sensitive answers|Tallenna arkaluonteiset vastaukseni|Spara mina känsliga svar"
+      INSIDE: "Loading…|Ladataan…|Laddar…|Store my sensitive answers|Tallenna arkaluonteiset vastaukseni|Spara mina känsliga svar"

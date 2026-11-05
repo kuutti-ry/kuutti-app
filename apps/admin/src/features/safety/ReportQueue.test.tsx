@@ -135,7 +135,7 @@ describe("the report queue", () => {
     ]);
     show();
     expect(screen.getByRole("heading", { level: 2, name: "Reports" })).toBeInTheDocument();
-    expect(screen.getByText("Loading the reports…")).toHaveAttribute("aria-busy", "true");
+    expect(screen.getByText("Loading…")).toHaveAttribute("aria-busy", "true");
     expect(await screen.findByText("3 waiting")).toHaveAttribute("aria-live", "polite");
     expect(screen.queryByText(/Showing the first/)).toBeNull();
 
@@ -281,7 +281,7 @@ describe("the report queue", () => {
     show();
     await waitFor(() => expect(answers).toEqual([false]));
     expect(screen.queryByRole("alert")).toBeNull();
-    expect(screen.queryByText("Loading the reports…")).toBeNull();
+    expect(screen.queryByText("Loading…")).toBeNull();
     expect(screen.queryByText(/wait/)).toBeNull();
   });
 

@@ -40,11 +40,11 @@ type Notice =
 
 const NOTICE: Readonly<Record<Notice, PlainMessageKey>> = {
   made: "settings.invite.made",
-  makeFailed: "settings.invite.makeFailed",
+  makeFailed: "load.failed.press",
   full: "errors.invitations_full",
   notYet: "errors.invitation_not_yet",
   withdrawn: "settings.invite.withdrawn",
-  withdrawFailed: "settings.invite.withdrawFailed",
+  withdrawFailed: "load.failed.press",
   shareFailed: "settings.invite.shareFailed",
 };
 
@@ -183,18 +183,12 @@ export function Invitations({
   if (view.status === "loading") {
     return (
       <Text variant="muted" accessibilityLiveRegion="polite">
-        {t("settings.invite.loading")}
+        {t("load.loading")}
       </Text>
     );
   }
   if (view.status === "failed") {
-    return (
-      <LoadFailed
-        headline={t("settings.invite.loadFailed")}
-        error={view.error}
-        onRetry={view.retry}
-      />
-    );
+    return <LoadFailed error={view.error} onRetry={view.retry} />;
   }
   const { canInvite, redeemable, reward, open, earned } = view.invitations;
   const earns = rewardParams(reward);

@@ -49,11 +49,7 @@ export function SeekWhomScreen() {
     return (
       <SafeAreaView className="flex-1 bg-background">
         <View className="flex-1 items-center justify-center gap-4 p-6">
-          <LoadFailed
-            headline={t("profile.failed")}
-            error={seeking.error}
-            onRetry={() => void seeking.reload()}
-          />
+          <LoadFailed error={seeking.error} onRetry={() => void seeking.reload()} />
         </View>
       </SafeAreaView>
     );
@@ -62,7 +58,7 @@ export function SeekWhomScreen() {
     return (
       <SafeAreaView className="flex-1 bg-background">
         <View className="flex-1 items-center justify-center p-6">
-          <Text accessibilityLiveRegion="polite">{t("profile.loading")}</Text>
+          <Text accessibilityLiveRegion="polite">{t("load.loading")}</Text>
         </View>
       </SafeAreaView>
     );
@@ -89,7 +85,7 @@ export function SeekWhomScreen() {
         />
         {refused > 0 && <Notice words={t("profile.seek.whom.keepOne")} answer={refused} refused />}
       </ScrollView>
-      <ConfirmLeaveDialog {...leaving} reason={t("profile.seek.failed")} />
+      <ConfirmLeaveDialog {...leaving} reason={t("load.failed.press")} />
     </SafeAreaView>
   );
 }

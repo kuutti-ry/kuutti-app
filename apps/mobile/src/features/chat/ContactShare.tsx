@@ -123,7 +123,7 @@ export function ContactShare({
     } catch (error) {
       const code = (error instanceof ApiError ? error.code : undefined) ?? "";
       if (isOpen.current) {
-        const refused = REFUSALS.get(code) ?? "chat.contact.error.failed";
+        const refused = REFUSALS.get(code) ?? "load.failed.press";
         setRefusal(refused);
         // iOS has no live regions; Android's speaks the same words already.
         if (Platform.OS === "ios") AccessibilityInfo.announceForAccessibility(t(refused));

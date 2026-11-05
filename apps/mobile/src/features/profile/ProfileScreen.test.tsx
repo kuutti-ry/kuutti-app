@@ -9,6 +9,7 @@ import { useLocales } from "expo-localization";
 import type * as React from "react";
 import { saveSession } from "@/lib/session";
 import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
+import { FAILED_TO_LOAD } from "@/test/failed";
 import { expectPinnedHeader } from "@/test/layout";
 import { renderWithTheme } from "@/test/render";
 import { ProfileScreen } from "./ProfileScreen";
@@ -628,7 +629,7 @@ describe("ProfileScreen", () => {
       return json({ profile: null, completeness: { complete: true, missing: [] }, home: null });
     }) as unknown as typeof fetch;
     await show(<ProfileScreen />);
-    expect(screen.getByText("Your profile could not be loaded.")).toBeTruthy();
+    expect(screen.getByText(FAILED_TO_LOAD)).toBeTruthy();
     // Why, in words: the API answered 500.
     expect(screen.getByText("Kuutti's server had a problem. Try again in a moment.")).toBeTruthy();
     failing = false;
@@ -646,7 +647,7 @@ describe("ProfileScreen", () => {
       }),
     ) as unknown as typeof fetch;
     await show(<ProfileScreen />);
-    expect(screen.getByText("Your profile could not be loaded.")).toBeTruthy();
+    expect(screen.getByText(FAILED_TO_LOAD)).toBeTruthy();
     expect(screen.getByText(/older than Kuutti's server/)).toBeTruthy();
     expect(screen.getByRole("button", { name: "Update the app" })).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Try again" })).toBeNull();

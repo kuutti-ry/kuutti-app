@@ -127,12 +127,12 @@ describe("the tunables", () => {
       (req) => (isList(req) ? new Promise<Response>((resolve) => (answer = resolve)) : null),
     ]);
     show();
-    expect(screen.getByText("Loading the tunables…")).toHaveAttribute("aria-busy", "true");
+    expect(screen.getByText("Loading…")).toHaveAttribute("aria-busy", "true");
     await waitFor(() => expect(lists(calls)).toHaveLength(1));
-    expect(screen.getByText("Loading the tunables…")).toBeInTheDocument();
+    expect(screen.getByText("Loading…")).toBeInTheDocument();
     answer(json({ items: [feedback, word, fetches, tips] }));
     const at = await item("feedback_per_day");
-    expect(screen.queryByText("Loading the tunables…")).toBeNull();
+    expect(screen.queryByText("Loading…")).toBeNull();
     expect(screen.getByRole("heading", { level: 2, name: "Tunables" })).toBeInTheDocument();
     expect(calls[0]?.authorization).toBe(`Bearer ${"t".repeat(43)}`);
     // The whole list is on the page: nothing counts it (#581).
@@ -201,14 +201,14 @@ describe("the tunables", () => {
     fetchMock([(req) => (isList(req) ? failure("internal_error", 500) : null)]);
     show();
     expect(await screen.findByRole("alert")).toHaveTextContent(/^Could not be loaded\.$/);
-    expect(screen.queryByText("Loading the tunables…")).toBeNull();
+    expect(screen.queryByText("Loading…")).toBeNull();
     expect(screen.queryByRole("list")).toBeNull();
   });
 
   it("leaves a refused list to the shell: no list, no failure of its own (#302)", async () => {
     const calls = fetchMock([(req) => (isList(req) ? failure("admin_forbidden", 403) : null)]);
     show();
-    await waitFor(() => expect(screen.queryByText("Loading the tunables…")).toBeNull());
+    await waitFor(() => expect(screen.queryByText("Loading…")).toBeNull());
     expect(lists(calls)).toHaveLength(1);
     expect(screen.queryByRole("alert")).toBeNull();
     expect(screen.queryByRole("list")).toBeNull();

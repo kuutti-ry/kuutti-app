@@ -503,18 +503,18 @@ function SafetyDialog({
     return send(
       "reported",
       () => requests.report({ reason: chosen, ...(words ? { note: words } : {}) }, photo),
-      "safety.report.failed",
+      "load.failed.press",
     );
   };
   const { unmatch: unmatchRequest } = requests;
-  const unmatch = () => unmatchRequest && send("unmatched", unmatchRequest, "chat.unmatch.failed");
+  const unmatch = () => unmatchRequest && send("unmatched", unmatchRequest, "load.failed.press");
 
   // The day's cap with a Block in its place where one is offered; in an
   // ended conversation, which offers none, that the cap lifts at midnight,
   // promising nothing of this conversation, whose window may close first (#351).
   const limitedWords: PlainMessageKey = offers.block
     ? "errors.report_budget_exceeded"
-    : "chat.report.limited";
+    : "errors.enough_today";
   const working = sending && <Text accessibilityLiveRegion="polite">{t("safety.sending")}</Text>;
   const noteLabel = t("safety.report.noteLabel", { max: REPORT_NOTE_MAX });
   const photoQuestion = t("safety.report.photo.question");
@@ -601,9 +601,7 @@ function SafetyDialog({
             </DialogHeader>
             <ScrollView style={{ flexShrink: 1 }} contentContainerClassName="gap-4">
               <DialogDescription>{t("chat.unmatch.body")}</DialogDescription>
-              {notice && (
-                <Text accessibilityLiveRegion="assertive">{t("chat.unmatch.failed")}</Text>
-              )}
+              {notice && <Text accessibilityLiveRegion="assertive">{t("load.failed.press")}</Text>}
               {working}
             </ScrollView>
             <DialogFooter>
@@ -743,7 +741,7 @@ function SafetyDialog({
               <Text accessibilityLiveRegion="assertive">{t("errors.report_window_closed")}</Text>
             )}
             {notice === "failed" && (
-              <Text accessibilityLiveRegion="assertive">{t("safety.report.failed")}</Text>
+              <Text accessibilityLiveRegion="assertive">{t("load.failed.press")}</Text>
             )}
             {working}
             <DialogFooter>

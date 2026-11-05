@@ -274,7 +274,7 @@ export function OnboardingScreen() {
     return (
       <SafeAreaView className="flex-1 bg-background">
         <View className="flex-1 items-center justify-center p-6">
-          <Text accessibilityLiveRegion="polite">{t("onboarding.loading")}</Text>
+          <Text accessibilityLiveRegion="polite">{t("load.loading")}</Text>
         </View>
       </SafeAreaView>
     );
@@ -289,7 +289,6 @@ export function OnboardingScreen() {
       <SafeAreaView className="flex-1 bg-background">
         <View className="flex-1 items-center justify-center gap-4 p-6">
           <LoadFailed
-            headline={t("onboarding.loadFailed")}
             // A status that has no step for this person (`stuck`) is no failed
             // read: it reads as "other".
             error={

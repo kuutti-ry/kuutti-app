@@ -4,6 +4,7 @@ import type * as React from "react";
 import { AccessibilityInfo } from "react-native";
 import { saveSession } from "@/lib/session";
 import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
+import { FAILED_TO_LOAD } from "@/test/failed";
 import { expectPinnedHeader } from "@/test/layout";
 import { renderWithTheme } from "@/test/render";
 import { SeekScreen } from "./SeekScreen";
@@ -416,7 +417,7 @@ describe("SeekScreen", () => {
     // No count and no (i): nothing is known that they could say.
     expect(screen.queryByText(/^\d+\/\d+$/)).toBeNull();
     expect(screen.queryByRole("button", { name: ABOUT })).toBeNull();
-    expect(screen.queryByText("Your profile could not be loaded.")).toBeNull();
+    expect(screen.queryByText(FAILED_TO_LOAD)).toBeNull();
     await press(row(SMOKING));
     expect(router.push).toHaveBeenCalledWith("/profile/deal-breakers/smoking");
   });
@@ -503,7 +504,7 @@ describe("SeekScreen", () => {
     });
     server.seeks = ["man"];
     await handBack();
-    expect(screen.queryByText("Loading your profile…")).toBeNull();
+    expect(screen.queryByText("Loading…")).toBeNull();
     expectAnswer(WHOM, "Women");
     await act(async () => {
       answer?.();
@@ -520,7 +521,7 @@ describe("SeekScreen", () => {
     await waitFor(() => expect(heard(SMOKING)).toBe("Never"));
     server.failing = true;
     await handBack();
-    expect(screen.queryByText("Your profile could not be loaded.")).toBeNull();
+    expect(screen.queryByText(FAILED_TO_LOAD)).toBeNull();
     expectAnswer(WHOM, "Women");
     expect(heard(SMOKING)).toBeUndefined();
     expect(screen.queryByText("Never")).toBeNull();
@@ -539,7 +540,7 @@ describe("SeekScreen", () => {
     const { server } = fakeApi();
     server.wait = new Promise(() => {});
     await show(<SeekScreen />);
-    expect(screen.getByText("Loading your profile…").props.accessibilityLiveRegion).toBe("polite");
+    expect(screen.getByText("Loading…").props.accessibilityLiveRegion).toBe("polite");
     expect(screen.queryByRole("button", { name: WHOM })).toBeNull();
     expect(screen.queryByRole("heading", { name: "What you seek" })).toBeNull();
   });
@@ -578,7 +579,7 @@ describe("SeekScreen", () => {
       dealBreakers: [dealBreaker("smoking", ["never"])],
     });
     await show(<SeekScreen />);
-    await waitFor(() => expect(screen.getByText("Your profile could not be loaded.")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText(FAILED_TO_LOAD)).toBeTruthy());
     // Why, in words: the API answered 500.
     expect(screen.getByText("Kuutti's server had a problem. Try again in a moment.")).toBeTruthy();
     expect(screen.queryByRole("button", { name: WHOM })).toBeNull();
@@ -589,21 +590,21 @@ describe("SeekScreen", () => {
     await press(screen.getByRole("button", { name: "Try again" }));
     await waitFor(() => expect(heard(SMOKING)).toBe("Never"));
     expectAnswer(WHOM, "Women");
-    expect(screen.queryByText("Your profile could not be loaded.")).toBeNull();
+    expect(screen.queryByText(FAILED_TO_LOAD)).toBeNull();
   });
 
   it("says it is loading again while Try again reads", async () => {
     const { server } = fakeApi({ failing: true });
     await show(<SeekScreen />);
-    await waitFor(() => expect(screen.getByText("Your profile could not be loaded.")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText(FAILED_TO_LOAD)).toBeTruthy());
     let answer: (() => void) | undefined;
     server.wait = new Promise((resolve) => {
       answer = resolve;
     });
     server.failing = false;
     await press(screen.getByRole("button", { name: "Try again" }));
-    expect(screen.getByText("Loading your profile…").props.accessibilityLiveRegion).toBe("polite");
-    expect(screen.queryByText("Your profile could not be loaded.")).toBeNull();
+    expect(screen.getByText("Loading…").props.accessibilityLiveRegion).toBe("polite");
+    expect(screen.queryByText(FAILED_TO_LOAD)).toBeNull();
     await act(async () => {
       answer?.();
       await settle();
@@ -617,7 +618,7 @@ describe("SeekScreen", () => {
     await waitFor(() => expect(router.dismissTo).toHaveBeenCalledWith("/"));
     expect(router.replace).not.toHaveBeenCalled();
     expect(screen.queryByRole("button", { name: WHOM })).toBeNull();
-    expect(screen.queryByText("Your profile could not be loaded.")).toBeNull();
+    expect(screen.queryByText(FAILED_TO_LOAD)).toBeNull();
   });
 
   it.each([

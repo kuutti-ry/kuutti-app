@@ -139,7 +139,7 @@ export function ChatPhotoScreen({
       {view.status === "loading" && (
         <>
           <Text accessibilityLiveRegion="polite" className="p-6">
-            {t("chat.photo.loading")}
+            {t("load.loading")}
           </Text>
           <Image
             placeholder={placeholder}
@@ -158,7 +158,6 @@ export function ChatPhotoScreen({
       {view.status === "failed" && (
         <View className="p-6">
           <LoadFailed
-            headline={t("chat.photo.failed")}
             error={view.error}
             onRetry={() => {
               setView({ status: "loading" });

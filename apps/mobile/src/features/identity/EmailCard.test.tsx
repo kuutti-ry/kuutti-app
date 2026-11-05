@@ -6,6 +6,7 @@ import { AccessibilityInfo, DeviceEventEmitter, Platform, StyleSheet, View } fro
 import { clearSession, saveSession } from "@/lib/session";
 import { UnsavedRow } from "@/lib/unsaved";
 import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
+import { FAILED_TO_LOAD } from "@/test/failed";
 import { renderWithTheme, underProviders } from "@/test/render";
 import { EmailCard, EmailScreen } from "./EmailCard";
 import { markLockOffered } from "./lock/LockProvider";
@@ -174,10 +175,8 @@ describe("EmailCard, reading the address", () => {
   it("says it is reading the address while the read is on its way", async () => {
     globalThis.fetch = jest.fn(() => new Promise<Response>(() => {})) as unknown as typeof fetch;
     await show(<EmailCard />);
-    expect(screen.getByText("Reading your e-mail address…")).toBeTruthy();
-    expect(screen.getByText("Reading your e-mail address…").props.accessibilityLiveRegion).toBe(
-      "polite",
-    );
+    expect(screen.getByText("Loading…")).toBeTruthy();
+    expect(screen.getByText("Loading…").props.accessibilityLiveRegion).toBe("polite");
     expect(screen.queryByText("A way to stay in touch")).toBeNull();
   });
 
@@ -189,7 +188,7 @@ describe("EmailCard, reading the address", () => {
         : json({ email: null, confirmed: false, codeExpiresAt: null }),
     ) as unknown as typeof fetch;
     await show(<EmailCard />);
-    expect(screen.getByText("Your e-mail address could not be read.")).toBeTruthy();
+    expect(screen.getByText(FAILED_TO_LOAD)).toBeTruthy();
     expect(screen.queryByText("A way to stay in touch")).toBeNull();
     failing = false;
     await press(button("Try again"));
@@ -224,7 +223,7 @@ describe("EmailCard, reading the address", () => {
         await settle();
       });
       expect(screen.queryByText("A way to stay in touch")).toBeNull();
-      expect(screen.queryByText("Your e-mail address could not be read.")).toBeNull();
+      expect(screen.queryByText(FAILED_TO_LOAD)).toBeNull();
       expect(globalThis.fetch).toHaveBeenCalledTimes(1);
     });
   });
@@ -397,7 +396,7 @@ describe.each(["ios", "android"] as const)(
       [
         "email_code_budget_exceeded",
         429,
-        "Saved. That is enough codes for today. You can send a new one after midnight.",
+        "Saved. That is enough for today. You can try again after midnight.",
       ],
     ])(
       "a save whose send failed, %s, is drawn in a live region of its own",
@@ -525,7 +524,7 @@ describe("EmailCard, the code", () => {
       [
         "email_code_budget_exceeded",
         429,
-        "That is enough codes for today. You can send a new one after midnight.",
+        "That is enough for today. You can try again after midnight.",
       ],
       ["mail_unavailable", 503, "The code could not be sent just now. Try again later."],
       ["internal_error", 500, TEXT.codeFailed],
@@ -889,11 +888,11 @@ describe("EmailCard, saving and removing", () => {
     await show(<EmailCard />);
     await type(screen.getByLabelText("E-mail address"), "aino@example.fi");
     await press(button("Send a confirmation code"));
-    expect(screen.getByText("The address could not be saved. Try again.")).toBeTruthy();
+    expect(screen.getByText("That did not go through. Try again.")).toBeTruthy();
     expect(screen.queryByText("That does not look like an e-mail address.")).toBeNull();
     // Typing again clears the line.
     await type(screen.getByLabelText("E-mail address"), "aino@example.org");
-    expect(screen.queryByText("The address could not be saved. Try again.")).toBeNull();
+    expect(screen.queryByText("That did not go through. Try again.")).toBeNull();
   });
 
   it("removing clears everything: the address, the code and its field", async () => {
@@ -912,7 +911,7 @@ describe("EmailCard, saving and removing", () => {
     refuse("DELETE /account/email", () => refusal("internal_error", 500));
     await show(<EmailCard />);
     await press(button("Remove the address"));
-    expect(screen.getByText("The address could not be saved. Try again.")).toBeTruthy();
+    expect(screen.getByText("That did not go through. Try again.")).toBeTruthy();
     expect(screen.getByLabelText("E-mail address").props.value).toBe("aino@example.fi");
     expect(button("Remove the address")).toBeTruthy();
   });

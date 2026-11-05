@@ -83,11 +83,11 @@ export function HomeScreen() {
         )}
 
         {gate.status === "checking" && (
-          <Text accessibilityLiveRegion="polite">{t("home.gate.checking")}</Text>
+          <Text accessibilityLiveRegion="polite">{t("load.loading")}</Text>
         )}
         {gate.status === "unknown" && (
           <View className="w-full max-w-md gap-3">
-            <LoadFailed headline={t("home.gate.failed")} error={gate.error} onRetry={gate.retry} />
+            <LoadFailed error={gate.error} onRetry={gate.retry} />
           </View>
         )}
 

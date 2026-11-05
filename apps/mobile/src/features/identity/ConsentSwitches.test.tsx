@@ -4,6 +4,7 @@ import type * as React from "react";
 import { Linking } from "react-native";
 import { clearSession, saveSession } from "@/lib/session";
 import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
+import { FAILED_TO_LOAD } from "@/test/failed";
 import { renderWithTheme, underProviders } from "@/test/render";
 import { ConsentSwitch, useConsentStates } from "./ConsentSwitches";
 
@@ -14,7 +15,7 @@ import { ConsentSwitch, useConsentStates } from "./ConsentSwitches";
 // kind switched here: research is not asked (#545, ADR-010 §19).
 
 const LABEL = "Store my sensitive answers";
-const FAILED = "The sensitive-answers choice could not be saved. Try again.";
+const FAILED = "That did not go through. Try again.";
 const SENSITIVE = String(CONSENT_VERSIONS.special_category);
 
 const token = (seed: string) => (seed + "x".repeat(43)).slice(0, 43);
@@ -212,14 +213,14 @@ describe("ConsentSwitch", () => {
   it("says it is reading the consent while the read is on its way", async () => {
     globalThis.fetch = jest.fn(() => new Promise<Response>(() => {})) as unknown as typeof fetch;
     await show(<ConsentSwitch kind="special_category" />);
-    expect(screen.getByText("Reading your choice…")).toBeTruthy();
+    expect(screen.getByText("Loading…")).toBeTruthy();
     expect(screen.queryByLabelText(LABEL)).toBeNull();
   });
 
   it("says why the consent could not be read, and reads it again on request (#287)", async () => {
     const calls = fetchMock([serverError]);
     await show(<ConsentSwitch kind="special_category" />);
-    expect(screen.getByText("Your choice could not be read.")).toBeTruthy();
+    expect(screen.getByText(FAILED_TO_LOAD)).toBeTruthy();
     expect(screen.getByText("Kuutti's server had a problem. Try again in a moment.")).toBeTruthy();
     consentsApi({ given: true });
     await act(async () => {
@@ -235,7 +236,7 @@ describe("ConsentSwitch", () => {
     fetchMock([]);
     await show(<ConsentSwitch kind="special_category" />);
     expect(screen.queryByLabelText(LABEL)).toBeNull();
-    expect(screen.queryByText("Reading your choice…")).toBeNull();
+    expect(screen.queryByText("Loading…")).toBeNull();
   });
 });
 

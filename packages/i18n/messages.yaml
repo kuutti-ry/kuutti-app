@@ -30,32 +30,46 @@
 
 # --- When something does not load: why, in words, and the way out that fits ---
 
+load.loading:
+  en: "Loading…"
+  description: "Any screen or part of one while its first read is on its way (#581): the one word for it, the app's and the panel's. What is loading is what the person just pressed, or the title or card around it."
+  fi: "Ladataan…"
+  sv: "Laddar…"
+  machine: { fi: true, sv: true }
+
+load.failed.press:
+  en: "That did not go through. Try again."
+  description: "A press whose control is still in sight did not go through (#581): the one line for it, so nothing names the control again. A block, a deletion, a break and logging out everywhere keep words of their own."
+  fi: "Se ei onnistunut. Yritä uudelleen."
+  sv: "Det gick inte. Försök igen."
+  machine: { fi: true, sv: true }
+
 load.failed.offline:
-  en: "Kuutti could not be reached. Check your connection and try again."
-  description: "Under a screen's own 'did not load' line: no answer came back from the API (no network, or the network dropped)."
-  fi: "Kuuttiin ei saatu yhteyttä. Tarkista verkkoyhteys ja yritä uudelleen."
-  sv: "Kuutti kunde inte nås. Kontrollera anslutningen och försök igen."
+  en: "Kuutti could not be reached. Check your connection."
+  description: "What a screen says when it did not load, over Try again: no answer came back from the API (no network, or the network dropped). Heard at once (#581)."
+  fi: "Kuuttiin ei saatu yhteyttä. Tarkista verkkoyhteys."
+  sv: "Kuutti kunde inte nås. Kontrollera anslutningen."
   machine: { fi: true, sv: true }
 
 load.failed.server:
   en: "Kuutti's server had a problem. Try again in a moment."
-  description: "Under a screen's own 'did not load' line: the API answered with a server error (5xx)."
+  description: "What a screen says when it did not load, over Try again: the API answered with a server error (5xx). 'In a moment' is the fact. Heard at once (#581)."
   fi: "Kuutin palvelimella oli ongelma. Yritä hetken päästä uudelleen."
   sv: "Kuuttis server hade ett problem. Försök igen om en stund."
   machine: { fi: true, sv: true }
 
 load.failed.outdated:
-  en: "This version of the app is older than Kuutti's server and cannot read its answer. Update the app to continue."
-  description: "Under a screen's own 'did not load' line: the API sent something this build does not know yet (a newer contract); trying again cannot help, updating can."
-  fi: "Tämä sovelluksen versio on vanhempi kuin Kuutin palvelin eikä osaa lukea sen vastausta. Päivitä sovellus jatkaaksesi."
-  sv: "Den här versionen av appen är äldre än Kuuttis server och kan inte läsa dess svar. Uppdatera appen för att fortsätta."
+  en: "This version of the app is older than Kuutti's server."
+  description: "What a screen says when it did not load, over Update the app: the API sent something this build does not know yet (a newer contract). It says why Try again is not offered. Heard at once (#581)."
+  fi: "Tämä sovelluksen versio on vanhempi kuin Kuutin palvelin."
+  sv: "Den här versionen av appen är äldre än Kuuttis server."
   machine: { fi: true, sv: true }
 
 load.failed.other:
-  en: "Something unexpected went wrong. Try again."
-  description: "Under a screen's own 'did not load' line: any other failure."
-  fi: "Jokin meni odottamatta pieleen. Yritä uudelleen."
-  sv: "Något oväntat gick fel. Försök igen."
+  en: "Something unexpected went wrong."
+  description: "What a screen says when it did not load, over Try again: any other failure. Heard at once (#581)."
+  fi: "Jokin meni odottamatta pieleen."
+  sv: "Något oväntat gick fel."
   machine: { fi: true, sv: true }
 
 load.retry:
@@ -107,27 +121,6 @@ profile.home.open:
   description: "Button on the home screen that opens the profile (#47)."
   fi: "Profiilisi"
   sv: "Din profil"
-  machine: { fi: true, sv: true }
-
-profile.loading:
-  en: "Loading your profile…"
-  description: "Shown while GET /profile is in flight."
-  fi: "Ladataan profiiliasi…"
-  sv: "Läser in din profil…"
-  machine: { fi: true, sv: true }
-
-profile.failed:
-  en: "Your profile could not be loaded."
-  description: "Profile edit screens, the headline when the profile could not be read; why and the way out follow under it (load.*)."
-  fi: "Profiiliasi ei voitu ladata."
-  sv: "Din profil kunde inte läsas in."
-  machine: { fi: true, sv: true }
-
-profile.retry:
-  en: "Try again"
-  description: "Retry button after a failed load."
-  fi: "Yritä uudelleen"
-  sv: "Försök igen"
   machine: { fi: true, sv: true }
 
 profile.back:
@@ -781,13 +774,6 @@ profile.seek.ages.summary:
   sv: "Yngsta {min, number}, äldsta {max, number}"
   machine: { fi: true, sv: true }
 
-profile.seek.failed:
-  en: "It could not be saved. Try again."
-  description: "Said when a change on the screens of whom one seeks, the ages, the gender or a deal-breaker could not be saved (#542, #552, #551). None of them can hold a wrong answer, so only the server or the network can be at fault: nothing here asks the person to check anything."
-  fi: "Tallentaminen ei onnistunut. Yritä uudelleen."
-  sv: "Det gick inte att spara. Försök igen."
-  machine: { fi: true, sv: true }
-
 profile.seek.intent.explain:
   en: "This also decides who sees you: people who want the same thing."
   description: "Lead text of the screen that changes what one is here for (#542, #581): the both-ways words beside this one-field section."
@@ -905,13 +891,6 @@ profile.place.saved:
   description: "Said to a screen reader after a new home, or what the card shows, was saved (#514), never drawn (#581): the filled button moves, or the field empties and the buttons show the new town."
   fi: "Tallennettu."
   sv: "Sparat."
-  machine: { fi: true, sv: true }
-
-profile.place.failed:
-  en: "It could not be saved. Try again."
-  description: "Said when saving the home failed for a reason other than an unknown postal code (#514)."
-  fi: "Tallentaminen ei onnistunut. Yritä uudelleen."
-  sv: "Det gick inte att spara. Försök igen."
   machine: { fi: true, sv: true }
 
 profile.later.title:
@@ -2895,20 +2874,6 @@ profile.card.explain:
   sv: "Det här ser andra."
   machine: { fi: true, sv: true }
 
-profile.card.loading:
-  en: "Loading your card…"
-  description: "Shown while GET /profile/card is in flight."
-  fi: "Ladataan korttiasi…"
-  sv: "Läser in ditt kort…"
-  machine: { fi: true, sv: true }
-
-profile.card.failed:
-  en: "Your card could not be loaded."
-  description: "GET /profile/card failed."
-  fi: "Korttia ei voitu ladata."
-  sv: "Kortet kunde inte läsas in."
-  machine: { fi: true, sv: true }
-
 profile.card.nameAge:
   en: "{name}, {years, number}"
   description: "Title of a card (#47, #239): the display name and the age in whole years from the bank's year and month. Every account is bank-verified, so the card does not say it."
@@ -3284,20 +3249,6 @@ errors.card_budget_exceeded:
   sv: Du har sett många profiler i dag. Nya kommer efter midnatt.
   machine: { fi: true, sv: true }
 
-errors.export_budget_exceeded:
-  en: That is enough copies of your data for today. You can download it again after midnight.
-  description: Export route (429 with Retry-After), the account has taken the day's copies from matching_config exports_per_day (#237); the day rolls at midnight in Finland. Said plainly, nobody is limited in silence.
-  fi: Tältä päivältä kopioita tiedoistasi on jo tarpeeksi. Voit ladata ne uudelleen keskiyön jälkeen.
-  sv: Det räcker med kopior av dina uppgifter för i dag. Du kan ladda ner dem igen efter midnatt.
-  machine: { fi: true, sv: true }
-
-errors.feedback_budget_exceeded:
-  en: That is enough feedback for today. You can send more after midnight.
-  description: "Feedback route (429 with Retry-After), the account has sent the day's feedback, matching_config feedback_per_day (#171); the day rolls at midnight in Finland. Said plainly, nobody is limited in silence."
-  fi: Tältä päivältä palautetta on jo tarpeeksi. Voit lähettää lisää keskiyön jälkeen.
-  sv: Det räcker med respons för i dag. Du kan skicka mer efter midnatt.
-  machine: { fi: true, sv: true }
-
 errors.report_budget_exceeded:
   en: That is enough reports for today. You can still block this person, but then you cannot report them later.
   description: "Report route (429 with Retry-After), the account has filed the day's reports, matching_config reports_per_day (#84, ADR-030 §4); nothing was written, the block neither, so the person is pointed to blocking, which has no cap. The app's report step shows it with a Block button under it. A blocked person's card is gone for good and there is no list of blocks, so a report after a block is impossible in the app: the text must not promise one. Never a number, the cap is a tunable."
@@ -3403,13 +3354,6 @@ errors.invitation_unknown:
   sv: "Koden fungerar inte. Kontrollera den och försök igen."
   machine: { fi: true, sv: true }
 
-errors.invitation_tries_exceeded:
-  en: "You have tried enough codes for today. You can try again after midnight."
-  description: "Typing an invitation code (429 with Retry-After, #107, ADR-044 §6): matching_config invitation_tries_per_day tries a Finnish day, whatever their answer. Never a number: the limit is a tunable. The day rolls at midnight in Finland."
-  fi: "Olet kokeillut tänään jo tarpeeksi koodeja. Voit yrittää uudelleen keskiyön jälkeen."
-  sv: "Du har provat tillräckligt många koder i dag. Du kan försöka igen efter midnatt."
-  machine: { fi: true, sv: true }
-
 errors.conversation_closed:
   en: "This conversation has ended, so the message was not sent."
   description: "Send (409, #348, ADR-031 §3): the conversation is closed, a block stands between the two, or the other person deleted their account. Must not say which: a block reads as an ended conversation (ADR-030 §6)."
@@ -3471,6 +3415,13 @@ errors.photo_rejected_other:
   description: "Photo in a conversation (400, #350): the automatic check was sure the photo shows something disturbing or hateful; nothing was stored. Names no label."
   fi: Ei lähetetty. Tätä kuvaa ei voi lähettää Kuutissa; kokeile toista.
   sv: Inte skickat. Det här fotot kan inte skickas på Kuutti; prova ett annat.
+  machine: { fi: true, sv: true }
+
+errors.enough_today:
+  en: "That is enough for today. You can try again after midnight."
+  description: "A daily limit was reached, on codes, copies of one's data, feedback, reports or invitation tries (#581): the one line for it, also the API's localised message for those codes. The photo limit in a conversation keeps its own words, since it must say that only photos stopped."
+  fi: "Tältä päivältä riittää. Voit yrittää uudelleen keskiyön jälkeen."
+  sv: "Det räcker för i dag. Du kan försöka igen efter midnatt."
   machine: { fi: true, sv: true }
 
 errors.message_photo_budget_exceeded:
@@ -3949,13 +3900,6 @@ signIn.unavailable:
   sv: "Här finns ingen bankinloggning: webbversionen och förhandsversionerna av pull requests har ingen. Prova ändringen lokalt med testbanken."
   machine: { fi: true, sv: true }
 
-signIn.tryAgain:
-  en: Try again
-  description: Sign-in screen, the button after a refusal that may pass (a cancel, a failure, a link gone stale); opens the bank again. A refusal that lasts has signIn.button instead (#466).
-  fi: Yritä uudelleen
-  sv: Försök igen
-  machine: { fi: true, sv: true }
-
 settings.session.label:
   en: "Logging out"
   description: "Title of the row under Account in Settings with Log out and Log out everywhere (#35, #511); named for what it holds, it was This device."
@@ -4065,25 +4009,11 @@ onboarding.progress:
   sv: "Steg {step, number} av {total, number}"
   machine: { fi: true, sv: true }
 
-onboarding.loading:
-  en: "One moment…"
-  description: "Shown while the onboarding status loads, and while the API is asked whether a code may still be typed."
-  fi: "Hetki…"
-  sv: "Ett ögonblick…"
-  machine: { fi: true, sv: true }
-
 onboarding.changeFrom:
   en: "Next change possible: {date}."
   description: "Under errors.change_too_soon in onboarding: the day from which the gender may be changed again, from the status's nextChange (#147, ADR-060 §9). {date} is d.M.yyyy (formatDate)."
   fi: "Seuraava muutos mahdollinen: {date}."
   sv: "Nästa ändring möjlig: {date}."
-  machine: { fi: true, sv: true }
-
-onboarding.loadFailed:
-  en: "Where you are in getting started could not be loaded."
-  description: "Onboarding, the headline when the onboarding status or the profile could not be read; why and the way out follow under it (load.*)."
-  fi: "Aloituksen vaihetta ei voitu ladata."
-  sv: "Var du är i kom-igång-stegen kunde inte läsas in."
   machine: { fi: true, sv: true }
 
 onboarding.failed:
@@ -4576,13 +4506,6 @@ photos.error.permission:
   sv: Kuutti kunde inte öppna dina foton. Tillåt åtkomst i telefonens inställningar och försök igen.
   machine: { fi: true, sv: true }
 
-photos.error.generic:
-  en: The photo could not be uploaded. Try again.
-  description: Photos screen, any upload failure without a more specific text (network, an unexpected answer).
-  fi: Kuvan lähetys ei onnistunut. Yritä uudelleen.
-  sv: Fotot kunde inte laddas upp. Försök igen.
-  machine: { fi: true, sv: true }
-
 photos.error.photo_limit:
   en: You already have the maximum number of photos. Remove one to add another.
   description: Photos screen, the API refused the upload because the account is at max_photos.
@@ -4868,13 +4791,6 @@ photos.caption.title:
   description: "Photos screen, title of the dialog that lists the lines to pick from. {position} counts from 1."
   fi: "Kuvateksti kuvalle {position, number}"
   sv: "En bildtext för foto {position, number}"
-  machine: { fi: true, sv: true }
-
-photos.caption.failed:
-  en: "The caption could not be saved. Try again."
-  description: "Photos screen, the notice when the API refused or did not answer a caption change (#296)."
-  fi: "Kuvatekstiä ei voitu tallentaa. Yritä uudelleen."
-  sv: "Bildtexten kunde inte sparas. Försök igen."
   machine: { fi: true, sv: true }
 
 photos.imageLabelCaption:
@@ -5673,10 +5589,6 @@ admin.queue.total:
   en: "{total, plural, =0 {Nothing waiting} one {# waiting} other {# waiting}}"
   description: "Admin panel, on Reports, Automatic shadow bans, Photos and Feedback: how many wait in all, past the list's first page too; on Automatic shadow bans, Photos and Feedback said again when one is decided; the screen's heading says of what (#581)."
 
-admin.queue.loading:
-  en: Loading the queue…
-  description: Admin panel, while the queue is fetched.
-
 admin.feedback.title:
   en: Feedback
   description: "Admin panel, the heading of the feedback list (#171)."
@@ -5684,10 +5596,6 @@ admin.feedback.title:
 admin.feedback.refresh:
   en: Refresh
   description: "Admin panel, the button that reloads the feedback list (#171)."
-
-admin.feedback.loading:
-  en: Loading the feedback…
-  description: "Admin panel, while the feedback list is fetched (#171)."
 
 admin.feedback.kind.bug:
   en: Bug
@@ -5736,10 +5644,6 @@ admin.queue.account:
 admin.queue.image:
   en: "Photo under review"
   description: Admin panel, alt text of the card image in the queue.
-
-admin.queue.imageLoading:
-  en: Loading the photo…
-  description: Admin panel, while the signed URL of a card is fetched.
 
 admin.queue.labels:
   en: What the automatic check saw
@@ -5841,10 +5745,6 @@ admin.config.refresh:
   en: "Refresh"
   description: "Admin panel, the button that reloads the tunables (#304)."
 
-admin.config.loading:
-  en: "Loading the tunables…"
-  description: "Admin panel, while the tunables are fetched (#304)."
-
 admin.config.history:
   en: "Versions, newest first"
   description: "Admin panel, the name of one key's history table (#304), heard by a screen reader and never drawn: the columns and the falling version numbers say it (#581)."
@@ -5920,10 +5820,6 @@ admin.overview.title:
 admin.overview.refresh:
   en: "Refresh"
   description: "Admin panel, the button that reloads the front page (#303)."
-
-admin.overview.loading:
-  en: "Loading what waits…"
-  description: "Admin panel, while the front page is fetched (#303)."
 
 admin.overview.foundThem.title:
   en: "Told Kuutti they found someone"
@@ -6009,10 +5905,6 @@ admin.automaticBans.explain:
   en: "Confirm or reverse each within {hours, plural, one {# hour} other {# hours}}."
   description: "Admin panel, the automatic shadow bans (#105), under the heading: how long a moderator has for each, which a row otherwise shows only once it is late (#581); {hours} is matching_config auto_shadow_ban_review_hours."
 
-admin.automaticBans.loading:
-  en: "Loading the automatic shadow bans…"
-  description: "Admin panel, the automatic shadow bans while the list loads (#105)."
-
 admin.automaticBans.refresh:
   en: "Refresh"
   description: "Admin panel, the automatic shadow bans: reload the list (#105)."
@@ -6097,10 +5989,6 @@ admin.reports.refresh:
   en: "Refresh"
   description: "Admin panel, the report queue: reload the list (#311)."
 
-admin.reports.loading:
-  en: "Loading the reports…"
-  description: "Admin panel, the report queue while the list loads (#311)."
-
 admin.reports.show:
   en: "Show"
   description: "Admin panel, the report queue: the name of the filter between the reports waiting and those decided (#311), heard by a screen reader and never drawn: the two choices say what they choose between (#581)."
@@ -6168,10 +6056,6 @@ admin.reports.decided:
 admin.report.title:
   en: "Report {report}"
   description: "Admin panel, one report's page (#312): its heading, with the report's id shortened to its first eight characters."
-
-admin.report.loading:
-  en: "Loading the report…"
-  description: "Admin panel, one report's page (#312): while the report loads."
 
 admin.report.missing:
   en: "No such report."
@@ -6389,10 +6273,6 @@ admin.account.title:
   en: "Account {account}"
   description: "Admin panel, the heading of a person's page; {account} is the first characters of the account id (#306)."
 
-admin.account.loading:
-  en: "Loading the page…"
-  description: "Admin panel, while a person's page is fetched (#306)."
-
 admin.account.missing:
   en: "No account has this id."
   description: "Admin panel, a person's page for an id that is no account (#306)."
@@ -6557,10 +6437,6 @@ admin.matching.refresh:
   en: "Refresh"
   description: "Admin panel, matching: reads the switch again."
 
-admin.matching.loading:
-  en: "Loading…"
-  description: "Admin panel, matching: while the switch loads."
-
 admin.matching.open:
   en: "Open"
   description: "Admin panel, matching: matching is open; said in words, never by colour alone."
@@ -6645,10 +6521,6 @@ admin.audit.apply:
   en: "Show"
   description: "Admin panel, the audit log filter form's button (#309)."
 
-admin.audit.loading:
-  en: "Loading the audit log…"
-  description: "Admin panel, while a page of the audit log is fetched (#309)."
-
 admin.audit.invalid:
   en: "A filter is not valid: an id is a uuid, an action is two words with a dot, a subject type is one word in small letters."
   description: "Admin panel, the API refused the filters (#309)."
@@ -6688,10 +6560,6 @@ admin.staff.title:
 admin.staff.refresh:
   en: "Refresh"
   description: "Admin panel, the button that reloads the staff list (#310)."
-
-admin.staff.loading:
-  en: "Loading the staff…"
-  description: "Admin panel, while the staff list is fetched (#310)."
 
 admin.staff.col.identity:
   en: "Identity"
@@ -7021,25 +6889,11 @@ account.export.title:
   sv: Dina Kuutti-uppgifter
   machine: { fi: true, sv: true }
 
-account.export.failed:
-  en: The download did not work. Try again.
-  description: Account card, the export request failed.
-  fi: Lataus ei onnistunut. Yritä uudelleen.
-  sv: Nedladdningen misslyckades. Försök igen.
-  machine: { fi: true, sv: true }
-
 account.export.saved:
   en: "Done."
   description: "Account card, once the export's file is handed over (#465): saved in the folder the person picked on Android, sent where they chose from the share sheet on iOS, downloaded on the web preview. Not shown when they back out of the picker or the sheet. Read out by the screen reader after the system's sheet closes."
   fi: "Valmis."
   sv: "Klart."
-  machine: { fi: true, sv: true }
-
-account.export.limited:
-  en: That is enough copies for today. You can download your data again after midnight.
-  description: Account card, the export refused because the day's copies (matching_config exports_per_day, #237) are used up; the day rolls at midnight in Finland. Never a number, the cap is a tunable.
-  fi: Tältä päivältä kopioita on jo tarpeeksi. Voit ladata tietosi uudelleen keskiyön jälkeen.
-  sv: Det räcker med kopior för i dag. Du kan ladda ner dina uppgifter igen efter midnatt.
   machine: { fi: true, sv: true }
 
 account.export.fileName:
@@ -7476,13 +7330,6 @@ account.foundThem.sending:
   sv: "Skickar…"
   machine: { fi: true, sv: true }
 
-account.foundThem.failed:
-  en: "That did not go through. Your choice is kept; try again."
-  description: "\"Löysin hänet\" (#83): a failure that keeps the choice."
-  fi: "Lähetys ei onnistunut. Valintasi on tallessa; yritä uudelleen."
-  sv: "Det gick inte fram. Ditt val finns kvar; försök igen."
-  machine: { fi: true, sv: true }
-
 account.foundThem.thanks:
   en: "Thank you for telling us."
   description: "\"Löysin hänet\" (#83): after the answer was counted, or when this account told Kuutti before. Not congratulations: the reason may be another one."
@@ -7511,13 +7358,6 @@ account.research.failed:
   description: "Not shown until there is a researcher (#545, ADR-010 §19). Notice when giving or withdrawing the research consent failed."
   fi: "Tutkimusvalintaa ei voitu tallentaa. Yritä uudelleen."
   sv: "Forskningsvalet kunde inte sparas. Försök igen."
-  machine: { fi: true, sv: true }
-
-account.specialCategory.failed:
-  en: "The sensitive-answers choice could not be saved. Try again."
-  description: "Notice on the sensitive answers' screen in Settings when giving or withdrawing the special-category consent failed (#146, #287); it said the research choice before."
-  fi: "Arkaluonteisia vastauksia koskevaa valintaa ei voitu tallentaa. Yritä uudelleen."
-  sv: "Valet om känsliga svar kunde inte sparas. Försök igen."
   machine: { fi: true, sv: true }
 
 account.specialCategory.label:
@@ -7590,13 +7430,6 @@ account.email.invalid:
   sv: "Det ser inte ut som en e-postadress."
   machine: { fi: true, sv: true }
 
-account.email.failed:
-  en: "The address could not be saved. Try again."
-  description: "Said when saving or removing the e-mail failed for another reason (#148)."
-  fi: "Osoitetta ei voitu tallentaa. Yritä uudelleen."
-  sv: "Adressen kunde inte sparas. Försök igen."
-  machine: { fi: true, sv: true }
-
 account.email.codeSent:
   en: "A code is on its way to the address."
   description: "The e-mail row (#385, ADR-043 §3, #581): over the code's field while one waits, and under the buttons after Send a new code, as the only answer to that press. No time: a late code is refused in words, with the way to a new one."
@@ -7665,13 +7498,6 @@ account.email.codeNone:
   description: "Said when a code is typed but none waits, for instance after the address changed on another phone (#385)."
   fi: "Mikään koodi ei odota. Lähetä uusi."
   sv: "Ingen kod väntar. Skicka en ny."
-  machine: { fi: true, sv: true }
-
-account.email.sendLimit:
-  en: "That is enough codes for today. You can send a new one after midnight."
-  description: "Said when the day's five codes are sent (#385); the day rolls at midnight in Finland. Said plainly, nobody is limited in silence."
-  fi: "Koodeja on lähetetty tälle päivälle tarpeeksi. Voit lähettää uuden keskiyön jälkeen."
-  sv: "Det räcker med koder för i dag. Du kan skicka en ny efter midnatt."
   machine: { fi: true, sv: true }
 
 account.email.mailUnavailable:
@@ -7779,20 +7605,6 @@ pond.counter.small:
   sv: "Kuutti har precis kommit igång."
   machine: { fi: true, sv: true }
 
-pond.counter.loading:
-  en: "Counting…"
-  description: "Pond card while the figures load."
-  fi: "Lasketaan…"
-  sv: "Räknar…"
-  machine: { fi: true, sv: true }
-
-pond.counter.failed:
-  en: "The numbers could not be read."
-  description: "Pond card when the figures could not be fetched."
-  fi: "Lukuja ei voitu lukea."
-  sv: "Siffrorna kunde inte läsas."
-  machine: { fi: true, sv: true }
-
 # --- The gate card (#500, ADR-060): whether matching is open for the person ---
 pond.gate.incomplete:
   en: "Matching opens for finished profiles. Yours still lacks something."
@@ -7813,20 +7625,6 @@ pond.gate.open:
   description: "Gate card when matching has opened for the person. It promises no card and no date (ADR-062)."
   fi: "Seuranhaku on sinulle auki."
   sv: "Matchningen är öppen för dig."
-  machine: { fi: true, sv: true }
-
-pond.gate.loading:
-  en: "Looking…"
-  description: "Gate card while it loads."
-  fi: "Katsotaan…"
-  sv: "Tittar…"
-  machine: { fi: true, sv: true }
-
-pond.gate.failed:
-  en: "Matching could not be checked."
-  description: "Gate card when it could not be fetched."
-  fi: "Seuranhakua ei voitu tarkistaa."
-  sv: "Det gick inte att kontrollera matchningen."
   machine: { fi: true, sv: true }
 
 # --- The queue (#379, #502, ADR-034, ADR-062): one card at a time, like, pass and Later, to its end ---
@@ -7851,20 +7649,6 @@ round.back:
   description: "Back arrow of the round screen, heard by a screen reader: where it goes (#379)."
   fi: "Takaisin alkuun"
   sv: "Tillbaka till start"
-  machine: { fi: true, sv: true }
-
-round.loading:
-  en: "Loading people…"
-  description: "The queue's screen while the next cards are read (#379, ADR-062)."
-  fi: "Ladataan ihmisiä…"
-  sv: "Läser in människor…"
-  machine: { fi: true, sv: true }
-
-round.failed:
-  en: "People did not load."
-  description: "The queue's screen when the next cards could not be read; why, and a button to try again, follow (#379)."
-  fi: "Ihmisiä ei voitu ladata."
-  sv: "Det gick inte att läsa in människor."
   machine: { fi: true, sv: true }
 
 round.reason.matches_filters:
@@ -7963,13 +7747,6 @@ round.short.nobody:
   description: "Short-pool panel (#99, ADR-042 §5): the relaxation was made, but by the time it was tapped it found nobody to add today. It can still be undone."
   fi: "Ketään uutta ei sittenkään ole näytettävänä tänään."
   sv: "Det finns ingen ny att visa i dag ändå."
-  machine: { fi: true, sv: true }
-
-round.short.failed:
-  en: "That did not go through. Try again."
-  description: "Short-pool panel (#99): a relaxation or its undo failed for a reason the reader cannot act on; nothing changed."
-  fi: "Se ei onnistunut. Yritä uudelleen."
-  sv: "Det gick inte. Försök igen."
   machine: { fi: true, sv: true }
 
 round.fish:
@@ -8084,13 +7861,6 @@ round.gone:
   sv: "Kortet är inte längre tillgängligt."
   machine: { fi: true, sv: true }
 
-round.decision.failed:
-  en: "That was not saved. Try again."
-  description: "Round screen when a like or a pass did not reach the API or failed there; the card stays for another try (#379)."
-  fi: "Valintaa ei tallennettu. Yritä uudelleen."
-  sv: "Det sparades inte. Försök igen."
-  machine: { fi: true, sv: true }
-
 round.match.title:
   en: "It's a match"
   description: "Round screen after a like made a match (#100, ADR-038): both liked each other. A short headline, no exclamation mark; see the tone guide."
@@ -8145,13 +7915,6 @@ round.star.first:
   sv: "Bara du ser dina stjärnor."
   machine: { fi: true, sv: true }
 
-round.star.failed:
-  en: "The star was not saved. Try again."
-  description: "Above the card when a star did not reach the API or failed there; the card stays as it was (#575)."
-  fi: "Tähteä ei tallennettu. Yritä uudelleen."
-  sv: "Stjärnan sparades inte. Försök igen."
-  machine: { fi: true, sv: true }
-
 stars.title:
   en: "Starred"
   description: "Title of the list of people the person put a star on (#575, ADR-064 §6). A plain name, and it shrinks to fit one line."
@@ -8173,20 +7936,6 @@ stars.back:
   sv: "Tillbaka till start"
   machine: { fi: true, sv: true }
 
-stars.loading:
-  en: "Loading your stars…"
-  description: "The Starred list while it is read (#575)."
-  fi: "Ladataan tähtiä…"
-  sv: "Läser in stjärnor…"
-  machine: { fi: true, sv: true }
-
-stars.failed:
-  en: "Your stars did not load."
-  description: "The Starred list when it could not be read; why, and a button to try again, follow (#575)."
-  fi: "Tähtiä ei voitu ladata."
-  sv: "Det gick inte att läsa in stjärnorna."
-  machine: { fi: true, sv: true }
-
 stars.none:
   en: "Nobody here right now."
   description: "The Starred list with nobody to show (#575). It may hold stars left out for now, so it never says the person has none, and never why anybody is gone (ADR-064 §6)."
@@ -8199,13 +7948,6 @@ stars.clear.label:
   description: "What a screen reader says for the star on a row of the Starred list (#575): a tap takes it off and the row goes. {name} stays in the nominative after the colon."
   fi: "Poista tähti: {name}"
   sv: "Ta bort stjärnan: {name}"
-  machine: { fi: true, sv: true }
-
-stars.clear.failed:
-  en: "The star was not taken off. Try again."
-  description: "Above the Starred list when taking a star off did not reach the API or failed there; the row stays (#575)."
-  fi: "Tähteä ei poistettu. Yritä uudelleen."
-  sv: "Stjärnan togs inte bort. Försök igen."
   machine: { fi: true, sv: true }
 
 stars.photo.label:
@@ -8271,20 +8013,6 @@ chat.list.empty:
   description: "The list when the person has no conversation (#348). Calm, no hurry."
   fi: "Ei vielä keskusteluja."
   sv: "Inga samtal än."
-  machine: { fi: true, sv: true }
-
-chat.list.loading:
-  en: "Loading conversations…"
-  description: "The list while it loads (#348)."
-  fi: "Ladataan keskusteluja…"
-  sv: "Laddar samtal…"
-  machine: { fi: true, sv: true }
-
-chat.list.failed:
-  en: "Your conversations could not be loaded."
-  description: "The list when it did not load (#348); the reason and a retry follow."
-  fi: "Keskustelujasi ei voitu ladata."
-  sv: "Dina samtal kunde inte laddas."
   machine: { fi: true, sv: true }
 
 chat.deletedUser:
@@ -8385,13 +8113,6 @@ chat.unmatch.done:
   sv: "Samtalet har avslutats."
   machine: { fi: true, sv: true }
 
-chat.unmatch.failed:
-  en: "The conversation could not be ended. Try again."
-  description: "The conversation's dialog of actions (#351), an unmatch the API did not take (no connection, a server error); the dialog stays open."
-  fi: "Keskustelun lopettaminen ei onnistunut. Yritä uudelleen."
-  sv: "Det gick inte att avsluta samtalet. Försök igen."
-  machine: { fi: true, sv: true }
-
 chat.block.body:
   en: "The conversation ends for both of you, and you will not see each other here again, even if either of you deletes their account and comes back. A block cannot be undone. They are not told."
   description: "The conversation's dialog of actions (#351, ADR-030 §1 and §2), under Block this person?: a block from a conversation ends it for both, holds both ways and through either person's deletion, for good, and the other person is not told. Plain, calm, no blame."
@@ -8413,13 +8134,6 @@ chat.report.alsoEnds:
   sv: "Samtalet avslutas för er båda, och ni ser inte varandra här igen, även om någon av er raderar sitt konto och kommer tillbaka. En blockering kan inte ångras. Personen får inte veta vem som anmälde."
   machine: { fi: true, sv: true }
 
-chat.report.limited:
-  en: "That is enough reports for today. You can send more after midnight."
-  description: "The report step in an ended conversation (#351), the day's reports filed (429 report_budget_exceeded, matching_config reports_per_day): nothing was written. No block is offered there, so unlike errors.report_budget_exceeded it says when the cap lifts (the day rolls at midnight in Finland). Must not promise that this conversation can still be reported then: its window may close first. Never a number, the cap is a tunable."
-  fi: "Tältä päivältä ilmoituksia on jo tarpeeksi. Voit lähettää lisää keskiyön jälkeen."
-  sv: "Det räcker med anmälningar för i dag. Du kan skicka fler efter midnatt."
-  machine: { fi: true, sv: true }
-
 chat.report.photo:
   en: "The report points the moderators to this photo."
   description: "The report step opened from Report this photo (chat.photo.report) on a conversation's photo full size (#476, ADR-030 §13), first under its title, before chat.report.copy: the report names this photo, whose line the moderators' copy marks in words and lists first. Says only that; the copy and the block follow in their own lines. Plain, calm."
@@ -8432,13 +8146,6 @@ chat.notice.gone:
   description: "Said on the list of conversations when an action from a conversation found it gone meanwhile (#351): nothing was reported, blocked or ended."
   fi: "Keskustelu ei ole enää saatavilla."
   sv: "Samtalet är inte längre tillgängligt."
-  machine: { fi: true, sv: true }
-
-chat.conversation.loading:
-  en: "Loading the conversation…"
-  description: "The conversation screen while it loads (#348)."
-  fi: "Ladataan keskustelua…"
-  sv: "Laddar samtalet…"
   machine: { fi: true, sv: true }
 
 chat.conversation.failed:
@@ -8630,20 +8337,6 @@ chat.photo.back:
   sv: "Tillbaka till samtalet"
   machine: { fi: true, sv: true }
 
-chat.photo.loading:
-  en: "Loading the photo…"
-  description: "A conversation's photo full size, while it loads (#350)."
-  fi: "Ladataan kuvaa…"
-  sv: "Laddar fotot…"
-  machine: { fi: true, sv: true }
-
-chat.photo.failed:
-  en: "The photo could not be loaded."
-  description: "A conversation's photo full size when it did not load (#350); the reason and a retry follow."
-  fi: "Kuvaa ei voitu ladata."
-  sv: "Fotot kunde inte laddas."
-  machine: { fi: true, sv: true }
-
 chat.photo.gone:
   en: "This photo is no longer available."
   description: "A conversation's photo full size when the API no longer gives it (#350): its sender deleted their account, or the conversation is gone."
@@ -8819,26 +8512,12 @@ chat.contact.error.message_budget_exceeded:
   sv: "Det blev mycket på kort tid. Vänta en stund och försök igen."
   machine: { fi: true, sv: true }
 
-chat.contact.error.failed:
-  en: "Nothing changed. Check your connection and try again."
-  description: "In the share dialog when a share or a stop failed for any other reason (#103)."
-  fi: "Mikään ei muuttunut. Tarkista yhteys ja yritä uudelleen."
-  sv: "Inget ändrades. Kontrollera anslutningen och försök igen."
-  machine: { fi: true, sv: true }
-
 # --- The home screen, the settings and the tech config (#143): one button to sign in, the person's own settings after it, the technical view outside production ---
 home.title:
   en: "Kuutti"
   description: "Home screen heading: the name of the app, as the placeholder page and the sign-in screen say it."
   fi: "Kuutti"
   sv: "Kuutti"
-  machine: { fi: true, sv: true }
-
-home.loading:
-  en: "Loading…"
-  description: "The first screen while the stored session is being read, before the sign-in or the home screen shows."
-  fi: "Ladataan…"
-  sv: "Laddar…"
   machine: { fi: true, sv: true }
 
 home.settings.open:
@@ -8853,20 +8532,6 @@ home.tech.open:
   description: "Accessible name of the wrench button on the home screen that opens the technical view (commits, API, test error); not in production builds."
   fi: "Tekniset tiedot"
   sv: "Teknisk vy"
-  machine: { fi: true, sv: true }
-
-home.gate.checking:
-  en: "Checking your account setup…"
-  description: "Home screen while GET /onboarding is in flight (#46): nothing that needs a finished account shows until it says complete."
-  fi: "Tarkistetaan tilisi asetuksia…"
-  sv: "Kontrollerar din kontoinställning…"
-  machine: { fi: true, sv: true }
-
-home.gate.failed:
-  en: "Your account setup could not be checked."
-  description: "Home screen when GET /onboarding failed: the gate stays closed and a retry is offered."
-  fi: "Tilisi asetuksia ei voitu tarkistaa."
-  sv: "Din kontoinställning kunde inte kontrolleras."
   machine: { fi: true, sv: true }
 
 home.welcomeBack:
@@ -9317,27 +8982,6 @@ push.channel:
   sv: "Aviseringar"
   machine: { fi: true, sv: true }
 
-notifications.loading:
-  en: "Loading your choices…"
-  description: "The Notifications screen (#176) while the choices load."
-  fi: "Ladataan valintojasi…"
-  sv: "Laddar dina val…"
-  machine: { fi: true, sv: true }
-
-notifications.failed:
-  en: "Your choices could not be loaded."
-  description: "The Notifications screen (#176) when the choices did not load; the reason and a retry follow."
-  fi: "Valintojasi ei voitu ladata."
-  sv: "Dina val kunde inte laddas."
-  machine: { fi: true, sv: true }
-
-notifications.saveFailed:
-  en: "The change was not saved. Try again."
-  description: "The Notifications screen (#176), a switch the API did not take (no connection, a server error); the switch shows the state as it was."
-  fi: "Muutosta ei tallennettu. Yritä uudelleen."
-  sv: "Ändringen sparades inte. Försök igen."
-  machine: { fi: true, sv: true }
-
 notifications.kind.message.label:
   en: "Messages"
   description: "The Notifications screen (#176), the switch of a new message in a conversation (#102 sends it)."
@@ -9394,13 +9038,6 @@ notices.read:
   sv: "Uppfattat"
   machine: { fi: true, sv: true }
 
-notices.readFailed:
-  en: "The notice could not be marked as read. Try again."
-  description: "The home screen's notices (#176), a mark the API did not take; the notice stays."
-  fi: "Tiedotetta ei voitu merkitä luetuksi. Yritä uudelleen."
-  sv: "Notisen kunde inte markeras som läst. Försök igen."
-  machine: { fi: true, sv: true }
-
 notices.invitationCounted.title:
   en: "An invitation of yours counted"
   description: "The home screen's notices (#107, ADR-044 §9): somebody the person invited finished their profile, counted at night. Never who: the person may have invited several. Short."
@@ -9446,20 +9083,6 @@ settings.invite.waiting:
   sv: "{waiting, plural, =0 {Skapa en inbjudan} one {En väntar på att användas} other {# väntar på att användas}}"
   machine: { fi: true, sv: true }
 
-settings.invite.loading:
-  en: "Loading your invitations…"
-  description: "The Invitations screen while the person's invitations are read (#107)."
-  fi: "Ladataan kutsujasi…"
-  sv: "Laddar dina inbjudningar…"
-  machine: { fi: true, sv: true }
-
-settings.invite.loadFailed:
-  en: "Your invitations could not be loaded."
-  description: "The Invitations screen when the read failed (#107); the reason and Try again follow (load.failed.*)."
-  fi: "Kutsujasi ei voitu ladata."
-  sv: "Dina inbjudningar kunde inte laddas."
-  machine: { fi: true, sv: true }
-
 settings.invite.earns:
   en: "{reward, select, both {When a friend you invite finishes their profile, you get {inviterFish, plural, one {a fish} other {# fish}} and your friend gets {friendFish, plural, one {a fish} other {# fish}}.} inviter {When a friend you invite finishes their profile, you get {inviterFish, plural, one {a fish} other {# fish}}.} other {When a friend you invite finishes their profile, your friend gets {friendFish, plural, one {a fish} other {# fish}}.}}"
   description: "The Invitations panel, what an invitation earns today (#107, ADR-044 §4, §8, #503, #581), from matching_config invitation_reward: reward says which of the two earn, both, inviter, or the friend alone; inviterFish and friendFish are their fish. Not drawn when neither earns. Never a number of days or a period (tunables)."
@@ -9487,13 +9110,6 @@ settings.invite.made:
   description: "Said to a screen reader as an invitation is made, never drawn (#107, ADR-044, #581): the code's card appears under the button and comes into sight."
   fi: "Kutsusi on valmis. Sen koodi on alla."
   sv: "Din inbjudan är klar. Koden finns nedan."
-  machine: { fi: true, sv: true }
-
-settings.invite.makeFailed:
-  en: "The invitation could not be made. Try again."
-  description: "The Invitations screen when Create an invitation failed for a reason the app has no words of its own for (#107)."
-  fi: "Kutsua ei voitu tehdä. Yritä uudelleen."
-  sv: "Inbjudan kunde inte skapas. Försök igen."
   machine: { fi: true, sv: true }
 
 settings.invite.code.label:
@@ -9605,13 +9221,6 @@ settings.invite.withdrawn:
   sv: "Inbjudan drogs tillbaka. Koden fungerar inte längre."
   machine: { fi: true, sv: true }
 
-settings.invite.withdrawFailed:
-  en: "The invitation could not be withdrawn. Try again."
-  description: "The Invitations screen when a withdrawal failed (#107); the list is read again, so one used meanwhile is gone from it."
-  fi: "Kutsua ei voitu perua. Yritä uudelleen."
-  sv: "Inbjudan kunde inte dras tillbaka. Försök igen."
-  machine: { fi: true, sv: true }
-
 settings.invite.earned.fish:
   en: "{fish, plural, one {You have an earned fish waiting.} other {You have # earned fish waiting.}}"
   description: "The Invitations screen (#107, ADR-044 §8): fish is how many fish invitations earned the person that are not used yet, those they made and the one they used; shown only when there is one."
@@ -9655,13 +9264,6 @@ invite.redeem.done:
   sv: "Koden är mottagen."
   machine: { fi: true, sv: true }
 
-invite.redeem.failed:
-  en: "The code could not be checked. Try again."
-  description: "When sending a code failed for a reason the app has no words of its own for (#107); the refusals have theirs (errors.invitation_*)."
-  fi: "Koodia ei voitu tarkistaa. Yritä uudelleen."
-  sv: "Koden kunde inte kontrolleras. Försök igen."
-  machine: { fi: true, sv: true }
-
 invite.step.title:
   en: "Did a friend invite you?"
   description: "Onboarding, the optional step right after the welcome (#107), offered once to a person who may still use a code."
@@ -9689,20 +9291,6 @@ settings.contacts.intro:
   description: "Ways to reach you screen, the line above the five cards (#103, #581): seen by nobody, shared one at a time, and what a change does once shared."
   fi: "Kukaan ei näe niitä, ennen kuin jaat jonkin niistä keskustelussa. Muutos tai poisto näkyy heti kaikkialla, missä olet sen jakanut."
   sv: "Ingen ser dem förrän du delar en av dem i ett samtal. En ändring eller borttagning syns direkt överallt där du har delat den."
-  machine: { fi: true, sv: true }
-
-settings.contacts.loading:
-  en: "Loading your contact details…"
-  description: "Ways to reach you screen while the stored contacts are read (#103)."
-  fi: "Ladataan yhteystietojasi…"
-  sv: "Laddar dina kontaktuppgifter…"
-  machine: { fi: true, sv: true }
-
-settings.contacts.loadFailed:
-  en: "Your contact details could not be loaded."
-  description: "Ways to reach you screen when the read failed (#103); the reason and Try again follow."
-  fi: "Yhteystietojasi ei voitu ladata."
-  sv: "Dina kontaktuppgifter kunde inte laddas."
   machine: { fi: true, sv: true }
 
 settings.contacts.title:
@@ -9766,20 +9354,6 @@ settings.contacts.invalid:
   description: "Said on a card of the Ways to reach you screen when what was typed is not one of its kind (#103): the phone checks first, the API's contact_invalid says the same. Nothing was saved; the words stay in the field."
   fi: "{kind, select, phone {Tämä ei näytä puhelinnumerolta. Kirjoita se maatunnuksen kanssa (+358…) tai suomalaisena numerona, joka alkaa nollalla.} whatsapp {Tämä ei näytä puhelinnumerolta. Kirjoita se maatunnuksen kanssa (+358…) tai suomalaisena numerona, joka alkaa nollalla.} telegram {Tämä ei näytä Telegram-käyttäjänimeltä: 5–32 kirjainta, numeroa tai alaviivaa, ensimmäisenä kirjain.} instagram {Tämä ei näytä Instagram-käyttäjänimeltä: enintään 30 kirjainta, numeroa, pistettä tai alaviivaa. Piste ei voi olla ensimmäisenä, viimeisenä eikä kahdesti peräkkäin.} snapchat {Tämä ei näytä Snapchat-käyttäjänimeltä: 3–15 kirjainta, numeroa, pistettä, alaviivaa tai yhdysmerkkiä, ensimmäisenä kirjain ja viimeisenä kirjain tai numero.} other {Tarkista, mitä kirjoitit.}}"
   sv: "{kind, select, phone {Det ser inte ut som ett telefonnummer. Skriv det med landsnummer (+358…) eller som ett finskt nummer som börjar med 0.} whatsapp {Det ser inte ut som ett telefonnummer. Skriv det med landsnummer (+358…) eller som ett finskt nummer som börjar med 0.} telegram {Det ser inte ut som ett användarnamn på Telegram: 5–32 bokstäver, siffror och understreck, först en bokstav.} instagram {Det ser inte ut som ett användarnamn på Instagram: högst 30 bokstäver, siffror, punkter och understreck, aldrig en punkt först, sist eller två i rad.} snapchat {Det ser inte ut som ett användarnamn på Snapchat: 3–15 bokstäver, siffror, punkter, understreck och bindestreck, först en bokstav och sist en bokstav eller en siffra.} other {Kontrollera vad du skrev.}}"
-  machine: { fi: true, sv: true }
-
-settings.contacts.failed:
-  en: "Nothing changed. Check your connection and try again."
-  description: "Said on a card of the Ways to reach you screen when a save or a removal failed for any other reason (#103); the words stay in the field."
-  fi: "Mikään ei muuttunut. Tarkista yhteys ja yritä uudelleen."
-  sv: "Inget ändrades. Kontrollera anslutningen och försök igen."
-  machine: { fi: true, sv: true }
-
-settings.contacts.retry:
-  en: "Try again"
-  description: "Under a contact's field of Settings after a save that failed or went past the minute's messages (#511): sends the words again."
-  fi: "Yritä uudelleen"
-  sv: "Försök igen"
   machine: { fi: true, sv: true }
 
 settings.contacts.country:
@@ -9948,20 +9522,6 @@ feedback.another:
   description: "Feedback screen, the button under the thanks that brings the empty form back (#171)."
   fi: "Lähetä lisää"
   sv: "Skicka mer"
-  machine: { fi: true, sv: true }
-
-feedback.failed:
-  en: "Sending did not work. Try again."
-  description: "Feedback screen, the request failed for a reason other than the day's cap (#171)."
-  fi: "Lähetys ei onnistunut. Yritä uudelleen."
-  sv: "Det gick inte att skicka. Försök igen."
-  machine: { fi: true, sv: true }
-
-feedback.limited:
-  en: "That is enough feedback for today. You can send more after midnight."
-  description: "Feedback screen, the request refused because the day's feedback is sent (matching_config feedback_per_day, #171); the day rolls at midnight in Finland. Never a number, the cap is a tunable."
-  fi: "Tältä päivältä palautetta on jo tarpeeksi. Voit lähettää lisää keskiyön jälkeen."
-  sv: "Det räcker med respons för i dag. Du kan skicka mer efter midnatt."
   machine: { fi: true, sv: true }
 
 safety.actions.title:
@@ -10139,13 +9699,6 @@ safety.report.done:
   sv: "Tack. En moderator tittar på anmälan."
   machine: { fi: true, sv: true }
 
-safety.report.failed:
-  en: "The report could not be sent. Try again."
-  description: "The report step (#84), a report the API did not take (no connection, a server error); the dialog stays open with the reason and the words kept."
-  fi: "Ilmoituksen lähetys ei onnistunut. Yritä uudelleen."
-  sv: "Det gick inte att skicka anmälan. Försök igen."
-  machine: { fi: true, sv: true }
-
 settings.research.title:
   en: "Research"
   description: "Not shown until there is a researcher (#545, ADR-010 §19). Settings, title of the research consent's row and of the screen with its switch (#287)."
@@ -10249,34 +9802,6 @@ settings.state.outdated:
   description: "Settings, under a consent's row when the API's wording is newer than this app's: the switch is locked until the app is updated (#287)."
   fi: "Päivitä sovellus muuttaaksesi tätä"
   sv: "Uppdatera appen för att ändra det"
-  machine: { fi: true, sv: true }
-
-account.choices.loading:
-  en: "Reading your choice…"
-  description: "On a consent's screen in Settings while the consent is being read (#287)."
-  fi: "Luetaan valintaasi…"
-  sv: "Läser ditt val…"
-  machine: { fi: true, sv: true }
-
-account.choices.loadFailed:
-  en: "Your choice could not be read."
-  description: "Headline on a consent's screen in Settings when the consent could not be read; why, and a button to try again, follow (#287)."
-  fi: "Valintaasi ei voitu lukea."
-  sv: "Ditt val kunde inte läsas."
-  machine: { fi: true, sv: true }
-
-account.email.loading:
-  en: "Reading your e-mail address…"
-  description: "Where the e-mail card goes, while the address is being read (#287)."
-  fi: "Luetaan sähköpostiosoitettasi…"
-  sv: "Läser din e-postadress…"
-  machine: { fi: true, sv: true }
-
-account.email.loadFailed:
-  en: "Your e-mail address could not be read."
-  description: "Headline where the e-mail card goes, when the address could not be read; why, and a button to try again, follow (#287)."
-  fi: "Sähköpostiosoitettasi ei voitu lukea."
-  sv: "Din e-postadress kunde inte läsas."
   machine: { fi: true, sv: true }
 
 settings.support.label:

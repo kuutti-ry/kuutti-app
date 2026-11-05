@@ -3,6 +3,7 @@ import { useLocales } from "expo-localization";
 import { PixelRatio } from "react-native";
 import { saveSession } from "@/lib/session";
 import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
+import { FAILED_TO_LOAD } from "@/test/failed";
 import { expectPinnedHeader, hasCutText } from "@/test/layout";
 import { renderWithTheme } from "@/test/render";
 import { MAX_FONT_SCALE } from "@/theme/a11y";
@@ -218,7 +219,7 @@ describe("CardPreviewScreen", () => {
         json({ card: null, completeness: { complete: true, missing: [] } }),
       ) as unknown as typeof fetch;
       await show();
-      await waitFor(() => expect(screen.queryByText("Loading your card…")).toBeNull());
+      await waitFor(() => expect(screen.queryByText("Loading…")).toBeNull());
       expect(textsOf(screen.toJSON())).toEqual(["Your card"]);
     });
 
@@ -231,13 +232,13 @@ describe("CardPreviewScreen", () => {
           }),
       ) as unknown as typeof fetch;
       await show();
-      expect(screen.getByText("Loading your card…")).toBeTruthy();
+      expect(screen.getByText("Loading…")).toBeTruthy();
       expect(screen.queryByText(EXPLAIN)).toBeNull();
       await act(async () => {
         answer?.(json({ error: { code: "internal_error", message: "x", requestId: "r" } }, 500));
         await settle();
       });
-      expect(screen.getByText("Your card could not be loaded.")).toBeTruthy();
+      expect(screen.getByText(FAILED_TO_LOAD)).toBeTruthy();
       expect(screen.queryByText(EXPLAIN)).toBeNull();
     });
 
@@ -280,13 +281,13 @@ describe("CardPreviewScreen", () => {
         }),
     ) as unknown as typeof fetch;
     await show();
-    expect(screen.getByText("Loading your card…")).toBeTruthy();
+    expect(screen.getByText("Loading…")).toBeTruthy();
     await act(async () => {
       answer?.(json({ error: { code: "internal_error", message: "x", requestId: "r" } }, 500));
       await settle();
     });
-    expect(screen.getByText("Your card could not be loaded.")).toBeTruthy();
-    expect(screen.queryByText("Loading your card…")).toBeNull();
+    expect(screen.getByText(FAILED_TO_LOAD)).toBeTruthy();
+    expect(screen.queryByText("Loading…")).toBeNull();
   });
 
   it("tries again on request when the card could not be loaded, and shows it then", async () => {
@@ -299,14 +300,14 @@ describe("CardPreviewScreen", () => {
         : answers(input, init),
     ) as unknown as typeof fetch;
     await show();
-    await waitFor(() => expect(screen.getByText("Your card could not be loaded.")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText(FAILED_TO_LOAD)).toBeTruthy());
     failing = false;
     await act(async () => {
       fireEvent.press(screen.getByRole("button", { name: "Try again" }));
       await settle();
     });
     await waitFor(() => expect(screen.getByText("Aino, 36")).toBeTruthy());
-    expect(screen.queryByText("Your card could not be loaded.")).toBeNull();
+    expect(screen.queryByText(FAILED_TO_LOAD)).toBeNull();
   });
 
   it("shows no checklist for a complete card", async () => {

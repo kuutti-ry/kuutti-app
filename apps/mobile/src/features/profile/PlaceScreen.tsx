@@ -19,7 +19,7 @@ type Notice = "unknown" | "failed";
 
 const NOTICE: Readonly<Record<Notice, PlainMessageKey>> = {
   unknown: "errors.postal_code_unknown",
-  failed: "profile.place.failed",
+  failed: "load.failed.press",
 };
 
 /**
@@ -46,7 +46,7 @@ export function PlaceScreen() {
     return (
       <SafeAreaView className="flex-1 bg-background">
         <View className="flex-1 items-center justify-center p-6">
-          <Text accessibilityLiveRegion="polite">{t("profile.loading")}</Text>
+          <Text accessibilityLiveRegion="polite">{t("load.loading")}</Text>
         </View>
       </SafeAreaView>
     );
@@ -55,11 +55,7 @@ export function PlaceScreen() {
     return (
       <SafeAreaView className="flex-1 bg-background">
         <View className="flex-1 items-center justify-center gap-4 p-6">
-          <LoadFailed
-            headline={t("profile.failed")}
-            error={profile.error}
-            onRetry={() => void profile.reload()}
-          />
+          <LoadFailed error={profile.error} onRetry={() => void profile.reload()} />
         </View>
       </SafeAreaView>
     );

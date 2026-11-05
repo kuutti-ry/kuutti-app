@@ -125,7 +125,7 @@ export function FeedbackForm() {
           {(state === "failed" || state === "limited") && (
             <Notice
               refused
-              words={state === "limited" ? t("feedback.limited") : t("feedback.failed")}
+              words={state === "limited" ? t("errors.enough_today") : t("load.failed.press")}
             />
           )}
           <Button

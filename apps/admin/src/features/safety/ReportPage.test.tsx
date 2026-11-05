@@ -226,10 +226,10 @@ describe("opening a report", () => {
     const calls = fetchMock([on("GET", REPORT, answer.answer)]);
     show({ strict: true });
     expect(screen.getByRole("heading", { level: 2, name: "Report 0b1c1c4e" })).toBeInTheDocument();
-    expect(screen.getByText("Loading the report…")).toHaveAttribute("aria-busy", "true");
+    expect(screen.getByText("Loading…")).toHaveAttribute("aria-busy", "true");
     answer.release(json(detail()));
     expect(await loaded()).toBeInTheDocument();
-    expect(screen.queryByText("Loading the report…")).toBeNull();
+    expect(screen.queryByText("Loading…")).toBeNull();
     expect(asked(calls)).toEqual([`GET ${REPORT}`]);
     expect(calls[0]?.headers.get("authorization")).toBe(`Bearer ${"t".repeat(43)}`);
   });
@@ -336,7 +336,7 @@ describe("opening a report", () => {
     const calls = fetchMock([on("GET", REPORT, () => failure(403, "admin_forbidden"))]);
     show();
     await waitFor(() => expect(answers).toEqual([false]));
-    await waitFor(() => expect(screen.queryByText("Loading the report…")).toBeNull());
+    await waitFor(() => expect(screen.queryByText("Loading…")).toBeNull());
     expect(screen.queryByRole("alert")).toBeNull();
     expect(screen.queryByText("No such report.")).toBeNull();
     expect(screen.queryByRole("heading", { level: 3 })).toBeNull();

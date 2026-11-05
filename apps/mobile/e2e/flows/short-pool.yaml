@@ -45,9 +45,7 @@ name: With few people left, the queue's end offers the deal-breakers to relax fo
 # switch whose label repeats the words beside it). Going back saves it.
 - openLink: kuutti://profile/deal-breakers/smoking
 - extendedWaitUntil:
-    visible:
-      text: "Everyone|Kaikki|Alla"
-      selected: true
+    visible: "✓ Everyone|✓ Kaikki|✓ Alla"
     timeout: 15000
 - waitForAnimationToEnd
 - tapOn: "Never|Ei koskaan|Aldrig"
@@ -68,9 +66,7 @@ name: With few people left, the queue's end offers the deal-breakers to relax fo
 # which would fill the day's log with the very people the filter leaves out.
 - openLink: kuutti://profile/deal-breakers/smoking
 - extendedWaitUntil:
-    visible:
-      text: "Never|Ei koskaan|Aldrig"
-      selected: true
+    visible: "✓ Never|✓ Ei koskaan|✓ Aldrig"
     timeout: 15000
 
 # The end of the queue, and under it the offers, read a moment after.
@@ -115,27 +111,21 @@ name: With few people left, the queue's end offers the deal-breakers to relax fo
     timeout: 15000
 - openLink: kuutti://profile/deal-breakers/smoking
 - extendedWaitUntil:
-    visible:
-      text: "Never|Ei koskaan|Aldrig"
-      selected: true
+    visible: "✓ Never|✓ Ei koskaan|✓ Aldrig"
     timeout: 15000
 - waitForAnimationToEnd
 - tapOn: "Everyone|Kaikki|Alla"
-- assertVisible:
-    text: "Everyone|Kaikki|Alla"
-    selected: true
+- assertVisible: "✓ Everyone|✓ Kaikki|✓ Alla"
 - tapOn: "Back|Takaisin|Tillbaka"
 - extendedWaitUntil:
     notVisible: "Fine with me|Sopii minulle|Okej för mig"
     timeout: 15000
 - openLink: kuutti://profile/later/smoking
 - extendedWaitUntil:
-    visible:
-      text: "Never|En koskaan|Aldrig"
-      selected: true
+    visible: "✓ Never|✓ En koskaan|✓ Aldrig"
     timeout: 15000
 - waitForAnimationToEnd
-- tapOn: "Never|En koskaan|Aldrig"
+- tapOn: "✓ Never|✓ En koskaan|✓ Aldrig"
 - scrollUntilVisible:
     element: "Save and continue|Tallenna ja jatka|Spara och fortsätt"
     direction: DOWN

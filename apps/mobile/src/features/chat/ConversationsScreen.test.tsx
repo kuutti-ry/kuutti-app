@@ -5,6 +5,7 @@ import * as SecureStore from "expo-secure-store";
 import { AccessibilityInfo, AppState, PixelRatio, Platform, StyleSheet } from "react-native";
 import { clearSession, saveSession } from "@/lib/session";
 import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
+import { FAILED_TO_LOAD } from "@/test/failed";
 import { expectPinnedHeader } from "@/test/layout";
 import { renderWithTheme } from "@/test/render";
 import { FakeWebSocket } from "@/test/websocket";
@@ -323,7 +324,7 @@ describe("the list of conversations", () => {
       () => json({ open: [summary(ID(1))], archived: [], yourTurn: COUNT(1) }),
     );
     await renderWithTheme(<ConversationsScreen />);
-    expect(await screen.findByText("Your conversations could not be loaded.")).toBeTruthy();
+    expect(await screen.findByText(FAILED_TO_LOAD)).toBeTruthy();
     await userEvent.setup().press(screen.getByRole("button", { name: "Try again" }));
     expect(await screen.findByRole("heading", { name: "Your turn: 1" })).toBeTruthy();
   });

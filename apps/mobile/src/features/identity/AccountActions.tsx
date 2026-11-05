@@ -26,8 +26,8 @@ type Notice = "export_saved" | "export_failed" | "export_limited" | "delete_fail
 
 const NOTICE: Record<Notice, PlainMessageKey> = {
   export_saved: "account.export.saved",
-  export_failed: "account.export.failed",
-  export_limited: "account.export.limited",
+  export_failed: "load.failed.press",
+  export_limited: "errors.enough_today",
   delete_failed: "account.delete.failed",
 };
 

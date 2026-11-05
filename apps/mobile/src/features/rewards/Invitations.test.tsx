@@ -6,6 +6,7 @@ import { AccessibilityInfo, AppState, Platform, Share } from "react-native";
 import { RevealProvider } from "@/lib/reveal";
 import { clearSession, saveSession } from "@/lib/session";
 import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
+import { FAILED_TO_LOAD } from "@/test/failed";
 import { renderWithTheme } from "@/test/render";
 import { Invitations } from "./Invitations";
 
@@ -138,15 +139,13 @@ describe("Invitations", () => {
         }),
     ) as unknown as typeof fetch;
     await renderWithTheme(<Invitations />);
-    expect(screen.getByText("Loading your invitations…").props.accessibilityLiveRegion).toBe(
-      "polite",
-    );
+    expect(screen.getByText("Loading…").props.accessibilityLiveRegion).toBe("polite");
     await act(async () => waiting.shift()?.(refusal("internal_error", 500)));
-    expect(screen.getByText("Your invitations could not be loaded.")).toBeTruthy();
+    expect(screen.getByText(FAILED_TO_LOAD)).toBeTruthy();
     expect(screen.getByText("Kuutti's server had a problem. Try again in a moment.")).toBeTruthy();
     noProblems();
     await act(async () => fireEvent.press(button("Try again")));
-    expect(screen.getByText("Loading your invitations…")).toBeTruthy();
+    expect(screen.getByText("Loading…")).toBeTruthy();
     await act(async () => waiting.shift()?.(json(answer())));
     expect(button(TEXT.make)).toBeTruthy();
   });
@@ -414,7 +413,7 @@ describe("Invitations", () => {
     api.override.make = () => refusal("internal_error", 500);
     await renderWithTheme(<Invitations />);
     await press(await screen.findByRole("button", { name: TEXT.make }));
-    const words = "The invitation could not be made. Try again.";
+    const words = "That did not go through. Try again.";
     expect(screen.getByText(words).props.accessibilityLiveRegion).toBe("assertive");
     expect(plain()).toEqual([]);
     expect(queued()).toEqual([]);
@@ -427,7 +426,7 @@ describe("Invitations", () => {
       "You have as many invitations waiting as you can have. Withdraw one, or wait until a friend uses one.",
     ],
     ["invitation_not_yet", 409, "You can invite friends once your profile is complete."],
-    ["internal_error", 500, "The invitation could not be made. Try again."],
+    ["internal_error", 500, "That did not go through. Try again."],
   ])(
     "says the refusal %s of a new invitation in words, and shows no code",
     async (code, status, words) => {
@@ -448,7 +447,7 @@ describe("Invitations", () => {
       json({ id: NEW.id, code: "ABCDEFGHJK", createdAt: NEW.createdAt }, 201);
     await renderWithTheme(<Invitations />);
     await press(await screen.findByRole("button", { name: TEXT.make }));
-    expect(screen.getByText("The invitation could not be made. Try again.")).toBeTruthy();
+    expect(screen.getByText("That did not go through. Try again.")).toBeTruthy();
     expect(screen.queryByText("ABCDEFGHJK")).toBeNull();
   });
 
@@ -536,7 +535,7 @@ describe("Invitations", () => {
     api.override.withdraw = () => refusal("not_found", 404);
     api.state.invitations = answer({ open: [OLDER] });
     await press(button("Withdraw the invitation"));
-    expect(screen.getByText("The invitation could not be withdrawn. Try again.")).toBeTruthy();
+    expect(screen.getByText("That did not go through. Try again.")).toBeTruthy();
     expect(screen.queryByText(CODE)).toBeNull();
     expect(screen.queryByRole("button", { name: "Share the code" })).toBeNull();
   });
@@ -597,7 +596,7 @@ describe("Invitations", () => {
     // Meanwhile a friend used it: the list read after the refusal no longer has it.
     api.state.invitations = answer({ open: [] });
     await press(button("Withdraw the invitation"));
-    const words = "The invitation could not be withdrawn. Try again.";
+    const words = "That did not go through. Try again.";
     expect(screen.getByText(words).props.accessibilityLiveRegion).toBe("assertive");
     expect(screen.queryByText(made(OLDER.createdAt))).toBeNull();
   });

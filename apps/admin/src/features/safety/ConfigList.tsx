@@ -117,7 +117,7 @@ export function ConfigList() {
       <p aria-live="polite" className="font-medium empty:sr-only">
         {saved ? t("admin.config.changed", { key: saved.key, value: shown(saved.value) }) : ""}
       </p>
-      {state.kind === "loading" && <Loading>{t("admin.config.loading")}</Loading>}
+      {state.kind === "loading" && <Loading>{t("load.loading")}</Loading>}
       {state.kind === "error" && <Alert>{t("admin.loadFailed")}</Alert>}
       {state.kind === "ready" && (
         <ul className="grid gap-3">

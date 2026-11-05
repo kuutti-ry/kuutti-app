@@ -107,7 +107,7 @@ Read on 27 and 28/10/2026, at version 0.73.0:
 - [Retention](#retention) (29)
 - [Limits](#limits) (15)
 - [Product constraints](#product-constraints) (13)
-- [Other](#other) (31)
+- [Other](#other) (36)
 - [Found on the way](#found-on-the-way)
 
 ## Sign-in and identity
@@ -810,6 +810,11 @@ Languages, legal texts, accessibility, feedback from the app, and the moderation
 
 | Decision | Value | Where | Recorded in | Source | Review |
 |---|---|---|---|---|---|
+| Every wait says one word, in the app and the panel, where a screen or a part of one waits for its first read. "Signing you in…" stays, the one wait back from the bank. | "Loading…" | `load.loading`, `packages/i18n/messages.yaml` | #581, row A1 | maintainer, 04/11/2026 | |
+| A screen that did not load says why and offers the way out, with no line of its own on what did not load; the reason is what a screen reader hears at once. A failed Earlier messages keeps its own line. The reasons say only why: the connection, the server "in a moment", something unexpected, or an app older than the server. | one component | `apps/mobile/src/components/LoadFailed.tsx`, `load.failed.*` | #581, rows A2 to A4 | maintainer, 04/11/2026 | |
+| A press whose control is still in sight and did not go through says one line, and every Try again is one text. A block, a deletion, a break and logging out everywhere keep words of their own, since those carry a fact. | "That did not go through. Try again." | `load.failed.press`, `load.retry` | #581, row A6 | maintainer, 04/11/2026 | |
+| A daily limit on codes, copies of one's data, feedback, reports or invitation tries says one line, also as the API's message. | "That is enough for today. You can try again after midnight." | `errors.enough_today`, `apps/api/src/lib/i18n.ts` | #581, row A6 | maintainer, 04/11/2026 | |
+| The photo limit that row A6 keeps in its own words is read as the conversation's limit on sent photos, which must say that only photos stopped. Its key is on the row's list too. | `errors.message_photo_budget_exceeded` kept | `packages/i18n/messages.yaml` | #581, row A6 | assumption | |
 | The app speaks English, Finnish and Swedish: English is the source and the fallback for any other phone language, Finnish and Swedish texts made by machine wait for a native review, and legal texts are never machine-translated. A release offers English and Finnish. | en and fi released; sv in development and staging | `RELEASED_LOCALES` in `packages/i18n/src/locales.ts` | .claude/rules/i18n.md; ADR-019 §3; ADR-010 §7; #55 | inherited, TD-17 | |
 | Stadin slangi is a made-up language beside the real ones, marked as fictional: a person chooses it in the app, and a key with no slang is the Finnish text. | `fi-x-stadi`; falls back to fi | `FICTIONAL_LOCALES` in `packages/i18n/src/locales.ts` | .claude/rules/i18n.md; #521; session 30/10/2026 | maintainer, 30/10/2026 | |
 | Open: where slang may stand, whether a push may speak it, who writes it and whether a release ever offers it. Meanwhile the queue, home, the profile editor and settings, without failures, consent, a person's data, safety, sessions or the answers that say who somebody is; development and staging only. | not on any push; not released | `isSlangKey` in `packages/i18n/scripts/lib/schema.ts` | .claude/rules/i18n.md; #521 | proposed, 30/10/2026 | |

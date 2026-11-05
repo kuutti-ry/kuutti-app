@@ -1,5 +1,6 @@
 import type { PondCounterResponse, PondSummary } from "@kuutti/schema";
 import { act, fireEvent } from "@testing-library/react-native";
+import { FAILED_TO_LOAD } from "@/test/failed";
 import { renderWithTheme } from "@/test/render";
 import { PondCard } from "./PondCard";
 
@@ -126,7 +127,7 @@ describe("PondCard", () => {
     ]);
     const screen = await renderWithTheme(<PondCard />);
     await settle();
-    expect(screen.getByText("The numbers could not be read.")).toBeTruthy();
+    expect(screen.getByText(FAILED_TO_LOAD)).toBeTruthy();
     expect(screen.queryByRole("image")).toBeNull();
     await act(async () => {
       fireEvent.press(screen.getByRole("button", { name: "Try again" }));
@@ -151,7 +152,7 @@ describe("PondCard", () => {
     answering([() => json({ k: 10, ponds: [before] })]);
     const screen = await renderWithTheme(<PondCard />);
     await settle();
-    expect(screen.getByText("The numbers could not be read.")).toBeTruthy();
+    expect(screen.getByText(FAILED_TO_LOAD)).toBeTruthy();
     expect(screen.getByRole("button", { name: "Update the app" })).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Try again" })).toBeNull();
     expect(screen.queryByText(/42/)).toBeNull();
@@ -164,7 +165,7 @@ describe("PondCard", () => {
     ]);
     const screen = await renderWithTheme(<PondCard />);
     await settle();
-    expect(screen.getByText("The numbers could not be read.")).toBeTruthy();
+    expect(screen.getByText(FAILED_TO_LOAD)).toBeTruthy();
     const retry = screen.getByRole("button", { name: "Try again" });
     expect(retry.props.accessibilityRole).toBe("button");
     await act(async () => {
@@ -173,6 +174,6 @@ describe("PondCard", () => {
     });
     await settle();
     expect(screen.getByText("11 people have completed their profiles.")).toBeTruthy();
-    expect(screen.queryByText("The numbers could not be read.")).toBeNull();
+    expect(screen.queryByText(FAILED_TO_LOAD)).toBeNull();
   });
 });

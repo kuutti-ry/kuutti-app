@@ -106,9 +106,9 @@ describe("RedeemInvitation", () => {
     [
       "invitation_tries_exceeded",
       429,
-      "You have tried enough codes for today. You can try again after midnight.",
+      "That is enough for today. You can try again after midnight.",
     ],
-    ["internal_error", 500, "The code could not be checked. Try again."],
+    ["internal_error", 500, "That did not go through. Try again."],
   ])(
     "says the refusal %s in words, aloud on iOS, and keeps the field",
     async (code, status, words) => {
@@ -146,7 +146,7 @@ describe("RedeemInvitation", () => {
     await renderWithTheme(<RedeemInvitation onRedeemed={jest.fn()} />);
     await type("ABCDE-FGHJK");
     await send();
-    expect(screen.getByText("The code could not be checked. Try again.")).toBeTruthy();
+    expect(screen.getByText("That did not go through. Try again.")).toBeTruthy();
   });
 
   it("is dimmed while a code is on its way", async () => {

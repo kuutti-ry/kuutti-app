@@ -4,6 +4,7 @@ import type * as React from "react";
 import { AccessibilityInfo, Platform } from "react-native";
 import { saveSession } from "@/lib/session";
 import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
+import { FAILED_TO_LOAD } from "@/test/failed";
 import { expectPinnedHeader } from "@/test/layout";
 import { renderWithTheme } from "@/test/render";
 import { SeekWhomScreen } from "./SeekWhomScreen";
@@ -121,8 +122,8 @@ const leaveAndGo = async (view: Awaited<ReturnType<typeof show>>) => {
 
 const ROWS = ["Women", "Men", "Non-binary people", "Anyone"];
 const KEEP_ONE = "Keep at least one.";
-const FAILED = "It could not be saved. Try again.";
-const LOAD_FAILED = "Your profile could not be loaded.";
+const FAILED = "That did not go through. Try again.";
+const LOAD_FAILED = FAILED_TO_LOAD;
 const THE_QUESTION = "Leave without saving?";
 const BACK = "Back to what you seek";
 
@@ -323,8 +324,8 @@ describe("SeekWhomScreen", () => {
   });
 
   it.each([
-    ["fi-FI", "Kenet tahansa", "Tallentaminen ei onnistunut. Yritä uudelleen."],
-    ["sv-FI", "Vem som helst", "Det gick inte att spara. Försök igen."],
+    ["fi-FI", "Kenet tahansa", "Se ei onnistunut. Yritä uudelleen."],
+    ["sv-FI", "Vem som helst", "Det gick inte. Försök igen."],
   ])("says in %s that a refused change could not be saved", async (tag, anyone, failed) => {
     (useLocales as jest.Mock).mockReturnValue([{ languageTag: tag }]);
     try {
@@ -451,7 +452,7 @@ describe("SeekWhomScreen", () => {
   it("says it is loading until the answer is read, and leaving then sends nothing", async () => {
     const { writes } = fakeApi({ wait: new Promise(() => {}) });
     await show(<SeekWhomScreen />);
-    expect(screen.getByText("Loading your profile…").props.accessibilityLiveRegion).toBe("polite");
+    expect(screen.getByText("Loading…").props.accessibilityLiveRegion).toBe("polite");
     expect(screen.queryByRole("checkbox")).toBeNull();
     await leave();
     expect(writes).toEqual([]);
@@ -460,7 +461,7 @@ describe("SeekWhomScreen", () => {
   it("says when the answer could not be read, and tries again", async () => {
     const { server } = fakeApi({ failing: true });
     await show(<SeekWhomScreen />);
-    await waitFor(() => expect(screen.getByText("Your profile could not be loaded.")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText(FAILED_TO_LOAD)).toBeTruthy());
     // Why, in words: the API answered 500.
     expect(screen.getByText("Kuutti's server had a problem. Try again in a moment.")).toBeTruthy();
     const found = pressables(screen.toJSON() as HostNode);
@@ -468,7 +469,7 @@ describe("SeekWhomScreen", () => {
     server.failing = false;
     await press(button("Try again"));
     await waitFor(() => expect(chosen()).toEqual(["Women"]));
-    expect(screen.queryByText("Your profile could not be loaded.")).toBeNull();
+    expect(screen.queryByText(FAILED_TO_LOAD)).toBeNull();
   });
 
   it("says it is loading again while Try again reads", async () => {
@@ -481,7 +482,7 @@ describe("SeekWhomScreen", () => {
     });
     server.failing = false;
     await press(button("Try again"));
-    expect(screen.getByText("Loading your profile…").props.accessibilityLiveRegion).toBe("polite");
+    expect(screen.getByText("Loading…").props.accessibilityLiveRegion).toBe("polite");
     expect(screen.queryByText(LOAD_FAILED)).toBeNull();
     await act(async () => {
       answer?.();
@@ -496,7 +497,7 @@ describe("SeekWhomScreen", () => {
     await waitFor(() => expect(router.dismissTo).toHaveBeenCalledWith("/"));
     expect(router.replace).not.toHaveBeenCalled();
     expect(screen.queryByRole("checkbox")).toBeNull();
-    expect(screen.queryByText("Your profile could not be loaded.")).toBeNull();
+    expect(screen.queryByText(FAILED_TO_LOAD)).toBeNull();
   });
 
   it.each([

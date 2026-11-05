@@ -67,7 +67,7 @@ export function FoundThemScreen() {
       {!signedIn ? (
         <Text variant="muted">{t("settings.session.none")}</Text>
       ) : state === "checking" ? (
-        <Text accessibilityLiveRegion="polite">{t("home.loading")}</Text>
+        <Text accessibilityLiveRegion="polite">{t("load.loading")}</Text>
       ) : state === "thanked" ? (
         <View className="gap-3" accessibilityLiveRegion="polite">
           <Text variant="h3" accessibilityRole="header">
@@ -104,7 +104,7 @@ export function FoundThemScreen() {
           </View>
           <Text variant="muted">{t("account.foundThem.unchanged")}</Text>
           {state === "failed" && (
-            <Text accessibilityLiveRegion="assertive">{t("account.foundThem.failed")}</Text>
+            <Text accessibilityLiveRegion="assertive">{t("load.failed.press")}</Text>
           )}
           <Button
             disabled={!reason || state === "sending"}

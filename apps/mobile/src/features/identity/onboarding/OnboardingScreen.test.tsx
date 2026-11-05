@@ -7,6 +7,7 @@ import type * as React from "react";
 import { AccessibilityInfo, PixelRatio, Platform } from "react-native";
 import { saveSession } from "@/lib/session";
 import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
+import { FAILED_TO_LOAD } from "@/test/failed";
 import { hasCutText } from "@/test/layout";
 import { renderWithTheme } from "@/test/render";
 import { FakeXhr } from "@/test/xhr";
@@ -519,17 +520,17 @@ describe("OnboardingScreen", () => {
       return answered(request);
     }) as unknown as typeof fetch;
     await show(<OnboardingScreen />);
-    await waitFor(() => expect(screen.getByText("One moment…")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("Loading…")).toBeTruthy());
     // Centred, as the status's own wait: no heading until there is an offer, and no number.
-    expect(drawn()).toEqual(["One moment…"]);
-    expect(screen.getByText("One moment…").props.accessibilityLiveRegion).toBe("polite");
+    expect(drawn()).toEqual(["Loading…"]);
+    expect(screen.getByText("Loading…").props.accessibilityLiveRegion).toBe("polite");
     await act(async () => {
       release();
       await settle();
     });
     await waitFor(() => expect(screen.getByText("Did a friend invite you?")).toBeTruthy());
     asked("Did a friend invite you?");
-    expect(screen.queryByText("One moment…")).toBeNull();
+    expect(screen.queryByText("Loading…")).toBeNull();
   });
 
   it.each([
@@ -1017,7 +1018,7 @@ describe("OnboardingScreen", () => {
       const api = failingUntilOk("/photos");
       await show(<OnboardingScreen />);
       await waitFor(() =>
-        expect(screen.getByText("The photo could not be uploaded. Try again.")).toBeTruthy(),
+        expect(screen.getByText("That did not go through. Try again.")).toBeTruthy(),
       );
       expect(screen.getByText("Step 7 of 8")).toBeTruthy();
       expect(readOnly()).toBe(false);
@@ -1028,7 +1029,7 @@ describe("OnboardingScreen", () => {
       await waitFor(() => expect(screen.getByText(LEAD)).toBeTruthy());
       expect(reads(calls, "/onboarding")).toBe(status + 1);
       expect(screen.getByText("Two photos of you")).toBeTruthy();
-      expect(screen.queryByText("The photo could not be uploaded. Try again.")).toBeNull();
+      expect(screen.queryByText("That did not go through. Try again.")).toBeNull();
       expect(readOnly()).toBe(true);
     });
 
@@ -1039,11 +1040,7 @@ describe("OnboardingScreen", () => {
       const api = failingUntilOk("/onboarding");
       await press(onward());
       await flush();
-      await waitFor(() =>
-        expect(
-          screen.getByText("Where you are in getting started could not be loaded."),
-        ).toBeTruthy(),
-      );
+      await waitFor(() => expect(screen.getByText(FAILED_TO_LOAD)).toBeTruthy());
       api.ok();
       await press(screen.getByRole("button", { name: "Try again" }));
       await flush();
@@ -1714,11 +1711,7 @@ describe("OnboardingScreen", () => {
     fakeApi();
     const api = failingUntilOk("/onboarding");
     await show(<OnboardingScreen />);
-    await waitFor(() =>
-      expect(
-        screen.getByText("Where you are in getting started could not be loaded."),
-      ).toBeTruthy(),
-    );
+    await waitFor(() => expect(screen.getByText(FAILED_TO_LOAD)).toBeTruthy());
     expect(screen.getByText("Kuutti's server had a problem. Try again in a moment.")).toBeTruthy();
     api.ok();
     await press(screen.getByRole("button", { name: "Try again" }));

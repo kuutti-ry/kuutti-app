@@ -26,7 +26,7 @@ name: An invitation made in Settings shows its code once, is shared, and is with
     file: ../common/open-settings-row.yaml
     env:
       ROW: "(Invitations|Kutsut|Inbjudningar)(, .*)?"
-      INSIDE: "When a friend you invite finishes their profile.*|Kun kutsumasi ystävä saa profiilinsa valmiiksi.*|När en vän du bjuder in gör klart sin profil.*|Loading your invitations…|Ladataan kutsujasi…|Laddar dina inbjudningar…"
+      INSIDE: "When a friend you invite finishes their profile.*|Kun kutsumasi ystävä saa profiilinsa valmiiksi.*|När en vän du bjuder in gör klart sin profil.*|Loading…|Ladataan…|Laddar…"
 # What an invitation earns, from matching_config invitation_reward: a fish each.
 - extendedWaitUntil:
     visible: "When a friend you invite finishes their profile, you get a fish and your friend gets a fish\\.|Kun kutsumasi ystävä saa profiilinsa valmiiksi, saat kalan ja ystäväsi saa kalan\\.|När en vän du bjuder in gör klart sin profil får du en fisk och din vän får en fisk\\."
@@ -98,4 +98,4 @@ name: An invitation made in Settings shows its code once, is shared, and is with
     notVisible: "[0-9A-HJKMNP-TV-Z]{5}-[0-9A-HJKMNP-TV-Z]{5}|(Invitation code|Kutsukoodi|Inbjudningskod): .*"
     timeout: 15000
 - assertNotVisible: "The invitation was withdrawn\\. Its code no longer works\\.|Kutsu peruttiin\\. Sen koodi ei enää toimi\\.|Inbjudan drogs tillbaka\\. Koden fungerar inte längre\\."
-- assertNotVisible: "The invitation could not be withdrawn\\..*|Kutsua ei voitu perua\\..*|Inbjudan kunde inte dras tillbaka\\..*"
+- assertNotVisible: "That did not go through\\. Try again\\.|Se ei onnistunut\\. Yritä uudelleen\\.|Det gick inte\\. Försök igen\\."

@@ -31,11 +31,10 @@ export function PondCard() {
         </CardHeader>
         <CardContent className="gap-2">
           {counter.status === "loading" && (
-            <Text accessibilityLiveRegion="polite">{t("pond.counter.loading")}</Text>
+            <Text accessibilityLiveRegion="polite">{t("load.loading")}</Text>
           )}
           {counter.status === "failed" && (
             <LoadFailed
-              headline={t("pond.counter.failed")}
               error={counter.error}
               onRetry={() => {
                 tap();

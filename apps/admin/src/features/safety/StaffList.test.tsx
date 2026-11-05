@@ -86,9 +86,9 @@ describe("the staff list", () => {
   it("is busy while it loads, then is a table named by the screen's heading, which only reads and counts nobody (#581)", async () => {
     fetchMock([staffOf()]);
     show();
-    expect(screen.getByText("Loading the staff…")).toHaveAttribute("aria-busy", "true");
+    expect(screen.getByText("Loading…")).toHaveAttribute("aria-busy", "true");
     const table = await screen.findByRole("table", { name: "Staff" });
-    expect(screen.queryByText("Loading the staff…")).toBeNull();
+    expect(screen.queryByText("Loading…")).toBeNull();
     expect(cells(table)).toEqual([]);
     // The whole screen: its heading, Refresh and the table's columns.
     expect(table.closest("section")?.textContent).toBe(
@@ -181,7 +181,7 @@ describe("the staff list", () => {
       fetchMock([answer(respond)]);
       show();
       expect(await screen.findByRole("alert")).toHaveTextContent(/^Could not be loaded\.$/);
-      expect(screen.queryByText("Loading the staff…")).toBeNull();
+      expect(screen.queryByText("Loading…")).toBeNull();
       expect(screen.queryByRole("table")).toBeNull();
       if (logs) expect(logged).toHaveBeenCalledWith("staff load failed", expect.anything());
       else expect(logged).not.toHaveBeenCalled();
@@ -194,7 +194,7 @@ describe("the staff list", () => {
   it("leaves a refused list to the shell: no table and no failure of its own (#302)", async () => {
     const calls = fetchMock([answer(() => failure("admin_forbidden", 403))]);
     show();
-    await waitFor(() => expect(screen.queryByText("Loading the staff…")).toBeNull());
+    await waitFor(() => expect(screen.queryByText("Loading…")).toBeNull());
     expect(screen.getByRole("heading", { level: 2, name: "Staff" })).toBeInTheDocument();
     expect(screen.queryByRole("alert")).toBeNull();
     expect(screen.queryByRole("table")).toBeNull();

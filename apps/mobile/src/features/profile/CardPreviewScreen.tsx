@@ -51,14 +51,10 @@ export function CardPreviewScreen() {
       />
       <ScrollView contentContainerClassName="flex-grow gap-4 p-6">
         {state.status === "loading" && (
-          <Text accessibilityLiveRegion="polite">{t("profile.card.loading")}</Text>
+          <Text accessibilityLiveRegion="polite">{t("load.loading")}</Text>
         )}
         {state.status === "error" && (
-          <LoadFailed
-            headline={t("profile.card.failed")}
-            error={state.error}
-            onRetry={() => setAttempt((n) => n + 1)}
-          />
+          <LoadFailed error={state.error} onRetry={() => setAttempt((n) => n + 1)} />
         )}
         {preview && !preview.completeness.complete && (
           <View className="gap-1">
