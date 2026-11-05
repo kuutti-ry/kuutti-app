@@ -70,6 +70,12 @@ variable "preview_databases" {
   default     = false
 }
 
+variable "demo_reset" {
+  description = "Staging only (#613, ADR-018 §8): declares the Run Command document that returns the demo personas to where they begin, inside the API's container, which demo-reset.yml sends through the plan role."
+  type        = bool
+  default     = false
+}
+
 variable "cpu_credits" {
   description = "t4g burst mode: standard caps the bill at baseline performance, unlimited keeps performance and bills surplus credits (TD-19). Staging standard, prod unlimited with its credit alarms."
   type        = string

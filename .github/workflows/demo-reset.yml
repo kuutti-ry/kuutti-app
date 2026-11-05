@@ -1,0 +1,100 @@
+name: Demo reset
+
+# Returns staging's demo personas to where they begin (#613, ADR-018 §8): on
+# demand, from the Actions tab or `gh workflow run demo-reset.yml`, so that a
+# round of testing starts clean without anybody opening a terminal on the box.
+# The reset itself lives inside the API's container and nowhere else (ADR-018
+# §2 to §4); this workflow only says "now". It sends the one Run Command
+# document envs/staging declares (modules/compute) to the staging box through
+# the plan role, which the bootstrap allows to send exactly that document to
+# exactly that box, as preview-cleanup.yml drops a preview database (ADR-012).
+# The document fetches the pictures' release into the container's cache first
+# (a new container starts without it) and then runs the reset; the lines of
+# both land in the log and in the step summary. The run is red when not
+# everybody was reset: the reset exits 2 and names the personas it spared (one
+# with a staff role or a line in the audit log, ADR-014 §12), and 3 when no
+# api container runs on the box.
+#
+# workflow_dispatch alone, from main: a dispatch runs the copy of this file on
+# the branch it is started from, and the plan role trusts pull requests and
+# main, so the first step refuses every other branch. No schedule yet (the
+# nightly reset is one line here when it is wanted) and no pull_request
+# trigger: nothing of a pull request runs here.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# bash -eo pipefail: a failed command behind a pipe must fail the step.
+defaults:
+  run:
+    shell: bash
+
+# One reset at a time; a second dispatch waits for the first.
+concurrency:
+  group: demo-reset
+  cancel-in-progress: false
+
+jobs:
+  reset:
+    name: return staging's personas to where they begin
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      AWS_REGION: ${{ vars.AWS_REGION }}
+      AWS_ROLE_ARN: ${{ vars.AWS_PLAN_ROLE_ARN }}
+      AWS_ROLE_SESSION_NAME: gha-demo-reset-${{ github.run_id }}
+    steps:
+      - name: Started from main
+        if: github.ref != 'refs/heads/main'
+        run: |
+          echo "::error::start this workflow from main: the plan role trusts main alone, and main's copy of this file is the one that was reviewed"
+          exit 1
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: .github/scripts
+      - run: .github/scripts/aws-oidc.sh
+
+      - name: Send the reset document to the staging box and wait for it
+        env:
+          RUN_ID: ${{ github.run_id }}
+        run: |
+          instance=$(aws ec2 describe-instances \
+            --filters Name=tag:Name,Values=kuutti-staging Name=instance-state-name,Values=running \
+            --query 'Reservations[].Instances[].InstanceId' --output text)
+          [ -n "$instance" ] || { echo "::error::no running kuutti-staging instance"; exit 1; }
+          id=$(aws ssm send-command --document-name kuutti-staging-demo-reset \
+            --instance-ids "$instance" --comment "demo-reset.yml: run $RUN_ID" \
+            --query Command.CommandId --output text)
+          echo "command $id sent to $instance"
+          # The document's own timeout is 1800 s; the reset has taken about two minutes.
+          status=Pending
+          for _ in $(seq 1 370); do
+            sleep 5
+            status=$(aws ssm get-command-invocation --command-id "$id" --instance-id "$instance" --query Status --output text 2>/dev/null || echo Pending)
+            case "$status" in Pending|InProgress|Delayed) continue ;; esac
+            break
+          done
+          code=$(aws ssm get-command-invocation --command-id "$id" --instance-id "$instance" --query ResponseCode --output text)
+          out=$(aws ssm get-command-invocation --command-id "$id" --instance-id "$instance" \
+            --query '[StandardOutputContent, StandardErrorContent]' --output text)
+          printf '%s\n' "$out"
+          {
+            echo "## Demo reset on staging: $status (exit $code)"
+            echo
+            echo '```'
+            printf '%s\n' "$out"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          case "$status:$code" in
+            Success:0) ;;
+            *:2) echo "::error::not everybody was reset: the reset's last line names the personas it spared, and why"; exit 2 ;;
+            *:3) echo "::error::no running api container on the staging box"; exit 3 ;;
+            *) echo "::error::the reset did not finish: $status (exit $code)"; exit 1 ;;
+          esac
