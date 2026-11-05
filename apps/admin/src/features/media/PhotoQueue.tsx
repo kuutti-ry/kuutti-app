@@ -167,8 +167,9 @@ function QueueItem({ item, onDecided }: { item: PhotoReviewItem; onDecided: () =
                 <Loading>{t("admin.queue.imageLoading")}</Loading>
               </div>
             )}
-            <figcaption className="text-xs text-muted-foreground">
-              {t("admin.queue.uploaded", { time: uploaded })} ·{" "}
+            {/* Two lines: the link's 44 px target (M43) does not fit beside the date under a photo, and a dot would hang at the line's end. */}
+            <figcaption className="flex flex-col items-start text-xs text-muted-foreground">
+              <span>{t("admin.queue.uploaded", { time: uploaded })}</span>
               <Link className="target" to={`/accounts/${item.accountId}`}>
                 {t("admin.queue.account", { account: item.accountId.slice(0, 8) })}
               </Link>

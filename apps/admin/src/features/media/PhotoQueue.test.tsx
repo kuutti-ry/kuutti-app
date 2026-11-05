@@ -484,7 +484,8 @@ describe("PhotoQueue", () => {
     expect(screen.getAllByRole("link")).toHaveLength(2);
     // The owner is named by the first part of the pseudonymous id only; the whole id is the link's (#306).
     const caption = first.closest("figcaption");
-    expect(caption).toHaveTextContent(/^Uploaded .* · Account 6f1c1c4e$/);
+    expect(caption).toHaveTextContent(/^Uploaded .*Account 6f1c1c4e$/);
+    expect(caption).not.toHaveTextContent("·");
     expect(caption).not.toHaveTextContent(item(1).accountId);
     fireEvent.click(second);
     expect(await screen.findByRole("status")).toHaveTextContent(other);
