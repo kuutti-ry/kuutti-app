@@ -71,7 +71,6 @@ export function SeekAgesScreen() {
         onBack={() => router.back()}
       />
       <ScrollView contentContainerClassName="flex-grow gap-6 p-6">
-        <Text>{t("profile.seek.ages.explain", { min: AGE_MIN, max: AGE_MAX })}</Text>
         <Stepper
           label={t("onboarding.age.youngest")}
           value={ages.min}

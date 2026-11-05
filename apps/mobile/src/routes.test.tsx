@@ -21,8 +21,6 @@ import CardPreviewRoute from "../app/profile/card";
 // biome-ignore lint/style/noRestrictedImports: a route file, not a slice internal
 import DealBreakerFieldRoute from "../app/profile/deal-breakers/[field]";
 // biome-ignore lint/style/noRestrictedImports: a route file, not a slice internal
-import DealBreakersRoute from "../app/profile/deal-breakers/index";
-// biome-ignore lint/style/noRestrictedImports: a route file, not a slice internal
 import GenderRoute from "../app/profile/gender";
 import ProfileRoute from "../app/profile/index";
 // biome-ignore lint/style/noRestrictedImports: a route file, not a slice internal
@@ -125,7 +123,6 @@ jest.mock("@/features/profile", () => {
   return {
     CardPreviewScreen: probe("CardPreviewScreen"),
     DealBreakerFieldScreen: probe("DealBreakerFieldScreen"),
-    DealBreakersScreen: probe("DealBreakersScreen"),
     GenderScreen: probe("GenderScreen"),
     holdLinkWhileUnsaved: jest.fn((path: string) => path),
     LaterFieldScreen: probe("LaterFieldScreen"),
@@ -190,7 +187,6 @@ describe("the screens without params", () => {
     ["/photos", PhotosRoute, "PhotosScreen"],
     ["/profile", ProfileRoute, "ProfileScreen"],
     ["/profile/card", CardPreviewRoute, "CardPreviewScreen"],
-    ["/profile/deal-breakers", DealBreakersRoute, "DealBreakersScreen"],
     ["/profile/gender", GenderRoute, "GenderScreen"],
     ["/profile/place", PlaceRoute, "PlaceScreen"],
     ["/profile/seek", SeekRoute, "SeekScreen"],

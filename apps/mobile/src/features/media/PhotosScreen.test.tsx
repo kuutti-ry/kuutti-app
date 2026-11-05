@@ -1,8 +1,9 @@
 import { act, fireEvent, screen, waitFor } from "@testing-library/react-native";
 import * as ImagePicker from "expo-image-picker";
+import { useLocales } from "expo-localization";
 import * as SecureStore from "expo-secure-store";
 import type * as React from "react";
-import { AccessibilityInfo } from "react-native";
+import { AccessibilityInfo, Dimensions, Platform } from "react-native";
 import { saveSession } from "@/lib/session";
 import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
 import { renderWithTheme } from "@/test/render";
@@ -25,6 +26,16 @@ const press = async (element: ReturnType<typeof screen.getByRole>) => {
   await fireEvent.press(element);
   await act(settle);
 };
+/** Every text on the screen, in order, the hidden too. */
+const drawn = () =>
+  screen
+    .queryAllByText(/./, { includeHiddenElements: true })
+    .map((node) => node.props.children as unknown);
+/** What this test says aloud behind what is being said: iOS's way for words no line carries (#581). */
+const queued = () =>
+  jest.spyOn(AccessibilityInfo, "announceForAccessibilityWithOptions").mockClear();
+/** What this test says aloud on a phone with no queue to stand in: Android's way. */
+const plain = () => jest.spyOn(AccessibilityInfo, "announceForAccessibility").mockClear();
 /** A screen reader's choice of one of a tile's actions (#179). */
 const action = async (tile: ReturnType<typeof screen.getByRole>, name: string) => {
   await fireEvent(tile, "accessibilityAction", { nativeEvent: { actionName: name } });
@@ -158,10 +169,8 @@ describe("PhotosScreen", () => {
     const { calls } = fetchMock([answersList(list(2)), answersUrls]);
     await show(<PhotosScreen />);
     expect(await screen.findByRole("heading", { name: "Your photos" })).toBeTruthy();
-    expect(await screen.findByText("2 photos, at most 3")).toBeTruthy();
-    expect(screen.getByText("Main photo")).toBeTruthy();
-    expect(screen.getByText("Visible to others")).toBeTruthy();
-    expect(screen.getByText("Waiting for review")).toBeTruthy();
+    expect(await screen.findByText("Main photo")).toBeTruthy();
+    expect(screen.getByText("In review")).toBeTruthy();
     // thumb for the grid; never card or full here (rules/mobile.md Images).
     await waitFor(() =>
       expect(calls.filter((c) => /\/thumb$/.test(new URL(c.url).pathname))).toHaveLength(2),
@@ -199,12 +208,10 @@ describe("PhotosScreen", () => {
       answersUrls,
     ]);
     await show(<PhotosScreen />);
-    await screen.findByText("Being reviewed");
+    await screen.findByText("In review");
     expect(
-      screen
-        .getAllByText(/^(Main photo|Being reviewed|Visible to others)$/)
-        .map((node) => node.props.children),
-    ).toEqual(["Being reviewed", "Main photo", "Visible to others", "Visible to others"]);
+      screen.getAllByText(/^(Main photo|In review)$/).map((node) => node.props.children),
+    ).toEqual(["In review", "Main photo"]);
   });
 
   it("marks a photo in review on the photo itself, hidden from a screen reader, which hears the words under it (#376)", async () => {
@@ -222,8 +229,10 @@ describe("PhotosScreen", () => {
       answersUrls,
     ]);
     await show(<PhotosScreen />);
-    await screen.findByText("Being reviewed");
-    expect(screen.getByText("Waiting for review")).toBeTruthy();
+    // The same words for both waits: nobody does anything different between them (#581).
+    expect(await screen.findAllByText("In review")).toHaveLength(2);
+    expect(screen.queryByText("Waiting for review")).toBeNull();
+    expect(screen.queryByText("Being reviewed")).toBeNull();
     // The sign is on the two in review only, and a screen reader is not sent to it.
     for (const position of [1, 2]) {
       const sign = screen.getByTestId(`photo-in-review-${position}`, {
@@ -302,7 +311,7 @@ describe("PhotosScreen", () => {
     expect(
       calls.some((c) => c.method === "POST" && /\/appeal$/.test(new URL(c.url).pathname)),
     ).toBe(true);
-    expect(await screen.findByText("Being reviewed")).toBeTruthy();
+    expect(await screen.findByText("In review")).toBeTruthy();
     expect(screen.queryByRole("button", { name: /^Ask a person to look/ })).toBeNull();
   });
 
@@ -417,7 +426,7 @@ describe("PhotosScreen", () => {
     expect(await screen.findByText("Step 8 of 10")).toBeTruthy();
     expect(screen.getByText("Step 8 of 10").props.accessibilityLiveRegion).toBe("polite");
     await show(<PhotosScreen />);
-    expect(await screen.findByText("2 photos, at most 3")).toBeTruthy();
+    expect(await screen.findByText("Main photo")).toBeTruthy();
     expect(screen.queryByText(/^Step /)).toBeNull();
   });
 
@@ -445,7 +454,7 @@ describe("PhotosScreen", () => {
           : null,
     ]);
     await show(<PhotosScreen />);
-    await screen.findByText("2 photos, at most 3");
+    await screen.findByRole("button", { name: "Open photo 1" });
     await action(tile(1), "moveLater");
     await waitFor(() => expect(calls.some((c) => c.method === "PUT")).toBe(true));
     const put = calls.find((c) => c.method === "PUT");
@@ -469,7 +478,8 @@ describe("PhotosScreen", () => {
 
     await press(screen.getByRole("button", { name: "Remove photo" }));
     await waitFor(() => expect(calls.some((c) => c.method === "DELETE")).toBe(true));
-    expect(await screen.findByText("No photos yet.")).toBeTruthy();
+    await waitFor(() => expect(screen.queryByRole("button", { name: /^Open photo/ })).toBeNull());
+    expect(screen.queryByText("Remove this photo?")).toBeNull();
   });
 
   it("adds a photo: picker, on-device check, pre-resize, upload with progress, then the grid grows", async () => {
@@ -487,12 +497,12 @@ describe("PhotosScreen", () => {
 
     await show(<PhotosScreen />);
     await press(await screen.findByRole("button", { name: "Add a photo" }));
-    await waitFor(() => expect(screen.getByText("2 photos, at most 3")).toBeTruthy());
+    await waitFor(() => expect(tile(2)).toBeTruthy());
     expect(checked).toEqual(["file:///a.heic"]); // the picked file, before the resize
     const sent = FakeXhr.sent[0];
     const parts = partsOf(sent);
     expect(parts[0]).toMatchObject({ uri: "file:///a.heic#resized", type: "image/jpeg" });
-    expect(screen.getAllByText("Waiting for review")).toHaveLength(1);
+    expect(screen.getAllByText("In review")).toHaveLength(1);
   });
 
   it("a photo the on-device check refuses is never sent, and the person is told in one line", async () => {
@@ -506,7 +516,7 @@ describe("PhotosScreen", () => {
     await press(await screen.findByRole("button", { name: "Add a photo" }));
     expect(await screen.findByText("This photo cannot be used.")).toBeTruthy();
     expect(FakeXhr.sent).toHaveLength(0);
-    expect(screen.getByText("1 photo, at most 3")).toBeTruthy();
+    expect(screen.getAllByRole("button", { name: /^Open photo/ })).toHaveLength(1);
   });
 
   it("shows the API's refusal in its own words and lets the person dismiss it", async () => {
@@ -535,14 +545,326 @@ describe("PhotosScreen", () => {
     expect(add.props.accessibilityState?.disabled).toBe(true);
   });
 
+  describe("at a large text size (#581)", () => {
+    afterEach(() => jest.restoreAllMocks());
+
+    it.each([
+      ["the default size", 1, "w-[47%]"],
+      ["just under the line", 1.29, "w-[47%]"],
+      ["the line", 1.3, "w-full"],
+      ["the largest", 2, "w-full"],
+    ])(
+      "sets its tiles at %s, so that a caption's word never breaks",
+      async (_size, fontScale, width) => {
+        jest
+          .spyOn(Dimensions, "get")
+          .mockReturnValue({ width: 393, height: 852, scale: 3, fontScale });
+        fetchMock([answersList(approvedList(3)), answersUrls]);
+        await show(<PhotosScreen />);
+        await screen.findByRole("button", { name: "Caption of photo 1" });
+        expect(screen.getByTestId("photo-tile-1").props.className).toBe(width);
+      },
+    );
+  });
+
+  describe("how many there are (#581)", () => {
+    afterEach(() => jest.restoreAllMocks());
+
+    it("draws the count at the limit alone, where Add a photo stops, directly above it", async () => {
+      fetchMock([answersList(list(3)), answersUrls]);
+      await show(<PhotosScreen />);
+      const count = await screen.findByText("3 photos, at most 3");
+      // Said as it changes, by the same word, so no live region says it a second time.
+      expect(count.props.accessibilityLiveRegion).toBeUndefined();
+      const lines = drawn();
+      expect(lines.indexOf("3 photos, at most 3")).toBe(lines.indexOf("Add a photo") - 1);
+    });
+
+    it.each([
+      ["none", 0],
+      ["some", 2],
+    ])(
+      "draws no count below the limit, with %s: the grid shows it, and Add a photo goes on",
+      async (_what, photos) => {
+        fetchMock([answersList(list(photos)), answersUrls]);
+        await show(<PhotosScreen />);
+        const add = await screen.findByRole("button", { name: "Add a photo" });
+        await waitFor(() => expect(add.props.accessibilityState?.disabled).toBe(false));
+        expect(screen.queryByText(/at most/, { includeHiddenElements: true })).toBeNull();
+      },
+    );
+
+    it("says nothing on arrival, at the limit or below it", async () => {
+      const said = queued();
+      fetchMock([answersList(list(2)), answersUrls]);
+      await show(<PhotosScreen />);
+      await screen.findByText("Main photo");
+      fetchMock([answersList(list(3)), answersUrls]);
+      await show(<PhotosScreen />);
+      await screen.findByText("3 photos, at most 3");
+      expect(said).not.toHaveBeenCalled();
+    });
+
+    const adding = (before: number, after: number) => {
+      fetchMock([answersLists(list(before), list(after)), answersUrls]);
+      launch.mockResolvedValueOnce({
+        canceled: false,
+        assets: [{ uri: "file:///a.heic", width: 4032, height: 3024 }],
+      });
+      FakeXhr.answers = [{ status: 201, body: JSON.stringify(photo(after)) }];
+    };
+
+    it("says it aloud once as a photo lands, queued on iOS, the one word that it did, and draws nothing", async () => {
+      jest.replaceProperty(Platform, "OS", "ios");
+      const said = queued();
+      adding(1, 2);
+      await show(<PhotosScreen />);
+      await press(await screen.findByRole("button", { name: "Add a photo" }));
+      await waitFor(() => expect(tile(2)).toBeTruthy());
+      expect(said.mock.calls).toEqual([["2 photos, at most 3", { queue: true }]]);
+      expect(screen.queryByText("2 photos, at most 3")).toBeNull();
+    });
+
+    it("tells TalkBack too, with no line for a live region to read", async () => {
+      jest.replaceProperty(Platform, "OS", "android");
+      const said = plain();
+      adding(1, 2);
+      await show(<PhotosScreen />);
+      await press(await screen.findByRole("button", { name: "Add a photo" }));
+      await waitFor(() => expect(tile(2)).toBeTruthy());
+      expect(said.mock.calls).toEqual([["2 photos, at most 3"]]);
+    });
+
+    it("says it, and draws it, as the last photo the limit allows lands", async () => {
+      const said = queued();
+      adding(2, 3);
+      await show(<PhotosScreen />);
+      await press(await screen.findByRole("button", { name: "Add a photo" }));
+      expect(await screen.findByText("3 photos, at most 3")).toBeTruthy();
+      expect(said.mock.calls).toEqual([["3 photos, at most 3", { queue: true }]]);
+    });
+
+    it("says it as a photo goes too, and takes the line away with the limit", async () => {
+      const said = queued();
+      fetchMock([
+        answersLists(list(3), list(2)),
+        answersUrls,
+        (req) => (req.method === "DELETE" ? new Response(null, { status: 204 }) : null),
+      ]);
+      await show(<PhotosScreen />);
+      await screen.findByText("3 photos, at most 3");
+      const [first] = screen.getAllByRole("button", { name: "Remove" });
+      await press(first as ReturnType<typeof screen.getByRole>);
+      await press(screen.getByRole("button", { name: "Remove photo" }));
+      await waitFor(() =>
+        expect(screen.getAllByRole("button", { name: /^Open photo/ })).toHaveLength(2),
+      );
+      expect(said.mock.calls).toEqual([["2 photos, at most 3", { queue: true }]]);
+      expect(screen.queryByText(/at most/)).toBeNull();
+    });
+
+    it("says nothing where the count stands: a picker cancelled, a photo refused, a move", async () => {
+      const said = queued();
+      const orders: string[][] = [];
+      fetchMock([answersList(approvedList(2)), answersUrls, ordering(orders)]);
+      launch.mockResolvedValueOnce({ canceled: true, assets: null });
+      await show(<PhotosScreen />);
+      await press(await screen.findByRole("button", { name: "Add a photo" }));
+      await waitFor(() => expect(launch).toHaveBeenCalledTimes(1));
+      launch.mockResolvedValueOnce({
+        canceled: false,
+        assets: [{ uri: "file:///nude.jpg", width: 3000, height: 2000 }],
+      });
+      setLocalCheck(async () => "refuse");
+      await press(screen.getByRole("button", { name: "Add a photo" }));
+      expect(await screen.findByText("This photo cannot be used.")).toBeTruthy();
+      await action(tile(2), "makeMain");
+      await waitFor(() => expect(orders).toHaveLength(1));
+      expect(said).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ["fi-FI", "2 kuvaa, enintään 3", "3 kuvaa, enintään 3"],
+      ["sv-FI", "2 foton, högst 3", "3 foton, högst 3"],
+    ])("says and draws it in %s", async (tag, heard, shown) => {
+      (useLocales as jest.Mock).mockReturnValue([{ languageTag: tag }]);
+      try {
+        const said = queued();
+        adding(1, 2);
+        await show(<PhotosScreen />);
+        await press(
+          await screen.findByRole("button", { name: /^(Lisää kuva|Lägg till ett foto)$/ }),
+        );
+        await waitFor(() => expect(said).toHaveBeenCalledWith(heard, { queue: true }));
+        fetchMock([answersList(list(3)), answersUrls]);
+        await show(<PhotosScreen />);
+        expect(await screen.findByText(shown)).toBeTruthy();
+      } finally {
+        (useLocales as jest.Mock).mockReturnValue([{ languageTag: "en-US" }]);
+      }
+    });
+  });
+
+  describe("what it no longer explains (#581)", () => {
+    const EXPLAIN =
+      "Hold a photo and drag it to change the order. A new photo is checked before anyone else sees it.";
+
+    it("leads with the two things the screen cannot show, and no limit: that is the count's at six", async () => {
+      fetchMock([answersList(list(2, 6)), answersUrls]);
+      await show(<PhotosScreen />);
+      expect(await screen.findByText(EXPLAIN)).toBeTruthy();
+      expect(screen.queryByText(/Up to/)).toBeNull();
+      expect(screen.queryByText(/main photo/)).toBeNull();
+    });
+
+    it.each([
+      [
+        "fi-FI",
+        "Vaihda järjestystä pitämällä kuvaa painettuna ja vetämällä se uuteen paikkaan. Uusi kuva tarkistetaan, ennen kuin kukaan muu näkee sen.",
+        "Tarkistuksessa",
+      ],
+      [
+        "sv-FI",
+        "Håll ett foto nedtryckt och dra det för att ändra ordningen. Ett nytt foto granskas innan någon annan ser det.",
+        "Under granskning",
+      ],
+    ])("says it in %s, and the same words for both waits", async (tag, explain, inReview) => {
+      (useLocales as jest.Mock).mockReturnValue([{ languageTag: tag }]);
+      try {
+        fetchMock([
+          answersList({
+            photos: [
+              { ...photo(1), state: "pending" },
+              { ...photo(2), state: "queued", position: 1 },
+            ],
+            maxPhotos: 6,
+            tips: [],
+          }),
+          answersUrls,
+        ]);
+        await show(<PhotosScreen />);
+        expect(await screen.findByText(explain)).toBeTruthy();
+        expect(screen.getAllByText(inReview)).toHaveLength(2);
+      } finally {
+        (useLocales as jest.Mock).mockReturnValue([{ languageTag: "en-US" }]);
+      }
+    });
+
+    it("says nothing for an empty list but its lead: no tile stands, and Add a photo says the rest", async () => {
+      fetchMock([answersList(list(0)), answersUrls]);
+      await show(<PhotosScreen />);
+      await screen.findByText(EXPLAIN);
+      expect(drawn()).toEqual(["Your photos", EXPLAIN, "Add a photo", "Done"]);
+    });
+
+    it("says nothing under a photo that is through: silence is the word for it", async () => {
+      fetchMock([answersList(approvedList(2)), answersUrls]);
+      await show(<PhotosScreen />);
+      await screen.findByText("Main photo");
+      // The main photo's name, and nothing else of either's state.
+      const lines = drawn();
+      expect(lines.filter((line) => line === "Main photo")).toHaveLength(1);
+      expect(lines).toEqual([
+        "Your photos",
+        EXPLAIN,
+        "Main photo",
+        "Add a caption",
+        "Add a caption",
+        "Add a photo",
+        "Done",
+      ]);
+    });
+
+    it("still draws the description under a photo that is through, when the setting asks", async () => {
+      store.set(
+        "kuutti.preference.photoDescriptions",
+        JSON.stringify({ shown: true, objects: true }),
+      );
+      const description = {
+        people: 1,
+        setting: "outdoors",
+        scene: [],
+        objects: [],
+        smile: false,
+        glasses: false,
+        sunglasses: false,
+        facialHair: false,
+      };
+      fetchMock([
+        answersList({
+          photos: [
+            { ...photo(1), state: "approved" },
+            { ...photo(2), state: "approved", position: 1, description },
+          ],
+          maxPhotos: 3,
+          tips: [],
+        }),
+        answersUrls,
+      ]);
+      await show(<PhotosScreen />);
+      expect(
+        await screen.findByText("Automatic description: One person, outdoors.", {
+          includeHiddenElements: true,
+        }),
+      ).toBeTruthy();
+    });
+
+    it("shuts the caption dialog on its close control, choosing nothing", async () => {
+      const { calls } = fetchMock([answersList(list(1)), answersUrls]);
+      await show(<PhotosScreen />);
+      await press(await screen.findByRole("button", { name: "Caption of photo 1" }));
+      await press(await screen.findByRole("button", { name: "Close" }));
+      expect(screen.queryByText("A caption for photo 1")).toBeNull();
+      expect(calls.some((c) => c.method === "PUT")).toBe(false);
+    });
+
+    it("gives the caption dialog its title and its lines alone", async () => {
+      fetchMock([answersList(list(1)), answersUrls]);
+      await show(<PhotosScreen />);
+      await press(await screen.findByRole("button", { name: "Caption of photo 1" }));
+      expect(await screen.findByText("A caption for photo 1")).toBeTruthy();
+      expect(screen.queryByText(/shown to others/)).toBeNull();
+      expect(screen.getByLabelText("A caption for photo 1").props.accessibilityRole).toBe(
+        "radiogroup",
+      );
+    });
+
+    it.each([
+      ["en-US", "Not accepted. A profile photo shows you alone."],
+      ["fi-FI", "Ei hyväksytty. Profiilikuvassa olet yksin."],
+      ["sv-FI", "Inte godkänt. På en profilbild är du ensam."],
+    ])("refuses a photo of several people in the fewest words, in %s", async (tag, words) => {
+      (useLocales as jest.Mock).mockReturnValue([{ languageTag: tag }]);
+      try {
+        fetchMock([
+          answersList({
+            photos: [{ ...photo(1), state: "rejected", rejectionReason: "several_people" }],
+            maxPhotos: 3,
+            tips: [],
+          }),
+          answersUrls,
+        ]);
+        await show(<PhotosScreen />);
+        expect(await screen.findByText(words)).toBeTruthy();
+      } finally {
+        (useLocales as jest.Mock).mockReturnValue([{ languageTag: "en-US" }]);
+      }
+    });
+  });
+
   it("a cancelled picker changes nothing", async () => {
     fetchMock([answersList(list(1)), answersUrls]);
     launch.mockResolvedValueOnce({ canceled: true, assets: null });
     await show(<PhotosScreen />);
     await press(await screen.findByRole("button", { name: "Add a photo" }));
     await waitFor(() => expect(launch).toHaveBeenCalled());
-    expect(screen.getByText("1 photo, at most 3")).toBeTruthy();
+    expect(screen.getAllByRole("button", { name: /^Open photo/ })).toHaveLength(1);
     expect(FakeXhr.sent).toHaveLength(0);
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: "Add a photo" }).props.accessibilityState?.disabled,
+      ).toBe(false),
+    );
   });
 
   it("says so when the photo library cannot be opened", async () => {
@@ -569,12 +891,13 @@ describe("PhotosScreen", () => {
     expect(await screen.findByText("The photo could not be uploaded. Try again.")).toBeTruthy();
   });
 
-  it("says it is choosing a photo while the picker is open, and holds the buttons and the moves", async () => {
+  it("holds the buttons and the moves while the picker is open, with no line: the picker covers the screen (#581)", async () => {
     const { calls } = fetchMock([answersList(approvedList(2)), answersUrls]);
     launch.mockReturnValueOnce(new Promise(() => undefined));
     await show(<PhotosScreen />);
     await press(await screen.findByRole("button", { name: "Add a photo" }));
-    expect(screen.getByText("Choosing a photo…")).toBeTruthy();
+    expect(screen.queryByText(/photo…$/)).toBeNull();
+    expect(screen.queryByText(/^Uploading/)).toBeNull();
     for (const remove of screen.getAllByRole("button", { name: "Remove" })) {
       expect(remove.props.accessibilityState?.disabled).toBe(true);
     }
@@ -586,6 +909,70 @@ describe("PhotosScreen", () => {
     // Nor does a tile lift while the screen is busy.
     await fireEvent(tile(2), "longPress");
     expect(lifted(2)).toBe(false);
+  });
+
+  it("holds them too while the picture is checked and resized, and says nothing until the upload (#581)", async () => {
+    fetchMock([answersLists(list(1), list(2)), answersUrls]);
+    launch.mockResolvedValueOnce({
+      canceled: false,
+      assets: [{ uri: "file:///a.heic", width: 4032, height: 3024 }],
+    });
+    let allow: (verdict: "allow") => void = () => undefined;
+    setLocalCheck(
+      () =>
+        new Promise((resolve) => {
+          allow = resolve;
+        }),
+    );
+    FakeXhr.answers = [{ status: 201, body: JSON.stringify(photo(2)) }];
+    await show(<PhotosScreen />);
+    await press(await screen.findByRole("button", { name: "Add a photo" }));
+    expect(
+      screen.getByRole("button", { name: "Add a photo" }).props.accessibilityState?.disabled,
+    ).toBe(true);
+    expect(screen.queryByText(/…/)).toBeNull();
+    expect(FakeXhr.sent).toHaveLength(0);
+    await act(async () => {
+      allow("allow");
+      await settle();
+    });
+    await waitFor(() => expect(tile(2)).toBeTruthy());
+    expect(
+      screen.getByRole("button", { name: "Add a photo" }).props.accessibilityState?.disabled,
+    ).toBe(false);
+  });
+
+  it("says how far an upload is in words, a card of its own that goes when it is done", async () => {
+    fetchMock([answersLists(list(1), list(2)), answersUrls]);
+    launch.mockResolvedValueOnce({
+      canceled: false,
+      assets: [{ uri: "file:///a.heic", width: 4032, height: 3024 }],
+    });
+    let land: () => void = () => undefined;
+    class WaitingXhr extends FakeXhr {
+      override send(): void {
+        // Stays open: the progress is what this test looks at, and the answer is its own to give.
+        land = () => {
+          this.status = 201;
+          this.responseText = JSON.stringify(photo(2));
+          this.onload?.();
+        };
+        setTimeout(() => {
+          this.upload.onprogress?.({ lengthComputable: true, loaded: 1, total: 4 });
+        }, 0);
+      }
+    }
+    (globalThis as { XMLHttpRequest: unknown }).XMLHttpRequest = WaitingXhr;
+    await show(<PhotosScreen />);
+    await press(await screen.findByRole("button", { name: "Add a photo" }));
+    const line = await screen.findByText("Uploading… 25 %");
+    expect(line.props.accessibilityLiveRegion).toBe("polite");
+    await act(async () => {
+      land();
+      await settle();
+    });
+    await waitFor(() => expect(tile(2)).toBeTruthy());
+    expect(screen.queryByText(/^Uploading/)).toBeNull();
   });
 
   const refusingThumbs = (code: string, status: number) => (req: Request) =>
@@ -604,7 +991,7 @@ describe("PhotosScreen", () => {
   it("stays quiet about a thumb refused for another reason", async () => {
     const { calls } = fetchMock([answersList(list(1)), refusingThumbs("not_found", 404)]);
     await show(<PhotosScreen />);
-    expect(await screen.findByText("1 photo, at most 3")).toBeTruthy();
+    expect(await screen.findByRole("button", { name: "Open photo 1" })).toBeTruthy();
     await waitFor(() => expect(calls.some((c) => /\/thumb$/.test(c.url))).toBe(true));
     await act(settle);
     expect(screen.queryByRole("button", { name: "OK" })).toBeNull();
@@ -621,7 +1008,7 @@ describe("PhotosScreen", () => {
     await press(screen.getByRole("button", { name: "Close" }));
     expect(screen.queryByText("Remove this photo?")).toBeNull();
     expect(calls.some((c) => c.method === "DELETE")).toBe(false);
-    expect(screen.getByText("1 photo, at most 3")).toBeTruthy();
+    expect(tile(1)).toBeTruthy();
   });
 
   it("gives a photo a caption from the list (#296): the dialog's lines, the choice sent and shown, No caption clears it", async () => {
@@ -711,7 +1098,7 @@ describe("PhotosScreen", () => {
       answersUrls,
     ]);
     await show(<PhotosScreen />);
-    expect(await screen.findByText("Being reviewed")).toBeTruthy();
+    expect(await screen.findByText("In review")).toBeTruthy();
     expect(screen.getByText("Not accepted")).toBeTruthy();
   });
 

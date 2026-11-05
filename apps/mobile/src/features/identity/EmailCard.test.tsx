@@ -23,7 +23,7 @@ jest.mock("nativewind", () => ({
 }));
 
 const { __router: router } = jest.requireMock("expo-router") as {
-  __router: { push: jest.Mock; replace: jest.Mock };
+  __router: { replace: jest.Mock };
 };
 const store = (SecureStore as unknown as { __store: Map<string, string> }).__store;
 const auth = jest.requireMock("expo-local-authentication") as Record<
@@ -153,7 +153,6 @@ function fakeApi(initial: Partial<Server> = {}) {
 
 beforeEach(async () => {
   router.replace.mockReset();
-  router.push.mockReset();
   (useLocales as jest.Mock).mockReturnValue([{ languageTag: "en-US" }]);
   (AccessibilityInfo.announceForAccessibility as jest.Mock).mockClear();
   (AccessibilityInfo.announceForAccessibilityWithOptions as jest.Mock).mockClear();
@@ -924,13 +923,7 @@ describe("EmailScreen", () => {
     fakeApi({ email: "aino@example.fi", confirmed: true });
     await show(<EmailScreen />);
     await waitFor(() => expect(button("Remove the address")).toBeTruthy());
-    expect(drawn()).toEqual([
-      "When you have a moment",
-      ...CARD,
-      "Remove the address",
-      "Your deal-breakers",
-      "Done",
-    ]);
+    expect(drawn()).toEqual(["When you have a moment", ...CARD, "Remove the address", "Done"]);
     await press(button("Done"));
     expect(router.replace).toHaveBeenCalledWith("/account/lock");
     expect(router.replace).toHaveBeenCalledTimes(1);
@@ -1006,7 +999,6 @@ describe("EmailScreen", () => {
       button(TEXT.confirm),
       button(TEXT.sendAgain),
       button("Remove the address"),
-      button("Your deal-breakers"),
       button("Done"),
     ]) {
       expect(scrolls(element)).toBe(true);
@@ -1061,12 +1053,5 @@ describe("EmailScreen", () => {
       expect(page().padding).toBe(0);
       await keyboard("keyboardWillHide");
     });
-  });
-
-  it("as the last of the later screens, offers the deal-breakers on the way", async () => {
-    fakeApi();
-    await show(<EmailScreen />);
-    await press(button("Your deal-breakers"));
-    expect(router.push).toHaveBeenCalledWith("/profile/deal-breakers");
   });
 });

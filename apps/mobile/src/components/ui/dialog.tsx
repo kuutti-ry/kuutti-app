@@ -26,7 +26,10 @@ const MINIMUM_TARGET = { minHeight: TOUCH_TARGET, minWidth: TOUCH_TARGET };
 
 // The dialog shrinks into the space it is given rather than overflow it; a
 // caller's own cap (a share of the window) holds while that space is larger.
-const SHRINK = { flexShrink: 1 };
+// It takes the whole width of that space, so every dialog is one width (the
+// maintainer, 04/11/2026): this wrapper, centred, hugged what it held, and a
+// dialog of a few words stood narrow. The web target draws no wrapper.
+const SPACE = { flexShrink: 1, width: "100%" } as const;
 
 // The close control lies over the corner, out of the flow, so a title would run
 // under it (#530). DialogContent alone draws it, so only a title inside one
@@ -74,7 +77,7 @@ function DialogOverlay({
     <NativeOnlyAnimatedView
       entering={FadeIn.delay(50).reduceMotion(ReduceMotion.System)}
       exiting={FadeOut.duration(150).reduceMotion(ReduceMotion.System)}
-      style={SHRINK}
+      style={SPACE}
     >
       {children}
     </NativeOnlyAnimatedView>

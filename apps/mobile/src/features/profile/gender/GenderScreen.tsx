@@ -26,9 +26,9 @@ type HeldGender = { gender: Gender | null; word: Word; code: string | undefined 
 
 /**
  * The person's own gender after sign-up (#552): the three genders from the
- * stored answer, saved on leaving. A change reaches everybody who can see the
- * card and starts the limit (ADR-060 §9), which the lead says up front, since
- * one mistaken tap cannot be taken back within it. While the limit runs the
+ * stored answer, saved on leaving. It is on the card, and a change starts the
+ * limit (ADR-060 §9), which the lead says up front, since one mistaken tap
+ * cannot be taken back within it. While the limit runs the
  * date is said on arrival and another gender stays unchosen; the API's refusal
  * remains for a change made elsewhere since this screen read the answer.
  *

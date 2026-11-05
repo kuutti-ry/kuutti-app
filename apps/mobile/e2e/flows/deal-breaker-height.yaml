@@ -7,9 +7,7 @@ name: Height takes one relation of its four buttons, kept by going back, and Eve
 - runFlow: ../common/sign-in.yaml
 - openLink: kuutti://profile/deal-breakers/height
 - extendedWaitUntil:
-    visible:
-      text: "Everyone|Kaikki|Alla"
-      selected: true
+    visible: "✓ Everyone|✓ Kaikki|✓ Alla"
     timeout: 15000
 - waitForAnimationToEnd
 - assertNotVisible: "Also people who did not answer|Myös ne, jotka eivät vastanneet|Även de som inte svarade"
@@ -17,16 +15,10 @@ name: Height takes one relation of its four buttons, kept by going back, and Eve
 # One relation at a time: the second replaces the first, and those who did not
 # answer are let through until switched off.
 - tapOn: "Taller than me|Minua pidempi|Längre än jag"
-- assertVisible:
-    text: "Taller than me|Minua pidempi|Längre än jag"
-    selected: true
+- assertVisible: "✓ Taller than me|✓ Minua pidempi|✓ Längre än jag"
 - tapOn: "My height or taller|Yhtä pitkä tai pidempi|Lika lång eller längre"
-- assertVisible:
-    text: "My height or taller|Yhtä pitkä tai pidempi|Lika lång eller längre"
-    selected: true
-- assertVisible:
-    text: "Taller than me|Minua pidempi|Längre än jag"
-    selected: false
+- assertVisible: "✓ My height or taller|✓ Yhtä pitkä tai pidempi|✓ Lika lång eller längre"
+- assertVisible: "Taller than me|Minua pidempi|Längre än jag"
 - assertVisible: "Also people who did not answer|Myös ne, jotka eivät vastanneet|Även de som inte svarade"
 
 # Kept by going back: it is there when the screen opens again.
@@ -36,17 +28,13 @@ name: Height takes one relation of its four buttons, kept by going back, and Eve
     timeout: 15000
 - openLink: kuutti://profile/deal-breakers/height
 - extendedWaitUntil:
-    visible:
-      text: "My height or taller|Yhtä pitkä tai pidempi|Lika lång eller längre"
-      selected: true
+    visible: "✓ My height or taller|✓ Yhtä pitkä tai pidempi|✓ Lika lång eller längre"
     timeout: 15000
 - waitForAnimationToEnd
 
 # Everyone takes it off, and going back, she is back as she began.
 - tapOn: "Everyone|Kaikki|Alla"
-- assertVisible:
-    text: "Everyone|Kaikki|Alla"
-    selected: true
+- assertVisible: "✓ Everyone|✓ Kaikki|✓ Alla"
 - assertNotVisible: "Also people who did not answer|Myös ne, jotka eivät vastanneet|Även de som inte svarade"
 - tapOn: "Back|Takaisin|Tillbaka"
 - extendedWaitUntil:
@@ -54,7 +42,5 @@ name: Height takes one relation of its four buttons, kept by going back, and Eve
     timeout: 15000
 - openLink: kuutti://profile/deal-breakers/height
 - extendedWaitUntil:
-    visible:
-      text: "Everyone|Kaikki|Alla"
-      selected: true
+    visible: "✓ Everyone|✓ Kaikki|✓ Alla"
     timeout: 15000

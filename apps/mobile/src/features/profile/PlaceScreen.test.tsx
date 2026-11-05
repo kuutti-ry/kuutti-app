@@ -41,10 +41,18 @@ const noProblems = () => {
   const found = pressables(screen.toJSON() as HostNode);
   expect(found.flatMap((node) => a11yProblems(node))).toEqual([]);
 };
-const selected = (name: string) =>
-  screen.getByRole("button", { name }).props.accessibilityState?.selected;
+/** A place by its name, chosen or not: the chosen one's name carries its mark. */
+const option = (name: string) => screen.getByRole("radio", { name: new RegExp(`^(✓ )?${name}$`) });
+const checked = (name: string) => option(name).props.accessibilityState?.checked;
 /** What this test says aloud: the mock outlives a test, with what earlier ones said. */
 const spoken = () => jest.spyOn(AccessibilityInfo, "announceForAccessibility").mockClear();
+/** Aloud behind what is being said: iOS's way for words no line carries (#581). */
+const queued = () =>
+  jest.spyOn(AccessibilityInfo, "announceForAccessibilityWithOptions").mockClear();
+
+const LEAD = "Others see a town or your area by name, never the digits.";
+const QUESTION = "What should your card show?";
+const UNKNOWN = "We can't find that code. Choose the nearest area from the list.";
 
 const HELSINKI = { fi: "Helsinki", sv: "Helsingfors" };
 const JOENSUU = { fi: "Joensuu", sv: "Joensuu" };
@@ -104,14 +112,13 @@ describe("PlaceScreen", () => {
   it("says the home in words, never digits, with what the card shows and the field empty", async () => {
     fakeApi(IN_KALLIO);
     await show();
-    expect(
-      screen.getByText(
-        "Your postal code tells Kuutti how far people are. Others see a town or your area by name, never the digits.",
-      ),
-    ).toBeTruthy();
-    expect(screen.getByRole("heading", { name: "What should your card show?" })).toBeTruthy();
-    expect(screen.getByText("On your card: Helsinki")).toBeTruthy();
-    expect(selected("Helsinki")).toBe(true);
+    expect(screen.getByText(LEAD)).toBeTruthy();
+    // Why Kuutti asks was said at onboarding: nobody moves home differently for it (#581).
+    expect(screen.queryByText(/tells Kuutti how far/)).toBeNull();
+    expect(screen.getByRole("heading", { name: QUESTION }).props["aria-level"]).toBe("3");
+    expect(checked("Helsinki")).toBe(true);
+    expect(checked("Kallio")).toBe(false);
+    expect(screen.getByText("✓ Helsinki")).toBeTruthy();
     expect(screen.getByLabelText("Postal code").props.value).toBe("");
     expect(screen.queryByText(/\d{5}/)).toBeNull();
     noProblems();
@@ -120,11 +127,10 @@ describe("PlaceScreen", () => {
   it("saves the choice on the tap, the choice alone, and reads it back", async () => {
     const sent = fakeApi(IN_KALLIO, () => json({ ...IN_KALLIO, showArea: true }));
     await show();
-    await press(screen.getByRole("button", { name: "Kallio" }));
-    await waitFor(() => expect(screen.getByText("Saved.")).toBeTruthy());
+    await press(option("Kallio"));
+    await waitFor(() => expect(checked("Kallio")).toBe(true));
     expect(sent).toEqual([{ showArea: true }]);
-    expect(selected("Kallio")).toBe(true);
-    expect(screen.getByText("On your card: Kallio")).toBeTruthy();
+    expect(checked("Helsinki")).toBe(false);
     noProblems();
   });
 
@@ -132,8 +138,8 @@ describe("PlaceScreen", () => {
     fakeApi(IN_KALLIO, () => json({ ...IN_KALLIO, showArea: true }));
     await show();
     await typeDigits("838");
-    await press(screen.getByRole("button", { name: "Kallio" }));
-    await waitFor(() => expect(screen.getByText("Saved.")).toBeTruthy());
+    await press(option("Kallio"));
+    await waitFor(() => expect(checked("Kallio")).toBe(true));
     expect(screen.getByLabelText("Postal code").props.value).toBe("838");
   });
 
@@ -142,13 +148,16 @@ describe("PlaceScreen", () => {
     await show();
     await typeDigits("83960");
     await press(screen.getByRole("button", { name: "8 3 9 6 0, Koli" }));
-    await waitFor(() => expect(screen.getByText("Saved.")).toBeTruthy());
+    // The town alone now: no area was kept, so what the card shows stands in the question's place.
+    await waitFor(() =>
+      expect(screen.getByRole("heading", { name: "On your card: Joensuu" })).toBeTruthy(),
+    );
     expect(sent).toEqual([{ postalCode: "83960" }]);
     expect(screen.getByLabelText("Postal code").props.value).toBe("");
     expect(screen.queryAllByRole("button", { name: /Koli/ })).toEqual([]);
-    // The town alone now: no area was kept, and the screen says so.
-    expect(screen.getByText("Your card shows the nearest town.")).toBeTruthy();
-    expect(screen.getByText("On your card: Joensuu")).toBeTruthy();
+    expect(screen.queryByText(QUESTION)).toBeNull();
+    expect(screen.queryAllByRole("radio")).toEqual([]);
+    expect(screen.queryByText("Your card shows the nearest town.")).toBeNull();
   });
 
   it("takes as many changes as the person likes, with no limit to say", async () => {
@@ -165,18 +174,20 @@ describe("PlaceScreen", () => {
       await press(screen.getByRole("button", { name }));
     }
     expect(sent).toHaveLength(3);
-    expect(screen.getByText("On your card: Joensuu")).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "On your card: Joensuu" })).toBeTruthy();
   });
 
   it("offers the field alone to somebody with no home, whose place left the list", async () => {
     const sent = fakeApi(null, () => json(IN_KALLIO));
     await show();
-    expect(screen.queryByRole("heading", { name: "What should your card show?" })).toBeNull();
+    expect(screen.queryByRole("heading", { name: QUESTION })).toBeNull();
     expect(screen.queryByText(/On your card/)).toBeNull();
+    expect(screen.queryAllByRole("radio")).toEqual([]);
+    expect(screen.getByText(LEAD)).toBeTruthy();
     noProblems();
     await typeDigits("00530");
     await press(screen.getByRole("button", { name: "0 0 5 3 0, Kallio" }));
-    await waitFor(() => expect(screen.getByText("On your card: Helsinki")).toBeTruthy());
+    await waitFor(() => expect(checked("Helsinki")).toBe(true));
     expect(sent).toEqual([{ postalCode: "00530" }]);
   });
 
@@ -186,26 +197,17 @@ describe("PlaceScreen", () => {
     await show();
     await typeDigits("83960");
     await press(screen.getByRole("button", { name: "8 3 9 6 0, Koli" }));
-    await waitFor(() =>
-      expect(
-        screen.getByText("We can't find that code. Choose the nearest area from the list."),
-      ).toBeTruthy(),
-    );
-    expect(screen.queryByText("Saved.")).toBeNull();
+    await waitFor(() => expect(screen.getByText(UNKNOWN)).toBeTruthy());
     expect(screen.getByLabelText("Postal code").props.value).toBe("83960");
-    expect(screen.getByText("On your card: Helsinki")).toBeTruthy();
+    expect(checked("Helsinki")).toBe(true);
     // The refused row is gone, with the nearest areas in its place, and the screen says why once.
     expect(screen.queryByRole("button", { name: "8 3 9 6 0, Koli" })).toBeNull();
-    expect(
-      screen.getAllByText("We can't find that code. Choose the nearest area from the list."),
-    ).toHaveLength(1);
+    expect(screen.getAllByText(UNKNOWN)).toHaveLength(1);
     refuse = false;
     await typeDigits("83940");
     await press(screen.getByRole("button", { name: "8 3 9 4 0, Nunnanlahti" }));
-    await waitFor(() => expect(screen.getByText("Saved.")).toBeTruthy());
-    expect(
-      screen.queryByText("We can't find that code. Choose the nearest area from the list."),
-    ).toBeNull();
+    await waitFor(() => expect(screen.getByLabelText("Postal code").props.value).toBe(""));
+    expect(screen.queryByText(UNKNOWN)).toBeNull();
   });
 
   it.each([
@@ -214,13 +216,13 @@ describe("PlaceScreen", () => {
   ])("says that it could not be saved on %s", async (_what, answer) => {
     fakeApi(IN_KALLIO, answer);
     await show();
-    await press(screen.getByRole("button", { name: "Kallio" }));
+    await press(option("Kallio"));
     await waitFor(() => expect(screen.getByText("It could not be saved. Try again.")).toBeTruthy());
-    expect(selected("Helsinki")).toBe(true);
-    expect(screen.getByText("On your card: Helsinki")).toBeTruthy();
+    expect(checked("Helsinki")).toBe(true);
+    expect(checked("Kallio")).toBe(false);
   });
 
-  it("says it is saving, holds the buttons meanwhile, and the notice goes with the next tap", async () => {
+  it("holds the rows while it saves, with no line that pushes them down, and asks nothing more meanwhile (#581)", async () => {
     let answer: ((response: Response) => void) | undefined;
     const sent = fakeApi(
       IN_KALLIO,
@@ -231,50 +233,135 @@ describe("PlaceScreen", () => {
     );
     await show();
     await typeDigits("00530");
-    await press(screen.getByRole("button", { name: "Kallio" }));
-    expect(screen.getByText("Saving…")).toBeTruthy();
+    await press(option("Kallio"));
+    expect(screen.queryByText("Saving…")).toBeNull();
     expect(
       screen.getByRole("button", { name: "0 0 5 3 0, Kallio" }).props.accessibilityState?.disabled,
     ).toBe(true);
-    await press(screen.getByRole("button", { name: "Helsinki" }));
+    await press(option("Helsinki"));
     expect(sent).toHaveLength(1);
     await act(async () => {
       answer?.(json({ ...IN_KALLIO, showArea: true }));
       await settle();
     });
-    expect(screen.queryByText("Saving…")).toBeNull();
-    expect(screen.getByText("Saved.")).toBeTruthy();
+    expect(screen.queryByText("Saved.")).toBeNull();
+    expect(checked("Kallio")).toBe(true);
+    expect(
+      screen.getByRole("button", { name: "0 0 5 3 0, Kallio" }).props.accessibilityState?.disabled,
+    ).toBe(false);
   });
 
-  it.each([
-    ["saved", "polite", () => json({ ...IN_KALLIO, showArea: true }), "Saved."],
-    [
-      "refused",
-      "assertive",
-      () => refusal("internal_error", 500),
-      "It could not be saved. Try again.",
-    ],
-  ])(
-    "says a %s notice where it appears, on Android by its live region",
-    async (_what, region, save, words) => {
+  it("takes a refusal's words away with the next tap", async () => {
+    let refuse = true;
+    fakeApi(IN_KALLIO, () =>
+      refuse ? refusal("internal_error", 500) : json({ ...IN_KALLIO, showArea: true }),
+    );
+    await show();
+    await press(option("Kallio"));
+    await waitFor(() => expect(screen.getByText("It could not be saved. Try again.")).toBeTruthy());
+    refuse = false;
+    await press(option("Kallio"));
+    expect(screen.queryByText("It could not be saved. Try again.")).toBeNull();
+    expect(checked("Kallio")).toBe(true);
+  });
+
+  describe("a save, heard and not drawn (#581)", () => {
+    /** The save waits until the test answers, so what is said as it starts can be told from what is said as it lands. */
+    const waitingSave = () => {
+      let answer: ((response: Response) => void) | undefined;
+      fakeApi(
+        IN_KALLIO,
+        () =>
+          new Promise<Response>((resolve) => {
+            answer = resolve;
+          }),
+      );
+      return () =>
+        act(async () => {
+          answer?.(json({ ...IN_KALLIO, showArea: true }));
+          await settle();
+        });
+    };
+
+    it("is queued on iOS behind the row's own name, as it starts and as it lands", async () => {
+      jest.replaceProperty(Platform, "OS", "ios");
+      const said = queued();
+      const land = waitingSave();
+      await show();
+      expect(said).not.toHaveBeenCalled();
+      await press(option("Kallio"));
+      expect(said.mock.calls).toEqual([["Saving…", { queue: true }]]);
+      await land();
+      expect(said.mock.calls).toEqual([
+        ["Saving…", { queue: true }],
+        ["Saved.", { queue: true }],
+      ]);
+    });
+
+    it("is told to TalkBack too, with no line for a live region to read", async () => {
       jest.replaceProperty(Platform, "OS", "android");
       const announce = spoken();
-      fakeApi(IN_KALLIO, save);
+      const land = waitingSave();
       await show();
-      await press(screen.getByRole("button", { name: "Kallio" }));
-      await waitFor(() => expect(screen.getByText(words)).toBeTruthy());
-      expect(screen.getByText(words).props.accessibilityLiveRegion).toBe(region);
       expect(announce).not.toHaveBeenCalled();
-    },
-  );
+      await press(option("Kallio"));
+      expect(announce.mock.calls).toEqual([["Saving…"]]);
+      await land();
+      expect(announce.mock.calls).toEqual([["Saving…"], ["Saved."]]);
+      expect(screen.queryByText("Saved.")).toBeNull();
+      expect(screen.queryByText("Saving…")).toBeNull();
+    });
 
-  it("speaks the notice on iOS, which has no live regions", async () => {
-    jest.replaceProperty(Platform, "OS", "ios");
-    const announce = spoken();
-    fakeApi(IN_KALLIO, () => json({ ...IN_KALLIO, showArea: true }));
-    await show();
-    await press(screen.getByRole("button", { name: "Kallio" }));
-    await waitFor(() => expect(announce).toHaveBeenCalledWith("Saved."));
+    it("says no Saved. of a save refused", async () => {
+      jest.replaceProperty(Platform, "OS", "android");
+      const announce = spoken();
+      fakeApi(IN_KALLIO, () => refusal("internal_error", 500));
+      await show();
+      await press(option("Kallio"));
+      await waitFor(() =>
+        expect(screen.getByText("It could not be saved. Try again.")).toBeTruthy(),
+      );
+      expect(announce.mock.calls).toEqual([["Saving…"]]);
+    });
+
+    it.each([
+      ["fi-FI", "Kallio", "Tallennetaan…", "Tallennettu."],
+      ["sv-FI", "Berghäll", "Sparar…", "Sparat."],
+    ])("is said in %s", async (tag, area, saving, saved) => {
+      (useLocales as jest.Mock).mockReturnValue([{ languageTag: tag }]);
+      jest.replaceProperty(Platform, "OS", "android");
+      const announce = spoken();
+      fakeApi(IN_KALLIO, () => json({ ...IN_KALLIO, showArea: true }));
+      await show();
+      await press(option(area));
+      await waitFor(() => expect(announce).toHaveBeenCalledTimes(2));
+      expect(announce.mock.calls).toEqual([[saving], [saved]]);
+    });
+  });
+
+  describe("a refusal, which nothing on the screen can say", () => {
+    it("stands in a line, on Android by its assertive live region", async () => {
+      jest.replaceProperty(Platform, "OS", "android");
+      const announce = spoken();
+      fakeApi(IN_KALLIO, () => refusal("internal_error", 500));
+      await show();
+      await press(option("Kallio"));
+      const words = "It could not be saved. Try again.";
+      await waitFor(() => expect(screen.getByText(words)).toBeTruthy());
+      expect(screen.getByText(words).props.accessibilityLiveRegion).toBe("assertive");
+      expect(announce).not.toHaveBeenCalledWith(words);
+    });
+
+    it("is spoken on iOS, which has no live regions", async () => {
+      jest.replaceProperty(Platform, "OS", "ios");
+      const announce = spoken();
+      fakeApi(IN_KALLIO, () => refusal("internal_error", 500));
+      await show();
+      await press(option("Kallio"));
+      await waitFor(() =>
+        expect(announce).toHaveBeenCalledWith("It could not be saved. Try again."),
+      );
+    });
   });
 
   it("stays above the keyboard: a tap on a row counts with it up", async () => {
@@ -295,17 +382,35 @@ describe("PlaceScreen", () => {
   });
 
   it.each([
-    ["fi-FI", "Koti", "Kortillasi: Helsinki"],
-    ["sv-FI", "Hem", "På ditt kort: Helsingfors"],
-  ])("speaks %s", async (tag, title, line) => {
+    [
+      "fi-FI",
+      "Koti",
+      "Takaisin profiiliisi",
+      "Muut näkevät kaupungin tai alueesi nimen, eivät koskaan numeroita.",
+      "Mitä korttisi näyttää?",
+      "Helsinki",
+      "Kortillasi: Joensuu",
+    ],
+    [
+      "sv-FI",
+      "Hem",
+      "Tillbaka till din profil",
+      "Andra ser en stad eller ditt område med namn, aldrig siffrorna.",
+      "Vad ska ditt kort visa?",
+      "Helsingfors",
+      "På ditt kort: Joensuu",
+    ],
+  ])("speaks %s", async (tag, title, back, lead, question, town, onCard) => {
     (useLocales as jest.Mock).mockReturnValue([{ languageTag: tag }]);
     fakeApi(IN_KALLIO);
     await show();
-    expectPinnedHeader(
-      title,
-      tag === "fi-FI" ? "Takaisin profiiliisi" : "Tillbaka till din profil",
-    );
-    expect(screen.getByText(line)).toBeTruthy();
+    expectPinnedHeader(title, back);
+    expect(screen.getByText(lead)).toBeTruthy();
+    expect(screen.getByRole("heading", { name: question })).toBeTruthy();
+    expect(checked(town)).toBe(true);
+    fakeApi(IN_KOLI);
+    await show();
+    expect(screen.getByRole("heading", { name: onCard })).toBeTruthy();
   });
 
   it("says it is loading, then that the profile could not be read, and tries again", async () => {
@@ -325,6 +430,6 @@ describe("PlaceScreen", () => {
     expect(screen.getByText("Your profile could not be loaded.")).toBeTruthy();
     fakeApi(IN_KALLIO);
     await press(screen.getByRole("button", { name: "Try again" }));
-    await waitFor(() => expect(screen.getByText("On your card: Helsinki")).toBeTruthy());
+    await waitFor(() => expect(checked("Helsinki")).toBe(true));
   });
 });

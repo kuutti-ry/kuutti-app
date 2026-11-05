@@ -40,6 +40,9 @@ const rowNames = () =>
 const speaking = (tag: string) => (useLocales as jest.Mock).mockReturnValue([{ languageTag: tag }]);
 /** What this test says aloud: the mock outlives a test, with what earlier ones said. */
 const spoken = () => jest.spyOn(AccessibilityInfo, "announceForAccessibility").mockClear();
+/** What this test says aloud behind what is being said: iOS's way for words no line carries (#581). */
+const queued = () =>
+  jest.spyOn(AccessibilityInfo, "announceForAccessibilityWithOptions").mockClear();
 
 const town = { fi: "Helsinki", sv: "Helsingfors" };
 const area = { fi: "Kallio", sv: "Berghäll" };
@@ -204,12 +207,8 @@ describe("PlacePicker", () => {
     await show(<PlacePicker busy={false} onPick={jest.fn()} />);
     await typeDigits("0");
     expect(screen.getAllByRole("button")).toHaveLength(PLACE_ROWS);
-    expect(
-      screen.getByText(`The first ${PLACE_ROWS} areas. More digits narrow them.`),
-    ).toBeTruthy();
     await typeDigits("00530");
     expect(rowNames()).toEqual(["0 0 5 3 0, Kallio"]);
-    expect(screen.getByText("1 area matches.")).toBeTruthy();
     // Both are drawn: the digits, then the name beside them.
     expect(screen.getByText("00530")).toBeTruthy();
     expect(screen.getByText("Kallio")).toBeTruthy();
@@ -218,10 +217,15 @@ describe("PlacePicker", () => {
   });
 
   it("counts the areas in the plural where there are several", async () => {
+    jest.replaceProperty(Platform, "OS", "android");
+    const announce = spoken();
     await show(<PlacePicker busy={false} onPick={jest.fn()} />);
     await typeDigits("9999");
     await typeDigits("999");
-    expect(screen.getByText(`${postalMatches("999", 9).length} areas match.`)).toBeTruthy();
+    expect(announce.mock.calls).toEqual([
+      ["1 area matches."],
+      [`${postalMatches("999", 9).length} areas match.`],
+    ]);
   });
 
   it("says a code the list lacks and offers the nearest, each a button that answers", async () => {
@@ -288,69 +292,147 @@ describe("PlacePicker", () => {
     expect(rowNames()).toEqual([`0 0 5 3 0, ${name}`]);
   });
 
-  it.each([
-    ["fi-FI", "1 alue sopii.", "Postinumero"],
-    ["sv-FI", "1 område passar.", "Postnummer"],
-  ])("says the line and the field's name in the %s of the catalogue", async (tag, line, label) => {
-    speaking(tag);
-    await show(<PlacePicker busy={false} onPick={jest.fn()} />);
-    await typeDigits("00530", label);
-    expect(screen.getByText(line)).toBeTruthy();
+  describe("how many there are, heard and not drawn: the rows show it (#581)", () => {
+    it.each([
+      [
+        "fi-FI",
+        "1 alue sopii.",
+        "Postinumero",
+        "Ensimmäiset 8 aluetta. Lisää numeroita tarkentaa listaa.",
+      ],
+      [
+        "sv-FI",
+        "1 område passar.",
+        "Postnummer",
+        "De första 8 områdena. Fler siffror begränsar listan.",
+      ],
+      ["en-US", "1 area matches.", "Postal code", "The first 8 areas. More digits narrow them."],
+    ])("says it in the %s of the catalogue", async (tag, one, label, more) => {
+      speaking(tag);
+      jest.replaceProperty(Platform, "OS", "android");
+      const announce = spoken();
+      await show(<PlacePicker busy={false} onPick={jest.fn()} />);
+      await typeDigits("0", label);
+      await typeDigits("00530", label);
+      expect(announce.mock.calls).toEqual([[more], [one]]);
+      expect(screen.queryByText(one)).toBeNull();
+      expect(screen.queryByText(more)).toBeNull();
+    });
+
+    it("tells iOS each time it changes, queued behind the keys being said", async () => {
+      jest.replaceProperty(Platform, "OS", "ios");
+      const said = queued();
+      const announce = spoken();
+      await show(<PlacePicker busy={false} onPick={jest.fn()} />);
+      expect(said).not.toHaveBeenCalled();
+      await typeDigits("00530");
+      expect(said.mock.calls).toEqual([["1 area matches.", { queue: true }]]);
+      await typeDigits("0");
+      expect(said.mock.calls.at(-1)).toEqual([
+        `The first ${PLACE_ROWS} areas. More digits narrow them.`,
+        { queue: true },
+      ]);
+      expect(announce).not.toHaveBeenCalled();
+    });
+
+    it("tells Android too, with no line for a live region to read", async () => {
+      jest.replaceProperty(Platform, "OS", "android");
+      const announce = spoken();
+      const said = queued();
+      await show(<PlacePicker busy={false} onPick={jest.fn()} />);
+      expect(announce).not.toHaveBeenCalled();
+      await typeDigits("00530");
+      expect(announce.mock.calls).toEqual([["1 area matches."]]);
+      expect(said).not.toHaveBeenCalled();
+    });
+
+    it("says it once while the words stay, and nothing for an empty field", async () => {
+      jest.replaceProperty(Platform, "OS", "android");
+      const announce = spoken();
+      await show(<PlacePicker busy={false} onPick={jest.fn()} />);
+      await typeDigits("9999");
+      await typeDigits("99990");
+      expect(announce.mock.calls).toEqual([["1 area matches."]]);
+      await typeDigits("");
+      expect(announce).toHaveBeenCalledTimes(1);
+    });
   });
 
-  it("speaks the line on iOS, which has no live regions, each time it changes", async () => {
-    jest.replaceProperty(Platform, "OS", "ios");
-    const announce = spoken();
-    await show(<PlacePicker busy={false} onPick={jest.fn()} />);
-    expect(announce).not.toHaveBeenCalled();
-    await typeDigits("00530");
-    expect(announce).toHaveBeenLastCalledWith("1 area matches.");
-    await typeDigits("99999");
-    expect(announce).toHaveBeenLastCalledWith(
-      "We can't find that code. Choose the nearest area from the list.",
-    );
-    await typeDigits("");
-    expect(announce).toHaveBeenCalledTimes(2);
-  });
+  describe("a code the list lacks, which no row can say", () => {
+    const UNKNOWN = "We can't find that code. Choose the nearest area from the list.";
 
-  it("leaves the line to Android's live region", async () => {
-    jest.replaceProperty(Platform, "OS", "android");
-    const announce = spoken();
-    await show(<PlacePicker busy={false} onPick={jest.fn()} />);
-    await typeDigits("00530");
-    expect(screen.getByText("1 area matches.").props.accessibilityLiveRegion).toBe("polite");
-    expect(announce).not.toHaveBeenCalled();
+    it("is drawn in a line above the rows, on iOS said once as it appears", async () => {
+      jest.replaceProperty(Platform, "OS", "ios");
+      const announce = spoken();
+      const said = queued();
+      await show(<PlacePicker busy={false} onPick={jest.fn()} />);
+      await typeDigits("99999");
+      expect(announce.mock.calls).toEqual([[UNKNOWN]]);
+      expect(said).not.toHaveBeenCalled();
+      expect(screen.getByText(UNKNOWN)).toBeTruthy();
+    });
+
+    it("is left to Android's live region", async () => {
+      jest.replaceProperty(Platform, "OS", "android");
+      const announce = spoken();
+      await show(<PlacePicker busy={false} onPick={jest.fn()} />);
+      await typeDigits("99999");
+      expect(screen.getByText(UNKNOWN).props.accessibilityLiveRegion).toBe("polite");
+      expect(announce).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ["fi-FI", "Postinumero", "Emme löydä tätä postinumeroa. Valitse lähin alue listalta."],
+      ["sv-FI", "Postnummer", "Vi hittar inte det postnumret. Välj närmaste område i listan."],
+    ])("says it in the %s of the catalogue", async (tag, label, words) => {
+      speaking(tag);
+      await show(<PlacePicker busy={false} onPick={jest.fn()} />);
+      await typeDigits("99999", label);
+      expect(screen.getByText(words)).toBeTruthy();
+    });
   });
 });
 
 describe("PlaceChoice", () => {
-  const buttons = () => screen.queryAllByRole("button");
-  const selected = (name: string) =>
-    screen.getByRole("button", { name }).props.accessibilityState?.selected;
+  const QUESTION = "What should your card show?";
+  /** A place by its name, chosen or not: the chosen one's name carries its mark. */
+  const option = (name: string) =>
+    screen.getByRole("radio", { name: new RegExp(`^(✓ )?${name}$`) });
+  const checked = (name: string) => option(name).props.accessibilityState?.checked;
 
-  it("offers the town and the area by name, with the one shown selected and said", async () => {
+  it("asks its question over the town and the area, whole-width radios in a group, the one shown filled and said", async () => {
     await show(<PlaceChoice home={home()} busy={false} onChoose={jest.fn()} />);
-    expect(selected("Helsinki")).toBe(true);
-    expect(selected("Kallio")).toBe(false);
-    expect(screen.getByText("On your card: Helsinki")).toBeTruthy();
+    expect(screen.getByRole("heading", { name: QUESTION })).toBeTruthy();
+    const group = screen.getByLabelText(QUESTION);
+    expect(group.props.accessibilityRole).toBe("radiogroup");
+    expect(group.props.className).not.toMatch(/\bflex-row\b/);
+    expect(screen.getAllByRole("radio").map((row) => row.props.accessibilityLabel)).toEqual([
+      "✓ Helsinki",
+      "Kallio",
+    ]);
+    expect(checked("Helsinki")).toBe(true);
+    expect(checked("Kallio")).toBe(false);
+    expect(screen.getByText("✓ Helsinki")).toBeTruthy();
+    // The filled one says it: no line repeats it, and no word of the town why.
+    expect(screen.queryByText(/On your card/)).toBeNull();
     expect(screen.queryByText("Your card shows the nearest town.")).toBeNull();
     noProblems();
   });
 
-  it("says the area once it is the one shown", async () => {
+  it("fills the area once it is the one shown", async () => {
     await show(<PlaceChoice home={home({ showArea: true })} busy={false} onChoose={jest.fn()} />);
-    expect(selected("Helsinki")).toBe(false);
-    expect(selected("Kallio")).toBe(true);
-    expect(screen.getByText("On your card: Kallio")).toBeTruthy();
+    expect(checked("Helsinki")).toBe(false);
+    expect(checked("Kallio")).toBe(true);
+    expect(screen.queryByText(/On your card/)).toBeNull();
   });
 
   it.each([
     ["the area", "Kallio", false, true],
     ["the town", "Helsinki", true, false],
-  ])("asks for %s on its button", async (_what, name, showArea, asked) => {
+  ])("asks for %s on its row", async (_what, name, showArea, asked) => {
     const onChoose = jest.fn();
     await show(<PlaceChoice home={home({ showArea })} busy={false} onChoose={onChoose} />);
-    await press(screen.getByRole("button", { name }));
+    await press(option(name));
     expect(onChoose).toHaveBeenCalledTimes(1);
     expect(onChoose).toHaveBeenCalledWith(asked);
   });
@@ -358,28 +440,27 @@ describe("PlaceChoice", () => {
   it("asks nothing for what is shown already, or while a save is on its way", async () => {
     const onChoose = jest.fn();
     await show(<PlaceChoice home={home()} busy={false} onChoose={onChoose} />);
-    await press(screen.getByRole("button", { name: "Helsinki" }));
+    await press(option("Helsinki"));
     expect(onChoose).not.toHaveBeenCalled();
     await show(<PlaceChoice home={home()} busy onChoose={onChoose} />);
-    await press(
-      screen.getAllByRole("button", { name: "Kallio" }).at(-1) as ReturnType<
-        typeof screen.getByRole
-      >,
-    );
+    await press(option("Kallio"));
     expect(onChoose).not.toHaveBeenCalled();
   });
 
-  it("offers no choice where no area is kept, and still says what the card shows", async () => {
+  it("has what the card shows in the question's place and role where no area is kept, with nothing to press (#581)", async () => {
     const joensuu = { fi: "Joensuu", sv: "Joensuu" };
     await show(
       <PlaceChoice home={home({ town: joensuu, area: null })} busy={false} onChoose={jest.fn()} />,
     );
-    expect(buttons()).toEqual([]);
-    expect(screen.getByText("Your card shows the nearest town.")).toBeTruthy();
-    expect(screen.getByText("On your card: Joensuu")).toBeTruthy();
+    expect(screen.queryAllByRole("radio")).toEqual([]);
+    expect(screen.queryAllByRole("button")).toEqual([]);
+    expect(screen.getByRole("heading", { name: "On your card: Joensuu" })).toBeTruthy();
+    expect(screen.queryByText(QUESTION)).toBeNull();
+    expect(screen.queryByLabelText(QUESTION)).toBeNull();
+    expect(screen.queryByText("Your card shows the nearest town.")).toBeNull();
   });
 
-  // The list's own cases: two buttons of one name would choose nothing.
+  // The list's own cases: two rows of one name would choose nothing.
   it.each([
     ["Sipoo", { fi: "Sipoo", sv: "Sibbo" }],
     ["Maarianhamina", { fi: "Maarianhamina", sv: "Mariehamn" }],
@@ -387,8 +468,8 @@ describe("PlaceChoice", () => {
     await show(
       <PlaceChoice home={home({ town: place, area: place })} busy={false} onChoose={jest.fn()} />,
     );
-    expect(buttons()).toEqual([]);
-    expect(screen.getByText(`On your card: ${name}`)).toBeTruthy();
+    expect(screen.queryAllByRole("radio")).toEqual([]);
+    expect(screen.getByRole("heading", { name: `On your card: ${name}` })).toBeTruthy();
   });
 
   it("asks the question of the reader's own language, where the two names differ in one", async () => {
@@ -397,30 +478,58 @@ describe("PlaceChoice", () => {
       area: { fi: "Savonlinna", sv: "Savonlinna" },
     });
     await show(<PlaceChoice home={places} busy={false} onChoose={jest.fn()} />);
-    expect(buttons()).toEqual([]);
+    expect(screen.queryAllByRole("radio")).toEqual([]);
     speaking("sv-FI");
     await show(<PlaceChoice home={places} busy={false} onChoose={jest.fn()} />);
-    expect(screen.getByRole("button", { name: "Nyslott" })).toBeTruthy();
-    expect(screen.getAllByRole("button", { name: "Savonlinna" })).toHaveLength(1);
+    expect(option("Nyslott")).toBeTruthy();
+    expect(screen.getAllByRole("radio", { name: "Savonlinna" })).toHaveLength(1);
+  });
+
+  describe("its heading's level, which the screen that holds it says", () => {
+    const joensuu = { fi: "Joensuu", sv: "Joensuu" };
+    const alone = home({ town: joensuu, area: null });
+
+    it.each([
+      ["a level under the screen's title by default, as Home has it", undefined, "3"],
+      ["the step's own where onboarding says so", "h2", "2"],
+    ] as const)("over a choice, %s", async (_what, heading, level) => {
+      await show(<PlaceChoice home={home()} busy={false} onChoose={jest.fn()} heading={heading} />);
+      expect(screen.getByRole("heading", { name: QUESTION }).props["aria-level"]).toBe(level);
+    });
+
+    it.each([
+      ["a level under the screen's title by default, as Home has it", undefined, "3"],
+      ["the step's own where onboarding says so", "h2", "2"],
+    ] as const)("in its place, %s", async (_what, heading, level) => {
+      await show(<PlaceChoice home={alone} busy={false} onChoose={jest.fn()} heading={heading} />);
+      expect(
+        screen.getByRole("heading", { name: "On your card: Joensuu" }).props["aria-level"],
+      ).toBe(level);
+    });
   });
 
   it.each([
-    ["en-US", "Helsinki", "Kallio", "On your card: Helsinki"],
-    ["fi-FI", "Helsinki", "Kallio", "Kortillasi: Helsinki"],
-    ["sv-FI", "Helsingfors", "Berghäll", "På ditt kort: Helsingfors"],
-  ])("speaks %s", async (tag, townName, areaName, line) => {
+    ["en-US", "Helsinki", "Kallio", QUESTION, "On your card: Joensuu"],
+    ["fi-FI", "Helsinki", "Kallio", "Mitä korttisi näyttää?", "Kortillasi: Joensuu"],
+    ["sv-FI", "Helsingfors", "Berghäll", "Vad ska ditt kort visa?", "På ditt kort: Joensuu"],
+  ])("speaks %s", async (tag, townName, areaName, question, line) => {
     speaking(tag);
     await show(<PlaceChoice home={home()} busy={false} onChoose={jest.fn()} />);
-    expect(screen.getByRole("button", { name: townName })).toBeTruthy();
-    expect(screen.getByRole("button", { name: areaName })).toBeTruthy();
-    expect(screen.getByText(line)).toBeTruthy();
+    expect(option(townName)).toBeTruthy();
+    expect(option(areaName)).toBeTruthy();
+    expect(screen.getByLabelText(question).props.accessibilityRole).toBe("radiogroup");
+    const joensuu = { fi: "Joensuu", sv: "Joensuu" };
+    await show(
+      <PlaceChoice home={home({ town: joensuu, area: null })} busy={false} onChoose={jest.fn()} />,
+    );
+    expect(screen.getByRole("heading", { name: line })).toBeTruthy();
   });
 
   it("holds at the largest text with a long name, wrapping and not cutting it", async () => {
     jest.spyOn(PixelRatio, "getFontScale").mockReturnValue(MAX_FONT_SCALE);
     const long = home({ area: { fi: "Toukola - Kumpula - Vanhakaupunki", sv: "x" } });
     await show(<PlaceChoice home={long} busy={false} onChoose={jest.fn()} />);
-    expect(screen.getByRole("button", { name: "Toukola - Kumpula - Vanhakaupunki" })).toBeTruthy();
+    expect(option("Toukola - Kumpula - Vanhakaupunki")).toBeTruthy();
     expect(hasCutText(screen.toJSON() as HostNode)).toBe(false);
     noProblems();
   });

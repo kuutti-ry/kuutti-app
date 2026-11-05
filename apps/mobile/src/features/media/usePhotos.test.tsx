@@ -152,6 +152,36 @@ describe("usePhotos: adding", () => {
     expect(result.current.notice).toBeNull();
   });
 
+  it("stays picking through the picker and the on-device check, with no step of its own before the upload (#581)", async () => {
+    serve(listing(() => json(list(1))));
+    launch.mockResolvedValueOnce({
+      canceled: false,
+      assets: [{ uri: "file:///a.jpg", width: 1200, height: 900 }],
+    });
+    let allow: (verdict: "allow") => void = () => undefined;
+    setLocalCheck(
+      () =>
+        new Promise((resolve) => {
+          allow = resolve;
+        }),
+    );
+    (globalThis as { XMLHttpRequest: unknown }).XMLHttpRequest = SteppedXhr;
+    const { result } = await ready();
+    let adding: Promise<void> | undefined;
+    await act(async () => {
+      adding = result.current.add();
+    });
+    // The picture is chosen, and being checked: the same held state as the picker's.
+    expect(result.current.busy).toEqual({ kind: "picking" });
+    await act(async () => allow("allow"));
+    await waitFor(() => expect(result.current.busy).toEqual({ kind: "uploading", percent: 0 }));
+    await act(async () => {
+      SteppedXhr.current?.answer(201, JSON.stringify(photo(2)));
+      await adding;
+    });
+    expect(result.current.busy).toEqual({ kind: "idle" });
+  });
+
   it("reports the upload's progress in whole percent, appends the new photo, then reads the list again for its tips (#287)", async () => {
     const seen = serve(
       listing(

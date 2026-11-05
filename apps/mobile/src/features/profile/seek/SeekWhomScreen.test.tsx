@@ -8,8 +8,9 @@ import { expectPinnedHeader } from "@/test/layout";
 import { renderWithTheme } from "@/test/render";
 import { SeekWhomScreen } from "./SeekWhomScreen";
 
-// Whom one seeks (#542): the seeks step's chips from the stored answer, saved on
-// leaving, one to three, and whoever has no consent never gets this far.
+// Whom one seeks (#542): the seeks step's rows from the stored answer, each a
+// checkbox, saved on leaving, one to three, and whoever has no consent never gets
+// this far.
 
 const settle = () => new Promise<void>((resolve) => setTimeout(resolve, 10));
 const show = async (ui: React.ReactElement) => {
@@ -118,20 +119,22 @@ const leaveAndGo = async (view: Awaited<ReturnType<typeof show>>) => {
   });
 };
 
-const CHIPS = ["Women", "Men", "Non-binary people", "Anyone"];
+const ROWS = ["Women", "Men", "Non-binary people", "Anyone"];
 const KEEP_ONE = "Keep at least one.";
 const FAILED = "It could not be saved. Try again.";
 const LOAD_FAILED = "Your profile could not be loaded.";
 const THE_QUESTION = "Leave without saving?";
 const BACK = "Back to what you seek";
 
-const chip = (name: string) => screen.getByRole("button", { name });
-const chosen = () => CHIPS.filter((name) => chip(name).props.accessibilityState?.selected === true);
+const button = (name: string) => screen.getByRole("button", { name });
+/** A row by its word, chosen or not: the chosen one's name carries its mark. */
+const row = (name: string) => screen.getByRole("checkbox", { name: new RegExp(`^(✓ )?${name}$`) });
+const chosen = () => ROWS.filter((name) => row(name).props.accessibilityState?.checked === true);
 
 const opened = async (start?: Partial<Server>) => {
   const api = fakeApi(start);
   const view = await show(<SeekWhomScreen />);
-  await waitFor(() => expect(chip("Women")).toBeTruthy());
+  await waitFor(() => expect(row("Women")).toBeTruthy());
   return { ...api, view };
 };
 
@@ -153,23 +156,28 @@ beforeEach(async () => {
 afterEach(() => jest.restoreAllMocks());
 
 describe("SeekWhomScreen", () => {
-  it("keeps the question and the way back to the list pinned above the chips", async () => {
+  it("keeps the question and the way back to the list pinned above the rows", async () => {
     await opened();
     expectPinnedHeader("Whom are you looking for?", BACK);
-    await press(chip(BACK));
+    await press(button(BACK));
     expect(router.back).toHaveBeenCalledTimes(1);
   });
 
-  it("says that the answer also decides who sees the person", async () => {
+  it("has no line over the rows: the question and Anyone say it, and the list says the rest (#581)", async () => {
     await opened();
-    expect(
-      screen.getByText("Pick everyone you want to see. It also decides who sees you."),
-    ).toBeTruthy();
+    expect(screen.queryAllByText(/./).map((node) => node.props.children)).toEqual([
+      "Whom are you looking for?",
+      "✓ Women",
+      "Men",
+      "Non-binary people",
+      "Anyone",
+    ]);
   });
 
-  it("has the chips and the way back, each labelled and a full target, and no Save", async () => {
+  it("has the rows and the way back, each labelled and a full target, and no Save", async () => {
     await opened();
-    for (const name of [BACK, ...CHIPS]) expect(chip(name)).toBeTruthy();
+    expect(button(BACK)).toBeTruthy();
+    for (const name of ROWS) expect(row(name)).toBeTruthy();
     const found = pressables(screen.toJSON() as HostNode);
     expect(found).toHaveLength(5);
     expect(found.flatMap((node) => a11yProblems(node))).toEqual([]);
@@ -179,17 +187,17 @@ describe("SeekWhomScreen", () => {
   it.each([
     ["one", ["man"], ["Men"]],
     ["two", ["non_binary", "woman"], ["Women", "Non-binary people"]],
-    ["all three, which is Anyone", ["man", "woman", "non_binary"], CHIPS],
+    ["all three, which is Anyone", ["man", "woman", "non_binary"], ROWS],
   ])("starts from the stored answer: %s", async (_what, seeks, shown) => {
     await opened({ seeks });
     expect(chosen()).toEqual(shown);
   });
 
-  describe("the only chip chosen", () => {
+  describe("the only row chosen", () => {
     it("stays chosen and says why, in an assertive live region", async () => {
       await opened({ seeks: ["man"] });
       expect(screen.queryByText(KEEP_ONE)).toBeNull();
-      await press(chip("Men"));
+      await press(row("Men"));
       expect(chosen()).toEqual(["Men"]);
       expect(screen.getByText(KEEP_ONE).props.accessibilityLiveRegion).toBe("assertive");
     });
@@ -199,9 +207,9 @@ describe("SeekWhomScreen", () => {
       const said = jest.spyOn(AccessibilityInfo, "announceForAccessibilityWithOptions");
       said.mockClear();
       await opened({ seeks: ["man"] });
-      await press(chip("Men"));
+      await press(row("Men"));
       expect(said.mock.calls).toEqual([[KEEP_ONE, { queue: true }]]);
-      await press(chip("Men"));
+      await press(row("Men"));
       expect(said.mock.calls).toEqual([
         [KEEP_ONE, { queue: true }],
         [KEEP_ONE, { queue: true }],
@@ -211,29 +219,29 @@ describe("SeekWhomScreen", () => {
 
     it("is said no more once another is chosen, and again when it is the only one anew", async () => {
       await opened({ seeks: ["man"] });
-      await press(chip("Men"));
-      await press(chip("Women"));
+      await press(row("Men"));
+      await press(row("Women"));
       expect(chosen()).toEqual(["Women", "Men"]);
       expect(screen.queryByText(KEEP_ONE)).toBeNull();
-      await press(chip("Men"));
+      await press(row("Men"));
       expect(chosen()).toEqual(["Women"]);
       expect(screen.queryByText(KEEP_ONE)).toBeNull();
-      await press(chip("Women"));
+      await press(row("Women"));
       expect(chosen()).toEqual(["Women"]);
       expect(screen.getByText(KEEP_ONE)).toBeTruthy();
     });
 
     it("is gone once Anyone is chosen", async () => {
       await opened({ seeks: ["man"] });
-      await press(chip("Men"));
-      await press(chip("Anyone"));
-      expect(chosen()).toEqual(CHIPS);
+      await press(row("Men"));
+      await press(row("Anyone"));
+      expect(chosen()).toEqual(ROWS);
       expect(screen.queryByText(KEEP_ONE)).toBeNull();
     });
 
     it("changes nothing: leaving after it sends nothing", async () => {
       const { writes } = await opened({ seeks: ["man"] });
-      await press(chip("Men"));
+      await press(row("Men"));
       await leave();
       expect(writes).toEqual([]);
     });
@@ -241,9 +249,9 @@ describe("SeekWhomScreen", () => {
 
   it("chooses all three on Anyone, and dropping one takes Anyone off", async () => {
     await opened();
-    await press(chip("Anyone"));
-    expect(chosen()).toEqual(CHIPS);
-    await press(chip("Men"));
+    await press(row("Anyone"));
+    expect(chosen()).toEqual(ROWS);
+    await press(row("Men"));
     expect(chosen()).toEqual(["Women", "Non-binary people"]);
   });
 
@@ -258,11 +266,11 @@ describe("SeekWhomScreen", () => {
 
   it("sends nothing for a change taken back, nor for the same set in another order", async () => {
     const { writes, view } = await opened({ seeks: ["woman", "man"] });
-    await press(chip("Men"));
-    await press(chip("Men"));
+    await press(row("Men"));
+    await press(row("Men"));
     // The stored answer again; then Women last, which makes it ["man", "woman"].
-    await press(chip("Women"));
-    await press(chip("Women"));
+    await press(row("Women"));
+    await press(row("Women"));
     await leaveAndGo(view);
     expect(writes).toEqual([]);
   });
@@ -274,15 +282,15 @@ describe("SeekWhomScreen", () => {
     ["everyone, by Anyone", ["woman"], ["Anyone"], ["woman", "man", "non_binary"]],
   ])("sends %s", async (_what, seeks, pressed, sent) => {
     const { writes, view } = await opened({ seeks });
-    for (const name of pressed) await press(chip(name));
+    for (const name of pressed) await press(row(name));
     await leaveAndGo(view);
     expect(writes).toEqual([saved(sent)]);
   });
 
   it("sends exactly whom one seeks, once, on leaving, and nothing before it", async () => {
     const { writes, server, view } = await opened();
-    await press(chip("Men"));
-    await press(chip("Non-binary people"));
+    await press(row("Men"));
+    await press(row("Non-binary people"));
     expect(writes).toEqual([]);
     const event = await leave();
     await leave();
@@ -296,7 +304,7 @@ describe("SeekWhomScreen", () => {
 
   it("brings a refused change back with the draft and says it could not be saved, and goes on the word", async () => {
     const { writes, view } = await opened({ refusal: () => envelope("internal_error", 500) });
-    await press(chip("Men"));
+    await press(row("Men"));
     await leaveAndGo(view);
     expect(writes).toEqual([saved(["woman", "man"])]);
     expect(router.push).toHaveBeenCalledWith("/profile/seek/whom");
@@ -307,7 +315,7 @@ describe("SeekWhomScreen", () => {
     expect(chosen()).toEqual(["Women", "Men"]);
     expect(screen.getByText(FAILED)).toBeTruthy();
 
-    await press(chip("Leave without saving"));
+    await press(button("Leave without saving"));
     expect(screen.queryByText(THE_QUESTION)).toBeNull();
     expect(router.back).toHaveBeenCalledTimes(1);
     await leave();
@@ -322,8 +330,8 @@ describe("SeekWhomScreen", () => {
     try {
       fakeApi({ refusal: () => envelope("internal_error", 500) });
       const view = await show(<SeekWhomScreen />);
-      await waitFor(() => expect(chip(anyone)).toBeTruthy());
-      await press(chip(anyone));
+      await waitFor(() => expect(row(anyone)).toBeTruthy());
+      await press(row(anyone));
       await leaveAndGo(view);
       await show(<SeekWhomScreen />);
       await waitFor(() => expect(screen.getByText(failed)).toBeTruthy());
@@ -337,7 +345,7 @@ describe("SeekWhomScreen", () => {
     const { server, writes, view } = await opened({
       refusal: () => envelope("internal_error", 500),
     });
-    await press(chip("Men"));
+    await press(row("Men"));
     await leaveAndGo(view);
     server.refusal = null;
     server.wait = new Promise(() => {});
@@ -350,7 +358,7 @@ describe("SeekWhomScreen", () => {
 
   it("holds a change the network lost, as any refusal", async () => {
     const { server, view } = await opened();
-    await press(chip("Men"));
+    await press(row("Men"));
     server.offline = true;
     await leaveAndGo(view);
     expect(router.push).toHaveBeenCalledWith("/profile/seek/whom");
@@ -364,7 +372,7 @@ describe("SeekWhomScreen", () => {
   describe("a change brought back with its read lost too", () => {
     const broughtBack = async () => {
       const { server, writes, view } = await opened();
-      await press(chip("Men"));
+      await press(row("Men"));
       server.offline = true;
       await leaveAndGo(view);
       const again = await show(<SeekWhomScreen />);
@@ -374,7 +382,7 @@ describe("SeekWhomScreen", () => {
 
     it("tries the save again on the leaving after Keep editing", async () => {
       const { server, writes, again } = await broughtBack();
-      await press(chip("Keep editing"));
+      await press(button("Keep editing"));
       expect(screen.queryByText(THE_QUESTION)).toBeNull();
       expect(screen.queryByText(LOAD_FAILED)).toBeNull();
       expect(router.back).not.toHaveBeenCalled();
@@ -388,7 +396,7 @@ describe("SeekWhomScreen", () => {
 
     it("comes back again when that save is lost too", async () => {
       const { writes, again } = await broughtBack();
-      await press(chip("Keep editing"));
+      await press(button("Keep editing"));
       await leaveAndGo(again);
       expect(writes).toHaveLength(2);
       expect(router.push).toHaveBeenCalledTimes(2);
@@ -400,7 +408,7 @@ describe("SeekWhomScreen", () => {
     it("goes back on Leave without saving, and sends nothing", async () => {
       const { server, writes } = await broughtBack();
       server.offline = false;
-      await press(chip("Leave without saving"));
+      await press(button("Leave without saving"));
       expect(screen.queryByText(THE_QUESTION)).toBeNull();
       expect(router.back).toHaveBeenCalledTimes(1);
       await leave();
@@ -412,16 +420,16 @@ describe("SeekWhomScreen", () => {
     const { writes, server, view } = await opened({
       refusal: () => envelope("internal_error", 500),
     });
-    await press(chip("Men"));
+    await press(row("Men"));
     await leaveAndGo(view);
     server.refusal = null;
     const again = await show(<SeekWhomScreen />);
     await waitFor(() => expect(screen.getByText(THE_QUESTION)).toBeTruthy());
-    await press(chip("Keep editing"));
+    await press(button("Keep editing"));
     expect(screen.queryByText(THE_QUESTION)).toBeNull();
     expect(router.back).not.toHaveBeenCalled();
-    await press(chip("Non-binary people"));
-    expect(chosen()).toEqual(CHIPS);
+    await press(row("Non-binary people"));
+    expect(chosen()).toEqual(ROWS);
     await leaveAndGo(again);
     expect(writes).toEqual([saved(["woman", "man"]), saved(["woman", "man", "non_binary"])]);
     expect(router.push).toHaveBeenCalledTimes(1);
@@ -429,13 +437,13 @@ describe("SeekWhomScreen", () => {
 
   it("holds no draft when what is gone is the consent: the list's read sends the person on", async () => {
     const { writes, view } = await opened({ refusal: () => envelope("consent_required", 403) });
-    await press(chip("Men"));
+    await press(row("Men"));
     await leaveAndGo(view);
     expect(writes).toEqual([saved(["woman", "man"])]);
     expect(router.push).not.toHaveBeenCalled();
     // And nothing is held for the next time the screen opens.
     await show(<SeekWhomScreen />);
-    await waitFor(() => expect(chip("Women")).toBeTruthy());
+    await waitFor(() => expect(row("Women")).toBeTruthy());
     expect(screen.queryByText(THE_QUESTION)).toBeNull();
     expect(chosen()).toEqual(["Women"]);
   });
@@ -444,7 +452,7 @@ describe("SeekWhomScreen", () => {
     const { writes } = fakeApi({ wait: new Promise(() => {}) });
     await show(<SeekWhomScreen />);
     expect(screen.getByText("Loading your profile…").props.accessibilityLiveRegion).toBe("polite");
-    expect(screen.queryByRole("button", { name: "Women" })).toBeNull();
+    expect(screen.queryByRole("checkbox")).toBeNull();
     await leave();
     expect(writes).toEqual([]);
   });
@@ -458,7 +466,7 @@ describe("SeekWhomScreen", () => {
     const found = pressables(screen.toJSON() as HostNode);
     expect(found.flatMap((node) => a11yProblems(node))).toEqual([]);
     server.failing = false;
-    await press(chip("Try again"));
+    await press(button("Try again"));
     await waitFor(() => expect(chosen()).toEqual(["Women"]));
     expect(screen.queryByText("Your profile could not be loaded.")).toBeNull();
   });
@@ -472,7 +480,7 @@ describe("SeekWhomScreen", () => {
       answer = resolve;
     });
     server.failing = false;
-    await press(chip("Try again"));
+    await press(button("Try again"));
     expect(screen.getByText("Loading your profile…").props.accessibilityLiveRegion).toBe("polite");
     expect(screen.queryByText(LOAD_FAILED)).toBeNull();
     await act(async () => {
@@ -482,40 +490,26 @@ describe("SeekWhomScreen", () => {
     await waitFor(() => expect(chosen()).toEqual(["Women"]));
   });
 
-  it("sends whoever has no consent back to Home, and shows no chip", async () => {
+  it("sends whoever has no consent back to Home, and shows no row", async () => {
     fakeApi({ consent: null });
     await show(<SeekWhomScreen />);
     await waitFor(() => expect(router.dismissTo).toHaveBeenCalledWith("/"));
     expect(router.replace).not.toHaveBeenCalled();
-    expect(screen.queryByRole("button", { name: "Women" })).toBeNull();
+    expect(screen.queryByRole("checkbox")).toBeNull();
     expect(screen.queryByText("Your profile could not be loaded.")).toBeNull();
   });
 
   it.each([
-    [
-      "fi-FI",
-      "Ketä etsit?",
-      "Takaisin siihen, mitä etsit",
-      "Valitse kaikki, joita haluat nähdä. Se ratkaisee myös, ketkä näkevät sinut.",
-      "Naisia",
-      "Pidä ainakin yksi.",
-    ],
-    [
-      "sv-FI",
-      "Vem söker du?",
-      "Tillbaka till vad du söker",
-      "Välj alla du vill se. Det avgör också vilka som ser dig.",
-      "Kvinnor",
-      "Behåll minst en.",
-    ],
-  ])("speaks %s", async (tag, title, back, lead, only, keepOne) => {
+    ["fi-FI", "Ketä etsit?", "Takaisin siihen, mitä etsit", "Naisia", "Pidä ainakin yksi."],
+    ["sv-FI", "Vem söker du?", "Tillbaka till vad du söker", "Kvinnor", "Behåll minst en."],
+  ])("speaks %s", async (tag, title, back, only, keepOne) => {
     (useLocales as jest.Mock).mockReturnValue([{ languageTag: tag }]);
     try {
       fakeApi();
       await show(<SeekWhomScreen />);
-      await waitFor(() => expect(screen.getByText(lead)).toBeTruthy());
+      await waitFor(() => expect(row(only)).toBeTruthy());
       expectPinnedHeader(title, back);
-      await press(chip(only));
+      await press(row(only));
       expect(screen.getByText(keepOne)).toBeTruthy();
     } finally {
       (useLocales as jest.Mock).mockReturnValue([{ languageTag: "en-US" }]);

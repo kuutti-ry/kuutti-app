@@ -85,8 +85,9 @@ name: At 99 the age window starts at 94 to 99 and neither end can leave the boun
 - assertVisible: "98"
 - tapOn: "Continue|Jatka|Fortsätt"
 
-# Koli has 271 people, under what is kept, so the card can only say the town,
-# and the screen says what it will.
+# Koli has 271 people, under what is kept, so the card can only say the town:
+# with no question to ask, what it says takes the question's place as the
+# step's heading, and no line says why (#581).
 - extendedWaitUntil:
     visible: "Where do you live\\?|Missä asut\\?|Var bor du\\?"
     timeout: 15000
@@ -96,9 +97,10 @@ name: At 99 the age window starts at 94 to 99 and neither end can leave the boun
 - tapOn: "Where do you live\\?|Missä asut\\?|Var bor du\\?"
 - tapOn: ".*Koli.*"
 - extendedWaitUntil:
-    visible: "Your card shows the nearest town\\.|Korttisi näyttää lähimmän kaupungin\\.|Ditt kort visar närmaste stad\\."
+    visible: "On your card: Joensuu|Kortillasi: Joensuu|På ditt kort: Joensuu"
     timeout: 15000
-- assertVisible: "On your card: Joensuu|Kortillasi: Joensuu|På ditt kort: Joensuu"
+- assertNotVisible: "What should your card show\\?|Mitä korttisi näyttää\\?|Vad ska ditt kort visa\\?"
+- assertNotVisible: "Your card shows the nearest town\\.|Korttisi näyttää lähimmän kaupungin\\.|Ditt kort visar närmaste stad\\."
 - tapOn: "Continue|Jatka|Fortsätt"
 - extendedWaitUntil:
     visible: "Two photos of you|Kaksi kuvaa sinusta|Två bilder på dig"

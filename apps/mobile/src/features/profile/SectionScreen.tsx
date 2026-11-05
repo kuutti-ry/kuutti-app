@@ -39,7 +39,6 @@ function NameEditor({ draft, update }: { draft: ProfileUpdate; update: Update })
         autoCapitalize="words"
         onChangeText={(displayName) => update({ displayName })}
       />
-      <Text variant="muted">{t("profile.displayName.hint", { max: DISPLAY_NAME_MAX })}</Text>
     </View>
   );
 }
@@ -48,10 +47,12 @@ function ItemEditor({
   item,
   draft,
   update,
+  alone,
 }: {
   item: SectionItem;
   draft: ProfileUpdate;
   update: Update;
+  alone: boolean;
 }) {
   if (item === "displayName") return <NameEditor draft={draft} update={update} />;
   if (item === "bio") return <BioEditor draft={draft} update={update} />;
@@ -61,7 +62,7 @@ function ItemEditor({
   // here it shows when it was given, to change or clear it, and is not
   // offered to everyone.
   if (item === "identityLabel" && draft.fields.identityLabel === undefined) return null;
-  return <FieldEditor field={item} draft={draft} update={update} />;
+  return <FieldEditor field={item} draft={draft} update={update} alone={alone} />;
 }
 
 /**
@@ -72,7 +73,8 @@ function ItemEditor({
  * holds it. Each section saves only its own changes onto the document as
  * stored (useProfile). What one is here for says beside its answer what the
  * answer does, and goes back to What you seek (#542). Opened for one answer
- * (`once`, the deal-breakers' "Answer it"), the arrow says it goes back there.
+ * (`once`, from a deal-breaker's row or its "Answer it"), the arrow says it
+ * goes back there.
  */
 export function SectionScreen({ section: id, once = false }: { section: string; once?: boolean }) {
   const { t } = useT();
@@ -147,7 +149,13 @@ export function SectionScreen({ section: id, once = false }: { section: string; 
         {/* No note on the article 9 consent over politics and religion: Settings is the
             one place that names it and takes it back (ADR-019 §4, #204, #239). */}
         {section.items.map((item) => (
-          <ItemEditor key={item} item={item} draft={draft} update={update} />
+          <ItemEditor
+            key={item}
+            item={item}
+            draft={draft}
+            update={update}
+            alone={section.items.length === 1}
+          />
         ))}
       </ScrollView>
 

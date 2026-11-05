@@ -5,7 +5,7 @@ import { act, fireEvent, screen } from "@testing-library/react-native";
 import { useLocales } from "expo-localization";
 import * as SecureStore from "expo-secure-store";
 import type * as React from "react";
-import { AccessibilityInfo, AppState, Linking, Platform, View } from "react-native";
+import { AccessibilityInfo, AppState, Keyboard, Linking, Platform, View } from "react-native";
 import { clearSession, saveSession } from "@/lib/session";
 import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
 import { renderWithTheme, underProviders } from "@/test/render";
@@ -648,6 +648,23 @@ describe("the passcode", () => {
     expect(screen.getByLabelText(TEXT.choose).props.value).toBe("12345");
     await type(TEXT.choose, "123456");
     expect(screen.getByLabelText(TEXT.repeat)).toBeTruthy();
+  });
+
+  it("closes the keyboard as its field goes for good, set or cancelled, and not between its entries", async () => {
+    await showLock();
+    const dismiss = jest.spyOn(Keyboard, "dismiss");
+    await press(button(TEXT.setPasscode));
+    await type(TEXT.choose, "123456");
+    await type(TEXT.repeat, "654321");
+    expect(dismiss).not.toHaveBeenCalled();
+    await type(TEXT.choose, "123456");
+    await type(TEXT.repeat, "123456");
+    expect(dismiss).toHaveBeenCalledTimes(1);
+    await press(button(TEXT.change));
+    expect(dismiss).toHaveBeenCalledTimes(1);
+    await press(button(TEXT.cancel));
+    expect(dismiss).toHaveBeenCalledTimes(2);
+    dismiss.mockRestore();
   });
 
   it("two that differ start again from the first, said assertively and aloud on iOS, and set nothing", async () => {

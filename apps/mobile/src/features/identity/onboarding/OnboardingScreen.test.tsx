@@ -11,6 +11,14 @@ import { renderWithTheme } from "@/test/render";
 import { MAX_FONT_SCALE } from "@/theme/a11y";
 import { defaultAgeWindow, OnboardingScreen } from "./OnboardingScreen";
 
+/** The names of the radio groups on the screen, each a plain view that a role query would leave out. */
+const radioGroups = () =>
+  screen.container
+    .queryAll(
+      (node) => typeof node.type === "string" && node.props.accessibilityRole === "radiogroup",
+    )
+    .map((node) => String(node.props.accessibilityLabel));
+
 const { __router: router, __focus: focus } = jest.requireMock("expo-router") as {
   __router: { push: jest.Mock; replace: jest.Mock; back: jest.Mock };
   __focus: () => void;
@@ -246,6 +254,10 @@ const checkA11y = () => {
   const found = pressables(screen.toJSON() as HostNode);
   expect(found.flatMap((node) => a11yProblems(node))).toEqual([]);
 };
+/** An answer that is a whole-width row (#581) by its word, chosen or not: the chosen one's name carries its mark. */
+const row = (name: string) =>
+  screen.getByRole(/^(radio|checkbox)$/, { name: new RegExp(`^(✓ )?${name}$`) });
+const checked = (name: string) => row(name).props.accessibilityState?.checked;
 const consented = (kind: string) => ({
   kind,
   version: { terms: TERMS, privacy: PRIVACY, research: RESEARCH, special_category: SPECIAL }[
@@ -292,14 +304,14 @@ describe("OnboardingScreen", () => {
     expect(server.profile?.displayName).toBe("Aino");
     checkA11y();
     expect(screen.getByText("Step 2 of 8")).toBeTruthy();
-    await press(screen.getByRole("button", { name: "Woman" }));
+    await press(row("Woman"));
     await press(screen.getByRole("button", { name: "Continue" }));
     await waitFor(() => expect(screen.getByText("Whom are you looking for?")).toBeTruthy());
     expect(server.gender).toBe("woman");
     expect(screen.getByText("Step 3 of 8")).toBeTruthy();
     checkA11y();
-    await press(screen.getByRole("button", { name: "Men" }));
-    await press(screen.getByRole("button", { name: "Non-binary people" }));
+    await press(row("Men"));
+    await press(row("Non-binary people"));
     // Nothing moves on without the article 9 consent, given on this screen.
     expect(
       screen.getByRole("button", { name: "Continue" }).props.accessibilityState?.disabled,
@@ -342,7 +354,7 @@ describe("OnboardingScreen", () => {
     await waitFor(() => expect(screen.getByText("What should your card show?")).toBeTruthy());
     expect(screen.getByText("Step 6 of 8")).toBeTruthy();
     checkA11y();
-    await press(screen.getByRole("button", { name: "Kallio" }));
+    await press(row("Kallio"));
     await flush();
     await press(screen.getByRole("button", { name: "Continue" }));
     await waitFor(() => expect(screen.getByText("Two photos of you")).toBeTruthy());
@@ -582,18 +594,90 @@ describe("OnboardingScreen", () => {
     expect(server.profile?.fields).toEqual({ intent: "dance_partner" });
   });
 
+  describe("the steps that ask one thing, as whole-width rows (#581)", () => {
+    const atGender = async () => {
+      const { server } = fakeApi();
+      server.consents.push(consented("terms"), consented("privacy"));
+      server.profile = { displayName: "Noa", bio: null, bioPreset: null, fields: {}, prompts: [] };
+      await show(<OnboardingScreen />);
+      await waitFor(() => expect(screen.getByText("How do you describe yourself?")).toBeTruthy());
+      return server;
+    };
+
+    it("the gender as radios in a group, with nothing chosen until a press", async () => {
+      await atGender();
+      expect(screen.getByLabelText("Gender").props.accessibilityRole).toBe("radiogroup");
+      expect(screen.getAllByRole("radio").map((r) => r.props.accessibilityLabel)).toEqual([
+        "Woman",
+        "Man",
+        "Non-binary",
+      ]);
+      await press(row("Man"));
+      expect(checked("Man")).toBe(true);
+      expect(screen.getByText("✓ Man")).toBeTruthy();
+      checkA11y();
+    });
+
+    it("the identity label as radios in a group of its own", async () => {
+      await atGender();
+      await press(row("Non-binary"));
+      await press(screen.getByRole("button", { name: "Continue" }));
+      await flush();
+      await waitFor(() => expect(screen.getByText("A word for it, if you like")).toBeTruthy());
+      const group = screen.getByLabelText("A word for it, if you like");
+      expect(group.props.accessibilityRole).toBe("radiogroup");
+      expect(screen.getAllByRole("radio")).toHaveLength(7);
+      expect(row("Genderfluid").parent).toBe(group);
+    });
+
+    it("whom one seeks as checkboxes, in no group that says one goes", async () => {
+      const server = await atGender();
+      server.gender = "woman";
+      await press(row("Woman"));
+      await press(screen.getByRole("button", { name: "Continue" }));
+      await waitFor(() => expect(screen.getByText("Whom are you looking for?")).toBeTruthy());
+      expect(screen.getAllByRole("checkbox").map((r) => r.props.accessibilityLabel)).toEqual([
+        "Women",
+        "Men",
+        "Non-binary people",
+        "Anyone",
+      ]);
+      expect(radioGroups()).toEqual([]);
+    });
+
+    it("the ready lines as radios in a group, under their heading, with no hint over them", async () => {
+      const { server } = fakeApi();
+      atWords(server);
+      await show(<OnboardingScreen />);
+      await waitFor(() => expect(screen.getByText("A few words")).toBeTruthy());
+      expect(screen.getByLabelText("Or pick a line instead").props.accessibilityRole).toBe(
+        "radiogroup",
+      );
+      expect(screen.getByText("Or pick a line instead")).toBeTruthy();
+      expect(screen.queryByText(/count as a bio/)).toBeNull();
+      // The step's own line says the bio's length, and the two questions.
+      expect(
+        screen.getByText(
+          "Answer two questions, write a bio of at least 50 characters, or pick a ready line. Your card leads with a photo and one answer.",
+        ),
+      ).toBeTruthy();
+      expect(screen.getByText("Questions")).toBeTruthy();
+      expect(screen.getByText("Add a question")).toBeTruthy();
+    });
+  });
+
   it("offers the identity label after a non-binary gender only, and saves the one chosen", async () => {
     const { server } = fakeApi();
     server.consents.push(consented("terms"), consented("privacy"));
     server.profile = { displayName: "Noa", bio: null, bioPreset: null, fields: {}, prompts: [] };
     await show(<OnboardingScreen />);
     await waitFor(() => expect(screen.getByText("How do you describe yourself?")).toBeTruthy());
-    await press(screen.getByRole("button", { name: "Non-binary" }));
+    await press(row("Non-binary"));
     await press(screen.getByRole("button", { name: "Continue" }));
     await flush();
     await waitFor(() => expect(screen.getByText("A word for it, if you like")).toBeTruthy());
     checkA11y();
-    await press(screen.getByRole("button", { name: "Genderfluid" }));
+    await press(row("Genderfluid"));
     await press(screen.getByRole("button", { name: "Continue" }));
     await flush();
     await waitFor(() => expect(screen.getByText("Whom are you looking for?")).toBeTruthy());
@@ -607,7 +691,7 @@ describe("OnboardingScreen", () => {
     server.genderFrom = "2026-11-08T10:00:00.000Z";
     await show(<OnboardingScreen />);
     await waitFor(() => expect(screen.getByText("How do you describe yourself?")).toBeTruthy());
-    await press(screen.getByRole("button", { name: "Woman" }));
+    await press(row("Woman"));
     await press(screen.getByRole("button", { name: "Continue" }));
     await flush();
     await waitFor(() => expect(screen.getByText(/You changed this recently/)).toBeTruthy());
@@ -620,7 +704,7 @@ describe("OnboardingScreen", () => {
     server.profile = { displayName: "Noa", bio: null, bioPreset: null, fields: {}, prompts: [] };
     await show(<OnboardingScreen />);
     await waitFor(() => expect(screen.getByText("How do you describe yourself?")).toBeTruthy());
-    await press(screen.getByRole("button", { name: "Non-binary" }));
+    await press(row("Non-binary"));
     await press(screen.getByRole("button", { name: "Continue" }));
     await flush();
     await waitFor(() => expect(screen.getByText("A word for it, if you like")).toBeTruthy());
@@ -645,7 +729,7 @@ describe("OnboardingScreen", () => {
     server.gender = "man";
     await show(<OnboardingScreen />);
     await waitFor(() => expect(screen.getByText("Whom are you looking for?")).toBeTruthy());
-    await press(screen.getByRole("button", { name: "Anyone" }));
+    await press(row("Anyone"));
     await press(screen.getByRole("button", { name: "Continue" }));
     await waitFor(() => expect(screen.getByText("What ages?")).toBeTruthy());
     const disabled = (name: string) =>
@@ -661,6 +745,28 @@ describe("OnboardingScreen", () => {
     await flush();
     expect(server.ageWindow).toEqual({ min: 18, max: 18 });
     expect(server.seeks).toEqual(["woman", "man", "non_binary"]);
+  });
+
+  it("stands the two age steppers one above the other: side by side, a small phone overflows (#581)", async () => {
+    const { server } = fakeApi();
+    server.consents.push(consented("terms"), consented("privacy"), consented("special_category"));
+    server.profile = {
+      displayName: "Onni",
+      bio: null,
+      bioPreset: null,
+      fields: { intent: "long_term" },
+      prompts: [],
+    };
+    server.gender = "man";
+    server.seeks = ["woman"];
+    await show(<OnboardingScreen />);
+    await waitFor(() => expect(screen.getByText("What ages?")).toBeTruthy());
+    const stepperOf = (name: string) => screen.getByText(name).parent;
+    const column = stepperOf("Youngest")?.parent;
+    expect(stepperOf("Oldest")?.parent).toBe(column);
+    expect(column?.props.className).not.toMatch(/\bflex-row\b/);
+    expect(stepperOf("Youngest")?.props.className).not.toMatch(/\bflex-1\b/);
+    checkA11y();
   });
 
   it("asks only whom one seeks again after a withdrawal, and keeps the age window", async () => {
@@ -680,7 +786,7 @@ describe("OnboardingScreen", () => {
     server.home = IN_KALLIO;
     await show(<OnboardingScreen />);
     await waitFor(() => expect(screen.getByText("Whom are you looking for?")).toBeTruthy());
-    await press(screen.getByRole("button", { name: "Anyone" }));
+    await press(row("Anyone"));
     await press(screen.getByLabelText("I consent to Kuutti storing whom I seek"));
     await press(screen.getByRole("button", { name: "Continue" }));
     await waitFor(() => expect(screen.getByText("Two photos of you")).toBeTruthy());
@@ -849,7 +955,7 @@ describe("OnboardingScreen", () => {
     server.seeks = null;
     await show(<OnboardingScreen />);
     await waitFor(() => expect(screen.getByText("Whom are you looking for?")).toBeTruthy());
-    await press(screen.getByRole("button", { name: "Men" }));
+    await press(row("Men"));
     await press(screen.getByLabelText("I consent to Kuutti storing whom I seek"));
     await press(screen.getByRole("button", { name: "Continue" }));
     await flush();
@@ -864,7 +970,7 @@ describe("OnboardingScreen", () => {
     server.seeks = null;
     await show(<OnboardingScreen />);
     await waitFor(() => expect(screen.getByText("Whom are you looking for?")).toBeTruthy());
-    await press(screen.getByRole("button", { name: "Men" }));
+    await press(row("Men"));
     // Taken back on another device while the step was open (ADR-010 §16).
     server.consents = server.consents.map((c) =>
       c.kind === "special_category" ? { ...c, withdrawnAt: "2026-10-01T10:00:00.000Z" } : c,
@@ -887,8 +993,7 @@ describe("OnboardingScreen", () => {
   describe("the seeks step and a stored answer (#542)", () => {
     const TITLE = "Whom are you looking for?";
     const CONSENT = "I consent to Kuutti storing whom I seek";
-    const selected = (name: string) =>
-      screen.getByRole("button", { name }).props.accessibilityState?.selected;
+    const selected = checked;
     const continueDisabled = () =>
       screen.getByRole("button", { name: "Continue" }).props.accessibilityState?.disabled;
     const putsOfPreferences = (calls: ReturnType<typeof fakeApi>["calls"]) =>
@@ -938,11 +1043,11 @@ describe("OnboardingScreen", () => {
       expect(continueDisabled()).toBe(true);
     });
 
-    it("leaves it empty when the last chip is taken away: the stored answer never fills it again", async () => {
+    it("leaves it empty when the last row is taken away: the stored answer never fills it again", async () => {
       const { server, calls } = fakeApi();
       outdated(server, ["man"]);
       await atTheStep();
-      await press(screen.getByRole("button", { name: "Men" }));
+      await press(row("Men"));
       expect(selected("Men")).toBe(false);
       expect(continueDisabled()).toBe(true);
       // Not when the status is read again either: the answer is still stored there.
@@ -955,14 +1060,14 @@ describe("OnboardingScreen", () => {
       expect(putsOfPreferences(calls)).toEqual([]);
     });
 
-    it("disables Continue again when the last chip goes, whatever the consent says", async () => {
+    it("disables Continue again when the last row goes, whatever the consent says", async () => {
       const { server } = fakeApi();
       allAnswered(server);
       server.seeks = null;
       await atTheStep();
-      await press(screen.getByRole("button", { name: "Men" }));
+      await press(row("Men"));
       expect(continueDisabled()).toBe(false);
-      await press(screen.getByRole("button", { name: "Men" }));
+      await press(row("Men"));
       expect(continueDisabled()).toBe(true);
     });
 
@@ -983,8 +1088,8 @@ describe("OnboardingScreen", () => {
     });
 
     it.each([
-      ["the change, then the consent", ["chips", "consent"]],
-      ["the consent, then the change", ["consent", "chips"]],
+      ["the change, then the consent", ["rows", "consent"]],
+      ["the consent, then the change", ["consent", "rows"]],
     ])("saves a change of a stored answer: %s", async (_what, order) => {
       const { server, calls } = fakeApi();
       outdated(server, ["man"]);
@@ -994,8 +1099,8 @@ describe("OnboardingScreen", () => {
           await press(screen.getByLabelText(CONSENT));
           await flush();
         } else {
-          await press(screen.getByRole("button", { name: "Women" }));
-          await press(screen.getByRole("button", { name: "Men" }));
+          await press(row("Women"));
+          await press(row("Men"));
         }
       }
       await press(screen.getByRole("button", { name: "Continue" }));
@@ -1024,12 +1129,12 @@ describe("OnboardingScreen", () => {
       await waitFor(() => expect(router.replace).toHaveBeenCalledWith("/"));
     });
 
-    it("saves what the chips say, not what was stored, when the step is still open at Continue", async () => {
+    it("saves what the rows say, not what was stored, when the step is still open at Continue", async () => {
       const { server, calls } = fakeApi();
       outdated(server, ["man"]);
       await atTheStep();
-      await press(screen.getByRole("button", { name: "Women" }));
-      await press(screen.getByRole("button", { name: "Men" }));
+      await press(row("Women"));
+      await press(row("Men"));
       // Taken back on another device meanwhile: the answer went, so the consent closes nothing.
       server.seeks = null;
       await press(screen.getByLabelText(CONSENT));
@@ -1105,7 +1210,7 @@ describe("OnboardingScreen", () => {
     failingUntilOk("/account/gender");
     await show(<OnboardingScreen />);
     await waitFor(() => expect(screen.getByText("How do you describe yourself?")).toBeTruthy());
-    await press(screen.getByRole("button", { name: "Woman" }));
+    await press(row("Woman"));
     await press(screen.getByRole("button", { name: "Continue" }));
     await flush();
     await waitFor(() =>
@@ -1163,6 +1268,15 @@ describe("OnboardingScreen", () => {
       ]);
     });
 
+    it("says how many areas match to a screen reader as the digits come, with no line under the field (#581)", async () => {
+      jest.replaceProperty(Platform, "OS", "android");
+      const announce = jest.spyOn(AccessibilityInfo, "announceForAccessibility").mockClear();
+      await atHome();
+      await type(screen.getByLabelText("Postal code"), "00530");
+      expect(announce.mock.calls).toEqual([["1 area matches."]]);
+      expect(screen.queryByText("1 area matches.")).toBeNull();
+    });
+
     it("says a code that cannot become one at once, and leaves the nearest areas to choose from", async () => {
       await atHome();
       await type(screen.getByLabelText("Postal code"), "99999");
@@ -1171,16 +1285,23 @@ describe("OnboardingScreen", () => {
       checkA11y();
     });
 
-    it("then shows what the card will say and the choice, under the same number", async () => {
+    it("then shows the choice, the one the card will show filled, under the same number", async () => {
       await atHome();
       await pick("00530", "0 0 5 3 0, Kallio");
       await waitFor(() => expect(screen.getByText("What should your card show?")).toBeTruthy());
       expect(screen.queryByText(/^Step 0/)).toBeNull();
       expect(screen.getByText("Step 6 of 8")).toBeTruthy();
-      expect(
-        screen.getByRole("button", { name: "Helsinki" }).props.accessibilityState?.selected,
-      ).toBe(true);
-      expect(screen.getByText("On your card: Helsinki")).toBeTruthy();
+      // The step's own heading, a level above the home screen's, once.
+      const question = screen.getByRole("heading", { name: "What should your card show?" });
+      expect(question.props["aria-level"]).toBe("2");
+      expect(screen.getAllByText("What should your card show?")).toHaveLength(1);
+      expect(screen.getByLabelText("What should your card show?").props.accessibilityRole).toBe(
+        "radiogroup",
+      );
+      expect(checked("Helsinki")).toBe(true);
+      expect(checked("Kallio")).toBe(false);
+      // The filled one says it: no line repeats it (#581).
+      expect(screen.queryByText(/On your card/)).toBeNull();
       expect(screen.queryByLabelText("Postal code")).toBeNull();
       checkA11y();
     });
@@ -1189,12 +1310,10 @@ describe("OnboardingScreen", () => {
       const { server, calls } = await atHome();
       await pick("00530", "0 0 5 3 0, Kallio");
       await waitFor(() => expect(screen.getByText("What should your card show?")).toBeTruthy());
-      await press(screen.getByRole("button", { name: "Kallio" }));
+      await press(row("Kallio"));
       await flush();
-      expect(
-        screen.getByRole("button", { name: "Kallio" }).props.accessibilityState?.selected,
-      ).toBe(true);
-      expect(screen.getByText("On your card: Kallio")).toBeTruthy();
+      expect(checked("Kallio")).toBe(true);
+      expect(checked("Helsinki")).toBe(false);
       expect(homeCalls(calls).at(-1)?.body).toEqual({ showArea: true });
       await press(screen.getByRole("button", { name: "Continue" }));
       await waitFor(() => expect(screen.getByText("Two photos of you")).toBeTruthy());
@@ -1214,11 +1333,12 @@ describe("OnboardingScreen", () => {
     it("says the town alone where no area is kept, with nothing to choose", async () => {
       await atHome();
       await pick("83960", "8 3 9 6 0, Koli");
-      await waitFor(() =>
-        expect(screen.getByText("Your card shows the nearest town.")).toBeTruthy(),
-      );
-      expect(screen.getByText("What should your card show?")).toBeTruthy();
-      expect(screen.getByText("On your card: Joensuu")).toBeTruthy();
+      // What the card says, in the question's place and role: the step still leads with a heading (#581).
+      const line = await screen.findByRole("heading", { name: "On your card: Joensuu" });
+      expect(line.props["aria-level"]).toBe("2");
+      expect(screen.queryByText("What should your card show?")).toBeNull();
+      expect(screen.queryByText("Your card shows the nearest town.")).toBeNull();
+      expect(screen.queryAllByRole("radio")).toEqual([]);
       expect(screen.getAllByRole("button").map((b) => b.props.children)).toHaveLength(1);
       checkA11y();
       await press(screen.getByRole("button", { name: "Continue" }));
@@ -1318,12 +1438,13 @@ describe("OnboardingScreen", () => {
       await pick("00530", "0 0 5 3 0, Kallio");
       await waitFor(() => expect(screen.getByText("What should your card show?")).toBeTruthy());
       failingUntilOk("/account/home");
-      await press(screen.getByRole("button", { name: "Kallio" }));
+      await press(row("Kallio"));
       await flush();
       await waitFor(() =>
         expect(screen.getByText("Something did not load. Try again.")).toBeTruthy(),
       );
-      expect(screen.getByText("On your card: Helsinki")).toBeTruthy();
+      expect(checked("Helsinki")).toBe(true);
+      expect(checked("Kallio")).toBe(false);
       expect(server.home?.showArea).toBe(false);
       await press(screen.getByRole("button", { name: "Continue" }));
       await waitFor(() => expect(screen.getByText("Two photos of you")).toBeTruthy());
@@ -1379,7 +1500,7 @@ describe("OnboardingScreen", () => {
     it.each([
       ["fi-FI", "Missä asut?", "Postinumero", "0 0 5 3 0, Kallio", "Mitä korttisi näyttää?"],
       ["sv-FI", "Var bor du?", "Postnummer", "0 0 5 3 0, Berghäll", "Vad ska ditt kort visa?"],
-    ])("speaks %s", async (tag, title, label, row, choice) => {
+    ])("speaks %s", async (tag, title, label, area, choice) => {
       (useLocales as jest.Mock).mockReturnValue([{ languageTag: tag }]);
       try {
         const { server } = fakeApi();
@@ -1388,7 +1509,7 @@ describe("OnboardingScreen", () => {
         await show(<OnboardingScreen />);
         await waitFor(() => expect(screen.getByText(title)).toBeTruthy());
         await type(screen.getByLabelText(label), "00530");
-        await press(screen.getByRole("button", { name: row }));
+        await press(screen.getByRole("button", { name: area }));
         await flush();
         await waitFor(() => expect(screen.getByText(choice)).toBeTruthy());
       } finally {
@@ -1403,23 +1524,22 @@ describe("OnboardingScreen", () => {
     server.profile = { displayName: "Noa", bio: null, bioPreset: null, fields: {}, prompts: [] };
     await show(<OnboardingScreen />);
     await waitFor(() => expect(screen.getByText("How do you describe yourself?")).toBeTruthy());
-    await press(screen.getByRole("button", { name: "Non-binary" }));
+    await press(row("Non-binary"));
     await press(screen.getByRole("button", { name: "Continue" }));
     await flush();
     await waitFor(() => expect(screen.getByText("A word for it, if you like")).toBeTruthy());
     const continueDisabled = () =>
       screen.getByRole("button", { name: "Continue" }).props.accessibilityState?.disabled;
-    await press(screen.getByRole("button", { name: "Genderfluid" }));
+    await press(row("Genderfluid"));
     expect(continueDisabled()).toBe(false);
-    await press(screen.getByRole("button", { name: "Genderfluid" }));
+    await press(row("Genderfluid"));
     expect(continueDisabled()).toBe(true);
     await press(screen.getByRole("button", { name: "Skip" }));
     await waitFor(() => expect(screen.getByText("Whom are you looking for?")).toBeTruthy());
-    const women = () => screen.getByRole("button", { name: "Women" });
-    await press(women());
-    expect(women().props.accessibilityState?.selected).toBe(true);
-    await press(women());
-    expect(women().props.accessibilityState?.selected).toBe(false);
+    await press(row("Women"));
+    expect(checked("Women")).toBe(true);
+    await press(row("Women"));
+    expect(checked("Women")).toBe(false);
   });
 
   it("keeps no bio when the one typed is cleared again", async () => {
@@ -1455,7 +1575,7 @@ describe("OnboardingScreen", () => {
     await waitFor(() => expect(screen.getByText("A few words")).toBeTruthy());
     expect(screen.getByText(/characters, or pick a ready line\. Your card/)).toBeTruthy();
     checkA11y();
-    await press(screen.getByRole("button", { name: "The photos say it. The rest over coffee." }));
+    await press(row("The photos say it. The rest over coffee."));
     await press(screen.getByRole("button", { name: "Save and continue" }));
     await flush();
     expect(server.profile).toMatchObject({ bio: null, bioPreset: "photos_speak", prompts: [] });
@@ -1482,7 +1602,7 @@ describe("OnboardingScreen", () => {
     await waitFor(() => expect(screen.getByText("Whom are you looking for?")).toBeTruthy());
     expect(screen.getByText(/Update the app to continue/)).toBeTruthy();
     expect(screen.queryByLabelText("I consent to Kuutti storing whom I seek")).toBeNull();
-    await press(screen.getByRole("button", { name: "Women" }));
+    await press(row("Women"));
     expect(
       screen.getByRole("button", { name: "Continue" }).props.accessibilityState?.disabled,
     ).toBe(true);
@@ -1520,9 +1640,7 @@ describe("OnboardingScreen", () => {
     await type(screen.getByLabelText("About you"), "");
     expect(saveDisabled()).toBe(true);
     await press(
-      screen.getByRole("button", {
-        name: "I was too lazy to write anything here, so this placeholder says I am a nice fellow.",
-      }),
+      row("I was too lazy to write anything here, so this placeholder says I am a nice fellow."),
     );
     expect(saveDisabled()).toBe(false);
     checkA11y();

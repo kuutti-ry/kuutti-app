@@ -46,7 +46,6 @@ name: Home says how many people have completed their profiles and the gate in wo
     direction: DOWN
     centerElement: true
     timeout: 60000
-- assertNotVisible: "Your deal-breakers|Ehdottomat rajasi|Dina absoluta gränser"
 - assertNotVisible: "Fill in the rest when you have a moment|Täydennä loput, kun sinulla on hetki|Fyll i resten när du har en stund"
 
 - openLink: kuutti://tech

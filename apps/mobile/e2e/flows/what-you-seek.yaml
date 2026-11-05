@@ -3,9 +3,12 @@
 # screen with no Save button. A change is
 # kept by going back and read again on the way in, as often as one wishes. The
 # only gender chosen stays chosen and says why, and what one is here for changes
-# and never clears. Ritva seeks men aged 60 to 72 for something long-term, and
-# she is this flow's alone; it ends as it began. A run that stops half-way leaves
-# a change: `pnpm demo:reset` puts her back.
+# and never clears. The list's top line is where both ways is said, and the
+# screens under it do not say it again, but for what one is here for. Beside the
+# deal-breakers' heading how many are in use, and the app's one (i), which opens
+# what they ask of a person (#581). Ritva seeks men aged 60 to 72 for something
+# long-term, and she is this flow's alone; it ends as it began. A run that stops
+# half-way leaves a change: `pnpm demo:reset` puts her back.
 appId: fi.kuutti.app
 name: What you seek lists whom, the ages, why and the deal-breakers, and each change is kept by going back
 ---
@@ -36,25 +39,35 @@ name: What you seek lists whom, the ages, why and the deal-breakers, and each ch
     direction: DOWN
     centerElement: true
     timeout: 60000
+
+# Beside the heading how many are in use, drawn as 0/7 and heard in words, which
+# is all Maestro reads of it on iOS; the sentence is behind the (i), not over the rows.
+- assertVisible: "0/7|0 of 7 in use|Käytössä 0, enintään 7|0 av 7 används"
+- assertNotVisible: "Up to 7\\. .*|Enintään 7\\. .*|Högst 7\\. .*"
+- tapOn: "About deal-breakers|Tietoa ehdottomista rajoista|Om absoluta gränser"
+- extendedWaitUntil:
+    visible: "Up to 7\\. Only on what you answered yourself, and both ways: yours apply to others, theirs to you\\.|Enintään 7\\. Vain siitä, mihin vastasit itse, ja molempiin suuntiin: sinun rajasi koskevat muita, heidän rajansa sinua\\.|Högst 7\\. Bara om det du själv svarat på, och åt båda hållen: dina gäller andra, deras gäller dig\\."
+    timeout: 15000
+- tapOn: "Close|Sulje|Stäng"
+- extendedWaitUntil:
+    notVisible: "Up to 7\\. .*|Enintään 7\\. .*|Högst 7\\. .*"
+    timeout: 15000
 - scrollUntilVisible:
     element: "These work both ways.*|Nämä toimivat molempiin suuntiin.*|De här gäller åt båda håll.*"
     direction: UP
     centerElement: true
     timeout: 60000
 
-# Whom: from the stored answer. The only one chosen stays chosen, and says why.
+# Whom: from the stored answer, with no line over it. The only one chosen stays chosen, and says why.
 - tapOn: "(Whom are you looking for\\?|Ketä etsit\\?|Vem söker du\\?)(, .*)?"
 - extendedWaitUntil:
-    visible:
-      text: "Men|Miehiä|Män"
-      selected: true
+    visible: "✓ Men|✓ Miehiä|✓ Män"
     timeout: 15000
 - waitForAnimationToEnd
-- tapOn: "Men|Miehiä|Män"
+- assertNotVisible: "Pick everyone you want to see\\. .*|Valitse kaikki, joita haluat nähdä\\. .*|Välj alla du vill se\\. .*"
+- tapOn: "✓ Men|✓ Miehiä|✓ Män"
 - assertVisible: "Keep at least one\\.|Pidä ainakin yksi\\.|Behåll minst en\\."
-- assertVisible:
-    text: "Men|Miehiä|Män"
-    selected: true
+- assertVisible: "✓ Men|✓ Miehiä|✓ Män"
 # A second one ends the refusal, and going back keeps it.
 - tapOn: "Women|Naisia|Kvinnor"
 - assertNotVisible: "Keep at least one\\.|Pidä ainakin yksi\\.|Behåll minst en\\."
@@ -65,28 +78,26 @@ name: What you seek lists whom, the ages, why and the deal-breakers, and each ch
 - waitForAnimationToEnd
 - tapOn: "(Whom are you looking for\\?|Ketä etsit\\?|Vem söker du\\?)(, .*)?"
 - extendedWaitUntil:
-    visible:
-      text: "Women|Naisia|Kvinnor"
-      selected: true
+    visible: "✓ Women|✓ Naisia|✓ Kvinnor"
     timeout: 15000
-- assertVisible:
-    text: "Men|Miehiä|Män"
-    selected: true
+- assertVisible: "✓ Men|✓ Miehiä|✓ Män"
 - waitForAnimationToEnd
 # Back as she began, which is no limit either: as often as one wishes (ADR-060 §9).
-- tapOn: "Women|Naisia|Kvinnor"
+- tapOn: "✓ Women|✓ Naisia|✓ Kvinnor"
 - tapOn: "Back to what you seek|Takaisin siihen, mitä etsit|Tillbaka till vad du söker"
 - extendedWaitUntil:
     visible: "These work both ways.*|Nämä toimivat molempiin suuntiin.*|De här gäller åt båda håll.*"
     timeout: 15000
 - waitForAnimationToEnd
 
-# The ages: a year at a time, kept by going back.
+# The ages: a year at a time, kept by going back, with no line over them: the
+# buttons stop at the bounds themselves.
 - tapOn: "(What ages\\?|Minkä ikäisiä\\?|Vilka åldrar\\?)(, .*)?"
 - extendedWaitUntil:
     visible: "60"
     timeout: 15000
 - assertVisible: "72"
+- assertNotVisible: "Between 18 and 99\\. .*|Väliltä 18–99\\. .*|Mellan 18 och 99\\. .*"
 - waitForAnimationToEnd
 - tapOn: "Youngest, one year older|Nuorin, vuotta vanhempi|Yngsta, ett år äldre"
 - assertVisible: "61"
@@ -108,26 +119,25 @@ name: What you seek lists whom, the ages, why and the deal-breakers, and each ch
     timeout: 15000
 - waitForAnimationToEnd
 
-# What she is here for: its own screen, where a second press clears nothing.
+# What she is here for: its own screen, which says beside the answer what the
+# answer does, and where a second press clears nothing.
 - tapOn: "(What are you here for\\?|Mitä etsit täältä\\?|Vad är du här för\\?)(, .*)?"
 - extendedWaitUntil:
-    visible: "This also decides who sees you.*|Tämä ratkaisee myös.*|Det här avgör också.*"
+    visible: "This also decides who sees you: people who want the same thing\\.|Tämä ratkaisee myös, ketkä näkevät sinut: ne, jotka haluavat samaa\\.|Det här avgör också vilka som ser dig: de som vill samma sak\\."
     timeout: 15000
 - waitForAnimationToEnd
-- assertVisible:
-    text: "Something long-term|Jotain pitkäaikaista|Något långvarigt"
-    selected: true
-- tapOn: "Something long-term|Jotain pitkäaikaista|Något långvarigt"
-- assertVisible:
-    text: "Something long-term|Jotain pitkäaikaista|Något långvarigt"
-    selected: true
+- assertVisible: "✓ Something long-term|✓ Jotain pitkäaikaista|✓ Något långvarigt"
+- tapOn: "✓ Something long-term|✓ Jotain pitkäaikaista|✓ Något långvarigt"
+- assertVisible: "✓ Something long-term|✓ Jotain pitkäaikaista|✓ Något långvarigt"
 - tapOn: "Back to what you seek|Takaisin siihen, mitä etsit|Tillbaka till vad du söker"
 - extendedWaitUntil:
     visible: "These work both ways.*|Nämä toimivat molempiin suuntiin.*|De här gäller åt båda håll.*"
     timeout: 15000
 - waitForAnimationToEnd
 
-# The deal-breakers are a row each, the distance last, and each opens its own screen.
+# The deal-breakers are a row each, the distance last, and each opens its own
+# screen, with no line over it either. Back on the list its row is what tells:
+# the screen's only Everyone wears the tick.
 - scrollUntilVisible:
     element: "(Distance|Etäisyys|Avstånd)(, .*)?"
     direction: DOWN
@@ -136,15 +146,13 @@ name: What you seek lists whom, the ages, why and the deal-breakers, and each ch
 - assertVisible: "((Distance|Etäisyys|Avstånd), )?(Everyone|Kaikki|Alla)"
 - tapOn: "(Distance|Etäisyys|Avstånd)(, .*)?"
 - extendedWaitUntil:
-    visible: "It works both ways.*|Tämä toimii molempiin suuntiin.*|Det här gäller åt båda håll.*"
+    visible: "✓ Everyone|✓ Kaikki|✓ Alla"
     timeout: 15000
 - waitForAnimationToEnd
-- assertVisible:
-    text: "Everyone|Kaikki|Alla"
-    selected: true
+- assertNotVisible: "It works both ways: it also decides who sees you\\.|Tämä toimii molempiin suuntiin: se ratkaisee myös, ketkä näkevät sinut\\.|Det här gäller åt båda håll: det avgör också vilka som ser dig\\."
 - tapOn: "Back|Takaisin|Tillbaka"
 - extendedWaitUntil:
-    visible: "(Distance|Etäisyys|Avstånd)(, .*)?"
+    visible: "((Distance|Etäisyys|Avstånd), )?(Everyone|Kaikki|Alla)"
     timeout: 15000
 - waitForAnimationToEnd
 

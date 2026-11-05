@@ -13,18 +13,14 @@ name: A later question left unsaved asks first, on the arrow and on a link from 
     timeout: 15000
 - waitForAnimationToEnd
 - tapOn: "Not my thing|Ei minun juttuni|Inte min grej"
-- assertVisible:
-    text: "Not my thing|Ei minun juttuni|Inte min grej"
-    selected: true
+- assertVisible: "✓ Not my thing|✓ Ei minun juttuni|✓ Inte min grej"
 
 - tapOn: "Back to your profile|Takaisin profiiliisi|Tillbaka till din profil"
 - extendedWaitUntil:
     visible: "Leave without saving\\?|Poistutaanko tallentamatta\\?|Lämna utan att spara\\?"
     timeout: 15000
 - tapOn: "Keep editing|Jatka muokkaamista|Fortsätt redigera"
-- assertVisible:
-    text: "Not my thing|Ei minun juttuni|Inte min grej"
-    selected: true
+- assertVisible: "✓ Not my thing|✓ Ei minun juttuni|✓ Inte min grej"
 
 - openLink: kuutti://
 - extendedWaitUntil:
@@ -36,10 +32,8 @@ name: A later question left unsaved asks first, on the arrow and on a link from 
     visible: "People on Kuutti|Ihmiset Kuutissa|Människor på Kuutti"
     timeout: 15000
 
-# Nothing of it is stored.
+# Nothing of it is stored: its words without the tick.
 - openLink: kuutti://profile/later/drugsAttitude
 - extendedWaitUntil:
-    visible:
-      text: "Not my thing|Ei minun juttuni|Inte min grej"
-      selected: false
+    visible: "Not my thing|Ei minun juttuni|Inte min grej"
     timeout: 15000
