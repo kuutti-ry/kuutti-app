@@ -197,7 +197,7 @@ export function App() {
             tabIndex={-1}
             className="mx-auto w-full max-w-6xl flex-1 space-y-6 px-4 py-6 md:px-8 md:py-8"
           >
-            {session.status === "loading" && <Loading>{t("admin.queue.loading")}</Loading>}
+            {session.status === "loading" && <Loading>{t("load.loading")}</Loading>}
             {session.status === "signed-out" && <SignIn />}
             {session.status === "signed-in" &&
               (front ? (

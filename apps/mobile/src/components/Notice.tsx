@@ -28,10 +28,12 @@ export function Notice({
   words,
   refused = false,
   answer = 0,
+  className,
 }: {
   words: string;
   refused?: boolean;
   answer?: number;
+  className?: string;
 }) {
   // A new answer with the same words is said again, hence the answer among the dependencies.
   useEffect(() => {
@@ -40,7 +42,11 @@ export function Notice({
     }
   }, [words, answer]);
   return (
-    <Text key={answer} accessibilityLiveRegion={refused ? "assertive" : "polite"}>
+    <Text
+      key={answer}
+      accessibilityLiveRegion={refused ? "assertive" : "polite"}
+      className={className}
+    >
       {words}
     </Text>
   );

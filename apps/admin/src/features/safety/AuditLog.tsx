@@ -173,7 +173,7 @@ export function AuditLog() {
           </form>
         </CardContent>
       </Card>
-      {state.kind === "loading" && <Loading>{t("admin.audit.loading")}</Loading>}
+      {state.kind === "loading" && <Loading>{t("load.loading")}</Loading>}
       {state.kind === "error" && (
         <Alert>{t(state.invalid ? "admin.audit.invalid" : "admin.loadFailed")}</Alert>
       )}

@@ -1,6 +1,7 @@
 import type { PlainMessageKey } from "@kuutti/i18n";
 import { useState } from "react";
 import { Linking, View } from "react-native";
+import { Notice } from "@/components/Notice";
 import { Button } from "@/components/ui/button";
 import { Text } from "@/components/ui/text";
 import { updateApp } from "@/lib/app-update";
@@ -21,21 +22,12 @@ const WHY: Record<FailureKind, PlainMessageKey> = {
 const INSTALL_PAGE = "https://expo.dev/accounts/kuutti/projects/kuutti/builds";
 
 /**
- * What a screen shows when something did not load: its own line saying what,
- * then why in words, and the way out that fits. Trying again helps when the
- * network or the server failed; an app older than its API needs the newest
- * update instead, and when this build has none, a new install.
+ * What a screen shows when something did not load: why in words, heard at once,
+ * and the way out that fits (#581). Trying again helps when the network or the
+ * server failed; an app older than its API needs the newest update instead, and
+ * when this build has none, a new install.
  */
-export function LoadFailed({
-  headline,
-  error,
-  onRetry,
-}: {
-  /** The screen's own words for what did not load. */
-  headline: string;
-  error: unknown;
-  onRetry: () => void;
-}) {
+export function LoadFailed({ error, onRetry }: { error: unknown; onRetry: () => void }) {
   const { t } = useT();
   const kind = failureKind(error);
   const [update, setUpdate] = useState<"idle" | "busy" | "none">("idle");
@@ -48,10 +40,7 @@ export function LoadFailed({
 
   return (
     <View className="items-center gap-4">
-      <Text accessibilityLiveRegion="assertive" className="text-center">
-        {headline}
-      </Text>
-      <Text className="text-center">{t(WHY[kind])}</Text>
+      <Notice refused words={t(WHY[kind])} className="text-center" />
       {kind !== "outdated" && <Button onPress={onRetry}>{t("load.retry")}</Button>}
       {kind === "outdated" && update !== "none" && (
         <Button disabled={update === "busy"} onPress={() => void runUpdate()}>

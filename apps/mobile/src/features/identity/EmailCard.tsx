@@ -39,13 +39,13 @@ const NOTICE: Readonly<Record<Notice, PlainMessageKey>> = {
   removed: "account.email.removed",
   codeSent: "account.email.codeSent",
   invalid: "account.email.invalid",
-  failed: "account.email.failed",
+  failed: "load.failed.press",
   confirmedNow: "account.email.confirmedNow",
   codeWrong: "account.email.codeWrong",
   codeSpent: "account.email.codeSpent",
   codeExpired: "account.email.codeExpired",
   codeNone: "account.email.codeNone",
-  sendLimit: "account.email.sendLimit",
+  sendLimit: "errors.enough_today",
   mailUnavailable: "account.email.mailUnavailable",
   codeFailed: "account.email.codeFailed",
 };
@@ -127,13 +127,13 @@ export function EmailCard({
   if (load.state === "loading") {
     return (
       <Text variant="muted" accessibilityLiveRegion="polite">
-        {t("account.email.loading")}
+        {t("load.loading")}
       </Text>
     );
   }
   if (load.state === "unavailable") {
     return (
-      <LoadFailed headline={t("account.email.loadFailed")} error={load.error} onRetry={read} />
+      <LoadFailed error={load.error} onRetry={read} />
     );
   }
   return <EmailForm first={load.email} inRow={inRow} onStored={onStored} />;

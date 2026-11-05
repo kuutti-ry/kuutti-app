@@ -122,7 +122,7 @@ export function AutomaticBans() {
         {done?.outcome === "lift" &&
           t("admin.automaticBans.done.reverse", { account: short(done.ban.accountId) })}
       </p>
-      {state.kind === "loading" && <Loading>{t("admin.automaticBans.loading")}</Loading>}
+      {state.kind === "loading" && <Loading>{t("load.loading")}</Loading>}
       {state.kind === "error" && <Alert>{t("admin.loadFailed")}</Alert>}
       {state.kind === "ready" && (
         <ul className="grid gap-4">

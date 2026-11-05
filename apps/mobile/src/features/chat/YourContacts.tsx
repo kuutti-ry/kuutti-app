@@ -94,12 +94,12 @@ export function YourContacts({ onStored }: { onStored?: (kept: readonly ContactK
   if (state === "loading") {
     return (
       <Text variant="muted" accessibilityLiveRegion="polite">
-        {t("settings.contacts.loading")}
+        {t("load.loading")}
       </Text>
     );
   }
   if (state === "unavailable") {
-    return <LoadFailed headline={t("settings.contacts.loadFailed")} error={error} onRetry={read} />;
+    return <LoadFailed error={error} onRetry={read} />;
   }
   return (
     <View className="gap-6">
@@ -403,7 +403,7 @@ function ContactCard({
                 leave();
               }}
             >
-              {t("settings.contacts.retry")}
+              {t("load.retry")}
             </Button>
           )}
         </View>
@@ -435,7 +435,7 @@ function wordsOf(
     case "pace":
       return t("chat.contact.error.message_budget_exceeded");
     case "failed":
-      return t("settings.contacts.failed");
+      return t("load.failed.press");
   }
 }
 

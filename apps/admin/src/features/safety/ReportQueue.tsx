@@ -115,7 +115,7 @@ function ReportList({ state }: { state: State }) {
           {t("admin.reports.refresh")}
         </Button>
       </div>
-      {page.kind === "loading" && <Loading>{t("admin.reports.loading")}</Loading>}
+      {page.kind === "loading" && <Loading>{t("load.loading")}</Loading>}
       {page.kind === "error" && <Alert>{t("admin.loadFailed")}</Alert>}
       {page.kind === "ready" && (
         <ul className="grid gap-4">

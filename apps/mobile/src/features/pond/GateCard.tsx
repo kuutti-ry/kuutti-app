@@ -26,11 +26,10 @@ export function GateCard({ whenOpen }: { whenOpen?: ReactNode }) {
     <Card className="w-full max-w-md">
       <CardContent className="gap-2">
         {view.status === "loading" && (
-          <Text accessibilityLiveRegion="polite">{t("pond.gate.loading")}</Text>
+          <Text accessibilityLiveRegion="polite">{t("load.loading")}</Text>
         )}
         {view.status === "failed" && (
           <LoadFailed
-            headline={t("pond.gate.failed")}
             error={view.error}
             onRetry={() => {
               tap();

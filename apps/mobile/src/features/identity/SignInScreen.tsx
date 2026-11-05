@@ -215,7 +215,7 @@ export function SignInScreen({ code, error, until }: SignInParams) {
 
   const buttonText =
     phase.kind === "error" && !LASTING_REFUSALS.has(phase.code)
-      ? t("signIn.tryAgain")
+      ? t("load.retry")
       : t("signIn.button");
 
   if (Platform.OS !== "web" && agreed === false && phase.kind === "idle") {

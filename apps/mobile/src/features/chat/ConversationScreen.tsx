@@ -597,7 +597,7 @@ export function ConversationScreen({ id }: { id: string }) {
       )}
       {shown.status === "loading" && (
         <Text accessibilityLiveRegion="polite" className="p-6">
-          {t("chat.conversation.loading")}
+          {t("load.loading")}
         </Text>
       )}
       {shown.status === "gone" && (
@@ -612,7 +612,6 @@ export function ConversationScreen({ id }: { id: string }) {
       {shown.status === "failed" && (
         <View className="p-6">
           <LoadFailed
-            headline={t("chat.conversation.failed")}
             error={shown.error}
             onRetry={() => {
               setView({ status: "loading" });

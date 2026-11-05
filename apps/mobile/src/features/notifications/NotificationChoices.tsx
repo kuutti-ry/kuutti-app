@@ -92,10 +92,10 @@ export function NotificationChoices({
       <PhoneLine />
       <Text>{t("notifications.intro")}</Text>
       {view.status === "loading" && (
-        <Text accessibilityLiveRegion="polite">{t("notifications.loading")}</Text>
+        <Text accessibilityLiveRegion="polite">{t("load.loading")}</Text>
       )}
       {view.status === "failed" && (
-        <LoadFailed headline={t("notifications.failed")} error={view.error} onRetry={read} />
+        <LoadFailed error={view.error} onRetry={read} />
       )}
       {view.status === "ready" &&
         view.choices.map(({ kind, enabled }) => {
@@ -116,7 +116,7 @@ export function NotificationChoices({
             </View>
           );
         })}
-      {failed && <Notice refused words={t("notifications.saveFailed")} answer={failures} />}
+      {failed && <Notice refused words={t("load.failed.press")} answer={failures} />}
     </>
   );
 }

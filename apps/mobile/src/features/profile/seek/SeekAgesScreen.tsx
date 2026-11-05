@@ -45,7 +45,6 @@ export function SeekAgesScreen() {
       <SafeAreaView className="flex-1 bg-background">
         <View className="flex-1 items-center justify-center gap-4 p-6">
           <LoadFailed
-            headline={t("profile.failed")}
             error={seeking.error}
             onRetry={() => void seeking.reload()}
           />
@@ -57,7 +56,7 @@ export function SeekAgesScreen() {
     return (
       <SafeAreaView className="flex-1 bg-background">
         <View className="flex-1 items-center justify-center p-6">
-          <Text accessibilityLiveRegion="polite">{t("profile.loading")}</Text>
+          <Text accessibilityLiveRegion="polite">{t("load.loading")}</Text>
         </View>
       </SafeAreaView>
     );
@@ -92,7 +91,7 @@ export function SeekAgesScreen() {
           onChange={(max) => setDraft({ ...ages, max })}
         />
       </ScrollView>
-      <ConfirmLeaveDialog {...leaving} reason={t("profile.seek.failed")} />
+      <ConfirmLeaveDialog {...leaving} reason={t("load.failed.press")} />
     </SafeAreaView>
   );
 }

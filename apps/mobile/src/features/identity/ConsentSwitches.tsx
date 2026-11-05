@@ -107,7 +107,7 @@ const EXPLAIN = {
   special_category: "account.specialCategory.explain",
 } as const;
 const FAILED = {
-  special_category: "account.specialCategory.failed",
+  special_category: "load.failed.press",
 } as const;
 
 /**
@@ -134,14 +134,13 @@ export function ConsentSwitch({
   if (consent.state === "loading") {
     return (
       <Text variant="muted" accessibilityLiveRegion="polite">
-        {t("account.choices.loading")}
+        {t("load.loading")}
       </Text>
     );
   }
   if (consent.state === "unavailable") {
     return (
       <LoadFailed
-        headline={t("account.choices.loadFailed")}
         error={consent.error}
         onRetry={consent.read}
       />

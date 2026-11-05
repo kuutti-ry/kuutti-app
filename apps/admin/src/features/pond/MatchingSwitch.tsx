@@ -59,7 +59,7 @@ export function MatchingSwitch() {
         {said === true && t("admin.matching.opened")}
         {said === false && t("admin.matching.closedNow")}
       </p>
-      {state.kind === "loading" && <Loading>{t("admin.matching.loading")}</Loading>}
+      {state.kind === "loading" && <Loading>{t("load.loading")}</Loading>}
       {state.kind === "error" && <Alert>{t("admin.loadFailed")}</Alert>}
       {pond && (
         <Card className="py-0 sm:py-0">

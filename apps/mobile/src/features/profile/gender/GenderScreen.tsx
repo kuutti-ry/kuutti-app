@@ -82,7 +82,6 @@ export function GenderScreen() {
       <SafeAreaView className="flex-1 bg-background">
         <View className="flex-1 items-center justify-center gap-4 p-6">
           <LoadFailed
-            headline={t("profile.failed")}
             error={own.status === "error" ? own.error : profile.error}
             onRetry={() => {
               void own.reload();
@@ -97,7 +96,7 @@ export function GenderScreen() {
     return (
       <SafeAreaView className="flex-1 bg-background">
         <View className="flex-1 items-center justify-center p-6">
-          <Text accessibilityLiveRegion="polite">{t("profile.loading")}</Text>
+          <Text accessibilityLiveRegion="polite">{t("load.loading")}</Text>
         </View>
       </SafeAreaView>
     );
@@ -148,7 +147,7 @@ export function GenderScreen() {
         reason={
           held?.code === "change_too_soon"
             ? (waiting ?? t("errors.change_too_soon"))
-            : t("profile.seek.failed")
+            : t("load.failed.press")
         }
       />
     </SafeAreaView>

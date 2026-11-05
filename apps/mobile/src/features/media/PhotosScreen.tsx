@@ -76,8 +76,8 @@ const ERROR_TEXT: ReadonlyMap<string, PlainMessageKey> = new Map([
 function noticeText(notice: PhotosNotice, t: ReturnType<typeof useT>["t"]): string {
   if (notice.kind === "refused_local") return t("photos.refused.local");
   if (notice.kind === "permission") return t("photos.error.permission");
-  if (notice.kind === "caption_failed") return t("photos.caption.failed");
-  return t(ERROR_TEXT.get(notice.code ?? "") ?? "photos.error.generic");
+  if (notice.kind === "caption_failed") return t("load.failed.press");
+  return t(ERROR_TEXT.get(notice.code ?? "") ?? "load.failed.press");
 }
 
 /**

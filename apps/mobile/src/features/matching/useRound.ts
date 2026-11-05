@@ -59,11 +59,11 @@ export type RoundNotice =
       | "errors.card_budget_exceeded"
       | "errors.stars_full"
       | "round.star.first"
-      | "round.star.failed"
+      | "load.failed.press"
       | "round.short.nobody"
-      | "round.short.failed"
+      | "load.failed.press"
       | "round.gone"
-      | "round.decision.failed"
+      | "load.failed.press"
     >
   | { waiting: number };
 
@@ -372,7 +372,7 @@ export function useRound(star?: string) {
           showRound({ ...held, yourTurn: waiting });
           setNotice({ waiting });
         } else {
-          setNotice("round.decision.failed");
+          setNotice("load.failed.press");
         }
       } finally {
         setBusy(false);
@@ -417,7 +417,7 @@ export function useRound(star?: string) {
         else if (statusOf(error) === 404) {
           drop(day, position);
           setNotice("round.gone");
-        } else setNotice("round.star.failed");
+        } else setNotice("load.failed.press");
       } finally {
         setBusy(false);
       }
@@ -454,7 +454,7 @@ export function useRound(star?: string) {
         else if (code === "relaxations_changed") setNotice("errors.relaxations_changed");
         // Relaxed, its cards in the round: the day's cards ran out serving them.
         else if (code === "card_budget_exceeded") setNotice("errors.card_budget_exceeded");
-        else setNotice("round.short.failed");
+        else setNotice("load.failed.press");
       } finally {
         setBusy(false);
       }
@@ -475,7 +475,7 @@ export function useRound(star?: string) {
       } catch (error) {
         if (!onDay(day)) return;
         if (codeOf(error) === "round_expired") read("errors.round_expired");
-        else setNotice("round.short.failed");
+        else setNotice("load.failed.press");
       } finally {
         setBusy(false);
       }

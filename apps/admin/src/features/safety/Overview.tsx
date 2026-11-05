@@ -80,7 +80,7 @@ export function Overview() {
           {t("admin.overview.refresh")}
         </Button>
       </div>
-      {state.kind === "loading" && <Loading>{t("admin.overview.loading")}</Loading>}
+      {state.kind === "loading" && <Loading>{t("load.loading")}</Loading>}
       {state.kind === "error" && <Alert>{t("admin.loadFailed")}</Alert>}
       {state.kind === "ready" && (
         <>

@@ -107,7 +107,7 @@ export function ReportPage() {
   return (
     <section aria-labelledby="report-title" className="space-y-6">
       <ScreenTitle id="report-title">{t("admin.report.title", { report: short(id) })}</ScreenTitle>
-      {state.kind === "loading" && <Loading>{t("admin.report.loading")}</Loading>}
+      {state.kind === "loading" && <Loading>{t("load.loading")}</Loading>}
       {state.kind === "error" && <Alert>{t("admin.loadFailed")}</Alert>}
       {state.kind === "missing" && (
         <p className="text-muted-foreground">{t("admin.report.missing")}</p>

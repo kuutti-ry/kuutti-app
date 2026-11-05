@@ -86,15 +86,15 @@ export function StarredScreen() {
       />
       {clearFailed && (
         <Text accessibilityLiveRegion="polite" className="px-6 pt-4">
-          {t("stars.clear.failed")}
+          {t("load.failed.press")}
         </Text>
       )}
       <ScrollView contentContainerClassName="flex-grow gap-4 p-6">
         {view.status === "loading" && (
-          <Text accessibilityLiveRegion="polite">{t("stars.loading")}</Text>
+          <Text accessibilityLiveRegion="polite">{t("load.loading")}</Text>
         )}
         {view.status === "failed" && (
-          <LoadFailed headline={t("stars.failed")} error={view.error} onRetry={retry} />
+          <LoadFailed error={view.error} onRetry={retry} />
         )}
         {view.status === "ready" && view.items.length === 0 && <Text>{t("stars.none")}</Text>}
         {view.status === "ready" && view.items.length > 0 && (

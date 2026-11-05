@@ -132,10 +132,9 @@ export function RoundScreen({ star }: { star?: string }) {
         ? t(notice)
         : t("round.yourTurn.refused", notice);
   useSpokenOnIos(words);
-  // A read past the last card takes the place of the button the focus was on, and
-  // one that fails does: iOS has no live region for either line to speak through.
-  useSpokenOnIos(round.readingOn ? t("round.loading") : null);
-  useSpokenOnIos(view.status === "failed" ? t("round.failed") : null);
+  // A read past the last card takes the place of the button the focus was on: iOS
+  // has no live region for the line to speak through.
+  useSpokenOnIos(round.readingOn ? t("load.loading") : null);
 
   const entries = view.status === "ready" ? view.round.entries : undefined;
   const entry = current?.entry;
@@ -216,10 +215,10 @@ export function RoundScreen({ star }: { star?: string }) {
         contentContainerClassName="flex-grow gap-4 p-6"
       >
         {view.status === "loading" && (
-          <Text accessibilityLiveRegion="polite">{t("round.loading")}</Text>
+          <Text accessibilityLiveRegion="polite">{t("load.loading")}</Text>
         )}
         {view.status === "failed" && (
-          <LoadFailed headline={t("round.failed")} error={view.error} onRetry={round.retry} />
+          <LoadFailed error={view.error} onRetry={round.retry} />
         )}
         {view.status === "budget" && (
           <Text ref={focus} accessibilityLiveRegion="polite">

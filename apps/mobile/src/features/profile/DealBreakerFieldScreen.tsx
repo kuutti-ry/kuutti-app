@@ -156,7 +156,6 @@ export function DealBreakerFieldScreen({ field: key }: { field: string }) {
       <SafeAreaView className="flex-1 bg-background">
         <View className="flex-1 items-center justify-center gap-4 p-6">
           <LoadFailed
-            headline={t("profile.failed")}
             error={profile.status === "error" ? profile.error : failure}
             onRetry={() => {
               void reload();
@@ -171,7 +170,7 @@ export function DealBreakerFieldScreen({ field: key }: { field: string }) {
     return (
       <SafeAreaView className="flex-1 bg-background">
         <View className="flex-1 items-center justify-center p-6">
-          <Text accessibilityLiveRegion="polite">{t("profile.loading")}</Text>
+          <Text accessibilityLiveRegion="polite">{t("load.loading")}</Text>
         </View>
       </SafeAreaView>
     );
@@ -320,7 +319,7 @@ export function DealBreakerFieldScreen({ field: key }: { field: string }) {
       </ScrollView>
       <ConfirmLeaveDialog
         {...leaving}
-        reason={held && profileErrorText(held.notice, t, "profile.seek.failed")}
+        reason={held && profileErrorText(held.notice, t, "load.failed.press")}
       />
     </SafeAreaView>
   );
