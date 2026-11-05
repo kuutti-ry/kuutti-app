@@ -36,3 +36,8 @@ output "preview_database_document" {
   description = "Name of the Run Command document preview-cleanup.yml sends to drop kuutti_pr_<n>; null where previews do not run."
   value       = var.preview_databases ? aws_ssm_document.preview_database[0].name : null
 }
+
+output "demo_reset_document" {
+  description = "Name of the Run Command document demo-reset.yml sends to return the demo personas to where they begin (#613); null where the demo does not live."
+  value       = var.demo_reset ? aws_ssm_document.demo_reset[0].name : null
+}
