@@ -431,9 +431,13 @@ describe("any order of decisions", () => {
     cards.filter((card) => card.decision === "fish" && !card.paid).length;
   const paidOf = ({ cards }: Holdings) => cards.filter((card) => card.paid).length;
 
-  test("no budget is passed, a unit sits on a standing fish or waits, and a refusal changes nothing", async ({
-    ctx,
-  }) => {
+  // Thirty runs of a round and up to ten decisions each, on real Postgres:
+  // 2.6 s alone on a laptop, 3 to 7 s on CI's shared arm runner beside the rest
+  // of the suite, and twice past the default 15 s on 05/11/2026 (main's 4862a3c8
+  // and #612) with nothing it runs changed. So a ceiling of its own.
+  test("no budget is passed, a unit sits on a standing fish or waits, and a refusal changes nothing", {
+    timeout: 60_000,
+  }, async ({ ctx }) => {
     const [a, b, c, d, e, x] = await cast(ctx.client, 6);
     if (!a || !b || !c || !d || !e || !x) throw new Error("cast not written");
     const { logger } = await captureLogger();
