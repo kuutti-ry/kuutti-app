@@ -8,7 +8,7 @@ name: Preview
 #           that API, at https://<EAS_HOSTING_SUBDOMAIN>--pr-<n>.expo.app
 #   native  when native code, auth, push, camera or the fingerprint changed
 #           against main: an EAS Update on branch pr-<n> for the dev client
-#           (#10), with a QR code; dormant until expo-updates is configured
+#           (#10), with a QR code
 #   admin   the moderation panel of the same commit, built under /pr-<n>/
 #           against the staging API, since a preview API has no bank
 #           (ADR-014 §1), and written to pr-<n>/ of the staging panel's
