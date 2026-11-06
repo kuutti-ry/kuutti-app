@@ -53,7 +53,7 @@ Each rests on AWS's documentation or on Dokploy's defaults, and nothing in the r
 - CloudFront replaces a viewer's own `CloudFront-Viewer-Address` on Kuutti's distribution. Two requests from one machine with different forged values must spend one bucket (`RateLimit-Remaining` falls across them). If they do not, the switch goes back.
 - The function runs on the chat's WebSocket upgrade (`GET /ws`). If it did not, every phone's upgrade would be unproven and share one bucket, which fails closed but would refuse reconnects.
 - A key's write is not in CloudTrail's event history (`aws cloudtrail lookup-events --lookup-attributes AttributeKey=EventName,AttributeValue=PutKey` finds nothing). Checked on 2026-11-06 after staging's two writes: none in us-east-1 or eu-central-1. The plan role is denied that history all the same.
-- Traefik's access log keeps no request headers (`accessLog.fields.headers.defaultMode` in Dokploy's `traefik.yml` is not `keep`), so the value is not on the box's disk or in its nightly backup.
+- Traefik's access log keeps no request headers (`accessLog.fields.headers.defaultMode` in Dokploy's `traefik.yml` is not `keep`), so the value is not on the box's disk or in its nightly backup. Checked on 2026-11-06 on staging: Traefik v3.6.25 keeps no access log at all, since its one static configuration, Dokploy's `/etc/dokploy/traefik/traefik.yml`, has no `accessLog` section, and no argument or variable sets one.
 - The first plan after the bootstrap's apply refreshes the store through the `cloudfront:` control plane alone.
 
 ## History
