@@ -52,7 +52,7 @@
   },
   "devDependencies": {
     "@biomejs/biome": "2.6.3",
-    "@kuutti-ry/tunnistus-oidc": "^0.1.1",
+    "@kuutti-ry/tunnistus-oidc": "^0.1.2",
     "eas-cli": "26.0.0",
     "knip": "6.43.0",
     "yaml": "2.9.1"
