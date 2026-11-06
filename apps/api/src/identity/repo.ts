@@ -339,20 +339,27 @@ export async function countRefusedAttempt(db: Queryable, identityId: string): Pr
 }
 
 /**
- * Null when the identity has a live account already: two logins of the same
- * person can both decide to create one (two devices), and the loser must go
- * through the decision again, where it resumes the winner's, rather than
- * surface the unique violation of `account_one_live_per_identity_idx`.
+ * Null when the identity has a live account already, or a cooldown at `now`.
+ * Two logins of the same person can both decide to create one (two devices),
+ * and the loser must go through the decision again, where it resumes the
+ * winner's, rather than surface the unique violation of
+ * `account_one_live_per_identity_idx`. The cooldown is the statement's own
+ * check and not the decision's alone: an erasure can commit between the
+ * login's read of the identity and its read of the live account, so the
+ * decision held an identity without a cooldown and found no account to
+ * resume (TD-7; the audit of #609, run 1, record 1). Refused here, the
+ * caller decides again and reads the cooldown.
  */
 export async function insertAccount(
   db: Queryable,
-  input: { identityId: string; birthYear: number; birthMonth: number },
+  input: { identityId: string; birthYear: number; birthMonth: number; now: Date },
 ): Promise<Account | null> {
   const { rows } = await db.query<Row>(
     `INSERT INTO account (identity_id, state, birth_year, birth_month)
-     VALUES ($1, 'registered', $2, $3)
+     SELECT i.id, 'registered', $2, $3 FROM identity i
+     WHERE i.id = $1 AND (i.reregister_after IS NULL OR i.reregister_after <= $4)
      ON CONFLICT (identity_id) WHERE state <> 'deleted' DO NOTHING RETURNING *`,
-    [input.identityId, input.birthYear, input.birthMonth],
+    [input.identityId, input.birthYear, input.birthMonth, input.now],
   );
   const row = rows[0];
   return row ? accountFrom(row) : null;

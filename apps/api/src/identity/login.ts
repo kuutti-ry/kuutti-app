@@ -234,7 +234,10 @@ type Derived = Awaited<ReturnType<typeof deriveFromBroker>>;
  * an identity is never deleted (outside the demo tools' resets), so its
  * insert is lost once at most, and an account lost to another login is live
  * when the next pass reads it (erasing it in between leaves a cooldown, which
- * refuses).
+ * refuses). An erasure that commits between the read of the identity and the
+ * read of its live account leaves this pass an identity without a cooldown
+ * and no account to resume: the insert itself refuses an identity inside its
+ * cooldown (repo.insertAccount), and the next pass reads it.
  */
 async function resolveAccount(
   deps: LoginDeps,
@@ -275,6 +278,7 @@ async function resolveAccount(
           identityId: created.id,
           birthYear: derived.birthYear,
           birthMonth: derived.birthMonth,
+          now,
         });
         if (!account) continue;
         return { accountId: account.id, outcome: "created" };
@@ -285,6 +289,7 @@ async function resolveAccount(
           identityId: decision.identityId,
           birthYear: derived.birthYear,
           birthMonth: derived.birthMonth,
+          now,
         });
         if (!account) continue;
         return { accountId: account.id, outcome: "created" };
