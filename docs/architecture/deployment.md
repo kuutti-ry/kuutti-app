@@ -339,7 +339,7 @@ flowchart TB
 
 ## Open
 
-- Production's ingress (#25, #198): its box admits 443 from anywhere until its cutover sets `media_enabled` and `cloudfront_only_ingress` together (`infra/README.md`, Media).
+- Production's ingress (#25, #198): its box admits 443 from anywhere until its cutover, which sets `media_enabled`, `cloudfront_only_ingress` and `trusted_proxy` together and so waits for the viewer address's proof below, unless the maintainer accepts the shared edge bucket in production too (`infra/README.md`, Media).
 - The viewer address (#198, ADR-008 History): the rate limiter keys on the CloudFront server that forwarded a request, not on the person, until the box can tell Kuutti's distribution from anybody's; how is the maintainer's decision.
 - Production (#25) runs without bank identification (ADR-049) and without swap (ADR-046). Until the next tag is applied it is the `t4g.small` of 2026-10-24, and its `admin-app-url` names `https://admin.kuutti.app`, a host not created yet.
 - SES (#196): the account is in SES's sandbox until the maintainer asks AWS for production access, so production as well delivers only to verified identities, the addresses of `kuutti.app` among them.
