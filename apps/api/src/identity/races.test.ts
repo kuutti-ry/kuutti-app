@@ -697,6 +697,55 @@ describe("a bank login racing another request", () => {
     ]);
   });
 
+  test("an erasure between the login's read of the identity and its read of the account sends the browser back with the cooldown, and no account is created", async ({
+    ctx,
+  }) => {
+    // The person has an account; the login reads their identity, their other
+    // device's erasure commits, and the login finds no account to resume while
+    // the identity it holds has no cooldown yet (#609, run 1, record 1).
+    const identity = await ctx.client.query<{ id: string }>(
+      "INSERT INTO identity (hetu_hmac) VALUES ($1) RETURNING id",
+      [HMAC],
+    );
+    const identityId = identity.rows[0]?.id ?? "";
+    const account = await ctx.client.query<{ id: string }>(
+      "INSERT INTO account (identity_id, state, birth_year, birth_month) VALUES ($1, 'active', 1985, 3) RETURNING id",
+      [identityId],
+    );
+    const accountId = account.rows[0]?.id ?? "";
+    const db = interleaved(
+      ctx.client,
+      { after: /SELECT \* FROM identity WHERE hetu_hmac = \$1/ },
+      () => eraseOnOtherDevice(ctx, accountId),
+    );
+    const { app, logs } = await appOn(db, { bank: true });
+    const state = await start(app);
+    const back = await app.request(`/auth/callback?code=ok&state=${encodeURIComponent(state)}`);
+    expect(db.ran()).toBe(true);
+    expect(back.status).toBe(302);
+    const location = new URL(back.headers.get("location") ?? "");
+    expect(location.protocol).toBe("kuutti:");
+    expect(location.searchParams.get("code")).toBeNull();
+    expect(location.searchParams.get("error")).toBe("auth_cooldown");
+    const { rows } = await ctx.client.query<{
+      until: Date;
+      refused: number;
+      live: string;
+      total: string;
+    }>(
+      `SELECT reregister_after AS until, refused_attempts AS refused,
+              (SELECT count(*) FROM account WHERE identity_id = $1 AND state <> 'deleted') AS live,
+              (SELECT count(*) FROM account WHERE identity_id = $1) AS total
+       FROM identity WHERE id = $1`,
+      [identityId],
+    );
+    expect(location.searchParams.get("until")).toBe(rows[0]?.until.toISOString());
+    // The tombstone is the identity's only account: the insert refused the
+    // identity inside its cooldown, and the next pass read the cooldown.
+    expect(rows[0]).toMatchObject({ refused: 1, live: "0", total: "1" });
+    expect(logs().find((l) => l.msg === "bank login")).toBeUndefined();
+  });
+
   test("an erasure between the code's use and the session opens no session for the tombstone", async ({
     ctx,
   }) => {

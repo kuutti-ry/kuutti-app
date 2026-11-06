@@ -70,12 +70,16 @@ export async function registerArtificial(
       );
       const identityId = rows[0]?.id;
       if (!identityId) throw new Error("the identity was written meanwhile");
-      const account = await repo.insertAccount(db, { identityId, ...birth });
+      const account = await repo.insertAccount(db, { identityId, ...birth, now: input.now });
       if (!account) throw new Error("the account was written meanwhile");
       return { kind: "created", accountId: account.id, hetuHmac: derived.hetuHmac };
     }
     case "create_account": {
-      const account = await repo.insertAccount(db, { identityId: decision.identityId, ...birth });
+      const account = await repo.insertAccount(db, {
+        identityId: decision.identityId,
+        ...birth,
+        now: input.now,
+      });
       if (!account) throw new Error("the account was written meanwhile");
       return { kind: "created", accountId: account.id, hetuHmac: derived.hetuHmac };
     }

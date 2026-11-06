@@ -352,10 +352,18 @@ describe("the features of the home", () => {
     expect((await homeRow(ctx, a.accountId))?.home_place).toBe(HOME);
     expect(db.said()).not.toMatch(/9999[89]/);
     // The refusal's line carries no detail, and the digits are in no line.
+    // The fields that are numbers of the run's own (the clock, the process,
+    // the ids, the duration) are left out of the comparison: the clock's
+    // milliseconds spelled 99998 once (CI, 2026-11-06) and failed this for
+    // nothing.
     const refused = logs().find((l) => l.code === "postal_code_unknown");
     expect(refused).toBeDefined();
     expect(refused?.detail).toBeUndefined();
-    expect(JSON.stringify(logs())).not.toMatch(/9999[89]/);
+    const runsOwn = ["time", "pid", "hostname", "requestId", "accountId", "durationMs"];
+    const said = logs().map((l) =>
+      Object.fromEntries(Object.entries(l).filter(([key]) => !runsOwn.includes(key))),
+    );
+    expect(JSON.stringify(said)).not.toMatch(/9999[89]/);
   });
 
   test("The digits of an area too small to keep are looked up in memory and gone", async ({
