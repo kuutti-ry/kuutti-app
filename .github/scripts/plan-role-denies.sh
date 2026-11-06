@@ -8,9 +8,11 @@
 # applied the bootstrap.
 #
 # Each probe is one call that would read something if it were allowed, aimed
-# at something that does not exist or matches nothing. A call that is wrongly
-# allowed answers "not found" or an empty list, never a value. Only the error
-# stream is kept, and a probe passes on AccessDenied alone.
+# at something that does not exist or matches nothing, or, for S3, at the
+# panel's public index.html: S3 answers for a missing object by ListBucket
+# alone and never asks GetObject's deny. A call that is wrongly allowed
+# answers "not found", an empty list or a public page, never a secret. Only
+# the error stream is kept, and a probe passes on AccessDenied alone.
 #
 # Usage: plan-role-denies.sh <infra/bootstrap/main.tf>, with the plan role's
 # credentials in the environment (infra-oidc.yml). plan-role-denies.test.sh
@@ -42,6 +44,7 @@ iso() { date -u -d "@$1" +%FT%TZ 2>/dev/null || date -u -r "$1" +%FT%TZ; }
 unprobed() {
   case "$1" in
     kms:Decrypt) echo "the step before asks to decrypt the canary parameter" ;;
+    logs:GetQueryResults) echo "Logs answers an unknown query id as invalid before it asks IAM, a known one would hand out its results, and StartQuery, denied in the same statement, cannot make one" ;;
     rds:DownloadCompleteDBLogFile) echo "a REST call the CLI does not make, denied in the same statement" ;;
     cloudfront-keyvaluestore:List\*) echo "ListKeys would hand out the store's values if it were allowed, and no store without values is there to aim at; GetKey shows the statement in force" ;;
     *) return 1 ;;
@@ -64,8 +67,6 @@ probe() {
       end=$(date -u +%s)
       aws logs start-query --log-group-name "/$none" --start-time $((end - 300)) --end-time "$end" \
         --query-string 'fields @timestamp | limit 1' ;;
-    logs:GetQueryResults)
-      aws logs get-query-results --query-id "$zero" ;;
     rds:DownloadDBLogFilePortion)
       aws rds download-db-log-file-portion --db-instance-identifier "$none" --log-file-name "$none" ;;
     cloudfront-keyvaluestore:Get\*)
@@ -91,11 +92,13 @@ probe() {
         --web-acl-arn "arn:aws:wafv2:us-east-1:$account:global/webacl/$none/$zero" --rule-metric-name "$none" \
         --time-window "StartTime=$(iso $((now - 3600))),EndTime=$(iso "$now")" ;;
     s3:GetObject)
-      # A bucket of this account outside the state bucket, a key it does not
-      # hold: if allowed, NoSuchKey; never an object.
-      aws s3api get-object --bucket "kuutti-media-staging-$account" --key "$none" "$work/object" ;;
+      # The panel's index.html, served to anybody by its distribution, in a
+      # bucket outside the state bucket: if allowed, a public page read into
+      # /dev/null. A missing key would prove nothing (above).
+      aws s3api get-object --bucket "kuutti-admin-staging-$account" --key index.html /dev/null ;;
     s3:GetObjectVersion)
-      aws s3api get-object --bucket "kuutti-media-staging-$account" --key "$none" --version-id "$none" "$work/object" ;;
+      # The same page's one version: the bucket has never been versioned.
+      aws s3api get-object --bucket "kuutti-admin-staging-$account" --key index.html --version-id null /dev/null ;;
     *)
       return 4 ;;
   esac

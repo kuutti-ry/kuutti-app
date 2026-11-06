@@ -54,7 +54,7 @@ policy="$root/infra/bootstrap/main.tf"
 probes "" "$policy"
 check "with every call refused, the run passes" '[ "$status" -eq 0 ] && [ "$(errors)" -eq 0 ]'
 check "the policy's first and last actions are read" 'grep -q "^· kms:Decrypt: not probed" "$work/out" && grep -q "^✔ s3:GetObjectVersion denied" "$work/out"'
-check "the three that cannot be probed say why" '[ "$(grep -c ": not probed, " "$work/out")" -eq 3 ]'
+check "the four that cannot be probed say why" '[ "$(grep -c ": not probed, " "$work/out")" -eq 4 ]'
 denied=$(grep -c '^✔ ' "$work/out")
 
 probes all "$policy"
