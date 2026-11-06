@@ -56,3 +56,9 @@ variable "memory_available_mb" {
   type        = number
   default     = 200
 }
+
+variable "health_search_string" {
+  description = "What the Route 53 probe wants in /health's body. \"status\":\"ok\" by default; \"originProof\":\"valid\" where the API trusts CloudFront's viewer address (ADR-066): /health is 503 unless its status is ok, and Route 53 counts a 5xx as a failure, so the status is still asked."
+  type        = string
+  default     = "\"status\":\"ok\""
+}

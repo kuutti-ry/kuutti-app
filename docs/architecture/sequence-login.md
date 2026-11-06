@@ -200,7 +200,7 @@ sequenceDiagram
 
 ## Open
 
-- **The doors behind CloudFront.** On staging the API is behind CloudFront and `trusted-proxy` is `traefik`, so the sign-in doors of step 5 count by the CloudFront server that forwarded the request, not by the person's network (ADR-005, History of 2026-10-09; ADR-008 §5). CloudFront-only ingress (#198) did not lift it: the box admits every distribution's servers, so the viewer address waits for the proof of Kuutti's distribution (ADR-066) and the switch to `cloudfront` after it.
+- **The doors behind CloudFront.** On staging the sign-in doors of step 5 counted by the CloudFront server that forwarded the request, not by the person's network, from 2026-10-09 (ADR-005 and ADR-008, History) until 2026-11-06. Since then `trusted-proxy` is `cloudfront` and they count by the viewer's address, believed only from a request carrying the proof of Kuutti's distribution (ADR-066, #198). Production keeps `traefik` until its cutover.
 - **PKCE with Telia** stays undecided (ADR-016, Not decided; ADR-027 §6). The app's own code is bound (step 26); Telia's code is not.
 - **Production.** Running since 2026-10-24 with bank identification off: `telia_client_id` is null, so the API writes no issuer and logs `bank identification off` (ADR-049). Its issuer, `https://tunnistus.telia.fi/uas`, and redirect URI, `https://api.kuutti.app/auth/callback`, are named in `docs/vendors/telia.md` but registered with nothing deployed; the agreement with Telia comes first.
 - **Refusing an invalid code as `auth_provider_error`** promises the person a retry that cannot help (`docs/vendors/telia.md`, the staging test users). Not a system question; noted for the flows.

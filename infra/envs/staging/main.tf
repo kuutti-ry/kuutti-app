@@ -153,6 +153,8 @@ module "observability" {
   alert_email    = var.alert_email
   # The test bed is free (#471): only a loop, in a build or by hand, gets here.
   bank_identifications_per_day = 100
+  # trusted_proxy is cloudfront, so the probe asks for the proof as well (ADR-066).
+  health_search_string = "\"originProof\":\"valid\""
 }
 
 # Non-secret configuration the API reads at boot from /kuutti/staging/ (TD-19).

@@ -73,15 +73,15 @@ variable "media_enabled" {
 }
 
 variable "cloudfront_only_ingress" {
-  description = "Passed to the network module: HTTPS from CloudFront's prefix list only. On since #198, once Dokploy and the previews were behind the distribution too (ADR-005 §7). The list is every CloudFront distribution's servers, not Kuutti's alone, so this closes the box to direct requests and proves nothing about whose distribution a request came through: trusted_proxy stays traefik (ADR-008 History). Turning this off is safe while trusted_proxy is traefik."
+  description = "Passed to the network module: HTTPS from CloudFront's prefix list only. On since #198, once Dokploy and the previews were behind the distribution too (ADR-005 §7). The list is every CloudFront distribution's servers, not Kuutti's alone, so this closes the box to direct requests and proves nothing about whose distribution a request came through; the proof of ADR-066 tells Kuutti's apart. Turning this off needs trusted_proxy at traefik first: a precondition refuses the pair."
   type        = bool
   default     = true
 }
 
 variable "trusted_proxy" {
-  description = "Whose word the API takes for the client address behind its rate limiter (#52, audit F19, ADR-008): /kuutti/staging/trusted-proxy. traefik reads the last X-Forwarded-For hop, the one Traefik appends: behind CloudFront, the CloudFront server that forwarded the request, which nobody chooses. cloudfront reads CloudFront's viewer address, which only a request through Kuutti's own distribution can be trusted to carry: the box's prefix list admits every CloudFront distribution, and any of them may send that header with a value of its own. So it stays traefik until the proof of ADR-066 is in place: the bootstrap's deny applied, origin-secret written to SSM and to the store, and /health answering \"originProof\":\"valid\" through the distribution. The API refuses to boot in cloudfront mode without origin-secret. The API reads it at boot: turning it on takes that proof first, then the parameter and a deploy; turning it off takes the parameter and a deploy before 443 opens again."
+  description = "Whose word the API takes for the client address behind its rate limiter (#52, audit F19, ADR-008): /kuutti/staging/trusted-proxy. cloudfront since 06/11/2026 (#198): CloudFront's viewer address, believed only from a request carrying the proof of Kuutti's distribution (ADR-066), since the box admits every distribution's servers. It went on once the bootstrap's deny was applied, origin-secret was in SSM and the store, and /health answered \"originProof\":\"valid\" through the distribution. traefik keys on the last X-Forwarded-For hop, the CloudFront server. The API reads it at boot: turning it back takes the parameter and a deploy before 443 opens again."
   type        = string
-  default     = "traefik"
+  default     = "cloudfront"
 
   validation {
     condition     = contains(["traefik", "cloudfront"], var.trusted_proxy)

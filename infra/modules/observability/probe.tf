@@ -6,7 +6,11 @@
 # fired StatusCheckFailed after 9 min 31 s). Route 53 health checkers call
 # /health from several regions every 30 s and want the body to say the API is
 # up, not only that something answers on 443; three failures in a row, about
-# 90 s, is the alarm.
+# 90 s, is the alarm. Where the API trusts CloudFront's viewer address, the
+# environment has the probe ask for a valid proof of Kuutti's distribution
+# instead (ADR-066): a store and a parameter that disagree put everybody in
+# one bucket, and that pages too. Route 53 counts only a 2xx or 3xx answer,
+# and /health is 503 unless its status is ok, so the status is still asked.
 #
 # Health-check metrics are published in us-east-1 only, and a CloudWatch alarm
 # can publish only to a topic in its own region, so the alarm and its topic
@@ -20,7 +24,7 @@ resource "aws_route53_health_check" "api" {
   port              = 443
   type              = "HTTPS_STR_MATCH"
   resource_path     = "/health"
-  search_string     = "\"status\":\"ok\""
+  search_string     = var.health_search_string
   request_interval  = 30
   failure_threshold = 3
   measure_latency   = false
@@ -74,7 +78,7 @@ resource "aws_sns_topic_subscription" "email_us_east_1" {
 resource "aws_cloudwatch_metric_alarm" "api_unreachable" {
   provider            = aws.us_east_1
   alarm_name          = "${local.name}-api-unreachable"
-  alarm_description   = "Route 53 health checkers cannot get a healthy /health from the API: the container, Traefik or the box is down. First steps: docs/runbooks/alerts.md."
+  alarm_description   = "Route 53 health checkers cannot get a healthy /health from the API: the container, Traefik or the box is down, or, where the probe asks for it, the proof of Kuutti's distribution is not valid. First steps: docs/runbooks/alerts.md."
   namespace           = "AWS/Route53"
   metric_name         = "HealthCheckStatus"
   dimensions          = { HealthCheckId = aws_route53_health_check.api.id }
