@@ -27,7 +27,7 @@ const refusal = (code: string, status: number) =>
 
 type Seen = { method: string; path: string; body: unknown };
 /** Answers by "METHOD /path"; a missing route is a network failure. */
-function serve(routes: Record<string, () => Response>) {
+function serve(routes: Record<string, () => Response | Promise<Response>>) {
   const seen: Seen[] = [];
   globalThis.fetch = jest.fn(async (input: Request | string, init?: RequestInit) => {
     const request = input instanceof Request ? input : new Request(input, init);
@@ -39,6 +39,14 @@ function serve(routes: Record<string, () => Response>) {
     return route();
   }) as unknown as typeof fetch;
   return seen;
+}
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((done) => {
+    resolve = done;
+  });
+  return { promise, resolve };
 }
 
 /** The provider as the root layout gives it, with what a logout the API did not take calls. */
@@ -148,6 +156,119 @@ describe("SessionProvider: signing in", () => {
     expect(error).toMatchObject({ status: 400, code: "code_expired" });
     expect(result.current.status).toBe("signed-out");
     expect(currentSession()).toBeNull();
+  });
+
+  it("keeps the newer sign-in's tokens and outcome when an earlier exchange finishes last", async () => {
+    const first = deferred<Response>();
+    const started = deferred<void>();
+    const replacement = tokens("new", "7f1c1c4e-9a8e-4a0b-9c3a-0c8d1e2f3a4b");
+    let exchanges = 0;
+    serve({
+      "POST /auth/exchange": () => {
+        exchanges += 1;
+        if (exchanges === 1) {
+          started.resolve();
+          return first.promise;
+        }
+        return json({ ...replacement, outcome: "resumed" });
+      },
+    });
+    const { result } = await session();
+    let earlier!: Promise<unknown>;
+    await act(async () => {
+      earlier = result.current.signIn(token("old-code"), VERIFIER).catch(() => undefined);
+      await started.promise;
+    });
+    await act(async () => {
+      await result.current.signIn(token("new-code"), VERIFIER);
+    });
+    await act(async () => {
+      first.resolve(json({ ...tokens("old"), outcome: "created" }));
+      await earlier;
+    });
+    expect(currentSession()).toEqual(replacement);
+    expect(result.current).toMatchObject({
+      status: "signed-in",
+      sessionId: replacement.sessionId,
+      outcome: "resumed",
+    });
+    expect(result.current).not.toHaveProperty("notice");
+  });
+});
+
+describe("SessionProvider: an operation's session", () => {
+  it.each([
+    { action: "signOut", path: "/auth/logout", clearFirst: false },
+    { action: "signOutEverywhere", path: "/auth/logout-all", clearFirst: true },
+    { action: "deleteAccount", path: "/account/delete", clearFirst: false },
+    { action: "pauseAccount", path: "/account/pause", clearFirst: true },
+  ] as const)(
+    "keeps the replacement session signed in without a stale notice when an earlier $action finishes",
+    async ({ action, path, clearFirst }) => {
+      await saveSession(tokens());
+      const response = deferred<Response>();
+      const started = deferred<void>();
+      serve({
+        [`POST ${path}`]: () => {
+          started.resolve();
+          return response.promise;
+        },
+      });
+      const unheard = jest.fn(async () => undefined);
+      const { result } = await session(unheard);
+      let earlier!: Promise<unknown>;
+      await act(async () => {
+        const operation =
+          action === "signOut" ? result.current.signOut("lock") : result.current[action]();
+        earlier = operation.catch(() => undefined);
+        await started.promise;
+      });
+      // Clearing makes a new lifecycle even if the next sign-in reuses its id.
+      const replacement = tokens(
+        "new",
+        clearFirst ? SESSION_ID : "7f1c1c4e-9a8e-4a0b-9c3a-0c8d1e2f3a4b",
+      );
+      await act(async () => {
+        if (clearFirst) await clearSession();
+        await saveSession(replacement);
+      });
+      await act(async () => {
+        response.resolve(new Response(null, { status: action === "signOut" ? 503 : 204 }));
+        await earlier;
+      });
+      expect(currentSession()).toEqual(replacement);
+      expect(result.current).toMatchObject({
+        status: "signed-in",
+        sessionId: replacement.sessionId,
+      });
+      expect(result.current).not.toHaveProperty("notice");
+      expect(unheard).not.toHaveBeenCalled();
+    },
+  );
+
+  it("still completes a pause after the same session's tokens rotate", async () => {
+    await saveSession(tokens());
+    const response = deferred<Response>();
+    const started = deferred<void>();
+    serve({
+      "POST /account/pause": () => {
+        started.resolve();
+        return response.promise;
+      },
+    });
+    const { result } = await session();
+    let pause!: Promise<void>;
+    await act(async () => {
+      pause = result.current.pauseAccount();
+      await started.promise;
+    });
+    await act(async () => saveSession(tokens("rotated")));
+    await act(async () => {
+      response.resolve(new Response(null, { status: 204 }));
+      await pause;
+    });
+    expect(currentSession()).toBeNull();
+    expect(result.current).toMatchObject({ status: "signed-out", notice: "paused" });
   });
 });
 
