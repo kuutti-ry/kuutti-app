@@ -9,7 +9,7 @@ Nothing here stores or logs an address (ADR-026 §7, ADR-067 §4). The edge keep
 | layer | what it counts | the number | what it answers | what mails |
 |---|---|---|---|---|
 | Shield Standard, AWS's, on every distribution | floods at the network's layers | AWS's | nothing reaches the distribution | nothing of Kuutti's |
-| The edge's rate rule (ADR-067) | every request the distribution sends to the box, per address, except `/media/` and the load runner's address for its hour | 2,000 in five minutes, `edge_requests_per_five_minutes` in `infra/envs/<env>/main.tf` | 429 `rate_limited`, `"requestId":"edge"`, `Retry-After: 300`, until the address's count over five minutes is under the limit | `kuutti-<env>-edge-rate-limited` (us-east-1) |
+| The edge's rate rule (ADR-067) | every request the distribution sends to the box, per address, except a signed photo's path (`/media/<sha256>/<variant>.webp`), the two sign-in starts and the load runner's address for its hour | 2,000 in five minutes, `edge_requests_per_five_minutes` in `infra/envs/<env>/main.tf` | 429 `rate_limited`, `"requestId":"edge"`, `Retry-After: 300`, until the address's count over five minutes is under the limit | `kuutti-<env>-edge-rate-limited` (us-east-1) |
 | Signed URLs (ADR-005) | a photo under `/media/` without a valid signature | 15 minutes, 20 for a photo sent in a conversation | 403 from CloudFront | nothing |
 | The address's window (ADR-026 §1, §2) | every request until a guard admits it; a signed-in request gives its count back | 120 a minute, 30 on a preview; `/kuutti/<env>/rate-limit-per-minute` | 429 `rate_limited`, on the request line with `route` `/*` and no account | `kuutti-<env>-api-refusals` |
 | The person's window (§1, §3) | every request a guard admits, per account or staff identity | the same number | 429 `rate_limited`, the line names the account | the same |
@@ -18,7 +18,7 @@ Nothing here stores or logs an address (ADR-026 §7, ADR-067 §4). The edge keep
 | The day's budgets | photo fetches, likes, cards, messages and the rest, per account | `matching_config`, in the panel under `/config` | 429 with the budget's own code | `kuutti-<env>-photo-budget-refusals` for photos; the refusals alarm for all |
 | The velocity rules (ADR-041) | reads of the queue and photos of people's cards, per account | `matching_config` | a shadow ban by the machine (ADR-033), whose `audit_log` row has no actor | nothing |
 
-The edge is for volume from one address. A flood from many addresses passes it, each under the limit, and the API's windows, the doors and the table's ceiling hold it. An IPv6 client is counted by its whole address at the edge and by its /64 at the API. Signed in or not, everybody behind one address shares the edge's number; only the API can tell people apart.
+The edge is for volume from one address. A flood from many addresses passes it, each under the limit, and the API's windows, the doors and the table's ceiling hold it. So does a flood of sign-in starts, which the edge leaves to the API's redirect (ADR-067 §2), and anything sent through somebody else's distribution, which never meets the edge; there `/health` and `/openapi.json` are counted by no window. An IPv6 client is counted by its whole address at the edge and by its /64 at the API. Signed in or not, everybody behind one address shares the edge's number; only the API can tell people apart.
 
 ## When the edge's alarm mails
 
@@ -45,7 +45,7 @@ The edge is for volume from one address. A flood from many addresses passes it, 
      --query '[length(ManagedKeysIPV4.Addresses), length(ManagedKeysIPV6.Addresses)]'
    ```
 
-   The command counts them; leave off `--query` to see them. One address is one sender, or many people behind one network. Many addresses at once is a flood the API's windows also carry.
+   The command counts them. Leaving off `--query` shows them: that is the maintainer's to do, never in an agent's session, where the addresses would reach the model's transcript. One address is one sender, or many people behind one network. Many addresses at once is a flood the API's windows also carry.
 4. People refused: the edge cannot tell them from a script. Somebody writing to hello@ about "too many requests" from a campus or a phone network is the sign; then raise the number (below).
 
 ## When the API's refusals alarm mails
@@ -69,12 +69,12 @@ The edge is for volume from one address. A flood from many addresses passes it, 
 Proof that the edge refuses and that both alarms mail (#41, as #29's probe test did for its alarm). From a laptop, once the team knows: for about five minutes the laptop's address, and everybody's behind it, is refused on staging, its API window included.
 
 ```sh
-url=https://api.staging.kuutti.app/edge-check-404
+url=https://api.staging.kuutti.app/media/../edge-check-404
 for i in $(seq 1 60); do
-  seq 1 100 | xargs -P 20 -I{} curl -s -o /dev/null "$url"
-  if curl -s "$url" | grep -q '"requestId":"edge"'; then echo "the edge refuses after about $((i * 100)) requests"; break; fi
+  seq 1 100 | xargs -P 20 -I{} curl --path-as-is -s -o /dev/null "$url"
+  if curl --path-as-is -s "$url" | grep -q '"requestId":"edge"'; then echo "the edge refuses after about $((i * 100)) requests"; break; fi
 done
-curl -s -D - -o /dev/null "$url" | grep -i -E '^(HTTP|retry-after)'
+curl --path-as-is -s -D - -o /dev/null "$url" | grep -i -E '^(HTTP|retry-after)'
 ```
 
-A path the API does not know answers 404 without the database, and the address's window counts it, so the API's 429s come first, from its 121st request in the minute, and the edge's after about 2,000. The last line shows the edge's 429 with `Retry-After: 300`. Within five minutes `aws cloudwatch describe-alarms --region us-east-1 --alarm-names kuutti-staging-edge-rate-limited --query 'MetricAlarms[0].StateValue'` says `ALARM`, and so does `kuutti-staging-api-refusals` in eu-central-1, from the API's own 429s. Both mail, and both mail OK some five to ten minutes after the loop stops.
+The path goes to the box: CloudFront picks the default behaviour for the path it has normalised, and the box resolves the dot segment to a path the API does not know, a 404 without the database. `--path-as-is` keeps curl from resolving it first. That the edge refuses it after about 2,000 shows both that the rule counts and that a `/media/` prefix gets nobody past it (ADR-067 §2). The address's window counts it too, so the API's 429s come first, from its 121st request in the minute. The last line shows the edge's 429 with `Retry-After: 300`. Within five minutes `aws cloudwatch describe-alarms --region us-east-1 --alarm-names kuutti-staging-edge-rate-limited --query 'MetricAlarms[0].StateValue'` says `ALARM`, and so does `kuutti-staging-api-refusals` in eu-central-1, from the API's own 429s. Both mail, and both mail OK some five to ten minutes after the loop stops.

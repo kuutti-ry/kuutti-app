@@ -789,15 +789,12 @@ describe("the address given back only for what the person's limiter counted (ADR
 });
 
 // The edge's refusal (ADR-067 §3): AWS WAF answers an address past the edge's
-// limit with this file in the API's place (infra/modules/media/edge.tf), so
-// the app, the panel and the load smoke must read it as the limiter's own 429.
+// limit with this body in the API's place (infra/modules/media/edge.tf reads
+// edge.json), so the app and the load smoke must read it as the limiter's own 429.
 describe("the edge's refusal", () => {
-  const edge: unknown = JSON.parse(
-    readFileSync(
-      new URL("../../../../infra/modules/media/edge-refusal.json", import.meta.url),
-      "utf8",
-    ),
-  );
+  const { refusal: edge } = JSON.parse(
+    readFileSync(new URL("../../../../infra/modules/media/edge.json", import.meta.url), "utf8"),
+  ) as { refusal: unknown };
 
   it("is the limiter's own envelope and code, with nothing else in it", async () => {
     const app = limitedApp();

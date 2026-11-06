@@ -81,8 +81,9 @@ module "media" {
   origin_proof_store_arn = aws_cloudfront_key_value_store.origin_proof.arn
 
   # The edge's rate rule (#41, ADR-067), from the cutover on: two thousand
-  # requests from one address in any five minutes, /media/ not counted, the
-  # maintainer's number of 2026-11-06, as on staging.
+  # requests from one address in any five minutes, signed photos and the two
+  # sign-in starts not counted (edge.json), the maintainer's number of
+  # 2026-11-06, as on staging.
   edge_requests_per_five_minutes = 2000
 }
 
