@@ -61,6 +61,26 @@ describe.skipIf(!endpoint)("media store (compose stand-in)", () => {
     }
   });
 
+  it("deletes objects in both batches when more than 1000 keys are supplied", async () => {
+    const client = createS3Client(config);
+    const store = s3MediaStore(client, config.S3_BUCKET);
+    const prefix = `test-bulk-${randomBytes(6).toString("hex")}`;
+    const keys = Array.from({ length: 1002 }, (_, i) => objectKey(`${prefix}-${i}`, "thumb"));
+    const first = keys[0] as string;
+    const second = keys[1000] as string;
+    try {
+      // Two tiny dummy objects suffice; missing keys are valid delete inputs.
+      await store.put(first, new Uint8Array([1]), "application/octet-stream");
+      await store.put(second, new Uint8Array([2]), "application/octet-stream");
+      await store.delete(keys);
+      expect(await store.get(first)).toBeNull();
+      expect(await store.get(second)).toBeNull();
+    } finally {
+      await store.delete([first, second]);
+      client.destroy();
+    }
+  });
+
   it("deleting nothing sends no request, so even a missing bucket cannot fail it", async () => {
     const client = createS3Client(config);
     try {

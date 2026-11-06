@@ -1,4 +1,4 @@
-import type { Queryable } from "@kuutti/db";
+import { type Queryable, transaction } from "@kuutti/db";
 import type { PlainMessageKey } from "@kuutti/i18n";
 import type { NotificationKind, PushData } from "@kuutti/schema";
 import { finnishHour, msUntilFinnishHour } from "../lib/finnish-day.ts";
@@ -72,7 +72,7 @@ export type PushDeps = {
   project?: string;
 };
 
-type Token = { id: string; accountId: string; token: string; locale: string };
+type Token = { id: string; accountId: string; sessionId: string; token: string; locale: string };
 
 /** Whether `hour` is in the quiet hours from `from` to `to` (ADR-055 §7); equal hours mean none. */
 export function inQuietHours(hour: number, from: number, to: number): boolean {
@@ -126,14 +126,19 @@ export function createPush(deps: PushDeps) {
 
   /** The tokens of the person's live sessions: an expired one waits for the night's prune, unsent to. */
   async function tokensOf(accountId: string, at: Date): Promise<Token[]> {
-    const { rows } = await deps.db.query<{ id: string; token: string; locale: string }>(
-      `SELECT t.id, t.token, t.locale FROM push_token t
+    const { rows } = await deps.db.query<{
+      id: string;
+      session_id: string;
+      token: string;
+      locale: string;
+    }>(
+      `SELECT t.id, t.session_id, t.token, t.locale FROM push_token t
          JOIN session s ON s.id = t.session_id AND s.account_id = t.account_id
         WHERE t.account_id = $1 AND s.revoked_at IS NULL AND s.expires_at > $2
         ORDER BY t.created_at`,
       [accountId, at],
     );
-    return rows.map((row) => ({ ...row, accountId }));
+    return rows.map(({ session_id, ...row }) => ({ ...row, accountId, sessionId: session_id }));
   }
 
   /** A token Apple or Google no longer knows goes (ADR-055 §8), by its row and its account. */
@@ -190,12 +195,51 @@ export function createPush(deps: PushDeps) {
     part: Array<{ token: Token; message: PushMessage }>,
     kind: PushData["kind"],
   ): Promise<Array<{ token: Token; ticket: PushTicket }>> {
+    let submitted: typeof part = [];
     try {
-      const tickets = await pusher.send(part.map(({ message }) => message));
-      return part.map(({ token }, i) => ({
-        token,
-        ticket: tickets[i] ?? { status: "error", error: null },
-      }));
+      return await transaction(deps.db, async (tx) => {
+        const accountId = part[0]?.token.accountId;
+        if (!accountId) return [];
+        // Match lifecycle writers' order: account, sessions, then token rows.
+        // Hold these through the bounded transport attempt. A committed change
+        // must precede this check or wait until this submission has finished.
+        const account = await tx.query(
+          "SELECT 1 FROM account WHERE id = $1 AND state <> 'deleted' FOR SHARE",
+          [accountId],
+        );
+        if (account.rows.length === 0) return [];
+        const sessions = await tx.query<{ id: string; revoked_at: Date | null; expires_at: Date }>(
+          `SELECT id, revoked_at, expires_at FROM session
+            WHERE account_id = $1 AND id = ANY($2::uuid[]) ORDER BY id FOR SHARE`,
+          [accountId, part.map(({ token }) => token.sessionId)],
+        );
+        const registered = await tx.query<{ id: string; session_id: string; token: string }>(
+          `SELECT id, session_id, token FROM push_token
+            WHERE account_id = $1 AND id = ANY($2::uuid[]) ORDER BY id FOR SHARE`,
+          [accountId, part.map(({ token }) => token.id)],
+        );
+        const at = deps.now().getTime();
+        const live = new Set(
+          sessions.rows
+            .filter((s) => s.revoked_at === null && s.expires_at.getTime() > at)
+            .map((s) => s.id),
+        );
+        const current = new Map(registered.rows.map((row) => [row.id, row]));
+        submitted = part.filter(({ token }) => {
+          const row = current.get(token.id);
+          return (
+            live.has(token.sessionId) &&
+            row?.session_id === token.sessionId &&
+            row.token === token.token
+          );
+        });
+        if (submitted.length === 0) return [];
+        const tickets = await pusher.send(submitted.map(({ message }) => message));
+        return submitted.map(({ token }, i) => ({
+          token,
+          ticket: tickets[i] ?? { status: "error", error: null },
+        }));
+      });
     } catch (error) {
       const groups = error instanceof PushFailed ? error.byProject : undefined;
       if (!(error instanceof PushFailed) || error.reason !== MIXED_PROJECTS || !groups) throw error;
@@ -204,7 +248,7 @@ export function createPush(deps: PushDeps) {
       const foreign = new Set(
         Object.entries(groups).flatMap(([name, tokens]) => (name === project ? [] : tokens)),
       );
-      const strays = part.filter(({ token }) => foreign.has(token.token));
+      const strays = submitted.filter(({ token }) => foreign.has(token.token));
       // No stray among this request's tokens: the refusal is the request's, as any other.
       if (strays.length === 0) throw error;
       for (const { token } of strays) await forget(token);
@@ -212,7 +256,7 @@ export function createPush(deps: PushDeps) {
         { push: kind, strays: strays.length },
         "push tokens of another project gone",
       );
-      const kept = part.filter(({ token }) => !foreign.has(token.token));
+      const kept = submitted.filter(({ token }) => !foreign.has(token.token));
       if (kept.length === 0) return [];
       await pause(REQUEST_SPACING_MS);
       return sendPart(pusher, kept, kind);

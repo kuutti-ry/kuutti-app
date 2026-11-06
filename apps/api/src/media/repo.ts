@@ -104,16 +104,16 @@ export async function countPhotos(db: Queryable, accountId: string): Promise<num
 /**
  * Appends after the account's last photo, and only while the account has
  * fewer than `maxPhotos` and is still live: both are the statement's HAVING
- * clause, so a request that arrives after another's commit (an upload that
- * outlived the erasure of its account, #51) is refused here even when it
- * passed the guard and the service's count. Null means the statement refused. Two
+ * clause. The live-account check holds a share lock until the insert commits:
+ * erasure (TD-7, #51) either deletes this photo afterwards or commits first
+ * and makes the check refuse the tombstone. A foreign key alone only checks
+ * that the retained account row exists. Null means the statement refused. Two
  * inserts that run at the same instant can still both see the old count
  * under READ COMMITTED and both succeed, one photo over the cap and on the
  * same position; the order stays stable through created_at and is renumbered
  * by the next reorder or delete, and the extra photo is the account's own to
- * remove. Closing that window needs a transaction with an advisory lock per
- * account, which the query seam does not offer yet; it is a product cap, not a
- * security boundary, so that waits for the seam.
+ * remove. Serialising those inserts would need an exclusive per-account lock;
+ * this shared lock preserves the existing product-cap behaviour.
  */
 export async function insertPhoto(
   db: Queryable,
@@ -131,7 +131,7 @@ export async function insertPhoto(
      SELECT $1, $2, $3, $4, $5, coalesce(max(position) + 1, 0) FROM photo
      WHERE account_id = $1 AND purpose = 'profile'
      HAVING count(*) < $6
-        AND EXISTS (SELECT 1 FROM account WHERE id = $1 AND state <> 'deleted')
+        AND EXISTS (SELECT 1 FROM account WHERE id = $1 AND state <> 'deleted' FOR SHARE)
      RETURNING ${COLUMNS}`,
     [input.accountId, input.key, input.blurhash, input.width, input.height, input.maxPhotos],
   );
@@ -433,7 +433,8 @@ export async function insertPhotoAccess(
       blocked: boolean;
       inserted: number;
     }>(
-      `WITH live AS (SELECT 1 FROM account WHERE id = $1 AND state <> 'deleted'),
+      // Serialize the live check and child write against account erasure (TD-7).
+      `WITH live AS (SELECT 1 FROM account WHERE id = $1 AND state <> 'deleted' FOR SHARE),
           used AS (SELECT count(*)::int AS n FROM photo_access
                    WHERE account_id = $1 AND variant = $3 AND at >= $5 AND purpose = 'profile'),
           blocked AS (SELECT EXISTS (SELECT 1 FROM photo
@@ -526,7 +527,7 @@ export async function logPhotoAccess(
 ): Promise<void> {
   await db.query(
     `INSERT INTO photo_access (account_id, photo_id, variant, at, purpose)
-     SELECT $1, $2, $3, $4, $5 FROM account WHERE id = $1 AND state <> 'deleted'`,
+     SELECT $1, $2, $3, $4, $5 FROM account WHERE id = $1 AND state <> 'deleted' FOR SHARE`,
     [input.accountId, input.photoId, input.variant, input.at, input.purpose ?? "profile"],
   );
 }
@@ -542,7 +543,8 @@ export async function logMessagePhotoAccess(
   input: { accountId: string; photoIds: readonly string[]; at: Date; since: Date },
 ): Promise<{ live: boolean; written: number }> {
   const { rows } = await db.query<{ live: boolean; written: number }>(
-    `WITH live AS (SELECT 1 FROM account WHERE id = $1 AND state <> 'deleted'),
+    // The live result authorizes URL delivery even when deduplication writes no row.
+    `WITH live AS (SELECT 1 FROM account WHERE id = $1 AND state <> 'deleted' FOR SHARE),
           ins AS (
             INSERT INTO photo_access (account_id, photo_id, variant, at, purpose)
             SELECT $1, u.photo_id, v.variant, $3, 'message'

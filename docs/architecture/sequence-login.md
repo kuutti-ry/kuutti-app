@@ -12,8 +12,10 @@ apps/api/src/identity/sessions.ts
 apps/api/src/identity/admin-session.ts
 apps/mobile/src/features/identity/verifier.ts
 apps/mobile/src/features/identity/session.tsx
+apps/mobile/src/features/identity/SignedOutToStart.tsx
 apps/mobile/src/lib/session.ts
 apps/mobile/app/auth.tsx
+apps/mobile/app/_layout.tsx
 apps/admin/src/features/identity/session.tsx
 -->
 
@@ -136,6 +138,8 @@ sequenceDiagram
 28. The app receives both tokens and the outcome: `created`, `resumed` or `unpaused`. A failure is said on the sign-in screen.
 29. The app keeps the session in the phone's secure store, readable while the phone is unlocked and on this device only.
 30. If the person answered the screens before the bank for this attempt, the app records the answers with `POST /consents` before anything else. The app then asks whether onboarding is finished (#395's sign-in flow).
+
+The phone binds stored tokens, request and upload retries, and socket callbacks to the session that started them. Refreshing that same session keeps its screens; ending or replacing it discards delayed refresh and sign-in results, stops old-session retries and socket callbacks, and clears the previous session's navigation history and screen state, including unsaved forms. Requests already sent can still finish. This reset cannot be stopped by a form's leave confirmation. A cold public deep link and the first bank callback keep their route and parameters so sign-in can finish. `SignedOutToStart` owns the root stack's reset; the session provider and device-registration listeners remain mounted outside it.
 
 ## Part 4: staff, to the admin panel
 

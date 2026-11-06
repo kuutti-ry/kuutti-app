@@ -1,7 +1,13 @@
 import { type ApiPaths, HealthResponse } from "@kuutti/schema";
 import createClient, { type Middleware } from "openapi-fetch";
 import { apiBaseUrl } from "./api-url";
-import { accessTokenIsStale, currentSession, refreshSession } from "./session";
+import {
+  accessTokenIsStale,
+  currentSession,
+  isCurrentSession,
+  refreshSession,
+  sessionGeneration,
+} from "./session";
 
 export { apiBaseUrl } from "./api-url";
 
@@ -20,7 +26,7 @@ export class ApiError extends Error {
 /** Routes that never carry a session: the login itself and the probe. */
 const ANONYMOUS = new Set(["/health", "/auth/exchange", "/auth/refresh"]);
 
-const retryable = new WeakMap<Request, Request>();
+const retryable = new WeakMap<Request, { copy: Request; generation: number }>();
 
 /**
  * The session on every request (#35): the access token goes in the header,
@@ -33,22 +39,24 @@ const retryable = new WeakMap<Request, Request>();
 export const sessionMiddleware: Middleware = {
   async onRequest({ request, schemaPath }) {
     if (ANONYMOUS.has(schemaPath)) return undefined;
+    const generation = sessionGeneration();
     let session = currentSession();
     if (session && accessTokenIsStale(session)) session = await refreshSession();
-    if (!session) return undefined;
-    retryable.set(request, request.clone());
+    if (!session || !isCurrentSession(generation)) return undefined;
+    retryable.set(request, { copy: request.clone(), generation });
     request.headers.set("authorization", `Bearer ${session.accessToken}`);
     return request;
   },
   async onResponse({ request, response }) {
     if (response.status !== 401) return undefined;
-    const copy = retryable.get(request);
-    if (!copy) return undefined;
+    const retry = retryable.get(request);
+    if (!retry) return undefined;
     retryable.delete(request);
+    if (!isCurrentSession(retry.generation)) return undefined;
     const session = await refreshSession();
-    if (!session) return undefined;
-    copy.headers.set("authorization", `Bearer ${session.accessToken}`);
-    return globalThis.fetch(copy);
+    if (!session || !isCurrentSession(retry.generation)) return undefined;
+    retry.copy.headers.set("authorization", `Bearer ${session.accessToken}`);
+    return globalThis.fetch(retry.copy);
   },
 };
 
