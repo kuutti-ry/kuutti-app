@@ -26,16 +26,19 @@ By 05/11/2026 the chain was 110 migrations and 9.5 MB of snapshots, each new one
    ```sql
    BEGIN;
    DO $$ BEGIN
-     IF (SELECT max(created_at) FROM drizzle.__drizzle_migrations) <> 1793827411048 THEN
-       RAISE EXCEPTION 'this database has not run the chain to 0109_pond_counter_finished';
+     IF (SELECT (count(*), max(created_at), sum(created_at)) FROM drizzle.__drizzle_migrations)
+        IS DISTINCT FROM (110::bigint, 1793827411048::bigint, 197137026651472::numeric) THEN
+       RAISE EXCEPTION 'this database has not run main''s chain to 0109_pond_counter_finished';
      END IF;
    END $$;
    DELETE FROM drizzle.__drizzle_migrations;
    INSERT INTO drizzle.__drizzle_migrations (hash, created_at) VALUES
-     ('<sha256 of 0000_baseline.sql>', <its when in the journal>),
-     ('<sha256 of 0001_baseline_sql.sql>', <its when in the journal>);
+     ('ac38e0e69fd5b0f485cfe61fb17515b98d51080edbb3ff9a7a4a2b90fc2cb715', 1793903336035),
+     ('96b5e859f6c260cad2594681d75f96a357d4d4c293a54676a9f3f91cd148abb9', 1793903336596);
    COMMIT;
    ```
+
+   The guard reads the journal's count, its last entry and the sum of its timestamps together, so it stamps only a journal that is main's chain to its end: an empty one, one short of the end, one with a branch's migration added or in place of one of main's, and one already stamped are refused and left as they were. The two rows are the files' SHA-256 and their `when` in the journal, written out because the migrator compares only `created_at`, and a larger number would skip every later migration without a word.
 
    A stamped database keeps its people and its earlier config versions, which change nothing, since the latest version of a key wins and a migration writes the next one as `max(version) + 1`.
 
