@@ -295,6 +295,12 @@ data "aws_iam_policy_document" "ci_plan_deny_data" {
       "cloudfront-keyvaluestore:List*",
       "cloudfront:TestFunction",
       "cloudtrail:LookupEvents",
+      # The edge's rate rule (ADR-067 §4): the addresses it is refusing now,
+      # and the sampled requests, with each one's address and headers, a
+      # session's bearer token among them, should samples ever be switched
+      # on. A plan reads the web ACL and its IP sets, nothing of the traffic.
+      "wafv2:GetRateBasedStatementManagedKeys",
+      "wafv2:GetSampledRequests",
     ]
     resources = ["*"]
   }

@@ -79,6 +79,11 @@ module "media" {
 
   # The proof of Kuutti's distribution, from the store below (ADR-066).
   origin_proof_store_arn = aws_cloudfront_key_value_store.origin_proof.arn
+
+  # The edge's rate rule (#41, ADR-067), from the cutover on: two thousand
+  # requests from one address in any five minutes, /media/ not counted, the
+  # maintainer's number of 2026-11-06, as on staging.
+  edge_requests_per_five_minutes = 2000
 }
 
 # The store of the proof of Kuutti's distribution (ADR-066): its one key,
@@ -132,6 +137,8 @@ module "observability" {
   # so a day of 50 spends a quarter of it; the maintainer resets this to twice a
   # normal day once production has one.
   bank_identifications_per_day = 50
+  # The edge's refusals mail too (#41, ADR-067), from the cutover on.
+  edge_web_acl_metric_name = var.media_enabled ? module.media[0].edge_web_acl_metric_name : null
 }
 
 # Non-secret configuration the API reads at boot from /kuutti/prod/ (TD-19).

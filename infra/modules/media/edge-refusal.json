@@ -1,0 +1,7 @@
+{
+  "error": {
+    "code": "rate_limited",
+    "message": "Too many requests from this address. Try again in a few minutes.",
+    "requestId": "edge"
+  }
+}

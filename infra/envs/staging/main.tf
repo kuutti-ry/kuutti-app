@@ -85,6 +85,11 @@ module "media" {
 
   # The proof of Kuutti's distribution, from the store below (ADR-066).
   origin_proof_store_arn = aws_cloudfront_key_value_store.origin_proof.arn
+
+  # The edge's rate rule (#41, ADR-067): two thousand requests from one
+  # address in any five minutes, /media/ not counted, the maintainer's number
+  # of 2026-11-06. The API's own windows come after it (ADR-026).
+  edge_requests_per_five_minutes = 2000
 }
 
 # The store of the proof of Kuutti's distribution (ADR-066): its one key,
@@ -155,6 +160,8 @@ module "observability" {
   bank_identifications_per_day = 100
   # trusted_proxy is cloudfront, so the probe asks for the proof as well (ADR-066).
   health_search_string = "\"originProof\":\"valid\""
+  # The edge's refusals mail too (#41, ADR-067), once the distribution exists.
+  edge_web_acl_metric_name = var.media_enabled ? module.media[0].edge_web_acl_metric_name : null
 }
 
 # Non-secret configuration the API reads at boot from /kuutti/staging/ (TD-19).

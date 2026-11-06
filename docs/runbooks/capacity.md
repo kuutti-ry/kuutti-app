@@ -36,6 +36,18 @@ Stage 1 also pays for setting up the connections: the runner's TLS handshakes to
 5. **Matching is open for the test persons.** The demo commands open it on staging (ADR-060 Open 1). A person whose matching is not open, or whose profile is not complete, is answered before the pool is read, so their reads say nothing of the queue.
 6. **The sessions file** is made (below).
 7. **The limit is decided** (below). With the default of 120 a minute, the run stops at about one visit a second.
+8. **The edge does not count the runner.** The edge's rate rule refuses an address past 2,000 requests in five minutes (ADR-067), which a run passes within its first minutes. So the runner's IPv4 address goes into the rule's allow list for the run's hour, and the run goes over IPv4:
+
+   ```sh
+   set=kuutti-staging-edge-unlimited
+   id=$(aws wafv2 list-ip-sets --scope CLOUDFRONT --region us-east-1 --query "IPSets[?Name=='$set'].Id" --output text)
+   token=$(aws wafv2 get-ip-set --scope CLOUDFRONT --region us-east-1 --name "$set" --id "$id" --query LockToken --output text)
+   aws wafv2 update-ip-set --scope CLOUDFRONT --region us-east-1 --name "$set" --id "$id" --lock-token "$token" \
+     --addresses "$(curl -s -4 https://checkip.amazonaws.com)/32"
+   export NODE_OPTIONS=--dns-result-order=ipv4first   # in the shell that runs pnpm load:smoke
+   ```
+
+   The address stays out of the repository and out of every file: OpenTofu leaves the set's contents alone. No apply runs during the hour, since an apply would write the address into the state. A minute after the update, the run's requests no longer count at the edge.
 
 ## Sessions
 
@@ -130,7 +142,7 @@ The run's whole rate comes from one address. What it does to each budget:
 | the exposure budget, per account per Finnish day (ADR-008 §1, `photo_fetches_per_day`) | thumb 600, card 0, full 60, and `exposure_cards_per_day` 0, where 0 is off (ADR-062 §9) | thumbnails only, at most 60 per account per run, spread over the run; card and full never. The queue's reads serve cards, which are recorded and meet no ceiling |
 | the alarms that shadow-ban a reader (ADR-041, ADR-062 §9) | 30 reads of the queue a minute; 300 different people's cards in 10 minutes | the reads are planned to 40 % of the first, on one visit in Q. The second the run never nears: it decides nothing, so an account is served the same undecided cards all day, at most a page of people. The third, 1,500 card photos in 60 minutes, it never touches |
 | the 5xx alarm, `kuutti-staging-api-5xx` | five in five minutes | the run stops sending at its third server error or unanswered request. The requests already in flight, up to `--concurrency`, still finish, and at the bend they tend to fail together (a full pool fails every waiting request). So the alarm may mail at the bend: that is expected, and announced |
-| the WAF rate rule of #41 | not in place on 17/10/2026 | once it is, the run's whole rate counts against it from one address. The maintainer scopes the rule down for the runner's address for the hour, or keeps the run under it |
+| the edge's rate rule (#41, ADR-067) | 2,000 requests from one address in five minutes, `/media/` not counted | nothing, once the runner's address is in the allow list (Before a run, step 8). Without it the edge answers 429 `rate_limited` with `"requestId":"edge"` within the run's first minutes, and the run stops there, as at any 429 |
 
 The plan is backed by guards as the run goes:
 
@@ -164,8 +176,9 @@ The same command with `--metric-name CPUUtilization` and `CPUCreditBalance` cove
 
 1. Put the script's row in the table. Fill the milestone, the log's p95 at the bend, what bent first, and the three server columns.
 2. Set `rate-limit-per-minute` back and restart, if it was raised.
-3. If `kuutti-staging-api-5xx` mailed, check in `kuutti-staging/errors-by-route` that its 5xx fall in the run's last stage, and say so to the team.
-4. If the first thing to bend is a surprise, open an issue for it.
+3. Empty the edge's allow list: the commands of Before a run, step 8, with a fresh lock token and `--addresses '[]'` in place of the address. `aws wafv2 get-ip-set --scope CLOUDFRONT --region us-east-1 --name kuutti-staging-edge-unlimited --id "$id" --query 'IPSet.Addresses'` then says `[]`.
+4. If `kuutti-staging-api-5xx` mailed, check in `kuutti-staging/errors-by-route` that its 5xx fall in the run's last stage, and say so to the team.
+5. If the first thing to bend is a surprise, open an issue for it.
 
 ## The table
 
