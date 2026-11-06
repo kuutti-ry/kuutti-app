@@ -36,16 +36,7 @@ The edge is for volume from one address. A flood from many addresses passes it, 
    ```
 
 2. What reached the box before the edge began: the API's refusals of those minutes, below. AWS can take up to several minutes to begin refusing, usually under thirty seconds.
-3. How many addresses, while the refusal lasts: the list is gone once it ends.
-
-   ```sh
-   id=$(aws wafv2 list-web-acls --scope CLOUDFRONT --region us-east-1 --query "WebACLs[?Name=='kuutti-<env>-edge'].Id" --output text)
-   aws wafv2 get-rate-based-statement-managed-keys --scope CLOUDFRONT --region us-east-1 \
-     --web-acl-name kuutti-<env>-edge --web-acl-id "$id" --rule-name requests-per-address \
-     --query '[length(ManagedKeysIPV4.Addresses), length(ManagedKeysIPV6.Addresses)]'
-   ```
-
-   The command counts them. Leaving off `--query` shows them: that is the maintainer's to do, never in an agent's session, where the addresses would reach the model's transcript. One address is one sender, or many people behind one network. Many addresses at once is a flood the API's windows also carry.
+3. Who: nothing here says. The edge keeps no log and no sample (ADR-067 §4), and AWS's list of the addresses a rule is refusing, `get-rate-based-statement-managed-keys`, came back empty during the burst test of 2026-11-06 while the edge was refusing the test's address. What reached the box in the same minutes is step 2's, and the API's refusals (below) name accounts where they come from people.
 4. People refused: the edge cannot tell them from a script. Somebody writing to hello@ about "too many requests" from a campus or a phone network is the sign; then raise the number (below).
 
 ## When the API's refusals alarm mails
@@ -78,3 +69,11 @@ curl --path-as-is -s -D - -o /dev/null "$url" | grep -i -E '^(HTTP|retry-after)'
 ```
 
 The path goes to the box: CloudFront picks the default behaviour for the path it has normalised, and the box resolves the dot segment to a path the API does not know, a 404 without the database. `--path-as-is` keeps curl from resolving it first. That the edge refuses it after about 2,000 shows both that the rule counts and that a `/media/` prefix gets nobody past it (ADR-067 §2). The address's window counts it too, so the API's 429s come first, from its 121st request in the minute. The last line shows the edge's 429 with `Retry-After: 300`. Within five minutes `aws cloudwatch describe-alarms --region us-east-1 --alarm-names kuutti-staging-edge-rate-limited --query 'MetricAlarms[0].StateValue'` says `ALARM`, and so does `kuutti-staging-api-refusals` in eu-central-1, from the API's own 429s. Both mail, and both mail OK some five to ten minutes after the loop stops.
+
+Proven 2026-11-06 (#41), from one laptop on the dot-segment path:
+
+- The burst began at 21:35:31 UTC, and the first answer was the API's 404, so the path reached the box.
+- The edge refused from 21:36:45, about 3,000 requests and 74 s in, with `HTTP/2 429`, `retry-after: 300` and `"requestId":"edge"`.
+- `kuutti-staging-api-refusals` went to ALARM at 21:36:05 on 1,215 refusals in its five minutes, and back to OK at 21:42:05.
+- `kuutti-staging-edge-rate-limited` went to ALARM at 21:37:35 on 23 refusals. On the bare metric it came back to OK only at 21:53:35, sixteen minutes after its last refusal, since WAF publishes no zero and CloudWatch kept judging the last refusal. It now alarms on `FILL(blocked, 0)`, whose OK comes with the first five minutes without a refusal.
+- Every mail reached the alert address.
