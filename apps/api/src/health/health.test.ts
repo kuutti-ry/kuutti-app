@@ -1,11 +1,12 @@
 import { createPool, type Queryable } from "@kuutti/db";
 import { HealthResponse } from "@kuutti/schema";
 import type { QueryResultRow } from "pg";
-import { afterAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, describe, expect, it, vi } from "vitest";
 import { createApp } from "../app.ts";
 import { ORIGIN_PROOF_HEADER } from "../lib/origin-proof.ts";
 import { TRUSTED_PROXIES } from "../lib/rate-limit.ts";
 import { captureLogger, test, testConfig } from "../test/harness.ts";
+import { watched } from "../test/races.ts";
 
 // The secret Kuutti's distribution sends (ADR-066).
 const SECRET = "origin-proof-of-the-test-4711-4711-4711";
@@ -267,9 +268,16 @@ describe("GET /health asks the database at most once a second, one check at a ti
     expect(counted.checks()).toBe(2);
   });
 
-  test("shares a check still under way however long it takes, and never runs two at once", async ({
+  // The reads' timeouts are timers the test moves itself, so a held statement
+  // gives up only when the test says (deterministic, never a sleep).
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  test("shares a check still under way past its second, and never begins two at once", async ({
     ctx,
   }) => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
     const reached = gate();
     const release = gate();
     let held = false;
@@ -282,7 +290,7 @@ describe("GET /health asks the database at most once a second, one check at a ti
     const { app, move, whenAsked } = await appAt(counted.db);
     const first = app.request("/health");
     await reached.passed; // the first check is under way, held at the migrations
-    move(5_000); // long past its second
+    move(5_000); // long past its second on the app's clock
     const second = app.request("/health");
     await whenAsked(2); // the second request has read the clock, and so chosen
     expect(counted.checks()).toBe(1);
@@ -291,6 +299,50 @@ describe("GET /health asks the database at most once a second, one check at a ti
     expect(answers.map((res) => res.status)).toEqual([200, 200]);
     expect(counted.checks()).toBe(1);
     // Settled, the check was kept for its own second, which is long over.
+    expect((await app.request("/health")).status).toBe(200);
+    expect(counted.checks()).toBe(2);
+  });
+
+  test("gives up on migrations that do not answer within the timeout, answers degraded, and checks again the next second", async ({
+    ctx,
+  }) => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    const reached = gate();
+    const gone = gate();
+    let held = false;
+    // A connection whose server went away mid-statement: the first read of the
+    // migrations never answers until the test lets it fail, and never reaches
+    // the test's transaction.
+    const counted = counting(ctx.client, async (text) => {
+      if (held || !ASKS_MIGRATIONS.test(text)) return;
+      held = true;
+      reached.open();
+      await gone.passed;
+      throw new Error("the connection went away");
+    });
+    const { app, move } = await appAt(counted.db);
+    const first = watched(Promise.resolve(app.request("/health")));
+    await reached.passed;
+    await vi.advanceTimersByTimeAsync(499);
+    expect(first.settled()).toBe(false);
+    await vi.advanceTimersByTimeAsync(1);
+    const degraded = await first.outcome;
+    if (typeof degraded === "string") throw new Error(degraded);
+    expect(degraded.status).toBe(503);
+    expect(HealthResponse.parse(await degraded.json())).toMatchObject({
+      status: "degraded",
+      db: "ok",
+      migrations: "pending",
+    });
+    // The check settled and holds its second; the next begins on a connection that answers.
+    move(999);
+    expect((await app.request("/health")).status).toBe(503);
+    move(1);
+    expect((await app.request("/health")).status).toBe(200);
+    expect(counted.checks()).toBe(2);
+    // The statement left behind fails at last, and nobody waits on it.
+    gone.open();
+    await vi.advanceTimersByTimeAsync(0);
     expect((await app.request("/health")).status).toBe(200);
     expect(counted.checks()).toBe(2);
   });

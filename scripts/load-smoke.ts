@@ -39,7 +39,8 @@
  * - The target is this computer or staging. Production by name, the previews (which share
  *   staging's box), any other host, APP_ENV=production and an APP_ENV that disagrees with the
  *   target are refused. Before any load the server is asked: /health must be ours and ready, and
- *   /openapi.json must be served, which production never does (app.ts).
+ *   /openapi.json must be served, which production never does (app.ts); it is counted in the
+ *   address's window, so a spent window refuses it with 429 and its wait.
  * - Staging needs --confirm-staging: it is the demo, where the team tries the app while the run
  *   spends the API's time (its address limit counts each viewer since ADR-066).
  * - The sessions file is refused inside any git work tree, readable by others, with a token twice,
@@ -1088,6 +1089,12 @@ async function execute(options: Options, io: Io, now: Date = new Date()): Promis
     );
   }
   const contract = await ask(base, "/openapi.json");
+  // The contract is counted in this address's window like any other path (#630).
+  if (typeof contract !== "string" && contract.status === 429) {
+    return refuse(
+      `the API at ${host} refused /openapi.json, this address's window spent: ask again in ${contract.headers.get("retry-after") ?? "?"} s; nothing was sent`,
+    );
+  }
   if (typeof contract === "string" || contract.status !== 200) {
     return refuse(
       `the API at ${host} does not serve /openapi.json, which production alone withholds (app.ts): nothing was sent`,
@@ -1875,6 +1882,27 @@ async function standInRuns(
     expect("what production was asked", b.seen, ["GET /health", "GET /openapi.json"]);
     expect("the file production left", readFileSync(fileB, "utf8"), ours(b.url, kept));
 
+    // The address's window spent on the contract (#630): refused with its wait, not as production.
+    const w = await standIn([], {
+      twist: (route) =>
+        route === "GET /openapi.json"
+          ? { status: 429, code: "rate_limited", retryAfter: 42, remaining: 0 }
+          : undefined,
+    });
+    const runW = await drive(w.url, undefined);
+    await w.close();
+    expect(
+      "a spent window's refusal",
+      [runW.status, w.seen, runW.out],
+      [
+        1,
+        ["GET /health", "GET /openapi.json"],
+        [
+          `load-smoke: the API at ${w.url.host} refused /openapi.json, this address's window spent: ask again in 42 s; nothing was sent`,
+        ],
+      ],
+    );
+
     // What answers is not Kuutti's API: refused after the one question.
     const n = await standIn([], {
       twist: (route) =>
@@ -2234,7 +2262,14 @@ async function standInRuns(
   }
 }
 
-type Twist = { status?: number; code?: string; json?: unknown; limit?: number; remaining?: number };
+type Twist = {
+  status?: number;
+  code?: string;
+  json?: unknown;
+  limit?: number;
+  remaining?: number;
+  retryAfter?: number;
+};
 /**
  * How the stand-in's socket misbehaves: it refuses the upgrade (as the address's limiter would),
  * refuses the auth, drops every connection at the first visit's signed-in part, or says two
@@ -2292,6 +2327,7 @@ async function standIn(
         "content-type": "application/json",
         "ratelimit-limit": String(twist?.limit ?? 60_000),
         "ratelimit-remaining": String(twist?.remaining ?? 59_990),
+        ...(twist?.retryAfter === undefined ? {} : { "retry-after": String(twist.retryAfter) }),
       });
       res.end(JSON.stringify(json));
     };

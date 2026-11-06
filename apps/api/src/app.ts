@@ -104,7 +104,7 @@ export type Deps = {
  * `cloudfront` mode, has no address (ADR-066). Counted, it would share the
  * bucket of no address with a flood through anybody's distribution, and Swarm
  * would replace a container that floods its own check out. Its database
- * answer is kept for a second instead, so no number of asks costs more than
+ * answer is kept for a second instead, so no number of asks begins more than
  * one check a second (health/index.ts, ADR-026 History of 2026-11-06).
  */
 const UNLIMITED_PATH = "/health";
