@@ -68,7 +68,7 @@ variable "media_enabled" {
 }
 
 variable "cloudfront_only_ingress" {
-  description = "Passed to the network module: HTTPS from CloudFront's prefix list only. Off until Dokploy and the previews are behind the distribution too (ADR-005)."
+  description = "Passed to the network module: HTTPS from CloudFront's prefix list only. Dokploy is behind the distribution from the cutover on (#198, ADR-005 §7), so the cutover commit sets this with media_enabled and trusted_proxy = cloudfront (ADR-008 §5)."
   type        = bool
   default     = false
 }

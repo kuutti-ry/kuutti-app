@@ -28,8 +28,14 @@ variable "api_fqdn" {
 }
 
 variable "origin_fqdn" {
-  description = "The name the distribution connects to the box by, pointing at the Elastic IP (origin.api.<env>.<domain>): Traefik must hold a certificate for it."
+  description = "The name the distribution connects to the box by, pointing at the Elastic IP (origin.api.<env>.<domain>): Traefik must hold a certificate for it. Its port 80 takes Let's Encrypt's HTTP-01 challenge for every alias."
   type        = string
+}
+
+variable "extra_aliases" {
+  description = "Names besides api_fqdn that the distribution serves for the box, each routed by Traefik on the forwarded Host: Dokploy's control plane and, on staging, the previews' wildcard (ADR-005 §7, #198). They are names on the certificate too; the environment's dns.tf points them at the distribution."
+  type        = list(string)
+  default     = []
 }
 
 variable "instance_role_name" {

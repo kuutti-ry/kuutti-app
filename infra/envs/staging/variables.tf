@@ -73,7 +73,7 @@ variable "media_enabled" {
 }
 
 variable "cloudfront_only_ingress" {
-  description = "Passed to the network module: HTTPS from CloudFront's prefix list only. Off until Dokploy and the previews are behind the distribution too (ADR-005)."
+  description = "Passed to the network module: HTTPS from CloudFront's prefix list only. Dokploy and the previews are behind the distribution since #198 (ADR-005 §7); it turns on together with trusted_proxy = cloudfront, never before (ADR-008 §5)."
   type        = bool
   default     = false
 }
