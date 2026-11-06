@@ -6,6 +6,13 @@
 - packages: write and attestations: write only in build.yml, contents: write
   only in release.yml, security-events: write only in scorecard.yml,
   id-token: write only in jobs that exchange the OIDC token;
+- pull-requests: write only in the job of auto-approve.yml: the repository
+  lets Actions approve pull requests, which that job needs, so the scope is
+  an approval in any job that holds it, and a job a pull request starts runs
+  the pull request's own copy of the scripts it hands the token to (#609).
+  Such a job comments with issues: write and reads with pull-requests: read.
+  What this script cannot hold is the setting itself: while it is on, a
+  workflow pushed to any branch asks for the scope in its own file;
 - actions: write only in the job of preview-cleanup.yml that cancels waiting
   runs (ADR-012 §8), and that job is what is written down here and nothing
   more: a checkout of the scripts and one script, the run's own token, no
@@ -39,6 +46,9 @@ WAITING_PERMISSIONS = {"contents": "read", "actions": "write", "pull-requests": 
 WAITING_CHECKOUT = {"persist-credentials": False, "sparse-checkout": ".github/scripts"}
 WAITING_SCRIPT = ".github/scripts/withdraw-waiting-runs.sh"
 WAITING_ENV = {"GH_TOKEN": "${{ github.token }}"}
+
+# The one job with pull-requests: write (#609).
+APPROVE_JOB = ("auto-approve.yml", "approve")
 
 
 def waiting_job_problems(doc: dict, job: dict) -> list[str]:
@@ -125,6 +135,12 @@ for path in WORKFLOWS:
             problems.append(f"{name}/{job_id}: security-events: write belongs only in scorecard.yml")
         if perms.get("contents") == "write" and holder != "release.yml":
             problems.append(f"{name}/{job_id}: contents: write belongs only in release.yml")
+        # With "Allow GitHub Actions to create and approve pull requests" on,
+        # which auto-approve.yml needs, pull-requests: write approves. A job a
+        # pull request starts runs the pull request's scripts, so it never
+        # holds the scope; a comment takes issues: write (#609).
+        if perms.get("pull-requests") == "write" and (holder, job_id) != APPROVE_JOB:
+            problems.append(f"{name}/{job_id}: pull-requests: write belongs only in auto-approve.yml/approve")
         # Cancelling a waiting run is all it is used for (ADR-012 §8). The
         # scope is wider than that: it also re-runs and deletes runs, starts
         # and disables workflows, approves the runs of fork pull requests and

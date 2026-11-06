@@ -1,8 +1,14 @@
 name: Auto-approve own pull requests
 
-# Runs from main only (schedule and manual dispatch never run a pull request's
-# copy of this file), so a contributor cannot edit the condition in their own
-# pull request and approve themselves. It reads nothing from a pull request but
+# Runs from main on its schedule. A manual dispatch runs the chosen branch's
+# copy of this file, and a push runs that branch's workflows, each with the
+# token scopes its own file asks for: so while the repository's "Allow GitHub
+# Actions to create and approve pull requests" is on, which this job needs,
+# a workflow anyone with write pushes can approve a pull request, and that
+# setting, not this file, decides who can approve (#609). Of the repository's
+# own workflows this is the one job with pull-requests: write, and the
+# invariants script holds the scope to it. It reads nothing from a pull
+# request but
 # its author, draft state, head repository and whether its diff adds a native
 # review record: a `reviewed:` line in packages/i18n/messages.yaml is the mark
 # a native speaker leaves through `pnpm i18n:review` (#55), and its record is
