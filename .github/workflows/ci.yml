@@ -341,3 +341,5 @@ jobs:
           python .github/scripts/check-workflow-permissions.py
       - name: what the sweep withdraws, and what it leaves
         run: .github/scripts/withdraw-waiting-runs.test.sh
+      - name: what the plan role's probes decide, against a stand-in aws
+        run: .github/scripts/plan-role-denies.test.sh

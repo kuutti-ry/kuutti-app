@@ -43,7 +43,7 @@ flowchart TB
   subgraph prwork["What a pull request builds and plans"]
     n6["build.yml image: built and smoke-tested on arm64, pushed to GHCR as pr-N"]
     n7["infra.yml: fmt, and beside it plans staging and prod as kuutti-ci-plan"]
-    n8["infra-oidc.yml: kuutti-ci-plan still cannot decrypt"]
+    n8["infra-oidc.yml: kuutti-ci-plan still reads no data"]
     n9["e2e.yml and e2e-admin.yml: the Maestro flows with the label e2e, the panel's flows when it changed; not required"]
   end
   subgraph prev["preview.yml, environment preview"]
@@ -76,7 +76,7 @@ flowchart TB
 5. The merge: a squash, and only with the fourteen checks green on a branch that is up to date with `main` (strict checks).
 6. `build.yml`, job `image`: the API's image, built natively on an arm64 runner, never under emulation, then started against a Postgres 17 service until `/health` says the database is reachable and the migrations current, and checked for its licence and third-party notices. For a pull request from this repository it is pushed to GHCR as `kuutti-api:pr-<n>-<sha7>` and `:pr-<n>`, with the job's `GITHUB_TOKEN` and `packages: write`, without provenance: nothing ships from it.
 7. `infra.yml`, when `infra/`, the workflow or `.github/scripts` changed: `tofu fmt` for everything, with no credential, and in parallel `init`, `validate` and `plan` for `envs/staging` and `envs/prod` as `kuutti-ci-plan`, each plan a sticky comment on the pull request. The bootstrap is never planned or applied by CI.
-8. `infra-oidc.yml`, when `infra/` or its own workflow changed, or by hand: proves that `kuutti-ci-plan` can still be assumed from a pull request and still cannot decrypt a SecureString parameter.
+8. `infra-oidc.yml`, when `infra/` or its own workflow changed, or by hand: proves that `kuutti-ci-plan` can still be assumed from a pull request, still cannot decrypt a SecureString parameter, and is refused every other read the bootstrap's `ci_plan_deny_data` denies. `.github/scripts/plan-role-denies.sh` reads the denied actions from that policy's text and makes one call for each, aimed at something that does not exist, so that an allowed call would read nothing. Each passes on AccessDenied alone. A deny declared but not yet applied by the maintainer fails the run, and so does a denied action with no probe.
 9. `e2e.yml`: the Maestro flows on Android emulators against a local stack on the runner (ADR-020 §6 and §7), on a pull request only with the label `e2e`, and on every push to `main`. `e2e-admin.yml`: the moderation panel's flows in Chromium against the same stack and the panel's production build under its host's headers (ADR-051), on a pull request that changes what they exercise (the panel, the API, the packages, the mock bank, the panel's host module, or the stack's and the workspace's files: `docker-compose.yml`, `env.example`, the manifests, the lockfile, `tsconfig.base.json` and the pnpm action), and on every push to `main`. Neither has an environment or a secret, and neither is a required check: they gate no deploy.
 10. `preview.yml`, lane `api`, while `PREVIEWS_ENABLED` is on: it waits for the image of step 6, then creates or updates the Dokploy application `api-pr-<n>` with `DOKPLOY_TOKEN`, a member's token that reaches the `previews` project only. It waits until the preview's `/health` reports the commit and checks that the preview answers its own web origin and refuses every other. At most three pull requests hold previews ([Deployment](deployment.md), part 4).
 11. Lane `web`: `expo export --platform web` against the preview's API, then `eas deploy --alias pr-<n>` with `EXPO_TOKEN`, and a check that the page's bundle names that API.
@@ -260,7 +260,7 @@ flowchart TB
 | `infra.yml`, `plan` | the same, pull requests and `main` | none | `kuutti-ci-plan` | `GITHUB_TOKEN`, `pull-requests: write` | `ALERT_EMAIL`, `MAIL_TESTERS`, `AWS_PLAN_ROLE_ARN` |
 | `infra.yml`, `apply staging` | `main` | `staging` | `kuutti-ci-apply` | none | `STAGING_ENABLED`, `ALERT_EMAIL`, `MAIL_TESTERS` |
 | `infra-prod.yml`, `apply prod` | `v*` tags | `prod`, reviewer | `kuutti-ci-apply` | none | `ALERT_EMAIL` |
-| `infra-oidc.yml`, `plan role cannot read secrets` | changes under `infra/` | none | `kuutti-ci-plan` | none | `AWS_PLAN_ROLE_ARN` |
+| `infra-oidc.yml`, `plan role reads no data` | changes under `infra/` | none | `kuutti-ci-plan` | none | `AWS_PLAN_ROLE_ARN` |
 | `eas-build.yml`, `i18n release gate` | `main`, `v*` tags, by hand | none | none | none | none |
 | `eas-build.yml`, `eas build` | the same | `staging`, or `prod` for a production build | none | `EXPO_TOKEN`; `GITHUB_TOKEN`, `issues: write` | `EAS_ENABLED`, `EAS_PLATFORMS`, `EAS_BUILDS_ISSUE` |
 | `e2e.yml` | `main`; a pull request with the label `e2e` | none | none | none | none |
