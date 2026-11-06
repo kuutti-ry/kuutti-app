@@ -340,13 +340,12 @@ The distribution certificate and the provisioning profiles are section 16's.
 
 ## 17. The origin secret (ADR-066)
 
-The value Kuutti's distribution sends to the box as `x-kuutti-origin`, which the API compares with its own copy before it believes CloudFront's viewer address. It lives in two places that must agree: the key `origin-secret` of the CloudFront key value store `kuutti-<env>-origin-proof`, and the SecureString `/kuutti/<env>/origin-secret`. Neither is a resource, so the value is in no state (ADR-001). CI's plan role may not read the store (the bootstrap's `ci_plan_deny_data`), so that deny must be applied before a value is first written.
+The value Kuutti's distribution sends to the box as `x-kuutti-origin`, which the API compares with its own copy before it believes CloudFront's viewer address. It lives in two places that must agree: the key `origin-secret` of the CloudFront key value store `kuutti-<env>-origin-proof`, and the SecureString `/kuutti/<env>/origin-secret`. Neither is a resource, so the value is in no state (ADR-001). CI's plan role may not read the store (the bootstrap's `ci_plan_deny_data`), so that deny must be applied before a value is first written. The value needs no other copy: a lost one is replaced, by these same steps, never restored. So it is made in the shell and never written to a file.
 
-**Steps.** Make the new value offline, keep it on the medium, then let the API take both the old and the new value, move the store, and let the API drop the old one:
+**Steps.** Let the API take both the old and the new value, move the store, then let the API drop the old one:
 
 ```sh
-openssl rand -base64 32 | tr '+/' '-_' | tr -d '=' > /Volumes/<offline-medium>/kuutti-<env>-origin-secret
-new=$(cat /Volumes/<offline-medium>/kuutti-<env>-origin-secret)
+new=$(openssl rand -base64 32 | tr '+/' '-_' | tr -d '=\n')
 old=$(aws ssm get-parameter --name /kuutti/<env>/origin-secret --with-decryption --query Parameter.Value --output text | awk '{print $NF}')
 aws ssm put-parameter --name /kuutti/<env>/origin-secret --type SecureString --overwrite --value "$old $new"
 # Redeploy the API (step "Restart" above), and on staging every open preview, as section 2 does;
@@ -360,13 +359,19 @@ aws ssm put-parameter --name /kuutti/<env>/origin-secret --type SecureString --o
 unset new old
 ```
 
-The first time, there is no old value: write the new one to SSM alone, then the store, then redeploy.
+The first time, there is no old value. One command writes both, and prints `1` and `1`, never the value (as on staging on 2026-11-06):
+
+```sh
+V=$(openssl rand -base64 32 | tr '+/' '-_' | tr -d '=\n') && aws ssm put-parameter --name /kuutti/<env>/origin-secret --type SecureString --value "$V" --query Version && ARN=$(aws cloudfront describe-key-value-store --name kuutti-<env>-origin-proof --query KeyValueStore.ARN --output text) && aws cloudfront-keyvaluestore put-key --kvs-arn "$ARN" --key origin-secret --value "$V" --if-match "$(aws cloudfront-keyvaluestore describe-key-value-store --kvs-arn "$ARN" --query ETag --output text)" --query ItemCount; unset V
+```
+
+Then redeploy. Should SSM take the value and the store refuse it, do not run it again (SSM refuses a second first write): put SSM's value into the store with the `put-key` above, its `--value` read by `aws ssm get-parameter --name /kuutti/<env>/origin-secret --with-decryption --query Parameter.Value --output text`.
 
 **Check.** `curl -s https://api.<env>.kuutti.app/health` (production `https://api.kuutti.app/health`) says `"originProof":"valid"` after each step. `wrong` means the store and SSM disagree. `missing` means the function sent nothing: the store has no key, the function is not attached, or its read failed. A preview answers for itself at its own address.
 
 **What breaks meanwhile:** nothing, if the steps keep their order. If the API is left in `cloudfront` mode with a value the store no longer sends, every request has no address, and they share one bucket until the two agree again.
 
-**If it leaked:** anyone holding it can forge a viewer address through a CloudFront distribution of their own. Rotate at once. In `traefik` mode the value proves nothing to the limiter, so a leak then has no effect until the switch. On staging the previews can read it (preview code holds the instance role), which is ADR-004 §3's trust.
+**If it leaked:** anyone holding it can forge a viewer address through a CloudFront distribution of their own. Rotate at once. In `traefik` mode the value proves nothing to the limiter, so a leak has no effect where that mode holds, production before its cutover among them. On staging the previews can read it (preview code holds the instance role), which is ADR-004 §3's trust.
 
 ## When someone with write access leaves
 

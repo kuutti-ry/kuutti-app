@@ -40,8 +40,8 @@
  *   staging's box), any other host, APP_ENV=production and an APP_ENV that disagrees with the
  *   target are refused. Before any load the server is asked: /health must be ours and ready, and
  *   /openapi.json must be served, which production never does (app.ts).
- * - Staging needs --confirm-staging: it is the demo, and its address limit counts the CloudFront
- *   edge the team's phones share (ADR-008 History).
+ * - Staging needs --confirm-staging: it is the demo, where the team tries the app while the run
+ *   spends the API's time (its address limit counts each viewer since ADR-066).
  * - The sessions file is refused inside any git work tree, readable by others, with a token twice,
  *   or naming another API than the target: an unknown token and a revoked one get the same 401.
  * - Hard caps no flag passes: 20 visits a second, 8 stages, 10 minutes, 64 requests in flight,
