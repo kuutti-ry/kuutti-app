@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Kuutti API",
-    "version": "0.110.3",
+    "version": "0.110.4",
     "description": "Free, non-commercial dating app for Finland. Every account is verified through a Finnish bank. Source: AGPL-3.0 with App Store exception."
   },
   "components": {
@@ -6950,7 +6950,7 @@
     "/health": {
       "get": {
         "summary": "Liveness and readiness in one answer",
-        "description": "200 when the database answers and committed migrations are applied; 503 with the same body when either fails.",
+        "description": "200 when the database answers and committed migrations are applied; 503 with the same body when either fails. One check of the database answers every request within its second.",
         "responses": {
           "200": {
             "description": "Every dependency answers.",
