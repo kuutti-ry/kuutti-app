@@ -9,9 +9,10 @@ import { tOf } from "./i18n.ts";
  * Whose word the API takes for the client address (#52, audit F19). A hop a
  * client can write is never trusted: `traefik` reads the last X-Forwarded-For
  * entry, the one Traefik itself appends on the box; `cloudfront` reads the
- * viewer address CloudFront adds, and is only right once the box admits
- * CloudFront alone (cloudfront_only_ingress), because until then anyone
- * reaching the origin could send that header; `none` is the socket, for a
+ * viewer address CloudFront adds, and is only right once nothing but
+ * Kuutti's own distribution can reach the box: admitting CloudFront alone
+ * (cloudfront_only_ingress) is not enough, since anybody's distribution may
+ * send that header too (#198, ADR-008 History); `none` is the socket, for a
  * process nothing fronts (development, tests).
  */
 export const TRUSTED_PROXIES = ["none", "traefik", "cloudfront"] as const;

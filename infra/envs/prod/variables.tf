@@ -68,13 +68,13 @@ variable "media_enabled" {
 }
 
 variable "cloudfront_only_ingress" {
-  description = "Passed to the network module: HTTPS from CloudFront's prefix list only. Dokploy is behind the distribution from the cutover on (#198, ADR-005 §7), so the cutover commit sets this with media_enabled and trusted_proxy = cloudfront (ADR-008 §5)."
+  description = "Passed to the network module: HTTPS from CloudFront's prefix list only. Dokploy is behind the distribution from the cutover on (#198, ADR-005 §7), so the cutover commit can set this with media_enabled and trusted_proxy = cloudfront, once the box can tell Kuutti's distribution from anybody's (#198, ADR-008 History)."
   type        = bool
   default     = false
 }
 
 variable "trusted_proxy" {
-  description = "Whose word the API takes for the client address behind its rate limiter (#52, audit F19, ADR-008): /kuutti/prod/trusted-proxy. traefik while the box answers 443 directly (the last X-Forwarded-For hop, the one Traefik appends); cloudfront once cloudfront_only_ingress is on (CloudFront's viewer address), and never before, since until then anyone reaching the origin could send that header."
+  description = "Whose word the API takes for the client address behind its rate limiter (#52, audit F19, ADR-008): /kuutti/prod/trusted-proxy. traefik reads the last X-Forwarded-For hop, the one Traefik appends: behind CloudFront, the CloudFront server that forwarded the request, which nobody chooses. cloudfront reads CloudFront's viewer address, which only a request through Kuutti's own distribution can be trusted to carry: the box's prefix list admits every CloudFront distribution, and any of them may send that header with a value of its own. So it stays traefik until the box can tell Kuutti's distribution from anybody's, the maintainer's decision (#198, ADR-008 History). The API reads it at boot: turning it on takes that proof first, then the parameter and a deploy; turning it off takes the parameter and a deploy before 443 opens again."
   type        = string
   default     = "traefik"
 

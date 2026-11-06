@@ -168,8 +168,9 @@ const Env = z.object({
   WS_PONG_TIMEOUT_MS: z.coerce.number().int().min(100).max(60_000).default(10_000),
   // Whose word the rate limiter takes for the client address (#52, F19,
   // lib/rate-limit.ts). Unset: the socket in development and test, Traefik on
-  // a deployed box. /kuutti/<env>/trusted-proxy says cloudfront the day the
-  // box admits CloudFront alone (cloudfront_only_ingress), never before.
+  // a deployed box. /kuutti/<env>/trusted-proxy says cloudfront only once the
+  // box can tell Kuutti's distribution from anybody's, which admitting
+  // CloudFront alone (cloudfront_only_ingress) does not (#198).
   TRUSTED_PROXY: z.enum(TRUSTED_PROXIES).optional(),
   SSM_PARAMETER_PREFIX: z.string().min(1).optional(),
 

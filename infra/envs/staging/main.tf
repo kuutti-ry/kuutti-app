@@ -167,8 +167,9 @@ resource "aws_ssm_parameter" "config" {
     # Both name module admin's host (#313, ADR-025 §10).
     "admin-app-url"        = var.admin_app_url
     "cors-allowed-origins" = var.cors_allowed_origins
-    # The rate limiter's idea of the client address (#52, F19): flips to
-    # cloudfront together with cloudfront_only_ingress, never before.
+    # The rate limiter's idea of the client address (#52, F19): cloudfront
+    # only with cloudfront_only_ingress, and only once the box can tell
+    # Kuutti's distribution from anybody's (#198, ADR-008 History).
     "trusted-proxy" = var.trusted_proxy
     }, var.media_enabled ? {
     # Photos (#48): what the API needs besides the private key, which is
@@ -195,6 +196,8 @@ resource "aws_ssm_parameter" "config" {
     # ADR-008 §5, enforced: with the origin still open to the world, a
     # cloudfront trusted proxy would let anyone forge the header the rate
     # limiter keys on. The plan fails before the parameter can say so.
+    # Necessary, not sufficient: the prefix list admits every CloudFront
+    # distribution, and any of them can send the header too (#198).
     precondition {
       condition     = var.trusted_proxy != "cloudfront" || var.cloudfront_only_ingress
       error_message = "trusted_proxy = cloudfront needs cloudfront_only_ingress = true in the same apply (ADR-008 §5)."

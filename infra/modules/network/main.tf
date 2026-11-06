@@ -127,9 +127,11 @@ resource "aws_vpc_security_group_ingress_rule" "api_https" {
 
 # CloudFront-only ingress (ADR-005, audit F141): the managed prefix list of
 # CloudFront's origin-facing addresses is the only source of HTTPS, so a
-# request that did not pass the distribution, its TLS and its headers cannot
-# reach the API. Switched on per environment once everything on 443 is behind
-# the distribution (see the variable).
+# request that passed no CloudFront distribution cannot reach the box's 443.
+# The list is every distribution's, not Kuutti's alone: it says a request
+# came through CloudFront, not whose distribution (#198, ADR-008 History).
+# Switched on per environment once everything on 443 is behind the
+# distribution (see the variable).
 data "aws_ec2_managed_prefix_list" "cloudfront" {
   count = var.cloudfront_only_ingress ? 1 : 0
 
