@@ -34,6 +34,7 @@ There is no rotation calendar. Rotate when a value may have been seen by someone
 | Telia's own signing keys | Telia's JWKS | the API, from discovery | Telia | 5 |
 | `/kuutti/<env>/hetu-hmac-key` | SSM SecureString; the offline medium; production also on paper in the sealed envelope | the API at boot | **nobody: never rotated** | 6 |
 | `/kuutti/<env>/cloudfront-signing-key` | SSM SecureString; the offline medium; the public half in `infra/envs/<env>/` | the API at boot | maintainer | 7 |
+| `/kuutti/<env>/origin-secret`, and the key `origin-secret` of the store `kuutti-<env>-origin-proof` | SSM SecureString; a CloudFront key value store; the offline medium | the API at boot; the distribution's CloudFront Function on every request | maintainer | 17 |
 | session and admin-session tokens, sign-in codes | hashes in the database | the API | nothing to rotate | 8 |
 | `DOKPLOY_TOKEN` (two keys), the Dokploy admin login | GitHub environments; Dokploy | `deploy.yml`, `preview.yml`, `preview-cleanup.yml` | the Dokploy admin and a repository admin | 9 |
 | `EXPO_TOKEN` | GitHub environments `staging`, `prod`, `preview`, `preview-cleanup` | `deploy.yml`, `eas-build.yml`, `preview.yml`, `preview-cleanup.yml` | an Expo owner or Admin and a repository admin | 10 |
@@ -337,6 +338,36 @@ The distribution certificate and the provisioning profiles are section 16's.
 - **Developer keys** for maintainer tools are not service secrets: the Claude API key of `pnpm i18n:translate` (`packages/i18n/README.md`) and the image-model key of the demo pictures (`docs/demo/photo-prompts.md`) live in the developer's own environment and are revoked at their provider.
 - **Human logins** (the mailbox, AWS root and Identity Center, GitHub, Expo, Dokploy, Sentry) are `custody.md`'s; a lost device is `SECURITY.md`'s.
 
+## 17. The origin secret (ADR-066)
+
+The value Kuutti's distribution sends to the box as `x-kuutti-origin`, which the API compares with its own copy before it believes CloudFront's viewer address. It lives in two places that must agree: the key `origin-secret` of the CloudFront key value store `kuutti-<env>-origin-proof`, and the SecureString `/kuutti/<env>/origin-secret`. Neither is a resource, so the value is in no state (ADR-001). CI's plan role may not read the store (the bootstrap's `ci_plan_deny_data`), so that deny must be applied before a value is first written.
+
+**Steps.** Make the new value offline, keep it on the medium, then let the API take both the old and the new value, move the store, and let the API drop the old one:
+
+```sh
+openssl rand -base64 32 | tr '+/' '-_' | tr -d '=' > /Volumes/<offline-medium>/kuutti-<env>-origin-secret
+new=$(cat /Volumes/<offline-medium>/kuutti-<env>-origin-secret)
+old=$(aws ssm get-parameter --name /kuutti/<env>/origin-secret --with-decryption --query Parameter.Value --output text | awk '{print $NF}')
+aws ssm put-parameter --name /kuutti/<env>/origin-secret --type SecureString --overwrite --value "$old $new"
+# Redeploy the API (step "Restart" above), and on staging every open preview, as section 2 does;
+# /health still says "originProof":"valid" with the old value.
+arn=$(aws cloudfront describe-key-value-store --name kuutti-<env>-origin-proof --query KeyValueStore.ARN --output text)
+etag=$(aws cloudfront-keyvaluestore describe-key-value-store --kvs-arn "$arn" --query ETag --output text)
+aws cloudfront-keyvaluestore put-key --kvs-arn "$arn" --key origin-secret --value "$new" --if-match "$etag"
+# Within a minute or so every edge sends the new value. Then:
+aws ssm put-parameter --name /kuutti/<env>/origin-secret --type SecureString --overwrite --value "$new"
+# Redeploy the API again, and on staging the open previews again.
+unset new old
+```
+
+The first time, there is no old value: write the new one to SSM alone, then the store, then redeploy.
+
+**Check.** `curl -s https://api.<env>.kuutti.app/health` (production `https://api.kuutti.app/health`) says `"originProof":"valid"` after each step. `wrong` means the store and SSM disagree. `missing` means the function sent nothing: the store has no key, the function is not attached, or its read failed. A preview answers for itself at its own address.
+
+**What breaks meanwhile:** nothing, if the steps keep their order. If the API is left in `cloudfront` mode with a value the store no longer sends, every request has no address, and they share one bucket until the two agree again.
+
+**If it leaked:** anyone holding it can forge a viewer address through a CloudFront distribution of their own. Rotate at once. In `traefik` mode the value proves nothing to the limiter, so a leak then has no effect until the switch. On staging the previews can read it (preview code holds the instance role), which is ADR-004 §3's trust.
+
 ## When someone with write access leaves
 
 Write access is staging-level trust: a pull request's preview runs its code on the staging box with the staging instance role and the `preview` environment's tokens (`infra/README.md`, Previews, Trust; ADR-004 §3). When a person with write leaves the team, after their access is removed:
@@ -344,7 +375,7 @@ Write access is staging-level trust: a pull request's preview runs its code on t
 - `EXPO_TOKEN` in all four environments (section 10);
 - `FONTS_TOKEN` in the EAS environments `preview` and `production` (section 13): anyone with write access could start a build that holds it;
 - the `ci-preview` Dokploy key (section 9);
-- on staging, what the role could read: `db-app-password` (1), `db-preview-password` (2), the Telia keys (4), the CloudFront key (7). The staging HMAC key is section 6's staging paragraph.
+- on staging, what the role could read: `db-app-password` (1), `db-preview-password` (2), the Telia keys (4), the CloudFront key (7), the origin secret (17). The staging HMAC key is section 6's staging paragraph.
 
 An organisation owner who leaves also had admin rights: add the deploy key (9) and the Sentry token (11).
 

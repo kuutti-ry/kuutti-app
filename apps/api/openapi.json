@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Kuutti API",
-    "version": "0.109.6",
+    "version": "0.110.0",
     "description": "Free, non-commercial dating app for Finland. Every account is verified through a Finnish bank. Source: AGPL-3.0 with App Store exception."
   },
   "components": {
@@ -2435,6 +2435,25 @@
               "pending"
             ],
             "description": "Committed migrations compared with the ones applied to this database."
+          },
+          "trustedProxy": {
+            "type": "string",
+            "enum": [
+              "none",
+              "traefik",
+              "cloudfront"
+            ],
+            "description": "Whose word the rate limiter takes for the client address, as the process read it at boot (ADR-008 §5)."
+          },
+          "originProof": {
+            "type": "string",
+            "enum": [
+              "valid",
+              "missing",
+              "wrong",
+              "unset"
+            ],
+            "description": "Whether this request carried the proof of Kuutti's own CloudFront distribution (ADR-066): unset when the process has no secret to check it against."
           }
         },
         "required": [

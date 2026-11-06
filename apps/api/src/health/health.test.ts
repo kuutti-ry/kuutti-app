@@ -83,6 +83,54 @@ describe("GET /health", () => {
   });
 });
 
+describe("GET /health and the proof of Kuutti's distribution (ADR-066)", () => {
+  const SECRET = "origin-proof-of-the-test-4711-4711-4711";
+
+  async function healthOf(
+    config: Record<string, string>,
+    headers: Record<string, string> = {},
+  ): Promise<HealthResponse> {
+    const { logger } = await captureLogger();
+    const pool = createPool({ connectionString: testConfig().databaseUrl, max: 1 });
+    try {
+      const app = createApp({ config: testConfig(config), logger, db: pool });
+      return HealthResponse.parse(await (await app.request("/health", { headers })).json());
+    } finally {
+      await pool.end();
+    }
+  }
+
+  test("names the mode the process read at boot, and unset with no secret to check", async () => {
+    const body = await healthOf({ TRUSTED_PROXY: "traefik" });
+    expect(body.trustedProxy).toBe("traefik");
+    expect(body.originProof).toBe("unset");
+  });
+
+  test("says whether this request carried the proof: missing, wrong or valid", async () => {
+    const config = { TRUSTED_PROXY: "cloudfront", ORIGIN_SECRET: SECRET };
+    expect((await healthOf(config)).originProof).toBe("missing");
+    expect((await healthOf(config, { "x-kuutti-origin": `${SECRET}x` })).originProof).toBe("wrong");
+    const proven = await healthOf(config, { "x-kuutti-origin": SECRET });
+    expect(proven.originProof).toBe("valid");
+    expect(proven.trustedProxy).toBe("cloudfront");
+  });
+
+  test("never echoes the secret or the header it came in", async () => {
+    const res = await (async () => {
+      const { logger } = await captureLogger();
+      const pool = createPool({ connectionString: testConfig().databaseUrl, max: 1 });
+      try {
+        const app = createApp({ config: testConfig({ ORIGIN_SECRET: SECRET }), logger, db: pool });
+        return await app.request("/health", { headers: { "x-kuutti-origin": SECRET } });
+      } finally {
+        await pool.end();
+      }
+    })();
+    expect(await res.text()).not.toContain(SECRET);
+    expect([...res.headers.values()].join(" ")).not.toContain(SECRET);
+  });
+});
+
 describe("GET /health with the database unreachable", () => {
   // A real pg pool pointed at a closed port: connection refused, not a mock.
   const unreachable = createPool({

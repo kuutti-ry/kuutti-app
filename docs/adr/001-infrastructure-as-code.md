@@ -40,7 +40,7 @@ State: one S3 bucket, one key per environment, versioned and encrypted, `use_loc
 
 CI: GitHub Actions assumes an AWS role by OIDC. `tofu plan` runs on every pull request and posts the plan. Apply to staging happens on merge to `main`; apply to production requires approval through a GitHub environment protection rule.
 
-Two roles. The plan role has `ReadOnlyAccess` minus data: it is explicitly denied `kms:Decrypt` (so it cannot read SecureString parameters under the default key), Secrets Manager reads, CloudWatch log reads, and `s3:GetObject` outside the state bucket, because it is assumable from any pull request. The apply role has `PowerUserAccess` plus scoped IAM, and can only create or modify roles that carry a permissions boundary shaped like `PowerUserAccess`, so it cannot mint a role more powerful than itself.
+Two roles. The plan role has `ReadOnlyAccess` minus data: it is explicitly denied `kms:Decrypt` (so it cannot read SecureString parameters under the default key), Secrets Manager reads, CloudWatch log reads, `s3:GetObject` outside the state bucket and, since ADR-066, the values of the CloudFront key value stores, because it is assumable from any pull request. The apply role has `PowerUserAccess` plus scoped IAM, and can only create or modify roles that carry a permissions boundary shaped like `PowerUserAccess`, so it cannot mint a role more powerful than itself.
 
 ### Out of scope, deliberately
 

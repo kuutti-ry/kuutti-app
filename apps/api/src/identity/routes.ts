@@ -283,7 +283,7 @@ export function authRoutes(
   const doors = rateLimit({
     limit: deps.config.SIGN_IN_RATE_LIMIT_PER_MINUTE,
     windowMs: SIGN_IN_WINDOW_MS,
-    keyOf: addressOf(deps.config.TRUSTED_PROXY, { ipv6Prefix: SIGN_IN_IPV6_PREFIX }),
+    keyOf: addressOf(deps.config, { ipv6Prefix: SIGN_IN_IPV6_PREFIX }),
     refuse: (c) => refuseSignInStart(c, deps, "address"),
   });
   for (const route of [startRoute, adminStartRoute]) {

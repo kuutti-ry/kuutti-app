@@ -244,6 +244,23 @@ data "aws_cloudfront_origin_request_policy" "all_viewer" {
   name = "Managed-AllViewerAndCloudFrontHeaders-2022-06"
 }
 
+# The proof of Kuutti's own distribution (ADR-066): the box admits every
+# CloudFront distribution's servers (ADR-008, History), so a viewer-request
+# function puts the store's secret in x-kuutti-origin on every request of
+# the default behaviour, after removing the viewer's own. The code holds the
+# store's id, never the value. The bucket's and the ACME behaviours carry no
+# function: neither the bucket nor Traefik's challenge handler asks for it.
+resource "aws_cloudfront_function" "origin_proof" {
+  name                         = "${local.name}-origin-proof"
+  runtime                      = "cloudfront-js-2.0"
+  comment                      = "x-kuutti-origin from the store on the default behaviour (ADR-066)"
+  publish                      = true
+  key_value_store_associations = [var.origin_proof_store_arn]
+  code = templatefile("${path.module}/origin-proof.js", {
+    store_id = element(split("/", var.origin_proof_store_arn), 1)
+  })
+}
+
 # The ACME behaviour's hop goes over plain HTTP, so it carries the path and
 # the Host and nothing else: no cookie, no other viewer header, no query
 # string. Traefik's challenge handler finds a token by those two. A signed-in
@@ -376,6 +393,11 @@ resource "aws_cloudfront_distribution" "this" {
     cache_policy_id          = data.aws_cloudfront_cache_policy.caching_disabled.id
     origin_request_policy_id = data.aws_cloudfront_origin_request_policy.all_viewer.id
     compress                 = false
+
+    function_association {
+      event_type   = "viewer-request"
+      function_arn = aws_cloudfront_function.origin_proof.arn
+    }
   }
 
   ordered_cache_behavior {

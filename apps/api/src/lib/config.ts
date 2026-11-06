@@ -172,6 +172,12 @@ const Env = z.object({
   // box can tell Kuutti's distribution from anybody's, which admitting
   // CloudFront alone (cloudfront_only_ingress) does not (#198).
   TRUSTED_PROXY: z.enum(TRUSTED_PROXIES).optional(),
+  // How the box tells Kuutti's distribution from anybody's (ADR-066): the
+  // value its CloudFront Function sends as x-kuutti-origin, from the
+  // SecureString /kuutti/<env>/origin-secret, written by hand and never a
+  // resource (ADR-001). Two values separated by a space while one replaces
+  // the other. Required with TRUSTED_PROXY=cloudfront (parseConfig).
+  ORIGIN_SECRET: z.string().trim().optional(),
   SSM_PARAMETER_PREFIX: z.string().min(1).optional(),
 
   // Pull-request preview (#9): the process creates and seeds kuutti_pr_<n>
@@ -187,8 +193,8 @@ const Env = z.object({
 const RATE_LIMIT_DEFAULT = { preview: 30, other: 120 } as const;
 /**
  * Production's doors are tight; elsewhere looser (ADR-026 §5): staging keys on
- * the CloudFront edge until its ingress switch (ADR-008 History), and the
- * demo's reset signs many personas in from one address.
+ * the CloudFront server until the proof of ADR-066 lets it trust the viewer
+ * address, and the demo's reset signs many personas in from one address.
  */
 const SIGN_IN_RATE_LIMIT_DEFAULT = { production: 10, other: 60 } as const;
 
@@ -209,6 +215,8 @@ export type Config = Omit<
   RATE_LIMIT_PER_MINUTE: number;
   SIGN_IN_RATE_LIMIT_PER_MINUTE: number;
   TRUSTED_PROXY: TrustedProxy;
+  /** ORIGIN_SECRET's values, none when it is unset (lib/origin-proof.ts). */
+  originSecrets: readonly string[];
   MAIL: "ses" | "log" | "off";
   PUSH: "expo" | "log" | "off";
   databaseUrl: string;
@@ -330,11 +338,30 @@ export function parseConfig(raw: Record<string, string | undefined>): Config {
   const trustedProxy: TrustedProxy =
     env.TRUSTED_PROXY ??
     (env.APP_ENV === "development" || env.APP_ENV === "test" ? "none" : "traefik");
+  const originSecrets = (env.ORIGIN_SECRET ?? "").split(/\s+/).filter((value) => value !== "");
+  if (originSecrets.length > 2 || originSecrets.some((value) => value.length < 32)) {
+    throw new ConfigError(
+      [],
+      ["ORIGIN_SECRET: one value of at least 32 characters, or two separated by a space (ADR-066)"],
+    );
+  }
+  // CloudFront's servers are every distribution's (ADR-008, History): with no
+  // secret, no request could prove it came through Kuutti's, and the limiter
+  // would put everybody in the one bucket of no address.
+  if (trustedProxy === "cloudfront" && originSecrets.length === 0) {
+    throw new ConfigError(
+      ["ORIGIN_SECRET"],
+      [
+        "ORIGIN_SECRET: trusted-proxy cloudfront needs origin-secret, the proof of Kuutti's distribution (ADR-066)",
+      ],
+    );
+  }
   return {
     ...env,
     RATE_LIMIT_PER_MINUTE: rateLimit,
     SIGN_IN_RATE_LIMIT_PER_MINUTE: signInRateLimit,
     TRUSTED_PROXY: trustedProxy,
+    originSecrets,
     MAIL: mail,
     PUSH: push,
     databaseUrl: preview ? withDatabase(baseUrl, preview.database) : baseUrl,
