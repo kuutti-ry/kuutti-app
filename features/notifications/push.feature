@@ -11,6 +11,13 @@ Feature: Pushes say that there is something, never what or from whom
   hours, nor of a kind the person switched off (ADR-032), and a device's
   token is its session's.
 
+  Scenario: A queued push checks its device again before each submission
+    Given a push has enough devices to need another batch
+    And one of the remaining devices changes to another session before that batch
+    When the next batch is submitted
+    Then the changed device gets no push for its previous session
+    And the other live devices keep their own delivery results
+
   Scenario: A message to somebody in the app sends no push
     Given "A" and "B" are in a conversation and "B" has the app open
     When "A" writes to "B"

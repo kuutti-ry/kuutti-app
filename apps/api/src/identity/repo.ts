@@ -597,7 +597,14 @@ export async function revokeAccountSessions(
   reason: string,
 ): Promise<number> {
   const result = await db.query(
-    "UPDATE session SET revoked_at = $2, revoked_reason = $3 WHERE account_id = $1 AND revoked_at IS NULL",
+    // Bulk lifecycle writers and push submission take session locks in the
+    // same order, before any revocation trigger takes a token lock.
+    `WITH locked AS MATERIALIZED (
+       SELECT id FROM session WHERE account_id = $1 AND revoked_at IS NULL
+       ORDER BY id FOR UPDATE
+     )
+     UPDATE session SET revoked_at = $2, revoked_reason = $3
+      WHERE id IN (SELECT id FROM locked)`,
     [accountId, at, reason],
   );
   return result.rowCount ?? 0;
@@ -610,8 +617,13 @@ export async function deleteDeadSessions(
   now: Date,
 ): Promise<number> {
   const result = await db.query(
-    `DELETE FROM session WHERE (revoked_at IS NOT NULL AND revoked_at < $1) OR expires_at < $2
-       OR account_id IN (SELECT id FROM account WHERE state = 'deleted')`,
+    `WITH locked AS MATERIALIZED (
+       SELECT id FROM session
+        WHERE (revoked_at IS NOT NULL AND revoked_at < $1) OR expires_at < $2
+          OR account_id IN (SELECT id FROM account WHERE state = 'deleted')
+       ORDER BY id FOR UPDATE
+     )
+     DELETE FROM session WHERE id IN (SELECT id FROM locked)`,
     [endedBefore, now],
   );
   return result.rowCount ?? 0;
@@ -806,7 +818,13 @@ export async function listSessionsForAccount(
 
 /** Every session of the account, gone (not revoked and kept: erasure). */
 export async function deleteAccountSessions(db: Queryable, accountId: string): Promise<number> {
-  const result = await db.query("DELETE FROM session WHERE account_id = $1", [accountId]);
+  const result = await db.query(
+    `WITH locked AS MATERIALIZED (
+       SELECT id FROM session WHERE account_id = $1 ORDER BY id FOR UPDATE
+     )
+     DELETE FROM session WHERE id IN (SELECT id FROM locked)`,
+    [accountId],
+  );
   return result.rowCount ?? 0;
 }
 
@@ -1189,7 +1207,8 @@ export async function recordExport(
       `account_export:${input.accountId}`,
     ]);
     const { rows } = await tx.query<{ live: boolean; used: number; id: string | null }>(
-      `WITH live AS (SELECT 1 FROM account WHERE id = $1 AND state <> 'deleted'),
+      // Share erasure's account lock before writing its child row (TD-7).
+      `WITH live AS (SELECT 1 FROM account WHERE id = $1 AND state <> 'deleted' FOR SHARE),
           used AS (SELECT count(*)::int AS n FROM account_export WHERE account_id = $1 AND at >= $3),
           ins AS (INSERT INTO account_export (account_id, at)
                   SELECT $1, $2 FROM live, used WHERE used.n < $4
