@@ -73,13 +73,13 @@ variable "media_enabled" {
 }
 
 variable "cloudfront_only_ingress" {
-  description = "Passed to the network module: HTTPS from CloudFront's prefix list only. Dokploy and the previews are behind the distribution since #198 (ADR-005 §7); it turns on together with trusted_proxy = cloudfront, never before (ADR-008 §5)."
+  description = "Passed to the network module: HTTPS from CloudFront's prefix list only. On since #198, once Dokploy and the previews were behind the distribution too (ADR-005 §7). The list is every CloudFront distribution's servers, not Kuutti's alone, so this closes the box to direct requests and proves nothing about whose distribution a request came through: trusted_proxy stays traefik (ADR-008 History). Turning this off is safe while trusted_proxy is traefik."
   type        = bool
-  default     = false
+  default     = true
 }
 
 variable "trusted_proxy" {
-  description = "Whose word the API takes for the client address behind its rate limiter (#52, audit F19, ADR-008): /kuutti/staging/trusted-proxy. traefik while the box answers 443 directly (the last X-Forwarded-For hop, the one Traefik appends); cloudfront once cloudfront_only_ingress is on (CloudFront's viewer address), and never before, since until then anyone reaching the origin could send that header."
+  description = "Whose word the API takes for the client address behind its rate limiter (#52, audit F19, ADR-008): /kuutti/staging/trusted-proxy. traefik reads the last X-Forwarded-For hop, the one Traefik appends: behind CloudFront, the CloudFront server that forwarded the request, which nobody chooses. cloudfront reads CloudFront's viewer address, which only a request through Kuutti's own distribution can be trusted to carry: the box's prefix list admits every CloudFront distribution, and any of them may send that header with a value of its own. So it stays traefik until the box can tell Kuutti's distribution from anybody's, the maintainer's decision (#198, ADR-008 History). The API reads it at boot: turning it on takes that proof first, then the parameter and a deploy; turning it off takes the parameter and a deploy before 443 opens again."
   type        = string
   default     = "traefik"
 
