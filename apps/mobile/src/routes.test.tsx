@@ -67,7 +67,7 @@ jest.mock("@/features/identity", () => {
     LockProvider: provider("LockProvider"),
     OnboardingScreen: probe("OnboardingScreen"),
     SignInScreen: probe("SignInScreen"),
-    SignedOutToStart: probe("SignedOutToStart"),
+    SignedOutToStart: provider("SignedOutToStart"),
     SessionProvider: provider("SessionProvider"),
   };
 });
@@ -452,12 +452,15 @@ describe("the root layout", () => {
     );
   });
 
-  it("puts the stack without headers under the providers, with the signed-out watcher, the push and the screen-reader hint beside it", async () => {
+  it("puts the stack without headers inside session navigation, with the push and the screen-reader hint beside it", async () => {
     await render(<RootLayout />);
     expect(propsOf("Stack")).toEqual({
       screenOptions: { headerShown: false, contentStyle: { backgroundColor: "transparent" } },
     });
     expect(screen.getByTestId("SignedOutToStart")).toBeTruthy();
+    let holder = screen.getByTestId("Stack").parent;
+    while (holder && holder.props.testID !== "SignedOutToStart") holder = holder.parent;
+    expect(holder?.props.testID).toBe("SignedOutToStart");
     expect(screen.getByTestId("PushNotifications")).toBeTruthy();
     expect(screen.getByTestId("ScreenReaderHint")).toBeTruthy();
   });

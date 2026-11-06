@@ -65,13 +65,19 @@
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import {
   chmodSync,
+  closeSync,
   existsSync,
+  linkSync,
+  lstatSync,
   mkdirSync,
   mkdtempSync,
+  openSync,
+  readdirSync,
   readFileSync,
   renameSync,
   rmSync,
   statSync,
+  symlinkSync,
   writeFileSync,
 } from "node:fs";
 import { createServer } from "node:http";
@@ -964,9 +970,21 @@ function readSessions(file: string, target: URL): Sessions | string {
 /** Written whole and renamed into place, so a crash leaves the old file or the new one. */
 function writeSessions(file: string, lines: string[]): void {
   const path = resolve(file);
-  const next = `${path}.${process.pid}.tmp`;
-  writeFileSync(next, lines.join("\n"), { mode: 0o600 });
-  renameSync(next, path);
+  // A short, random sibling stays on the same filesystem. Exclusive creation
+  // gives this call its own private inode; write through that descriptor.
+  const next = join(dirname(path), `.kuutti-sessions-${randomUUID()}.tmp`);
+  const descriptor = openSync(next, "wx", 0o600);
+  try {
+    writeFileSync(descriptor, lines.join("\n"));
+    renameSync(next, path);
+  } finally {
+    try {
+      closeSync(descriptor);
+    } finally {
+      // Remove at most this leaf: never traverse a substituted directory.
+      rmSync(next, { force: true });
+    }
+  }
 }
 
 /**
@@ -1620,6 +1638,7 @@ async function selfTest(): Promise<never> {
   ];
   for (const [a, b, want] of apis) expect(`sameApi ${a} ${b}`, sameApi(api(a), api(b)), want);
 
+  sessionFileChecks(expect);
   const runs = await standInRuns(expect);
   for (const failure of failures) console.error(`✖ self-test: ${failure}`);
   if (failures.length > 0) process.exit(1);
@@ -1627,6 +1646,100 @@ async function selfTest(): Promise<never> {
     `✔ load-smoke self-test: ${checks} checks, ${lines.length} of them command lines, ${runs} runs against a stand-in`,
   );
   process.exit(0);
+}
+
+/** The atomic writer keeps unrelated entries intact and removes its own staging files. */
+function sessionFileChecks(expect: (what: string, got: unknown, want: unknown) => void): void {
+  const dir = mkdtempSync(join(tmpdir(), "kuutti-session-files-"));
+  try {
+    const ordinary = join(dir, "ordinary");
+    for (const lines of [
+      ["# dummy header", "dummy first", ""],
+      ["dummy second", "# comment"],
+    ]) {
+      writeSessions(ordinary, lines);
+      expect(
+        "session replacement preserves exact bytes",
+        readFileSync(ordinary, "utf8"),
+        lines.join("\n"),
+      );
+      expect("session replacement is owner-only", statSync(ordinary).mode & 0o777, 0o600);
+      expect("session replacement leaves no staging entry", readdirSync(dir), ["ordinary"]);
+    }
+    for (const kind of ["regular", "symlink", "hardlink"] as const) {
+      const caseDir = join(dir, kind);
+      mkdirSync(caseDir);
+      const file = join(caseDir, "sessions");
+      const legacy = `${file}.${process.pid}.tmp`;
+      const sentinel = join(caseDir, "sentinel");
+      writeFileSync(sentinel, "dummy unrelated bytes");
+      chmodSync(sentinel, 0o666);
+      if (kind === "symlink") symlinkSync(sentinel, legacy);
+      else if (kind === "hardlink") linkSync(sentinel, legacy);
+      else {
+        writeFileSync(legacy, "dummy unrelated bytes");
+        chmodSync(legacy, 0o666);
+      }
+      writeSessions(file, ["dummy replacement"]);
+      expect(
+        `${kind}: unrelated content survives`,
+        readFileSync(sentinel, "utf8"),
+        "dummy unrelated bytes",
+      );
+      expect(`${kind}: old temporary entry survives`, existsSync(legacy), true);
+      if (existsSync(legacy)) {
+        expect(
+          `${kind}: old temporary bytes survive`,
+          readFileSync(legacy, "utf8"),
+          "dummy unrelated bytes",
+        );
+      }
+      expect(`${kind}: destination is a regular file`, lstatSync(file).isFile(), true);
+      expect(`${kind}: destination is owner-only`, statSync(file).mode & 0o777, 0o600);
+      expect(`${kind}: exact replacement bytes`, readFileSync(file, "utf8"), "dummy replacement");
+    }
+    const longName = join(dir, "s".repeat(246));
+    writeSessions(longName, ["dummy long-name replacement"]);
+    expect(
+      "a long destination basename still works",
+      readFileSync(longName, "utf8"),
+      "dummy long-name replacement",
+    );
+    const previousUmask = process.umask(0);
+    try {
+      writeSessions(ordinary, ["dummy permissive-umask replacement"]);
+      expect("a permissive umask keeps owner-only mode", statSync(ordinary).mode & 0o777, 0o600);
+    } finally {
+      process.umask(previousUmask);
+    }
+    const blocked = join(dir, "nonempty-directory");
+    mkdirSync(blocked);
+    writeFileSync(join(blocked, "sentinel"), "dummy preserved bytes");
+    const entries = readdirSync(dir).sort();
+    let failed = false;
+    try {
+      writeSessions(blocked, ["dummy replacement"]);
+    } catch {
+      failed = true;
+    }
+    expect("rename failure propagates", failed, true);
+    expect(
+      "rename failure preserves the destination",
+      readFileSync(join(blocked, "sentinel"), "utf8"),
+      "dummy preserved bytes",
+    );
+    expect("rename failure removes its staging entry", readdirSync(dir).sort(), entries);
+    failed = false;
+    try {
+      writeSessions(join(dir, "missing-parent", "sessions"), ["dummy replacement"]);
+    } catch {
+      failed = true;
+    }
+    expect("creation failure propagates", failed, true);
+    expect("creation failure leaves no staging entry", readdirSync(dir).sort(), entries);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 }
 
 /**

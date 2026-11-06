@@ -18,6 +18,14 @@ export type StoredSession = SessionTokens;
 const KEY = "kuutti.session";
 
 let memory: StoredSession | null = null;
+let generation = 0;
+let revision = 0;
+let writes: Promise<void> = Promise.resolve();
+let pendingWrites = 0;
+
+/** Changes on sign-out or replacement, but not on token rotation within a session. */
+export const sessionGeneration = (): number => generation;
+export const isCurrentSession = (expected: number): boolean => generation === expected;
 
 /**
  * A session belongs to the device that signed in through the bank (#35, TD-1):
@@ -37,33 +45,60 @@ const THIS_DEVICE = { keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_
 
 async function persist(session: StoredSession | null): Promise<void> {
   memory = session;
-  if (Platform.OS === "web") return;
-  await SecureStore.deleteItemAsync(KEY);
-  if (session !== null) await SecureStore.setItemAsync(KEY, JSON.stringify(session), THIS_DEVICE);
+  const change = ++revision;
+  if (Platform.OS !== "web") {
+    pendingWrites += 1;
+    const write = writes.then(async () => {
+      if (revision !== change) return;
+      await SecureStore.deleteItemAsync(KEY);
+      if (session !== null && revision === change) {
+        await SecureStore.setItemAsync(KEY, JSON.stringify(session), THIS_DEVICE);
+      }
+    });
+    // Each caller still receives its own error; a failed native write must
+    // not prevent a later sign-out or replacement from reaching storage.
+    writes = write.catch(() => undefined);
+    try {
+      await write;
+    } finally {
+      pendingWrites -= 1;
+    }
+  }
+  if (revision === change) notify();
 }
 
 /** Loaded once at start; a value that does not parse is treated as no session. */
 export async function loadSession(): Promise<StoredSession | null> {
   if (Platform.OS === "web") return memory;
+  const read = revision;
+  let loaded: StoredSession | null;
   try {
+    if (pendingWrites > 0) {
+      await writes;
+      if (revision !== read) return memory;
+    }
     const raw = await SecureStore.getItemAsync(KEY);
-    memory = raw ? SessionTokens.parse(JSON.parse(raw)) : null;
+    loaded = raw ? SessionTokens.parse(JSON.parse(raw)) : null;
   } catch {
-    memory = null;
+    loaded = null;
   }
+  if (revision !== read) return memory;
+  if (memory?.sessionId !== loaded?.sessionId) generation += 1;
+  revision += 1;
+  memory = loaded;
   return memory;
 }
 
 export const currentSession = (): StoredSession | null => memory;
 
 export async function saveSession(session: StoredSession): Promise<void> {
+  if (memory?.sessionId !== session.sessionId) generation += 1;
   await persist(session);
-  notify();
 }
 
 export async function clearSession(): Promise<void> {
+  generation += 1;
   await persist(null);
-  notify();
 }
 
 type Listener = (session: StoredSession | null) => void;
@@ -85,7 +120,12 @@ export function accessTokenIsStale(session: StoredSession, now = Date.now()): bo
   return new Date(session.accessExpiresAt).getTime() - now < REFRESH_AHEAD_MS;
 }
 
-let inFlight: Promise<StoredSession | null> | null = null;
+type Refresh = {
+  generation: number;
+  refreshToken: string;
+  promise: Promise<StoredSession | null>;
+};
+let inFlight: Refresh | null = null;
 
 /**
  * One refresh at a time: callers that arrive while one runs get its result.
@@ -93,29 +133,45 @@ let inFlight: Promise<StoredSession | null> | null = null;
  * typed client, whose middleware would call back into here.
  */
 export function refreshSession(): Promise<StoredSession | null> {
-  if (inFlight) return inFlight;
   const session = memory;
   if (!session) return Promise.resolve(null);
-  inFlight = (async () => {
+  if (inFlight?.generation === generation && inFlight.refreshToken === session.refreshToken) {
+    return inFlight.promise;
+  }
+  const owner = generation;
+  const ownsInput = () => isCurrentSession(owner) && memory?.refreshToken === session.refreshToken;
+  const flight: Refresh = {
+    generation: owner,
+    refreshToken: session.refreshToken,
+    promise: Promise.resolve(null),
+  };
+  inFlight = flight;
+  flight.promise = (async () => {
     try {
       const response = await fetch(`${apiBaseUrl()}/auth/refresh`, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ refreshToken: session.refreshToken }),
       });
+      if (!ownsInput()) return null;
       if (response.status === 401) {
         await clearSession();
         return null;
       }
       if (!response.ok) return session; // the API is unwell; keep what we have and try again later
       const next = SessionTokens.parse(await response.json());
-      await saveSession(next);
-      return next;
+      if (!ownsInput()) return null;
+      if (next.sessionId !== session.sessionId) throw new Error("refresh changed session");
+      await persist(next);
+      return isCurrentSession(owner) ? memory : null;
+    } catch (error) {
+      if (!isCurrentSession(owner)) return null;
+      throw error;
     } finally {
-      inFlight = null;
+      if (inFlight === flight) inFlight = null;
     }
   })();
-  return inFlight;
+  return flight.promise;
 }
 
 /**

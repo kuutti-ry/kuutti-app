@@ -35,7 +35,7 @@ sequenceDiagram
   person->>app: Picks a photo from the library
   app->>app: The phone's own check on the picked file: a pass-through until its classifier is built, #35;184
   app->>app: Pre-resizes to 1600 px on the long edge and saves a new JPEG without the original's EXIF
-  app->>api: POST /photos, multipart, one part named photo, with the session's bearer token
+  app->>api: POST /photos, multipart, one part named photo, only while the initiating session is current
   api->>api: Checks the session, caps the body at 10 MB, accepts JPEG, PNG or WebP
   api->>db: Counts the account's photos against max_photos
   api->>api: Refuses above the image concurrency limit, then reads the format and size from the file header
@@ -50,7 +50,7 @@ sequenceDiagram
 1. The person picks a photo from the phone's library.
 2. The app runs the phone's own nudity check on the picked file, before any byte leaves the phone. Its classifier is native and not built yet (#184): until then every picture passes, and on the web preview always. A classifier that fails refuses the picture, and a refusal sends nothing.
 3. The app pre-resizes the picture to 1600 px on the long edge with `expo-image-manipulator` and saves a new JPEG, which carries none of the original's EXIF, so location and camera data never leave the phone.
-4. The app posts it to `POST /photos` as multipart with one part, `photo`, with this device's bearer token, refreshed first when it is stale and once more on a 401. There is no path from the phone to the bucket (rule 4).
+4. The app posts it to `POST /photos` as multipart with one part, `photo`, using the session that began the upload. It refreshes that session first when its token is stale and may retry once after a 401. Before either send, including after building the multipart body or waiting for refresh, it checks that the same session still owns the upload; a sign-out or replacement stops that submission. This cannot recall a request that has already left the phone. There is no path from the phone to the bucket (rule 4).
 5. The API checks the session before it reads the body, caps the body at 10 MB (413 `payload_too_large`), and validates the part: JPEG, PNG or WebP, anything else 400.
 6. It counts the account's photos against `max_photos` in `matching_config` (409 `photo_limit`).
 7. Above the image concurrency limit, `p-limit` at the box's vCPU count unless `IMAGE_CONCURRENCY` says otherwise, it answers 503 `media_busy` with `Retry-After` rather than queue the work. Then it reads the format, width and height from the file header alone: anything but JPEG, PNG or WebP is 415 `photo_unsupported`, and more than 30 million pixels is 422 `photo_too_many_pixels`, before any decoder runs.

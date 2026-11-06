@@ -30,14 +30,15 @@ function RootLayout() {
               <LockProvider>
                 {/* The chat's socket while signed in and in front (#349). */}
                 <ChatLiveProvider>
-                  <Stack
-                    screenOptions={{
-                      headerShown: false,
-                      contentStyle: { backgroundColor: "transparent" },
-                    }}
-                  />
+                  <SignedOutToStart>
+                    <Stack
+                      screenOptions={{
+                        headerShown: false,
+                        contentStyle: { backgroundColor: "transparent" },
+                      }}
+                    />
+                  </SignedOutToStart>
                   <StatusBar style="auto" />
-                  <SignedOutToStart />
                   {/* The push: the token while signed in, a tap opening what it is about (#102). */}
                   <PushNotifications />
                   {/* The one-time hint for a screen-reader user (#296); stays on the device. */}

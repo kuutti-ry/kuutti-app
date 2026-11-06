@@ -37,7 +37,7 @@ function gate<T>() {
 /** Lets every settled promise run on: the fakes do no I/O, so this is all there is to wait for. */
 const settle = () => new Promise<void>((resolve) => setImmediate(resolve));
 
-async function harness(options: { listening?: boolean } = {}) {
+async function harness(options: { listening?: boolean; delayTransportClose?: boolean } = {}) {
   const lookup = gate<SessionLookup | null>();
   const touch = gate<void>();
   const standing = gate<SessionStanding>();
@@ -63,7 +63,7 @@ async function harness(options: { listening?: boolean } = {}) {
   let closed: { code: number; reason: string } | null = null;
   const ws = {
     get readyState() {
-      return closed ? 3 : 1;
+      return closed && !options.delayTransportClose ? 3 : 1;
     },
     send: (data: string) => frames.push(JSON.parse(data) as ServerFrame),
     close: (code: number, reason: string) => {
@@ -129,6 +129,51 @@ async function signedIn(h: Awaited<ReturnType<typeof harness>>) {
 }
 
 describe("one socket's life, interleaved", () => {
+  it("withholds fan-out after refusal even while the transport is still open", async () => {
+    const h = await harness({ delayTransportClose: true });
+    await signedIn(h);
+    const socket = h.live.presence.socketsOf(ACCOUNT)[0];
+    h.live.closeAll(1008, "session_revoked");
+    socket?.send({ type: "presence", conversationId: ACCOUNT, online: true });
+    expect(h.frames).toEqual([{ type: "ready" }, { type: "error", code: "session_revoked" }]);
+  });
+
+  it("withholds fan-out until the final session check succeeds", async () => {
+    const h = await harness();
+    h.send({ type: "auth", token: TOKEN });
+    h.lookup.open(found());
+    await settle();
+    h.touch.open();
+    await settle();
+    const socket = h.live.presence.socketsOf(ACCOUNT)[0];
+    expect(socket).toBeDefined();
+    const frame: ServerFrame = { type: "presence", conversationId: ACCOUNT, online: true };
+    socket?.send(frame);
+    expect(h.frames).toEqual([]);
+    h.standing.open(LIVE);
+    await settle();
+    socket?.send(frame);
+    expect(h.frames).toEqual([{ type: "ready" }, frame]);
+  });
+
+  it("refuses a resume while final session admission is pending", async () => {
+    const h = await harness();
+    const resume = vi.spyOn(h.live.hub, "resume").mockResolvedValue();
+    h.send({ type: "auth", token: TOKEN });
+    h.lookup.open(found());
+    await settle();
+    h.touch.open();
+    await settle();
+    h.send({ type: "resume", conversations: [] });
+    await settle();
+    expect(h.frames).toEqual([{ type: "error", code: "bad_frame" }]);
+    expect(h.closed()).toEqual({ code: 1008, reason: "bad_frame" });
+    expect(resume).not.toHaveBeenCalled();
+    h.standing.open(LIVE);
+    await settle();
+    expect(h.frames).toEqual([{ type: "error", code: "bad_frame" }]);
+  });
+
   it("refuses a second auth unread while the first is looked up, and the first then registers nothing", async () => {
     const h = await harness();
     h.send({ type: "auth", token: TOKEN });

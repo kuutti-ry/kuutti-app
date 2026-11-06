@@ -161,6 +161,7 @@ jest.mock("expo-router", () => {
       }
     },
     useRouter: () => router,
+    useRootNavigationState: () => undefined,
     useLocalSearchParams: () => ({}),
     useFocusEffect: (effect) =>
       useEffect(() => {

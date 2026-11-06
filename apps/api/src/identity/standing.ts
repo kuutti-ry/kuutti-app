@@ -187,8 +187,13 @@ export async function endSessionsForSanction(
   const sessions =
     input.accountIds.length > 0
       ? await db.query(
-          `UPDATE session SET revoked_at = $2, revoked_reason = 'sanction'
-           WHERE account_id = ANY($1::uuid[]) AND revoked_at IS NULL`,
+          `WITH locked AS MATERIALIZED (
+             SELECT id FROM session
+              WHERE account_id = ANY($1::uuid[]) AND revoked_at IS NULL
+             ORDER BY id FOR UPDATE
+           )
+           UPDATE session SET revoked_at = $2, revoked_reason = 'sanction'
+            WHERE id IN (SELECT id FROM locked)`,
           [input.accountIds, input.at],
         )
       : { rowCount: 0 };

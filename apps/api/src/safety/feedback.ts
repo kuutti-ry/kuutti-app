@@ -46,7 +46,8 @@ export async function recordFeedback(db: Queryable, input: NewFeedback): Promise
   return transaction(db, async (tx) => {
     await tx.query("SELECT pg_advisory_xact_lock(hashtext($1))", [`feedback:${input.accountId}`]);
     const { rows } = await tx.query<{ live: boolean; used: number; id: string | null }>(
-      `WITH live AS (SELECT 1 FROM account WHERE id = $1 AND state <> 'deleted'),
+      // Hold the live account through the insert: erasure must see this row or refuse it (TD-7).
+      `WITH live AS (SELECT 1 FROM account WHERE id = $1 AND state <> 'deleted' FOR SHARE),
           used AS (SELECT count(*)::int AS n FROM feedback WHERE account_id = $1 AND created_at >= $8),
           ins AS (INSERT INTO feedback (account_id, kind, text, app_version, platform, locale, created_at)
                   SELECT $1, $2::feedback_kind, $3, $4, $5::feedback_platform, $6, $7

@@ -957,6 +957,9 @@ describe("a delivery in requests (ADR-055 §8)", () => {
       });
       push.match({ accountId: s.b });
       await first.promise;
+      // The send's transaction must finish before the spacing timer is armed.
+      // Wait on that actual scheduling boundary, not just provider entry.
+      await vi.waitFor(() => expect(vi.getTimerCount()).toBe(1), { interval: 0 });
       await vi.advanceTimersByTimeAsync(REQUEST_SPACING_MS - 1);
       expect(s.pusher.batches).toHaveLength(1);
       await vi.advanceTimersByTimeAsync(1);
