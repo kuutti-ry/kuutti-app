@@ -51,18 +51,25 @@ export function s3MediaStore(client: S3Client, bucket: string): MediaStore {
     },
     async delete(keys) {
       if (keys.length === 0) return;
-      // DeleteObjects answers 200 with a per-object error list; quiet mode
-      // still lists the failures, and a partial failure is a failure here.
-      const out = await client.send(
-        new DeleteObjectsCommand({
-          Bucket: bucket,
-          Delete: { Objects: keys.map((Key) => ({ Key })), Quiet: true },
-        }),
-      );
-      const failed = out.Errors ?? [];
-      if (failed.length > 0) {
-        const codes = [...new Set(failed.map((e) => e.Code ?? "unknown"))].join(", ");
-        throw new Error(`DeleteObjects left ${failed.length} of ${keys.length} objects (${codes})`);
+      // S3 accepts at most 1000 keys per DeleteObjects request. Erasure and
+      // report pruning can release more variants than that (TD-7).
+      for (let offset = 0; offset < keys.length; offset += 1000) {
+        const batch = keys.slice(offset, offset + 1000);
+        const out = await client.send(
+          new DeleteObjectsCommand({
+            Bucket: bucket,
+            Delete: { Objects: batch.map((Key) => ({ Key })), Quiet: true },
+          }),
+        );
+        // A 200 response can still list per-object failures, even in quiet
+        // mode. Stop on a failed batch; never report a partial delete as success.
+        const failed = out.Errors ?? [];
+        if (failed.length > 0) {
+          const codes = [...new Set(failed.map((e) => e.Code ?? "unknown"))].join(", ");
+          throw new Error(
+            `DeleteObjects left ${failed.length} of ${batch.length} objects (${codes})`,
+          );
+        }
       }
     },
   };
