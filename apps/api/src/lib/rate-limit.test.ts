@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { ErrorResponse } from "@kuutti/schema";
 import { Hono, type MiddlewareHandler } from "hono";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { AppEnv } from "./env.ts";
@@ -783,5 +785,25 @@ describe("the address given back only for what the person's limiter counted (ADR
     expect((await app.request("/ends-session")).status).toBe(200);
     expect((await app.request("/ends-session")).status).toBe(429);
     expect(counts).toEqual([]);
+  });
+});
+
+// The edge's refusal (ADR-067 §3): AWS WAF answers an address past the edge's
+// limit with this body in the API's place (infra/modules/media/edge.tf reads
+// edge.json), so the app and the load smoke must read it as the limiter's own 429.
+describe("the edge's refusal", () => {
+  const { refusal: edge } = JSON.parse(
+    readFileSync(new URL("../../../../infra/modules/media/edge.json", import.meta.url), "utf8"),
+  ) as { refusal: unknown };
+
+  it("is the limiter's own envelope and code, with nothing else in it", async () => {
+    const app = limitedApp();
+    const client = from({ "x-forwarded-for": "203.0.113.9" });
+    await app.request("/", client);
+    await app.request("/", client);
+    const own = ErrorResponse.parse(await (await app.request("/", client)).json());
+    // zod leaves out a key the envelope does not have, so a stray one fails the comparison.
+    expect(ErrorResponse.parse(edge)).toEqual(edge);
+    expect(ErrorResponse.parse(edge).error.code).toBe(own.error.code);
   });
 });
