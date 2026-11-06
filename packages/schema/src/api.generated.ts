@@ -11,7 +11,7 @@ export interface paths {
         };
         /**
          * Liveness and readiness in one answer
-         * @description 200 when the database answers and committed migrations are applied; 503 with the same body when either fails.
+         * @description 200 when the database answers and committed migrations are applied; 503 with the same body when either fails. One check of the database answers every request within its second.
          */
         get: {
             parameters: {
