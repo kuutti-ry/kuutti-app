@@ -1,8 +1,12 @@
 name: Infra OIDC
 
-# Keeps two properties of the bootstrap roles proven (ADR-001, #6): the plan
-# role is assumable from a pull request and from main, and it cannot decrypt a
-# SecureString even though ReadOnlyAccess alone would let it. The gate job is
+# Keeps three properties of the bootstrap roles proven (ADR-001, #6): the plan
+# role is assumable from a pull request and from main, it cannot decrypt a
+# SecureString even though ReadOnlyAccess alone would let it, and it is
+# refused every other data read that the bootstrap's ci_plan_deny_data denies
+# it (ADR-066, ADR-067; .github/scripts/plan-role-denies.sh). A deny declared
+# in infra/bootstrap but not yet applied fails the run until the maintainer
+# has applied it. The gate job is
 # for the one-time check of the GitHub environments: dispatched from a v* tag
 # with gate=prod it waits for the reviewer; from a branch with gate=staging
 # GitHub refuses the ref before it starts.
@@ -26,7 +30,7 @@ permissions:
 
 jobs:
   plan-role:
-    name: plan role cannot read secrets
+    name: plan role reads no data
     # Nothing to prove before the bootstrap has been applied; a dispatch counts
     # only from main, since the plan role trusts main and pull requests but not
     # tags or feature branches; and a fork pull request gets no OIDC token at
@@ -68,6 +72,18 @@ jobs:
           echo "$out"
           echo "$out" | grep -qiE 'AccessDenied|not authorized' \
             || { echo "::error::decrypt failed for a reason other than the deny"; exit 1; }
+
+      # The policy's own text says which actions to probe, so this needs the
+      # bootstrap's main.tf beside the script, and nothing else of the tree.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: |
+            .github/scripts
+            infra/bootstrap
+
+      - name: Every other data read the bootstrap denies is refused
+        run: .github/scripts/plan-role-denies.sh infra/bootstrap/main.tf
 
   gate:
     name: apply role from the ${{ inputs.gate }} environment
