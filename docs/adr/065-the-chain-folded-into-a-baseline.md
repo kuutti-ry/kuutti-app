@@ -1,6 +1,6 @@
 # ADR-065: The migration chain folded into one baseline
 
-- Status: accepted 2026-11-05 (#611, the maintainer's decision of that day; how staging crosses is his, §5)
+- Status: accepted 2026-11-05 (#611, the maintainer's decision of that day; staging made anew on his word of 2026-11-06, §5)
 - Date: 2026-11-05
 - Follows: CLAUDE.md rule 10, `.claude/rules/db.md`. Makes one exception, once, to rule 10's "never edited afterwards" and to db.md's "a version of a key that lives is never deleted or rewritten" (ADR-013 §17, ADR-060 §6).
 
@@ -41,6 +41,8 @@ By 05/11/2026 the chain was 110 migrations and 9.5 MB of snapshots, each new one
    The guard reads the journal's count, its last entry and the sum of its timestamps together, so it stamps only a journal that is main's chain to its end: an empty one, one short of the end, one with a branch's migration added or in place of one of main's, and one already stamped are refused and left as they were. The two rows are the files' SHA-256 and their `when` in the journal, written out because the migrator compares only `created_at`, and a larger number would skip every later migration without a word.
 
    A stamped database keeps its people and its earlier config versions, which change nothing, since the latest version of a key wins and a migration writes the next one as `max(version) + 1`.
+
+   Staging was made anew, the maintainer's choice of 06/11/2026: its schemas dropped and `public` made again by the master role before the merge, the baseline migrated by the deploy, then the audit boundary and the demo again. It took with it the audit rows that kept three personas spared by every demo reset. The local databases are made anew too, and a preview's is always new.
 
 6. **Never again once a real person's row exists anywhere.** From then on the chain is what moved real data, and a test of a move is a test of what happened to somebody.
 
