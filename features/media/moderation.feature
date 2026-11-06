@@ -8,7 +8,7 @@ Feature: Photo moderation before anyone else sees a photo
   (#376); nothing is ever deleted by a machine. A person may also take down
   a profile photo that was approved, with a reason the owner is told (#477).
   Each hard group of labels has two lines, 60 to ask a person and 90
-  to decide, as migration 0030 sets them. A photo sent in a conversation is
+  to decide, as matching_config sets them. A photo sent in a conversation is
   held to the same lines without the face rules, and only what the check is
   sure of is refused: there `queued` is the stored state of a photo
   delivered with no human queue (ADR-031 §10).

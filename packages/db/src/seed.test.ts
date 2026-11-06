@@ -4,19 +4,13 @@ import { postalMatches } from "@kuutti/schema/postal-areas";
 import { describe, expect, it } from "vitest";
 import { migrate } from "./migrate.ts";
 import { createPool } from "./pool.ts";
-import {
-  MATCHING_CONFIG_V1,
-  MATCHING_CONFIG_V2,
-  MATCHING_CONFIG_V3,
-  SEED_PONDS,
-  seed,
-} from "./seed.ts";
+import { MATCHING_CONFIG_V1, SEED_PONDS, seed } from "./seed.ts";
 import { withTemporaryDatabase } from "./test/temporary-database.ts";
 
 const MIGRATIONS = resolve(import.meta.dirname, "..", "drizzle");
 
 describe("seed", () => {
-  it("is idempotent and writes the one pond and matching_config versions 1, 2 and 3", async () => {
+  it("is idempotent and writes the one pond and matching_config's version 1", async () => {
     await withTemporaryDatabase(async (url) => {
       const pool = createPool({ connectionString: url, max: 2 });
       try {
@@ -40,9 +34,9 @@ describe("seed", () => {
         );
         // The decisions log numbers, read back from the database.
         expect(byKey).toEqual({
-          like_budget_balanced: 12,
+          like_budget_balanced: 10,
           like_expiry_days: 14,
-          pass_cooldown_days: 90,
+          pass_cooldown_days: 30,
           silent_match_archive_days: 7,
           max_photos: 6,
           photo_moderation_label_threshold: 60,
@@ -75,15 +69,15 @@ describe("seed", () => {
           photo_tip_fish_confidence_min: 80,
           photo_tip_fish_species_min: 70,
           photo_description_confidence_min: 80,
-          exposure_cards_per_day: 60,
-          photo_fetches_per_day: { thumb: 600, card: 300, full: 60 },
+          exposure_cards_per_day: 0,
+          photo_fetches_per_day: { thumb: 600, card: 0, full: 60 },
           exports_per_day: 3,
           feedback_per_day: 5,
           email_code_minutes: 30,
           email_code_attempts: 3,
           email_codes_per_day: 5,
           // #107: the invitations, the reward the maintainer's of 22/10/2026.
-          invitation_reward: { fish: 1, likes: 0 },
+          invitation_reward: { inviterFish: 1, friendFish: 1 },
           invitations_open: 5,
           invitation_tries_per_day: 5,
           // #102: the push, the maintainer's of 25/10/2026.
@@ -102,10 +96,10 @@ describe("seed", () => {
           auto_shadow_ban_same_first_message_hours: 24,
           auto_shadow_ban_review_hours: 48,
           // #86: the velocity rules, the maintainer's of 21/10/2026.
-          auto_shadow_ban_photo_fetches: 120,
+          auto_shadow_ban_photo_fetches: 1500,
           auto_shadow_ban_photo_fetches_minutes: 60,
-          auto_shadow_ban_cards_served: 0,
-          auto_shadow_ban_cards_served_minutes: 60,
+          auto_shadow_ban_cards_served: 300,
+          auto_shadow_ban_cards_served_minutes: 10,
           auto_shadow_ban_round_reads: 30,
           auto_shadow_ban_round_reads_minutes: 1,
           message_max_length: 2000,
@@ -114,7 +108,7 @@ describe("seed", () => {
           messages_per_minute: 30,
           pond_counter_k: 10,
           change_cadence_days: 30,
-          deal_breakers_max: 2,
+          deal_breakers_max: 7,
           // #514: the home and the distance, the maintainer's of 31/10/2026.
           home_min_inhabitants: 3000,
           home_town_min_inhabitants: 20000,
@@ -132,30 +126,7 @@ describe("seed", () => {
           stars_max: 10,
         });
         expect(byKey).toEqual(MATCHING_CONFIG_V1);
-        // Version 2 wins over version 1: ten likes a day (#98, ADR-036), a pass of thirty days, no ceiling on cards
-        // with the cards alarm on (ADR-062 §6, §9), and the invited friend's fish, in the reward's new shape (#503, ADR-044 §4).
-        const later = Object.fromEntries(
-          config.rows.filter((r) => r.version === 2).map((r) => [r.key, r.value]),
-        );
-        expect(later).toEqual({
-          like_budget_balanced: 10,
-          auto_shadow_ban_photo_fetches: 200,
-          deal_breakers_max: 6,
-          pass_cooldown_days: 30,
-          exposure_cards_per_day: 0,
-          photo_fetches_per_day: { thumb: 600, card: 0, full: 60 },
-          auto_shadow_ban_cards_served: 300,
-          auto_shadow_ban_cards_served_minutes: 10,
-          invitation_reward: { inviterFish: 1, friendFish: 1 },
-        });
-        expect(later).toEqual(MATCHING_CONFIG_V2);
-        // Version 3: the distance is a seventh deal-breaker (ADR-061 §7), and the photo alarm clears an honest reader (ADR-062 §9).
-        const latest = Object.fromEntries(
-          config.rows.filter((r) => r.version === 3).map((r) => [r.key, r.value]),
-        );
-        expect(latest).toEqual({ deal_breakers_max: 7, auto_shadow_ban_photo_fetches: 1500 });
-        expect(latest).toEqual(MATCHING_CONFIG_V3);
-        expect(config.rows.filter((r) => r.version > 3)).toEqual([]);
+        expect(config.rows.filter((r) => r.version > 1)).toEqual([]);
       } finally {
         await pool.end();
       }
@@ -199,18 +170,18 @@ describe("seed", () => {
               "SELECT key, version, value, reason FROM matching_config WHERE reason IS NOT NULL ORDER BY key",
             )
           ).rows;
-        // The seed's and the migrations' rows were written before reasons were kept.
+        // A reason is the panel's: neither the seed's rows nor the migrations' carry one.
         expect(await withReason()).toEqual([]);
 
         // Two changes from the panel, then a preview's next boot seeds again.
         await pool.query(
           `INSERT INTO matching_config (version, key, value, valid_from, created_by, reason) VALUES
-             (4, 'deal_breakers_max', '5'::jsonb, '2026-10-16T09:00:00Z', 'admin', 'Fewer at first'),
+             (2, 'deal_breakers_max', '5'::jsonb, '2026-10-16T09:00:00Z', 'admin', 'Fewer at first'),
              (2, 'like_expiry_days', '25'::jsonb, '2026-10-16T09:00:00Z', 'admin', 'Smaller ponds first')`,
         );
         await seed(pool);
         expect(await withReason()).toEqual([
-          { key: "deal_breakers_max", version: 4, value: 5, reason: "Fewer at first" },
+          { key: "deal_breakers_max", version: 2, value: 5, reason: "Fewer at first" },
           { key: "like_expiry_days", version: 2, value: 25, reason: "Smaller ponds first" },
         ]);
         const latest = await pool.query<{ key: string; version: number }>(
@@ -218,7 +189,7 @@ describe("seed", () => {
            WHERE key IN ('deal_breakers_max', 'like_expiry_days') GROUP BY key ORDER BY key`,
         );
         expect(latest.rows).toEqual([
-          { key: "deal_breakers_max", version: 4 },
+          { key: "deal_breakers_max", version: 2 },
           { key: "like_expiry_days", version: 2 },
         ]);
       } finally {

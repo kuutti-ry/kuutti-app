@@ -10,7 +10,7 @@ Data dictionary of `pnpm demo:population` (#73, ADR-014 §8 to §10). The popula
 pnpm demo:population
 ```
 
-Writes three hundred people into the database of the local environment, replacing the synthetic population that was there. The pond is the one every database has (migration 0027). The pictures are a release of the public photos repository (`docs/demo/photo-prompts.md`), fetched and verified by `pnpm demo:assets` into `~/.cache/kuutti-demo-photos/v3`; this repository holds the manifest (`packages/db/src/seed/photos-manifest.ts`) and never a picture.
+Writes three hundred people into the database of the local environment, replacing the synthetic population that was there. The pond is the one every database has (the migrations write it). The pictures are a release of the public photos repository (`docs/demo/photo-prompts.md`), fetched and verified by `pnpm demo:assets` into `~/.cache/kuutti-demo-photos/v3`; this repository holds the manifest (`packages/db/src/seed/photos-manifest.ts`) and never a picture.
 
 After a write or a removal the public counter (#54) is counted anew over what is in the database now, so `GET /ponds/counter` and the card in the app show the population at once. Left to itself the counter would not move: it counts once a day and moves in steps of ten people, which is right among people and would leave a demo showing yesterday's figures. What may be said of a pond is decided as ever.
 

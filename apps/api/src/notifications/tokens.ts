@@ -2,8 +2,8 @@ import { type Queryable, transaction } from "@kuutti/db";
 import type { ExportedPush, PushPlatform } from "@kuutti/schema";
 
 // A device's push token (#102, ADR-055 §2, §3): one per session, a token in
-// one session. It goes by itself when the session is revoked (migration
-// 0082's trigger) or deleted (the cascade); erasure deletes the account's
+// one session. It goes by itself when the session is revoked (the
+// `session_revoked_push_token` trigger) or deleted (the cascade); erasure deletes the account's
 // (erasePushTokensOf). Raw parameterised SQL, as in the rest of the slice.
 
 /**

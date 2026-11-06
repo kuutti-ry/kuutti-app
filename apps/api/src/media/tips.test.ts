@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { fishSpecies, type TipPhoto, type TipThresholds, tips } from "./tips.ts";
 
-/** Seed / migrations 0028, 0029, 0031 and 0036 defaults. */
+/** The seed's and the migrations' defaults. */
 const thresholds: TipThresholds = {
   mirrorConfidenceMin: 50,
   bathroomConfidenceMin: 50,

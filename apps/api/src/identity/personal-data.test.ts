@@ -54,7 +54,7 @@ const REGISTER: Record<string, Entry> = {
   },
   audit_log: {
     erasure: "stays",
-    why: "Append-only record of what staff did (migration 0006); it outlives everybody.",
+    why: "Append-only record of what staff did, by its trigger; it outlives everybody.",
     stays: "action actor_identity_id at detail id subject_id subject_type",
     exported: { not: "No route exports it (docs/security-checklist.md)." },
   },

@@ -1,1 +1,0 @@
-ALTER TYPE "public"."photo_rejection_reason" ADD VALUE 'not_reviewed';

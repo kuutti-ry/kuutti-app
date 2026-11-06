@@ -170,7 +170,7 @@ export type CardSubject = {
  * themselves, or M4's round after the matching rules), and recorded by
  * recordCardServed in the media slice for anyone but the owner. The viewer
  * is named in the statement for the one thing that is theirs to know here,
- * whether a block stands between the two (`blocked_between`, migration 0051).
+ * whether a block stands between the two (`blocked_between`).
  */
 export async function findCardSubject(
   db: Queryable,

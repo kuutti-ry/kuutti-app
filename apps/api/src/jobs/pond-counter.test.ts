@@ -276,14 +276,14 @@ describe("the figures", () => {
     expect(await ensureFirstSnapshot((await deps(ctx, DAY_2)).deps)).toBeNull();
   });
 
-  test("a row as the migration leaves it says no number, the boot does not count it, and the next count replaces it at once (#581)", async ({
+  test("a row with its bands and the number at its default says no number, the boot does not count it, and the next count replaces it at once (#581)", async ({
     ctx,
   }) => {
     const pond = await pondNamed(ctx.client, "test-counter-migrated");
     const finished = { complete: true, consented: true, seeks: ["man" as const] };
     await people(ctx.client, pond, 12, finished);
     await taken(ctx, DAY_1);
-    // Migration 0109: the old figures gone, the bands as they stood, and the number at its default.
+    // The bands as they stood, and the number at its default.
     await ctx.client.query("UPDATE pond_counter SET finished = 0 WHERE pond_id = $1", [pond]);
     expect(await listed(ctx, pond)).toMatchObject({ day: null, finished: null });
 

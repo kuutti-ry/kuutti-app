@@ -14,7 +14,7 @@ import * as repo from "./repo.ts";
 
 // The live half of the chat (#349, ADR-031 §9): Postgres is the store, the
 // socket the notifier. What changed arrives as a notification on
-// CHAT_CHANNEL, sent by the triggers of migration 0055 when its transaction
+// CHAT_CHANNEL, sent by the triggers of 0001_baseline_sql.sql when its transaction
 // commits, with ids and numbers only. The hub turns each into the frames each
 // person may see, read through that person's own participant row with every
 // rule of #348's reads: nothing crosses a block, a conversation hidden from
@@ -25,7 +25,7 @@ import * as repo from "./repo.ts";
 
 export const CHAT_CHANNEL = "kuutti_chat";
 
-/** What the triggers send (packages/db/drizzle/0055_chat_notify.sql, 0059_contact_share_notify.sql, 0063_conversation_notify_close_only.sql). */
+/** What the triggers send (packages/db/drizzle/0001_baseline_sql.sql). */
 const Notification = z.discriminatedUnion("t", [
   z.object({ t: z.literal("message"), c: z.uuid(), s: z.int().min(1) }),
   z.object({ t: z.literal("conversation"), c: z.uuid() }),

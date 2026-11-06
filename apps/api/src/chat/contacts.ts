@@ -48,8 +48,8 @@ export async function exportContacts(
 /**
  * Keeps a piece in the one form of its kind (normaliseContact), replacing the
  * one stored before; a changed piece that is shared shows its new value at
- * once (migration 0059 tells the conversations). Held against an erasure, so
- * a request that outlived one writes nothing.
+ * once (the `contact_notify` trigger tells the conversations). Held against an
+ * erasure, so a request that outlived one writes nothing.
  */
 export async function keepContact(
   deps: Deps,

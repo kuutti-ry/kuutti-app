@@ -1,1 +1,0 @@
-ALTER TABLE "profile" ADD COLUMN "hidden_fields" text[] DEFAULT '{}'::text[] NOT NULL;

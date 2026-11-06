@@ -252,7 +252,7 @@ export async function closeConversationsOf(
  * nobody. Both read it as ended, "Conversation ended", with nothing
  * saying who ended it or how, and both may still report it for
  * report_after_close_days. What either shared there ends with it (#103); the
- * other person is told by the socket (#349, migration 0055's trigger). One
+ * other person is told by the socket (#349, the `conversation_notify` trigger). One
  * already closed stays as it is, and the answer is the same. Not the caller's,
  * or hidden from them as its blocker: 404.
  */
@@ -336,8 +336,8 @@ export const conversationsOnTurn = repo.countOnTurn;
  * on side a. The caller holds the pair's lock and has asked that none
  * stands between the two that they can write in. A second match is a new
  * conversation: one left archived between them is closed first, so a pair has
- * one they can write in (ADR-062 §7). No trigger announces it (migration 0055
- * notifies on updates and messages, not on this insert): the other person sees
+ * one they can write in (ADR-062 §7). No trigger announces it (they notify on
+ * updates and messages, not on this insert): the other person sees
  * it at their next read of the list (ADR-038 §1, Open 1).
  */
 export async function openConversation(

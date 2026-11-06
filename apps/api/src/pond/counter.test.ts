@@ -236,7 +236,7 @@ describe("the bar of whom a pond seeks (#507)", () => {
     expect(await askBar(ctx, person.headers)).toBeNull();
   });
 
-  test("a row as the migration leaves it keeps its bar for a person of the pond, with no number beside it, until the next count replaces both (#581)", async ({
+  test("a row with its bands and the number at its default keeps its bar for a person of the pond, with no number beside it, until the next count replaces both (#581)", async ({
     ctx,
   }) => {
     const pond = await pondWithBands(ctx, "test-bar-migrated", [10, 10, 10]);
@@ -244,7 +244,7 @@ describe("the bar of whom a pond seeks (#507)", () => {
     await taken(ctx);
     const said = await askBar(ctx, person.headers);
     expect(said).toEqual({ men: 35, everyone: 30, women: 35 });
-    // Migration 0109: the old figures gone, the bands as they stood, and the number at its default.
+    // The bands as they stood, and the number at its default.
     await ctx.client.query("UPDATE pond_counter SET finished = 0 WHERE pond_id = $1", [pond]);
     expect(await inPublic(ctx, pond)).toMatchObject({ day: null, finished: null, seeks: null });
     expect(await askBar(ctx, person.headers)).toEqual(said);

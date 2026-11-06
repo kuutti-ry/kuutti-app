@@ -6,8 +6,8 @@ import { account, identity, matchingConfig, ponds, preferences, profile } from "
 
 /**
  * One pond, the whole country (ADR-061 §8), set by the API with a person's
- * home. Migration 0027 writes the same row, and a second pond here would come
- * back on every boot of a preview after migration 0095 took it away.
+ * home. The migrations write the same row, and a second pond here would stand
+ * on every boot of a preview and nowhere else.
  */
 export const SEED_PONDS = [
   {
@@ -17,20 +17,22 @@ export const SEED_PONDS = [
 ] as const;
 
 /**
- * matching_config version 1: the defaults from the decisions log. Changing a
- * number here is a decision (ADR or a new config version), never a test edit.
+ * matching_config version 1: every key as the migrations write it, each at the
+ * value it stood at when the chain was folded (ADR-065; migrate.test.ts holds the
+ * two identical). docs/decisions.md says who decided each. Changing a number here
+ * is a decision (ADR or a new config version), never a test edit.
  */
 export const MATCHING_CONFIG_V1 = {
-  like_budget_balanced: 12, // TD-14
+  like_budget_balanced: 10, // TD-14; #98 (ADR-036): ten a day for everybody, the first cut's
   like_expiry_days: 14, // TD-11
-  pass_cooldown_days: 90, // TD-12
+  pass_cooldown_days: 30, // TD-12; #503 (ADR-062 §6): a pass holds thirty days
   silent_match_archive_days: 7, // TD-13
   max_photos: 6, // #48: photos per account; the grid and the upload route read it
   // #49, #253: a moderation label the check does not know goes to a person at or
   // above this confidence; a face counts as present at or above the face line.
   photo_moderation_label_threshold: 60,
   photo_moderation_face_threshold: 90,
-  // #253 (ADR-006 §2, migration 0030): each hard group of labels, a person from
+  // #253 (ADR-006 §2): each hard group of labels, a person from
   // `review`, the check's own rejection from `reject`.
   photo_moderation_nudity_review: 60,
   photo_moderation_nudity_reject: 90,
@@ -40,17 +42,17 @@ export const MATCHING_CONFIG_V1 = {
   photo_moderation_disturbing_reject: 90,
   photo_moderation_hate_review: 60,
   photo_moderation_hate_reject: 90,
-  // #253 (migration 0033): a nudity label this sure leaves the owner no appeal.
+  // #253: a nudity label this sure leaves the owner no appeal.
   photo_moderation_nudity_no_appeal: 95,
-  // #253 (migration 0035): two hard rejections in 30 days make the check
+  // #253: two hard rejections in 30 days make the check
   // stricter for that account for 30 days, its reject line at 75.
   photo_closer_look_attempts: 2,
   photo_closer_look_window_days: 30,
   photo_closer_look_days: 30,
   photo_closer_look_reject: 75,
-  // #376 (migration 0068): a photo nobody decided in two weeks is rejected as not reviewed.
+  // #376: a photo nobody decided in two weeks is rejected as not reviewed.
   photo_queue_reject_days: 14,
-  // #378 (ADR-039, migration 0072): a fish a person may send in each seven
+  // #378 (ADR-039): a fish a person may send in each seven
   // days from a Monday, the calendar week (#475; rolling until then).
   fish_budget: 1,
   fish_window_days: 7,
@@ -63,57 +65,59 @@ export const MATCHING_CONFIG_V1 = {
   photo_tip_sharpness_below: 20,
   photo_tip_group_photo_min_faces: 2,
   photo_tip_photos_suggested: 3,
-  // #253 (migration 0031): the main-photo tips, a lot of skin and a fish.
+  // #253: the main-photo tips, a lot of skin and a fish.
   photo_tip_revealing_confidence_min: 80,
   photo_tip_fish_confidence_min: 80,
-  // #253 (migration 0036): the fish tip names the species from this confidence.
+  // #253: the fish tip names the species from this confidence.
   photo_tip_fish_species_min: 70,
-  // #296 (ADR-006 §3, migration 0045): the automatic description says a scene,
+  // #296 (ADR-006 §3): the automatic description says a scene,
   // an object or a face attribute only from this confidence. Up when wrong
   // descriptions turn out common.
   photo_description_confidence_min: 80,
   // #52 (TD-6, ADR-008): the exposure budget. Cards an account may be served
   // per day (the card route of #47 counts against it) and signed photo URLs
   // per variant per day, counted from the fetch log in the statement that
-  // writes it. The day is the Finnish calendar day. 0 is off (ADR-062 §9).
-  exposure_cards_per_day: 60,
-  photo_fetches_per_day: { thumb: 600, card: 300, full: 60 },
-  // #237 (ADR-007 §3, migration 0040): copies of one's own data per Finnish
+  // writes it. The day is the Finnish calendar day. 0 is off: #502 (ADR-062 §9)
+  // took the ceiling off cards and card photos, the maintainer's of 01/11/2026,
+  // and the cards alarm stands instead.
+  exposure_cards_per_day: 0,
+  photo_fetches_per_day: { thumb: 600, card: 0, full: 60 },
+  // #237 (ADR-007 §3): copies of one's own data per Finnish
   // day, counted from account_export in the statement that writes it. The
   // zip carries every full-size photo, so the day's copies bound the exposure.
   exports_per_day: 3,
-  // #171 (ADR-023, migration 0042): feedback a person may send per Finnish
+  // #171 (ADR-023): feedback a person may send per Finnish
   // day, counted from feedback in the statement that writes the row; the
   // sixth is refused in words.
   feedback_per_day: 5,
-  // #385 (migration 0078, ADR-043): a code works thirty minutes and three
+  // #385 (ADR-043): a code works thirty minutes and three
   // wrong attempts; five codes an account a Finnish day.
   email_code_minutes: 30,
   email_code_attempts: 3,
   email_codes_per_day: 5,
-  // #107 (ADR-044, migration 0080): what an invitation that counted earns its
-  // inviter, one fish and no likes, 0 switching a kind off; the unredeemed
-  // invitations a person may hold at once; the codes a person may try a
-  // Finnish day.
-  invitation_reward: { fish: 1, likes: 0 },
+  // #107, #503 (ADR-044 §4): what an invitation that counted earns its inviter and
+  // the friend who used it, a fish each, the maintainer's of 29/10 and 31/10/2026,
+  // 0 switching a side off; the unredeemed invitations a person may hold at once;
+  // the codes a person may try a Finnish day.
+  invitation_reward: { inviterFish: 1, friendFish: 1 },
   invitations_open: 5,
   invitation_tries_per_day: 5,
-  // #102 (ADR-055 §10, migration 0082): at most one push of a conversation to
+  // #102 (ADR-055 §10): at most one push of a conversation to
   // its recipient in ten minutes; none from 22 to 8 in Helsinki (equal hours
   // mean no quiet hours).
   message_push_min_interval_minutes: 10,
   push_quiet_from_hour: 22,
   push_quiet_to_hour: 8,
   moderation_response_hours: 24, // #303, #299: the hours the association promises to answer within
-  // #84 (ADR-030 §4, migration 0052): reports a person may file per Finnish
+  // #84 (ADR-030 §4): reports a person may file per Finnish
   // day, counted from report in the statement that writes the row; the sixth
   // is refused in words, and nothing is written, the block included.
   reports_per_day: 5,
-  // #351 (ADR-030 §12, migration 0061): the days after a conversation closed
+  // #351 (ADR-030 §12): the days after a conversation closed
   // during which either person may still report it, so a block cannot be
   // used to dodge a report.
   report_after_close_days: 30,
-  // #105 (ADR-033, migration 0065): the automatic shadow bans, the
+  // #105 (ADR-033): the automatic shadow bans, the
   // maintainer's of 19/10/2026. Reports by this many different people within
   // the days; this many first messages within the minutes; the same first
   // message to this many people within the hours; and the hours a moderator
@@ -125,23 +129,24 @@ export const MATCHING_CONFIG_V1 = {
   auto_shadow_ban_same_first_message: 5,
   auto_shadow_ban_same_first_message_hours: 24,
   auto_shadow_ban_review_hours: 48,
-  // #86 (ADR-041, migration 0075): the velocity rules, the maintainer's of
-  // 21/10/2026. URLs of other people's photos in the card and full sizes
-  // within the minutes; different people's cards served within the minutes,
-  // off while the round bounded them; and reads of the day's round within the
-  // minutes. A threshold of 0 switches its rule off.
-  auto_shadow_ban_photo_fetches: 120,
+  // #86 (ADR-041): the velocity rules, the maintainer's of 21/10/2026. URLs of other
+  // people's photos in the card and full sizes within the minutes, where an honest
+  // reader of the queue stays under the alarm, the maintainer's of 01/11/2026 (#502,
+  // ADR-062 §9); different people's cards served within the minutes, the alarm that
+  // stands with no ceiling on cards; and reads of the queue within the minutes. A
+  // threshold of 0 switches its rule off.
+  auto_shadow_ban_photo_fetches: 1500,
   auto_shadow_ban_photo_fetches_minutes: 60,
-  auto_shadow_ban_cards_served: 0,
-  auto_shadow_ban_cards_served_minutes: 60,
+  auto_shadow_ban_cards_served: 300,
+  auto_shadow_ban_cards_served_minutes: 10,
   auto_shadow_ban_round_reads: 30,
   auto_shadow_ban_round_reads_minutes: 1,
-  // #348 (ADR-031 §6, migration 0054): the longest message, in characters
+  // #348 (ADR-031 §6): the longest message, in characters
   // after trimming, and the messages one account may send in a minute; the
   // send reads both on each request.
   message_max_length: 2000,
   messages_per_minute: 30,
-  // #350 (migration 0057): photos one account may send in conversations per
+  // #350: photos one account may send in conversations per
   // Finnish day, counted in the statement that writes the photo; the next
   // one is refused in words until midnight.
   message_photos_per_day: 10,
@@ -154,72 +159,36 @@ export const MATCHING_CONFIG_V1 = {
   // #147 (the field sheet, ADR-060 §9): a change of gender is possible once in
   // this many days.
   change_cadence_days: 30,
-  // #149 (TD-16, the disclose-to-filter rule): how many deal-breakers a person
-  // may set; two at launch, so a small pond is not cut to nothing.
-  deal_breakers_max: 2,
-  // #514 (ADR-061 §2, §3, migration 0097): a place kept has at least this many
+  // #149 (TD-16, the disclose-to-filter rule), #508 (ADR-009 History), #514 (ADR-061
+  // §7): how many deal-breakers a person may set: seven, one on every field a
+  // deal-breaker can be set on and the distance, which is no field; the
+  // maintainer's of 31/10/2026.
+  deal_breakers_max: 7,
+  // #514 (ADR-061 §2, §3): a place kept has at least this many
   // people, the one number no name, band or probe narrows anybody below; a
   // town on a card has at least the second.
   home_min_inhabitants: 3000,
   home_town_min_inhabitants: 20000,
-  // #514 (ADR-061 §5, migration 0097): the outer edges of the distance bands
+  // #514 (ADR-061 §5): the outer edges of the distance bands
   // in kilometres, nearby, close and around; far has none.
   distance_nearby_km: 5,
   distance_close_km: 15,
   distance_around_km: 50,
-  // #502, #503 (ADR-062 §6, migration 0104): the ladder's clocks, the second
+  // #502, #503 (ADR-062 §6): the ladder's clocks, the second
   // pass the maintainer's of 01/11/2026 and the others #503's of 29/10/2026.
   liked_cooldown_days: 90,
   ended_cooldown_days: 90,
   second_pass_cooldown_days: 365,
-  // #502 (ADR-062 §5, migration 0104): the conversations on a person's turn at
+  // #502 (ADR-062 §5): the conversations on a person's turn at
   // which they can make no new match, and at which the list warns of it.
   your_turn_limit: 8,
   your_turn_warning: 6,
-  // #502 (ADR-062 §4, migration 0104): the unread likes that keep a person out
+  // #502 (ADR-062 §4): the unread likes that keep a person out
   // of everybody's ordinary queue until they have gone through them.
   inbox_stop: 30,
-  // #575 (ADR-064 §5, migration 0108): the most stars a person's list may hold,
+  // #575 (ADR-064 §5): the most stars a person's list may hold,
   // the maintainer's of 03/11/2026. Those it leaves out do not count, and 0 is off.
   stars_max: 10,
-} as const;
-
-/**
- * matching_config version 2: version 1 keeps its row, and the latest version
- * of a key wins (apps/api/src/lib/matching-config.ts).
- */
-export const MATCHING_CONFIG_V2 = {
-  // #98 (ADR-036, migration 0070): ten likes a day for everybody, the first cut's.
-  like_budget_balanced: 10,
-  // #513 (ADR-041 History, migration 0088): a card shows every photo in the card
-  // size, so a full round looked at whole stays under the photo rule; the
-  // maintainer's of 29/10/2026, where version 1 took 120.
-  auto_shadow_ban_photo_fetches: 200,
-  // #508 (ADR-009 History, migration 0092): six, one on every field a
-  // deal-breaker can be set on; the maintainer's of 31/10/2026, where version 1 took two.
-  deal_breakers_max: 6,
-  // #503 (ADR-062 §6, migration 0104): a pass holds thirty days, where version 1 took ninety.
-  pass_cooldown_days: 30,
-  // #502 (ADR-062 §9, migration 0104): no ceiling on cards or card photos, the
-  // maintainer's of 01/11/2026; 0 is off. The cards alarm comes on instead.
-  exposure_cards_per_day: 0,
-  photo_fetches_per_day: { thumb: 600, card: 0, full: 60 },
-  auto_shadow_ban_cards_served: 300,
-  auto_shadow_ban_cards_served_minutes: 10,
-  // #503 (ADR-044 §4, migration 0105): earned likes go and the invited friend
-  // earns a fish too, the maintainer's of 29/10 and 31/10/2026.
-  invitation_reward: { inviterFish: 1, friendFish: 1 },
-} as const;
-
-/**
- * matching_config version 3: a seventh deal-breaker, the distance, which is no
- * field (ADR-061 §7, migration 0097); the maintainer's of 31/10/2026.
- */
-export const MATCHING_CONFIG_V3 = {
-  deal_breakers_max: 7,
-  // #502 (ADR-062 §9, migration 0104): an honest reader of the queue stays
-  // under the photo alarm; the maintainer's of 01/11/2026, where version 2 took 200.
-  auto_shadow_ban_photo_fetches: 1500,
 } as const;
 
 /**
@@ -257,8 +226,8 @@ export type SeedResult = { ponds: number; matchingConfig: number; identities: nu
 
 /**
  * Idempotent: upserts keyed by slug and by (key, version). Safe to run on every
- * boot of a preview. It opens the ponds it writes on every run, a row a
- * migration wrote first (0027) among them, so that development, previews and
+ * boot of a preview. It opens the ponds it writes on every run, the row the
+ * migrations wrote first among them, so that development, previews and
  * CI have rounds from the first start (ADR-060 §10). Production refuses it.
  */
 export async function seed(pool: Pool, createdBy = "seed"): Promise<SeedResult> {
@@ -278,20 +247,14 @@ export async function seed(pool: Pool, createdBy = "seed"): Promise<SeedResult> 
       });
   }
 
-  for (const [version, rows] of [
-    [1, MATCHING_CONFIG_V1],
-    [2, MATCHING_CONFIG_V2],
-    [3, MATCHING_CONFIG_V3],
-  ] as const) {
-    for (const [key, value] of Object.entries(rows)) {
-      await db
-        .insert(matchingConfig)
-        .values({ version, key, value, createdBy })
-        .onConflictDoUpdate({
-          target: [matchingConfig.key, matchingConfig.version],
-          set: { value },
-        });
-    }
+  for (const [key, value] of Object.entries(MATCHING_CONFIG_V1)) {
+    await db
+      .insert(matchingConfig)
+      .values({ version: 1, key, value, createdBy })
+      .onConflictDoUpdate({
+        target: [matchingConfig.key, matchingConfig.version],
+        set: { value },
+      });
   }
 
   const now = Date.now();
@@ -373,10 +336,7 @@ export async function seed(pool: Pool, createdBy = "seed"): Promise<SeedResult> 
 
   return {
     ponds: SEED_PONDS.length,
-    matchingConfig: [MATCHING_CONFIG_V1, MATCHING_CONFIG_V2, MATCHING_CONFIG_V3].reduce(
-      (sum, version) => sum + Object.keys(version).length,
-      0,
-    ),
+    matchingConfig: Object.keys(MATCHING_CONFIG_V1).length,
     identities: SEED_IDENTITIES.length,
   };
 }

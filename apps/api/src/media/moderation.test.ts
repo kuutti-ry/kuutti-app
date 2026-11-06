@@ -68,7 +68,7 @@ const inspection = (
   calls: 3,
 });
 
-/** Migration 0030's lines for every hard group, the given lines for unknown labels and faces, and 0045's for the description. */
+/** The migrations' lines for every hard group and the description, and the given lines for unknown labels and faces. */
 const lines = (labelThreshold: number, faceThreshold: number): Thresholds => ({
   labelThreshold,
   faceThreshold,

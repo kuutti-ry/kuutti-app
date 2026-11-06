@@ -257,7 +257,7 @@ describe("the block route's edges", () => {
   });
 });
 
-describe("blocked_between, the test every read that shows a person asks (migration 0051)", () => {
+describe("blocked_between, the test every read that shows a person asks", () => {
   test("holds both ways, across a later account of either identity, and for nobody else", async ({
     ctx,
   }) => {

@@ -310,24 +310,27 @@ describe("listConfig", () => {
     ctx,
   }) => {
     const key = (await listConfig(ctx.client)).find((i) => i.key === "deal_breakers_max");
-    expect(key).toMatchObject({ key: "deal_breakers_max", value: 7, version: 3 });
+    expect(key).toMatchObject({ key: "deal_breakers_max", value: 7, version: 1 });
     expect(key?.versions.map((v) => [v.version, v.value, v.createdBy])).toEqual([
-      [3, 7, "migration:0097"],
-      [2, 6, "migration:0092"],
-      [1, 2, "migration:0024"],
+      [1, 7, "migration:0001"],
     ]);
 
     const from = new Date("2026-10-15T06:30:00Z");
     await ctx.client.query(
       `INSERT INTO matching_config (version, key, value, valid_from, created_by, reason)
-       VALUES (4, 'deal_breakers_max', '5'::jsonb, $1, 'someone', 'Fewer at first')`,
+       VALUES (2, 'deal_breakers_max', '6'::jsonb, $1, 'before', NULL),
+              (3, 'deal_breakers_max', '5'::jsonb, $1, 'someone', 'Fewer at first')`,
       [from],
     );
     const again = (await listConfig(ctx.client)).find((i) => i.key === "deal_breakers_max");
-    expect(again).toMatchObject({ value: 5, version: 4 });
-    expect(again?.versions.map((v) => v.version)).toEqual([4, 3, 2, 1]);
+    expect(again).toMatchObject({ value: 5, version: 3 });
+    expect(again?.versions.map((v) => [v.version, v.value, v.createdBy])).toEqual([
+      [3, 5, "someone"],
+      [2, 6, "before"],
+      [1, 7, "migration:0001"],
+    ]);
     expect(again?.versions[0]).toEqual({
-      version: 4,
+      version: 3,
       value: 5,
       validFrom: from.toISOString(),
       createdBy: "someone",
@@ -469,7 +472,7 @@ describe("changeConfig", () => {
         version: 1,
         value: 14,
         validFrom: expect.any(String),
-        createdBy: "migration:0007",
+        createdBy: "migration:0001",
         reason: null,
       },
     ]);
@@ -518,7 +521,7 @@ describe("changeConfig", () => {
     expect(listed?.versions.map((v) => [v.version, v.value, v.createdBy])).toEqual([
       [3, 12, second.identityId],
       [2, 10, first.identityId],
-      [1, 14, "migration:0007"],
+      [1, 14, "migration:0001"],
     ]);
     const rows = await versionsOf(ctx, "like_expiry_days");
     expect(
@@ -560,7 +563,7 @@ describe("changeConfig", () => {
 
     const rows = await versionsOf(ctx, "silent_match_archive_days");
     expect(rows.map((r) => [r.version, r.value, r.created_by, r.reason])).toEqual([
-      [1, 7, "migration:0007", null],
+      [1, 7, "migration:0001", null],
       [2, 5, second.identityId, "Five days"],
     ]);
     expect(await configAudit(ctx)).toEqual([
