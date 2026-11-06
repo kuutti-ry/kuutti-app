@@ -97,7 +97,17 @@ export type Deps = {
   push?: Push;
 };
 
-const UNLIMITED_PATHS = new Set(["/health", "/openapi.json"]);
+/**
+ * The one path outside every window, the probes': Route 53's, the deploys'
+ * waits, and the container's own HEALTHCHECK, which asks from inside the
+ * container without the proof of Kuutti's distribution and so, in
+ * `cloudfront` mode, has no address (ADR-066). Counted, it would share the
+ * bucket of no address with a flood through anybody's distribution, and Swarm
+ * would replace a container that floods its own check out. Its database
+ * answer is kept for a second instead, so no number of asks begins more than
+ * one check a second (health/index.ts, ADR-026 History of 2026-11-06).
+ */
+const UNLIMITED_PATH = "/health";
 
 /**
  * The routes that end a session or the account (ADR-026 §2): outside the
@@ -183,7 +193,7 @@ export function createApp(deps: Deps) {
         isSignInStart(c.req.path)
           ? refuseSignInStart(c, deps, "address")
           : limited(c, retryAfterSeconds),
-      skip: (path) => UNLIMITED_PATHS.has(path),
+      skip: (path) => path === UNLIMITED_PATH,
     }),
   );
 
