@@ -33,7 +33,6 @@ case "$env" in
   prod)    app_env=production; api_host=api.kuutti.app; dokploy_host=dokploy.kuutti.app; preview_domain= ;;
   *) echo "environment must be staging or prod" >&2; exit 2 ;;
 esac
-[ -z "$preview_domain" ] || command -v openssl >/dev/null || { echo "openssl is not installed" >&2; exit 1; }
 
 # Staging and production share the account, so Run Command would take either
 # box's id; the Name tag (modules/compute) says whose it is. This also proves
@@ -276,15 +275,21 @@ for _ in $(seq 1 120); do
 done
 
 # The wildcard answers any name under the preview domain, an application or
-# not; Traefik's default certificate means it is not there (yet).
+# not; Traefik's default certificate means it is not there (yet). Asked on the
+# box, through Run Command: the name answers through CloudFront with the
+# distribution's certificate (#198), and once the box admits CloudFront alone
+# nothing else reaches its 443.
 if [ -n "$preview_domain" ]; then
   echo "waiting for Traefik to serve *.$preview_domain"
-  for i in $(seq 1 60); do
-    served=$(openssl s_client -connect "check.$preview_domain:443" -servername "check.$preview_domain" </dev/null 2>/dev/null | openssl x509 -noout -subject 2>/dev/null || true)
-    if grep -qF "*.$preview_domain" <<< "$served"; then echo "served: $served"; break; fi
-    [ "$i" -lt 60 ] || { echo "no certificate for *.$preview_domain after 5 minutes; Traefik's log is /kuutti/$env/api, stream dokploy-traefik (ADR-053)" >&2; exit 1; }
-    sleep 5
+  probe=$(printf 'for i in $(seq 1 30); do s=$(timeout 5 openssl s_client -connect 127.0.0.1:443 -servername check.%s </dev/null 2>/dev/null | openssl x509 -noout -subject 2>/dev/null); case "$s" in *"*.%s"*) echo "$s"; exit 0 ;; esac; sleep 5; done; exit 1' "$preview_domain" "$preview_domain")
+  cid=$(aws ssm send-command --instance-ids "$INSTANCE_ID" --document-name AWS-RunShellScript --comment "The previews' certificate (dokploy-setup.sh)" --parameters "$(jq -cn --arg p "$probe" '{commands: [$p], executionTimeout: ["330"]}')" --query 'Command.CommandId' --output text)
+  for _ in $(seq 1 120); do
+    st=$(aws ssm get-command-invocation --command-id "$cid" --instance-id "$INSTANCE_ID" --query Status --output text 2>/dev/null || echo Pending)
+    case "$st" in Success|Failed|TimedOut|Cancelled) break ;; esac
+    sleep 3
   done
+  [ "$st" = Success ] || { echo "no certificate for *.$preview_domain after 5 minutes ($st); Traefik's log is /kuutti/$env/api, stream dokploy-traefik (ADR-053)" >&2; exit 1; }
+  echo "served: $(aws ssm get-command-invocation --command-id "$cid" --instance-id "$INSTANCE_ID" --query StandardOutputContent --output text)"
 fi
 
 cat <<TXT

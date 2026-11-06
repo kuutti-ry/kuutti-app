@@ -26,7 +26,7 @@ variable "ssh_cidrs" {
 }
 
 variable "cloudfront_only_ingress" {
-  description = "When true, port 443 admits only CloudFront's origin-facing prefix list (ADR-005), so the box is reachable through the distribution alone. Off until Dokploy's control plane (deploy.yml) and the pull-request previews are served through the distribution too: today they reach the box on 443 directly. Port 80 stays open for the ACME challenge and the redirect either way."
+  description = "When true, port 443 admits only CloudFront's origin-facing prefix list (ADR-005), so the box is reachable through the distribution alone. Turned on with trusted_proxy = cloudfront in the same apply (ADR-008 §5), once everything the box serves on 443 goes through the distribution: Dokploy's control plane (deploy.yml) and, on staging, the pull-request previews are its extra aliases (#198). Port 80 stays open for the ACME challenge and the redirect either way."
   type        = bool
   default     = false
 }

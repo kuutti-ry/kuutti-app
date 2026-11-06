@@ -54,9 +54,10 @@ module "compute" {
 }
 
 # Photos (#48, ADR-005): the media bucket and the CloudFront distribution that
-# fronts both the bucket (/media/*, signed URLs) and the API. Dormant until the
-# cutover (variable media_enabled); the public half of the signing key pair is
-# committed next to this file, the private half is in SSM only.
+# fronts the bucket (/media/*, signed URLs), the API and the rest of what the
+# box serves on 443 (#198). Dormant until the cutover (variable media_enabled);
+# the public half of the signing key pair is committed next to this file, the
+# private half is in SSM only.
 module "media" {
   count  = var.media_enabled ? 1 : 0
   source = "../../modules/media"
@@ -74,6 +75,13 @@ module "media" {
   signing_public_key_pem = fileexists("${path.module}/cloudfront-signing-key.pub.pem") ? file("${path.module}/cloudfront-signing-key.pub.pem") : ""
   # Rotation (ADR-005): cloudfront-signing-key.<anything>.pub.pem files are trusted too.
   additional_signing_public_keys_pem = [for f in fileset(path.module, "cloudfront-signing-key.*.pub.pem") : file("${path.module}/${f}")]
+
+  # Dokploy's control plane and the previews behind the same distribution, so
+  # that the box can admit CloudFront alone (ADR-005 §7, #198). The wildcard is
+  # spelled through the previews' CAA record (dns.tf) so that the certificate
+  # waits for that record to admit ACM: a refused CAA check fails an ACM
+  # certificate for good.
+  extra_aliases = ["dokploy.staging.${var.domain}", "*.${aws_route53_record.preview_caa.name}"]
 }
 
 # The research copy (#194, ADR-029): the API's write-once rights on research/

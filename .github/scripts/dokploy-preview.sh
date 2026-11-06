@@ -56,7 +56,8 @@ deploy() {
     # HTTPS through Traefik under the previews' one wildcard, which covers the
     # host, so Traefik orders nothing; the DNS resolver could not order one for
     # it either (ADR-053). The wildcard DNS record for $PREVIEW_API_DOMAIN points
-    # at the box.
+    # at staging's CloudFront distribution, which forwards the Host to the box
+    # (#198).
     post domain.create "$(jq -cn --arg id "$id" --arg host "$host" \
       '{applicationId: $id, host: $host, path: "/", port: 3000, https: true, certificateType: "custom", customCertResolver: "letsencrypt-dns", domainType: "application"}')" >/dev/null
     echo "created $name ($id) at https://$host"
