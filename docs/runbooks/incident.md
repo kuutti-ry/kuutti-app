@@ -2,7 +2,7 @@
 
 What to do when Kuutti breaks or leaks (#191): how an incident is noticed, how bad it is, who does what in an association with one maintainer, what the code can do to stop it, whom to tell, and the review afterwards. The staging outage of 2026-09-27 is the worked example. The last section is the restore drill, written and not yet run.
 
-Companions: `alerts.md` (each alarm and its first three commands), `custody.md` (who holds which account and key), `rotation.md` (each key's rotation), `police-disclosure.md` (a lawful request from the police is not an incident), `SECURITY.md` (how outsiders report a vulnerability). `<env>` is `staging` or `prod`, `<id>` the box's instance id (`tofu output -raw instance_id` in `infra/envs/<env>`). Every AWS and box command needs the maintainer's session (`pnpm aws:login`); an agent never runs them.
+Companions: `alerts.md` (each alarm and its first three commands), `abuse.md` (the limits, a flood, and what to do), `custody.md` (who holds which account and key), `rotation.md` (each key's rotation), `police-disclosure.md` (a lawful request from the police is not an incident), `SECURITY.md` (how outsiders report a vulnerability). `<env>` is `staging` or `prod`, `<id>` the box's instance id (`tofu output -raw instance_id` in `infra/envs/<env>`). Every AWS and box command needs the maintainer's session (`pnpm aws:login`); an agent never runs them.
 
 Staging holds no real person (ADR-018 §1), and production has nobody until the first release (#25). Until then an incident is an outage or an exposed key, never a personal data breach. The sections on people and the Data Protection Ombudsman are written for the day production has people.
 
@@ -69,6 +69,7 @@ From the person's page in the panel (`/accounts/<id>`, reached by account id onl
 - **The photo-budget alarm** (`kuutti-<env>-photo-budget-refusals`; `alerts.md` has no row for it yet). First: `aws logs tail /kuutti/<env>/api --since 24h --filter-pattern '{ $.msg = "photo refused" && $.reason = "budget" }'`. Each line names the `accountId`, the `variant`, `used` and `limit` (`apps/api/src/media/photos.ts`). One account with many lines is a script: suspend it (One person, above). Many accounts each just over the limit means the budget is too low: raise it, as in the next item.
 - Lower or raise `photo_fetches_per_day` in the panel under `/config` (an admin; a new version with a reason, written to the audit log first). It takes effect without a restart.
 - The request limits are parameters read at boot: `/kuutti/<env>/rate-limit-per-minute` and `/kuutti/<env>/sign-in-rate-limit-per-minute` (ADR-026 §5). Set them with `aws ssm put-parameter --type String --overwrite`, then redeploy the API.
+- In front of them, the edge refuses an address past 2,000 requests in five minutes (ADR-067), a number in `infra/envs/<env>/main.tf`. `abuse.md` has every layer, its two alarms (`kuutti-<env>-edge-rate-limited`, `kuutti-<env>-api-refusals`), how to read a flood and how to move each number.
 
 ### Taking the API down, and bringing it back
 

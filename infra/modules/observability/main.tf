@@ -9,13 +9,14 @@
 #
 # Cost: standard alarms at 0.10 USD and custom metrics at 0.30 USD each (the
 # 5xx and Rekognition metrics, the exposure-budget one of #52, the
-# nightly-failure one of #194, the box's free memory of #77 and the bank
-# identifications of #471), plus the box's PutMetricData once a minute, about
-# 44,000 calls a month at 0.01 USD a thousand: about 3.20 USD a month per
-# environment at list price; query
-# definitions and the topic are free. The probe from outside the box,
-# which is what catches a stopped container, is probe.tf (#29): a Route 53
-# health check with its alarm and topic in us-east-1.
+# nightly-failure one of #194, the box's free memory of #77, the bank
+# identifications of #471 and the API's refusals of #41), plus the box's
+# PutMetricData once a minute, about 44,000 calls a month at 0.01 USD a
+# thousand: about 3.70 USD a month per environment at list price, the edge's
+# alarm included; query definitions and the topic are free. The probe from
+# outside the box, which is what catches a stopped container, is probe.tf
+# (#29): a Route 53 health check with its alarm and topic in us-east-1. The
+# edge's alarm, edge.tf, mails through that topic too (#41, ADR-067).
 # ---------------------------------------------------------------------------
 
 data "aws_caller_identity" "current" {}
@@ -316,6 +317,56 @@ resource "aws_cloudwatch_metric_alarm" "photo_budget_refusals" {
   treat_missing_data  = "notBreaching" # no refusals is the normal day
   alarm_actions       = [aws_sns_topic.alerts.arn]
   ok_actions          = [aws_sns_topic.alerts.arn]
+}
+
+# The API's own limits refusing (#41, ADR-026 §7): a 429 on the request line,
+# or, for a sign-in start, which answers 302 to the app or the panel, a warn
+# line of its own ({"msg":"sign-in refused","detail":{"limiter":"address"},...};
+# "cap", or "evicted" when the table of attempts is full). The day's budgets
+# of the product answer 429 too (likes, cards, messages, photos): a person
+# meets each a few times a day, so a hundred refusals in five minutes is a
+# script, a loop in a build or a limit set too low, whichever limit it was.
+# The saved query below says which. A preview logs to the same group.
+resource "aws_cloudwatch_log_metric_filter" "refusals" {
+  name           = "${local.name}-api-refusals"
+  log_group_name = var.log_group_name
+  pattern        = "{ ($.msg = \"request\" && $.status = 429) || ($.msg = \"sign-in refused\") }"
+
+  metric_transformation {
+    name          = "ApiRefusals"
+    namespace     = local.namespace
+    value         = "1"
+    default_value = "0"
+  }
+}
+
+resource "aws_cloudwatch_metric_alarm" "refusals" {
+  alarm_name          = "${local.name}-api-refusals"
+  alarm_description   = "The API refused ${var.refusals_per_five_minutes} or more requests for its limits or budgets within five minutes (#41): a flood, a loop in a build, or a limit set too low. First steps: docs/runbooks/abuse.md."
+  namespace           = local.namespace
+  metric_name         = "ApiRefusals"
+  statistic           = "Sum"
+  period              = 300
+  evaluation_periods  = 1
+  threshold           = var.refusals_per_five_minutes
+  comparison_operator = "GreaterThanOrEqualToThreshold"
+  treat_missing_data  = "notBreaching" # no refusals is the normal five minutes
+  alarm_actions       = [aws_sns_topic.alerts.arn]
+  ok_actions          = [aws_sns_topic.alerts.arn]
+}
+
+# The refusals alarm's five minutes, split by what refused: a 429 without an
+# account is the address's window, one with an account the person's window or
+# a day's budget (the route tells which), a sign-in line its limiter.
+resource "aws_cloudwatch_query_definition" "refusals" {
+  name            = "${local.name}/refusals-by-route"
+  log_group_names = [var.log_group_name]
+  query_string    = <<-EOT
+    filter (msg = "request" and status = 429) or msg = "sign-in refused"
+    | fields ispresent(accountId) or ispresent(staffIdentityId) as signedIn
+    | stats count() as refusals by msg, route, signedIn, detail.limiter
+    | sort refusals desc
+  EOT
 }
 
 # Every nightly job ends in one line (apps/api/src/jobs/nightly.ts), and a

@@ -57,6 +57,18 @@ variable "memory_available_mb" {
   default     = 200
 }
 
+variable "refusals_per_five_minutes" {
+  description = "The API's refusals within five minutes that raise its refusals alarm (#41, ADR-026 §7): 429s on the request line, the limits' and the day's budgets', and sign-in starts refused or evicted."
+  type        = number
+  default     = 100
+}
+
+variable "edge_web_acl_metric_name" {
+  description = "The metric name of the API distribution's web ACL (modules/media output edge_web_acl_metric_name, ADR-067), whose refusals the edge alarm counts; null where the environment has no distribution yet, as production before its cutover."
+  type        = string
+  default     = null
+}
+
 variable "health_search_string" {
   description = "What the Route 53 probe wants in /health's body. \"status\":\"ok\" by default; \"originProof\":\"valid\" where the API trusts CloudFront's viewer address (ADR-066): /health is 503 unless its status is ok, and Route 53 counts a 5xx as a failure, so the status is still asked."
   type        = string

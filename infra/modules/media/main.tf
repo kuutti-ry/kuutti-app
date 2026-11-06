@@ -340,6 +340,8 @@ resource "aws_cloudfront_distribution" "this" {
   # the classes add edges nobody here reaches.
   price_class = "PriceClass_100"
   aliases     = concat([var.api_fqdn], var.extra_aliases)
+  # The edge's rate rule (edge.tf, #41, ADR-067).
+  web_acl_id = aws_wafv2_web_acl.edge.arn
 
   origin {
     origin_id                = "media"

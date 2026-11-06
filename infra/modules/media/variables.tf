@@ -43,6 +43,16 @@ variable "extra_aliases" {
   default     = []
 }
 
+variable "edge_requests_per_five_minutes" {
+  description = "The edge's rate rule (#41, ADR-067): how many requests one viewer address may send in any five minutes, to every host and path of the distribution but a signed photo's and the two sign-in starts (edge.json), before AWS WAF answers it 429 until its rate falls back. Each environment sets its own; a change is a pull request and an apply, never a deploy."
+  type        = number
+
+  validation {
+    condition     = var.edge_requests_per_five_minutes >= 10 && floor(var.edge_requests_per_five_minutes) == var.edge_requests_per_five_minutes
+    error_message = "A WAF rate-based rule takes a whole number of requests, 10 at least."
+  }
+}
+
 variable "instance_role_name" {
   description = "The API box's instance role (modules/compute output role_name); it gets the bucket policy attached."
   type        = string
