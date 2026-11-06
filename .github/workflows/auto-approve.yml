@@ -5,10 +5,11 @@ name: Auto-approve own pull requests
 # token scopes its own file asks for: so while the repository's "Allow GitHub
 # Actions to create and approve pull requests" is on, which this job needs,
 # a workflow anyone with write pushes can approve a pull request, and that
-# setting, not this file, decides who can approve (#609). Of the repository's
-# own workflows this is the one job with pull-requests: write, and the
-# invariants script holds the scope to it. It reads nothing from a pull
-# request but
+# setting, not this file, decides who can approve (#609). The jobs a pull
+# request starts hold the same scope, since GitHub lets a token comment on a
+# pull request only with it (issues: write alone answers 403, tried on
+# 2026-11-06), and they run the pull request's own scripts. It reads nothing
+# from a pull request but
 # its author, draft state, head repository and whether its diff adds a native
 # review record: a `reviewed:` line in packages/i18n/messages.yaml is the mark
 # a native speaker leaves through `pnpm i18n:review` (#55), and its record is

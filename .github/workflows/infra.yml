@@ -51,10 +51,7 @@ jobs:
     permissions:
       contents: read
       id-token: write
-      # The plan is a comment, and a comment takes issues: write. Never
-      # pull-requests: write here: the repository lets Actions approve pull
-      # requests, and this job runs the pull request's own scripts (#609).
-      issues: write
+      pull-requests: write
     strategy:
       fail-fast: false
       matrix:

@@ -73,8 +73,7 @@ jobs:
     environment: preview-cleanup
     permissions:
       contents: read
-      issues: write
-      pull-requests: read
+      pull-requests: write
     outputs:
       numbers: ${{ steps.select.outputs.numbers }}
       # The panel job has no environment to read it from (ADR-025 §8).

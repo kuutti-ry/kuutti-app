@@ -57,12 +57,7 @@ jobs:
     permissions:
       contents: read
       packages: read
-      # The sticky comment takes issues: write, pr-open.sh reads the pull
-      # request's state. Never pull-requests: write in a job a pull request
-      # starts: the repository lets Actions approve pull requests, and the
-      # job runs the pull request's own scripts (#609).
-      issues: write
-      pull-requests: read
+      pull-requests: write
     environment:
       name: preview
       url: ${{ steps.names.outputs.api_url }}
@@ -201,8 +196,7 @@ jobs:
     runs-on: ubuntu-24.04-arm
     permissions:
       contents: read
-      issues: write
-      pull-requests: read
+      pull-requests: write
     environment:
       name: preview
       url: ${{ needs.api.outputs.web_origin }}
@@ -381,8 +375,7 @@ jobs:
     permissions:
       contents: read
       id-token: write
-      issues: write
-      pull-requests: read
+      pull-requests: write
     outputs:
       url: ${{ steps.served.outputs.url }}
     env:
@@ -503,8 +496,7 @@ jobs:
     environment: preview
     permissions:
       contents: read
-      issues: write
-      pull-requests: read
+      pull-requests: write
     env:
       PR_NUMBER: ${{ github.event.pull_request.number }}
     steps:
