@@ -227,7 +227,7 @@ Comments (`issue-comments.json`, each with its `issue_url`) are posted the same 
 
 ## Verify
 
-`.github/workflows/infra-oidc.yml` keeps the two properties of the plan role proven on every infrastructure change: it is assumable from a pull request and from `main`, and it cannot decrypt a SecureString even though `ReadOnlyAccess` would allow it. It needs one throwaway parameter:
+`.github/workflows/infra-oidc.yml` keeps three properties of the plan role proven on every infrastructure change: it is assumable from a pull request and from `main`, it cannot decrypt a SecureString even though `ReadOnlyAccess` would allow it, and it is refused every other read that `ci_plan_deny_data` denies (`.github/scripts/plan-role-denies.sh`, with one probe per denied action; a deny declared but not yet applied fails it until the bootstrap is applied). It needs one throwaway parameter:
 
 ```sh
 aws ssm put-parameter --name /kuutti/ci-check/secret --type SecureString --value not-a-secret
@@ -253,7 +253,7 @@ The same in `infra/envs/prod`. Applies run through CI (#8): plans on every pull 
 |---|---|---|---|
 | `infra.yml` | pull requests and `main` touching `infra/**` | `kuutti-ci-plan` | `fmt` for everything, `validate` and `plan` for `envs/staging` and `envs/prod`; each plan is a sticky comment on the pull request; on `main` it then applies `envs/staging` behind the `staging` environment with `kuutti-ci-apply` |
 | `infra-prod.yml` | `v*` tags | `kuutti-ci-apply` | applies `envs/prod` after the `prod` reviewer approves |
-| `infra-oidc.yml` | changes under `infra/**` | `kuutti-ci-plan` | proves the plan role still cannot decrypt a SecureString |
+| `infra-oidc.yml` | changes under `infra/**` | `kuutti-ci-plan` | proves the plan role still cannot decrypt a SecureString, nor make any read `ci_plan_deny_data` denies |
 | `eas-build.yml` | `main` (fingerprint changed), `v*` tags, by hand | none (GitHub environment `staging` or `prod`) | native builds on EAS: `development` when the fingerprint of `main` differs from the last development build's, `production` on a tag, `preview` and `staging` by hand; links on the pinned builds issue (`apps/mobile/README.md`) |
 | `build.yml` | every push and pull request | none | builds the API image on arm64 and smoke-tests it; on `main` pushes `ghcr.io/kuutti-ry/kuutti-api:<sha>` and `:main`, on a pull request from this repository `:pr-<n>-<sha7>` for its preview, on a tag retags that same image as `:vX.Y.Z`, then calls `deploy.yml` (Dokploy, `/health`, then the EAS Update to the environment's channel, #10), `admin-deploy.yml` and, for tags, `release.yml` |
 | `admin-deploy.yml` | called by `build.yml` after each deploy; by hand from `main` or a `v*` tag | none for the build; `kuutti-ci-apply` for the upload (GitHub environment `staging`, or `prod` behind its reviewer) | builds the moderation panel against the environment's API in a job that holds no credentials, and a second job syncs that build to the root of the panel's bucket (never under `pr-` nor `fonts/`), invalidates the distribution and checks the served page, its headers and the API's CORS for the panel's origin (ADR-025 §5) |
