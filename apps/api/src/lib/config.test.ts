@@ -581,3 +581,61 @@ describe("ssmPrefix", () => {
     }
   });
 });
+
+describe("parseConfig for the proof of Kuutti's distribution (ADR-066)", () => {
+  const staging = { DATABASE_URL: "postgres://x", APP_ENV: "staging", NODE_ENV: "production" };
+  const secret = "a".repeat(32);
+  const next = "b".repeat(43);
+
+  it("has no secret unless one is set, and a deployed box keeps traefik then", () => {
+    const config = parseConfig(staging);
+    expect(config.originSecrets).toEqual([]);
+    expect(config.TRUSTED_PROXY).toBe("traefik");
+  });
+
+  it("refuses to trust CloudFront's viewer address with nothing to prove a request came through Kuutti's", () => {
+    expect(() => parseConfig({ ...staging, TRUSTED_PROXY: "cloudfront" })).toThrow(
+      /ORIGIN_SECRET: trusted-proxy cloudfront needs origin-secret/,
+    );
+    try {
+      parseConfig({ ...staging, TRUSTED_PROXY: "cloudfront", ORIGIN_SECRET: "  " });
+      throw new Error("expected ConfigError");
+    } catch (error) {
+      expect((error as ConfigError).missing).toEqual(["ORIGIN_SECRET"]);
+    }
+    expect(
+      parseConfig({ ...staging, TRUSTED_PROXY: "cloudfront", ORIGIN_SECRET: secret }).originSecrets,
+    ).toEqual([secret]);
+  });
+
+  it("takes one value, or two while one replaces the other, trimmed as a file-loaded parameter is", () => {
+    expect(parseConfig({ ...staging, ORIGIN_SECRET: `${secret}\n` }).originSecrets).toEqual([
+      secret,
+    ]);
+    expect(parseConfig({ ...staging, ORIGIN_SECRET: `${secret} ${next}` }).originSecrets).toEqual([
+      secret,
+      next,
+    ]);
+    expect(parseConfig({ ...staging, ORIGIN_SECRET: `${secret}\n${next}` }).originSecrets).toEqual([
+      secret,
+      next,
+    ]);
+  });
+
+  it("refuses a value under 32 characters, and a third value", () => {
+    for (const ORIGIN_SECRET of [
+      "a".repeat(31),
+      `${secret} ${"c".repeat(31)}`,
+      `${secret} ${next} ${secret}`,
+    ]) {
+      expect(() => parseConfig({ ...staging, ORIGIN_SECRET })).toThrow(
+        /ORIGIN_SECRET: one value of at least 32 characters, or two separated by a space/,
+      );
+    }
+  });
+
+  it("is read from the parameter the ADR names", () => {
+    // /kuutti/<env>/origin-secret, as the SSM loader turns a leaf into a key.
+    expect(parseConfig({ ...staging, ORIGIN_SECRET: secret }).ORIGIN_SECRET).toBe(secret);
+  });
+});

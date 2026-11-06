@@ -7820,6 +7820,16 @@ export interface components {
              * @enum {string}
              */
             migrations: "current" | "pending";
+            /**
+             * @description Whose word the rate limiter takes for the client address, as the process read it at boot (ADR-008 §5).
+             * @enum {string}
+             */
+            trustedProxy?: "none" | "traefik" | "cloudfront";
+            /**
+             * @description Whether this request carried the proof of Kuutti's own CloudFront distribution (ADR-066): unset when the process has no secret to check it against.
+             * @enum {string}
+             */
+            originProof?: "valid" | "missing" | "wrong" | "unset";
         };
         ErrorResponse: {
             error: {

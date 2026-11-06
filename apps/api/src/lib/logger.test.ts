@@ -261,6 +261,7 @@ describe("request log line: who asked (ADR-026 §7)", () => {
 describe("request log line: never the client's address (ADR-026 §7)", () => {
   const IPV4 = "203.0.113.47";
   const IPV6 = "2001:db8:4711::47";
+  const PROOF = "origin-proof-of-the-test-4711-4711-4711";
 
   it.each(TRUSTED_PROXIES)(
     "behind %s, with every place an address can come from filled, and the address limiter refusing",
@@ -271,7 +272,12 @@ describe("request log line: never the client's address (ADR-026 §7)", () => {
       app.use("*", requestLogger(logger, { trustedProxy }));
       app.use(
         "*",
-        rateLimit({ limit: 1, windowMs: 60_000, keyOf: addressOf(trustedProxy), now: () => 0 }),
+        rateLimit({
+          limit: 1,
+          windowMs: 60_000,
+          keyOf: addressOf({ TRUSTED_PROXY: trustedProxy, originSecrets: [PROOF] }),
+          now: () => 0,
+        }),
       );
       app.get("/items/:id", (c) => c.text("ok"));
       for (const [hop, viewer, remoteAddress] of [
@@ -287,6 +293,8 @@ describe("request log line: never the client's address (ADR-026 §7)", () => {
                 "x-forwarded-for": hop,
                 "cloudfront-viewer-address": viewer,
                 "x-amz-cf-id": "abcDEF123_-=",
+                // Through Kuutti's distribution, so CloudFront's viewer address is read (ADR-066).
+                "x-kuutti-origin": PROOF,
               },
             },
             { incoming: { socket: { remoteAddress, remotePort: 40000, remoteFamily: "IPv6" } } },
@@ -298,7 +306,7 @@ describe("request log line: never the client's address (ADR-026 §7)", () => {
       }
       const out = JSON.stringify(lines());
       expect(lines().filter((l) => l.msg === "request")).toHaveLength(4);
-      for (const forbidden of [IPV4, "2001:db8:4711", "4711::", "/64"]) {
+      for (const forbidden of [IPV4, "2001:db8:4711", "4711::", "/64", PROOF]) {
         expect(out).not.toContain(forbidden);
       }
     },

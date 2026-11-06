@@ -32,6 +32,11 @@ variable "origin_fqdn" {
   type        = string
 }
 
+variable "origin_proof_store_arn" {
+  description = "The environment's CloudFront key value store whose one key, origin-secret, the distribution sends to the box as x-kuutti-origin (ADR-066). The store is the environment's, so that it exists, and can be filled by hand, before the cutover; its value is never a resource (ADR-001)."
+  type        = string
+}
+
 variable "extra_aliases" {
   description = "Names besides api_fqdn that the distribution serves for the box, each routed by Traefik on the forwarded Host: Dokploy's control plane and, on staging, the previews' wildcard (ADR-005 §7, #198). They are names on the certificate too; the environment's dns.tf points them at the distribution."
   type        = list(string)

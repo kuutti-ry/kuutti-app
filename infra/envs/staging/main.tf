@@ -82,6 +82,25 @@ module "media" {
   # waits for that record to admit ACM: a refused CAA check fails an ACM
   # certificate for good.
   extra_aliases = ["dokploy.staging.${var.domain}", "*.${aws_route53_record.preview_caa.name}"]
+
+  # The proof of Kuutti's distribution, from the store below (ADR-066).
+  origin_proof_store_arn = aws_cloudfront_key_value_store.origin_proof.arn
+}
+
+# The store of the proof of Kuutti's distribution (ADR-066): its one key,
+# origin-secret, is written by hand with the CLI, never by OpenTofu, so the
+# value is in no state (ADR-001), and the plan role may not read it
+# (bootstrap, ci_plan_deny_data). The environment's rather than module
+# media's, so it exists, and can be filled, before the cutover.
+resource "aws_cloudfront_key_value_store" "origin_proof" {
+  name    = "kuutti-staging-origin-proof"
+  comment = "origin-secret, written by hand: the value the distribution sends as x-kuutti-origin (ADR-066)"
+
+  lifecycle {
+    # A new store is an empty one, and the plan would not say the value is
+    # lost: in cloudfront mode every request would then go unproven.
+    prevent_destroy = true
+  }
 }
 
 # The research copy (#194, ADR-029): the API's write-once rights on research/

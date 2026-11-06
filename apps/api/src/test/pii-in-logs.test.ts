@@ -46,6 +46,8 @@ const FIXTURES = {
   verifier: VERIFIER_PROBE,
   // Its SHA-256, which the start carries in the query.
   challenge: createHash("sha256").update(VERIFIER_PROBE).digest("hex"),
+  // The proof of Kuutti's distribution (ADR-066): a secret, so never in a line either.
+  originSecret: "pii-origin-proof-4711-4711-4711-4711",
 } as const;
 
 /**
@@ -102,6 +104,8 @@ function requestFor(
     "x-probe": FIXTURES.email,
     "x-forwarded-for": client.forwardedFor,
     "cloudfront-viewer-address": client.viewer,
+    // As through Kuutti's distribution, so the cloudfront mode reads the viewer address.
+    "x-kuutti-origin": FIXTURES.originSecret,
   };
   const withBody = method !== "GET" && method !== "HEAD";
   if (withBody) headers["content-type"] = "application/json";
@@ -527,7 +531,7 @@ describe("PII in logs", () => {
       const { logger, lines } = await captureLogger();
       // Built with media, so the photo routes run their own code and not the 503 of a bare app (#49).
       const app = createApp({
-        config: testConfig({ TRUSTED_PROXY: mode }),
+        config: testConfig({ TRUSTED_PROXY: mode, ORIGIN_SECRET: FIXTURES.originSecret }),
         logger,
         db: testPool(),
         media: testMediaDeps().deps,
@@ -551,7 +555,11 @@ describe("PII in logs", () => {
       const { logger, lines } = await captureLogger();
       const build = (overrides: Record<string, string>) =>
         createApp({
-          config: testConfig({ TRUSTED_PROXY: mode, ...overrides }),
+          config: testConfig({
+            TRUSTED_PROXY: mode,
+            ORIGIN_SECRET: FIXTURES.originSecret,
+            ...overrides,
+          }),
           logger,
           db: ctx.client,
         });
@@ -862,7 +870,10 @@ describe("PII in logs", () => {
     const app = createApp({ config: testConfig(), logger, db: testPool() });
     const keyed =
       (mode: TrustedProxy) => async (c: Parameters<ReturnType<typeof addressOf>>[0]) => {
-        logger.info({ key: addressOf(mode)(c) }, "debug");
+        logger.info(
+          { key: addressOf({ TRUSTED_PROXY: mode, originSecrets: [FIXTURES.originSecret] })(c) },
+          "debug",
+        );
         return c.json({ ok: true });
       };
     app.get("/leak/forwarded", (c) => {

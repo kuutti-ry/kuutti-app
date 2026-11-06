@@ -175,7 +175,7 @@ export function createApp(deps: Deps) {
     rateLimit({
       limit: deps.config.RATE_LIMIT_PER_MINUTE,
       windowMs: 60_000,
-      keyOf: addressOf(deps.config.TRUSTED_PROXY),
+      keyOf: addressOf(deps.config),
       // Given back only for a request the person's limiter counted: a guard
       // without it, or a session-ending route it skips, stays on the address.
       refund: (c) => c.get("personCounted") === true,

@@ -284,6 +284,17 @@ data "aws_iam_policy_document" "ci_plan_deny_data" {
       "logs:GetQueryResults",
       "rds:DownloadDBLogFilePortion",
       "rds:DownloadCompleteDBLogFile",
+      # The proof of Kuutti's distribution lives in a CloudFront key value
+      # store (ADR-066), whose values ReadOnlyAccess would hand out
+      # (cloudfront-keyvaluestore:Get*, List*); denied by the same wildcards,
+      # so an action AWS adds there stays denied. The plan needs the store's
+      # metadata alone, which is the cloudfront: control plane. A function's
+      # test run would print the header it sets, and the event history the
+      # parameters of a write, should AWS log a store's write there.
+      "cloudfront-keyvaluestore:Get*",
+      "cloudfront-keyvaluestore:List*",
+      "cloudfront:TestFunction",
+      "cloudtrail:LookupEvents",
     ]
     resources = ["*"]
   }
