@@ -302,7 +302,7 @@ The same distribution fronts the rest of what the box serves on 443, as `extra_a
 1. `tofu apply` in `infra/bootstrap`, so CI's plan role may not read the store (`ci_plan_deny_data`) before a value is in it.
 2. Make the value and write it to SSM and then to the store with section 17's first-time command (`docs/runbooks/rotation.md`; the value needs no other copy, a lost one is replaced), then redeploy the API.
 3. `curl -s https://api.<env>.kuutti.app/health` says `"originProof":"valid"`. `missing` means the function sent nothing (no key, no function, or a failed read), `wrong` that the two differ.
-4. Only then `trusted_proxy = "cloudfront"` in `envs/<env>/variables.tf`, in a pull request of its own, with the probe's `health_search_string` set to `"originProof":"valid"`. After its deploy, `/health` says `"trustedProxy":"cloudfront"`. Staging went through all four on 2026-11-06 (#198).
+4. Only then `trusted_proxy = "cloudfront"` in `envs/<env>/variables.tf`, in a pull request of its own, with the probe's `health_search_string` set to `"originProof":"valid"`. After its deploy, `/health` says `"trustedProxy":"cloudfront"`. Staging went through all four with #198, the switch in version 0.110.1.
 
 Production's function exists only from its cutover (`modules/media`, behind `media_enabled`), so step 3 cannot be seen there beforehand, and the switch is the cutover commit itself, with `media_enabled` and `cloudfront_only_ingress`. There, after steps 1 and 2:
 

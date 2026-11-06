@@ -192,8 +192,9 @@ const Env = z.object({
 /** Previews throttle harder than staging: nothing real runs there (#9). */
 const RATE_LIMIT_DEFAULT = { preview: 30, other: 120 } as const;
 /**
- * Production's doors are tight; elsewhere looser (ADR-026 §5), since the demo's
- * reset signs many personas in from one address.
+ * Production's doors are tight; elsewhere looser (ADR-026 §5), since a laptop's
+ * demo reset signs many personas in from one address. Whether staging keeps
+ * sixty is open (ADR-026 History, #198).
  */
 const SIGN_IN_RATE_LIMIT_DEFAULT = { production: 10, other: 60 } as const;
 

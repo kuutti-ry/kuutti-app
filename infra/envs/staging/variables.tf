@@ -73,7 +73,7 @@ variable "media_enabled" {
 }
 
 variable "cloudfront_only_ingress" {
-  description = "Passed to the network module: HTTPS from CloudFront's prefix list only. On since #198, once Dokploy and the previews were behind the distribution too (ADR-005 §7). The list is every CloudFront distribution's servers, not Kuutti's alone, so this closes the box to direct requests and proves nothing about whose distribution a request came through: trusted_proxy stays traefik (ADR-008 History). Turning this off is safe while trusted_proxy is traefik."
+  description = "Passed to the network module: HTTPS from CloudFront's prefix list only. On since #198, once Dokploy and the previews were behind the distribution too (ADR-005 §7). The list is every CloudFront distribution's servers, not Kuutti's alone, so this closes the box to direct requests and proves nothing about whose distribution a request came through; the proof of ADR-066 tells Kuutti's apart. Turning this off needs trusted_proxy at traefik first: a precondition refuses the pair."
   type        = bool
   default     = true
 }
