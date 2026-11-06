@@ -23,7 +23,7 @@ Until now the request object carried neither lever, and the confirmations table 
 ## Consequences
 
 - `docs/vendors/telia.md`: the open question about `prompt=login` becomes this record; what remains to confirm at the first pre-production login is that Telia honours `prompt=login` with a fresh bank authentication and an `auth_time` to match.
-- The fake Telia (`src/test/fake-telia.ts`) and the conformance test assert `prompt: "login"` in the request object; the bank-login feature gains the scenario for a stale `auth_time`.
+- The fake Telia (`src/testing/fake-telia.ts` in kuutti-ry/tunnistus-oidc since ADR-017 §6) and the conformance test assert `prompt: "login"` in the request object; the bank-login feature gains the scenario for a stale `auth_time`.
 - The mock IdP shows its login page on every request anyway; `prompt=login` changes nothing locally. Its `auth_time` is the token's issue time when it sends none, which is after the attempt began.
 - A person who leaves the bank page open for longer than the attempt's ten minutes (`AUTH_REQUEST_TTL_MS`) is refused by the state check as before; this decision adds no new timeout.
 
