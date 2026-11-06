@@ -42,7 +42,7 @@ By 05/11/2026 the chain was 110 migrations and 9.5 MB of snapshots, each new one
 
    A stamped database keeps its people and its earlier config versions, which change nothing, since the latest version of a key wins and a migration writes the next one as `max(version) + 1`.
 
-   Staging was made anew, the maintainer's choice of 06/11/2026: its schemas dropped and `public` made again by the master role before the merge, the baseline migrated by the deploy, then the audit boundary and the demo again. It took with it the audit rows that kept three personas spared by every demo reset. The local databases are made anew too, and a preview's is always new.
+   Staging was made anew, the maintainer's choice of 06/11/2026, and it crossed both ways in turn. His drop after the merge emptied it, and with it the audit rows that kept three personas spared by every demo reset. A minute later the old image's container, restarted because `/health` failed, migrated its own chain into the empty database before the merge's image came up, and the merge's image then refused the baseline. That empty old schema was stamped, the merge's image booted with nothing to apply, and the audit boundary was set again. So a deployed database is dropped only with its app stopped or the new image already serving; otherwise it is stamped. The local databases were made anew, and a preview's is always new.
 
 6. **Never again once a real person's row exists anywhere.** From then on the chain is what moved real data, and a test of a move is a test of what happened to somebody.
 
