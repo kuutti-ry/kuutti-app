@@ -453,6 +453,7 @@ describe("App", () => {
       "Feedback",
       "A person",
       "Matching",
+      "Announcements",
       "Tunables",
       "Audit log",
       "Staff",
@@ -568,8 +569,9 @@ describe("App", () => {
     ["/audit", "Audit log"],
     ["/staff", "Staff"],
     ["/matching", "Matching"],
+    ["/announcements", "Announcements"],
   ])(
-    "shows a moderator no audit log, staff or matching switch in the menu, and at %s says the role does not allow it, asking nothing (#309, #310, #500)",
+    "shows a moderator no audit log, staff, matching switch or announcements in the menu, and at %s says the role does not allow it, asking nothing (#309, #310, #500, #573)",
     async (address, title) => {
       window.sessionStorage.setItem("kuutti.admin.session", JSON.stringify(staff));
       window.history.replaceState(null, "", address);
@@ -589,6 +591,7 @@ describe("App", () => {
       expect(within(menu).queryByRole("link", { name: "Audit log" })).toBeNull();
       expect(within(menu).queryByRole("link", { name: "Staff" })).toBeNull();
       expect(within(menu).queryByRole("link", { name: "Matching" })).toBeNull();
+      expect(within(menu).queryByRole("link", { name: "Announcements" })).toBeNull();
       expect(screen.queryByRole("form", { name: "Filters" })).toBeNull();
       expect(screen.queryByRole("button", { name: "Refresh" })).toBeNull();
       expect(document.title).toBe(`${title} · Kuutti admin`);

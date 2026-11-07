@@ -79,6 +79,8 @@ const BUCKET = "kuutti-test-admin-e2e";
 const LOCK = "kuutti-e2e-admin";
 /** Who the flows sign in as: Mikael, a newcomer the stories give no history, so staff and nothing else. */
 const MODERATOR = "mikael";
+/** The two admins of the announcements' flow (#573), whom no other flow signs in as. */
+const ADMINS = ["ritva", "siiri"] as const;
 const LOOPBACK = ["127.0.0.1", "localhost", "[::1]"];
 
 type Pool = ReturnType<typeof createPool>;
@@ -350,6 +352,14 @@ class Stack {
     await session(MODERATOR);
     const recent = this.moderator(["recent"]).split("\n")[0]?.split(" ")[0] ?? "";
     this.moderator(["grant", recent, "moderator", "--by", "e2e:admin"]);
+    // Two admins, as an announcement needs one to write it and another to approve it (#573,
+    // ADR-068 §2): each granted the role the same way, a second apart for the same reason.
+    for (const admin of ADMINS) {
+      await new Promise((resolve) => setTimeout(resolve, 1100));
+      await session(admin);
+      const signedIn = this.moderator(["recent"]).split("\n")[0]?.split(" ")[0] ?? "";
+      this.moderator(["grant", signedIn, "admin", "--by", "e2e:admin"]);
+    }
 
     const laura = await session("laura");
     const conversations = ConversationList.parse(

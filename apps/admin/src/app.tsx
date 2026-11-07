@@ -7,6 +7,7 @@ import {
   LayoutDashboard,
   LogOut,
   type LucideIcon,
+  Megaphone,
   MessageSquare,
   ScrollText,
   ShieldAlert,
@@ -22,6 +23,7 @@ import { Button } from "./components/ui/button.tsx";
 import { Loading } from "./components/ui/spinner.tsx";
 import { SignIn, useStaffSession } from "./features/identity/index.ts";
 import { PhotoQueue } from "./features/media/index.ts";
+import { Announcements } from "./features/notifications/index.ts";
 import { MatchingSwitch } from "./features/pond/index.ts";
 import {
   AccountLookup,
@@ -126,6 +128,13 @@ const SCREENS: readonly Screen[] = [
     icon: ToggleRight,
     roles: ["admin"],
     element: <MatchingSwitch />,
+  },
+  {
+    path: "/announcements",
+    label: "admin.nav.announcements",
+    icon: Megaphone,
+    roles: ["admin"],
+    element: <Announcements />,
   },
   {
     path: "/config",

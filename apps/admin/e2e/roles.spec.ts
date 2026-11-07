@@ -6,6 +6,7 @@ import { expect, signInAsModerator, test } from "./fixtures.ts";
 
 for (const [path, heading] of [
   ["/matching", "Matching"],
+  ["/announcements", "Announcements"],
   ["/config", "Tunables"],
   ["/audit", "Audit log"],
   ["/staff", "Staff"],
