@@ -59,16 +59,27 @@ name: A section saves on going back, the card shows what it saved, and a hidden 
 - extendedWaitUntil:
     visible: "(The basics|Perustiedot|Grunderna)(, .*)?"
     timeout: 15000
+# Exercise is on the whole card under Lifestyle (#644), a chip heard with its question.
 - openLink: kuutti://profile/card
 - extendedWaitUntil:
     visible: "Your card|Korttisi|Ditt kort"
     timeout: 15000
 - scrollUntilVisible:
-    element: "Exercise|Liikunta|Motion"
+    element: "Show the whole card|Näytä koko kortti|Visa hela kortet"
     direction: DOWN
     centerElement: true
     timeout: 60000
-- assertVisible: "Weekly|Viikoittain|Varje vecka"
+- tapOn: "Show the whole card|Näytä koko kortti|Visa hela kortet"
+- scrollUntilVisible:
+    element: "Lifestyle|Elämäntavat|Livsstil"
+    direction: DOWN
+    centerElement: true
+    timeout: 60000
+- scrollUntilVisible:
+    element: "(Exercise|Liikunta|Motion): (Weekly|Viikoittain|Varje vecka)"
+    direction: DOWN
+    centerElement: true
+    timeout: 60000
 
 # Hidden: the section keeps the answer and says what hiding did, saved by going
 # back like any answer, and the card has no Exercise any more.
@@ -101,12 +112,19 @@ name: A section saves on going back, the card shows what it saved, and a hidden 
     visible: "Your card|Korttisi|Ditt kort"
     timeout: 15000
 - scrollUntilVisible:
-    element: "Weekly|Viikoittain|Varje vecka"
+    element: "Show the whole card|Näytä koko kortti|Visa hela kortet"
     direction: DOWN
     centerElement: true
-    timeout: 8000
-    optional: true
-- assertNotVisible: "Weekly|Viikoittain|Varje vecka"
+    timeout: 60000
+- tapOn: "Show the whole card|Näytä koko kortti|Visa hela kortet"
+# Her hobbies end the whole card: Lifestyle is gone with its one answer.
+- scrollUntilVisible:
+    element: "(.*: )?(Swimming|Uinti|Simning)"
+    direction: DOWN
+    centerElement: true
+    timeout: 60000
+- assertNotVisible: "Lifestyle|Elämäntavat|Livsstil"
+- assertNotVisible: "(.*: )?(Weekly|Viikoittain|Varje vecka)"
 
 # Shown again from the same place, and back on the card.
 - openLink: kuutti://profile
@@ -134,7 +152,13 @@ name: A section saves on going back, the card shows what it saved, and a hidden 
     visible: "Your card|Korttisi|Ditt kort"
     timeout: 15000
 - scrollUntilVisible:
-    element: "Weekly|Viikoittain|Varje vecka"
+    element: "Show the whole card|Näytä koko kortti|Visa hela kortet"
+    direction: DOWN
+    centerElement: true
+    timeout: 60000
+- tapOn: "Show the whole card|Näytä koko kortti|Visa hela kortet"
+- scrollUntilVisible:
+    element: "(Exercise|Liikunta|Motion): (Weekly|Viikoittain|Varje vecka)"
     direction: DOWN
     centerElement: true
     timeout: 60000

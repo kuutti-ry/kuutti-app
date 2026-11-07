@@ -47,7 +47,7 @@ export type CardDeps = {
 
 /**
  * What both the viewer and the subject answered (#150): the hobbies and
- * languages the card marks "you too". Computed at build time from the
+ * languages the card marks as shared (#644). Computed at build time from the
  * viewer's document and what the subject's card shows, so a hidden answer is
  * never told this way (#515); never stored, never a count or a score (the
  * matching document's invariant 6); nothing for the owner's own preview.

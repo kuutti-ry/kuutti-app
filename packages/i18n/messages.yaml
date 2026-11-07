@@ -2965,11 +2965,32 @@ profile.card.photoNext:
   sv: "Nästa foto"
   machine: { fi: true, sv: true }
 
-profile.card.sharedOption:
-  en: "{option} (you too)"
-  description: "An answer on a card that the viewer gave as well (#150): a hobby or a language both answered, marked in words, never a count."
-  fi: "{option} (sinäkin)"
-  sv: "{option} (du också)"
+profile.card.showWhole:
+  en: "Show the whole card"
+  description: "Button under the short card (#644): opens the rest of the same card in place, below it: the bio, the other prompts and the remaining answers. Names no person, since a name would have to inflect."
+  fi: "Näytä koko kortti"
+  sv: "Visa hela kortet"
+  machine: { fi: true, sv: true }
+
+profile.card.showLess:
+  en: "Show less"
+  description: "The same button once the whole card is open (#644): closes it back to the short card."
+  fi: "Näytä vähemmän"
+  sv: "Visa mindre"
+  machine: { fi: true, sv: true }
+
+profile.card.fact:
+  en: "{question}: {answer}"
+  description: "What a screen reader hears for the first chip of an answer on a card (#644): the field's label, then the person's own answer, since the icon before the answer is decorative. {question} is a field's label (profile.field.*), {answer} the answer as the card shows it, both in nominative."
+  fi: "{question}: {answer}"
+  sv: "{question}: {answer}"
+  machine: { fi: true, sv: true }
+
+profile.card.shared:
+  en: "{option}, shared"
+  description: "What a screen reader hears for a chip on a card whose answer the viewer gave as well (#644, #150): a hobby or a language both answered. The eye sees the chip filled and in bold; never a count or a score. Replaces the words 'you too', which read like 'me too'."
+  fi: "{option}, yhteinen"
+  sv: "{option}, gemensam"
   machine: { fi: true, sv: true }
 
 profile.card.back:
