@@ -49,6 +49,30 @@ describe.skipIf(!endpoint)("media store (compose stand-in)", () => {
     }
   });
 
+  it("lists the objects under a prefix with when they were written, and nothing of another prefix", async () => {
+    const client = createS3Client(config);
+    const store = s3MediaStore(client, config.S3_BUCKET);
+    const key = `test-list-${randomBytes(6).toString("hex")}`;
+    const before = Date.now();
+    try {
+      await store.put(objectKey(key, "thumb"), new Uint8Array([1]), "image/webp");
+      await store.put(objectKey(key, "card"), new Uint8Array([2]), "image/webp");
+      const listed = await store.list(`media/${key}/`);
+      expect(listed.map((o) => o.key).sort()).toEqual([
+        objectKey(key, "card"),
+        objectKey(key, "thumb"),
+      ]);
+      for (const object of listed) {
+        // The stand-in's clock is this machine's; a minute of slack either way.
+        expect(Math.abs(object.lastModified.getTime() - before)).toBeLessThan(60_000);
+      }
+      expect(await store.list(`media/${key}-other/`)).toEqual([]);
+    } finally {
+      await store.delete([objectKey(key, "thumb"), objectKey(key, "card")]);
+      client.destroy();
+    }
+  });
+
   it("a failure other than a missing object is thrown, never read as a missing object", async () => {
     const client = createS3Client(config);
     try {

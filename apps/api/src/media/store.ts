@@ -1,6 +1,7 @@
 import {
   DeleteObjectsCommand,
   GetObjectCommand,
+  ListObjectsV2Command,
   PutObjectCommand,
   type S3Client,
 } from "@aws-sdk/client-s3";
@@ -11,11 +12,19 @@ import type { PhotoVariant } from "@kuutti/schema";
 // use an in-memory one. Only the pipeline's output ever reaches put(), so the
 // store never sees an original (rule 4).
 
+/** One object as the bucket lists it: its key and when it was last written. */
+export type StoredObject = { key: string; lastModified: Date };
+
 export type MediaStore = {
   put(key: string, body: Uint8Array, contentType: string): Promise<void>;
   /** Null when the object is missing. */
   get(key: string): Promise<Uint8Array | null>;
   delete(keys: string[]): Promise<void>;
+  /**
+   * Every object whose key starts with `prefix`, a thousand a page: the night's
+   * sweep reads `media/` this way (#636), nothing else lists.
+   */
+  list(prefix: string): Promise<StoredObject[]>;
 };
 
 /** media/<content address>/<variant>.webp: the object path of one variant. */
@@ -72,22 +81,56 @@ export function s3MediaStore(client: S3Client, bucket: string): MediaStore {
         }
       }
     },
+    async list(prefix) {
+      const objects: StoredObject[] = [];
+      let token: string | undefined;
+      do {
+        const out = await client.send(
+          new ListObjectsV2Command({ Bucket: bucket, Prefix: prefix, ContinuationToken: token }),
+        );
+        for (const object of out.Contents ?? []) {
+          // S3 and the stand-in name both for every object; one without either is nothing to sweep.
+          if (object.Key && object.LastModified) {
+            objects.push({ key: object.Key, lastModified: object.LastModified });
+          }
+        }
+        token = out.IsTruncated ? out.NextContinuationToken : undefined;
+      } while (token);
+      return objects;
+    },
   };
 }
 
-/** For tests and the document generator: a Map, nothing else. */
-export function memoryMediaStore(): MediaStore & { objects: Map<string, Uint8Array> } {
+/**
+ * For tests and the document generator: a Map, nothing else, and the time of
+ * each put from `now` for `list`. An object a test sets on the map itself has
+ * no time and lists as from the epoch: old enough for any sweep.
+ */
+export function memoryMediaStore(
+  now: () => Date = () => new Date(),
+): MediaStore & { objects: Map<string, Uint8Array>; writtenAt: Map<string, Date> } {
   const objects = new Map<string, Uint8Array>();
+  const writtenAt = new Map<string, Date>();
   return {
     objects,
+    writtenAt,
     async put(key, body) {
       objects.set(key, body);
+      writtenAt.set(key, now());
     },
     async get(key) {
       return objects.get(key) ?? null;
     },
     async delete(keys) {
-      for (const key of keys) objects.delete(key);
+      for (const key of keys) {
+        objects.delete(key);
+        writtenAt.delete(key);
+      }
+    },
+    async list(prefix) {
+      return [...objects.keys()]
+        .filter((key) => key.startsWith(prefix))
+        .map((key) => ({ key, lastModified: writtenAt.get(key) ?? new Date(0) }));
     },
   };
 }

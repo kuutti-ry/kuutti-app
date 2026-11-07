@@ -215,3 +215,10 @@ Feature: Account deletion per the erasure table
     Then A's export lists both invitations with their state, none used, and the fish with when it was earned and used
     And B's lists when B typed the code and when it counted, and the fish it earned them
     And neither carries a code, its hash or the other's account id
+
+
+  Scenario: An object no photo row names goes in the night's sweep once it is a day old
+    Given the bucket holds the variants of a photo whose row is gone, written two days ago
+    And the variants of a photo that has a row, and of one written an hour ago whose row is not in yet
+    When the night's sweep runs
+    Then the first photo's objects are gone and the other two's remain

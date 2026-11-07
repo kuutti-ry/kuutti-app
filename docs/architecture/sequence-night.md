@@ -6,7 +6,7 @@ apps/api/src/boot.ts
 infra/modules/observability/
 -->
 
-What the API does at night, from the system's side: the timer that runs inside the API's own process at 04:00 in Helsinki, the fourteen jobs it runs one after another, what each reads and writes, and how a failed job reaches the maintainer's mailbox through the log and an alarm. It is written for a contributor who adds or changes a job, and for whoever answers the alarm. There is no cron and no second process: the jobs are listed in the API's boot and run by a timer in the same process as HTTP and the socket. This view draws ADR-006 §2, ADR-011 §6 and §9, ADR-013, ADR-015, ADR-024 §5, ADR-029, ADR-030 §8, ADR-031 §8, ADR-044 §7 and ADR-062 §1 and §13. Nothing of the queue is built at night: the first read of a Finnish day opens a person's log, and what the night does for rounds is delete those past their year.
+What the API does at night, from the system's side: the timer that runs inside the API's own process at 04:00 in Helsinki, the fifteen jobs it runs one after another, what each reads and writes, and how a failed job reaches the maintainer's mailbox through the log and an alarm. It is written for a contributor who adds or changes a job, and for whoever answers the alarm. There is no cron and no second process: the jobs are listed in the API's boot and run by a timer in the same process as HTTP and the socket. This view draws ADR-006 §2, ADR-011 §6 and §9, ADR-013, ADR-015, ADR-024 §5, ADR-029, ADR-030 §8, ADR-031 §8, ADR-044 §7 and ADR-062 §1 and §13. Nothing of the queue is built at night: the first read of a Finnish day opens a person's log, and what the night does for rounds is delete those past their year.
 
 In these diagrams every arrow is built. Mermaid's sequence diagrams take a message's words as they are, so the labels are not in quotes, and they name an environment as `{env}`, staging or prod.
 
@@ -30,6 +30,7 @@ In these diagrams every arrow is built. Mermaid's sequence diagrams take a messa
 | 12 | `prune-reports` | safety | reports, their frozen copies, erased senders' sent photos | deletes reports older than 365 days, then the photos no copy holds, then their objects | everywhere; the objects where media is configured |
 | 13 | `archive-silent-conversations` | chat | conversations | archives the silent ones; a research event per person | everywhere |
 | 14 | `moderate-pending-photos` | media | photos pending with no recorded check, their stored card variant | the check's outcome | where media is configured |
+| 15 | `sweep-orphaned-objects` | media | every object under `media/`, the photo rows | deletes the objects a day old or more whose content key no photo row names | where media is configured |
 
 ## Part 1: the run, and a failure
 
@@ -133,7 +134,7 @@ sequenceDiagram
 ```mermaid
 sequenceDiagram
   accTitle: The night's jobs, part 4: photos, reports and silent conversations
-  accDescr: Profile photos nobody decided in time are rejected as not reviewed. The photo check's notes and the reports past twelve months are deleted, and with the reports the sent photos of erased people that no copy holds any more, objects included. Silent conversations are archived, and the chat tells the open sockets. Where media is configured, photos the automatic check missed get one more look.
+  accDescr: Profile photos nobody decided in time are rejected as not reviewed. Last, the sweep deletes the objects under media/ that are a day old or more and that no photo row names. The photo check's notes and the reports past twelve months are deleted, and with the reports the sent photos of erased people that no copy holds any more, objects included. Silent conversations are archived, and the chat tells the open sockets. Where media is configured, photos the automatic check missed get one more look.
   autonumber 23
   participant api as The API's nightly run
   participant db as PostgreSQL
@@ -153,6 +154,11 @@ sequenceDiagram
     api->>check: One more look at each
     api->>db: Each outcome, or the photo stays pending
   end
+  opt where media is configured
+    api->>bucket: sweep-orphaned-objects. List every object under media/
+    api->>db: Of those a day old or more, which content keys no photo row names
+    api->>bucket: Delete their objects, in batches of a thousand
+  end
 ```
 
 ### Steps
@@ -167,15 +173,18 @@ sequenceDiagram
 30. The job reads each one's stored card variant from the bucket; one with no card variant is logged and counted as failed.
 31. The check is Rekognition through the instance role where `MODERATION=rekognition`, and otherwise the human queue for everything (ADR-006 §4).
 32. Each outcome is written as the upload's would be. A photo the check cannot reach stays pending: nothing expires into visibility.
+33. `sweep-orphaned-objects` (media, #636, ADR-007), where media is configured, last: lists every object under `media/` in the bucket, a thousand a page.
+34. Of those written a day or more ago and of the variant shape, `media/<content key>/<variant>.webp`, it asks the `photo` table which content keys no row names. An object under `media/` of another shape is counted, left and said in a warning: not this job's to judge.
+35. Their objects are deleted in batches of a thousand, as erasure's are. The answer is counts, never a key: the objects seen, the aged ones, the orphaned keys, the objects deleted, the unexpected. A day's grace keeps an upload's objects until its row is in; what a failed delete, a failed upload cleanup or a crash between the two left behind goes the first night it is a day old: the same night for an object that aged long before its delete failed, the next for a fresh one.
 
 ## Where it lives
 
 - The timer and the list: `apps/api/src/jobs/nightly.ts` (`msUntilNightly` over `msUntilFinnishHour`, which a push's time to live uses too, `runNightly`, `scheduleNightly`), `apps/api/src/boot.ts` (the jobs, in order, and the one held back in production), `apps/api/src/index.ts` (`scheduleNightly` at start)
-- The jobs: `apps/api/src/identity/sessions.ts` and `admin-session.ts`; `apps/api/src/research/copy.ts`, `copy-store.ts`, `partitions.ts`, `anonymity.ts`; `apps/api/src/safety/sanctions.ts` (`endSuspensions`), `photo-check.ts`, `reports.ts` (`pruneReports`); `apps/api/src/jobs/pond-counter.ts`, `pool.ts`, `invitation-count.ts` with `apps/api/src/rewards/invitations.ts`; `apps/api/src/matching/rounds.ts` (`pruneRounds`); `apps/api/src/media/moderation.ts` (`rejectUnreviewedPhotos`, `sweepPendingPhotos`); `apps/api/src/chat/archive.ts`
+- The jobs: `apps/api/src/identity/sessions.ts` and `admin-session.ts`; `apps/api/src/research/copy.ts`, `copy-store.ts`, `partitions.ts`, `anonymity.ts`; `apps/api/src/safety/sanctions.ts` (`endSuspensions`), `photo-check.ts`, `reports.ts` (`pruneReports`); `apps/api/src/jobs/pond-counter.ts`, `pool.ts`, `invitation-count.ts` with `apps/api/src/rewards/invitations.ts`; `apps/api/src/matching/rounds.ts` (`pruneRounds`); `apps/api/src/media/moderation.ts` (`rejectUnreviewedPhotos`, `sweepPendingPhotos`); `apps/api/src/chat/archive.ts`; `apps/api/src/media/erasure.ts` (`sweepOrphanedObjects`).
 - The alarm: `infra/modules/observability/main.tf` (the topic, the e-mail subscription, the metric filter `nightly-failures`, the alarm `nightly-job-failed`), `infra/modules/compute/main.tf` and `templates/user_data.sh.tpl` (the log group and the `awslogs` driver), `infra/envs/staging/main.tf` and `infra/envs/prod/main.tf` (each composes it), `docs/runbooks/alerts.md`
-- Specs: `features/safety/sanctions.feature` (the night lifts a suspension), `features/pond/opening.feature`, `features/pond/counter.feature`, `features/matching/decisions.feature`, `features/media/moderation.feature`, `features/chat/conversations.feature`
-- ADRs: [ADR-006](../adr/006-photo-moderation.md) §2 and §4, [ADR-011](../adr/011-research-events.md) §6 and §9, [ADR-013](../adr/013-waitlist-counter.md), [ADR-060](../adr/060-no-waiting-at-the-pond.md), [ADR-022](../adr/022-taking-a-break.md) §4, [ADR-024](../adr/024-sanctions.md) §5, [ADR-029](../adr/029-the-research-copy.md) §1 to §6 and §12, [ADR-030](../adr/030-reports-and-blocks.md) §8 and §12, [ADR-031](../adr/031-chat.md) §8, [ADR-032](../adr/032-notification-choices-and-notices.md), [ADR-034](../adr/034-the-round-record.md) §7, [ADR-044](../adr/044-invitations.md) §7, [ADR-062](../adr/062-one-queue.md) §1 and §13
-- Issues: #35, #49, #50, #54, #84, #107, #194, #253, #307, #348, #351, #376, #500, #502; the alarm #11 and #194
+- Specs: `features/identity/erasure.feature` (the sweep), `features/safety/sanctions.feature` (the night lifts a suspension), `features/pond/opening.feature`, `features/pond/counter.feature`, `features/matching/decisions.feature`, `features/media/moderation.feature`, `features/chat/conversations.feature`
+- ADRs: [ADR-007](../adr/007-erasure-and-export.md) (the sweep), [ADR-006](../adr/006-photo-moderation.md) §2 and §4, [ADR-011](../adr/011-research-events.md) §6 and §9, [ADR-013](../adr/013-waitlist-counter.md), [ADR-060](../adr/060-no-waiting-at-the-pond.md), [ADR-022](../adr/022-taking-a-break.md) §4, [ADR-024](../adr/024-sanctions.md) §5, [ADR-029](../adr/029-the-research-copy.md) §1 to §6 and §12, [ADR-030](../adr/030-reports-and-blocks.md) §8 and §12, [ADR-031](../adr/031-chat.md) §8, [ADR-032](../adr/032-notification-choices-and-notices.md), [ADR-034](../adr/034-the-round-record.md) §7, [ADR-044](../adr/044-invitations.md) §7, [ADR-062](../adr/062-one-queue.md) §1 and §13
+- Issues: #35, #49, #50, #54, #84, #107, #194, #253, #307, #348, #351, #376, #500, #502, #636; the alarm #11 and #194
 
 ## Open
 
