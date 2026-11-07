@@ -130,6 +130,8 @@ describe("sessions", () => {
       body: JSON.stringify({ code, verifier: VERIFIER }),
     });
     expect(exchanged.status).toBe(200);
+    // The tokens' answer is nobody's to keep (#636), as every authenticated answer is.
+    expect(exchanged.headers.get("cache-control")).toBe("no-store");
     const tokens = SessionTokens.parse(await exchanged.json());
     expect(tokens.accessToken).toMatch(TOKEN);
     expect(tokens.refreshToken).toMatch(REFRESH);
@@ -632,7 +634,9 @@ describe("a refresh token's family (ADR-059)", () => {
       );
     }
     expect(await ending(ctx, a.sessionId)).toEqual([{ revoked_at: null, revoked_reason: null }]);
-    expect((await refresh(ctx.app, a.refreshToken)).status).toBe(200);
+    const refreshed = await refresh(ctx.app, a.refreshToken);
+    expect(refreshed.status).toBe(200);
+    expect(refreshed.headers.get("cache-control")).toBe("no-store");
   });
 
   test("a signed-out session keeps its end: its live token reads as over, an earlier one as reuse, and neither writes", async ({

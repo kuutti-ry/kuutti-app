@@ -100,9 +100,133 @@ describe("error serialization", () => {
     expect(serialized.stack).toBe("Error: [redacted]\n    at handler (routes.ts:1:1)");
   });
 
+  it("blanks every line of the stack that is not a frame: a message over several lines too", () => {
+    const serialized = serializeError(new Error("the address\na@b.fi\nwas refused"));
+    expect(serialized.stack).toMatch(/^Error: \[redacted\]\n\[redacted\]\n\[redacted\]\n\s+at /);
+    expect(JSON.stringify(serialized)).not.toContain("a@b.fi");
+  });
+
   it("keeps the type of a named error on the first line", () => {
     const error = new TypeError("cannot read email a@b.fi");
     expect(serializeError(error).stack).toMatch(/^TypeError: \[redacted\]\n\s+at /);
+  });
+
+  it("keeps of a database error what names the kind and drops what quotes a value (#636)", async () => {
+    // The shape node-postgres gives a unique violation: detail, hint and where carry the values.
+    const pg = Object.assign(
+      new Error('duplicate key value violates unique constraint "identity_hetu_hmac_unique"'),
+      {
+        name: "error",
+        severity: "ERROR",
+        code: "23505",
+        detail: "Key (hetu_hmac)=(0f3a9c…) already exists.",
+        hint: "Perhaps you meant a@b.fi",
+        where: "SQL statement \"INSERT INTO identity … VALUES ('0f3a9c…')\"",
+        internalQuery: "INSERT INTO identity (hetu_hmac) VALUES ('0f3a9c…')",
+        schema: "public",
+        table: "identity",
+        column: "hetu_hmac",
+        constraint: "identity_hetu_hmac_unique",
+        routine: "_bt_check_unique",
+        position: "12",
+      },
+    );
+    const serialized = serializeError(pg);
+    expect(Object.keys(serialized).sort()).toEqual(
+      [
+        "code",
+        "column",
+        "constraint",
+        "message",
+        "name",
+        "routine",
+        "schema",
+        "severity",
+        "stack",
+        "table",
+        "type",
+      ].sort(),
+    );
+    expect(serialized).toMatchObject({
+      code: "23505",
+      constraint: "identity_hetu_hmac_unique",
+      table: "identity",
+    });
+    expect(serialized.stack).toMatch(/^Error: \[redacted\]\n\s+at /);
+    const { logger, lines } = await captureLogger();
+    logger.error({ err: pg }, "unhandled error");
+    const text = JSON.stringify(lines());
+    expect(text).not.toContain("0f3a9c");
+    expect(text).not.toContain("a@b.fi");
+    expect(text).not.toContain("duplicate key value");
+  });
+
+  it("serializes a cause the same way, drops a validation error's issues, and keeps an AppError's own detail", async () => {
+    const cause = Object.assign(new Error("Key (email)=(a@b.fi)"), {
+      detail: "Key (email)=(a@b.fi) already exists.",
+      code: "23505",
+    });
+    const wrapped = Object.assign(new Error("saving the address failed", { cause }), {
+      status: 500,
+      code: "address_not_saved",
+      // The route's own detail, an object, is the log's by design (lib/errors.ts).
+      detail: { key: "push_quiet_from_hour" },
+      issues: [{ code: "invalid_type", path: ["email"], received: "a@b.fi" }],
+    });
+    const serialized = serializeError(wrapped) as { cause?: Record<string, unknown> };
+    expect(Object.keys(serialized).sort()).toEqual(
+      ["cause", "code", "detail", "message", "stack", "status", "type"].sort(),
+    );
+    expect(serialized).toMatchObject({ detail: { key: "push_quiet_from_hour" } });
+    expect(serialized.cause).toMatchObject({ type: "Error", code: "23505", message: "[redacted]" });
+    expect(Object.keys(serialized.cause ?? {})).not.toContain("detail");
+    // pino writes the cause's message into the stack too, after "caused by:".
+    expect((serialized as { stack?: string }).stack).toMatch(/\ncaused by: \[redacted\]\n\s+at /);
+    expect(JSON.stringify(serialized)).not.toContain("a@b.fi");
+    // Through the logger too: a cause's message is two levels down, past the redaction paths.
+    const { logger, lines } = await captureLogger();
+    logger.error({ err: wrapped }, "unhandled error");
+    expect(JSON.stringify(lines())).not.toContain("a@b.fi");
+  });
+
+  it("drops a cause that is no error: a library's object of claims, a database's string", async () => {
+    const withClaims = new Error("claim mismatch", {
+      cause: { expected: "x", claims: { hetu: "010190-999X", email: "a@b.fi" } },
+    });
+    const withText = new Error("insert failed", {
+      cause: "Key (email)=(a@b.fi) already exists.",
+    });
+    for (const error of [withClaims, withText]) {
+      const serialized = serializeError(error);
+      expect(serialized).not.toHaveProperty("cause");
+      const { logger, lines } = await captureLogger();
+      logger.error({ err: error }, "unhandled error");
+      const text = JSON.stringify(lines());
+      expect(text).not.toContain("a@b.fi");
+      expect(text).not.toContain("010190");
+    }
+  });
+
+  it("keeps an AWS SDK error's metadata and a kit error's reason", () => {
+    const sdk = Object.assign(new Error("Access Denied"), {
+      name: "AccessDenied",
+      $fault: "client",
+      $metadata: { httpStatusCode: 403, requestId: "ABC123", attempts: 1 },
+    });
+    expect(serializeError(sdk)).toMatchObject({
+      type: "Error",
+      name: "AccessDenied",
+      $metadata: { httpStatusCode: 403, requestId: "ABC123" },
+    });
+    expect(serializeError(sdk)).not.toHaveProperty("$fault");
+    const kit = Object.assign(new Error("ID token was not encrypted"), {
+      name: "TunnistusError",
+      reason: "ID token was not encrypted",
+    });
+    expect(serializeError(kit)).toMatchObject({
+      name: "TunnistusError",
+      reason: "ID token was not encrypted",
+    });
   });
 
   it("writes an err or error field that holds no error as it is, null included, and never throws (#102)", async () => {

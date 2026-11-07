@@ -1,7 +1,9 @@
 # syntax=docker/dockerfile:1
 # Built for linux/arm64 in CI (t4g is arm64). Two stages: build with pnpm, run with node only.
 
-FROM node:22-bookworm-slim AS build
+# The base image by its digest (the multi-platform index, so arm64 in CI and amd64
+# on a laptop resolve the same release); Dependabot moves it (#636).
+FROM node:22-bookworm-slim@sha256:5ec23b7c622b00547753bc6ffd78085dd868a68aeb41c8e0a1418f033e13d96d AS build
 WORKDIR /repo
 ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0
 RUN corepack enable
@@ -25,7 +27,7 @@ COPY apps/api apps/api
 # (scripts/notices.ts, #416): a package with no licence text fails here.
 RUN pnpm --filter @kuutti/api build
 
-FROM node:22-bookworm-slim AS runtime
+FROM node:22-bookworm-slim@sha256:5ec23b7c622b00547753bc6ffd78085dd868a68aeb41c8e0a1418f033e13d96d AS runtime
 # One region (TD-4); the SDK never reads it from instance metadata. The RDS
 # bundle (apps/api/certs, sha256 in its README) lets pg verify the database.
 ENV NODE_ENV=production PORT=3000 MIGRATIONS_DIR=/app/drizzle \
