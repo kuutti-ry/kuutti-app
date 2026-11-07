@@ -332,7 +332,7 @@ export const sv: Readonly<Record<string, string>> = {
   "notifications.ask.body": "Kuutti kan berätta för den här telefonen när någon gillar dig tillbaka och när ett meddelande kommer. En avisering säger att det finns ett nytt meddelande eller en ny matchning, aldrig vad det står eller från vem. Du väljer slagen i inställningarna.",
   "notifications.ask.decline": "Nej tack",
   "notifications.ask.heading": "Ska Kuutti berätta för dig?",
-  "notifications.intro": "En avisering säger att det finns ett nytt meddelande eller en ny matchning, aldrig vad det står eller från vem.",
+  "notifications.intro": "En avisering säger att det finns ett nytt meddelande, en ny matchning eller ett meddelande från Kuutti, aldrig vad det står eller från vem.",
   "notifications.kind.announcement.hint": "När det här är avstängt syns ett meddelande ändå i appen, utan avisering och utan e-post.",
   "notifications.kind.announcement.label": "Meddelanden från Kuutti",
   "notifications.kind.match.label": "Matchningar",

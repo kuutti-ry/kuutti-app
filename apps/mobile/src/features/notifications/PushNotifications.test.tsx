@@ -24,7 +24,7 @@ const phone = jest.requireMock("expo-notifications") as {
   __newToken: (token: Notifications.DevicePushToken) => void;
 };
 const { __router: router } = jest.requireMock("expo-router") as {
-  __router: { push: jest.Mock };
+  __router: { push: jest.Mock; dismissTo: jest.Mock };
 };
 const secureStore = jest.requireMock("expo-secure-store") as { __store: Map<string, string> };
 
@@ -333,6 +333,16 @@ describe("a tap on a push", () => {
     });
     await settle();
     expect(router.push).toHaveBeenCalledTimes(1);
+  });
+
+  it("on an announcement goes home, where its notice is, once (#573)", async () => {
+    await renderWithTheme(<PushNotifications />);
+    await settle();
+    await act(async () => phone.__respond(tap({ kind: "announcement" })));
+    await waitFor(() => expect(router.dismissTo).toHaveBeenCalledWith("/"));
+    expect(router.dismissTo).toHaveBeenCalledTimes(1);
+    expect(router.push).not.toHaveBeenCalled();
+    expect(notifications.clearLastNotificationResponse).toHaveBeenCalledTimes(1);
   });
 
   it("at a cold start waits for the session, then opens the conversations", async () => {

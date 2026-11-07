@@ -340,7 +340,7 @@ export const fi: Readonly<Record<string, string>> = {
   "notifications.ask.body": "Kuutti voi kertoa tälle puhelimelle, kun joku tykkää sinusta takaisin ja kun saat viestin. Ilmoitus kertoo, että sinulle on uusi viesti tai uusi mätsi, ei koskaan mitä siinä lukee tai keneltä se on. Lajit valitset asetuksista.",
   "notifications.ask.decline": "Ei kiitos",
   "notifications.ask.heading": "Kerrotaanko sinulle?",
-  "notifications.intro": "Ilmoitus kertoo, että sinulle on uusi viesti tai uusi mätsi, ei koskaan mitä siinä lukee tai keneltä se on.",
+  "notifications.intro": "Ilmoitus kertoo, että sinulle on uusi viesti, uusi mätsi tai tiedote, ei koskaan mitä siinä lukee tai keneltä se on.",
   "notifications.kind.announcement.hint": "Kun tämä on pois päältä, tiedote näkyy silti sovelluksessa, mutta ilman ilmoitusta ja sähköpostia.",
   "notifications.kind.announcement.label": "Kuutin tiedotteet",
   "notifications.kind.match.label": "Mätsit",

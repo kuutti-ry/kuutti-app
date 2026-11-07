@@ -673,7 +673,7 @@ export const enXA: Readonly<Record<string, string>> = {
   "notifications.ask.body": "［Kúúúúttíí çááñ tééll thííš phóóñéé whééñ šóómééóóñéé lííkééš ýýóóúú bááçk ááñd whééñ áá mééššáágéé áárríívééš. ÁÁ ñóótíífííçáátííóóñ šááýýš tháát thééréé ííš áá ñééw mééššáágéé óór áá ñééw máátçh, ñéévéér wháát íít šááýýš óór fróóm whóóm. ÝÝóóúú çhóóóóšéé whííçh kííñdš ííñ Šééttííñgš.］",
   "notifications.ask.decline": "［Ñóó thááñkš］",
   "notifications.ask.heading": "［Šhááll Kúúúúttíí tééll ýýóóúú?］",
-  "notifications.intro": "［ÁÁ ñóótíífííçáátííóóñ šááýýš tháát thééréé ííš áá ñééw mééššáágéé óór áá ñééw máátçh, ñéévéér wháát íít šááýýš óór fróóm whóóm.］",
+  "notifications.intro": "［ÁÁ ñóótíífííçáátííóóñ šááýýš tháát thééréé ííš áá ñééw mééššáágéé, áá ñééw máátçh óór ááñ ááññóóúúñçéémééñt, ñéévéér wháát íít šááýýš óór fróóm whóóm.］",
   "notifications.kind.announcement.hint": "［Whééñ thííš ííš óóff, ááñ ááññóóúúñçéémééñt štííll šhóówš ííñ théé áápp, wííth ñóó púúšh ááñd ñóó éémááííl.］",
   "notifications.kind.announcement.label": "［ÁÁññóóúúñçéémééñtš fróóm Kúúúúttíí］",
   "notifications.kind.match.label": "［Máátçhééš］",

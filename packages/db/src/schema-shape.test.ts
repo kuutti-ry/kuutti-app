@@ -48,6 +48,8 @@ describe("the tables", () => {
       "account",
       "account_export",
       "admin_session",
+      // What Kuutti told everybody, kept for good (#573, ADR-068).
+      "announcement",
       "audit_log",
       "auth_request",
       "block",
@@ -196,7 +198,7 @@ describe("the foreign keys", () => {
     }),
   );
 
-  it("cascade only from a photo to what describes it, from a conversation to its people and messages, from a report to its copy, from a sanction or an invitation to its notice, from an invitation to what it earned, and from a session to its push token; identity and account rows are never deleted from under anything (TD-7)", () => {
+  it("cascade only from a photo to what describes it, from a conversation to its people and messages, from a report to its copy, from a sanction, an invitation or an announcement to its notice, from an invitation to what it earned, and from a session to its push token; identity and account rows are never deleted from under anything (TD-7)", () => {
     expect(references.filter((reference) => reference.endsWith(" cascade")).sort()).toEqual([
       "card_shown.photo_id -> photo.id cascade",
       // A conversation goes only once nobody is left to keep it for (#348, ADR-031 §5),
@@ -204,6 +206,8 @@ describe("the foreign keys", () => {
       "contact_share.conversation_id -> conversation.id cascade",
       "conversation_participant.conversation_id -> conversation.id cascade",
       "message.conversation_id -> conversation.id cascade",
+      // An announcement's notices go with it: a draft, deleted, has none (#573, ADR-068 §8).
+      "notice.announcement_id -> announcement.id cascade",
       // A counted invitation's notice, either side's, goes with its invitation (#107, #503).
       "notice.invitation_id -> invitation.id cascade",
       // A warning's notice goes with its warning (#176).
@@ -272,6 +276,9 @@ describe("the foreign keys", () => {
     expect(toIdentity.sort()).toEqual([
       "account.identity_id",
       "admin_session.identity_id",
+      // The two admins of an announcement (#573, ADR-068 §2): staff's work, kept for good.
+      "announcement.approved_by",
+      "announcement.written_by",
       "audit_log.actor_identity_id",
       "auth_request.identity_id",
       "block.blocked_identity_id",
@@ -543,7 +550,19 @@ describe("the checks of invitations and their notices (#107, ADR-044)", () => {
   });
 
   it("hold a warning to its sanction and a counted invitation's notice to its invitation", () => {
-    expect(checks("notice")).toEqual(["notice_invitation_check", "notice_warning_check"]);
+    expect(checks("notice")).toEqual([
+      "notice_announcement_check",
+      "notice_invitation_check",
+      "notice_warning_check",
+    ]);
+  });
+
+  it("hold an announcement's Swedish whole or absent, and its approval to a second admin (#573, ADR-068)", () => {
+    expect(checks("announcement")).toEqual([
+      "announcement_approval_check",
+      "announcement_second_admin_check",
+      "announcement_swedish_check",
+    ]);
   });
 });
 

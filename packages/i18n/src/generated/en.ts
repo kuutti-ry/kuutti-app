@@ -673,7 +673,7 @@ export const en: Readonly<Record<string, string>> = {
   "notifications.ask.body": "Kuutti can tell this phone when someone likes you back and when a message arrives. A notification says that there is a new message or a new match, never what it says or from whom. You choose which kinds in Settings.",
   "notifications.ask.decline": "No thanks",
   "notifications.ask.heading": "Shall Kuutti tell you?",
-  "notifications.intro": "A notification says that there is a new message or a new match, never what it says or from whom.",
+  "notifications.intro": "A notification says that there is a new message, a new match or an announcement, never what it says or from whom.",
   "notifications.kind.announcement.hint": "When this is off, an announcement still shows in the app, with no push and no email.",
   "notifications.kind.announcement.label": "Announcements from Kuutti",
   "notifications.kind.match.label": "Matches",

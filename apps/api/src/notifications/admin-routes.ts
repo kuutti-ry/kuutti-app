@@ -106,9 +106,11 @@ export function announcementAdminRoutes(
 ) {
   const app = new OpenAPIHono<AppEnv>();
   const now = deps.now ?? (() => new Date());
-  for (const route of [listRoute, writeRoute, deleteRoute, approveRoute]) {
-    app.use(route.getRoutingPath(), requireAdministrator);
-  }
+  // The list and the write share a path: each path is guarded once.
+  const paths = new Set(
+    [listRoute, writeRoute, deleteRoute, approveRoute].map((route) => route.getRoutingPath()),
+  );
+  for (const path of paths) app.use(path, requireAdministrator);
 
   app.openapi(listRoute, async (c) => {
     const staff = staffOf(c);

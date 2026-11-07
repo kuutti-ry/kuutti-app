@@ -8969,10 +8969,10 @@ settings.notifications.someOn:
   machine: { fi: true, sv: true }
 
 notifications.intro:
-  en: "A notification says that there is a new message or a new match, never what it says or from whom."
-  description: "The Notifications panel's one line (#176, ADR-032; #102, ADR-055; #581): what a lock screen will show, which cannot be seen until it has happened and which somebody else may read. A push says which kind and nothing more: no text, no name."
-  fi: "Ilmoitus kertoo, että sinulle on uusi viesti tai uusi mätsi, ei koskaan mitä siinä lukee tai keneltä se on."
-  sv: "En avisering säger att det finns ett nytt meddelande eller en ny matchning, aldrig vad det står eller från vem."
+  en: "A notification says that there is a new message, a new match or an announcement, never what it says or from whom."
+  description: "The Notifications panel's one line (#176, ADR-032; #102, ADR-055; #581; #573, ADR-068 §4): what a lock screen will show, which cannot be seen until it has happened and which somebody else may read. A push says which kind and nothing more: no text, no name, and of an announcement not its words."
+  fi: "Ilmoitus kertoo, että sinulle on uusi viesti, uusi mätsi tai tiedote, ei koskaan mitä siinä lukee tai keneltä se on."
+  sv: "En avisering säger att det finns ett nytt meddelande, en ny matchning eller ett meddelande från Kuutti, aldrig vad det står eller från vem."
   machine: { fi: true, sv: true }
 
 notifications.phone.allowed:
