@@ -55,3 +55,7 @@ Since #198, everything the box serves on 443 comes through the one distribution 
 - **CloudFront's flat-rate plans**, which include WAF. AWS's table of their features lists a key value store, which ADR-066's function reads, from the Pro plan up, and a custom origin request policy, which the ACME path has, from Business up.
 - **A web ACL on the panel's distribution:** static files from a bucket, with no box behind them.
 - **Refusing by country:** people travel, and a VPN takes the country of its choice.
+
+## History
+
+- 2026-11-06 (#41): proven on staging by the burst test of `docs/runbooks/abuse.md`. The edge refused from about 3,000 requests and 74 s in, and both alarms mailed. The test also showed two things the first version had wrong. AWS's list of the addresses the rule was refusing stayed empty while it refused one, so the runbook no longer leans on it. And the edge alarm stayed in ALARM long after the last refusal, since WAF publishes no zero, so it alarms on `FILL(blocked, 0)` instead (§6). Version 0.110.6.
