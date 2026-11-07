@@ -13,6 +13,7 @@ export {
   eraseReleasedPhotos,
   exportPhotos,
   type PhotoErasure,
+  sweepOrphanedObjects,
 } from "./erasure.ts";
 export {
   type Inspection,
