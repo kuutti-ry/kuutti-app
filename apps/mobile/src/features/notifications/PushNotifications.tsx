@@ -90,7 +90,10 @@ function OnThePhone() {
     if (response.actionIdentifier !== Notifications.DEFAULT_ACTION_IDENTIFIER) return;
     const data = PushData.safeParse(response.notification.request.content.data);
     if (!data.success) return;
-    router.push("/chats");
+    // An announcement is read in the home screen's notices (#573, ADR-068 §4);
+    // a message or a match in the conversations.
+    if (data.data.kind === "announcement") router.dismissTo("/");
+    else router.push("/chats");
   }, [response, status, holding, router]);
 
   return null;

@@ -15,16 +15,20 @@ import { NotificationChoices } from "./NotificationChoices";
 // and every switch labelled.
 
 const INTRO =
-  "A notification says that there is a new message or a new match, never what it says or from whom.";
+  "A notification says that there is a new message, a new match or an announcement, never what it says or from whom.";
 const KINDS = ["Messages", "Matches", "Moderators' decisions"];
 const HINT = "Nothing is sent to your phones for these yet.";
+/** Kuutti's announcements (#573, ADR-068 §6): off stops the push and the email, never the notice. */
+const ANNOUNCEMENTS = "Announcements from Kuutti";
+const ANNOUNCEMENTS_HINT =
+  "When this is off, an announcement still shows in the app, with no push and no email.";
 /** Every text on the screen, in order. */
 const drawn = () => screen.queryAllByText(/./).map((node) => node.props.children);
 const token = (seed: string) => (seed + "x".repeat(43)).slice(0, 43);
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
 const choices = (off: string[] = []) => ({
-  choices: ["message", "match", "moderation"].map((kind) => ({
+  choices: ["message", "match", "moderation", "announcement"].map((kind) => ({
     kind,
     enabled: !off.includes(kind),
   })),
@@ -71,12 +75,12 @@ describe("NotificationChoices", () => {
     );
     await renderWithTheme(<NotificationChoices />);
     expect(await screen.findByRole("switch", { name: "Messages" })).toBeTruthy();
-    for (const name of ["Messages", "Moderators' decisions"]) {
+    for (const name of ["Messages", "Moderators' decisions", ANNOUNCEMENTS]) {
       expect(checked(name)).toBe(true);
     }
     expect(checked("Matches")).toBe(false);
     // The round's push went with the daily set (ADR-062 §12), and its switch with it.
-    expect(screen.getAllByRole("switch")).toHaveLength(3);
+    expect(screen.getAllByRole("switch")).toHaveLength(4);
     expect(screen.queryByRole("switch", { name: "A new round" })).toBeNull();
     noProblems();
     await act(async () =>
@@ -100,7 +104,7 @@ describe("NotificationChoices", () => {
     ],
     ["allowing them", { granted: true, canAskAgain: true, ios: { status: 2 } }, []],
   ])(
-    "draws what a phone %s leaves to do first, then what a notification says, then the kinds, a line under Moderators' decisions alone (#581)",
+    "draws what a phone %s leaves to do first, then what a notification says, then the kinds, a line under Moderators' decisions and Announcements alone (#581, #573)",
     async (_phone, answer, phonePart) => {
       if (answer)
         jest.mocked(Notifications).getPermissionsAsync.mockResolvedValueOnce(answer as never);
@@ -108,7 +112,14 @@ describe("NotificationChoices", () => {
       await renderWithTheme(<NotificationChoices />);
       await screen.findByRole("switch", { name: "Messages" });
       await settle();
-      expect(drawn()).toEqual([...phonePart, INTRO, ...KINDS, HINT]);
+      expect(drawn()).toEqual([
+        ...phonePart,
+        INTRO,
+        ...KINDS,
+        HINT,
+        ANNOUNCEMENTS,
+        ANNOUNCEMENTS_HINT,
+      ]);
       noProblems();
     },
   );
@@ -116,25 +127,31 @@ describe("NotificationChoices", () => {
   it.each([
     [
       "fi-FI",
-      "Ilmoitus kertoo, että sinulle on uusi viesti tai uusi mätsi, ei koskaan mitä siinä lukee tai keneltä se on.",
+      "Ilmoitus kertoo, että sinulle on uusi viesti, uusi mätsi tai tiedote, ei koskaan mitä siinä lukee tai keneltä se on.",
       "Viestit",
       "Näistä ei vielä lähetetä puhelimillesi mitään.",
+      "Kuutin tiedotteet",
+      "Kun tämä on pois päältä, tiedote näkyy silti sovelluksessa, mutta ilman ilmoitusta ja sähköpostia.",
     ],
     [
       "sv-FI",
-      "En avisering säger att det finns ett nytt meddelande eller en ny matchning, aldrig vad det står eller från vem.",
+      "En avisering säger att det finns ett nytt meddelande, en ny matchning eller ett meddelande från Kuutti, aldrig vad det står eller från vem.",
       "Meddelanden",
       "Inget skickas till dina telefoner om detta än.",
+      "Meddelanden från Kuutti",
+      "När det här är avstängt syns ett meddelande ändå i appen, utan avisering och utan e-post.",
     ],
   ])(
-    "says what a notification says, and the line of Moderators' decisions, in %s",
-    async (languageTag, intro, messages, hint) => {
+    "says what a notification says, and the lines of Moderators' decisions and Announcements, in %s",
+    async (languageTag, intro, messages, hint, announcements, announcementsHint) => {
       (useLocales as jest.Mock).mockReturnValue([{ languageTag }]);
       api(() => json(choices()));
       await renderWithTheme(<NotificationChoices />);
       expect(await screen.findByRole("switch", { name: messages })).toBeTruthy();
       expect(screen.getByText(intro)).toBeTruthy();
       expect(screen.getByText(hint)).toBeTruthy();
+      expect(screen.getByRole("switch", { name: announcements })).toBeTruthy();
+      expect(screen.getByText(announcementsHint)).toBeTruthy();
     },
   );
 

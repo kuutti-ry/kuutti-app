@@ -565,6 +565,8 @@ describe("migrate", () => {
           "account",
           "account_export",
           "admin_session",
+          // What Kuutti told everybody, kept for good (#573, ADR-068).
+          "announcement",
           "audit_log",
           "auth_request",
           "block",

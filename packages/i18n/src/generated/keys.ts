@@ -655,6 +655,8 @@ export type MessageParams = {
   "lock.unlock.biometrics": Record<never, never>;
   "lock.unlock.face": Record<never, never>;
   "lock.unlock.fingerprint": Record<never, never>;
+  "mail.announcement.subject": { "title": string };
+  "mail.announcement.why": Record<never, never>;
   "mail.emailCode.code": { "code": string; "minutes": number };
   "mail.emailCode.ignore": Record<never, never>;
   "mail.emailCode.subject": Record<never, never>;
@@ -673,6 +675,8 @@ export type MessageParams = {
   "notifications.ask.decline": Record<never, never>;
   "notifications.ask.heading": Record<never, never>;
   "notifications.intro": Record<never, never>;
+  "notifications.kind.announcement.hint": Record<never, never>;
+  "notifications.kind.announcement.label": Record<never, never>;
   "notifications.kind.match.label": Record<never, never>;
   "notifications.kind.message.label": Record<never, never>;
   "notifications.kind.moderation.hint": Record<never, never>;
@@ -1299,6 +1303,7 @@ export type MessageParams = {
   "profile.tip.tight_crop": Record<never, never>;
   "profile.tip.title": Record<never, never>;
   "profile.title": Record<never, never>;
+  "push.announcement": Record<never, never>;
   "push.channel": Record<never, never>;
   "push.match": Record<never, never>;
   "push.message": Record<never, never>;

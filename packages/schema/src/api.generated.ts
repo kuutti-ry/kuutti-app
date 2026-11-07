@@ -3160,7 +3160,7 @@ export interface paths {
         };
         /**
          * The caller's notices in the app
-         * @description What must reach the person even without a push, newest first, at most 20: a moderator's warning, with its reason, until it is lifted, and an invitation of the person's that counted, with what it earned and never who was invited. A notice holds no text of its own; the app says it.
+         * @description What must reach the person even without a push, newest first, at most 20: a moderator's warning, with its reason, until it is lifted; an invitation of the person's that counted, with what it earned and never who was invited; and an announcement to everybody (#573, ADR-068), with its title and body in the request's language, Swedish falling back to English and Stadi reading Finnish. Every other notice holds no text of its own; the app says it.
          */
         get: {
             parameters: {
@@ -6144,6 +6144,287 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/admin/announcements": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The newest announcements, and how many one would reach
+         * @description The newest 50, drafts and sent alike, each in its languages and whether the caller wrote it, which is who may not approve it; never who wrote or approved it, which the audit log says. With them how many an announcement approved now reaches: every account that is not erased gets its notice, the people with the announcements switch on and a live device its push, and the confirmed addresses with the switch on its email. Admins only.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The announcements. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AdminAnnouncementList"];
+                    };
+                };
+                /** @description unauthenticated, session_expired or session_revoked. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description admin_forbidden: the role does not allow this. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        /**
+         * Write an announcement
+         * @description A draft in English and Finnish, and in Swedish or not at all: each a title of at most 80 characters and a body of at most 1,000, trimmed, never empty, and with no address, link, phone number or handle (the plain-text rule). Nothing is sent until another admin approves it. Admins only; written to audit_log with no words.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["AnnouncementDraft"];
+                };
+            };
+            responses: {
+                /** @description The draft. */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AdminAnnouncement"];
+                    };
+                };
+                /** @description validation_failed, or text_contact_details naming the language and what was found. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description unauthenticated, session_expired or session_revoked. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description admin_forbidden: the role does not allow this. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/announcements/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete a draft
+         * @description Any admin may delete an announcement that has not been approved; one that went to everybody stays. Admins only; written to audit_log.
+         */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Deleted. */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Validation failed. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description unauthenticated, session_expired or session_revoked. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description admin_forbidden: the role does not allow this. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description No such announcement. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description announcement_sent: it went to everybody already. */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/announcements/{id}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Approve an announcement, which sends it to everybody
+         * @description The second admin's approval: never the one who wrote it, and once. In the same transaction every account that is not erased gets the announcement as a notice in the app; after the answer, the confirmed addresses whose switch is on get it by email, and the people whose notice is still unread and whose switch is on get a push in the app's own words, or once the quiet hours end. Nothing takes it back. Admins only; written to audit_log with how many notices it wrote.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The announcement, sent. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AdminAnnouncement"];
+                    };
+                };
+                /** @description Validation failed. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description unauthenticated, session_expired or session_revoked. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description admin_forbidden: the role does not allow this. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description No such announcement. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description own_announcement: the caller wrote it; announcement_sent: it went to everybody already. */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/gate": {
         parameters: {
             query?: never;
@@ -7707,9 +7988,9 @@ export interface components {
             enabled: boolean;
         };
         /** @enum {string} */
-        NotificationKind: "message" | "match" | "moderation";
+        NotificationKind: "message" | "match" | "moderation" | "announcement";
         /** @enum {string} */
-        NoticeKind: "warning" | "invitation_counted" | "invitation_friend";
+        NoticeKind: "warning" | "invitation_counted" | "invitation_friend" | "announcement";
         ExportedRounds: {
             /** @description What this part is, in the request's language. */
             about: string;
@@ -8267,7 +8548,7 @@ export interface components {
         Notices: {
             notices: components["schemas"]["Notice"][];
         };
-        Notice: components["schemas"]["WarningNotice"] | components["schemas"]["InvitationCountedNotice"] | components["schemas"]["InvitationFriendNotice"];
+        Notice: components["schemas"]["WarningNotice"] | components["schemas"]["InvitationCountedNotice"] | components["schemas"]["InvitationFriendNotice"] | components["schemas"]["AnnouncementNotice"];
         WarningNotice: {
             /** Format: uuid */
             id: string;
@@ -8312,6 +8593,21 @@ export interface components {
              */
             kind: "invitation_friend";
             reward: components["schemas"]["RewardUnits"];
+        };
+        AnnouncementNotice: {
+            /** Format: uuid */
+            id: string;
+            /** Format: date-time */
+            at: string;
+            /** Format: date-time */
+            readAt: string | null;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "announcement";
+            title: string;
+            body: string;
         };
         PushTokenRequest: {
             token: string;
@@ -8868,6 +9164,36 @@ export interface components {
         };
         PondMatchingChange: {
             open: boolean;
+        };
+        AdminAnnouncementList: {
+            items: components["schemas"]["AdminAnnouncement"][];
+            reach: components["schemas"]["AnnouncementReach"];
+        };
+        AdminAnnouncement: {
+            /** Format: uuid */
+            id: string;
+            en: components["schemas"]["AnnouncementText"];
+            fi: components["schemas"]["AnnouncementText"];
+            sv: components["schemas"]["AnnouncementText"] & unknown;
+            /** Format: date-time */
+            writtenAt: string;
+            /** Format: date-time */
+            approvedAt: string | null;
+            yours: boolean;
+        };
+        AnnouncementText: {
+            title: string;
+            body: string;
+        };
+        AnnouncementReach: {
+            accounts: number;
+            phones: number;
+            addresses: number;
+        };
+        AnnouncementDraft: {
+            en: components["schemas"]["AnnouncementText"];
+            fi: components["schemas"]["AnnouncementText"];
+            sv?: components["schemas"]["AnnouncementText"];
         };
         GateResponse: {
             state: components["schemas"]["GateState"];

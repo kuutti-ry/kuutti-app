@@ -22,7 +22,7 @@ name: The messages switch in Settings, Notifications, goes off, is kept on the s
     file: ../common/open-settings-row.yaml
     env:
       ROW: "(Notifications|Ilmoitukset|Aviseringar)(, .*)?"
-      INSIDE: "A notification says that there is a new message or a new match, never what it says or from whom\\.|Ilmoitus kertoo, että sinulle on uusi viesti tai uusi mätsi, ei koskaan mitä siinä lukee tai keneltä se on\\.|En avisering säger att det finns ett nytt meddelande eller en ny matchning, aldrig vad det står eller från vem\\."
+      INSIDE: "A notification says that there is a new message, a new match or an announcement, never what it says or from whom\\.|Ilmoitus kertoo, että sinulle on uusi viesti, uusi mätsi tai tiedote, ei koskaan mitä siinä lukee tai keneltä se on\\.|En avisering säger att det finns ett nytt meddelande, en ny matchning eller ett meddelande från Kuutti, aldrig vad det står eller från vem\\."
 # The phone's button comes once the phone has been read; its answer has no line
 # of its own, and a change of it is said aloud, which Maestro cannot hear (#581).
 - extendedWaitUntil:
@@ -36,14 +36,14 @@ name: The messages switch in Settings, Notifications, goes off, is kept on the s
 - extendedWaitUntil:
     visible:
       text: "1|(Messages|Viestit|Meddelanden), on"
-      below: "A notification says that there is a new message or a new match, never what it says or from whom\\.|Ilmoitus kertoo, että sinulle on uusi viesti tai uusi mätsi, ei koskaan mitä siinä lukee tai keneltä se on\\.|En avisering säger att det finns ett nytt meddelande eller en ny matchning, aldrig vad det står eller från vem\\."
+      below: "A notification says that there is a new message, a new match or an announcement, never what it says or from whom\\.|Ilmoitus kertoo, että sinulle on uusi viesti, uusi mätsi tai tiedote, ei koskaan mitä siinä lukee tai keneltä se on\\.|En avisering säger att det finns ett nytt meddelande, en ny matchning eller ett meddelande från Kuutti, aldrig vad det står eller från vem\\."
       above: "Matches|Mätsit|Matchningar"
     timeout: 15000
 - tapOn: "Messages|Viestit|Meddelanden"
 - extendedWaitUntil:
     visible:
       text: "0|(Messages|Viestit|Meddelanden), off"
-      below: "A notification says that there is a new message or a new match, never what it says or from whom\\.|Ilmoitus kertoo, että sinulle on uusi viesti tai uusi mätsi, ei koskaan mitä siinä lukee tai keneltä se on\\.|En avisering säger att det finns ett nytt meddelande eller en ny matchning, aldrig vad det står eller från vem\\."
+      below: "A notification says that there is a new message, a new match or an announcement, never what it says or from whom\\.|Ilmoitus kertoo, että sinulle on uusi viesti, uusi mätsi tai tiedote, ei koskaan mitä siinä lukee tai keneltä se on\\.|En avisering säger att det finns ett nytt meddelande, en ny matchning eller ett meddelande från Kuutti, aldrig vad det står eller från vem\\."
       above: "Matches|Mätsit|Matchningar"
     timeout: 15000
 - assertNotVisible: "That did not go through\\. Try again\\.|Se ei onnistunut\\. Yritä uudelleen\\.|Det gick inte\\. Försök igen\\."
@@ -59,18 +59,18 @@ name: The messages switch in Settings, Notifications, goes off, is kept on the s
     file: ../common/open-settings-row.yaml
     env:
       ROW: "(Notifications|Ilmoitukset|Aviseringar)(, .*)?"
-      INSIDE: "A notification says that there is a new message or a new match, never what it says or from whom\\.|Ilmoitus kertoo, että sinulle on uusi viesti tai uusi mätsi, ei koskaan mitä siinä lukee tai keneltä se on\\.|En avisering säger att det finns ett nytt meddelande eller en ny matchning, aldrig vad det står eller från vem\\."
+      INSIDE: "A notification says that there is a new message, a new match or an announcement, never what it says or from whom\\.|Ilmoitus kertoo, että sinulle on uusi viesti, uusi mätsi tai tiedote, ei koskaan mitä siinä lukee tai keneltä se on\\.|En avisering säger att det finns ett nytt meddelande, en ny matchning eller ett meddelande från Kuutti, aldrig vad det står eller från vem\\."
 - extendedWaitUntil:
     visible:
       text: "0|(Messages|Viestit|Meddelanden), off"
-      below: "A notification says that there is a new message or a new match, never what it says or from whom\\.|Ilmoitus kertoo, että sinulle on uusi viesti tai uusi mätsi, ei koskaan mitä siinä lukee tai keneltä se on\\.|En avisering säger att det finns ett nytt meddelande eller en ny matchning, aldrig vad det står eller från vem\\."
+      below: "A notification says that there is a new message, a new match or an announcement, never what it says or from whom\\.|Ilmoitus kertoo, että sinulle on uusi viesti, uusi mätsi tai tiedote, ei koskaan mitä siinä lukee tai keneltä se on\\.|En avisering säger att det finns ett nytt meddelande, en ny matchning eller ett meddelande från Kuutti, aldrig vad det står eller från vem\\."
       above: "Matches|Mätsit|Matchningar"
     timeout: 15000
 - tapOn: "Messages|Viestit|Meddelanden"
 - extendedWaitUntil:
     visible:
       text: "1|(Messages|Viestit|Meddelanden), on"
-      below: "A notification says that there is a new message or a new match, never what it says or from whom\\.|Ilmoitus kertoo, että sinulle on uusi viesti tai uusi mätsi, ei koskaan mitä siinä lukee tai keneltä se on\\.|En avisering säger att det finns ett nytt meddelande eller en ny matchning, aldrig vad det står eller från vem\\."
+      below: "A notification says that there is a new message, a new match or an announcement, never what it says or from whom\\.|Ilmoitus kertoo, että sinulle on uusi viesti, uusi mätsi tai tiedote, ei koskaan mitä siinä lukee tai keneltä se on\\.|En avisering säger att det finns ett nytt meddelande, en ny matchning eller ett meddelande från Kuutti, aldrig vad det står eller från vem\\."
       above: "Matches|Mätsit|Matchningar"
     timeout: 15000
 - assertNotVisible: "That did not go through\\. Try again\\.|Se ei onnistunut\\. Yritä uudelleen\\.|Det gick inte\\. Försök igen\\."
@@ -78,4 +78,4 @@ name: The messages switch in Settings, Notifications, goes off, is kept on the s
     file: ../common/close-settings-row.yaml
     env:
       ROW: "(Notifications|Ilmoitukset|Aviseringar)(, .*)?"
-      INSIDE: "A notification says that there is a new message or a new match, never what it says or from whom\\.|Ilmoitus kertoo, että sinulle on uusi viesti tai uusi mätsi, ei koskaan mitä siinä lukee tai keneltä se on\\.|En avisering säger att det finns ett nytt meddelande eller en ny matchning, aldrig vad det står eller från vem\\."
+      INSIDE: "A notification says that there is a new message, a new match or an announcement, never what it says or from whom\\.|Ilmoitus kertoo, että sinulle on uusi viesti, uusi mätsi tai tiedote, ei koskaan mitä siinä lukee tai keneltä se on\\.|En avisering säger att det finns ett nytt meddelande, en ny matchning eller ett meddelande från Kuutti, aldrig vad det står eller från vem\\."
