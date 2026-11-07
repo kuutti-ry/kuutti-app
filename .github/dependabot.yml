@@ -21,14 +21,6 @@ updates:
       github-actions:
         patterns: ["*"]
 
-  # The API image's base image, pinned by digest in apps/api/Dockerfile:
-  # Dependabot moves the digest, and the tag with it when Node's line moves (#636).
-  - package-ecosystem: "docker"
-    directory: "/apps/api"
-    schedule:
-      interval: "monthly"
-    cooldown:
-      default-days: 7
   # The pnpm workspace. Minor and patch bumps arrive as one pull request a
   # month; majors come alone so they get read.
   - package-ecosystem: "npm"

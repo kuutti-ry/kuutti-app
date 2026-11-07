@@ -189,6 +189,24 @@ describe("error serialization", () => {
     expect(JSON.stringify(lines())).not.toContain("a@b.fi");
   });
 
+  it("drops a cause that is no error: a library's object of claims, a database's string", async () => {
+    const withClaims = new Error("claim mismatch", {
+      cause: { expected: "x", claims: { hetu: "010190-999X", email: "a@b.fi" } },
+    });
+    const withText = new Error("insert failed", {
+      cause: "Key (email)=(a@b.fi) already exists.",
+    });
+    for (const error of [withClaims, withText]) {
+      const serialized = serializeError(error);
+      expect(serialized).not.toHaveProperty("cause");
+      const { logger, lines } = await captureLogger();
+      logger.error({ err: error }, "unhandled error");
+      const text = JSON.stringify(lines());
+      expect(text).not.toContain("a@b.fi");
+      expect(text).not.toContain("010190");
+    }
+  });
+
   it("keeps an AWS SDK error's metadata and a kit error's reason", () => {
     const sdk = Object.assign(new Error("Access Denied"), {
       name: "AccessDenied",

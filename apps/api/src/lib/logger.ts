@@ -118,9 +118,11 @@ export function serializeError(error: unknown): ReturnType<typeof pino.stdSerial
     })
     .join("\n");
   if ("message" in kept) kept.message = "[redacted]";
-  // A cause gets the same allowlist, read off the error itself: pino leaves it out.
+  // A cause gets the same allowlist, read off the error itself, since pino
+  // leaves it out; one that is no error (a library's object of claims, a
+  // database's string) is dropped, as nothing of it names a kind.
   const cause = (error as { cause?: unknown } | null)?.cause;
-  if (cause !== undefined) kept.cause = serializeError(cause);
+  if (cause instanceof Error) kept.cause = serializeError(cause);
   return kept as ReturnType<typeof pino.stdSerializers.err>;
 }
 
