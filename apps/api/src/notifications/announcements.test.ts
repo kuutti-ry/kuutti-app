@@ -239,9 +239,15 @@ describe("announcements", () => {
       await signedInAccount(ctx.client),
       await signedInAccount(ctx.client),
     ];
-    // Somebody erased is told nothing.
+    // Somebody erased is told nothing; a newcomer still onboarding and somebody
+    // on a break are told as anybody is, and read it when they come.
     const gone = await signedInAccount(ctx.client);
     await ctx.client.query("UPDATE account SET state = 'deleted' WHERE id = $1", [gone.accountId]);
+    const newcomer = await signedInAccount(ctx.client, undefined, { state: "registered" });
+    const resting = await signedInAccount(ctx.client);
+    await ctx.client.query("UPDATE account SET state = 'paused' WHERE id = $1", [
+      resting.accountId,
+    ]);
     const { id } = await written(app, writer.headers);
     expect((await approve(app, other.headers, id)).status).toBe(200);
     await settled();
@@ -255,11 +261,16 @@ describe("announcements", () => {
     expect(await words(englishman, "en")).toEqual([[DRAFT.en.title, DRAFT.en.body]]);
     // Stadi reads the Finnish.
     expect(await words(finn, "fi-x-stadi")).toEqual([[DRAFT.fi.title, DRAFT.fi.body]]);
-    const { rows } = await ctx.client.query(
-      "SELECT 1 FROM notice WHERE account_id = $1 AND announcement_id = $2",
-      [gone.accountId, id],
-    );
-    expect(rows).toEqual([]);
+    const told = async (who: SignedIn) =>
+      (
+        await ctx.client.query(
+          "SELECT 1 FROM notice WHERE account_id = $1 AND announcement_id = $2",
+          [who.accountId, id],
+        )
+      ).rows.length;
+    expect(await told(gone)).toBe(0);
+    expect(await told(newcomer)).toBe(1);
+    expect(await told(resting)).toBe(1);
     // Every account that is not erased, and no more.
     const { rows: live } = await ctx.client.query<{ n: number }>(
       "SELECT count(*)::int AS n FROM account WHERE state <> 'deleted'",
