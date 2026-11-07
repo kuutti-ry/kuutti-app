@@ -231,6 +231,8 @@ export async function boot({
     logger,
     now: () => new Date(),
     ...(pusher ? { pusher } : {}),
+    // An announcement's email goes with its push (ADR-068 §5).
+    ...(mailer ? { mailer } : {}),
     online: (accountId) => live.online(accountId),
   });
   const app = createApp({

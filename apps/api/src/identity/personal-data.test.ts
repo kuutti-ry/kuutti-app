@@ -52,6 +52,13 @@ const REGISTER: Record<string, Entry> = {
     stays: "access_hash created_at expires_at id identity_id last_used_at revoked_at role",
     exported: { not: "A member of staff's work, not the person's account." },
   },
+  announcement: {
+    erasure: "stays",
+    why: "Kuutti's words to everybody and the two members of staff who wrote and approved them: staff's work, kept for good once sent (ADR-068 §8).",
+    stays:
+      "approved_at approved_by body_en body_fi body_sv id title_en title_fi title_sv written_at written_by",
+    exported: { not: "A member of staff's work, not the person's account." },
+  },
   audit_log: {
     erasure: "stays",
     why: "Append-only record of what staff did, by its trigger; it outlives everybody.",

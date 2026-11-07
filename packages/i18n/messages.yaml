@@ -7598,6 +7598,20 @@ mail.emailCode.ignore:
   sv: "Någon lade till den här adressen i Kuutti-appen för att hålla kontakten. Om det inte var du kan du bortse från det här meddelandet."
   machine: { fi: true, sv: true }
 
+mail.announcement.subject:
+  en: "Kuutti: {title}"
+  description: "The subject of an announcement's email (#573, ADR-068 §5): the app's name and the announcement's own title as an admin wrote it, in the language of the text the person gets (Swedish where written, otherwise English; Finnish for Finnish)."
+  fi: "Kuutti: {title}"
+  sv: "Kuutti: {title}"
+  machine: { fi: true, sv: true }
+
+mail.announcement.why:
+  en: "You get this because you confirmed this address in the Kuutti app. Announcements can be turned off in Settings, under Notifications."
+  description: "An announcement's email (#573, ADR-068 §5), after its body: why the person gets it, and where the Announcements switch is (Settings › Notifications), which stops the email and the push but not the notice in the app. No link: the mail carries none."
+  fi: "Saat tämän, koska vahvistit tämän osoitteen Kuutti-sovelluksessa. Kuutin tiedotteet voi laittaa pois päältä Asetuksista, kohdasta Ilmoitukset."
+  sv: "Du får det här eftersom du bekräftade den här adressen i Kuutti-appen. Meddelanden från Kuutti kan stängas av i Inställningar, under Aviseringar."
+  machine: { fi: true, sv: true }
+
 mail.signature:
   en: "Kuutti ry"
   description: "The last line of every message Kuutti sends (#385): the association's name, never an address (the maintainer, 06/10/2026)."
@@ -8955,10 +8969,10 @@ settings.notifications.someOn:
   machine: { fi: true, sv: true }
 
 notifications.intro:
-  en: "A notification says that there is a new message or a new match, never what it says or from whom."
-  description: "The Notifications panel's one line (#176, ADR-032; #102, ADR-055; #581): what a lock screen will show, which cannot be seen until it has happened and which somebody else may read. A push says which kind and nothing more: no text, no name."
-  fi: "Ilmoitus kertoo, että sinulle on uusi viesti tai uusi mätsi, ei koskaan mitä siinä lukee tai keneltä se on."
-  sv: "En avisering säger att det finns ett nytt meddelande eller en ny matchning, aldrig vad det står eller från vem."
+  en: "A notification says that there is a new message, a new match or an announcement, never what it says or from whom."
+  description: "The Notifications panel's one line (#176, ADR-032; #102, ADR-055; #581; #573, ADR-068 §4): what a lock screen will show, which cannot be seen until it has happened and which somebody else may read. A push says which kind and nothing more: no text, no name, and of an announcement not its words."
+  fi: "Ilmoitus kertoo, että sinulle on uusi viesti, uusi mätsi tai tiedote, ei koskaan mitä siinä lukee tai keneltä se on."
+  sv: "En avisering säger att det finns ett nytt meddelande, en ny matchning eller ett meddelande från Kuutti, aldrig vad det står eller från vem."
   machine: { fi: true, sv: true }
 
 notifications.phone.allowed:
@@ -9011,10 +9025,10 @@ notifications.ask.heading:
   machine: { fi: true, sv: true }
 
 notifications.ask.body:
-  en: "Kuutti can tell this phone when someone likes you back and when a message arrives. A notification says that there is a new message or a new match, never what it says or from whom. You choose which kinds in Settings."
-  description: "The home screen's offer of notifications (#102, ADR-055 §9), the reason in words, under its heading: the two pushes, what a push never carries, and where the kinds are chosen. Calm; no promise of more."
-  fi: "Kuutti voi kertoa tälle puhelimelle, kun joku tykkää sinusta takaisin ja kun saat viestin. Ilmoitus kertoo, että sinulle on uusi viesti tai uusi mätsi, ei koskaan mitä siinä lukee tai keneltä se on. Lajit valitset asetuksista."
-  sv: "Kuutti kan berätta för den här telefonen när någon gillar dig tillbaka och när ett meddelande kommer. En avisering säger att det finns ett nytt meddelande eller en ny matchning, aldrig vad det står eller från vem. Du väljer slagen i inställningarna."
+  en: "Kuutti can tell this phone when someone likes you back and when a message arrives. A notification says that there is a new message, a new match or an announcement, never what it says or from whom. You choose which kinds in Settings."
+  description: "The home screen's offer of notifications (#102, ADR-055 §9), the reason in words, under its heading: the two pushes a person is told of most, what a push says and never carries (an announcement among the kinds since #573, ADR-068 §4), and where the kinds are chosen. Calm; no promise of more."
+  fi: "Kuutti voi kertoa tälle puhelimelle, kun joku tykkää sinusta takaisin ja kun saat viestin. Ilmoitus kertoo, että sinulle on uusi viesti, uusi mätsi tai tiedote, ei koskaan mitä siinä lukee tai keneltä se on. Lajit valitset asetuksista."
+  sv: "Kuutti kan berätta för den här telefonen när någon gillar dig tillbaka och när ett meddelande kommer. En avisering säger att det finns ett nytt meddelande, en ny matchning eller ett meddelande från Kuutti, aldrig vad det står eller från vem. Du väljer slagen i inställningarna."
   machine: { fi: true, sv: true }
 
 notifications.ask.decline:
@@ -9036,6 +9050,13 @@ push.match:
   description: "A push (#102, ADR-055 §5), its one line: somebody the person liked liked them back and a conversation opened. Never who; the phone shows it on the lock screen. Short, no full stop."
   fi: "Sinulle on uusi mätsi"
   sv: "Du har en ny matchning"
+  machine: { fi: true, sv: true }
+
+push.announcement:
+  en: "An announcement from Kuutti"
+  description: "A push (#573, ADR-068 §4), its one line: Kuutti has told everybody something, which the person reads in the app's notices and, with a confirmed address, by email. Never the announcement's own words, which never pass through Expo, Apple or Google; the phone shows it on the lock screen. Short, no full stop."
+  fi: "Tiedote Kuutilta"
+  sv: "Ett meddelande från Kuutti"
   machine: { fi: true, sv: true }
 
 push.channel:
@@ -9071,6 +9092,20 @@ notifications.kind.moderation.hint:
   description: "Under the Moderators' decisions switch (#176, ADR-032, #581): the one thing the panel cannot show, that nothing reads this switch yet. Goes when something is sent for it."
   fi: "Näistä ei vielä lähetetä puhelimillesi mitään."
   sv: "Inget skickas till dina telefoner om detta än."
+  machine: { fi: true, sv: true }
+
+notifications.kind.announcement.label:
+  en: "Announcements from Kuutti"
+  description: "The Notifications screen (#573, ADR-068 §6), the switch of Kuutti's announcements to everybody: when on, an announcement comes as a push and, to a confirmed address, by email. Distinct from the home screen's Notices heading."
+  fi: "Kuutin tiedotteet"
+  sv: "Meddelanden från Kuutti"
+  machine: { fi: true, sv: true }
+
+notifications.kind.announcement.hint:
+  en: "When this is off, an announcement still shows in the app, with no push and no email."
+  description: "Under the Announcements switch (#573, ADR-068 §6): the fact a person needs before switching it off, that what Kuutti tells everybody still reaches them in the app."
+  fi: "Kun tämä on pois päältä, tiedote näkyy silti sovelluksessa, mutta ilman ilmoitusta ja sähköpostia."
+  sv: "När det här är avstängt syns ett meddelande ändå i appen, utan avisering och utan e-post."
   machine: { fi: true, sv: true }
 
 notices.title:

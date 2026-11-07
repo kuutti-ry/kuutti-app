@@ -28,8 +28,9 @@ const notice = {
 };
 
 describe("the notification choices", () => {
-  it("are three kinds, in the order Settings lists them", () => {
-    expect(NotificationKind.options).toEqual(["message", "match", "moderation"]);
+  it("are four kinds, in the order Settings lists them", () => {
+    // Kuutti's announcements last (#573, ADR-068 §6).
+    expect(NotificationKind.options).toEqual(["message", "match", "moderation", "announcement"]);
     expect(NotificationKindParams.parse({ kind: "match" })).toEqual({ kind: "match" });
     expect(codes(NotificationKindParams, { kind: "push" })).toEqual(["invalid_value"]);
     // The round's went with its push (ADR-062 §12).
@@ -44,20 +45,46 @@ describe("the notification choices", () => {
       "unrecognized_keys",
     ]);
     const all = NotificationKind.options.map((kind) => ({ kind, enabled: true }));
-    expect(NotificationChoices.parse({ choices: all }).choices).toHaveLength(3);
+    expect(NotificationChoices.parse({ choices: all }).choices).toHaveLength(4);
     expect(codes(NotificationChoices, { choices: [...all, all[0]] })).toEqual(["too_big"]);
   });
 });
 
 describe("the notices", () => {
   it("carry a warning's reason, and no more than a screen of them", () => {
-    expect(NoticeKind.options).toEqual(["warning", "invitation_counted", "invitation_friend"]);
+    expect(NoticeKind.options).toEqual([
+      "warning",
+      "invitation_counted",
+      "invitation_friend",
+      "announcement",
+    ]);
     expect(Notices.parse({ notices: [notice] }).notices).toEqual([notice]);
     expect(codes(Notices, { notices: [{ ...notice, reason: "rude" }] })).toEqual(["invalid_value"]);
     expect(codes(Notices, { notices: [{ ...notice, kind: "match" }] })).toEqual(["invalid_union"]);
     expect(
       codes(Notices, { notices: Array.from({ length: NOTICES_MAX + 1 }, () => notice) }),
     ).toEqual(["too_big"]);
+  });
+
+  it("carry an announcement's own words, at most a title of 80 characters and a body of 1,000 (#573)", () => {
+    const announced = {
+      id: notice.id,
+      kind: "announcement",
+      at,
+      readAt: null,
+      title: "A short break on Sunday",
+      body: "Kuutti is closed from 10 to 12.",
+    };
+    expect(Notices.parse({ notices: [announced] }).notices).toEqual([announced]);
+    expect(codes(Notices, { notices: [{ ...announced, title: "t".repeat(81) }] })).toEqual([
+      "too_big",
+    ]);
+    expect(codes(Notices, { notices: [{ ...announced, body: "b".repeat(1001) }] })).toEqual([
+      "too_big",
+    ]);
+    // Without its words it is no announcement.
+    const { title: _title, ...wordless } = announced;
+    expect(codes(Notices, { notices: [wordless] })).toEqual(["invalid_type"]);
   });
 
   it("carry a counted invitation's reward, and never who was invited (#107)", () => {

@@ -40,7 +40,7 @@ Stack: Expo SDK 57, React Native 0.86, React 19, TypeScript, dev client (`expo s
 
 ## Notifications
 
-- Two pushes, the maintainer's of 25/10/2026, and no daily one (ADR-062 §12): a message, to somebody not in the app, at most once a conversation per `message_push_min_interval_minutes`; and a new match, to the person whose earlier like it met. Nothing in the quiet hours. A push says that there is something, never what or from whom: no message text, no name, no account id, no badge (ADR-055).
+- Three pushes, and no daily one (ADR-062 §12): a message, to somebody not in the app, at most once a conversation per `message_push_min_interval_minutes`; a new match, to the person whose earlier like it met (both the maintainer's of 25/10/2026); and an announcement to everybody whose notice of it is unread, which a tap opens on home (#573, ADR-068 §4, his of 07/11/2026). Nothing in the quiet hours. A push says that there is something, never what or from whom: no message text, no name, no account id, no badge (ADR-055).
 - The permission is asked once there is something to tell (the home screen's offer, once matching is open), with the reason, never at the first start; an answer is remembered and the offer never comes back. Everything works without it.
 
 ## i18n

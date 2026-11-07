@@ -64,7 +64,7 @@ const noticesRoute = createRoute({
   path: "/notices",
   summary: "The caller's notices in the app",
   description:
-    "What must reach the person even without a push, newest first, at most 20: a moderator's warning, with its reason, until it is lifted, and an invitation of the person's that counted, with what it earned and never who was invited. A notice holds no text of its own; the app says it.",
+    "What must reach the person even without a push, newest first, at most 20: a moderator's warning, with its reason, until it is lifted; an invitation of the person's that counted, with what it earned and never who was invited; and an announcement to everybody (#573, ADR-068), with its title and body in the request's language, Swedish falling back to English and Stadi reading Finnish. Every other notice holds no text of its own; the app says it.",
   ...bearer,
   responses: {
     200: { description: "The notices.", ...json(Notices) },
@@ -134,7 +134,7 @@ export function notificationRoutes(deps: Deps, guard: MiddlewareHandler<AppEnv>)
 
   app.openapi(noticesRoute, async (c) => {
     const { accountId } = callerOf(c);
-    return c.json(await noticesOf(deps.db, accountId), 200);
+    return c.json(await noticesOf(deps.db, accountId, c.get("locale")), 200);
   });
 
   app.openapi(readNoticeRoute, async (c) => {

@@ -54,6 +54,7 @@ export {
   photoVariant,
 } from "./media.ts";
 export {
+  announcement,
   notice,
   noticeKind,
   notificationKind,

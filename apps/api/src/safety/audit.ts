@@ -27,6 +27,12 @@ const AUDIT_ACTIONS = [
   "report.decide",
   // A pond's switch turned in the panel (#500, ADR-060 §2): `detail` says which way.
   "pond.matching",
+  // An announcement to everybody (#573, ADR-068 §2): written, approved by a
+  // second admin (`detail` says how many notices it wrote), or deleted as a
+  // draft. Never its words.
+  "announcement.write",
+  "announcement.approve",
+  "announcement.delete",
 ] as const;
 type AuditAction = (typeof AUDIT_ACTIONS)[number];
 
@@ -35,7 +41,15 @@ export type AuditEntry = {
   actorIdentityId: string | null;
   action: AuditAction;
   /** "any": an audit read narrowed to a subject id of no named type (#309). */
-  subjectType: "photo" | "feedback" | "account" | "config" | "report" | "pond" | "any";
+  subjectType:
+    | "photo"
+    | "feedback"
+    | "account"
+    | "config"
+    | "report"
+    | "pond"
+    | "announcement"
+    | "any";
   subjectId: string;
   detail?: Record<string, string | number | boolean | null>;
 };

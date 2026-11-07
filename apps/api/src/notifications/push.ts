@@ -4,6 +4,7 @@ import type { NotificationKind, PushData } from "@kuutti/schema";
 import { finnishHour, msUntilFinnishHour } from "../lib/finnish-day.ts";
 import { tFor } from "../lib/i18n.ts";
 import type { Logger } from "../lib/logger.ts";
+import type { Mailer } from "../lib/mail.ts";
 import { asHour, matchingConfigNumber, matchingConfigNumbers } from "../lib/matching-config.ts";
 import {
   EXPO_PROJECT,
@@ -14,6 +15,8 @@ import {
   type PushMessage,
   type PushTicket,
 } from "../lib/push.ts";
+import { mailAnnouncement } from "./announcements.ts";
+import { unreadAnnouncementAccounts } from "./repo.ts";
 
 // The push (#102, ADR-055): that there is something, never what or from
 // whom. Each sender reads, fresh: the person's switch for its kind (ADR-032),
@@ -40,6 +43,7 @@ export const REQUEST_SPACING_MS = 200;
 const LINES: Record<PushData["kind"], PlainMessageKey> = {
   message: "push.message",
   match: "push.match",
+  announcement: "push.announcement",
 };
 
 /**
@@ -63,6 +67,8 @@ export type PushDeps = {
   now: () => Date;
   /** Absent where PUSH is off: nothing is sent, and nothing is read for it. */
   pusher?: Pusher;
+  /** An announcement's email goes with its push (ADR-068 §5); absent where MAIL is off. */
+  mailer?: Mailer;
   /** Whether the account has a live socket now (#349): the chat's registry. */
   online: (accountId: string) => boolean;
   schedule?: Schedule;
@@ -385,6 +391,45 @@ export function createPush(deps: PushDeps) {
       if (!pusher) return;
       inTheBackground("match", async () => {
         await deliver(pusher, input.accountId, { kind: "match" });
+      });
+    },
+
+    /**
+     * An announcement approved (ADR-068 §4, §5): its email at once, and its
+     * push to everybody whose notice of it is still unread, at once or,
+     * approved in the quiet hours, once they end, where a message's would be
+     * dropped. Each person's push reads the switch, the hours and the devices
+     * as every push does. Returns at once.
+     */
+    announcement(input: { announcementId: string }): void {
+      const { mailer, pusher } = deps;
+      if (mailer) {
+        inTheBackground("announcement", async () => {
+          await mailAnnouncement(
+            { db: deps.db, logger: deps.logger, mailer, pause },
+            input.announcementId,
+          );
+        });
+      }
+      if (!pusher) return;
+      const toEverybody = async () => {
+        let pushed = 0;
+        for (const accountId of await unreadAnnouncementAccounts(deps.db, input.announcementId)) {
+          if ((await deliver(pusher, accountId, { kind: "announcement" })) > 0) pushed += 1;
+        }
+        deps.logger.info({ announcementId: input.announcementId, pushed }, "announcement pushed");
+      };
+      inTheBackground("announcement", async () => {
+        const at = deps.now();
+        const { quiet } = await timing(at);
+        if (!quiet) return toEverybody();
+        const to = asHour(QUIET_TO_KEY, await matchingConfigNumber(deps.db, QUIET_TO_KEY));
+        // shortcut: the wait lives in this process's memory, so a restart before
+        // the quiet hours end loses the push (ADR-068, Left out); the notices
+        // and the email have gone. A column for when the push went would lift it.
+        schedule(msUntilFinnishHour(at, to), async () => {
+          inTheBackground("announcement", toEverybody);
+        });
       });
     },
 

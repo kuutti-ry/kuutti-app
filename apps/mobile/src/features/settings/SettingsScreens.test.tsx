@@ -689,7 +689,7 @@ describe("the account's rows", () => {
     expect(await screen.findByRole("button", { name: "Allow notifications" })).toBeTruthy();
     expect(
       screen.getByText(
-        "A notification says that there is a new message or a new match, never what it says or from whom.",
+        "A notification says that there is a new message, a new match or an announcement, never what it says or from whom.",
       ),
     ).toBeTruthy();
     noProblems();

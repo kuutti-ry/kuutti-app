@@ -41,6 +41,15 @@ const used = (n: number, reward: { fish: number }) => ({
   readAt: null,
   reward,
 });
+/** An announcement to everybody (#573), in the words the API gave it for the reader. */
+const announced = (n: number) => ({
+  id: `00000000-0000-4000-8000-00000000003${n}`,
+  kind: "announcement",
+  at: "2026-11-07T10:00:00.000Z",
+  readAt: null,
+  title: "A short break on Sunday",
+  body: "Kuutti is closed from 10 to 12 for maintenance.",
+});
 /** The screen's own words around a notice, by language. */
 const AROUND = {
   en: ["Notices", "Got it"],
@@ -217,6 +226,29 @@ describe("Notices", () => {
       noProblems();
     },
   );
+
+  it("shows an announcement in its own words beside a warning, and Got it takes it off (#573)", async () => {
+    const seen = api([announced(1), notice(1)]);
+    await renderWithTheme(<Notices />);
+    expect(await screen.findByText("A short break on Sunday")).toBeTruthy();
+    // Its title and body are all it says: the screen adds nothing of its own to them.
+    expect(said()).toEqual([
+      "Notices",
+      "A short break on Sunday",
+      "Kuutti is closed from 10 to 12 for maintenance.",
+      "Got it",
+      "A warning from a moderator",
+      BODY,
+      "Got it",
+    ]);
+    noProblems();
+    const first = screen.getAllByRole("button", { name: "Got it" })[0];
+    await act(async () => fireEvent.press(first as ReturnType<typeof screen.getByRole>));
+    await settle();
+    expect(seen).toContain(`POST /notices/${announced(1).id}/read`);
+    expect(screen.queryByText("A short break on Sunday")).toBeNull();
+    expect(screen.getByText(BODY)).toBeTruthy();
+  });
 
   it("keeps a notice whose mark failed, says so, and tells VoiceOver", async () => {
     jest.replaceProperty(Platform, "OS", "ios");
