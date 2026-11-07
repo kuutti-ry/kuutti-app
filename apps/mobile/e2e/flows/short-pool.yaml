@@ -120,7 +120,10 @@ name: With few people left, the queue's end offers the deal-breakers to relax fo
 - extendedWaitUntil:
     notVisible: "Fine with me|Sopii minulle|Okej för mig"
     timeout: 15000
-- openLink: kuutti://profile/later/smoking
+# Opened for its one answer (`once`), the screen draws smoking beside other
+# nicotine; otherwise it asks only the half still open (#616), and smoking's
+# answer is not on it.
+- openLink: kuutti://profile/later/smoking?once=1
 - extendedWaitUntil:
     visible: "✓ Never|✓ En koskaan|✓ Aldrig"
     timeout: 15000

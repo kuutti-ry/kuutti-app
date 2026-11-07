@@ -21,7 +21,9 @@ name: Taking one's own answer back pauses the deal-breaker on it, and answering 
     timeout: 15000
 
 # Her own answer taken back: the first person's words, on her own question.
-- openLink: kuutti://profile/later/smoking
+# Opened for its one answer (`once`), the screen draws smoking beside other
+# nicotine; otherwise it asks only the half still open (#616), which is not hers.
+- openLink: kuutti://profile/later/smoking?once=1
 - extendedWaitUntil:
     visible: "✓ Never|✓ En koskaan|✓ Aldrig"
     timeout: 15000
