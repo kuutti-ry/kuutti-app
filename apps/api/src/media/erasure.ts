@@ -64,9 +64,10 @@ export async function eraseReleasedPhotos(
  * keeps its objects. What remains is the window between this check and the
  * delete, the same one the upload's failure path and deletePhoto have had
  * since #57: closing it takes a per-content-key ownership protocol in the
- * media slice, noted for the M4 orphan sweep. Best effort: a failure is
- * logged with the content keys (SHA-256 of the WebP bytes, nothing personal)
- * and the account; the rows are already gone.
+ * media slice. Best effort: a failure is logged with the content keys
+ * (SHA-256 of the WebP bytes, nothing personal) and the account; the rows are
+ * already gone, and the night's `sweepOrphanedObjects` takes the objects once
+ * they are a day old (#636).
  */
 export async function deleteOrphanedObjects(
   deps: { db: Queryable; store: MediaStore; logger: Logger },
@@ -91,6 +92,80 @@ export async function deleteOrphanedObjects(
     );
     return 0;
   }
+}
+
+/**
+ * How old an object must be before the night may call it an orphan. An upload
+ * puts the variants and then inserts the row (photos.ts); a day is far more
+ * than that gap, and far less than anyone waits for an erasure to be whole.
+ */
+export const ORPHAN_GRACE_MS = 24 * 60 * 60 * 1000;
+
+/** `media/<content key>/<variant>.webp`, as `objectKey` writes it: the content key, or null for a key of another shape. */
+const contentKeyOf = (key: string): string | null =>
+  /^media\/([^/]+)\/[^/]+\.webp$/.exec(key)?.[1] ?? null;
+
+/** What the night's sweep counts; never a key. */
+type OrphanSweep = {
+  /** Every object under `media/`. */
+  objects: number;
+  /** Of the variant shape and a day old or more: the ones asked about. */
+  aged: number;
+  /** The content keys among them that no photo row names. */
+  orphaned: number;
+  /** Their objects, deleted. */
+  deleted: number;
+  /** Under `media/` but of another shape: counted and left alone. */
+  unexpected: number;
+};
+
+/**
+ * The night's sweep (#636, ADR-007): every object under `media/` that is a day
+ * old or more and whose content key no photo row names is deleted. It takes
+ * what `deleteOrphanedObjects` and the upload's failure path miss: a delete
+ * that failed after its rows were gone, a crash between an upload's puts and
+ * its row. One listing of the prefix, one query of the aged keys against the
+ * table, one delete in batches. An object under `media/` of another shape is
+ * not this job's to judge: counted, left, said in a warning. The window between
+ * the query and the delete is the one ADR-007 names, and at 04:00 it needs an
+ * upload of the very bytes of an orphan. A failure is the job's, which
+ * `runNightly` logs and the alarm counts.
+ */
+export async function sweepOrphanedObjects(
+  deps: { db: Queryable; store: MediaStore; logger: Logger },
+  now: Date,
+): Promise<OrphanSweep> {
+  const objects = await deps.store.list("media/");
+  const cutoff = now.getTime() - ORPHAN_GRACE_MS;
+  const aged = new Map<string, string[]>();
+  let agedObjects = 0;
+  let unexpected = 0;
+  for (const object of objects) {
+    const contentKey = contentKeyOf(object.key);
+    if (contentKey === null) {
+      unexpected += 1;
+      continue;
+    }
+    if (object.lastModified.getTime() > cutoff) continue;
+    aged.set(contentKey, [...(aged.get(contentKey) ?? []), object.key]);
+    agedObjects += 1;
+  }
+  if (unexpected > 0) {
+    deps.logger.warn(
+      { job: "sweep-orphaned-objects", unexpected },
+      "sweep: objects under media/ of another shape, left alone",
+    );
+  }
+  const orphaned = aged.size === 0 ? [] : await repo.orphanedKeys(deps.db, [...aged.keys()]);
+  const toDelete = orphaned.flatMap((key) => aged.get(key) ?? []);
+  await deps.store.delete(toDelete);
+  return {
+    objects: objects.length,
+    aged: agedObjects,
+    orphaned: orphaned.length,
+    deleted: toDelete.length,
+    unexpected,
+  };
 }
 
 const EXPORT_ACCESS_LOG_LIMIT = 1000;

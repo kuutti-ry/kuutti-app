@@ -1,4 +1,9 @@
-import { DeleteObjectsCommand, GetObjectCommand, type S3Client } from "@aws-sdk/client-s3";
+import {
+  DeleteObjectsCommand,
+  GetObjectCommand,
+  type ListObjectsV2Command,
+  type S3Client,
+} from "@aws-sdk/client-s3";
 import { describe, expect, it } from "vitest";
 import { memoryMediaStore, objectKey, s3MediaStore } from "./store.ts";
 
@@ -127,5 +132,84 @@ describe("the memory store", () => {
     expect(await store.get(objectKey("abc", "full"))).toBeNull();
     await store.delete([key, objectKey("never", "thumb")]);
     expect(store.objects.size).toBe(0);
+  });
+});
+
+/** A client that answers each command with the next answer, and records what it sent. */
+function answeringEach(answers: unknown[]) {
+  const sent: unknown[] = [];
+  let next = 0;
+  const client = {
+    async send(command: unknown) {
+      sent.push(command);
+      return answers[next++] ?? {};
+    },
+  } as unknown as S3Client;
+  return { client, sent };
+}
+
+describe("listing a prefix", () => {
+  const t = new Date("2026-11-05T01:00:00.000Z");
+
+  it("lists the prefix page by page, each page asked for with the token the one before gave, and skips an entry without a key or a time", async () => {
+    const { client, sent } = answeringEach([
+      {
+        Contents: [
+          { Key: "media/a/thumb.webp", LastModified: t },
+          { Key: "media/a/card.webp" },
+          { LastModified: t },
+        ],
+        IsTruncated: true,
+        NextContinuationToken: "page-2",
+      },
+      { Contents: [{ Key: "media/b/thumb.webp", LastModified: t }], IsTruncated: false },
+    ]);
+    expect(await s3MediaStore(client, "bucket").list("media/")).toEqual([
+      { key: "media/a/thumb.webp", lastModified: t },
+      { key: "media/b/thumb.webp", lastModified: t },
+    ]);
+    const commands = sent as ListObjectsV2Command[];
+    expect(
+      commands.map((command) => [
+        command.input.Bucket,
+        command.input.Prefix,
+        command.input.ContinuationToken,
+      ]),
+    ).toEqual([
+      ["bucket", "media/", undefined],
+      ["bucket", "media/", "page-2"],
+    ]);
+  });
+
+  it("a prefix with nothing under it lists nothing, in one request", async () => {
+    const { client, sent } = answeringEach([{}]);
+    expect(await s3MediaStore(client, "bucket").list("media/")).toEqual([]);
+    expect(sent).toHaveLength(1);
+  });
+
+  it("the memory store lists a prefix with each object's put time, an object set on the map itself as from the epoch, and forgets a deleted one", async () => {
+    let clock = new Date("2026-11-05T00:00:00.000Z");
+    const store = memoryMediaStore(() => clock);
+    await store.put("media/a/thumb.webp", new Uint8Array([1]), "image/webp");
+    clock = new Date("2026-11-06T00:00:00.000Z");
+    await store.put("media/b/thumb.webp", new Uint8Array([1]), "image/webp");
+    await store.put(
+      "research/2026/11/2026-11-05.parquet",
+      new Uint8Array([1]),
+      "application/octet-stream",
+    );
+    store.objects.set("media/c/thumb.webp", new Uint8Array([1]));
+    const byKey = (a: { key: string }, b: { key: string }) => a.key.localeCompare(b.key);
+    expect((await store.list("media/")).sort(byKey)).toEqual([
+      { key: "media/a/thumb.webp", lastModified: new Date("2026-11-05T00:00:00.000Z") },
+      { key: "media/b/thumb.webp", lastModified: new Date("2026-11-06T00:00:00.000Z") },
+      { key: "media/c/thumb.webp", lastModified: new Date(0) },
+    ]);
+    await store.delete(["media/a/thumb.webp"]);
+    expect((await store.list("media/")).map((o) => o.key).sort()).toEqual([
+      "media/b/thumb.webp",
+      "media/c/thumb.webp",
+    ]);
+    expect(store.writtenAt.has("media/a/thumb.webp")).toBe(false);
   });
 });

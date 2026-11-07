@@ -58,6 +58,7 @@ function flakyStore() {
       await inner.put(key, body, contentType);
     },
     get: (key) => inner.get(key),
+    list: (prefix) => inner.list(prefix),
     async delete(keys) {
       if (fail.delete) throw new Error("InternalError: the bucket did not delete");
       await inner.delete(keys);

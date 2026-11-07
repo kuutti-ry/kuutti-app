@@ -180,7 +180,8 @@ async function processUnderLimit(deps: PhotoServiceDeps, bytes: Uint8Array) {
 // shortcut: erasure's `deleteOrphanedObjects` window is here too: a send of
 // the same picture that stored its objects and has not committed its row
 // yet loses them to a refused one's cleanup. A per-content-key ownership
-// protocol lifts it, noted for the M4 orphan sweep.
+// protocol lifts it; meanwhile the night's `sweepOrphanedObjects` (#636) takes
+// what it leaves behind once a day old.
 async function dropOrphansOf(deps: PhotoServiceDeps, key: string, accountId: string) {
   try {
     if ((await repo.countRowsForKey(deps.db, key)) === 0) {

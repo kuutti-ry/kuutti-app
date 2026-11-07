@@ -1,5 +1,6 @@
 import { PHOTO_VARIANTS } from "@kuutti/schema";
 import { describe, expect } from "vitest";
+import { runNightly } from "../jobs/nightly.ts";
 import { signedInAccount, staffSession, withMatchingConfig } from "../test/account.ts";
 import { captureLogger, type TestContext, test } from "../test/harness.ts";
 import { testMediaDeps } from "../test/media.ts";
@@ -8,10 +9,12 @@ import {
   erasePhotosOfAccount,
   eraseReleasedPhotos,
   exportPhotos,
+  ORPHAN_GRACE_MS,
+  sweepOrphanedObjects,
 } from "./erasure.ts";
 import type { PhotoServiceDeps } from "./photos.ts";
 import { insertPhoto, insertPhotoAccess, logPhotoAccess } from "./repo.ts";
-import { type MediaStore, objectKey } from "./store.ts";
+import { type MediaStore, memoryMediaStore, objectKey } from "./store.ts";
 
 // The media half of erasure and export (#51, TD-7): the rows inside the
 // caller's transaction, the objects after it and only when no row still
@@ -194,6 +197,7 @@ describe("deleting the objects after the commit", () => {
     const store: MediaStore = {
       put: async () => undefined,
       get: async () => null,
+      list: async () => [],
       delete: async (keys) => {
         asked.push(keys);
       },
@@ -215,6 +219,7 @@ describe("deleting the objects after the commit", () => {
     const store: MediaStore = {
       put: async () => undefined,
       get: async () => null,
+      list: async () => [],
       delete: async () => {
         throw new Error("InternalError");
       },
@@ -471,5 +476,133 @@ describe("the export of the photos", () => {
       cardsShown: [],
       sent: new Map(),
     });
+  });
+});
+
+// The night's sweep (#636, ADR-007): the objects under media/ a day old or
+// more that no photo row names go; a row's objects, a fresh orphan, an object
+// of another shape and another prefix stay. Counts in the answer and the log,
+// never a key.
+describe("the night's sweep of orphaned objects", () => {
+  /** 04:00 in Helsinki, one night in November. */
+  const NIGHT = new Date("2026-11-07T02:00:00.000Z");
+  const DAY_MS = 24 * 60 * 60 * 1000;
+
+  test("An object no photo row names goes in the night's sweep once it is a day old", async ({
+    ctx,
+  }) => {
+    const a = await signedInAccount(ctx.client);
+    let clock = new Date(NIGHT.getTime() - 2 * DAY_MS);
+    const store = memoryMediaStore(() => clock);
+    await photoOf(ctx, a.accountId, "k-kept");
+    await storedVariants(store, "k-kept");
+    await storedVariants(store, "k-orphan");
+    await store.put("media/strange", new Uint8Array([1]), "image/webp");
+    await store.put(
+      "research/2026/11/2026-11-05.parquet",
+      new Uint8Array([1]),
+      "application/octet-stream",
+    );
+    clock = new Date(NIGHT.getTime() - 3_600_000);
+    await storedVariants(store, "k-fresh");
+    const { logger, lines } = await captureLogger();
+
+    const result = await sweepOrphanedObjects({ db: ctx.client, store, logger }, NIGHT);
+
+    expect(result).toEqual({ objects: 10, aged: 6, orphaned: 1, deleted: 3, unexpected: 1 });
+    const left = [...store.objects.keys()].sort();
+    expect(left).toEqual(
+      [
+        ...PHOTO_VARIANTS.map((v) => objectKey("k-kept", v)),
+        ...PHOTO_VARIANTS.map((v) => objectKey("k-fresh", v)),
+        "media/strange",
+        "research/2026/11/2026-11-05.parquet",
+      ].sort(),
+    );
+    const warning = lines().find(
+      (line) => line.msg === "sweep: objects under media/ of another shape, left alone",
+    );
+    expect(warning).toMatchObject({ job: "sweep-orphaned-objects", unexpected: 1 });
+    expect(JSON.stringify(lines())).not.toMatch(/k-orphan|k-kept|k-fresh|strange/);
+  });
+
+  test("a day old to the millisecond is old enough, a millisecond younger is not", async ({
+    ctx,
+  }) => {
+    let clock = new Date(NIGHT.getTime() - ORPHAN_GRACE_MS);
+    const store = memoryMediaStore(() => clock);
+    await store.put(objectKey("k-day", "thumb"), new Uint8Array([1]), "image/webp");
+    clock = new Date(NIGHT.getTime() - ORPHAN_GRACE_MS + 1);
+    await store.put(objectKey("k-younger", "thumb"), new Uint8Array([1]), "image/webp");
+    const { logger } = await captureLogger();
+
+    const result = await sweepOrphanedObjects({ db: ctx.client, store, logger }, NIGHT);
+
+    expect(result).toEqual({ objects: 2, aged: 1, orphaned: 1, deleted: 1, unexpected: 0 });
+    expect([...store.objects.keys()]).toEqual([objectKey("k-younger", "thumb")]);
+  });
+
+  test("nothing under media/ means zero counts, no question to the table and no delete", async ({
+    ctx,
+  }) => {
+    const store = memoryMediaStore(() => new Date(0));
+    await store.put(
+      "research/2026/11/2026-11-05.parquet",
+      new Uint8Array([1]),
+      "application/octet-stream",
+    );
+    const deletes: string[][] = [];
+    const watched: MediaStore = {
+      ...store,
+      async delete(keys) {
+        deletes.push(keys);
+      },
+    };
+    const { logger, lines } = await captureLogger();
+
+    const result = await sweepOrphanedObjects({ db: ctx.client, store: watched, logger }, NIGHT);
+
+    expect(result).toEqual({ objects: 0, aged: 0, orphaned: 0, deleted: 0, unexpected: 0 });
+    expect(deletes).toEqual([[]]);
+    expect(lines()).toEqual([]);
+  });
+
+  test("the night logs the sweep's counts as done, and a store that cannot delete as the job's failure", async ({
+    ctx,
+  }) => {
+    const store = memoryMediaStore(() => new Date(0));
+    await storedVariants(store, "k-orphan");
+    const broken: MediaStore = {
+      ...store,
+      async delete() {
+        throw new Error("DeleteObjects left 3 of 3 objects (AccessDenied)");
+      },
+    };
+    const job = (s: MediaStore) => ({
+      name: "sweep-orphaned-objects",
+      run: () => sweepOrphanedObjects({ db: ctx.client, store: s, logger }, NIGHT),
+    });
+    const { logger, lines } = await captureLogger();
+
+    await runNightly([job(broken)], logger);
+    expect(lines().at(-1)).toMatchObject({
+      job: "sweep-orphaned-objects",
+      msg: "nightly job failed",
+      // The logger redacts every error's message, the night's too; the type and the frames stay.
+      err: { type: "Error", message: "[redacted]" },
+    });
+    expect(store.objects.size).toBe(3);
+
+    await runNightly([job(store)], logger);
+    expect(lines().at(-1)).toMatchObject({
+      job: "sweep-orphaned-objects",
+      msg: "nightly job done",
+      objects: 3,
+      aged: 3,
+      orphaned: 1,
+      deleted: 3,
+      unexpected: 0,
+    });
+    expect(store.objects.size).toBe(0);
   });
 });

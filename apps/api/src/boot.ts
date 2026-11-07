@@ -22,7 +22,12 @@ import { pusherFor } from "./lib/push.ts";
 import { createS3Client } from "./lib/s3.ts";
 import { initSentry, sentryReporter } from "./lib/sentry.ts";
 import { pruneRounds } from "./matching/index.ts";
-import { createMediaDeps, rejectUnreviewedPhotos, sweepPendingPhotos } from "./media/index.ts";
+import {
+  createMediaDeps,
+  rejectUnreviewedPhotos,
+  sweepOrphanedObjects,
+  sweepPendingPhotos,
+} from "./media/index.ts";
 import { createPush, type Push } from "./notifications/index.ts";
 import {
   copiedBeforeDrop,
@@ -306,6 +311,14 @@ export async function boot({
     jobs.push({
       name: "moderate-pending-photos",
       run: () => sweepPendingPhotos({ db: pool, logger, now, moderator, store: mediaDeps.store }),
+    });
+  }
+  // Last, the objects under media/ a day old or more that no photo row names (#636,
+  // ADR-007): what a failed delete or a crash between an upload's puts and its row left.
+  if (mediaDeps) {
+    jobs.push({
+      name: "sweep-orphaned-objects",
+      run: () => sweepOrphanedObjects({ db: pool, store: mediaDeps.store, logger }, now()),
     });
   }
   // A database with no figures yet gets its first ones now, so the public route has a day to serve.

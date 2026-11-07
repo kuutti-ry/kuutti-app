@@ -258,19 +258,25 @@ describe("boot", () => {
       S3_FORCE_PATH_STYLE: "true",
     });
     expect(line(lines, "media")).toMatchObject({ mode: "presigned", moderation: "queue" });
-    expect(jobs.map((j) => j.name).at(-1)).toBe("moderate-pending-photos");
+    // The look, and last the sweep of the objects no row names (#636), both only with a store.
+    expect(jobs.map((j) => j.name).slice(-2)).toEqual([
+      "moderate-pending-photos",
+      "sweep-orphaned-objects",
+    ]);
     // And the research copy, to the same bucket, right before the prune that checks it (#194).
     expect(jobs.map((j) => j.name).slice(2, 4)).toEqual([
       "research-export",
       "research-events-partitions",
     ]);
-    expect(jobs).toHaveLength(14);
+    expect(jobs).toHaveLength(15);
     // The prune asks the copy first; tonight no month is due, so the bucket is asked nothing.
     const partitions = jobs.find((j) => j.name === "research-events-partitions");
     expect(await partitions?.run()).toMatchObject({ dropped: 0, uncopied: 0 });
     // Nothing is pending in this database: the look finds nothing and asks the store nothing.
-    const sweep = jobs.at(-1);
-    expect(await sweep?.run()).toEqual({ rechecked: 0, failed: 0 });
+    // The sweep is not run here: the stand-in's bucket is shared with the developer's own
+    // stack, whose rows are in another database, so it would take their photos for orphans.
+    const look = jobs.at(-2);
+    expect(await look?.run()).toEqual({ rechecked: 0, failed: 0 });
     // The reports' prune is handed the store, for the objects of the photos it lets go (#351).
     const prune = jobs.find((j) => j.name === "prune-reports");
     expect(await prune?.run()).toEqual({ pruned: 0, photos: 0, objects: 0 });
