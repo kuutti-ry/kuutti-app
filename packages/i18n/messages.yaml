@@ -6536,6 +6536,162 @@ admin.matching.cancel:
   en: "Cancel"
   description: "Admin panel, matching: leaves the confirm step with nothing changed."
 
+admin.nav.announcements:
+  en: "Announcements"
+  description: "Admin panel menu: the announcements to everybody, admins only (#573, ADR-068)."
+
+admin.announcements.title:
+  en: "Announcements"
+  description: "Admin panel, the announcements screen's heading (#573)."
+
+admin.announcements.refresh:
+  en: "Refresh"
+  description: "Admin panel, the announcements screen's button that reads the list again (#573)."
+
+admin.announcements.write:
+  en: "Write an announcement"
+  description: "Admin panel, the heading of the form that writes an announcement to everybody (#573, ADR-068 §1)."
+
+admin.announcements.language.en:
+  en: "English"
+  description: "Admin panel, an announcement's language: English, required (#573)."
+
+admin.announcements.language.fi:
+  en: "Finnish"
+  description: "Admin panel, an announcement's language: Finnish, required (#573)."
+
+admin.announcements.language.sv:
+  en: "Swedish"
+  description: "Admin panel, an announcement's language: Swedish, optional (#573)."
+
+admin.announcements.swedishOptional:
+  en: "Swedish, if you write it"
+  description: "Admin panel, the legend of the form's Swedish part, which may be left empty (#573, the maintainer's decision of 07/11/2026)."
+
+admin.announcements.swedishFallback:
+  en: "People who read Kuutti in Swedish get the English when there is no Swedish."
+  description: "Admin panel, under the Swedish part of the form: who the fallback reaches (#573, the maintainer's decision of 07/11/2026)."
+
+admin.announcements.titleField:
+  en: "Title"
+  description: "Admin panel, the label of an announcement's title in one language, at most 80 characters; the email's subject (#573)."
+
+admin.announcements.bodyField:
+  en: "Text"
+  description: "Admin panel, the label of an announcement's text in one language, at most 1,000 characters (#573)."
+
+admin.announcements.save:
+  en: "Save for a second admin"
+  description: "Admin panel, the form's button: saves the announcement as a draft, which another admin approves before it goes (#573, ADR-068 §2)."
+
+admin.announcements.missing:
+  en: "Write a title and a text in English and in Finnish."
+  description: "Admin panel, the form's refusal before sending: English or Finnish is not whole (#573)."
+
+admin.announcements.swedishHalf:
+  en: "Swedish needs a title and a text, or neither."
+  description: "Admin panel, the form's refusal before sending: half a Swedish text (#573)."
+
+admin.announcements.contactDetails:
+  en: "An announcement cannot carry an e-mail address, a link, a phone number or a handle."
+  description: "Admin panel, the API refused the words under the plain-text rule (#573, ADR-068 §1); it never says which words."
+
+admin.announcements.invalid:
+  en: "The announcement was not accepted: a title is at most 80 characters and a text at most 1,000."
+  description: "Admin panel, the API refused the draft's shape (#573)."
+
+admin.announcements.failed:
+  en: "That did not go through. Try again."
+  description: "Admin panel, any other failure of writing, approving or deleting an announcement (#573)."
+
+admin.announcements.ownRefused:
+  en: "You wrote this announcement, so another admin approves it."
+  description: "Admin panel, the API refused an approval by the admin who wrote it (#573, ADR-068 §2)."
+
+admin.announcements.sentAlready:
+  en: "This announcement went to everybody already."
+  description: "Admin panel, the API refused an approval or a deletion of an announcement already sent (#573)."
+
+admin.announcements.waiting:
+  en: "Waiting for a second admin"
+  description: "Admin panel, the heading of the drafts nobody has approved yet (#573, ADR-068 §2)."
+
+admin.announcements.waitingNone:
+  en: "Nothing is waiting."
+  description: "Admin panel, no draft waits for approval (#573)."
+
+admin.announcements.yours:
+  en: "You wrote this, so another admin approves it."
+  description: "Admin panel, on a draft the reader wrote, where the Approve button is left out (#573, ADR-068 §2)."
+
+admin.announcements.approve:
+  en: "Approve and send"
+  description: "Admin panel, a draft's button for another admin: opens the confirm step that sends it to everybody (#573)."
+
+admin.announcements.delete:
+  en: "Delete"
+  description: "Admin panel, a draft's button: opens the confirm step that deletes it (#573)."
+
+admin.announcements.sent:
+  en: "Sent"
+  description: "Admin panel, the heading of the announcements that went to everybody (#573)."
+
+admin.announcements.sentNone:
+  en: "Nothing has been sent yet."
+  description: "Admin panel, no announcement has been sent (#573)."
+
+admin.announcements.writtenAt:
+  en: "Written {at}"
+  description: "Admin panel, when a draft was written; {at} is a date and time (#573)."
+
+admin.announcements.sentAt:
+  en: "Sent {at}"
+  description: "Admin panel, when an announcement went to everybody; {at} is a date and time (#573)."
+
+admin.announcements.noSwedish:
+  en: "Not written: Swedish readers get the English."
+  description: "Admin panel, an announcement with no Swedish, said where the Swedish would be (#573, the maintainer's decision of 07/11/2026)."
+
+admin.announcements.savedNow:
+  en: "Saved. It waits for another admin's approval."
+  description: "Admin panel, said after a draft is saved (#573)."
+
+admin.announcements.sentNow:
+  en: "Sent to everybody."
+  description: "Admin panel, said after an approval sent an announcement (#573)."
+
+admin.announcements.deletedNow:
+  en: "Deleted."
+  description: "Admin panel, said after a draft is deleted (#573)."
+
+admin.announcements.confirmSend.title:
+  en: "Send this announcement to everybody?"
+  description: "Admin panel, the heading of the approval's confirm step (#573, ADR-068 §2)."
+
+admin.announcements.confirmSend.effect:
+  en: "It goes now to every account as a notice in the app ({accounts, plural, one {# account} other {# accounts}}), by e-mail to {addresses, plural, one {# confirmed address} other {# confirmed addresses}}, and as a push to {phones, plural, one {# person} other {# people}}, or once the quiet hours end if they hold. Nothing takes it back."
+  description: "Admin panel, the approval's confirm step: what sending does and to how many, from the API's reach (#573, ADR-068 §3, §4, §5)."
+
+admin.announcements.confirmSend.apply:
+  en: "Send to everybody"
+  description: "Admin panel, the confirm step's button that approves and sends (#573)."
+
+admin.announcements.confirmDelete.title:
+  en: "Delete this draft?"
+  description: "Admin panel, the heading of a draft's deletion step (#573)."
+
+admin.announcements.confirmDelete.effect:
+  en: "Nobody has been told of it. It goes for good."
+  description: "Admin panel, what deleting a draft does (#573, ADR-068 §8)."
+
+admin.announcements.confirmDelete.apply:
+  en: "Delete the draft"
+  description: "Admin panel, the deletion step's button (#573)."
+
+admin.announcements.cancel:
+  en: "Cancel"
+  description: "Admin panel, closes an announcement's confirm step with nothing done (#573)."
+
 admin.matching.failed:
   en: "That did not go through. Nothing was changed."
   description: "Admin panel, matching: the confirm step's refusal in words, for any failure of the request."

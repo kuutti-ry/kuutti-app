@@ -36,3 +36,4 @@ Whoever runs Kuutti has had no way to tell everybody something they must know, s
 ## History
 
 - 2026-11-07: written with #573's first pull request, on the maintainer's decisions of that day.
+- 2026-11-07: the panel's screen, #573's second pull request: `/announcements`, admins only. One admin writes in English and Finnish, and Swedish or not, the form saying who the Swedish fallback reaches; the draft lists its languages, Swedish's absence said in words; its writer is offered no approval, and why; another admin approves through a confirm step that says to how many accounts, addresses and people it goes, and that nothing takes it back; either deletes a draft through a step of its own.
