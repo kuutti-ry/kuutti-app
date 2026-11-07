@@ -62,22 +62,66 @@ export type LoggerOptions = {
 };
 
 /**
- * pino's default error serializer copies the message into the first line of
- * the stack, which the redaction of `*.message` does not reach: a database or
- * validation error can quote user input there. The frames stay, the message
- * goes; Sentry receives the unredacted error (#11).
+ * What of an error may reach a line: the fields that name the kind of failure
+ * and nothing that quotes a value. pino's default serializer copies every own
+ * property of the error, and a database error's `detail` ("Key (hetu_hmac)=(…)
+ * already exists"), `hint` and `where` quote the statement and its values, a
+ * validation error's `issues` can carry what was received (#636, the audit of
+ * #609). An `AppError`'s detail is the route's own object, meant for the log
+ * (lib/errors.ts) and kept; a detail that is a string is a database's and goes.
+ * The message is blanked here at every level, since the redaction of `*.message`
+ * reaches one level down and a cause's cause is deeper; the stack keeps its
+ * frames and nothing else, since pino writes the message on its first line, a
+ * multiline message on the next ones and a cause's message after `caused by:`.
+ * Sentry receives the unredacted error (#11).
  */
+const ERROR_FIELDS = new Set([
+  "type",
+  "message",
+  "stack",
+  "name",
+  "code",
+  "status",
+  "statusCode",
+  "reason",
+  "kind",
+  "problem",
+  // A database error's kind: never its detail, hint or where.
+  "severity",
+  "schema",
+  "table",
+  "column",
+  "constraint",
+  "routine",
+  // An AWS SDK error's: the status, the request ids, the retries.
+  "$metadata",
+]);
+
 export function serializeError(error: unknown): ReturnType<typeof pino.stdSerializers.err> {
   const serialized = pino.stdSerializers.err(error as Error);
   // A value that is no error comes back as it was, null too (#102: a push
   // refused with no code logs `error: null`), and has no stack to redact.
-  if (typeof serialized?.stack === "string") {
-    serialized.stack = serialized.stack.replace(
-      /^[^\n]*/,
-      `${serialized.type ?? "Error"}: [redacted]`,
-    );
-  }
-  return serialized;
+  if (typeof serialized?.stack !== "string") return serialized;
+  const kept: Record<string, unknown> = Object.fromEntries(
+    Object.entries(serialized).filter(
+      ([field, value]) =>
+        ERROR_FIELDS.has(field) ||
+        (field === "detail" && typeof value === "object" && value !== null),
+    ),
+  );
+  kept.stack = serialized.stack
+    .split("\n")
+    .map((line, i) => {
+      if (i === 0) return `${serialized.type ?? "Error"}: [redacted]`;
+      if (/^\s+at /.test(line)) return line;
+      return line.startsWith("caused by: ") ? "caused by: [redacted]" : "[redacted]";
+    })
+    .join("\n");
+  if ("message" in kept) kept.message = "[redacted]";
+  // A cause gets the same allowlist, read off the error itself: pino leaves it out.
+  const cause = (error as { cause?: unknown } | null)?.cause;
+  if (cause !== undefined) kept.cause = serializeError(cause);
+  return kept as ReturnType<typeof pino.stdSerializers.err>;
 }
 
 export async function createLogger(options: LoggerOptions): Promise<Logger> {

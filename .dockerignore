@@ -1,0 +1,11 @@
+# The API image's build context is the repository root (build.yml, docker compose).
+# The Dockerfile copies named paths, apps/api among them, so a developer's own
+# files under them would ride into a build made by hand: never an environment
+# file (rule 9), never a dependency tree or a build output of this machine.
+**/.env
+**/.env.*
+.git
+**/node_modules
+**/dist
+**/coverage
+**/.expo

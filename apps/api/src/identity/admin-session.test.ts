@@ -151,6 +151,7 @@ describe("staff sessions", () => {
 
     const res = await exchange(app, "/admin/auth/exchange", code);
     expect(res.status).toBe(200);
+    expect(res.headers.get("cache-control")).toBe("no-store");
     const session = AdminSession.parse(await res.json());
     expect(session.role).toBe("moderator");
     const ttl = new Date(session.expiresAt).getTime() - Date.now();

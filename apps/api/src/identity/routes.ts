@@ -351,11 +351,15 @@ export function authRoutes(
       platform: login.platform,
       userAgent: c.req.header("user-agent")?.slice(0, USER_AGENT_MAX) ?? null,
     });
+    // Tokens are for the device alone: nothing between may keep the answer (#636).
+    // The authenticated routes get the same header from their guard.
+    c.header("Cache-Control", "no-store");
     return c.json({ ...tokens, outcome: login.outcome }, 200);
   });
 
   app.openapi(refreshRoute, async (c) => {
     const { refreshToken } = c.req.valid("json");
+    c.header("Cache-Control", "no-store");
     return c.json(await refreshSession(sessionDeps, refreshToken), 200);
   });
 
@@ -398,6 +402,7 @@ export function authRoutes(
 
   app.openapi(adminExchangeRoute, async (c) => {
     const { code } = c.req.valid("json");
+    c.header("Cache-Control", "no-store");
     return c.json(await exchangeAdminCode(sessionDeps, code), 200);
   });
 
