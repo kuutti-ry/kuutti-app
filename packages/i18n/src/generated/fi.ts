@@ -337,7 +337,7 @@ export const fi: Readonly<Record<string, string>> = {
   "notices.warning.body": "Syy: {reason}. Varoitus ei sellaisenaan muuta mitään siinä, miten käytät sovellusta.",
   "notices.warning.title": "Varoitus moderaattorilta",
   "notifications.allow": "Salli ilmoitukset",
-  "notifications.ask.body": "Kuutti voi kertoa tälle puhelimelle, kun joku tykkää sinusta takaisin ja kun saat viestin. Ilmoitus kertoo, että sinulle on uusi viesti tai uusi mätsi, ei koskaan mitä siinä lukee tai keneltä se on. Lajit valitset asetuksista.",
+  "notifications.ask.body": "Kuutti voi kertoa tälle puhelimelle, kun joku tykkää sinusta takaisin ja kun saat viestin. Ilmoitus kertoo, että sinulle on uusi viesti, uusi mätsi tai tiedote, ei koskaan mitä siinä lukee tai keneltä se on. Lajit valitset asetuksista.",
   "notifications.ask.decline": "Ei kiitos",
   "notifications.ask.heading": "Kerrotaanko sinulle?",
   "notifications.intro": "Ilmoitus kertoo, että sinulle on uusi viesti, uusi mätsi tai tiedote, ei koskaan mitä siinä lukee tai keneltä se on.",

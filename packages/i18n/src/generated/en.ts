@@ -670,7 +670,7 @@ export const en: Readonly<Record<string, string>> = {
   "notices.warning.body": "Reason: {reason}. A warning by itself changes nothing in how you use the app.",
   "notices.warning.title": "A warning from a moderator",
   "notifications.allow": "Allow notifications",
-  "notifications.ask.body": "Kuutti can tell this phone when someone likes you back and when a message arrives. A notification says that there is a new message or a new match, never what it says or from whom. You choose which kinds in Settings.",
+  "notifications.ask.body": "Kuutti can tell this phone when someone likes you back and when a message arrives. A notification says that there is a new message, a new match or an announcement, never what it says or from whom. You choose which kinds in Settings.",
   "notifications.ask.decline": "No thanks",
   "notifications.ask.heading": "Shall Kuutti tell you?",
   "notifications.intro": "A notification says that there is a new message, a new match or an announcement, never what it says or from whom.",

@@ -9025,10 +9025,10 @@ notifications.ask.heading:
   machine: { fi: true, sv: true }
 
 notifications.ask.body:
-  en: "Kuutti can tell this phone when someone likes you back and when a message arrives. A notification says that there is a new message or a new match, never what it says or from whom. You choose which kinds in Settings."
-  description: "The home screen's offer of notifications (#102, ADR-055 §9), the reason in words, under its heading: the two pushes, what a push never carries, and where the kinds are chosen. Calm; no promise of more."
-  fi: "Kuutti voi kertoa tälle puhelimelle, kun joku tykkää sinusta takaisin ja kun saat viestin. Ilmoitus kertoo, että sinulle on uusi viesti tai uusi mätsi, ei koskaan mitä siinä lukee tai keneltä se on. Lajit valitset asetuksista."
-  sv: "Kuutti kan berätta för den här telefonen när någon gillar dig tillbaka och när ett meddelande kommer. En avisering säger att det finns ett nytt meddelande eller en ny matchning, aldrig vad det står eller från vem. Du väljer slagen i inställningarna."
+  en: "Kuutti can tell this phone when someone likes you back and when a message arrives. A notification says that there is a new message, a new match or an announcement, never what it says or from whom. You choose which kinds in Settings."
+  description: "The home screen's offer of notifications (#102, ADR-055 §9), the reason in words, under its heading: the two pushes a person is told of most, what a push says and never carries (an announcement among the kinds since #573, ADR-068 §4), and where the kinds are chosen. Calm; no promise of more."
+  fi: "Kuutti voi kertoa tälle puhelimelle, kun joku tykkää sinusta takaisin ja kun saat viestin. Ilmoitus kertoo, että sinulle on uusi viesti, uusi mätsi tai tiedote, ei koskaan mitä siinä lukee tai keneltä se on. Lajit valitset asetuksista."
+  sv: "Kuutti kan berätta för den här telefonen när någon gillar dig tillbaka och när ett meddelande kommer. En avisering säger att det finns ett nytt meddelande, en ny matchning eller ett meddelande från Kuutti, aldrig vad det står eller från vem. Du väljer slagen i inställningarna."
   machine: { fi: true, sv: true }
 
 notifications.ask.decline:

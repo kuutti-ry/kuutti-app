@@ -670,7 +670,7 @@ export const enXA: Readonly<Record<string, string>> = {
   "notices.warning.body": "［Rééáášóóñ: {reason}. ÁÁ wáárñííñg býý íítšéélf çhááñgééš ñóóthííñg ííñ hóów ýýóóúú úúšéé théé áápp.］",
   "notices.warning.title": "［ÁÁ wáárñííñg fróóm áá móódééráátóór］",
   "notifications.allow": "［ÁÁllóów ñóótíífííçáátííóóñš］",
-  "notifications.ask.body": "［Kúúúúttíí çááñ tééll thííš phóóñéé whééñ šóómééóóñéé lííkééš ýýóóúú bááçk ááñd whééñ áá mééššáágéé áárríívééš. ÁÁ ñóótíífííçáátííóóñ šááýýš tháát thééréé ííš áá ñééw mééššáágéé óór áá ñééw máátçh, ñéévéér wháát íít šááýýš óór fróóm whóóm. ÝÝóóúú çhóóóóšéé whííçh kííñdš ííñ Šééttííñgš.］",
+  "notifications.ask.body": "［Kúúúúttíí çááñ tééll thííš phóóñéé whééñ šóómééóóñéé lííkééš ýýóóúú bááçk ááñd whééñ áá mééššáágéé áárríívééš. ÁÁ ñóótíífííçáátííóóñ šááýýš tháát thééréé ííš áá ñééw mééššáágéé, áá ñééw máátçh óór ááñ ááññóóúúñçéémééñt, ñéévéér wháát íít šááýýš óór fróóm whóóm. ÝÝóóúú çhóóóóšéé whííçh kííñdš ííñ Šééttííñgš.］",
   "notifications.ask.decline": "［Ñóó thááñkš］",
   "notifications.ask.heading": "［Šhááll Kúúúúttíí tééll ýýóóúú?］",
   "notifications.intro": "［ÁÁ ñóótíífííçáátííóóñ šááýýš tháát thééréé ííš áá ñééw mééššáágéé, áá ñééw máátçh óór ááñ ááññóóúúñçéémééñt, ñéévéér wháát íít šááýýš óór fróóm whóóm.］",
