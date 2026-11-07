@@ -10,11 +10,13 @@ import {
   openPonds,
   PERSONA_HISTORIES,
   personaBirth,
+  renewPopulationConsents,
   writePopulation,
 } from "@kuutti/db/demo";
 import { BIO_MIN_FOR_COMPLETENESS, PreferencesUpdate, ProfileUpdate } from "@kuutti/schema";
 import { it } from "vitest";
 import { CURRENT_CONSENT_VERSIONS, hmacKeyFromHex } from "../../src/identity/index.ts";
+import { subjectsAmong } from "../../src/jobs/pool.ts";
 import { fillQueue } from "../../src/jobs/round-builder.ts";
 import { finnishDay } from "../../src/lib/finnish-day.ts";
 import { inEachOthersPool, type PoolPerson } from "../../src/matching/index.ts";
@@ -364,5 +366,44 @@ describe("what the cast gives the members", () => {
       conversations: { written: 0, already: 3, missing: 2 },
     });
     expect(await conversations()).toEqual({ n: 3, erased: 0, messages: 9 });
+  });
+});
+
+describe("the cast after a new wording", () => {
+  test("is nobody's card until the reset renews their consents, and then everybody's it was", async ({
+    ctx,
+  }) => {
+    // Written while the terms read otherwise: a version bump since, as the deploy after one leaves staging.
+    await writePopulation(ctx.client, castWithHomes(), {
+      ...CURRENT_CONSENT_VERSIONS,
+      special_category: SPECIAL_CATEGORY_CONSENT_VERSION,
+      terms: "2026-08-an-earlier-wording",
+    });
+    await ctx.client.query(
+      `INSERT INTO photo (account_id, key, blurhash, width, height, state, position)
+       SELECT a.id, md5(a.id::text || n::text), 'LEHV6nWB2yk8pyo0adR*.7kCMdnj', 800, 1067, 'approved', n
+         FROM account a JOIN identity i ON i.id = a.identity_id, generate_series(0, 1) n
+        WHERE i.broker_subject LIKE $1`,
+      [`${DEMO_SUBJECT_PREFIX}demo-cast-%`],
+    );
+    const { rows: ponds } = await ctx.client.query<{ id: string }>("SELECT id FROM ponds");
+    const pond = ponds[0]?.id;
+    if (!pond) throw new Error("no pond");
+    const { rows } = await ctx.client.query<{ id: string }>(
+      `SELECT a.id FROM account a JOIN identity i ON i.id = a.identity_id WHERE i.broker_subject LIKE $1`,
+      [`${DEMO_SUBJECT_PREFIX}demo-cast-%`],
+    );
+    const cast = rows.map((row) => row.id);
+    expect(cast).toHaveLength(CAST.length);
+    const night = new Date("2026-11-07T00:17:00Z");
+
+    expect(await subjectsAmong(ctx.client, pond, cast, night)).toEqual([]);
+    expect(await renewPopulationConsents(ctx.client, CURRENT_CONSENT_VERSIONS, night)).toEqual({
+      terms: CAST.length,
+      privacy: 0,
+      special_category: 0,
+    });
+    const back = await subjectsAmong(ctx.client, pond, cast, night);
+    expect(new Set(back.map((subject) => subject.id))).toEqual(new Set(cast));
   });
 });

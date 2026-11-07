@@ -25,6 +25,7 @@ import {
   demoHetuHmac,
   PLACEHOLDER_PHOTO_PREFIX,
   removePopulation,
+  renewPopulationConsents,
   writePopulation,
 } from "./write-population.ts";
 
@@ -819,6 +820,217 @@ describe("writing the population", () => {
         ).rejects.toThrow("no pond nowhere in this database");
         const { rows } = await pool.query("SELECT 1 FROM identity");
         expect(rows).toHaveLength(0);
+      } finally {
+        await pool.end();
+      }
+    });
+  });
+});
+
+describe("renewing the population's consents", () => {
+  const NONE = { terms: 0, privacy: 0, special_category: 0 };
+
+  it("gives the wording in force beside each that changed, kind by kind and once, and leaves an older wording on purpose as it was", async () => {
+    await withTemporaryDatabase(async (url) => {
+      const pool = createPool({ connectionString: url, max: 2 });
+      const count = async (sql: string, values: unknown[] = []) =>
+        Number((await pool.query<{ n: string }>(sql, values)).rows[0]?.n);
+      /** The rows of `version` given beside a row of `beside` on the same account and kind. */
+      const besideOf = (version: string, beside: string) =>
+        count(
+          `SELECT count(*) AS n FROM consent c
+           WHERE c.version = $1 AND EXISTS (SELECT 1 FROM consent o WHERE o.account_id = c.account_id
+                                            AND o.kind = c.kind AND o.version = $2)`,
+          [version, beside],
+        );
+      try {
+        await migrate(pool, MIGRATIONS);
+        await seed(pool);
+        await writePopulation(pool, generatePopulation({ homes: HOMES }), VERSIONS);
+        const night = new Date("2026-11-07T00:17:00Z");
+
+        // Nothing changed, so nothing is given.
+        expect(await renewPopulationConsents(pool, VERSIONS, night)).toEqual(NONE);
+
+        // New terms: everybody who agreed to the old ones, but the fifty of the
+        // bar, whose older wording keeps them on nobody's card (ADR-014 §8).
+        const newTerms = { ...VERSIONS, terms: "test-terms-2" };
+        expect(await renewPopulationConsents(pool, newTerms, night)).toEqual({
+          ...NONE,
+          terms: 226,
+        });
+        expect(
+          await count(
+            "SELECT count(*) AS n FROM consent WHERE version = 'test-terms-2' AND given_at = $1",
+            [night],
+          ),
+        ).toBe(226);
+        expect(await besideOf("test-terms-2", "test-terms-1")).toBe(226);
+        expect(await besideOf("test-terms-2", "demo-older-wording")).toBe(0);
+        // The old rows stay, as a person's do.
+        expect(
+          await count("SELECT count(*) AS n FROM consent WHERE version = 'test-terms-1'"),
+        ).toBe(226);
+        expect(
+          await count("SELECT count(*) AS n FROM consent WHERE version = 'demo-older-wording'"),
+        ).toBe(50);
+        // In the language the old wording was shown in, of the three the population speaks.
+        expect(
+          await count(
+            `SELECT count(*) AS n FROM consent c JOIN consent o
+               ON o.account_id = c.account_id AND o.kind = c.kind AND o.version = 'test-terms-1'
+             WHERE c.version = 'test-terms-2' AND c.locale_shown <> o.locale_shown`,
+          ),
+        ).toBe(0);
+        expect(
+          await count(
+            "SELECT count(DISTINCT locale_shown) AS n FROM consent WHERE version = 'test-terms-2'",
+          ),
+        ).toBe(3);
+        // Run again, it gives nothing.
+        expect(await renewPopulationConsents(pool, newTerms, night)).toEqual(NONE);
+
+        // All three new: the bar's fifty keep their place on the bar, the
+        // special-category consent, and still not the terms.
+        const later = new Date("2026-12-01T00:17:00Z");
+        const allNew = {
+          terms: "test-terms-3",
+          privacy: "test-privacy-2",
+          special_category: "test-special-2",
+        };
+        expect(await renewPopulationConsents(pool, allNew, later)).toEqual({
+          terms: 226,
+          privacy: 276,
+          special_category: 276,
+        });
+        expect(await besideOf("test-special-2", "test-special-1")).toBe(276);
+        expect(
+          await count(
+            `SELECT count(*) AS n FROM consent c WHERE c.version = 'test-special-2'
+             AND EXISTS (SELECT 1 FROM consent o WHERE o.account_id = c.account_id AND o.version = 'demo-older-wording')`,
+          ),
+        ).toBe(50);
+        expect(await besideOf("test-terms-3", "demo-older-wording")).toBe(0);
+        expect(await count("SELECT count(*) AS n FROM consent WHERE kind = 'research'")).toBe(0);
+        expect(await renewPopulationConsents(pool, allNew, later)).toEqual(NONE);
+      } finally {
+        await pool.end();
+      }
+    });
+  });
+
+  it("gives nothing to somebody a login made, nothing for research, nothing back to somebody who withdrew, and one row from the newest", async () => {
+    await withTemporaryDatabase(async (url) => {
+      const pool = createPool({ connectionString: url, max: 2 });
+      const count = async (sql: string, values: unknown[] = []) =>
+        Number((await pool.query<{ n: string }>(sql, values)).rows[0]?.n);
+      try {
+        await migrate(pool, MIGRATIONS);
+        await seed(pool);
+        await writePopulation(pool, generatePopulation({ homes: HOMES }), VERSIONS);
+        // Three, by label, who agreed to the old terms: none of the bar's, whose terms are older on purpose.
+        const { rows: agreed } = await pool.query<{ id: string }>(
+          `SELECT c.account_id AS id FROM consent c
+           JOIN account a ON a.id = c.account_id JOIN identity i ON i.id = a.identity_id
+           WHERE c.kind = 'terms' AND c.version = 'test-terms-1'
+           ORDER BY i.broker_subject LIMIT 3`,
+        );
+        const [withdrew, research, twice] = agreed.map((row) => row.id);
+        if (!withdrew || !research || !twice)
+          throw new Error("not three who agreed to the old terms");
+
+        // As a login makes an identity, with the consents of the old wordings
+        // a renewal would give anew to a synthetic person.
+        const made = async (subject: string, hash: string) => {
+          const identity = await pool.query<{ id: string }>(
+            `INSERT INTO identity (hetu_hmac, broker_subject, acr, amr, authenticated_at)
+             VALUES ($1, $2, 'http://ftn.ficora.fi/2017/loatest2', ARRAY['bank'], $3) RETURNING id`,
+            [hash, subject, new Date("2026-09-20T10:00:00Z")],
+          );
+          const account = await pool.query<{ id: string }>(
+            `INSERT INTO account (identity_id, state, birth_year, birth_month)
+             VALUES ($1, 'active', 1990, 6) RETURNING id`,
+            [identity.rows[0]?.id],
+          );
+          await pool.query(
+            `INSERT INTO consent (account_id, kind, version, locale_shown)
+             VALUES ($1, 'terms', 'test-terms-1', 'fi'), ($1, 'privacy', 'test-privacy-1', 'fi'),
+                    ($1, 'special_category', 'test-special-1', 'fi')`,
+            [account.rows[0]?.id],
+          );
+          return account.rows[0]?.id;
+        };
+        const logins = [
+          // A subject that begins with the mark, one that is a synthetic label
+          // to the letter, and the right hash beside a time of authentication.
+          await made(`${DEMO_SUBJECT_PREFIX}not-synthetic`, "a".repeat(64)),
+          await made(`${DEMO_SUBJECT_PREFIX}demo-9998`, "b".repeat(64)),
+          await made(`${DEMO_SUBJECT_PREFIX}demo-9999`, demoHetuHmac("demo-9999")),
+        ];
+
+        // The first withdraws the special-category consent, as the product
+        // marks every live row of the kind withdrawn.
+        await pool.query(
+          "UPDATE consent SET withdrawn_at = $2 WHERE account_id = $1 AND kind = 'special_category'",
+          [withdrew, new Date("2026-10-01T12:00:00Z")],
+        );
+        // The second holds a research consent, which the population never gives.
+        await pool.query(
+          "INSERT INTO consent (account_id, kind, version, locale_shown) VALUES ($1, 'research', 'test-research-1', 'fi')",
+          [research],
+        );
+        // The third holds an older live row of the terms too, in another
+        // language than their newest.
+        const { rows: newest } = await pool.query<{ locale_shown: string }>(
+          "SELECT locale_shown FROM consent WHERE account_id = $1 AND kind = 'terms'",
+          [twice],
+        );
+        const language = newest[0]?.locale_shown;
+        expect(newest).toHaveLength(1);
+        await pool.query(
+          `INSERT INTO consent (account_id, kind, version, locale_shown, given_at)
+           VALUES ($1, 'terms', 'test-terms-0', $2, '2020-01-01T00:00:00Z')`,
+          [twice, language === "en" ? "fi" : "en"],
+        );
+
+        // The API hands in every kind's version, research among them.
+        const inForce = {
+          terms: "test-terms-2",
+          privacy: "test-privacy-2",
+          special_category: "test-special-2",
+          research: "test-research-2",
+        };
+        expect(
+          await renewPopulationConsents(pool, inForce, new Date("2026-11-07T00:17:00Z")),
+        ).toEqual({
+          terms: 226,
+          privacy: 276,
+          special_category: 275,
+        });
+        expect(
+          await count(
+            "SELECT count(*) AS n FROM consent WHERE account_id = ANY($1) AND version LIKE '%-2'",
+            [logins],
+          ),
+        ).toBe(0);
+        expect(await count("SELECT count(*) AS n FROM consent WHERE kind = 'research'")).toBe(1);
+        expect(
+          await count(
+            "SELECT count(*) AS n FROM consent WHERE account_id = $1 AND kind = 'special_category' AND withdrawn_at IS NULL",
+            [withdrew],
+          ),
+        ).toBe(0);
+        expect(
+          await count(
+            "SELECT count(*) AS n FROM consent WHERE account_id = $1 AND version LIKE '%-2'",
+            [withdrew],
+          ),
+        ).toBe(2);
+        const { rows: given } = await pool.query<{ locale_shown: string }>(
+          "SELECT locale_shown FROM consent WHERE account_id = $1 AND version = 'test-terms-2'",
+          [twice],
+        );
+        expect(given).toEqual([{ locale_shown: language }]);
       } finally {
         await pool.end();
       }
