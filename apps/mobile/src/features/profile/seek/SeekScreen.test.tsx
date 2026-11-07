@@ -139,11 +139,14 @@ const DEAL_BREAKER_ROWS = [
 const row = (title: string) => screen.getByRole("button", { name: title });
 const heard = (title: string) => row(title).props.accessibilityValue?.text as string | undefined;
 
-/** The answer drawn under the row's title and heard once, as the value: no hint repeats it. */
+/**
+ * The answer drawn under the row's title and heard once, as the value: no hint
+ * repeats it. The hint says only what the row's star says, where it has one (#616).
+ */
 function expectAnswer(title: string, answer: string) {
   expect(within(row(title)).getByText(answer)).toBeTruthy();
   expect(row(title).props.accessibilityValue).toEqual({ text: answer });
-  expect(row(title).props.accessibilityHint).toBeUndefined();
+  expect(row(title).props.accessibilityHint ?? "").not.toContain(answer);
 }
 
 const opened = async (start?: Partial<Server>) => {
@@ -200,6 +203,22 @@ describe("SeekScreen", () => {
         "These work both ways: they decide whom you see and who sees you. Conversations you already have stay as they are.",
       ),
     ).toBeTruthy();
+  });
+
+  it("stars whom one seeks and the ages, what the card needs, and not what one is here for, and says what the star means under them (#616)", async () => {
+    await opened();
+    const needed = "Needed before your card can be shown";
+    for (const name of [WHOM, AGES]) {
+      expect(screen.getByRole("button", { name }).props.accessibilityHint).toMatch(
+        new RegExp(`^${needed}`),
+      );
+      expect(screen.getByText(`${name} *`)).toBeTruthy();
+    }
+    expect(screen.getByRole("button", { name: INTENT }).props.accessibilityHint ?? "").not.toMatch(
+      needed,
+    );
+    expect(screen.queryByText(`${INTENT} *`)).toBeNull();
+    expect(screen.getByText(`* ${needed}`).props.accessibilityLabel).toBe(needed);
   });
 
   it("has onboarding's three questions in their order, then a row per deal-breaker, and nothing else to press", async () => {

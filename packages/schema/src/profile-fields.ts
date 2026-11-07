@@ -120,8 +120,13 @@ const flag = (r: Roles) => ({ kind: "flag" as const, ...roles(r), schema: z.bool
  * language is not a country and no flag stands for one. In the order of use
  * (#239): the two national languages, English, then by the people of 20 to 64
  * who speak each as their registered language (Statistics Finland, StatFin
- * 11rl, 31.12.2025). The first LANGUAGES_SHOWN_FIRST lead the picker, the
- * rest is found by search, and "other" stays last.
+ * 11rl, 31.12.2025). After them Finland's own languages, which that count
+ * does not order: the two sign languages, Inari and Skolt Sami, Karelian and
+ * Romani, by their ISO 639-3 codes, since none has one of two letters (the
+ * maintainer, 07/11/2026, #616; a sign language is no word on hearing, since
+ * hearing people sign too, and the field can be hidden from the card). The
+ * first LANGUAGES_SHOWN_FIRST lead the picker, the rest is found by search,
+ * and "other" stays last, shown only once a search finds nothing else (#616).
  */
 const LANGUAGES = [
   "fi",
@@ -158,6 +163,12 @@ const LANGUAGES = [
   "ja",
   "se",
   "ko",
+  "fse",
+  "fss",
+  "smn",
+  "sms",
+  "krl",
+  "rmf",
   "other",
 ] as const;
 export const LANGUAGES_SHOWN_FIRST = 10;

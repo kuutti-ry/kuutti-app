@@ -21,6 +21,7 @@ import { useT } from "@/lib/locale";
 import { useHapticTap } from "@/theme/haptics";
 import { DealBreakerRows, useDealBreakers } from "../DealBreakerRows";
 import { optionKey, seeksKey } from "../keys";
+import { NeededNote } from "../NeededNote";
 import { INTENT_SECTION, sectionPath } from "../sections";
 import { SEEK_AGES_PATH } from "./SeekAgesScreen";
 import { SEEK_WHOM_PATH } from "./SeekWhomScreen";
@@ -112,7 +113,8 @@ export function SeekScreen() {
       />
       <ScrollView contentContainerClassName="flex-grow gap-6 p-6">
         <Text>{t("profile.seek.explain")}</Text>
-        {/* Each answer is the row's state: drawn under the title, heard once, as its value. */}
+        {/* Each answer is the row's state: drawn under the title, heard once, as
+            its value. Whom and the ages are what a card needs, starred (#616). */}
         <RowGroup
           rows={[
             {
@@ -120,6 +122,7 @@ export function SeekScreen() {
               title: t("onboarding.seeks.title"),
               summary: whom,
               value: whom,
+              needed: t("profile.needed.hint"),
               onPress: open(SEEK_WHOM_PATH),
             },
             {
@@ -127,6 +130,7 @@ export function SeekScreen() {
               title: t("onboarding.age.title"),
               summary: ages,
               value: ages,
+              needed: t("profile.needed.hint"),
               onPress: open(SEEK_AGES_PATH),
             },
             {
@@ -138,6 +142,7 @@ export function SeekScreen() {
             },
           ]}
         />
+        <NeededNote />
         <View className="gap-3">
           {/* A 44 pt row around a line of text: the margins keep the heading with its rows. */}
           <View className="-my-2 min-h-touch flex-row items-center gap-2">

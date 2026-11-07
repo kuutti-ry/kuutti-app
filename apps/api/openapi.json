@@ -781,11 +781,17 @@
                 "ja",
                 "se",
                 "ko",
+                "fse",
+                "fss",
+                "smn",
+                "sms",
+                "krl",
+                "rmf",
                 "other"
               ]
             },
             "minItems": 1,
-            "maxItems": 35
+            "maxItems": 41
           },
           "education": {
             "type": "string",
@@ -3578,7 +3584,7 @@
                   "type": "string",
                   "maxLength": 40
                 },
-                "maxItems": 35
+                "maxItems": 41
               }
             },
             "required": [

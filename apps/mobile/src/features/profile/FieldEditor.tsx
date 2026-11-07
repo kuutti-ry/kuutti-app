@@ -45,8 +45,10 @@ export const ROWS_UP_TO = 8;
 /**
  * The options a picker shows (#239): with something typed, every option whose
  * text matches; with nothing typed, all of them, or, on a list that names how
- * many lead it (the languages), those first ones, anything chosen already and
- * "other", the rest left to the search.
+ * many lead it (the languages), those first ones and anything chosen already,
+ * the rest left to the search. There "other" waits for a search that finds
+ * nothing else, so that nobody takes Another language for a language the
+ * search holds (the maintainer, 07/11/2026, #616), and stays once chosen.
  */
 export function visibleOptions(
   options: readonly string[],
@@ -56,9 +58,14 @@ export function visibleOptions(
   textOf: (option: string) => string,
 ): readonly string[] {
   const needle = search.trim().toLowerCase();
-  if (needle !== "") return options.filter((o) => textOf(o).toLowerCase().includes(needle));
-  if (shownFirst === undefined) return options;
-  return options.filter((o, i) => i < shownFirst || chosen.includes(o) || o === "other");
+  if (shownFirst === undefined) {
+    return needle === ""
+      ? options
+      : options.filter((o) => textOf(o).toLowerCase().includes(needle));
+  }
+  if (needle === "") return options.filter((o, i) => i < shownFirst || chosen.includes(o));
+  const found = options.filter((o) => o !== "other" && textOf(o).toLowerCase().includes(needle));
+  return found.length > 0 || !options.includes("other") ? found : ["other"];
 }
 
 /**

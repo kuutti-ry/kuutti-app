@@ -24,6 +24,7 @@ function answerOf(key: ProfileFieldKey): unknown {
   return true;
 }
 
+const NEEDED = "Needed before your card can be shown";
 const settle = () => new Promise<void>((resolve) => setTimeout(resolve, 10));
 const show = (ui: React.ReactElement) =>
   act(async () => {
@@ -290,13 +291,18 @@ describe("ProfileScreen", () => {
       },
     );
 
+    it("has no hint on Questions, and no line: its title and its count say it", async () => {
+      await ready();
+      expect(row("Questions").props.accessibilityHint).toBeUndefined();
+      expect(screen.queryByText("Up to three questions, answered in your own words")).toBeNull();
+    });
+
     it.each([
       ["Photos", "What others see first on your card"],
-      ["Questions", "Up to three questions, answered in your own words"],
       ["What you seek", "Whom, what ages, what you are here for and your deal-breakers"],
-    ])("has no hint on %s, and no line: its title and its count say it", async (title, line) => {
+    ])("has only what the star says as the hint on %s, and no line (#616)", async (title, line) => {
       await ready();
-      expect(row(title).props.accessibilityHint).toBeUndefined();
+      expect(row(title).props.accessibilityHint).toBe(NEEDED);
       expect(screen.queryByText(line)).toBeNull();
     });
 
@@ -308,8 +314,8 @@ describe("ProfileScreen", () => {
           .map((node) => node.props.children);
       expect(lines("Lifestyle")).toEqual(["Lifestyle", "0/6"]);
       expect(lines("Questions")).toEqual(["Questions", "0/3"]);
-      expect(lines("Photos")).toEqual(["Photos", "0/2"]);
-      expect(lines("What you seek")).toEqual(["What you seek"]);
+      expect(lines("Photos")).toEqual(["Photos *", "0/2"]);
+      expect(lines("What you seek")).toEqual(["What you seek *"]);
     });
 
     it.each([
@@ -334,6 +340,30 @@ describe("ProfileScreen", () => {
       }
     });
   });
+
+  it.each([
+    ["en-US", "Photos", "What you seek", NEEDED],
+    ["fi-FI", "Kuvat", "Mitä etsit", "Tarvitaan, ennen kuin korttisi voidaan näyttää"],
+    ["sv-FI", "Foton", "Vad du söker", "Behövs innan ditt kort kan visas"],
+  ])(
+    "stars in %s what the card needs, the photos and what one seeks alone, and says under the list what the star means, complete or not (#616)",
+    async (tag, photos, seek, words) => {
+      (useLocales as jest.Mock).mockReturnValue([{ languageTag: tag }]);
+      try {
+        fakeApi([[]]);
+        await show(<ProfileScreen />);
+        await waitFor(() => expect(screen.getByText(`${photos} *`)).toBeTruthy());
+        expect(screen.getByText(`${seek} *`)).toBeTruthy();
+        // No section is starred: each holds what the card does not need too.
+        expect(screen.getAllByText(/ \*$/)).toHaveLength(2);
+        const note = screen.getByText(`* ${words}`);
+        // Heard without the star, which a screen reader would read out as a word.
+        expect(note.props.accessibilityLabel).toBe(words);
+      } finally {
+        (useLocales as jest.Mock).mockReturnValue([{ languageTag: "en-US" }]);
+      }
+    },
+  );
 
   it("says nothing about the card once it is complete (#239)", async () => {
     fakeApi([[]]);
@@ -445,15 +475,15 @@ describe("ProfileScreen", () => {
       await waitFor(() => expect(screen.getByText("The basics")).toBeTruthy());
     };
 
-    it("opens the list, its title alone (#581)", async () => {
+    it("opens the list, its title alone and its star (#581, #616)", async () => {
       await ready();
       const row = screen.getByRole("button", { name: "What you seek" });
-      expect(row.props.accessibilityHint).toBeUndefined();
+      expect(row.props.accessibilityHint).toBe(NEEDED);
       expect(
         within(row)
           .getAllByText(/./)
           .map((node) => node.props.children),
-      ).toEqual(["What you seek"]);
+      ).toEqual(["What you seek *"]);
       await press(row);
       expect(router.push).toHaveBeenCalledWith("/profile/seek");
     });
@@ -461,7 +491,8 @@ describe("ProfileScreen", () => {
     it("holds no answer, whatever is answered: the list is where those are", async () => {
       await ready({ fields: { intent: "casual" } });
       const row = screen.getByRole("button", { name: "What you seek" });
-      expect(row.props.accessibilityHint).toBeUndefined();
+      // Only what the star says: the answers stay off the list (#616).
+      expect(row.props.accessibilityHint).toBe(NEEDED);
       expect(row.props.accessibilityValue?.text).toBeUndefined();
       expect(screen.queryByText("Something casual")).toBeNull();
     });

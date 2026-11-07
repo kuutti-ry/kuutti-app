@@ -12,6 +12,7 @@ import { useEffect, useRef, useState } from "react";
 import { Animated, Pressable, ScrollView, useWindowDimensions, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { sayAloud } from "@/components/Notice";
+import { ScreenHeader } from "@/components/ScreenHeader";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/card";
 import {
@@ -105,8 +106,11 @@ const ONE_COLUMN_FONT_SCALE = 1.3;
  * progress is in words. The count is drawn only at the limit, where Add a photo
  * stops and needs a reason; below it the grid shows the count, and each change
  * of it is said to a screen reader, the one word that a photo landed (#581).
- * It is onboarding's photos step too (#146, #581): under that step's number,
- * heading and line, with the step's Continue in place of Done.
+ * Opened from the profile, it has the arrow back at the top that other screens
+ * have, and Done at the end (#616): the route has no back gesture, which the
+ * grid's drag would start. It is onboarding's photos step too (#146, #581):
+ * under that step's number, heading and line, with no arrow and the step's
+ * Continue in place of Done, the step's only end.
  */
 export function PhotosScreen({
   step,
@@ -173,19 +177,28 @@ export function PhotosScreen({
 
   return (
     <SafeAreaView className="flex-1 bg-background">
+      {!step && (
+        <ScreenHeader
+          title={t("photos.title")}
+          backLabel={t("photos.back")}
+          onBack={() => router.back()}
+        />
+      )}
       <ScrollView
         contentContainerClassName="flex-grow gap-4 p-6"
         scrollEnabled={drag.active === null}
       >
         {step && (
-          <Text variant="muted" accessibilityLiveRegion="polite">
-            {t("onboarding.progress", { step: step.position, total: step.total })}
-          </Text>
+          <>
+            <Text variant="muted" accessibilityLiveRegion="polite">
+              {t("onboarding.progress", { step: step.position, total: step.total })}
+            </Text>
+            <Text variant="h1" accessibilityRole="header">
+              {t("onboarding.photos.title")}
+            </Text>
+            <Text>{t("onboarding.photos.explain")}</Text>
+          </>
         )}
-        <Text variant="h1" accessibilityRole="header">
-          {t(step ? "onboarding.photos.title" : "photos.title")}
-        </Text>
-        {step && <Text>{t("onboarding.photos.explain")}</Text>}
         {list && <Text>{t("photos.explain")}</Text>}
 
         {photos.notice && (
@@ -394,7 +407,7 @@ export function PhotosScreen({
             {t("onboarding.continue")}
           </Button>
         ) : (
-          // Headers are hidden app-wide: this is the way back to the profile.
+          // The end of the scroll's way back, beside the arrow at the top (#616).
           <Button
             variant="outline"
             onPress={() => {

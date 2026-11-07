@@ -778,13 +778,22 @@ describe("DealBreakerFieldScreen", () => {
       });
       expect(button("Somali")).toBeTruthy();
       expect(button("German")).toBeTruthy();
-      expect(button("Another language")).toBeTruthy();
       expect(screen.queryByRole("button", { name: "French" })).toBeNull();
       // Taken back, an accepted language beyond the ten stays to be accepted again.
       await press(button("German"));
       expect(selected("German")).toBe(false);
       await press(button("German"));
       expect(selected("German")).toBe(true);
+    });
+
+    it("offers no Another language, which names no language two people share, even to a search for it (#616)", async () => {
+      await opened("languages");
+      expect(screen.queryByRole("button", { name: "Another language" })).toBeNull();
+      await act(async () => {
+        fireEvent.changeText(screen.getByLabelText("Search"), "another");
+        await settle();
+      });
+      expect(screen.queryByRole("button", { name: "Another language" })).toBeNull();
     });
 
     it("keeps a language found by searching in view once the search is cleared", async () => {

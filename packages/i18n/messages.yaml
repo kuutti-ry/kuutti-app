@@ -2489,6 +2489,48 @@ profile.option.languages.ko:
   sv: "Koreanska"
   machine: { fi: true, sv: true }
 
+profile.option.languages.fse:
+  en: "Finnish Sign Language"
+  description: "Option fse of the languages field, one of Finland's own languages by its ISO 639-3 code (#616): the language's name in the reader's language, as every option is (ADR-019 §3, amended 11/10/2026, #238)."
+  fi: "Suomalainen viittomakieli"
+  sv: "Finskt teckenspråk"
+  machine: { fi: true, sv: true }
+
+profile.option.languages.fss:
+  en: "Finland-Swedish Sign Language"
+  description: "Option fss of the languages field, one of Finland's own languages by its ISO 639-3 code (#616): the language's name in the reader's language, as every option is (ADR-019 §3, amended 11/10/2026, #238)."
+  fi: "Suomenruotsalainen viittomakieli"
+  sv: "Finlandssvenskt teckenspråk"
+  machine: { fi: true, sv: true }
+
+profile.option.languages.smn:
+  en: "Inari Sami"
+  description: "Option smn of the languages field, one of Finland's own languages by its ISO 639-3 code (#616): the language's name in the reader's language, as every option is (ADR-019 §3, amended 11/10/2026, #238)."
+  fi: "Inarinsaame"
+  sv: "Enaresamiska"
+  machine: { fi: true, sv: true }
+
+profile.option.languages.sms:
+  en: "Skolt Sami"
+  description: "Option sms of the languages field, one of Finland's own languages by its ISO 639-3 code (#616): the language's name in the reader's language, as every option is (ADR-019 §3, amended 11/10/2026, #238)."
+  fi: "Koltansaame"
+  sv: "Skoltsamiska"
+  machine: { fi: true, sv: true }
+
+profile.option.languages.krl:
+  en: "Karelian"
+  description: "Option krl of the languages field, one of Finland's own languages by its ISO 639-3 code (#616): the language's name in the reader's language, as every option is (ADR-019 §3, amended 11/10/2026, #238)."
+  fi: "Karjala"
+  sv: "Karelska"
+  machine: { fi: true, sv: true }
+
+profile.option.languages.rmf:
+  en: "Finnish Romani"
+  description: "Option rmf of the languages field, one of Finland's own languages by its ISO 639-3 code (#616): the language's name in the reader's language, as every option is (ADR-019 §3, amended 11/10/2026, #238)."
+  fi: "Suomen romanikieli"
+  sv: "Finsk romani"
+  machine: { fi: true, sv: true }
+
 profile.option.languages.other:
   en: "Another language"
   description: "Option other of the languages field (#145 registry)."
@@ -2767,6 +2809,20 @@ profile.completeness.age_window:
   description: "Missing item that onboarding (#46) sets: nobody without it reaches the profile, so it names no way to fix it (#581)."
   fi: "Ikähaarukkasi"
   sv: "Ditt åldersspann"
+  machine: { fi: true, sv: true }
+
+profile.needed.hint:
+  en: "Needed before your card can be shown"
+  description: "What a star after a field or a row of the profile means (#616): the footnote under the starred rows, and what a screen reader hears on each starred one in place of the star. The same words as the completeness checklist's heading. Nothing is refused for it: an unfinished card is only not shown."
+  fi: "Tarvitaan, ennen kuin korttisi voidaan näyttää"
+  sv: "Behövs innan ditt kort kan visas"
+  machine: { fi: true, sv: true }
+
+profile.needed.bioOrPrompts:
+  en: "Your card needs one of these: a bio of {min, number} characters, a ready line, or two answered questions."
+  description: "Under the bio in The basics and under the questions (#616): the either-or of completeness, which a star cannot say, so neither is starred. {min} is the bio length."
+  fi: "Korttisi tarvitsee yhden näistä: vähintään {min, number} merkin esittelyn, valmiin rivin tai kaksi vastattua kysymystä."
+  sv: "Ditt kort behöver ett av dessa: en presentation på {min, number} tecken, en färdig rad eller två besvarade frågor."
   machine: { fi: true, sv: true }
 
 profile.tip.title:
@@ -4366,9 +4422,16 @@ photos.add:
   sv: Lägg till ett foto
   machine: { fi: true, sv: true }
 
+photos.back:
+  en: "Back to your profile"
+  description: "Screen-reader label of the back arrow at the top of Your photos, opened from the profile's Photos row (#616); onboarding's photos step has no arrow, its Continue being the only way on."
+  fi: "Takaisin profiiliisi"
+  sv: "Tillbaka till din profil"
+  machine: { fi: true, sv: true }
+
 photos.done:
   en: Done
-  description: "Photos screen, the button at the end that returns to the profile list, whose Photos row opened it (#239); onboarding's step has Continue in its place (#581). Headers are hidden and the route has no back gesture, so this button is the screen's way back."
+  description: "Photos screen, the button at the end that returns to the profile list, whose Photos row opened it (#239), beside the arrow at the top (#616); onboarding's step has Continue in its place (#581)."
   fi: Valmis
   sv: Klar
   machine: { fi: true, sv: true }
@@ -9088,6 +9151,13 @@ settings.invite.earns:
   description: "The Invitations panel, what an invitation earns today (#107, ADR-044 §4, §8, #503, #581), from matching_config invitation_reward: reward says which of the two earn, both, inviter, or the friend alone; inviterFish and friendFish are their fish. Not drawn when neither earns. Never a number of days or a period (tunables)."
   fi: "{reward, select, both {Kun kutsumasi ystävä saa profiilinsa valmiiksi, saat {inviterFish, plural, one {kalan} other {# kalaa}} ja ystäväsi saa {friendFish, plural, one {kalan} other {# kalaa}}.} inviter {Kun kutsumasi ystävä saa profiilinsa valmiiksi, saat {inviterFish, plural, one {kalan} other {# kalaa}}.} other {Kun kutsumasi ystävä saa profiilinsa valmiiksi, ystäväsi saa {friendFish, plural, one {kalan} other {# kalaa}}.}}"
   sv: "{reward, select, both {När en vän du bjuder in gör klart sin profil får du {inviterFish, plural, one {en fisk} other {# fiskar}} och din vän får {friendFish, plural, one {en fisk} other {# fiskar}}.} inviter {När en vän du bjuder in gör klart sin profil får du {inviterFish, plural, one {en fisk} other {# fiskar}}.} other {När en vän du bjuder in gör klart sin profil får din vän {friendFish, plural, one {en fisk} other {# fiskar}}.}}"
+  machine: { fi: true, sv: true }
+
+settings.invite.fish:
+  en: "A fish is a like that comes first in the other person's queue, ahead of ordinary likes."
+  description: "Under what an invitation earns, on the Invitations panel (#616): what a fish is, where many first meet the word. Drawn only with that line. ADR-039 §1, §6 and ADR-062 §2; the word itself is ADR-039 Open 1."
+  fi: "Kala on tykkäys, joka tulee toisen jonossa ensimmäisenä, tavallisten tykkäysten edellä."
+  sv: "En fisk är ett gillande som kommer först i den andras kö, före vanliga gillanden."
   machine: { fi: true, sv: true }
 
 settings.invite.notYet:

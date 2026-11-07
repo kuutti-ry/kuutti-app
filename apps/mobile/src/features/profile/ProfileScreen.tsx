@@ -18,6 +18,7 @@ import { fetchOwnGender } from "./client";
 import { GENDER_PATH } from "./gender/GenderScreen";
 import { completenessText, genderKey, shownPlaceName } from "./keys";
 import { FIRST_LATER_FIELD, laterPath, laterProgress } from "./later/LaterFieldScreen";
+import { NeededNote } from "./NeededNote";
 import { ProgressMark, progressWords } from "./ProgressMark";
 import { isDone, type Progress, photoProgress, sectionProgress } from "./progress";
 import { LISTED_SECTIONS, sectionHintKey, sectionPath, sectionTitleKey } from "./sections";
@@ -174,6 +175,7 @@ export function ProfileScreen() {
               {
                 key: "photos",
                 title: t("profile.section.photos.title"),
+                needed: t("profile.needed.hint"),
                 onPress: open("/photos"),
               },
               photos,
@@ -213,6 +215,7 @@ export function ProfileScreen() {
             {
               key: "seek",
               title: t("profile.seek.title"),
+              needed: t("profile.needed.hint"),
               onPress: open(SEEK_PATH),
             },
             // An invitation only while something is left to ask (#239).
@@ -227,6 +230,10 @@ export function ProfileScreen() {
               : []),
           ]}
         />
+        {/* What the stars mean: what a card needs, starred where one row
+            holds it, and never a section that also holds what it does not
+            (#616); the name's star is on its field in The basics. */}
+        <NeededNote />
       </ScrollView>
     </SafeAreaView>
   );

@@ -55,6 +55,7 @@ const TEXT = {
   make: "Create an invitation",
   earns:
     "When a friend you invite finishes their profile, you get a fish and your friend gets a fish.",
+  fish: "A fish is a like that comes first in the other person's queue, ahead of ordinary likes.",
   made: "Your invitation is ready. Its code is below.",
   once: "Kuutti shows this code only now. Share it with one friend.",
   withdrawn: "The invitation was withdrawn. Its code no longer works.",
@@ -150,13 +151,13 @@ describe("Invitations", () => {
     expect(button(TEXT.make)).toBeTruthy();
   });
 
-  it("says what an invitation earns over its button, and no more, with no accessibility problems (#581)", async () => {
+  it("says what an invitation earns and what a fish is over its button, and no more, with no accessibility problems (#581, #616)", async () => {
     fakeApi(answer());
     await renderWithTheme(<Invitations />);
     expect(await screen.findByText(TEXT.earns)).toBeTruthy();
     // No line of what a code is or how many counted; somebody who may invite
     // cannot type a code: the two never meet.
-    expect(drawn()).toEqual([TEXT.earns, TEXT.make]);
+    expect(drawn()).toEqual([TEXT.earns, TEXT.fish, TEXT.make]);
     expect(screen.queryByLabelText(TEXT.codeLabel)).toBeNull();
     noProblems();
   });
@@ -236,6 +237,20 @@ describe("Invitations", () => {
   });
 
   it.each([
+    ["en", TEXT.fish],
+    [
+      "fi",
+      "Kala on tykkäys, joka tulee toisen jonossa ensimmäisenä, tavallisten tykkäysten edellä.",
+    ],
+    ["sv", "En fisk är ett gillande som kommer först i den andras kö, före vanliga gillanden."],
+  ])("says in %s what a fish is, where many first meet the word (#616)", async (locale, words) => {
+    (useLocales as jest.Mock).mockReturnValue([{ languageTag: locale }]);
+    fakeApi(answer());
+    await renderWithTheme(<Invitations />);
+    expect(await screen.findByText(words)).toBeTruthy();
+  });
+
+  it.each([
     ["en", { inviterFish: 0, friendFish: 0 }, "Create an invitation"],
     ["fi", { inviterFish: 0, friendFish: 0 }, "Tee kutsu"],
     ["sv", { inviterFish: 0, friendFish: 0 }, "Skapa en inbjudan"],
@@ -261,7 +276,7 @@ describe("Invitations", () => {
       fakeApi(answer({ counted, earned }));
       await renderWithTheme(<Invitations />);
       expect(await screen.findByText(TEXT.earns)).toBeTruthy();
-      expect(drawn()).toEqual([TEXT.earns, TEXT.make, ...waiting]);
+      expect(drawn()).toEqual([TEXT.earns, TEXT.fish, TEXT.make, ...waiting]);
     },
   );
 
@@ -687,6 +702,7 @@ describe("Invitations", () => {
     expect(await screen.findByRole("button", { name: "Skapa en inbjudan" })).toBeTruthy();
     expect(drawn()).toEqual([
       "När en vän du bjuder in gör klart sin profil får du en fisk och din vän får en fisk.",
+      "En fisk är ett gillande som kommer först i den andras kö, före vanliga gillanden.",
       "Skapa en inbjudan",
     ]);
   });

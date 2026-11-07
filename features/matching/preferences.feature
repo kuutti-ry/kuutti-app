@@ -83,6 +83,7 @@ Feature: The hard preferences of onboarding
       | a deal-breaker on a field outside the whitelist   | 400    |
       | a deal-breaker on a field it has not answered     | 409    |
       | a deal-breaker accepting an answer the field has not | 400 |
+      | a deal-breaker on languages accepting another language | 400 |
       | the same field twice                              | 400    |
       | a deal-breaker on height accepting no relation of height | 400 |
       | a deal-breaker on height accepting two relations  | 400    |
@@ -118,6 +119,11 @@ Feature: The hard preferences of onboarding
     When it accepts nearby, then nearby and close, then everyone
     Then each is a hard row that reads back as saved, a second one replaces the first, and everyone leaves no row
     And it is never paused, and it lets through those who did not answer, whatever the request said
+
+  Scenario: A language deal-breaker saved with Another language reads back without it
+    Given one account's language deal-breaker saved accepting Finnish and Another language, and another's accepting Another language alone
+    When each reads its deal-breakers
+    Then the first accepts Finnish alone and the second has none, as the queue's builder reads them too
 
   Scenario: The deal-breakers of another account are never served
     Given two accounts, one with a deal-breaker set

@@ -39,6 +39,27 @@ export function screenOpen(fields: Record<string, unknown>, key: ProfileFieldKey
   );
 }
 
+/**
+ * The fields a later screen draws: its own and its companion, or only the half
+ * still open where both count and one is answered (#616): someone who answered
+ * smoking before other nicotine existed is asked other nicotine alone, and took
+ * smoking shown again, already chosen, for a mistake. Read off the stored
+ * document, so that a half answered on the screen stays in view. A screen
+ * opened for its one answer (`once`) draws both, its field being the reason it
+ * was opened, as does the profile's own section.
+ */
+export function laterFieldsShown(
+  saved: Record<string, unknown>,
+  key: ProfileFieldKey,
+  once: boolean,
+): readonly ProfileFieldKey[] {
+  const companion = LATER_COMPANIONS[key];
+  if (companion === undefined) return [key];
+  if (once || !countsAsAnswer(companion)) return [key, companion];
+  const open = [key, companion].filter((field) => saved[field] === undefined);
+  return open.length === 1 ? open : [key, companion];
+}
+
 /** The first later screen after the index that still asks something; none when every one is done. */
 function nextUnanswered(
   fields: Record<string, unknown>,
@@ -103,7 +124,6 @@ export function LaterFieldScreen({ field, once = false }: { field: string; once?
     };
   }, []);
   if (index < 0 || !key) return null;
-  const companion = LATER_COMPANIONS[key];
 
   if (profile.status === "loading") {
     return (
@@ -160,8 +180,9 @@ export function LaterFieldScreen({ field, once = false }: { field: string; once?
           <Text>{t("profile.later.explain")}</Text>
         )}
 
-        <FieldEditor field={key} draft={draft} update={update} alone />
-        {companion && <FieldEditor field={companion} draft={draft} update={update} alone />}
+        {laterFieldsShown(saved.fields, key, once).map((shown) => (
+          <FieldEditor key={shown} field={shown} draft={draft} update={update} alone />
+        ))}
 
         {profile.notice?.kind === "error" && (
           <Text accessibilityLiveRegion="assertive">{profileErrorText(profile.notice, t)}</Text>
