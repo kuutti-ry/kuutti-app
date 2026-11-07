@@ -7598,6 +7598,20 @@ mail.emailCode.ignore:
   sv: "Någon lade till den här adressen i Kuutti-appen för att hålla kontakten. Om det inte var du kan du bortse från det här meddelandet."
   machine: { fi: true, sv: true }
 
+mail.announcement.subject:
+  en: "Kuutti: {title}"
+  description: "The subject of an announcement's email (#573, ADR-068 §5): the app's name and the announcement's own title as an admin wrote it, in the language of the text the person gets (Swedish where written, otherwise English; Finnish for Finnish)."
+  fi: "Kuutti: {title}"
+  sv: "Kuutti: {title}"
+  machine: { fi: true, sv: true }
+
+mail.announcement.why:
+  en: "You get this because you confirmed this address in the Kuutti app. Announcements can be turned off in Settings, under Notifications."
+  description: "An announcement's email (#573, ADR-068 §5), after its body: why the person gets it, and where the Announcements switch is (Settings › Notifications), which stops the email and the push but not the notice in the app. No link: the mail carries none."
+  fi: "Saat tämän, koska vahvistit tämän osoitteen Kuutti-sovelluksessa. Kuutin tiedotteet voi laittaa pois päältä Asetuksista, kohdasta Ilmoitukset."
+  sv: "Du får det här eftersom du bekräftade den här adressen i Kuutti-appen. Meddelanden från Kuutti kan stängas av i Inställningar, under Aviseringar."
+  machine: { fi: true, sv: true }
+
 mail.signature:
   en: "Kuutti ry"
   description: "The last line of every message Kuutti sends (#385): the association's name, never an address (the maintainer, 06/10/2026)."
@@ -9038,6 +9052,13 @@ push.match:
   sv: "Du har en ny matchning"
   machine: { fi: true, sv: true }
 
+push.announcement:
+  en: "An announcement from Kuutti"
+  description: "A push (#573, ADR-068 §4), its one line: Kuutti has told everybody something, which the person reads in the app's notices and, with a confirmed address, by email. Never the announcement's own words, which never pass through Expo, Apple or Google; the phone shows it on the lock screen. Short, no full stop."
+  fi: "Tiedote Kuutilta"
+  sv: "Ett meddelande från Kuutti"
+  machine: { fi: true, sv: true }
+
 push.channel:
   en: "Notifications"
   description: "The name of Kuutti's one notification channel in Android's own settings for the app (#102, ADR-055 §9). Short."
@@ -9071,6 +9092,20 @@ notifications.kind.moderation.hint:
   description: "Under the Moderators' decisions switch (#176, ADR-032, #581): the one thing the panel cannot show, that nothing reads this switch yet. Goes when something is sent for it."
   fi: "Näistä ei vielä lähetetä puhelimillesi mitään."
   sv: "Inget skickas till dina telefoner om detta än."
+  machine: { fi: true, sv: true }
+
+notifications.kind.announcement.label:
+  en: "Announcements from Kuutti"
+  description: "The Notifications screen (#573, ADR-068 §6), the switch of Kuutti's announcements to everybody: when on, an announcement comes as a push and, to a confirmed address, by email. Distinct from the home screen's Notices heading."
+  fi: "Kuutin tiedotteet"
+  sv: "Meddelanden från Kuutti"
+  machine: { fi: true, sv: true }
+
+notifications.kind.announcement.hint:
+  en: "When this is off, an announcement still shows in the app, with no push and no email."
+  description: "Under the Announcements switch (#573, ADR-068 §6): the fact a person needs before switching it off, that what Kuutti tells everybody still reaches them in the app."
+  fi: "Kun tämä on pois päältä, tiedote näkyy silti sovelluksessa, mutta ilman ilmoitusta ja sähköpostia."
+  sv: "När det här är avstängt syns ett meddelande ändå i appen, utan avisering och utan e-post."
   machine: { fi: true, sv: true }
 
 notices.title:

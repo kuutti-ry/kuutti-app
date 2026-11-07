@@ -9,7 +9,7 @@ import { SanctionReason } from "./sanction.ts";
 
 /** What a person may be notified of, in the order Settings lists them. Mirrors the database's enum. */
 export const NotificationKind = z
-  .enum(["message", "match", "moderation"])
+  .enum(["message", "match", "moderation", "announcement"])
   .meta({ id: "NotificationKind" });
 export type NotificationKind = z.infer<typeof NotificationKind>;
 
@@ -38,7 +38,7 @@ export type PutNotificationChoice = z.infer<typeof PutNotificationChoice>;
 
 /** What a notice is about. Mirrors the database's enum; #312 and M5 add theirs. */
 export const NoticeKind = z
-  .enum(["warning", "invitation_counted", "invitation_friend"])
+  .enum(["warning", "invitation_counted", "invitation_friend", "announcement"])
   .meta({ id: "NoticeKind" });
 export type NoticeKind = z.infer<typeof NoticeKind>;
 
@@ -76,9 +76,45 @@ export const InvitationFriendNotice = NoticeBase.extend({
   reward: RewardUnits,
 }).meta({ id: "InvitationFriendNotice" });
 
-/** A notice in the app: no text of its own, the app says it from the kind and what it points at. */
+// Announcements (#573, ADR-068): one text to everybody, written by an admin
+// in the panel and sent once another admin approves it. English and Finnish
+// are required, Swedish optional; a Swedish reader of one without Swedish
+// reads the English, and Stadi reads the Finnish. Formats, not tunables.
+
+/** The most characters of an announcement's title, its email's subject. */
+export const ANNOUNCEMENT_TITLE_MAX = 80;
+/** The most characters of an announcement's body. */
+export const ANNOUNCEMENT_BODY_MAX = 1000;
+
+/** One language's words of an announcement: plain text, never empty, trimmed. */
+export const AnnouncementText = z
+  .object({
+    title: z.string().trim().min(1).max(ANNOUNCEMENT_TITLE_MAX),
+    body: z.string().trim().min(1).max(ANNOUNCEMENT_BODY_MAX),
+  })
+  .strict()
+  .meta({ id: "AnnouncementText" });
+export type AnnouncementText = z.infer<typeof AnnouncementText>;
+
+/**
+ * An announcement to everybody (#573, ADR-068 §3): its title and body in the
+ * request's language, as an admin wrote them. The one notice with words of
+ * its own, which are Kuutti's, never a person's.
+ */
+export const AnnouncementNotice = NoticeBase.extend({
+  kind: z.literal("announcement"),
+  title: z.string().max(ANNOUNCEMENT_TITLE_MAX),
+  body: z.string().max(ANNOUNCEMENT_BODY_MAX),
+}).meta({ id: "AnnouncementNotice" });
+
+/** A notice in the app: no text of its own, the app says it from the kind and what it points at; an announcement says its own. */
 export const Notice = z
-  .discriminatedUnion("kind", [WarningNotice, InvitationCountedNotice, InvitationFriendNotice])
+  .discriminatedUnion("kind", [
+    WarningNotice,
+    InvitationCountedNotice,
+    InvitationFriendNotice,
+    AnnouncementNotice,
+  ])
   .meta({ id: "Notice" });
 export type Notice = z.infer<typeof Notice>;
 
@@ -126,9 +162,9 @@ export const PushTokenRequest = z
   .meta({ id: "PushTokenRequest" });
 export type PushTokenRequest = z.infer<typeof PushTokenRequest>;
 
-/** What a push's `data` carries: its kind. A tap goes to the conversations. */
+/** What a push's `data` carries: its kind. A tap on a message's or a match's goes to the conversations, on an announcement's home. */
 export const PushData = z
-  .object({ kind: z.enum(["message", "match"]) })
+  .object({ kind: z.enum(["message", "match", "announcement"]) })
   .strict()
   .meta({ id: "PushData" });
 export type PushData = z.infer<typeof PushData>;
@@ -143,3 +179,64 @@ export const ExportedPush = z
   })
   .meta({ id: "ExportedPush" });
 export type ExportedPush = z.infer<typeof ExportedPush>;
+
+// The panel's side of the announcements (#573, ADR-068 §2): an admin writes
+// one, another approves it, and either may delete it before then.
+
+/** An announcement as an admin writes it: English and Finnish, and Swedish or nothing. */
+export const AnnouncementDraft = z
+  .object({
+    en: AnnouncementText,
+    fi: AnnouncementText,
+    sv: AnnouncementText.optional(),
+  })
+  .strict()
+  .meta({ id: "AnnouncementDraft" });
+export type AnnouncementDraft = z.infer<typeof AnnouncementDraft>;
+
+/**
+ * One announcement in the panel: its words, when it was written and approved,
+ * and whether the caller wrote it, which is who may not approve it. Never who
+ * wrote or approved it: the audit log says that.
+ */
+export const AdminAnnouncement = z
+  .object({
+    id: z.uuid(),
+    en: AnnouncementText,
+    fi: AnnouncementText,
+    sv: AnnouncementText.nullable(),
+    writtenAt: z.iso.datetime(),
+    /** Null while it waits for a second admin; set, it went to everybody then. */
+    approvedAt: z.iso.datetime().nullable(),
+    yours: z.boolean(),
+  })
+  .meta({ id: "AdminAnnouncement" });
+export type AdminAnnouncement = z.infer<typeof AdminAnnouncement>;
+
+/** How many an announcement approved now reaches: everybody gets the notice; the switch and a device or a confirmed address decide the rest. */
+export const AnnouncementReach = z
+  .object({
+    accounts: z.int().min(0),
+    /** People who would be pushed: the switch on and a live device. */
+    phones: z.int().min(0),
+    /** Confirmed addresses whose person has the switch on. */
+    addresses: z.int().min(0),
+  })
+  .meta({ id: "AnnouncementReach" });
+export type AnnouncementReach = z.infer<typeof AnnouncementReach>;
+
+/** The newest announcements the panel lists. */
+export const ANNOUNCEMENTS_LISTED = 50;
+
+export const AdminAnnouncementList = z
+  .object({
+    items: z.array(AdminAnnouncement).max(ANNOUNCEMENTS_LISTED),
+    reach: AnnouncementReach,
+  })
+  .meta({ id: "AdminAnnouncementList" });
+export type AdminAnnouncementList = z.infer<typeof AdminAnnouncementList>;
+
+export const AnnouncementParams = z
+  .object({ id: z.uuid() })
+  .strict()
+  .meta({ id: "AnnouncementParams" });

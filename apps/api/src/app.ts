@@ -52,7 +52,12 @@ import { addressOf, limited, personOf, rateLimit } from "./lib/rate-limit.ts";
 import { serverRequestId } from "./lib/request-id.ts";
 import { preferencesRoutes, readPreferences, roundRoutes, starRoutes } from "./matching/index.ts";
 import { type MediaDeps, photoAdminRoutes, photoRoutes, UPLOAD_ROUTE } from "./media/index.ts";
-import { createPush, notificationRoutes, type Push } from "./notifications/index.ts";
+import {
+  announcementAdminRoutes,
+  createPush,
+  notificationRoutes,
+  type Push,
+} from "./notifications/index.ts";
 import { pondAdminRoutes, pondRoutes } from "./pond/index.ts";
 import { buildCard, exportProfile, profileRoutes } from "./profile/index.ts";
 import { invitationLinkRoutes, invitationRoutes } from "./rewards/index.ts";
@@ -285,6 +290,7 @@ export function createApp(deps: Deps) {
       logger: deps.logger,
       now: deps.now ?? (() => new Date()),
       ...(deps.pusher ? { pusher: deps.pusher } : {}),
+      ...(deps.mailer ? { mailer: deps.mailer } : {}),
       online: (accountId) => live.online(accountId),
     });
   // The conversations a match opens and their text messages (#348, ADR-031).
@@ -330,6 +336,8 @@ export function createApp(deps: Deps) {
   app.route("/", auditAdminRoutes(deps, admins));
   app.route("/", staffAdminRoutes(deps, admins));
   app.route("/", pondAdminRoutes(deps, admins));
+  // Announcements to everybody (#573, ADR-068): an admin writes, another approves.
+  app.route("/", announcementAdminRoutes(deps, admins, push));
   // Completeness reads across slices and lives with the jobs; the pond's route is handed it.
   app.route(
     "/",

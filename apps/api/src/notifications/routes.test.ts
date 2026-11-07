@@ -61,6 +61,8 @@ const ALL_ON = [
   { kind: "message", enabled: true },
   { kind: "match", enabled: true },
   { kind: "moderation", enabled: true },
+  // Kuutti's announcements to everybody (#573, ADR-068 §6).
+  { kind: "announcement", enabled: true },
 ];
 
 describe("the notification choices", () => {

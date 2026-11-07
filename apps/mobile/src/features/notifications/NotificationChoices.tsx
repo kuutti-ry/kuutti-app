@@ -22,6 +22,11 @@ const WORDS: Record<NotificationKind, { label: PlainMessageKey; hint?: PlainMess
     label: "notifications.kind.moderation.label",
     hint: "notifications.kind.moderation.hint",
   },
+  // Off stops the push and the email, never the notice (#573, ADR-068 §6).
+  announcement: {
+    label: "notifications.kind.announcement.label",
+    hint: "notifications.kind.announcement.hint",
+  },
 };
 
 type ChoicesView =

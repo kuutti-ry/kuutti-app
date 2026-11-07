@@ -2003,7 +2003,7 @@
             "items": {
               "$ref": "#/components/schemas/NotificationChoice"
             },
-            "maxItems": 3
+            "maxItems": 4
           },
           "notices": {
             "type": "array",
@@ -2057,7 +2057,8 @@
         "enum": [
           "message",
           "match",
-          "moderation"
+          "moderation",
+          "announcement"
         ]
       },
       "NoticeKind": {
@@ -2065,7 +2066,8 @@
         "enum": [
           "warning",
           "invitation_counted",
-          "invitation_friend"
+          "invitation_friend",
+          "announcement"
         ]
       },
       "ExportedRounds": {
@@ -4061,7 +4063,7 @@
             "items": {
               "$ref": "#/components/schemas/NotificationChoice"
             },
-            "maxItems": 3
+            "maxItems": 4
           }
         },
         "required": [
@@ -4105,6 +4107,9 @@
           },
           {
             "$ref": "#/components/schemas/InvitationFriendNotice"
+          },
+          {
+            "$ref": "#/components/schemas/AnnouncementNotice"
           }
         ],
         "discriminator": {
@@ -4112,7 +4117,8 @@
           "mapping": {
             "warning": "#/components/schemas/WarningNotice",
             "invitation_counted": "#/components/schemas/InvitationCountedNotice",
-            "invitation_friend": "#/components/schemas/InvitationFriendNotice"
+            "invitation_friend": "#/components/schemas/InvitationFriendNotice",
+            "announcement": "#/components/schemas/AnnouncementNotice"
           }
         }
       },
@@ -4228,6 +4234,46 @@
           "readAt",
           "kind",
           "reward"
+        ]
+      },
+      "AnnouncementNotice": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "readAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "announcement"
+            ]
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 80
+          },
+          "body": {
+            "type": "string",
+            "maxLength": 1000
+          }
+        },
+        "required": [
+          "id",
+          "at",
+          "readAt",
+          "kind",
+          "title",
+          "body"
         ]
       },
       "PushTokenRequest": {
@@ -6450,6 +6496,132 @@
         },
         "required": [
           "open"
+        ],
+        "additionalProperties": false
+      },
+      "AdminAnnouncementList": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminAnnouncement"
+            },
+            "maxItems": 50
+          },
+          "reach": {
+            "$ref": "#/components/schemas/AnnouncementReach"
+          }
+        },
+        "required": [
+          "items",
+          "reach"
+        ]
+      },
+      "AdminAnnouncement": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "en": {
+            "$ref": "#/components/schemas/AnnouncementText"
+          },
+          "fi": {
+            "$ref": "#/components/schemas/AnnouncementText"
+          },
+          "sv": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AnnouncementText"
+              },
+              {
+                "nullable": true
+              }
+            ]
+          },
+          "writtenAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "approvedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "yours": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "en",
+          "fi",
+          "sv",
+          "writtenAt",
+          "approvedAt",
+          "yours"
+        ]
+      },
+      "AnnouncementText": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "body": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000
+          }
+        },
+        "required": [
+          "title",
+          "body"
+        ],
+        "additionalProperties": false
+      },
+      "AnnouncementReach": {
+        "type": "object",
+        "properties": {
+          "accounts": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "phones": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "addresses": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "accounts",
+          "phones",
+          "addresses"
+        ]
+      },
+      "AnnouncementDraft": {
+        "type": "object",
+        "properties": {
+          "en": {
+            "$ref": "#/components/schemas/AnnouncementText"
+          },
+          "fi": {
+            "$ref": "#/components/schemas/AnnouncementText"
+          },
+          "sv": {
+            "$ref": "#/components/schemas/AnnouncementText"
+          }
+        },
+        "required": [
+          "en",
+          "fi"
         ],
         "additionalProperties": false
       },
@@ -9763,7 +9935,7 @@
     "/notices": {
       "get": {
         "summary": "The caller's notices in the app",
-        "description": "What must reach the person even without a push, newest first, at most 20: a moderator's warning, with its reason, until it is lifted, and an invitation of the person's that counted, with what it earned and never who was invited. A notice holds no text of its own; the app says it.",
+        "description": "What must reach the person even without a push, newest first, at most 20: a moderator's warning, with its reason, until it is lifted; an invitation of the person's that counted, with what it earned and never who was invited; and an announcement to everybody (#573, ADR-068), with its title and body in the request's language, Swedish falling back to English and Stadi reading Finnish. Every other notice holds no text of its own; the app says it.",
         "security": [
           {
             "session": []
@@ -12745,6 +12917,271 @@
           },
           "404": {
             "description": "No such pond.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/announcements": {
+      "get": {
+        "summary": "The newest announcements, and how many one would reach",
+        "description": "The newest 50, drafts and sent alike, each in its languages and whether the caller wrote it, which is who may not approve it; never who wrote or approved it, which the audit log says. With them how many an announcement approved now reaches: every account that is not erased gets its notice, the people with the announcements switch on and a live device its push, and the confirmed addresses with the switch on its email. Admins only.",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The announcements.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminAnnouncementList"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "unauthenticated, session_expired or session_revoked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "admin_forbidden: the role does not allow this.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Write an announcement",
+        "description": "A draft in English and Finnish, and in Swedish or not at all: each a title of at most 80 characters and a body of at most 1,000, trimmed, never empty, and with no address, link, phone number or handle (the plain-text rule). Nothing is sent until another admin approves it. Admins only; written to audit_log with no words.",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AnnouncementDraft"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The draft.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminAnnouncement"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "validation_failed, or text_contact_details naming the language and what was found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "unauthenticated, session_expired or session_revoked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "admin_forbidden: the role does not allow this.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/announcements/{id}": {
+      "delete": {
+        "summary": "Delete a draft",
+        "description": "Any admin may delete an announcement that has not been approved; one that went to everybody stays. Admins only; written to audit_log.",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted."
+          },
+          "400": {
+            "description": "Validation failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "unauthenticated, session_expired or session_revoked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "admin_forbidden: the role does not allow this.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such announcement.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "announcement_sent: it went to everybody already.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/announcements/{id}/approve": {
+      "post": {
+        "summary": "Approve an announcement, which sends it to everybody",
+        "description": "The second admin's approval: never the one who wrote it, and once. In the same transaction every account that is not erased gets the announcement as a notice in the app; after the answer, the confirmed addresses whose switch is on get it by email, and the people whose notice is still unread and whose switch is on get a push in the app's own words, or once the quiet hours end. Nothing takes it back. Admins only; written to audit_log with how many notices it wrote.",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The announcement, sent.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminAnnouncement"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "unauthenticated, session_expired or session_revoked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "admin_forbidden: the role does not allow this.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such announcement.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "own_announcement: the caller wrote it; announcement_sent: it went to everybody already.",
             "content": {
               "application/json": {
                 "schema": {
