@@ -50,7 +50,7 @@ function Offer({ onAnswered }: { onAnswered: () => void }) {
 
   return (
     <View className="mt-4 gap-2">
-      <Text variant="large" accessibilityRole="header">
+      <Text variant="title" accessibilityRole="header">
         {t("notifications.ask.heading")}
       </Text>
       <Text>{t("notifications.ask.body")}</Text>

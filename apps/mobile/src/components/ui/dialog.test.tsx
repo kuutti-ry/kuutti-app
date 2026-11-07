@@ -2,7 +2,7 @@ import { act, fireEvent, render, screen } from "@testing-library/react-native";
 import { DeviceEventEmitter, Keyboard, Platform, StyleSheet, Text, TextInput } from "react-native";
 import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
 import { renderWithTheme, underProviders } from "@/test/render";
-import { TOUCH_TARGET } from "@/theme/a11y";
+import { HEADING_FONT_SCALE, MAX_FONT_SCALE, TOUCH_TARGET } from "@/theme/a11y";
 import {
   Dialog,
   DialogContent,
@@ -35,6 +35,17 @@ describe("Dialog", () => {
     );
     expect(screen.getByText("Remove this photo?")).toBeTruthy();
     expect(screen.getByText("It is deleted for good.")).toBeTruthy();
+    // The title is a title in Saiga, growing as a title does; the description is read (#408).
+    const title = screen.getByText("Remove this photo?");
+    expect(title.props.className.split(" ")).toEqual(
+      expect.arrayContaining(["font-sans", "text-title"]),
+    );
+    expect(title.props.maxFontSizeMultiplier).toBe(HEADING_FONT_SCALE.title);
+    const body = screen.getByText("It is deleted for good.");
+    expect(body.props.className.split(" ")).toEqual(
+      expect.arrayContaining(["font-system", "text-small"]),
+    );
+    expect(body.props.maxFontSizeMultiplier).toBe(MAX_FONT_SCALE);
     expect(screen.getByText("Footer")).toBeTruthy();
     const close = screen.getByRole("button", { name: "Close the question" });
     expect(StyleSheet.flatten(close.props.style)).toMatchObject({ minHeight: 44, minWidth: 44 });

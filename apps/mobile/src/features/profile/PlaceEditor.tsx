@@ -147,8 +147,8 @@ export function PlacePicker({
               onPick(row.code);
             }}
           >
-            <Text className="font-normal text-muted-foreground">{row.code}</Text>
-            <Text className="flex-1 font-normal">{name}</Text>
+            <Text className="font-system text-muted-foreground">{row.code}</Text>
+            <Text className="flex-1 font-system">{name}</Text>
           </Button>
         );
       })}

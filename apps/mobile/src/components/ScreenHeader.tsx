@@ -20,7 +20,7 @@ import { useHapticTap } from "@/theme/haptics";
  * as "Valintapainikkeet" from x1.1 on a 375 pt phone, and at the default size
  * on a 320 pt one), and a pinned title of two or three lines took the room the
  * content needs most at that size. It has no fixed line height
- * (`text-4xl/[normal]`): iOS places a shrunk font at the foot of the line
+ * (`text-h1/[normal]`): iOS places a shrunk font at the foot of the line
  * height set for the font before it shrank, below the arrow's middle. The web
  * preview cannot shrink text, and one line there is an ellipsis that hides the
  * title, so it wraps as before.
@@ -62,7 +62,7 @@ export function ScreenHeader({
       <Text
         variant="h1"
         accessibilityRole="header"
-        className="flex-1 text-4xl/[normal]"
+        className="flex-1 text-h1/[normal]"
         numberOfLines={Platform.OS === "web" ? undefined : 1}
         adjustsFontSizeToFit
       >

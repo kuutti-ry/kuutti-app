@@ -43,17 +43,36 @@ module.exports = {
       },
       // The minimum touch target (CLAUDE.md Accessibility): min-h-touch min-w-touch.
       spacing: { touch: "44px" },
-      // Saiga, Kuutti's typeface (ADR-052), through `font-sans` on the text
-      // primitives. A phone takes the first family only (NativeWind keeps one)
-      // and draws in the system font when its build has no Saiga; the web reads
-      // the whole stack, for a browser without Saiga and for a character it
-      // lacks (✓).
+      // Two families (#408, ADR-052 §4): Saiga, Kuutti's typeface, through
+      // `font-sans` for headings and controls, and the phone's own font through
+      // `font-system` for everything read, the Text primitive's default. A phone
+      // takes the first family only (NativeWind keeps one): iOS knows "System",
+      // and Android draws a family it does not know in its system font, as a
+      // build without Saiga draws Saiga's text. The web reads the whole stack,
+      // for a browser without Saiga and for a character it lacks (✓).
       fontFamily: {
         sans: ["Saiga", "system-ui", "-apple-system", "'Segoe UI'", "Roboto", "sans-serif"],
+        system: ["System", "system-ui", "-apple-system", "'Segoe UI'", "Roboto", "sans-serif"],
       },
-      // Saiga has no 600. Bold, as the website draws its 650 (its decision 18),
-      // and the same face on every platform, where each would pick its own.
-      fontWeight: { semibold: "700" },
+      // The type scale (#408): points on a phone and pixels on the web, which
+      // the rem-based sizes were not (rem 14 on a phone, 16 on the web). Saiga
+      // Regular is as dark as the system font's Semibold, so the variants of
+      // the Text primitive name Saiga's weight for each role.
+      fontSize: {
+        h1: ["30px", { lineHeight: "36px", letterSpacing: "-0.3px" }],
+        h2: ["24px", { lineHeight: "30px" }],
+        // h3 and the title of a card or a dialog.
+        title: ["20px", { lineHeight: "26px" }],
+        // What is read, in the phone's font.
+        body: ["17px", { lineHeight: "25px" }],
+        // One line at body size: a button's words, h4.
+        control: ["17px", { lineHeight: "22px" }],
+        // Saiga's small words: a field's label, a chip, the heading of a group.
+        label: ["15px", { lineHeight: "20px", letterSpacing: "0.15px" }],
+        // Secondary text, in the phone's font.
+        small: ["15px", { lineHeight: "20px" }],
+        caption: ["13px", { lineHeight: "18px" }],
+      },
     },
   },
   plugins: [require("tailwindcss-animate")],

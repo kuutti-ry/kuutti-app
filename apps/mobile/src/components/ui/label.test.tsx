@@ -24,6 +24,10 @@ describe("Label", () => {
     expect(pressables(screen.toJSON() as HostNode).flatMap((n) => a11yProblems(n))).toEqual([]);
     expect(rootOf("Name").props.className).not.toMatch(/opacity-50/);
     expect(screen.getByText("Name").props.className).toMatch(/(^| )text-foreground( |$)/);
+    // A label is Saiga's small words (#408).
+    expect(screen.getByText("Name").props.className.split(" ")).toEqual(
+      expect.arrayContaining(["font-sans", "text-label"]),
+    );
   });
 
   it("is dimmed and ignores presses when disabled", async () => {

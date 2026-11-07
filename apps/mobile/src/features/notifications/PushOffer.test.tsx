@@ -77,7 +77,7 @@ afterEach(() => jest.restoreAllMocks());
 describe("PushOffer", () => {
   it("offers once, with the reason in words and two answers of equal weight", async () => {
     await renderWithTheme(<PushOffer />);
-    expect(await screen.findByRole("header", { name: HEADING })).toBeTruthy();
+    expect(await screen.findByRole("heading", { name: HEADING })).toBeTruthy();
     // What a lock screen shows, in true words, and that the kinds are separate (#581).
     expect(
       screen.getByText(

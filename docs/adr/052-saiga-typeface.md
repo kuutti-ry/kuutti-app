@@ -1,6 +1,6 @@
 # ADR-052: Saiga, Kuutti's typeface, in the app and the panel, its files never public
 
-- Status: proposed (built as written here at the maintainer's word of 2026-10-24, "Saiga IN!", with his choice that day that the panel's copy is uploaded by hand; the token, the Expo GitHub App's reach, the uploads and Spoke's credit are his, the type scale the designer's, see Open)
+- Status: proposed (built as written here at the maintainer's word of 2026-10-24, "Saiga IN!", with his choice that day that the panel's copy is uploaded by hand; the token, the Expo GitHub App's reach, the uploads and Spoke's credit are his, the type scale his of 2026-11-08, the designer's to change, see History and Open)
 - Date: 2026-10-24
 - Follows: TD-2 (Expo and EAS as the native shell and the update channel), TD-9 (the design tokens, NativeWind), ADR-004 §3 (write access is the trust of what runs with `EXPO_TOKEN`), ADR-025 §3, §4 and §5 (the panel's CSP, its caching and its deploy), ADR-047 (the drawings follow the code), ADR-050 (the panel's components, system fonts only), CLAUDE.md (Decisions: the delivery of a licensed asset is infrastructure; Security: secrets; Accessibility: the OS's font scaling), the website's decision 18 (`kuutti-app-site`); issues #394, #408, #405
 
@@ -33,10 +33,12 @@ Saiga covers every character of `messages.yaml` (å, ä and ö among them) but �
    No font list is in the config, `_internal` is not hashed, and the same modules load either way, so a build with Saiga and one without have one fingerprint. `plugins/fingerprint.test.js` holds this with two real computations, each with its own `HOME`. Adding the plugin moves the fingerprint once: a native change of its own, after the seal-head icons' (#444), whose builds it orphans, so the next development build follows it.
 
    Run-time loading was not chosen, for the reasons in Context: the files would ride public updates and exports built on runners, an absent file breaks the toolchain, and an update exported without them would switch installed apps back.
-4. **The type.**
-   - NativeWind's `font-sans` is Saiga first, then a system stack: a phone takes the first family, the web the whole stack. It is on every text primitive: `Text`, `Input`, `Label`, and the dialog's title and description.
-   - `font-semibold` is 700: Saiga has no 600, and each platform would pick its own neighbour. The website draws its 650 in Bold. The designer may say otherwise (#408).
-   - The OS's font scaling is unchanged (`MAX_FONT_SCALE`). A character Saiga lacks falls back by the platform's cascade, or by the stack on the web.
+4. **The type** of the phone app, as amended on 2026-11-08 (#408, History):
+   - Two families. NativeWind's `font-sans` is Saiga first, then a system stack; `font-system` is the phone's own font ("System", then the same stack). A phone takes the first family, the web the whole stack.
+   - What is read, Kuutti's words and people's, is in `font-system`: the `Text` primitive's default, `Input`, the dialog's description, a row of a list. Saiga draws headings, a button's words, a label, a chip and the heading of a group of rows, through the variants of `Text` and through `Button`, `Label` and the dialog's title.
+   - The scale is `fontSize` in `tailwind.config.js`, in points on a phone and pixels on the web: h1 30/36, h2 24/30, h3 and a title 20/26, body text 17/25, a control's line 17/22, a label and small text 15/20, a caption 13/18.
+   - Saiga Regular is as dark as the system font's Semibold, so it takes Semibold's jobs: a title, a button's words, a label. h2 to h4 are Medium and h1 alone is Bold. No role asks Saiga for 600, which it lacks; `font-semibold` is the system font's own, for emphasis in what is read.
+   - The OS's font scaling is unchanged (`MAX_FONT_SCALE`), and headings grow less (`HEADING_FONT_SCALE`: h1 1.25, h2 1.5, h3 and a title 1.75). A character Saiga lacks falls back by the platform's cascade, or by the stack on the web.
 5. **The web target** has `@font-face` rules in `global.css`, which native ignores. Metro's dev server answers the files from the cache, to this computer alone (`metro.config.js`). No export carries them, so a pull request's web preview is in the system font.
 6. **The panel** names four faces at `/fonts/saiga-<version>/`, root-absolute, so a preview under `/pr-<n>/` finds them too.
    - `--font-sans` is Saiga and a system stack, and semibold is 700. `tabular-nums` keeps the system's font, since Saiga has no tabular figures.
@@ -68,7 +70,7 @@ Saiga covers every character of `messages.yaml` (å, ä and ö among them) but �
 2. **The Expo GitHub App** is installed on all of the organisation's repositories, with contents and administration write, so it can read `kuutti-app-fonts`. Narrowing it is his setting (#394, step 1).
 3. **The uploads:** Saiga to the staging panel's bucket (`pnpm aws:login`, `pnpm fonts`, `pnpm fonts -- --upload <ADMIN_BUCKET>`), and to production's with #25.
 4. **Spoke's credit:** whether and how, on the site, in the app's licences screen and in the panel. It waits on Spoke (#405).
-5. **The type scale:** SemiBold as Bold, the line heights and the figures are the designer's (#408).
+5. **The type scale:** set on 2026-11-08 (History), the designer's to change. Saiga Light for what is read, which nobody has seen in the app, is hers to try; embedding it is a native change.
 6. **A store build without Saiga** is allowed by `--soft` today. Should a `production` build refuse instead?
 
 ## Not done, and what would make it needed
@@ -86,3 +88,7 @@ Saiga covers every character of `messages.yaml` (å, ä and ö among them) but �
 - **A git submodule, or a `package.json` dependency on the private repository:** either puts the files into every install, every CI job and the cached pnpm store.
 - **The panel's fonts fetched by its deploy job** with a GitHub environment secret: automatic, but the token and the files would be on a runner, against points 2 and 7.
 - **The panel's fonts read from `kuutti.app`:** needs CORS on the website, and a loosened rule lets any origin use the files.
+
+## History
+
+- 2026-11-08 (#408): the phone app's type, at the maintainer's word ("Build D now", on the specimen sheets of the designer's question whether Saiga can be a text face). Measured in Chromium from the drawn text, not from the files, Saiga Regular has SF Pro Semibold's stems (a capital I 0.181 of the cap height, SF Pro Regular 0.125) and 39% more ink per letter than SF Pro Regular, and is 16% wider (21% in Finnish) at the same x-height, 0.51 em. Body text in it read a weight too dark. §4 was: `font-sans` on every text primitive, Tailwind's rem sizes (14 pt body text on a phone), and `font-semibold` drawn as 700. Now what is read is in the phone's font and Saiga draws headings and controls, on §4's scale; `HEADING_FONT_SCALE` gives h2 1.5 (his of 28/10/2026, an agent's 1.45 since) and a title 1.75, so that every heading stays above body text at 2x (34 pt). The panel (§6) is unchanged.

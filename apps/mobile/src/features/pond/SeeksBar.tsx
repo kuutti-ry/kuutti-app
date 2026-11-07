@@ -47,7 +47,7 @@ export function SeeksBar({ seeks }: { seeks: PondSeeks }) {
         {bands.map(({ band, colour, label }) => (
           <View key={band} className="flex-row items-center gap-1.5">
             <View className={cn("size-3 rounded-sm", colour)} />
-            <Text className="text-sm">{label}</Text>
+            <Text className="text-small">{label}</Text>
           </View>
         ))}
       </View>

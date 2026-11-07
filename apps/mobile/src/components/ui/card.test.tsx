@@ -25,6 +25,13 @@ describe("Card", () => {
     const title = screen.getByRole("heading", { name: "Your pond" });
     expect(title.props["aria-level"]).toBe(3);
     expect(screen.getByText("How it fills up").props.className).toMatch(/text-muted-foreground/);
+    // The title is a title in Saiga; the description is read, smaller (#408).
+    expect(title.props.className.split(" ")).toEqual(
+      expect.arrayContaining(["font-sans", "text-title"]),
+    );
+    expect(screen.getByText("How it fills up").props.className.split(" ")).toEqual(
+      expect.arrayContaining(["font-system", "text-small"]),
+    );
     // Text inside the card takes the card's foreground token, never a colour of its own.
     expect(screen.getByText("Body").props.className).toMatch(/text-card-foreground/);
     expect(screen.getByText("Footer").props.className).toMatch(/text-card-foreground/);

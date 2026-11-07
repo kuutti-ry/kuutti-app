@@ -85,6 +85,6 @@ describe("SeeksBar", () => {
     const { labels, screen } = await parts();
     expect(labels.props.className).toMatch(/(^| )flex-wrap( |$)/);
     expect(labels.props.className).not.toMatch(/(^| )h-/);
-    expect(screen.getByText("30 % men").props.className).toMatch(/(^| )text-sm( |$)/);
+    expect(screen.getByText("30 % men").props.className).toMatch(/(^| )text-small( |$)/);
   });
 });

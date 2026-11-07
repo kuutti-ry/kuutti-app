@@ -153,6 +153,16 @@ describe("Button", () => {
     expect(unchosen).toMatch(/(^| )border( |$)/);
   });
 
+  // Saiga Regular, as dark as the system font's Semibold, the weight a phone
+  // gives a button's words (#408).
+  it("draws its words in Saiga Regular on one line at body size", async () => {
+    await renderWithTheme(<Button>Save</Button>);
+    const words = String(screen.getByText("Save").props.className).split(" ");
+    expect(words).toEqual(expect.arrayContaining(["font-sans", "text-control", "font-normal"]));
+    expect(words).not.toContain("font-system");
+    expect(words).not.toContain("font-semibold");
+  });
+
   it.each([
     ["destructive", /text-destructive-foreground/],
     ["outline", /text-foreground/],

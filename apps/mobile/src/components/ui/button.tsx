@@ -55,7 +55,9 @@ const buttonVariants = cva(
   },
 );
 
-const buttonTextVariants = cva("text-base font-semibold", {
+// Saiga Regular: as dark as the system font's Semibold, the weight a phone
+// gives a button's words (#408).
+const buttonTextVariants = cva("font-sans text-control font-normal", {
   variants: {
     variant: {
       default: "text-primary-foreground",

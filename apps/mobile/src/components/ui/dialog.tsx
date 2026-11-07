@@ -15,7 +15,7 @@ import { FullWindowOverlay as RNFullWindowOverlay } from "react-native-screens";
 import { Icon } from "@/components/ui/icon";
 import { NativeOnlyAnimatedView } from "@/components/ui/native-only-animated-view";
 import { cn } from "@/lib/utils";
-import { MAX_FONT_SCALE, TOUCH_TARGET } from "@/theme/a11y";
+import { HEADING_FONT_SCALE, MAX_FONT_SCALE, TOUCH_TARGET } from "@/theme/a11y";
 
 // From React Native Reusables (#12, TD-9), adapted: the close control is a
 // labelled 44 pt button (closeLabel is required), the scrim is a token,
@@ -199,11 +199,11 @@ function DialogTitle({ className, ...props }: React.ComponentProps<typeof Dialog
       // pr-8 ends the title where the close control starts: past the content's
       // padding the control takes 26.5 pt on a phone (rem 14) and 24 on the web.
       className={cn(
-        "font-sans text-foreground text-lg font-semibold",
+        "font-sans text-foreground text-title font-normal",
         hasClose && "pr-8",
         className,
       )}
-      maxFontSizeMultiplier={MAX_FONT_SCALE}
+      maxFontSizeMultiplier={HEADING_FONT_SCALE.title}
       {...props}
     />
   );
@@ -215,7 +215,7 @@ function DialogDescription({
 }: React.ComponentProps<typeof DialogPrimitive.Description>) {
   return (
     <DialogPrimitive.Description
-      className={cn("font-sans text-muted-foreground text-sm", className)}
+      className={cn("font-system text-muted-foreground text-small", className)}
       maxFontSizeMultiplier={MAX_FONT_SCALE}
       {...props}
     />

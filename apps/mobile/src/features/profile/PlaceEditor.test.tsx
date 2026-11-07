@@ -209,9 +209,13 @@ describe("PlacePicker", () => {
     expect(screen.getAllByRole("button")).toHaveLength(PLACE_ROWS);
     await typeDigits("00530");
     expect(rowNames()).toEqual(["0 0 5 3 0, Kallio"]);
-    // Both are drawn: the digits, then the name beside them.
-    expect(screen.getByText("00530")).toBeTruthy();
-    expect(screen.getByText("Kallio")).toBeTruthy();
+    // Both are drawn: the digits, then the name beside them, read in the
+    // phone's font, not the Button's Saiga (#408).
+    for (const words of ["00530", "Kallio"]) {
+      const classes = String(screen.getByText(words).props.className).split(" ");
+      expect(classes).toContain("font-system");
+      expect(classes).not.toContain("font-sans");
+    }
     await typeDigits("");
     expect(screen.queryAllByRole("button")).toEqual([]);
   });

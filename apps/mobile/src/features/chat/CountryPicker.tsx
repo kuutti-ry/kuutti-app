@@ -136,8 +136,8 @@ function CountryRow({
       <Text accessibilityElementsHidden importantForAccessibility="no">
         {country.flag}
       </Text>
-      <Text className="flex-1 font-normal">{country.name}</Text>
-      <Text className="font-normal text-muted-foreground">{country.code}</Text>
+      <Text className="flex-1 font-system">{country.name}</Text>
+      <Text className="font-system text-muted-foreground">{country.code}</Text>
       {chosen && <Icon as={Check} className="text-foreground" />}
     </Button>
   );

@@ -36,7 +36,7 @@ function Label({
     >
       <LabelPrimitive.Text
         className={cn(
-          "shrink font-sans text-sm font-medium text-foreground",
+          "shrink font-sans text-label font-normal text-foreground",
           disabled && "text-muted-foreground",
           className,
         )}

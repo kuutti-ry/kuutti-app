@@ -12,6 +12,10 @@ describe("Input", () => {
     const input = screen.getByLabelText("Your name");
     expect(input.props.maxFontSizeMultiplier).toBe(2);
     expect(input.props.className).toMatch(/\bmin-h-touch\b/);
+    // What people type is read: the phone's font at body size (#408).
+    expect(input.props.className.split(" ")).toEqual(
+      expect.arrayContaining(["font-system", "text-body"]),
+    );
     expect(input.props.className).not.toMatch(/opacity-50/);
     expect(input.props.className).not.toMatch(/\bborder-dashed\b/);
     await fireEvent.changeText(input, "Aino");
