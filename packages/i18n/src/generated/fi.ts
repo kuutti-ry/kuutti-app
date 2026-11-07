@@ -568,6 +568,7 @@ export const fi: Readonly<Record<string, string>> = {
   "profile.card.back": "Takaisin profiiliisi",
   "profile.card.explain": "Tämän muut näkevät.",
   "profile.card.fact": "{question}: {answer}",
+  "profile.card.fieldAndWork": "Ala ja työ: {answer}",
   "profile.card.nameAge": "{name}, {years, number}",
   "profile.card.open": "Katso korttisi",
   "profile.card.photoLabel": "Kuva {position, number} / {total, number}",

@@ -940,6 +940,7 @@ export const en: Readonly<Record<string, string>> = {
   "profile.card.back": "Back to your profile",
   "profile.card.explain": "This is what others see.",
   "profile.card.fact": "{question}: {answer}",
+  "profile.card.fieldAndWork": "Field and work: {answer}",
   "profile.card.nameAge": "{name}, {years, number}",
   "profile.card.open": "See your card",
   "profile.card.photoLabel": "Photo {position, number} of {total, number}",

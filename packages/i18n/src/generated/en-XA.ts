@@ -940,6 +940,7 @@ export const enXA: Readonly<Record<string, string>> = {
   "profile.card.back": "［Bááçk tóó ýýóóúúr próófííléé］",
   "profile.card.explain": "［Thííš ííš wháát óóthéérš šéééé.］",
   "profile.card.fact": "［{question}: {answer}］",
+  "profile.card.fieldAndWork": "［Fííééld ááñd wóórk: {answer}］",
   "profile.card.nameAge": "［{name}, {years, number}］",
   "profile.card.open": "［Šéééé ýýóóúúr çáárd］",
   "profile.card.photoLabel": "［Phóótóó {position, number} óóf {total, number}］",

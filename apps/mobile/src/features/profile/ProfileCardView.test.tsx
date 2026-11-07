@@ -727,6 +727,55 @@ describe("ProfileCardView", () => {
       expect(screen.getByRole("button", { name: "Show the whole card" })).toBeTruthy();
     });
 
+    it("draws a field and a work that read the same as one chip with both icons, heard as both, and keeps a pair that differs apart", async () => {
+      await renderWithTheme(
+        <ProfileCardView
+          card={{
+            ...bare,
+            fields: {
+              field: ["arts", "science"],
+              occupation: ["science", "arts_culture"],
+              occupationTitle: "Architect",
+            },
+          }}
+        />,
+      );
+      await toggle("Show the whole card");
+      // Science and Science and research read apart, so each keeps its chip and its question.
+      expect(heardChips()).toEqual([
+        "Field and work: Arts and culture",
+        "Field: Science",
+        "Work: Science and research",
+        "Job title: Architect",
+      ]);
+      expect(screen.getAllByText("Arts and culture")).toHaveLength(1);
+      const both = screen.getByTestId("chip-field.arts");
+      for (const icon of ["field-icon-field", "field-icon-occupation"]) {
+        expect(within(both).getByTestId(icon, { includeHiddenElements: true })).toBeTruthy();
+      }
+    });
+
+    it.each([
+      ["en-US", "Field and work: Arts and culture"],
+      ["fi-FI", "Ala ja työ: Taide ja kulttuuri"],
+      ["sv-FI", "Bransch och arbete: Konst och kultur"],
+    ])("says a field that reads as the work as both, for a %s reader", async (tag, heard) => {
+      (useLocales as jest.Mock).mockReturnValue([{ languageTag: tag }]);
+      try {
+        await renderWithTheme(
+          <ProfileCardView
+            card={{ ...bare, fields: { field: ["arts"], occupation: ["arts_culture"] } }}
+          />,
+        );
+        await act(async () => {
+          fireEvent.press(screen.getByRole("button"));
+        });
+        expect(heardChips()).toEqual([heard]);
+      } finally {
+        (useLocales as jest.Mock).mockReturnValue([{ languageTag: "en-US" }]);
+      }
+    });
+
     it("marks an answer both gave by a filled chip in bold, heard as shared, in the order given, and never says 'you too'", async () => {
       await renderWithTheme(
         <ProfileCardView

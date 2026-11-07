@@ -941,6 +941,7 @@ export type MessageParams = {
   "profile.card.back": Record<never, never>;
   "profile.card.explain": Record<never, never>;
   "profile.card.fact": { "question": string; "answer": string };
+  "profile.card.fieldAndWork": { "answer": string };
   "profile.card.nameAge": { "name": string; "years": number };
   "profile.card.open": Record<never, never>;
   "profile.card.photoLabel": { "position": number; "total": number };

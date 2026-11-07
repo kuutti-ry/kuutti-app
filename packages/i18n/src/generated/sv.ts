@@ -560,6 +560,7 @@ export const sv: Readonly<Record<string, string>> = {
   "profile.card.back": "Tillbaka till din profil",
   "profile.card.explain": "Det här ser andra.",
   "profile.card.fact": "{question}: {answer}",
+  "profile.card.fieldAndWork": "Bransch och arbete: {answer}",
   "profile.card.nameAge": "{name}, {years, number}",
   "profile.card.open": "Se ditt kort",
   "profile.card.photoLabel": "Foto {position, number} av {total, number}",

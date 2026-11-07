@@ -2986,6 +2986,13 @@ profile.card.fact:
   sv: "{question}: {answer}"
   machine: { fi: true, sv: true }
 
+profile.card.fieldAndWork:
+  en: "Field and work: {answer}"
+  description: "What a screen reader hears for the one chip a card draws when the person's field and their work read the same, such as 'Arts and culture' twice (#644): the chip carries both icons. The labels are profile.field.field's and profile.field.occupation's; {answer} is the answer as the card shows it, in nominative."
+  fi: "Ala ja työ: {answer}"
+  sv: "Bransch och arbete: {answer}"
+  machine: { fi: true, sv: true }
+
 profile.card.shared:
   en: "{option}, shared"
   description: "What a screen reader hears for a chip on a card whose answer the viewer gave as well (#644, #150): a hobby or a language both answered. The eye sees the chip filled and in bold; never a count or a score. Replaces the words 'you too', which read like 'me too'."

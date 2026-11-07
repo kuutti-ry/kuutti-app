@@ -90,8 +90,33 @@ type Chip = {
   text: string;
   /** Both the viewer and the subject answered it (#150): filled and in bold, never a colour alone. */
   shared: boolean;
+  /** A field that reads as the work beside it says both answers, with both icons. */
+  withWork: boolean;
   heard: string;
 };
+type Unheard = Omit<Chip, "heard">;
+
+/**
+ * A field and a work that read the same are one chip with both icons (#644,
+ * the maintainer's of 07/11/2026): two chips of "Arts and culture" told the
+ * two answers apart by their icons alone. Matched by the words the reader
+ * sees, so a pair that differs in a language stays two there. The fields come
+ * before the work in their section, so the work's chip is taken as its field's
+ * twin is reached.
+ */
+function mergeFieldAndWork(chips: readonly Unheard[]): Unheard[] {
+  const taken = new Set<string>();
+  return chips.flatMap((chip) => {
+    if (taken.has(chip.id)) return [];
+    if (chip.field !== "field") return [chip];
+    const work = chips.find(
+      (other) => other.field === "occupation" && other.text === chip.text && !taken.has(other.id),
+    );
+    if (!work) return [chip];
+    taken.add(work.id);
+    return [{ ...chip, withWork: true }];
+  });
+}
 
 /**
  * A card as others see it (#47, #150), in two depths (#644, the maintainer's
@@ -194,7 +219,7 @@ export function ProfileCardView({
   ].filter((word): word is string => word !== null);
 
   /** A field's answers as chips, one an option; none for what the card never shows (a setting). */
-  const chipsOf = (key: ProfileFieldKey): Chip[] => {
+  const chipsOf = (key: ProfileFieldKey): Unheard[] => {
     const value = fields[key];
     const spec = PROFILE_FIELDS[key];
     if (value === undefined || spec.kind === "flag") return [];
@@ -209,26 +234,37 @@ export function ProfileCardView({
             }));
     const shared: readonly string[] =
       key === "hobbies" ? card.shared.hobbies : key === "languages" ? card.shared.languages : [];
-    return answers.map((answer, at) => {
-      const both = answer.option !== null && shared.includes(answer.option);
-      const said = both ? t("profile.card.shared", { option: answer.text }) : answer.text;
+    return answers.map((answer) => ({
+      ...answer,
+      id: `${key}.${answer.option ?? "value"}`,
+      field: key,
+      shared: answer.option !== null && shared.includes(answer.option),
+      withWork: false,
+    }));
+  };
+  /**
+   * How each chip is heard: a field's first chip of its own names its question,
+   * which the icon says only to the eye, and a field read as the work names both.
+   */
+  const heardAll = (chips: readonly Unheard[]): Chip[] => {
+    const asked = new Set<ProfileFieldKey>();
+    return chips.map((chip) => {
+      const answer = chip.shared ? t("profile.card.shared", { option: chip.text }) : chip.text;
+      if (chip.withWork) return { ...chip, heard: t("profile.card.fieldAndWork", { answer }) };
+      const first = !asked.has(chip.field);
+      asked.add(chip.field);
       return {
-        ...answer,
-        id: `${key}.${answer.option ?? "value"}`,
-        field: key,
-        shared: both,
-        // The field's first chip names its question, which the icon says only to the eye.
-        heard:
-          at === 0
-            ? t("profile.card.fact", { question: t(fieldLabelKey(key)), answer: said })
-            : said,
+        ...chip,
+        heard: first
+          ? t("profile.card.fact", { question: t(fieldLabelKey(chip.field)), answer })
+          : answer,
       };
     });
   };
-  const keyChips = KEY_FACTS.flatMap(chipsOf);
+  const keyChips = heardAll(KEY_FACTS.flatMap(chipsOf));
   const sections = WHOLE_SECTIONS.map((section) => ({
     id: section.id,
-    chips: section.fields.flatMap(chipsOf),
+    chips: heardAll(mergeFieldAndWork(section.fields.flatMap(chipsOf))),
   })).filter((section) => section.chips.length > 0);
   // What the person wrote wins over a ready line, an empty bio being none.
   const bio = card.bio || (card.bioPreset ? t(presetKey(card.bioPreset)) : null);
@@ -447,6 +483,9 @@ function FactChip({ chip }: { chip: Chip }) {
           size={16}
           testID={group ? `hobby-group-icon-${group}` : `field-icon-${chip.field}`}
         />
+      )}
+      {chip.withWork && (
+        <Icon as={FIELD_ICONS.occupation} size={16} testID="field-icon-occupation" />
       )}
       <Text className="shrink">{chip.text}</Text>
     </>
