@@ -6,6 +6,7 @@ import type * as React from "react";
 import { AccessibilityInfo, Dimensions, Platform } from "react-native";
 import { saveSession } from "@/lib/session";
 import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
+import { expectPinnedHeader } from "@/test/layout";
 import { renderWithTheme } from "@/test/render";
 import { FakeXhr, partsOf } from "@/test/xhr";
 import { setLocalCheck } from "./localCheck";
@@ -179,8 +180,8 @@ describe("PhotosScreen", () => {
 
     const found = pressables(screen.toJSON() as HostNode);
     expect(found.flatMap((node) => a11yProblems(node))).toEqual([]);
-    // Each photo: open, caption (#296), remove. Plus add and done. The moves are the tiles' actions, not buttons (#179).
-    expect(found).toHaveLength(8);
+    // The arrow back (#616). Each photo: open, caption (#296), remove. Plus add and done. The moves are the tiles' actions, not buttons (#179).
+    expect(found).toHaveLength(9);
     expect(screen.queryByRole("button", { name: "Move later" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Make main photo" })).toBeNull();
     const tiles = screen.getAllByRole("button", { name: /^Open photo/ });
@@ -432,11 +433,15 @@ describe("PhotosScreen", () => {
     expect(screen.queryByText(/^Step /)).toBeNull();
   });
 
-  it("Done returns to where the person came from, since no header offers a way back", async () => {
+  it("has its title and the arrow back pinned above the grid, and both the arrow and Done return to where the person came from (#616)", async () => {
     fetchMock([answersList(list(2)), answersUrls]);
     await show(<PhotosScreen />);
-    await press(await screen.findByRole("button", { name: "Done" }));
+    await screen.findByText("Main photo");
+    expectPinnedHeader("Your photos", "Back to your profile");
+    await press(screen.getByRole("button", { name: "Back to your profile" }));
     expect(router.back).toHaveBeenCalledTimes(1);
+    await press(screen.getByRole("button", { name: "Done" }));
+    expect(router.back).toHaveBeenCalledTimes(2);
   });
 
   describe("as onboarding's photos step (#581)", () => {
@@ -488,6 +493,8 @@ describe("PhotosScreen", () => {
         "Add a photo",
         "Continue",
       ]);
+      // The step's only end is Continue: no arrow back (#616).
+      expect(screen.queryByRole("button", { name: "Back to your profile" })).toBeNull();
       const heading = screen.getByRole("heading", { name: "Two photos of you" });
       expect(heading.props.accessibilityRole).toBe("header");
       expect(heading.props["aria-level"]).toBe("1");

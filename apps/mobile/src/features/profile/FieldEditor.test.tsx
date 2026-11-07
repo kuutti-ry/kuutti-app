@@ -577,17 +577,9 @@ describe("FieldEditor: a long list", () => {
     },
   );
 
-  it("leads the languages with ten, keeps the chosen and 'other' in view, and finds the rest by search (#239)", async () => {
+  it("leads the languages with ten and the chosen, and finds the rest by search (#239)", async () => {
     await show("languages", { languages: ["de"] } as ProfileFields);
-    for (const name of [
-      "Finnish",
-      "Swedish",
-      "English",
-      "Russian",
-      "Somali",
-      "German",
-      "Another language",
-    ]) {
+    for (const name of ["Finnish", "Swedish", "English", "Russian", "Somali", "German"]) {
       expect(screen.getByRole("button", { name })).toBeTruthy();
     }
     // Vietnamese is eleventh: found by search only.
@@ -600,6 +592,35 @@ describe("FieldEditor: a long list", () => {
     await fireEvent.changeText(screen.getByLabelText("Search"), "");
     expect(chosen("Vietnamese")).toBe(true);
     expect(screen.queryByRole("button", { name: "French" })).toBeNull();
+  });
+
+  it("offers Another language only once a search finds no language of the list, and keeps it in view once chosen (#616)", async () => {
+    await show("languages");
+    expect(screen.queryByRole("button", { name: "Another language" })).toBeNull();
+    // A search that finds a language of the list offers that one alone.
+    await fireEvent.changeText(screen.getByLabelText("Search"), "another");
+    expect(screen.getByRole("button", { name: "Another language" })).toBeTruthy();
+    await fireEvent.changeText(screen.getByLabelText("Search"), "germ");
+    expect(screen.getByRole("button", { name: "German" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Another language" })).toBeNull();
+    await fireEvent.changeText(screen.getByLabelText("Search"), "Icelandic");
+    await fireEvent.press(screen.getByRole("button", { name: "Another language" }));
+    expect(fields).toEqual({ languages: ["other"] });
+    await fireEvent.changeText(screen.getByLabelText("Search"), "");
+    expect(chosen("Another language")).toBe(true);
+  });
+
+  it.each([
+    ["sign language", ["Finnish Sign Language", "Finland-Swedish Sign Language"]],
+    ["sami", ["Northern Sami", "Inari Sami", "Skolt Sami"]],
+    ["karel", ["Karelian"]],
+    ["romani", ["Finnish Romani", "Romanian"]],
+  ] as const)("finds Finland's own languages by a search for %s (#616)", async (search, found) => {
+    await show("languages");
+    await fireEvent.changeText(screen.getByLabelText("Search"), search);
+    for (const name of found) expect(screen.getByRole("button", { name })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Finnish" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Another language" })).toBeNull();
   });
 
   it("keeps a language beyond the first ten in view once taken back, so it can be chosen again (#239)", async () => {
@@ -622,14 +643,29 @@ describe("visibleOptions", () => {
     expect(visibleOptions(["a", "b"], undefined, [], "nothing", text)).toEqual([]);
   });
 
-  it("shows the first ones, the chosen and 'other' of a list that names first ones", () => {
+  it("shows the first ones and the chosen of a list that names first ones", () => {
     expect(visibleOptions(["a", "b", "c", "d", "other"], 2, ["d"], "", text)).toEqual([
       "a",
       "b",
       "d",
+    ]);
+    expect(visibleOptions(["a", "b", "c", "other"], 2, ["other"], "", text)).toEqual([
+      "a",
+      "b",
       "other",
     ]);
     expect(visibleOptions(["a", "b", "c"], 0, [], " ", text)).toEqual([]);
+  });
+
+  it("keeps 'other' of a list that names first ones for a search that finds nothing else (#616)", () => {
+    const options = ["a", "b", "c", "other"];
+    expect(visibleOptions(options, 2, [], "of c", text)).toEqual(["c"]);
+    // Its own text found is no language of the list found.
+    expect(visibleOptions(options, 2, [], "of other", text)).toEqual(["other"]);
+    expect(visibleOptions(options, 2, [], "nothing", text)).toEqual(["other"]);
+    expect(visibleOptions(options, 2, ["other"], "of a", text)).toEqual(["a"]);
+    // A list without one finds nothing.
+    expect(visibleOptions(["a", "b", "c"], 2, [], "nothing", text)).toEqual([]);
   });
 });
 

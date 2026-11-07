@@ -28,7 +28,7 @@ name: Fill in the rest walks the unanswered fields in order, and Ask me later wr
 - assertVisible: "9 of 16 answered|9 / 16 vastattu|9 av 16 besvarade"
 # The first question says the one thing the screen cannot: the card (#581).
 - assertVisible: "Every answer is on your card only when you give it\\.|Jokainen vastaus näkyy kortillasi vain, jos annat sen\\.|Varje svar syns på ditt kort bara om du ger det\\."
-# Her smoking is answered; other nicotine, asked with it, is not, under smoking's whole-width rows.
+# Her smoking is answered and other nicotine is not: the screen asks only the half still open (#616).
 - scrollUntilVisible:
     element: "Other nicotine|Muu nikotiini|Annat nikotin"
     direction: DOWN

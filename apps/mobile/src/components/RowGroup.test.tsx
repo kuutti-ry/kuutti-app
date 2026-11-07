@@ -81,6 +81,33 @@ describe("RowGroup", () => {
     expect(theme.props.accessibilityValue).toEqual({ text: "Dark" });
   });
 
+  it("stars a row that holds what something needs, and says so in words before its hint, its label still the title (#616)", async () => {
+    await renderWithTheme(
+      <RowGroup
+        rows={[
+          { key: "a", title: "Photos", needed: "Needed for the card", onPress: () => {} },
+          {
+            key: "b",
+            title: "What you seek",
+            summary: "Women, 25 to 35",
+            needed: "Needed for the card",
+            onPress: () => {},
+          },
+          { key: "c", title: "Hobbies", onPress: () => {} },
+        ]}
+      />,
+    );
+    const photos = screen.getByRole("button", { name: "Photos" });
+    expect(photos.props.accessibilityHint).toBe("Needed for the card");
+    expect(screen.getByText("Photos *")).toBeTruthy();
+    const seek = screen.getByRole("button", { name: "What you seek" });
+    expect(seek.props.accessibilityHint).toBe("Needed for the card, Women, 25 to 35");
+    // A row that needs nothing has no star and no words for one.
+    expect(screen.getByText("Hobbies")).toBeTruthy();
+    expect(screen.queryByText("Hobbies *")).toBeNull();
+    expect(screen.getByRole("button", { name: "Hobbies" }).props.accessibilityHint).toBeUndefined();
+  });
+
   describe("a row that holds its panel (#511)", () => {
     const toggle = jest.fn();
     const rows = (expanded: boolean, extra: Partial<Row> = {}): Row[] => [

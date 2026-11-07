@@ -894,6 +894,8 @@ describe("OnboardingScreen", () => {
         "Continue",
       ]);
       const field = screen.getByLabelText("Name on your card");
+      // Every step is what the card needs, so nothing is starred or said of it (#616).
+      expect(field.props.accessibilityHint).toBeUndefined();
       expect(field.props.maxLength).toBe(DISPLAY_NAME_MAX);
       expect(field.props.autoCapitalize).toBe("words");
       expect(readOnly()).toBe(true);

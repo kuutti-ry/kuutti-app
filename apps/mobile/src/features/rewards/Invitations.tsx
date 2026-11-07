@@ -198,7 +198,13 @@ export function Invitations({
       {canInvite ? (
         <>
           <View className="gap-3">
-            {earns.reward !== "none" && <Text>{t("settings.invite.earns", earns)}</Text>}
+            {earns.reward !== "none" && (
+              <>
+                <Text>{t("settings.invite.earns", earns)}</Text>
+                {/* Where many first meet the word, what it is, in place and with no (i) (#616). */}
+                <Text variant="muted">{t("settings.invite.fish")}</Text>
+              </>
+            )}
             <Button
               disabled={busy}
               onPress={() => {

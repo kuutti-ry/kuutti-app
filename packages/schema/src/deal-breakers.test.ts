@@ -43,9 +43,16 @@ describe("a deal-breaker's field", () => {
 });
 
 describe("what a deal-breaker may accept", () => {
-  it("is a list's options", () => {
+  it("is a list's options, never its other, which names no answer two people share (#616)", () => {
     expect(dealBreakerOptions("smoking")).toEqual(PROFILE_FIELDS.smoking.options);
-    expect(dealBreakerOptions("languages")).toEqual(PROFILE_FIELDS.languages.options);
+    expect(PROFILE_FIELDS.languages.options).toContain("other");
+    expect(dealBreakerOptions("languages")).toEqual(
+      PROFILE_FIELDS.languages.options.filter((option) => option !== "other"),
+    );
+    // Finland's own languages are there to accept, as any other language (#616).
+    expect(dealBreakerOptions("languages")).toEqual(
+      expect.arrayContaining(["fse", "fss", "smn", "sms", "krl", "rmf"]),
+    );
   });
 
   it("is a number's relations to the holder's own answer (#508)", () => {

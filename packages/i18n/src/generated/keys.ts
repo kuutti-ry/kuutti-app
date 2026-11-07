@@ -733,6 +733,7 @@ export type MessageParams = {
   "photos.add": Record<never, never>;
   "photos.appeal": Record<never, never>;
   "photos.appeal.label": { "position": number };
+  "photos.back": Record<never, never>;
   "photos.caption.add": Record<never, never>;
   "photos.caption.ask_me": Record<never, never>;
   "photos.caption.at_work": Record<never, never>;
@@ -999,6 +1000,8 @@ export type MessageParams = {
   "profile.later.search": Record<never, never>;
   "profile.later.skip": Record<never, never>;
   "profile.later.title": Record<never, never>;
+  "profile.needed.bioOrPrompts": { "min": number };
+  "profile.needed.hint": Record<never, never>;
   "profile.number.down": Record<never, never>;
   "profile.number.unset": Record<never, never>;
   "profile.number.up": Record<never, never>;
@@ -1120,11 +1123,14 @@ export type MessageParams = {
   "profile.option.languages.fa": Record<never, never>;
   "profile.option.languages.fi": Record<never, never>;
   "profile.option.languages.fr": Record<never, never>;
+  "profile.option.languages.fse": Record<never, never>;
+  "profile.option.languages.fss": Record<never, never>;
   "profile.option.languages.hi": Record<never, never>;
   "profile.option.languages.hu": Record<never, never>;
   "profile.option.languages.it": Record<never, never>;
   "profile.option.languages.ja": Record<never, never>;
   "profile.option.languages.ko": Record<never, never>;
+  "profile.option.languages.krl": Record<never, never>;
   "profile.option.languages.ku": Record<never, never>;
   "profile.option.languages.lt": Record<never, never>;
   "profile.option.languages.lv": Record<never, never>;
@@ -1133,9 +1139,12 @@ export type MessageParams = {
   "profile.option.languages.other": Record<never, never>;
   "profile.option.languages.pl": Record<never, never>;
   "profile.option.languages.pt": Record<never, never>;
+  "profile.option.languages.rmf": Record<never, never>;
   "profile.option.languages.ro": Record<never, never>;
   "profile.option.languages.ru": Record<never, never>;
   "profile.option.languages.se": Record<never, never>;
+  "profile.option.languages.smn": Record<never, never>;
+  "profile.option.languages.sms": Record<never, never>;
   "profile.option.languages.so": Record<never, never>;
   "profile.option.languages.sq": Record<never, never>;
   "profile.option.languages.sv": Record<never, never>;
@@ -1409,6 +1418,7 @@ export type MessageParams = {
   "settings.invite.code.spoken": { "characters": string };
   "settings.invite.earned.fish": { "fish": number };
   "settings.invite.earns": { "reward": string; "inviterFish": number; "friendFish": number };
+  "settings.invite.fish": Record<never, never>;
   "settings.invite.label": Record<never, never>;
   "settings.invite.made": Record<never, never>;
   "settings.invite.make": Record<never, never>;

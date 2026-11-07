@@ -9,6 +9,10 @@ import { renderWithTheme } from "@/test/render";
 import { SectionScreen } from "./SectionScreen";
 import { PROFILE_SECTIONS } from "./sections";
 
+const NEEDED = "Needed before your card can be shown";
+const EITHER =
+  "Your card needs one of these: a bio of 50 characters, a ready line, or two answered questions.";
+
 const settle = () => new Promise<void>((resolve) => setTimeout(resolve, 10));
 const show = async (ui: React.ReactElement) => {
   let view: Awaited<ReturnType<typeof renderWithTheme>> | undefined;
@@ -156,6 +160,32 @@ describe("SectionScreen", () => {
     expect(screen.getByText("Pets")).toBeTruthy();
     expect(screen.queryByText("Languages")).toBeNull();
     expect(screen.queryByLabelText("Name on your card")).toBeNull();
+  });
+
+  it("stars the name in the basics, says under the bio that a bio or the questions are enough, and what the star means (#616)", async () => {
+    fakeApi();
+    await show(<SectionScreen section="basics" />);
+    await waitFor(() => expect(screen.getByLabelText("Name on your card")).toBeTruthy());
+    expect(screen.getByText("Name on your card *")).toBeTruthy();
+    expect(screen.getByLabelText("Name on your card").props.accessibilityHint).toBe(NEEDED);
+    expect(screen.getByText(EITHER)).toBeTruthy();
+    expect(screen.getByText(`* ${NEEDED}`).props.accessibilityLabel).toBe(NEEDED);
+  });
+
+  it("says under the questions that either is enough, with no star and no note of one (#616)", async () => {
+    fakeApi();
+    await show(<SectionScreen section="prompts" />);
+    await waitFor(() => expect(screen.getByText(EITHER)).toBeTruthy());
+    expect(screen.queryByText(`* ${NEEDED}`)).toBeNull();
+    expect(screen.queryByText(/ \*$/)).toBeNull();
+  });
+
+  it("says nothing of what the card needs in a section that holds none of it (#616)", async () => {
+    fakeApi();
+    await show(<SectionScreen section="lifestyle" />);
+    await waitFor(() => expect(screen.getByText("Smoking")).toBeTruthy());
+    expect(screen.queryByText(EITHER)).toBeNull();
+    expect(screen.queryByText(`* ${NEEDED}`)).toBeNull();
   });
 
   it("keeps the section's name and the way back pinned above its fields", async () => {
@@ -388,7 +418,8 @@ describe("SectionScreen", () => {
       fakeApi();
       await show(<SectionScreen section="basics" />);
       await waitFor(() => expect(screen.getByLabelText("Name on your card")).toBeTruthy());
-      expect(screen.getByText("Name on your card")).toBeTruthy();
+      // The label with the star of what the card needs (#616), and no line on the length.
+      expect(screen.getByText("Name on your card *")).toBeTruthy();
       expect(screen.getByLabelText("Name on your card").props.maxLength).toBe(20);
       expect(screen.queryByText(/How you want to be called/)).toBeNull();
     });

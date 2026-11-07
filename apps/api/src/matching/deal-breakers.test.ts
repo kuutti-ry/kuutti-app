@@ -3,6 +3,7 @@ import { describe, expect } from "vitest";
 import { consentedAccount, signedInAccount, withMatchingConfig } from "../test/account.ts";
 import { exportOf } from "../test/export.ts";
 import { type TestContext, test } from "../test/harness.ts";
+import { dealBreakersFrom } from "./deal-breakers.ts";
 
 // features/matching/preferences.feature (#149): the deal-breakers under the
 // disclose-to-filter rule. Hard rows beside the two of onboarding; #87 applies
@@ -69,6 +70,12 @@ describe("A deal-breaker the rule refuses is not stored", () => {
     [
       "a deal-breaker accepting an answer the field has not",
       [{ ...smoking, accept: ["cigars"] }],
+      400,
+    ],
+    [
+      // Two who chose Another language may speak none in common (#616).
+      "a deal-breaker on languages accepting another language",
+      [{ field: "languages", accept: ["fi", "other"], includeUnknown: false }],
       400,
     ],
     ["the same field twice", [smoking, { ...smoking, accept: ["quitting"] }], 400],
@@ -471,6 +478,40 @@ describe("deal-breakers", () => {
       });
     },
   );
+
+  test("A language deal-breaker saved with Another language reads back without it", async ({
+    ctx,
+  }) => {
+    await withMatchingConfig(ctx.client, { deal_breakers_max: 2 });
+    const a = await signedInAccount(ctx.client);
+    const b = await signedInAccount(ctx.client);
+    // Rows as a save before #616 could leave them: Another language beside Finnish, and alone.
+    const rows = [
+      { account: a, value: ["fi", "other"] },
+      { account: b, value: ["other"] },
+    ];
+    for (const { account, value } of rows) {
+      expect((await answer(ctx.app, account.headers, { languages: ["fi", "other"] })).status).toBe(
+        200,
+      );
+      await ctx.client.query(
+        `INSERT INTO preferences (account_id, field, value, mode, include_unknown)
+         VALUES ($1, 'languages', $2::jsonb, 'hard', false)`,
+        [account.accountId, JSON.stringify(value)],
+      );
+    }
+    expect(await readDealBreakers(ctx.app, a.headers)).toEqual({
+      dealBreakers: [{ field: "languages", accept: ["fi"], includeUnknown: false, paused: false }],
+      max: 2,
+    });
+    expect(await readDealBreakers(ctx.app, b.headers)).toEqual({ dealBreakers: [], max: 2 });
+    // The queue's builder reads the rows through the same function (jobs/pool.ts).
+    expect(
+      rows.map(({ value }) =>
+        dealBreakersFrom([{ field: "languages", value, include_unknown: false }]),
+      ),
+    ).toEqual([[{ field: "languages", accept: ["fi"], includeUnknown: false }], []]);
+  });
 
   test("The deal-breakers of another account are never served", async ({ ctx }) => {
     await withMatchingConfig(ctx.client, { deal_breakers_max: 2 });

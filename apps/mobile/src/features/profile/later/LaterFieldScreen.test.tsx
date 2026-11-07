@@ -8,7 +8,7 @@ import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
 import { FAILED_TO_LOAD } from "@/test/failed";
 import { expectPinnedHeader } from "@/test/layout";
 import { renderWithTheme, underProviders } from "@/test/render";
-import { LaterFieldScreen, laterProgress, screenOpen } from "./LaterFieldScreen";
+import { LaterFieldScreen, laterFieldsShown, laterProgress, screenOpen } from "./LaterFieldScreen";
 
 /** The names of the radio groups on the screen, each a plain view that a role query would leave out. */
 const radioGroups = () =>
@@ -139,6 +139,31 @@ describe("screenOpen", () => {
     expect(screenOpen({ field: ["tech"] }, "field")).toBe(false);
     expect(screenOpen({ occupation: ["tech"] }, "occupation")).toBe(false);
     expect(screenOpen({ hasKids: "no" }, "hasKids")).toBe(false);
+  });
+});
+
+describe("laterFieldsShown", () => {
+  it("draws only the half still open where both halves count and one is answered (#616)", () => {
+    expect(laterFieldsShown({}, "smoking", false)).toEqual(["smoking", "nicotine"]);
+    expect(laterFieldsShown({ smoking: "never" }, "smoking", false)).toEqual(["nicotine"]);
+    expect(laterFieldsShown({ nicotine: ["snus"] }, "smoking", false)).toEqual(["smoking"]);
+    expect(laterFieldsShown({ smoking: "never", nicotine: ["none"] }, "smoking", false)).toEqual([
+      "smoking",
+      "nicotine",
+    ]);
+  });
+
+  it("draws both halves on a screen opened for its one answer, and a setting or a free text with its field", () => {
+    expect(laterFieldsShown({ smoking: "never" }, "smoking", true)).toEqual([
+      "smoking",
+      "nicotine",
+    ]);
+    expect(laterFieldsShown({ hideFromField: true }, "field", false)).toEqual([
+      "field",
+      "hideFromField",
+    ]);
+    expect(laterFieldsShown({}, "occupation", false)).toEqual(["occupation", "occupationTitle"]);
+    expect(laterFieldsShown({ smoking: "never" }, "hasKids", false)).toEqual(["hasKids"]);
   });
 });
 
@@ -383,12 +408,39 @@ describe("LaterFieldScreen", () => {
     unmount();
   });
 
+  it("asks only other nicotine of someone whose smoking was answered before it existed, and keeps the smoking answer (#616)", async () => {
+    const { puts } = fakeApi(named({ smoking: "never" }));
+    await show(<LaterFieldScreen field="smoking" />);
+    await waitFor(() => expect(screen.getByText("Other nicotine")).toBeTruthy());
+    // Smoking's answers are radios, other nicotine's checkboxes (#581): none of smoking's is drawn.
+    expect(screen.queryAllByRole("radio")).toHaveLength(0);
+    expect(screen.getAllByRole("checkbox")).toHaveLength(3);
+    checkA11y();
+    await press(answer("Snus"));
+    // Answered on the screen, nothing comes back or goes: the screen reads the stored document.
+    expect(answer("Snus")).toBeTruthy();
+    expect(screen.queryAllByRole("radio")).toHaveLength(0);
+    await press(screen.getByRole("button", { name: "Save and continue" }));
+    await waitFor(() => expect(puts).toHaveLength(1));
+    expect(puts[0]).toMatchObject({ fields: { smoking: "never", nicotine: ["snus"] } });
+  });
+
+  it("asks only smoking of someone who answered other nicotine alone (#616)", async () => {
+    fakeApi(named({ nicotine: ["pouches"] }));
+    await show(<LaterFieldScreen field="smoking" />);
+    await waitFor(() => expect(answer("Never")).toBeTruthy());
+    expect(screen.getAllByRole("radio")).toHaveLength(5);
+    expect(screen.queryAllByRole("checkbox")).toHaveLength(0);
+  });
+
   it("asks other nicotine on the smoking screen, and saves both with one press (#239)", async () => {
     const { puts } = fakeApi(named({}));
     await show(<LaterFieldScreen field="smoking" />);
     await waitFor(() => expect(screen.getByText("Other nicotine")).toBeTruthy());
     checkA11y();
     await press(answer("Vaping"));
+    // Smoking answered on the screen stays there beside other nicotine (#616).
+    expect(screen.getAllByRole("radio")).toHaveLength(5);
     await press(answer("Snus"));
     await press(screen.getByRole("button", { name: "Save and continue" }));
     await waitFor(() => expect(puts).toHaveLength(1));
@@ -685,6 +737,14 @@ describe("LaterFieldScreen", () => {
       expect(router.dismissTo).not.toHaveBeenCalled();
       expect(router.push).not.toHaveBeenCalled();
       expect(puts).toEqual([]);
+    });
+
+    it("draws smoking beside other nicotine, the reason it was opened (#616)", async () => {
+      fakeApi(named({ smoking: "never" }));
+      await show(<LaterFieldScreen field="smoking" once />);
+      await waitFor(() => expect(screen.getByText("Other nicotine")).toBeTruthy());
+      expect(screen.getAllByRole("radio")).toHaveLength(5);
+      expect(screen.getAllByRole("checkbox")).toHaveLength(3);
     });
 
     it("still asks before the arrow leaves an answer not saved", async () => {

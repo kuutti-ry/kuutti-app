@@ -190,6 +190,9 @@ describe("the profile field registry (ADR-019)", () => {
     ]);
     expect(options.at(-1)).toBe("other");
     expect(new Set(options).size).toBe(options.length);
+    // Finland's own languages, which the count leaves out, after the counted ones (#616).
+    expect(options.slice(-7, -1)).toEqual(["fse", "fss", "smn", "sms", "krl", "rmf"]);
+    expect(options).toHaveLength(41);
     for (const key of PROFILE_FIELD_KEYS) {
       const spec = PROFILE_FIELDS[key];
       if (spec.kind === "multi" && key !== "languages")

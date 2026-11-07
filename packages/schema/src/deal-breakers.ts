@@ -24,12 +24,21 @@ export const DealBreakerField = z
   .meta({ id: "DealBreakerField" });
 export type DealBreakerField = z.infer<typeof DealBreakerField>;
 
-/** What a deal-breaker on the field may accept: the options of a list, the relations of a number (#508), the bands of the distance. */
+/**
+ * What a deal-breaker on the field may accept: the options of a list, the
+ * relations of a number (#508), the bands of the distance. Never a list's
+ * "other", which names no answer two people can be known to share: two who
+ * chose Another language may speak none in common (the maintainer,
+ * 07/11/2026, #616). A stored filter that accepted it reads without it, and
+ * one that accepted nothing else reads as none (`dealBreakersFrom`).
+ */
 export function dealBreakerOptions(field: DealBreakerField): readonly string[] {
   if (field === "distance") return DISTANCE_FILTER_BANDS;
   const spec = PROFILE_FIELDS[field];
   if (spec.kind === "number") return spec.relations;
-  return spec.kind === "single" || spec.kind === "multi" ? spec.options : [];
+  return spec.kind === "single" || spec.kind === "multi"
+    ? spec.options.filter((option) => option !== "other")
+    : [];
 }
 
 export const DealBreaker = z

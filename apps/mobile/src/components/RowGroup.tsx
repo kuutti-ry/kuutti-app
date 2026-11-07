@@ -11,6 +11,12 @@ import { Text } from "@/components/ui/text";
 import { useT } from "@/lib/locale";
 import { cn } from "@/lib/utils";
 
+/**
+ * The star after what something needs (#616), the same in every language and
+ * never heard: what it means is said in words where it stands.
+ */
+export const NEEDED_MARK = " *";
+
 export type Row = {
   key: string;
   title: string;
@@ -20,6 +26,12 @@ export type Row = {
   hint?: string;
   /** Its state in words, heard as the value (the profile's progress, the theme chosen). */
   value?: string;
+  /**
+   * That the row holds what something needs, in words (#616): drawn as a star
+   * after the title, which a screen reader never hears, and heard before the
+   * hint. The label stays the title alone.
+   */
+  needed?: string;
   /** A mark of its state, drawn before the chevron. */
   mark?: ReactNode;
   /** A picture before the title, decoration only (Settings' placeholders until #410's icons). */
@@ -92,7 +104,7 @@ function RowView({ row, last }: { row: Row; last: boolean }) {
   );
   const words = (
     <View className="flex-1 gap-0.5">
-      <Text>{row.title}</Text>
+      <Text>{row.needed ? `${row.title}${NEEDED_MARK}` : row.title}</Text>
       {row.summary && (
         <Text className="text-sm font-normal text-muted-foreground">{row.summary}</Text>
       )}
@@ -129,13 +141,16 @@ function RowView({ row, last }: { row: Row; last: boolean }) {
         ? t("row.state.withValue", { value: row.value, state })
         : state
       : row.value;
+  // A summary that is the state is heard once, as the value.
+  const hint = [row.needed, row.hint ?? (row.summary !== row.value ? row.summary : undefined)]
+    .filter(Boolean)
+    .join(", ");
   const button = (
     <Button
       ref={header}
       variant="ghost"
       accessibilityLabel={row.title}
-      // A summary that is the state is heard once, as the value.
-      accessibilityHint={row.hint ?? (row.summary !== row.value ? row.summary : undefined)}
+      accessibilityHint={hint || undefined}
       accessibilityValue={value ? { text: value } : undefined}
       accessibilityState={holds && !ios ? { expanded: open } : undefined}
       // TalkBack offers expand and collapse from its actions; without a handler they would open nothing.

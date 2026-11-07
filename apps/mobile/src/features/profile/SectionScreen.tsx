@@ -1,9 +1,10 @@
-import { DISPLAY_NAME_MAX, type ProfileUpdate } from "@kuutti/schema";
+import { BIO_MIN_FOR_COMPLETENESS, DISPLAY_NAME_MAX, type ProfileUpdate } from "@kuutti/schema";
 import { useRouter } from "expo-router";
 import { useEffect } from "react";
 import { ScrollView, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LoadFailed } from "@/components/LoadFailed";
+import { NEEDED_MARK } from "@/components/RowGroup";
 import { ScreenHeader } from "@/components/ScreenHeader";
 import { Input } from "@/components/ui/input";
 import { Text } from "@/components/ui/text";
@@ -12,6 +13,7 @@ import { BioEditor } from "./BioEditor";
 import { ConfirmLeaveDialog } from "./ConfirmLeave";
 import { profileErrorText } from "./errorText";
 import { FieldEditor } from "./FieldEditor";
+import { NeededNote } from "./NeededNote";
 import { PromptsEditor } from "./PromptsEditor";
 import {
   findSection,
@@ -27,14 +29,31 @@ import { useRefusedDraft, useSaveOnLeave } from "./useSaveOnLeave";
 
 type Update = (patch: Partial<ProfileUpdate>) => void;
 
-/** The field's own name over it: the basics' and onboarding's name step (#581). */
-export function NameEditor({ draft, update }: { draft: ProfileUpdate; update: Update }) {
+/**
+ * The field's own name over it: the basics' and onboarding's name step (#581).
+ * In The basics it is starred as what a card needs (`needed`, #616); in
+ * onboarding every step is, so nothing is.
+ */
+export function NameEditor({
+  draft,
+  update,
+  needed = false,
+}: {
+  draft: ProfileUpdate;
+  update: Update;
+  needed?: boolean;
+}) {
   const { t } = useT();
   return (
     <View className="gap-2">
-      <Text variant="small">{t("profile.displayName.label")}</Text>
+      <Text variant="small">
+        {needed
+          ? `${t("profile.displayName.label")}${NEEDED_MARK}`
+          : t("profile.displayName.label")}
+      </Text>
       <Input
         accessibilityLabel={t("profile.displayName.label")}
+        accessibilityHint={needed ? t("profile.needed.hint") : undefined}
         value={draft.displayName}
         maxLength={DISPLAY_NAME_MAX}
         autoCapitalize="words"
@@ -55,9 +74,23 @@ function ItemEditor({
   update: Update;
   alone: boolean;
 }) {
-  if (item === "displayName") return <NameEditor draft={draft} update={update} />;
-  if (item === "bio") return <BioEditor draft={draft} update={update} />;
-  if (item === "prompts") return <PromptsEditor draft={draft} update={update} />;
+  const { t } = useT();
+  if (item === "displayName") return <NameEditor draft={draft} update={update} needed />;
+  if (item === "bio" || item === "prompts") {
+    // Either is enough for a card, which a star cannot say: the line says it, beside both (#616).
+    return (
+      <View className="gap-2">
+        {item === "bio" ? (
+          <BioEditor draft={draft} update={update} />
+        ) : (
+          <PromptsEditor draft={draft} update={update} />
+        )}
+        <Text variant="muted">
+          {t("profile.needed.bioOrPrompts", { min: BIO_MIN_FOR_COMPLETENESS })}
+        </Text>
+      </View>
+    );
+  }
   // The identity label is offered after a non-binary gender only, in
   // onboarding and on the gender screen (the registry's rule, #146, #552);
   // here it shows when it was given, to change or clear it, and is not
@@ -154,6 +187,8 @@ export function SectionScreen({ section: id, once = false }: { section: string; 
             alone={section.items.length === 1}
           />
         ))}
+        {/* What the name's star means, where it stands (#616). */}
+        {section.items.includes("displayName") && <NeededNote />}
       </ScrollView>
 
       <ConfirmLeaveDialog {...leaving} reason={profileErrorText(profile.notice, t)} />
