@@ -417,8 +417,9 @@ describe("LaterFieldScreen", () => {
     expect(screen.getAllByRole("checkbox")).toHaveLength(3);
     checkA11y();
     await press(answer("Snus"));
-    // Answered on the screen, the half stays in view: the screen reads the stored document.
+    // Answered on the screen, nothing comes back or goes: the screen reads the stored document.
     expect(answer("Snus")).toBeTruthy();
+    expect(screen.queryAllByRole("radio")).toHaveLength(0);
     await press(screen.getByRole("button", { name: "Save and continue" }));
     await waitFor(() => expect(puts).toHaveLength(1));
     expect(puts[0]).toMatchObject({ fields: { smoking: "never", nicotine: ["snus"] } });
@@ -438,6 +439,8 @@ describe("LaterFieldScreen", () => {
     await waitFor(() => expect(screen.getByText("Other nicotine")).toBeTruthy());
     checkA11y();
     await press(answer("Vaping"));
+    // Smoking answered on the screen stays there beside other nicotine (#616).
+    expect(screen.getAllByRole("radio")).toHaveLength(5);
     await press(answer("Snus"));
     await press(screen.getByRole("button", { name: "Save and continue" }));
     await waitFor(() => expect(puts).toHaveLength(1));
