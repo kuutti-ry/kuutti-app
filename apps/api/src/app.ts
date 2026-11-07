@@ -55,7 +55,7 @@ import { type MediaDeps, photoAdminRoutes, photoRoutes, UPLOAD_ROUTE } from "./m
 import { createPush, notificationRoutes, type Push } from "./notifications/index.ts";
 import { pondAdminRoutes, pondRoutes } from "./pond/index.ts";
 import { buildCard, exportProfile, profileRoutes } from "./profile/index.ts";
-import { invitationRoutes } from "./rewards/index.ts";
+import { invitationLinkRoutes, invitationRoutes } from "./rewards/index.ts";
 import {
   accountAdminRoutes,
   auditAdminRoutes,
@@ -136,6 +136,9 @@ export const PUBLIC_ROUTES = new Set([
   "POST /auth/refresh",
   "GET /.well-known/assetlinks.json",
   "GET /.well-known/apple-app-site-association",
+  // The one link (#574, ADR-044 §13): a redirect to a store, no page, no lookup.
+  "GET /i",
+  "GET /i/:code",
   "GET /admin/auth/start",
   "POST /admin/auth/exchange",
   // The chat's socket (#349): its first frame carries the session's token, checked
@@ -243,6 +246,7 @@ export function createApp(deps: Deps) {
   app.route("/", authRoutes(deps, guard, anyStaff));
   app.route("/", accountRoutes(deps, guard));
   app.route("/", wellKnownRoutes(deps));
+  app.route("/", invitationLinkRoutes(deps));
   // A URL of somebody else's photo is checked by the velocity rule (#86,
   // ADR-041): the safety slice decides, the media slice only issues.
   app.route(

@@ -345,8 +345,9 @@ describe("Invitations", () => {
 
   const INVITED =
     "You're invited to Kuutti, a free dating app for Finland where everyone signs in with their bank ID.";
+  // The one link (#574) on the API the app talks to, here the local default.
   const GET_IT =
-    "Get the app at https://kuutti.app/ and type this code after signing in: ABCDE-FGHJK";
+    "Get the app: http://localhost:3000/i/ABCDE-FGHJK After signing in, type this code: ABCDE-FGHJK";
   const LITTLE_MORE = "A fish is a like that says a little more.";
 
   it.each([

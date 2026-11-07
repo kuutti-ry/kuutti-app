@@ -64,6 +64,8 @@ The bank login returns to the app by deep link. Today that link is the custom sc
 
 Both are SSM parameters of those names under `/kuutti/<env>/` (plain String; the values are public). Until they are set the files answer 404 and nothing else changes.
 
+The one link of an invitation (`/i/{code}`, #574, ADR-044 §13) reads two more of the same kind, `APP_STORE_URL` and `PLAY_STORE_URL`: each listing's https address (`https://apps.apple.com/app/id<n>`, `https://play.google.com/store/apps/details?id=fi.kuutti.app`), set once that listing is public (#193). Until then the link sends that phone to `https://kuutti.app/`.
+
 Checking, once the native batch is installed:
 
 - Android: `adb shell pm get-app-links fi.kuutti.app` shows `verified` for the API's host; `adb shell pm verify-app-links --re-verify fi.kuutti.app` asks again. Google's checker: `https://digitalassetlinks.googleapis.com/v1/statements:list?source.web.site=https://api.staging.kuutti.app&relation=delegate_permission/common.handle_all_urls`.

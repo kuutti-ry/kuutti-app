@@ -408,10 +408,13 @@ describe("no route grants or revokes a role", () => {
 });
 
 /** Every handler route as a request a crawler could make: params filled with plausible values. */
-function crawlable(app: ReturnType<typeof createApp>): { method: string; path: string }[] {
+function crawlable(
+  app: ReturnType<typeof createApp>,
+): { key: string; method: string; path: string }[] {
   return app.routes
     .filter(({ handler }) => handler.length !== 2)
     .map(({ method, path }) => ({
+      key: `${method} ${path}`,
       method,
       path: path
         .replace(/:id\b/g, "00000000-0000-4000-8000-000000000001")
@@ -432,8 +435,8 @@ describe("no web surface", () => {
     const { logger } = await captureLogger();
     const app = createApp({ config: testConfig(), logger, db: testPool() });
     const refused: string[] = [];
-    for (const { method, path } of crawlable(app)) {
-      if (PUBLIC_ROUTES.has(`${method} ${path}`)) continue;
+    for (const { key, method, path } of crawlable(app)) {
+      if (PUBLIC_ROUTES.has(key)) continue;
       const response = await app.request(path, { method });
       if (response.status !== 401) refused.push(`${method} ${path} -> ${response.status}`);
     }
@@ -464,7 +467,10 @@ describe("no web surface", () => {
   });
 
   it("the public list names no route with an id in its path", () => {
-    for (const key of PUBLIC_ROUTES) expect(key).not.toMatch(/[:{]/);
+    // The one exception: the one link's code (#574, ADR-044 §13), a redirect
+    // to a store that never looks the code up and names nobody (rewards/link.test.ts).
+    const valued = new Set(["GET /i/:code"]);
+    for (const key of PUBLIC_ROUTES) if (!valued.has(key)) expect(key).not.toMatch(/[:{]/);
   });
 
   it("every response says noindex", async () => {

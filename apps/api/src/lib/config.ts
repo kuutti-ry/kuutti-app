@@ -123,6 +123,10 @@ const Env = z.object({
     .string()
     .regex(/^[A-Z0-9]{10}$/, "ten characters")
     .optional(),
+  // The stores' listings for the one link (#574, rewards/link.ts): public
+  // values, unset until each listing is out (#193), the website meanwhile.
+  APP_STORE_URL: z.url({ protocol: /^https$/ }).optional(),
+  PLAY_STORE_URL: z.url({ protocol: /^https$/ }).optional(),
   // The key of HMAC-SHA256(hetu), 32 bytes as hex, from /kuutti/<env>/hetu-hmac-key
   // (rule 2: fetched at boot, never rotated, one offline copy). Without it the
   // auth routes answer 503; the login never runs with a key from anywhere else.

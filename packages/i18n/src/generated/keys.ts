@@ -595,7 +595,7 @@ export type MessageParams = {
   "invite.redeem.earns": { "reward": string; "friendFish": number; "inviterFish": number };
   "invite.redeem.label": Record<never, never>;
   "invite.redeem.title": Record<never, never>;
-  "invite.share.message": { "reward": string; "friendFish": number; "inviterFish": number; "code": string };
+  "invite.share.message": { "reward": string; "friendFish": number; "inviterFish": number; "link": string; "code": string };
   "invite.step.skip": Record<never, never>;
   "invite.step.title": Record<never, never>;
   "legal.privacy.summary": Record<never, never>;
