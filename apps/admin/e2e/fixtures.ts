@@ -59,6 +59,10 @@ export async function signIn(page: Page, persona = MODERATOR, path = "/"): Promi
   await page.getByRole("button", { name: persona, exact: true }).click();
 }
 
+/** The two admins of every local stack, granted the role by e2e/run.ts (#573). */
+export const ADMIN_WRITER = "Ritva Lahtinen";
+export const ADMIN_APPROVER = "Siiri Koskinen";
+
 /** Signs in as the moderator and waits for the shell to say so. */
 export async function signInAsModerator(page: Page, path = "/"): Promise<void> {
   await signIn(page, MODERATOR, path);
