@@ -74,25 +74,94 @@ const ACCOUNT_TABLES = [
   "auth_request",
 ] as const;
 
+/**
+ * The synthetic identities, and how many carry the mark without being one.
+ * Synthetic is who carries the mark, the hash of the label behind the mark,
+ * and no time of authentication. The hash is computed by the server from the
+ * row's own subject, the way demoHetuHmac computes it.
+ */
+async function syntheticIdentities(db: Queryable): Promise<{ ids: string[]; spared: number }> {
+  const { rows } = await db.query<{ id: string; synthetic: boolean }>(
+    `SELECT id,
+            (authenticated_at IS NULL
+             AND hetu_hmac = encode(sha256(convert_to(
+                   'kuutti demo identity: ' || substr(broker_subject, length($2) + 1), 'UTF8')), 'hex')
+            ) AS synthetic
+     FROM identity WHERE broker_subject LIKE $1`,
+    [`${DEMO_SUBJECT_PREFIX}%`, DEMO_SUBJECT_PREFIX],
+  );
+  const ids = rows.filter((r) => r.synthetic).map((r) => r.id);
+  return { ids, spared: rows.length - ids.length };
+}
+
 /** Removes every synthetic identity with everything of its accounts. */
 export async function removePopulation(db: Queryable): Promise<RemoveResult> {
   return transaction(db, async (tx) => {
-    // Synthetic is who carries the mark, the hash of the label behind the
-    // mark, and no time of authentication. The hash is computed by the server
-    // from the row's own subject, the way demoHetuHmac computes it.
-    const { rows } = await tx.query<{ id: string; synthetic: boolean }>(
-      `SELECT id,
-              (authenticated_at IS NULL
-               AND hetu_hmac = encode(sha256(convert_to(
-                     'kuutti demo identity: ' || substr(broker_subject, length($2) + 1), 'UTF8')), 'hex')
-              ) AS synthetic
-       FROM identity WHERE broker_subject LIKE $1`,
-      [`${DEMO_SUBJECT_PREFIX}%`, DEMO_SUBJECT_PREFIX],
+    const { ids, spared } = await syntheticIdentities(tx);
+    await deleteIdentities(tx, ids);
+    return { removed: ids.length, spared };
+  });
+}
+
+/** The kinds the population consents to: never research (population.ts says why). */
+const POPULATION_CONSENTS = [
+  "terms",
+  "privacy",
+  "special_category",
+] as const satisfies readonly (keyof ConsentVersions)[];
+
+/** How many consent rows of the wording in force a renewal gave, by kind. */
+export type RenewResult = Record<keyof ConsentVersions, number>;
+
+/**
+ * Brings the population's consents to the wordings in force (#560). A
+ * consent of a wording that has changed since reads as none (ADR-010 §6),
+ * and nobody is in a pool without terms, privacy and the special-category
+ * consent of the current wording, nor in a band of the seek bar without the
+ * last: after a new version every synthetic person would be on nobody's card
+ * until the population was written again, its pictures through the photo
+ * check again. So each live consent of a synthetic person that names a
+ * wording since changed gets a row of the current one beside it, in the
+ * language the last was shown in, given at `at`, as accepting the new wording
+ * gives a person one (`recordConsent` in the identity slice); the old row
+ * stays, as a person's does. A consent of an older wording on purpose (the
+ * people who fill the seek bar and are nobody's card, `olderWording`) stays
+ * as it is, and so does a withdrawn one. Run again, it gives nothing.
+ */
+export async function renewPopulationConsents(
+  db: Queryable,
+  consentVersions: ConsentVersions,
+  at: Date,
+): Promise<RenewResult> {
+  return transaction(db, async (tx) => {
+    const { ids } = await syntheticIdentities(tx);
+    // One row per account and kind, from its newest live row: the language it was shown in.
+    const { rows } = await tx.query<{ kind: keyof ConsentVersions }>(
+      `INSERT INTO consent (account_id, kind, version, locale_shown, given_at)
+       SELECT DISTINCT ON (c.account_id, c.kind)
+              c.account_id, c.kind, v.version, c.locale_shown, $4::timestamptz
+       FROM consent c
+       JOIN account a ON a.id = c.account_id
+       JOIN unnest($2::consent_kind[], $3::text[]) AS v(kind, version) ON v.kind = c.kind
+       WHERE a.identity_id = ANY($1::uuid[])
+         AND c.withdrawn_at IS NULL
+         AND c.version <> $5
+         AND NOT EXISTS (SELECT 1 FROM consent n
+                         WHERE n.account_id = c.account_id AND n.kind = c.kind
+                           AND n.version = v.version AND n.withdrawn_at IS NULL)
+       ORDER BY c.account_id, c.kind, c.given_at DESC
+       RETURNING kind`,
+      [
+        ids,
+        POPULATION_CONSENTS,
+        POPULATION_CONSENTS.map((kind) => consentVersions[kind]),
+        at,
+        OLDER_WORDING,
+      ],
     );
-    const identities = rows.filter((r) => r.synthetic).map((r) => r.id);
-    const spared = rows.length - identities.length;
-    await deleteIdentities(tx, identities);
-    return { removed: identities.length, spared };
+    const renewed = Object.fromEntries(POPULATION_CONSENTS.map((kind) => [kind, 0])) as RenewResult;
+    for (const row of rows) renewed[row.kind] += 1;
+    return renewed;
   });
 }
 

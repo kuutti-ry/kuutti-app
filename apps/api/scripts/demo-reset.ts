@@ -39,8 +39,9 @@ import {
   describeTarget,
   openPonds,
   PERSONA_HISTORIES,
+  renewPopulationConsents,
 } from "@kuutti/db/demo";
-import { hmacKeyFromHex } from "../src/identity/index.ts";
+import { CURRENT_CONSENT_VERSIONS, hmacKeyFromHex } from "../src/identity/index.ts";
 import { takeSnapshot } from "../src/jobs/pond-counter.ts";
 import { loadConfig, parseConfig } from "../src/lib/config.ts";
 import { createLogger, type Logger } from "../src/lib/logger.ts";
@@ -100,9 +101,9 @@ if (envArg !== undefined && process.env.APP_ENV !== undefined && envArg !== proc
 }
 
 /**
- * The counter after the people changed, the ponds opened, then the round of
- * the stories, which needs its pond open (#379): the same steps locally and on
- * staging.
+ * The population's consents to the wordings in force, the counter after the
+ * people changed, the ponds opened, then the round of the stories, which needs
+ * its pond open (#379): the same steps locally and on staging.
  */
 async function recount(
   pool: ReturnType<typeof createPool>,
@@ -110,6 +111,12 @@ async function recount(
   now: () => Date,
   results: readonly HistoryResult[],
 ) {
+  // First, since the counter's bands and everybody's pool read only consents
+  // of the current wording: after a new version the synthetic people, the
+  // cast among them, would be nobody's card until the population was written
+  // again (#560).
+  const renewed = await renewPopulationConsents(pool, CURRENT_CONSENT_VERSIONS, now());
+  console.log(JSON.stringify({ msg: "demo reset: consents renewed", ...renewed }));
   // The ponds have other people in them now: the counter of #54 is counted
   // anew, as after a write of the population (demo-population.ts says why).
   await pool.query("DELETE FROM pond_counter");

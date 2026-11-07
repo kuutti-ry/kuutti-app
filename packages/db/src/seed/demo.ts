@@ -103,7 +103,9 @@ export {
   demoHetuHmac,
   PLACEHOLDER_PHOTO_PREFIX,
   type RemoveResult,
+  type RenewResult,
   removePopulation,
+  renewPopulationConsents,
   type WriteResult,
   writePopulation,
 } from "./write-population.ts";
