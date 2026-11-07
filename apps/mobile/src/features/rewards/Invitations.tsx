@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/dialog";
 import { Text } from "@/components/ui/text";
 import { ApiError } from "@/lib/api";
+import { apiBaseUrl } from "@/lib/api-url";
 import { useT } from "@/lib/locale";
 import { useRevealOn } from "@/lib/reveal";
 import { useRowData } from "@/lib/row-data";
@@ -174,7 +175,9 @@ export function Invitations({
   const shareCode = async (code: string, reward: InvitationReward) => {
     tap();
     try {
-      await share({ message: t("invite.share.message", { code, ...rewardParams(reward) }) });
+      // The one link (#574): the API sends the friend's phone to its store.
+      const link = `${apiBaseUrl()}/i/${code}`;
+      await share({ message: t("invite.share.message", { code, link, ...rewardParams(reward) }) });
     } catch {
       say("shareFailed");
     }
