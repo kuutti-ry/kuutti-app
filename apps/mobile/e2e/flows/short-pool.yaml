@@ -104,15 +104,22 @@ name: With few people left, the queue's end offers the deal-breakers to relax fo
 
 # Taken back, by way of home: the queue must not come into sight again with the
 # filter gone, or it would add those people to the day's log, where the next run's
-# offers could not find them.
-- openLink: kuutti://
-- extendedWaitUntil:
-    visible: "Your profile|Profiilisi|Din profil"
-    timeout: 15000
-- openLink: kuutti://profile/deal-breakers/smoking
-- extendedWaitUntil:
-    visible: "✓ Never|✓ Ei koskaan|✓ Aldrig"
-    timeout: 15000
+# offers could not find them. Home and the screen once more if the screen's read
+# never arrives: on Android CI (#645, 07/11/2026) its GET of the deal-breakers
+# failed on the phone and never reached the API, its /profile beside it answered,
+# and the screen showed "Kuutti could not be reached"; by way of home it mounts
+# anew and reads again.
+- retry:
+    maxRetries: 1
+    commands:
+      - openLink: kuutti://
+      - extendedWaitUntil:
+          visible: "Your profile|Profiilisi|Din profil"
+          timeout: 15000
+      - openLink: kuutti://profile/deal-breakers/smoking
+      - extendedWaitUntil:
+          visible: "✓ Never|✓ Ei koskaan|✓ Aldrig"
+          timeout: 15000
 - waitForAnimationToEnd
 - tapOn: "Everyone|Kaikki|Alla"
 - assertVisible: "✓ Everyone|✓ Kaikki|✓ Alla"
@@ -120,7 +127,10 @@ name: With few people left, the queue's end offers the deal-breakers to relax fo
 - extendedWaitUntil:
     notVisible: "Fine with me|Sopii minulle|Okej för mig"
     timeout: 15000
-- openLink: kuutti://profile/later/smoking
+# Opened for its one answer (`once`), the screen draws smoking beside other
+# nicotine; otherwise it asks only the half still open (#616), and smoking's
+# answer is not on it.
+- openLink: kuutti://profile/later/smoking?once=1
 - extendedWaitUntil:
     visible: "✓ Never|✓ En koskaan|✓ Aldrig"
     timeout: 15000
