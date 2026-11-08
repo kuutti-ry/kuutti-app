@@ -46,6 +46,9 @@ const NON_TEXT_PAIRS: ReadonlyArray<readonly [foreground: string, background: st
   ["input", "card"],
   ["ring", "background"],
   ["ring", "card"],
+  // The structural stroke of a control or a container (neubrutalism's border).
+  ["stroke", "background"],
+  ["stroke", "card"],
   ["seeks-men", "seeks-everyone"],
   ["seeks-everyone", "seeks-women"],
 ];
