@@ -112,24 +112,38 @@ describe("CardPreviewScreen", () => {
     expect(screen.getByText("Espoo")).toBeTruthy();
     // The owner's preview says where, and never how far (ADR-061 §5): only a round's entry has a band.
     expect(screen.queryByText(/^(Nearby|Close|Around|Far)$/)).toBeNull();
-    // Languages in the reader's language, as every option (ADR-019 §3, #238); what both answered said in words.
-    expect(screen.getByText("Finnish, English (you too)")).toBeTruthy();
-    expect(screen.getByText("Yoga (you too), Hiking")).toBeTruthy();
+    // Languages in the reader's language, as every option (ADR-019 §3, #238); what both
+    // answered is filled, in bold and heard as shared (#644).
+    expect(screen.getByLabelText("Languages: Finnish")).toBeTruthy();
+    expect(screen.getByLabelText("English, shared")).toBeTruthy();
     expect(screen.getByText("Something long-term")).toBeTruthy();
-    expect(screen.getByText("Architect")).toBeTruthy();
     expect(screen.getByText("171 cm")).toBeTruthy();
-    expect(screen.getByText("The photos say it. The rest over coffee.")).toBeTruthy();
     expect(screen.getByText("A long breakfast.")).toBeTruthy();
-    expect(screen.getByText("I can whistle with my mouth full.")).toBeTruthy();
     expect(screen.getByText("Whom you are looking for")).toBeTruthy();
+    // The owner sees the same two depths as others (#644): the rest waits for the whole card.
+    expect(screen.queryByText("Architect")).toBeNull();
+    expect(screen.queryByText("I can whistle with my mouth full.")).toBeNull();
+    await act(async () => {
+      fireEvent.press(screen.getByRole("button", { name: "Show the whole card" }));
+      await settle();
+    });
+    expect(screen.getByText("Architect")).toBeTruthy();
+    expect(screen.getByLabelText("Hobbies: Yoga, shared")).toBeTruthy();
+    expect(screen.getByText("Hiking")).toBeTruthy();
+    expect(screen.getByText("The photos say it. The rest over coffee.")).toBeTruthy();
+    expect(screen.getByText("I can whistle with my mouth full.")).toBeTruthy();
     // The identity label stands in the header, not among the fields.
     expect(screen.queryByText("Identity")).toBeNull();
-    // The card leads with the photo and one answer in the person's words; the rest follows (#150).
+    // The card leads with the photo and one answer in the person's words; the whole card
+    // follows with the other words, then the answers under their sections (#150, #644).
     const order = textsOf(screen.toJSON());
     expect(order.indexOf("Non-binary")).toBeLessThan(order.indexOf("Genderfluid"));
-    expect(order.indexOf("A long breakfast.")).toBeLessThan(order.indexOf("Hobbies"));
-    expect(order.indexOf("Hobbies")).toBeLessThan(
+    expect(order.indexOf("A long breakfast.")).toBeLessThan(order.indexOf("Show less"));
+    expect(order.indexOf("Show less")).toBeLessThan(
       order.indexOf("I can whistle with my mouth full."),
+    );
+    expect(order.indexOf("I can whistle with my mouth full.")).toBeLessThan(
+      order.indexOf("Hobbies"),
     );
     await waitFor(() => expect(calls).toContain(`/photos/${PHOTO_A}/card`));
     // The next photo only once it comes to the front (#513), in the card size as well.
@@ -161,7 +175,11 @@ describe("CardPreviewScreen", () => {
     serveCard({ complete: true, missing: [] });
     await show();
     await waitFor(() => expect(screen.getByText("Aino, 36")).toBeTruthy());
-    expect(screen.getByText("Yoga (you too), Hiking")).toBeTruthy();
+    await act(async () => {
+      fireEvent.press(screen.getByRole("button", { name: "Show the whole card" }));
+      await settle();
+    });
+    expect(screen.getByLabelText("Hobbies: Yoga, shared")).toBeTruthy();
     expect(screen.getByText("I can whistle with my mouth full.")).toBeTruthy();
     // No fixed-height text container anywhere on the card (CLAUDE.md Accessibility).
     expect(hasCutText(screen.toJSON() as HostNode)).toBe(false);

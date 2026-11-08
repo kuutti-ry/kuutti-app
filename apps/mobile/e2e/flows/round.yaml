@@ -36,13 +36,10 @@ name: The queue shows one card at a time, liking back makes a match, Later and U
 - assertNotVisible: "Send a fish|Lähetä kala|Skicka en fisk"
 # The day's likes, said beside the buttons from the first card (#524).
 - assertVisible: "10 likes left today|10 tykkäystä jäljellä tänään|10 gillanden kvar i dag"
-# Her town and how far, each a word under her name (ADR-061 §3, §5): Henna lives
-# the nearest of the four, and no digits or kilometres say it.
-- scrollUntilVisible:
-    element: "Nearby|Lähellä|I närheten"
-    direction: DOWN
-    centerElement: true
-    timeout: 60000
+# Her town and how far, words on the line under her name, above the photo
+# (ADR-061 §3, §5, #644): Henna lives the nearest of the four, and no digits or
+# kilometres say it. The top of the card is in view without a scroll.
+- assertVisible: "Nearby|Lähellä|I närheten"
 - assertVisible: "Helsinki|Helsingfors"
 - assertNotVisible: ".*\\d{5}.*"
 - assertNotVisible: ".*\\d+ ?km.*"
@@ -97,13 +94,11 @@ name: The queue shows one card at a time, liking back makes a match, Later and U
     timeout: 15000
 # Two of the day's are gone: the like of the card before, and Henna's like back.
 - assertVisible: "8 likes left today|8 tykkäystä jäljellä tänään|8 gillanden kvar i dag"
-# Block or report is in the card's header, below the main photo, and may sit
-# at the fold above the decisions' bar: brought to the middle first (README).
-- scrollUntilVisible:
-    element: "Block or report|Estä tai ilmoita|Blockera eller anmäl"
-    direction: DOWN
-    centerElement: true
-    timeout: 60000
+# Block or report stands beside the name, above the main photo (#644), so the
+# top of the card has it in view with no scroll.
+- extendedWaitUntil:
+    visible: "Block or report|Estä tai ilmoita|Blockera eller anmäl"
+    timeout: 15000
 - waitForAnimationToEnd
 - tapOn: "Block or report|Estä tai ilmoita|Blockera eller anmäl"
 - extendedWaitUntil:
