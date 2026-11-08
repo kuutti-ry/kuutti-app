@@ -33,4 +33,4 @@ The reasoning behind Kuutti's rules lives in two places. The technical decisions
 
 ## After the edit
 
-`pnpm check:adr-index` after any of the above; `pnpm check:docs` says which drawings the change touches (ADR-047); `pnpm check:decisions` holds `docs/decisions.md` to `matching_config` (#396). The `open-pr` skill runs them before the pull request.
+`pnpm check:adr-index` after any of the above (it reads tracked files: `git add` a new doc first, or CI sees what the laptop did not); `pnpm check:docs` says which drawings the change touches (ADR-047); `pnpm check:decisions` holds `docs/decisions.md` to `matching_config` (#396). The `open-pr` skill runs them before the pull request.
