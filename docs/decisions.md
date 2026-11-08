@@ -63,7 +63,7 @@ The four areas the maintainer named first: how many profiles a person sees and h
 | Where | What holds it: a `matching_config` key bare in backticks, a constant with its file, or a file. |
 | Recorded in | Where it is written down, most specific first: an ADR section, an issue, a pull request, a migration (a number below 0110 is the chain folded by ADR-065, in git at 77768edf). *Session* and a date when the maintainer said it only in a Claude Code session; its issue then carries a comment saying so. |
 | Source | Who decided it, below. |
-| Review | Empty until the maintainer marks it *keep*, *change* or *open*. A *change* becomes its own issue. |
+| Review | Empty until the maintainer marks it *keep*, *change* or *open*, if and when he reviews a rule; the register is complete without the marks (his word of 08/11/2026, #396). A *change* becomes its own issue. |
 
 The sources:
 
@@ -92,25 +92,25 @@ Read on 27 and 28/10/2026, at version 0.73.0:
 
 ## Areas
 
-- [Sign-in and identity](#sign-in-and-identity) (33)
-- [Pond](#pond) (38)
-- [Profile](#profile) (75)
-- [Photos](#photos) (40)
-- [Filters](#filters) (24)
-- [Round](#round) (51)
-- [Likes and fish](#likes-and-fish) (25)
-- [Match](#match) (13)
-- [Chat](#chat) (22)
-- [Notifications](#notifications) (20)
-- [E-mail](#e-mail) (11)
-- [Invitations and rewards](#invitations-and-rewards) (18)
-- [Safety](#safety) (77)
-- [Break and erasure](#break-and-erasure) (32)
-- [Research](#research) (32)
-- [Retention](#retention) (29)
-- [Limits](#limits) (15)
-- [Product constraints](#product-constraints) (13)
-- [Other](#other) (36)
+- [Sign-in and identity](#sign-in-and-identity)
+- [Pond](#pond)
+- [Profile](#profile)
+- [Photos](#photos)
+- [Filters](#filters)
+- [Round](#round)
+- [Likes and fish](#likes-and-fish)
+- [Match](#match)
+- [Chat](#chat)
+- [Notifications](#notifications)
+- [E-mail](#e-mail)
+- [Invitations and rewards](#invitations-and-rewards)
+- [Safety](#safety)
+- [Break and erasure](#break-and-erasure)
+- [Research](#research)
+- [Retention](#retention)
+- [Limits](#limits)
+- [Product constraints](#product-constraints)
+- [Other](#other)
 - [Found on the way](#found-on-the-way)
 
 ## Sign-in and identity
@@ -854,7 +854,8 @@ Languages, legal texts, accessibility, feedback from the app, and the moderation
 | What is read, Kuutti's words and people's, is in the phone's own font at 17 pt; Saiga draws headings, a button's words, labels, chips and the heading of a group of rows: Regular for titles and controls, since it is as dark as the system font's Semibold, Medium for h2 to h4, Bold for h1 alone. | body 17 pt; h1 30, h2 24, h3 and a title 20, a label 15 | `fontSize` and `fontFamily` in `apps/mobile/tailwind.config.js`; the variants in `apps/mobile/src/components/ui/text.tsx` | #408; ADR-052 §4 and History 2026-11-08; the specimen sheets of 08/11/2026 (proposal D) | maintainer, 08/11/2026 | |
 | A screen's title is one line that shrinks as far as its width needs, so that no word breaks in the middle in any language. | one line | `apps/mobile/src/components/ScreenHeader.tsx` | #467; session 28/10/2026 | maintainer, 28/10/2026 | |
 | Every dialog of the phone app is one width, the whole of the space it is given, however few words it holds. | one width | `apps/mobile/src/components/ui/dialog.tsx` | #581's comment 04/11/2026, on Block or report, read as being about its width; was as wide as its words | maintainer, 04/11/2026 | |
-| Settings is one list in six sections, the account last: every row opens what it holds under itself, one at a time, and closes it again; support and the licences open screens of their own; the row left open is remembered while the app runs, never on the phone, so a cold start shows every row closed; a row's second line is its value, and a row holding nothing says what to do: Add your e-mail, Add a way to reach you (these words an agent's, the idea the maintainer's), Create an invitation. A row with no value has no second line, Version, Terms of use, Privacy and Licences among them, and signed out there is no Account section. | everything in place but support and the licences; one row open | `apps/mobile/src/features/settings/SettingsScreen.tsx` | #581's table, rows S1, S3 to S5, S93, and comment 04/11/2026; #511; #376; PR #516; was None given, None kept and None waiting to be used | maintainer, 04/11/2026 | The memory belongs to the session that left the row open, so the next login after a logout finds every row closed (`open-rows.ts`): an agent's reading of "while the app runs", PR #516. |
+| Settings is one list in six sections, the account last: every row opens what it holds under itself, one at a time, and closes it again; support and the licences open screens of their own; the row left open is remembered while the app runs, never on the phone, so a cold start shows every row closed; a row's second line is its value, and a row holding nothing says what to do: Add your e-mail, Add a way to reach you (these words an agent's, the idea the maintainer's), Create an invitation. A row with no value has no second line, Version, Terms of use, Privacy and Licences among them, and signed out there is no Account section. | everything in place but support and the licences; one row open | `apps/mobile/src/features/settings/SettingsScreen.tsx` | #581's table, rows S1, S3 to S5, S93, and comment 04/11/2026; #511; #376; PR #516; was None given, None kept and None waiting to be used | maintainer, 04/11/2026 | |
+| The row left open belongs to the session that opened it, so the next login after a logout finds every row closed. |  | `apps/mobile/src/features/settings/open-rows.ts` | PR #516, an agent's reading of "while the app runs"; was a note in the Review cell of the row above | assumption | |
 | Settings saves as the profile does: a choice at once, a contact when its field is left, a wrong one refused in words with the text kept; leaving with something refused or not sent asks first, in a title and two buttons, with a reason only where a save was refused; the e-mail keeps one button, Send a confirmation code, since it mails one, and does not draw it while the field holds the kept address; feedback goes with Send. A contact kept says Saved. under its field. A removal, of a contact or of the e-mail, an e-mail saved with its code on the way, and a first code asked for draw nothing and are said aloud on both platforms. | no Save buttons | `apps/mobile/src/features/chat/YourContacts.tsx`; `apps/mobile/src/features/identity/EmailCard.tsx` | ADR-043 History 04/11/2026; #581's table, rows S24, S26, S28, S31, S36; #511; PR #516; the profile's row above; was the button dimmed over the kept address, and a line after each | maintainer, 04/11/2026 | |
 | A contact emptied and left is not removed: the kept one comes back, since a removal ends every share of it; Remove is the way. |  | `apps/mobile/src/features/chat/YourContacts.tsx` | #511; PR #516 | maintainer, 29/10/2026 | |
 | Log out everywhere asks first; log out here asks nothing. |  | `apps/mobile/src/features/settings/DeviceActions.tsx` | #511; #35; PR #516 | maintainer, 29/10/2026 | |
@@ -878,32 +879,31 @@ Languages, legal texts, accessibility, feedback from the app, and the moderation
 Where a record and the code disagree, or a tunable is not where CLAUDE.md puts it. Each names its row.
 
 - **Sign-in and identity, Every sign-in goes through the bank afresh.** ADR-016 is built, and the first login on Telia's bed showed it at work, yet its status still says proposed (#203).
-- **Sign-in and identity, The lock's time in the background.** The four choices and the default of one minute are the build's reading of the maintainer's answer to #418, a range of 1 to 15 minutes with a question mark; nothing records him confirming that reading.
-- **Sign-in and identity, Onboarding's steps.** ADR-010 §10 and the comment on `ONBOARDING_STEPS` say onboarding asks for three photos; the step passes with two that are not rejected, and completeness asks for two approved (#56, PR #125).
+- **Sign-in and identity, The app locks at every cold start and after the person's chosen time in the background.** The four choices and the default of one minute are the build's reading of the maintainer's answer to #418, a range of 1 to 15 minutes with a question mark; nothing records him confirming that reading.
+- **Sign-in and identity, Onboarding's photos step is the photos screen itself.** ADR-010 §10 and the comment on `ONBOARDING_STEPS` say onboarding asks for three photos; the step passes with two that are not rejected, and completeness asks for two approved (#56, PR #125).
 - **Profile, Gender.** ADR-010's Consequences still list the gender list and its texts as open, though the field sheet of 07/10/2026 kept the three genders and added the identity label after non-binary (#147).
-- **Profile, The sensitive-answers wording.** ADR-019 §4 names the draft 2026-10-draft-1; the app carries 2026-11-draft-3.
-- **Profile, The card's age.** ADR-009 §6 still says the card marks the age as verified by the bank; since 12/10/2026 the card does not say it (#239, PR #268), though its contract still carries `verifiedByBank`.
+- **Profile, Open: the wording of the sensitive-answers consent.** ADR-019 §4 names the draft 2026-10-draft-1; the app carries 2026-11-draft-3.
+- **Profile, A card shows the age in whole years.** ADR-009 §6 still says the card marks the age as verified by the bank; since 12/10/2026 the card does not say it (#239, PR #268), though its contract still carries `verifiedByBank`.
 - **Profile, Politics.** #213 asks for the parties in alphabetical order by the name shown; the list stands in the order of their Finnish names in every language, so in English and Swedish it is not alphabetical.
 - **Profile, Religion.** ADR-019's status and its 'Not decided here' still call the religion list the maintainer's to confirm; he set its order on 10/10/2026 (#213) and its contents in a session on 12/10/2026.
 - **Photos, The group-photo tip.** Since 12/10/2026 the check rejects a photo with more than one sure face, so the tip can fire only on photos a person approved on appeal.
-- **Filters, The age window's starting point.** #146 gives the field sheet's default as the person's own band ±1; the app starts the window at the person's age ±5 years.
-- **Filters, The age bounds.** Ages up to 130 pass the card's and the chat's contracts, but no window reaches past 99, so a person aged 100 or more is in nobody's pool.
+- **Filters, In onboarding the age window starts around the person's own age.** #146 gives the field sheet's default as the person's own band ±1; the app starts the window at the person's age ±5 years.
+- **Filters, Open: the age bounds.** Ages up to 130 pass the card's and the chat's contracts, but no window reaches past 99, so a person aged 100 or more is in nobody's pool.
 - **Round, Later is a button beside Like, Pass and the fish; Filters, A round is short once no new person is left; Match, A second match is a new conversation.** ADR-062 §3's details, §7 and §10 carry no mark of the maintainer's of their own. These rows read its Status line, which names §15 alone as what was not put to him; nothing else records his word on them.
-- **Match, An ended conversation keeps the two apart for this many days.** Set in the panel below `like_expiry_days`, a like from before the ended conversation can open a new one; the values of 90 and 14 do not reach it (ADR-062 Consequences).
+- **Match, An ended conversation, by either person or by the silence that archives it, keeps the two apart for this many days.** Set in the panel below `like_expiry_days`, a like from before the ended conversation can open a new one; the values of 90 and 14 do not reach it (ADR-062 Consequences).
 - **Chat, With this many conversations on their turn a person cannot make a new match.** The row says it reads what the person may see, so that a shadow ban shows nothing. One older thing shows through: a send takes a conversation out of the archive for both people, a shadow-banned person's too (TD-13), so it comes back onto the other person's list with nothing new to read and can count on their turn (ADR-062 Consequences).
 - **Chat, One account may send at most this many messages a minute.** ADR-031 §6 says #101 proposed 60 a minute. #101's table, migration 0054 and the code say 30.
 - **Chat, Open: should the list preview the first 80 characters of the last message.** The 80 is a constant of the contract in packages/schema/src/chat.ts, not a matching_config row, though CLAUDE.md puts every tunable in matching_config. ADR-031 §6 chose so.
 - **Notifications, The home screen is given the newest twenty notices.** The twenty is a constant in packages/schema/src/notifications.ts, not a matching_config row.
 - **Notifications, Open: the moderation switch governs a push only.** Settings shows the moderation switch, but no code reads it: a push for a moderator's decision does not exist yet (ADR-055, Not done).
-- **Notifications, Kuutti pushes two things.** Android phones get no push token until the Firebase configuration is in the native build, and production has no push setting yet, so production sends no push at all (ADR-055 Consequences).
-- **Safety, Open: a shadow-banned person's read mark.** ADR-024 §7 and ADR-031 §4 say nobody learns of a shadow ban, yet the person's read mark still reaches the people they talk to, beside a missing photo and no Online (#470, open).
+- **Notifications, Kuutti pushes three things.** Android phones get no push token until the Firebase configuration is in the native build, and production has no push setting yet, so production sends no push at all (ADR-055 Consequences).
 - **Safety, The association promises to answer within 24 hours.** #303 calls 24 the maintainer's figure, but #299, which it cites, leaves the number to him, and the moderation runbook that should state it does not exist yet.
 - **Research, A changed like or pass writes its own event marked revised.** ADR-034 Open 1 still lists the revised flag as open, though the maintainer approved it in a session on 19/10/2026; the six bands of seconds stay open.
 - **Break and erasure, Deleting the account erases the person's data; register again after 30 days.** The app repeats the 30 days in a constant of its own for its text (apps/mobile/src/features/identity/AccountActions.tsx), so a change needs both; the number is kept out of matching_config on purpose.
 - **Break and erasure, The export lists at most the newest 1,000 rows of each history.** Older rows are left out without a word, which touches the right of access (rounds no longer reach it, being kept a year); the same thousand is repeated in apps/api/src/rewards/invitations.ts and as a literal in apps/api/src/notifications/repo.ts.
-- **Break and erasure, The export lists only the newest 1,000 photo fetches and cards shown.** A person going through the queue at length passes a thousand rows within days, so an active person's export shows only the latest part of these logs.
+- **Break and erasure, The export lists only the newest 1,000 photo fetches and the newest 1,000 cards shown to the person.** A person going through the queue at length passes a thousand rows within days, so an active person's export shows only the latest part of these logs.
 - **Retention, Audit log entries are kept five years.** Nothing prunes the audit log and its table refuses deletes by trigger (migration 0006), so entries are kept for good, past the five years that TD-7 and .claude/rules/db.md give.
-- **Limits, No ceiling on cards, and photo links a day.** ADR-008 §1 still sizes its budgets on a round of 12. The thumbs' 600 and the full size's 60 keep those numbers; since ADR-056 §3 the full-size budget covers one's own photos only.
+- **Limits, No ceiling on cards; Limits, A person may be handed at most so many photo links a Finnish day.** ADR-008 §1 still sizes its budgets on a round of 12. The thumbs' 600 and the full size's 60 keep those numbers; since ADR-056 §3 the full-size budget covers one's own photos only.
 - **Limits, A person may change a consent at most ten times in 24 hours.** It counts a rolling 24 hours, unlike the Finnish day of ADR-008 §2, and each consent kind separately, though ADR-010 §4 names only the research opt-in.
 - **Limits, A person, and an address, may make at most 120 requests a minute.** The request limits are configuration in the parameter store, read at boot (ADR-026 §5), not rows of matching_config; production's value may differ from the code's default.
 - **Product constraints, Every tunable lives in the matching configuration table.** Numbers a person meets that read as tunables are constants in code: SUSPENSION_DAYS_MAX, REPORT_NOTE_MAX, SANCTION_NOTE_MAX, FEEDBACK_TEXT_MAX, CONSENT_CHURN_PER_DAY, the three export limits, and FOUND_THEM_RECENT_DAYS, which ADR-040 Open 2 calls the maintainer's; the request limits sit in the parameter store. The 30-day wait, k = 10, the 90 days and the twelve-month retentions are rules on purpose.
