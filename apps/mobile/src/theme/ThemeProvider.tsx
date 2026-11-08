@@ -16,6 +16,25 @@ export type SchemePreference = "system" | "light" | "dark";
 const isScheme = (value: string | null): value is SchemePreference =>
   value === "system" || value === "light" || value === "dark";
 
+/**
+ * The palettes of the neubrutalism try (tokens.css): Ice is the base sets,
+ * Dusk and Birch classes on the root view. Chosen on the tech screen, which
+ * production has not, so a released app is always in Ice.
+ */
+export const PALETTES = ["ice", "dusk", "birch"] as const;
+export type Palette = (typeof PALETTES)[number];
+
+const isPalette = (value: string | null): value is Palette =>
+  (PALETTES as readonly (string | null)[]).includes(value);
+
+// Whole class names, never built from parts: Tailwind keeps a rule of
+// tokens.css only for a class it finds written out in the source.
+const PALETTE_CLASS: Record<Palette, { light?: string; dark?: string }> = {
+  ice: {},
+  dusk: { light: "palette-dusk", dark: "palette-dusk-dark" },
+  birch: { light: "palette-birch", dark: "palette-birch-dark" },
+};
+
 type Theme = {
   /** What is on screen now. */
   scheme: "light" | "dark";
@@ -24,6 +43,8 @@ type Theme = {
   setPreference: (preference: SchemePreference) => void;
   highContrast: boolean;
   setHighContrast: (on: boolean) => void;
+  palette: Palette;
+  setPalette: (palette: Palette) => void;
 };
 
 const ThemeContext = React.createContext<Theme | null>(null);
@@ -66,6 +87,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [preference, setPreferenceState] = React.useState<SchemePreference>("system");
   const systemHighContrast = useSystemHighContrast();
   const [chosenHighContrast, setChosenHighContrast] = React.useState<boolean | null>(null);
+  const [palette, setPaletteState] = React.useState<Palette>("ice");
   const highContrast = chosenHighContrast ?? systemHighContrast;
   const scheme = colorScheme === "dark" ? "dark" : "light";
 
@@ -95,6 +117,10 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     setChosenHighContrast(on);
     void writePreference("highContrast", on ? "true" : "false");
   }, []);
+  const setPalette = React.useCallback((next: Palette) => {
+    setPaletteState(next);
+    void writePreference("palette", next === "ice" ? null : next);
+  }, []);
 
   // What was chosen last time, read once; nothing stored is the OS's setting.
   React.useEffect(() => {
@@ -105,6 +131,9 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     void readPreference("highContrast").then((stored) => {
       if (mounted && stored !== null) setChosenHighContrast(stored === "true");
     });
+    void readPreference("palette").then((stored) => {
+      if (mounted && isPalette(stored)) setPaletteState(stored);
+    });
     return () => {
       mounted = false;
     };
@@ -114,11 +143,12 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   // high-contrast set also goes on <body> there (not on <html>, where
   // .dark:root would outrank it). Native portals render inside the PortalHost
   // and inherit from the root view.
+  // High contrast wins over a palette: its sets are for a person who needs them.
   const contrastClass = highContrast
     ? scheme === "dark"
       ? "high-contrast-dark"
       : "high-contrast"
-    : undefined;
+    : PALETTE_CLASS[palette][scheme];
   React.useEffect(() => {
     if (Platform.OS !== "web" || !contrastClass) return;
     const body = globalThis.document?.body;
@@ -128,7 +158,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
   const duration = useMotionDuration(THEME_FADE_MS);
   const opacity = React.useRef(new Animated.Value(1)).current;
-  const appearance = `${scheme}:${highContrast}`;
+  const appearance = `${scheme}:${highContrast}:${palette}`;
   const shown = React.useRef(appearance);
   React.useEffect(() => {
     if (shown.current === appearance) return;
@@ -148,8 +178,10 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       setPreference,
       highContrast,
       setHighContrast,
+      palette,
+      setPalette,
     }),
-    [scheme, preference, setPreference, highContrast, setHighContrast],
+    [scheme, preference, setPreference, highContrast, setHighContrast, palette, setPalette],
   );
 
   return (

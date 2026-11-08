@@ -6,6 +6,7 @@ import * as Updates from "expo-updates";
 import { useCallback, useEffect, useState } from "react";
 import { ScrollView, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { Choice } from "@/components/Choice";
 import { ScreenHeader } from "@/components/ScreenHeader";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -16,6 +17,7 @@ import { buildInfo } from "@/lib/build";
 import { appEnvironment, isProduction } from "@/lib/environment";
 import { useT } from "@/lib/locale";
 import { useHapticTap } from "@/theme/haptics";
+import { PALETTES, useTheme } from "@/theme/ThemeProvider";
 import { SourceOffer } from "./SourceOffer";
 
 type State =
@@ -155,6 +157,10 @@ export function TechConfigScreen() {
               </View>
             </Card>
 
+            {/* The neubrutalism try's palettes (tokens.css): this screen exists
+                outside production only, so a released app stays in Ice. */}
+            <PaletteChoices />
+
             {/* Proves error reporting end to end (#11): a real JS error with a stack
                 for Sentry to symbolicate. A no-op in a build without a DSN. */}
             <View className="w-full max-w-md gap-2">
@@ -183,5 +189,41 @@ export function TechConfigScreen() {
         )}
       </ScrollView>
     </SafeAreaView>
+  );
+}
+
+const PALETTE_LABELS = {
+  ice: "tech.palette.ice",
+  dusk: "tech.palette.dusk",
+  birch: "tech.palette.birch",
+} as const;
+
+function PaletteChoices() {
+  const { t } = useT();
+  const theme = useTheme();
+  const tap = useHapticTap();
+  return (
+    <View className="w-full max-w-md gap-2">
+      <Text variant="group" role="heading" aria-level="2">
+        {t("tech.palette.title")}
+      </Text>
+      <View
+        accessibilityRole="radiogroup"
+        accessibilityLabel={t("tech.palette.title")}
+        className="flex-row flex-wrap gap-2"
+      >
+        {PALETTES.map((palette) => (
+          <Choice
+            key={palette}
+            label={t(PALETTE_LABELS[palette])}
+            chosen={theme.palette === palette}
+            onPress={() => {
+              tap();
+              theme.setPalette(palette);
+            }}
+          />
+        ))}
+      </View>
+    </View>
   );
 }

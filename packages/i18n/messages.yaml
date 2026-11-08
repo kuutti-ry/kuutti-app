@@ -8970,6 +8970,34 @@ tech.errorTest.send:
   sv: "Skicka ett testfel"
   machine: { fi: true, sv: true }
 
+tech.palette.title:
+  en: "Colours to try"
+  description: "Heading of the tech screen's choice of palette for the neubrutalism try (outside production only); the released app stays in Ice."
+  fi: "Kokeiltavat värit"
+  sv: "Färger att prova"
+  machine: { fi: true, sv: true }
+
+tech.palette.ice:
+  en: "Ice"
+  description: "Palette of the neubrutalism try: today's blues, softened (ice and water)."
+  fi: "Jää"
+  sv: "Is"
+  machine: { fi: true, sv: true }
+
+tech.palette.dusk:
+  en: "Dusk"
+  description: "Palette of the neubrutalism try: lavender dusk over the sea, with peach (the designer's concept)."
+  fi: "Hämärä"
+  sv: "Skymning"
+  machine: { fi: true, sv: true }
+
+tech.palette.birch:
+  en: "Birch"
+  description: "Palette of the neubrutalism try: birch-bark cream, spruce and a muted lingonberry red."
+  fi: "Koivu"
+  sv: "Björk"
+  machine: { fi: true, sv: true }
+
 tech.errorTest.sent:
   en: "Test error sent. It shows up in the error tracker within a minute if reporting is on in this build."
   description: "Tech config, under the test error button after it was pressed."

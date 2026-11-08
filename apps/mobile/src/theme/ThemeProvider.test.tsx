@@ -60,6 +60,7 @@ function Probe() {
       <Text testID="scheme">{theme.scheme}</Text>
       <Text testID="preference">{theme.preference}</Text>
       <Text testID="contrast">{String(theme.highContrast)}</Text>
+      <Text testID="palette">{theme.palette}</Text>
       <Pressable
         accessibilityRole="button"
         accessibilityLabel="dark"
@@ -79,6 +80,16 @@ function Probe() {
         accessibilityRole="button"
         accessibilityLabel="contrast off"
         onPress={() => theme.setHighContrast(false)}
+      />
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="dusk"
+        onPress={() => theme.setPalette("dusk")}
+      />
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="ice"
+        onPress={() => theme.setPalette("ice")}
       />
     </>
   );
@@ -209,6 +220,54 @@ describe("ThemeProvider", () => {
     await fireEvent.press(screen.getByLabelText("contrast off"));
     expect(rootClass()).not.toMatch(/high-contrast/);
     await waitFor(() => expect(store.get("kuutti.preference.highContrast")).toBe("false"));
+  });
+
+  // The neubrutalism try's palettes (tokens.css): Ice is the base sets, Dusk and
+  // Birch a class on the root view in the scheme's set, and high contrast wins.
+  it.each([
+    ["light", "palette-dusk"],
+    ["dark", "palette-dusk-dark"],
+  ] as const)(
+    "puts Dusk's %s set on the root view, keeps it, and forgets it for Ice",
+    async (scheme, set) => {
+      mockColorScheme = scheme;
+      osSettings();
+      await show();
+      expect(textOf("palette")).toBe("ice");
+      expect(rootClass()).not.toMatch(/palette-/);
+      await fireEvent.press(screen.getByLabelText("dusk"));
+      expect(textOf("palette")).toBe("dusk");
+      expect(rootClass().split(" ")).toContain(set);
+      await waitFor(() => expect(store.get("kuutti.preference.palette")).toBe("dusk"));
+      await fireEvent.press(screen.getByLabelText("ice"));
+      expect(rootClass()).not.toMatch(/palette-/);
+      await waitFor(() => expect(store.has("kuutti.preference.palette")).toBe(false));
+    },
+  );
+
+  it("takes the palette chosen last time", async () => {
+    osSettings();
+    store.set("kuutti.preference.palette", "birch");
+    await show();
+    expect(textOf("palette")).toBe("birch");
+    expect(rootClass().split(" ")).toContain("palette-birch");
+  });
+
+  it("stays in Ice for a stored palette it does not know", async () => {
+    osSettings();
+    store.set("kuutti.preference.palette", "neon");
+    await show();
+    expect(textOf("palette")).toBe("ice");
+    expect(rootClass()).not.toMatch(/palette-/);
+  });
+
+  it("lets high contrast win over a palette", async () => {
+    osSettings({ darker: true });
+    store.set("kuutti.preference.palette", "dusk");
+    await show();
+    expect(textOf("palette")).toBe("dusk");
+    expect(rootClass()).toMatch(/\bhigh-contrast\b/);
+    expect(rootClass()).not.toMatch(/palette-/);
   });
 
   it("fades a change of appearance in, briefly", async () => {

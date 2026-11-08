@@ -29,6 +29,8 @@ module.exports = {
         overlay: token("overlay"),
         // Behind a logo made for a light page (#510); no text sits on it.
         "logo-plate": token("logo-plate"),
+        // Neubrutalism's one ink: the structural stroke, and the hard shadow's colour.
+        stroke: token("stroke"),
         // The bands of the bar of whom people seek (SeeksBar, #581); no text sits on them.
         seeks: {
           men: token("seeks-men"),

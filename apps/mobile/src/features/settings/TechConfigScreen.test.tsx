@@ -1,5 +1,6 @@
 import * as Sentry from "@sentry/react-native";
-import { fireEvent, screen, userEvent, waitFor } from "@testing-library/react-native";
+import { fireEvent, screen, userEvent, waitFor, within } from "@testing-library/react-native";
+import * as SecureStore from "expo-secure-store";
 import { Linking } from "react-native";
 import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
 import { expectPinnedHeader } from "@/test/layout";
@@ -38,6 +39,25 @@ describe("the tech config screen", () => {
     (Sentry.captureException as jest.Mock).mockClear();
   });
   afterEach(() => jest.restoreAllMocks());
+
+  // The neubrutalism try's palettes, on this screen alone, which production has not.
+  it("offers the try's three palettes as radios, and says and keeps the one chosen", async () => {
+    const store = (SecureStore as unknown as { __store: Map<string, string> }).__store;
+    store.clear();
+    await renderWithTheme(<TechConfigScreen />);
+    await waitFor(() => expect(screen.getByText("git commit abc1234")).toBeTruthy());
+    const group = screen.getByLabelText("Colours to try");
+    expect(group.props.accessibilityRole).toBe("radiogroup");
+    const labels = () =>
+      within(group)
+        .getAllByRole("radio")
+        .map((radio) => radio.props.accessibilityLabel);
+    expect(labels()).toEqual(["✓ Ice", "Dusk", "Birch"]);
+    await fireEvent.press(within(group).getByRole("radio", { name: "Dusk" }));
+    expect(labels()).toEqual(["Ice", "✓ Dusk", "Birch"]);
+    await waitFor(() => expect(store.get("kuutti.preference.palette")).toBe("dusk"));
+    expect(pressables(screen.toJSON() as HostNode).flatMap((n) => a11yProblems(n))).toEqual([]);
+  });
 
   it("keeps the title and the way back pinned above the details", async () => {
     await renderWithTheme(<TechConfigScreen />);

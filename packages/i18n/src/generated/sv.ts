@@ -1230,6 +1230,10 @@ export const sv: Readonly<Record<string, string>> = {
   "tech.licenses.texts": "Licenstexter",
   "tech.licenses.title": "Paketens licenser",
   "tech.licenses.version": "Version {version}, {license}",
+  "tech.palette.birch": "Björk",
+  "tech.palette.dusk": "Skymning",
+  "tech.palette.ice": "Is",
+  "tech.palette.title": "Färger att prova",
   "tech.title": "Teknisk vy",
   "tech.unavailable": "Inte i den här versionen.",
 };

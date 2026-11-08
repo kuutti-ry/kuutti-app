@@ -7,6 +7,14 @@ import { Button } from "./button";
 import { Icon } from "./icon";
 import { Text, TextClassContext } from "./text";
 
+// The ink a phone reads from the root view's token set; the test runner has no
+// compiled stylesheet to read it from.
+jest.mock("nativewind", () => ({
+  ...jest.requireActual("nativewind"),
+  useUnstableNativeVariable: (name: string) =>
+    name === "--stroke" ? [222, "40%", "14%"] : undefined,
+}));
+
 // The button (#12, TD-9): a 44 pt target whatever its size, a role a screen
 // reader announces, plain text that labels itself, and a disabled state that
 // is said and not only drawn.
@@ -48,7 +56,7 @@ describe("Button", () => {
       );
       const classes = screen.getByRole("button", { name: "Save" }).props.className as string;
       expect(classes).not.toMatch(/opacity-/);
-      expect(classes).toMatch(/(^| )border( |$)/);
+      expect(classes).toMatch(/(^| )border-2( |$)/);
       expect(classes).toMatch(/\bborder-dashed\b/);
       expect(classes).not.toMatch(/\bborder-solid\b/);
       expect(classes).toMatch(/\bborder-input\b/);
@@ -102,7 +110,9 @@ describe("Button", () => {
     await renderWithTheme(<Button variant="outline">Cancel</Button>);
     const classes = screen.getByRole("button", { name: "Cancel" }).props.className as string;
     expect(classes).not.toMatch(/\bborder-dashed\b/);
-    expect(classes).toMatch(/\bbg-background\b/);
+    // The neubrutalism try: the ink's stroke around a card's fill.
+    expect(classes).toMatch(/\bborder-stroke\b/);
+    expect(classes).toMatch(/\bbg-card\b/);
     expect(screen.getByText("Cancel").props.className).toMatch(/(^| )text-foreground( |$)/);
   });
 
@@ -127,17 +137,26 @@ describe("Button", () => {
     expect(screen.getByRole("button", { name: "Close" })).toBeTruthy();
   });
 
-  it.each(["destructive", "secondary", "ghost"] as const)(
-    "gives the %s variant the same transparent 1 px border, so disabling it never resizes it (#239, #467)",
-    async (variant) => {
+  it.each([
+    ["default", "border-stroke"],
+    ["destructive", "border-stroke"],
+    ["outline", "border-stroke"],
+    ["secondary", "border-stroke"],
+    ["ghost", "border-transparent"],
+  ] as const)(
+    "gives the %s variant the same 2 px border, here %s, so disabling it never resizes it (#239, #467)",
+    async (variant, colour) => {
       await renderWithTheme(<Button variant={variant}>Block</Button>);
-      const classes = screen.getByRole("button", { name: "Block" }).props.className as string;
-      expect(classes).toMatch(/(^| )border( |$)/);
-      expect(classes).toMatch(/\bborder-transparent\b/);
+      const classes = (
+        screen.getByRole("button", { name: "Block" }).props.className as string
+      ).split(" ");
+      expect(classes).toContain("border-2");
+      expect(classes).toContain(colour);
+      expect(classes).not.toContain("border");
     },
   );
 
-  it("draws a chosen choice (default) and an unchosen one (outline) the same size: both have a 1 px border (#239)", async () => {
+  it("draws a chosen choice (default) and an unchosen one (outline) the same size: both have a 2 px border (#239)", async () => {
     await renderWithTheme(
       <>
         <Button accessibilityState={{ selected: true }}>Gemini</Button>
@@ -148,9 +167,54 @@ describe("Button", () => {
     );
     const chosen = screen.getByRole("button", { name: "Gemini" }).props.className;
     const unchosen = screen.getByRole("button", { name: "Cancer" }).props.className;
-    expect(chosen).toMatch(/(^| )border( |$)/);
-    expect(chosen).toMatch(/\bborder-transparent\b/);
-    expect(unchosen).toMatch(/(^| )border( |$)/);
+    for (const classes of [chosen, unchosen]) {
+      expect(classes).toMatch(/(^| )border-2( |$)/);
+      expect(classes).toMatch(/\bborder-stroke\b/);
+    }
+  });
+
+  // The neubrutalism try: a drawn button lies on a hard shadow of the ink, and
+  // pressed it moves into it, at once.
+  it("lies on its hard shadow, and pressed moves down into it", async () => {
+    await renderWithTheme(<Button>Send</Button>);
+    const button = () => screen.getByRole("button", { name: "Send" });
+    expect(StyleSheet.flatten(button().props.style)).toMatchObject({
+      boxShadow: "2px 2px 0px 0px hsl(222, 40%, 14%)",
+      minHeight: 44,
+    });
+    await fireEvent(button(), "pressIn");
+    const pressed = StyleSheet.flatten(button().props.style);
+    expect(pressed.boxShadow).toBeUndefined();
+    expect(pressed.transform).toEqual([{ translateX: 2 }, { translateY: 2 }]);
+    await fireEvent(button(), "pressOut");
+    expect(StyleSheet.flatten(button().props.style).boxShadow).toBe(
+      "2px 2px 0px 0px hsl(222, 40%, 14%)",
+    );
+  });
+
+  it("still tells a caller's own press handlers", async () => {
+    const pressIn = jest.fn();
+    const pressOut = jest.fn();
+    await renderWithTheme(
+      <Button onPressIn={pressIn} onPressOut={pressOut}>
+        Send
+      </Button>,
+    );
+    await fireEvent(screen.getByRole("button", { name: "Send" }), "pressIn");
+    await fireEvent(screen.getByRole("button", { name: "Send" }), "pressOut");
+    expect(pressIn).toHaveBeenCalledTimes(1);
+    expect(pressOut).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    ["a ghost button, a row or a link", { variant: "ghost" as const }],
+    ["a disabled button, which lies flat", { disabled: true }],
+  ])("draws no shadow on %s", async (_what, props) => {
+    await renderWithTheme(<Button {...props}>Later</Button>);
+    const button = screen.getByRole("button", { name: "Later" });
+    expect(StyleSheet.flatten(button.props.style).boxShadow).toBeUndefined();
+    await fireEvent(button, "pressIn");
+    expect(StyleSheet.flatten(button.props.style).transform).toBeUndefined();
   });
 
   // Saiga Regular, as dark as the system font's Semibold, the weight a phone

@@ -30,12 +30,12 @@ function Switch({ className, accessibilityLabel, ...props }: SwitchProps) {
       hitSlop={hitSlopFor(TRACK_WIDTH, TRACK_HEIGHT)}
       style={{ width: TRACK_WIDTH, height: TRACK_HEIGHT }}
       className={cn(
-        "shrink-0 flex-row items-center rounded-full border-2 border-solid border-input px-0.5",
+        "shrink-0 flex-row items-center rounded-full border-2 border-solid border-stroke px-0.5",
         Platform.select({
           web: "outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed",
         }),
         props.checked ? "justify-end bg-primary" : "justify-start bg-background",
-        props.disabled && "border-dashed bg-transparent",
+        props.disabled && "border-dashed border-input bg-transparent",
         className,
       )}
       {...props}

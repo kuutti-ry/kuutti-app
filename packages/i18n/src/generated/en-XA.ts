@@ -1610,6 +1610,10 @@ export const enXA: Readonly<Record<string, string>> = {
   "tech.licenses.texts": "［Lííçééñçéé tééxtš］",
   "tech.licenses.title": "［Lííçééñçééš óóf théé pááçkáágééš］",
   "tech.licenses.version": "［Vééršííóóñ {version}, {license}］",
+  "tech.palette.birch": "［Bíírçh］",
+  "tech.palette.dusk": "［Dúúšk］",
+  "tech.palette.ice": "［ÍÍçéé］",
+  "tech.palette.title": "［Çóólóóúúrš tóó trýý］",
   "tech.title": "［Tééçh çóóñfííg］",
   "tech.unavailable": "［Ñóót ííñ thííš búúííld.］",
 };

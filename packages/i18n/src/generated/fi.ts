@@ -1238,6 +1238,10 @@ export const fi: Readonly<Record<string, string>> = {
   "tech.licenses.texts": "Lisenssitekstit",
   "tech.licenses.title": "Pakettien lisenssit",
   "tech.licenses.version": "Versio {version}, {license}",
+  "tech.palette.birch": "Koivu",
+  "tech.palette.dusk": "Hämärä",
+  "tech.palette.ice": "Jää",
+  "tech.palette.title": "Kokeiltavat värit",
   "tech.title": "Tekniset tiedot",
   "tech.unavailable": "Ei tässä versiossa.",
 };

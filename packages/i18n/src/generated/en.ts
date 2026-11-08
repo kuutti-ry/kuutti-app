@@ -1610,6 +1610,10 @@ export const en: Readonly<Record<string, string>> = {
   "tech.licenses.texts": "Licence texts",
   "tech.licenses.title": "Licences of the packages",
   "tech.licenses.version": "Version {version}, {license}",
+  "tech.palette.birch": "Birch",
+  "tech.palette.dusk": "Dusk",
+  "tech.palette.ice": "Ice",
+  "tech.palette.title": "Colours to try",
   "tech.title": "Tech config",
   "tech.unavailable": "Not in this build.",
 };

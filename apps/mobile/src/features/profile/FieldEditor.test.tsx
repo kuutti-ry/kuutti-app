@@ -739,7 +739,8 @@ describe("FieldEditor: a number", () => {
   it("has Clear the answer as an outlined button, only with an answer to clear (#581)", async () => {
     await show("height", { height: 170 } as ProfileFields);
     const clear = screen.getByRole("button", { name: "Clear the answer" });
-    expect(clear.props.className).toMatch(/\bborder-input\b/);
+    expect(clear.props.className).toMatch(/\bborder-stroke\b/);
+    expect(clear.props.className).not.toMatch(/\bbg-(primary|secondary)\b/);
     expect(pressables(screen.toJSON() as HostNode).flatMap((n) => a11yProblems(n))).toEqual([]);
   });
 

@@ -16,8 +16,8 @@ function Input({ className, ...props }: InputProps) {
   return (
     <TextInput
       className={cn(
-        "min-h-touch w-full min-w-0 rounded-md border border-solid border-input bg-background px-3 py-2 font-system text-body text-foreground placeholder:text-muted-foreground",
-        props.editable === false && "border-dashed text-muted-foreground",
+        "min-h-touch w-full min-w-0 rounded-md border-2 border-solid border-stroke bg-card px-3 py-2 font-system text-body text-foreground placeholder:text-muted-foreground",
+        props.editable === false && "border-dashed border-input text-muted-foreground",
         Platform.select({
           web: "outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring",
         }),
