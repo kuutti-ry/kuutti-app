@@ -57,6 +57,7 @@ describe("a licence text as the screen's paragraphs (#416)", () => {
       name: "a",
       version: "1.0.0",
       license: "MIT",
+      provider: null,
       licences: [{ file: "LICENSE", copyright: ["Copyright A"], text: "k1" }],
       notices: [],
     };
@@ -112,6 +113,16 @@ describe("src/generated/licenses.json (#143, #177, #416)", () => {
     expect(
       committed.packages.filter((e) => !installed.has(`${e.name}@${e.version} ${e.license}`)),
     ).toEqual([]);
+  });
+
+  it("says who provides a package, by its scope or its package.json, never with an address (#512)", () => {
+    expect(byName("@expo/ui")?.provider).toBe("expo");
+    expect(byName("zod")?.provider).toBe("Colin McDonnell");
+    expect(byName("i18next")?.provider).toBe("Jan Mühlemann");
+    expect(byName("react")?.provider).toBeNull();
+    const providers = committed.packages.flatMap((p) => p.provider ?? []);
+    expect(providers.filter((name) => /[<>()@]|:\/\//.test(name))).toEqual([]);
+    expect(providers.filter((name) => name !== name.trim() || name === "")).toEqual([]);
   });
 
   it("gives every package a licence with a text, and names no text it does not carry", () => {

@@ -1,4 +1,5 @@
 import type { Queryable } from "@kuutti/db";
+import type { DistanceEdges } from "@kuutti/schema";
 import { AppError } from "./errors.ts";
 
 /**
@@ -51,4 +52,31 @@ export async function matchingConfigNumbers<K extends string>(
     out[key] = value;
   }
   return out;
+}
+
+/** Each band's outer edge (ADR-061 §5), read once where a pool is read. */
+export async function distanceEdges(db: Queryable): Promise<DistanceEdges> {
+  const km = await matchingConfigNumbers(db, [
+    "distance_nearby_km",
+    "distance_close_km",
+    "distance_around_km",
+  ]);
+  return {
+    nearby: km.distance_nearby_km,
+    close: km.distance_close_km,
+    around: km.distance_around_km,
+  };
+}
+
+/**
+ * An hour of the day, 0 to 23, read as matchingConfigNumber reads a number: the
+ * push's quiet hours (#102, ADR-055 §7). The panel keeps a number whole and from
+ * 0 but has no ceiling, and a 24 is no hour there is, so anything else fails as
+ * a missing row.
+ */
+export function asHour(key: string, value: number): number {
+  if (!Number.isInteger(value) || value < 0 || value > 23) {
+    throw new AppError(500, "internal_error", `matching_config ${key} is not an hour`, { key });
+  }
+  return value;
 }

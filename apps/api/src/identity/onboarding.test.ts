@@ -4,7 +4,6 @@ import {
   GENDERS,
   ONBOARDING_STEPS,
   OnboardingStatus,
-  PondList,
   ProfileResponse,
 } from "@kuutti/schema";
 import { describe, expect, it } from "vitest";
@@ -52,21 +51,15 @@ const consentRows = async (ctx: TestContext, accountId: string, kind?: string) =
   return Number(rows[0]?.n ?? 0);
 };
 
-async function pond(ctx: TestContext) {
-  const { rows } = await ctx.client.query<{ id: string }>(
-    `INSERT INTO ponds (slug, name_nominative, name_inessive) VALUES ('test-otaniemi', 'Otaniemi', 'Otaniemessä') RETURNING id`,
-  );
-  return rows[0]?.id ?? "";
-}
+const putHome = (app: App, headers: Headers, postalCode: string) =>
+  app.request("/account/home", {
+    method: "PUT",
+    headers: jsonHeaders(headers),
+    body: JSON.stringify({ postalCode }),
+  });
 
-/** Every answer activation needs, in the order the app asks (#146); returns the pond id. */
-async function onboard(
-  ctx: TestContext,
-  app: App,
-  headers: Headers,
-  options: { research?: boolean } = {},
-) {
-  const pondId = await pond(ctx);
+/** Every answer activation needs but the home, in the order the app asks (#146). */
+async function answerUpToTheHome(app: App, headers: Headers) {
   await consent(app, headers, "terms", CURRENT_CONSENT_VERSIONS.terms);
   await consent(app, headers, "privacy", CURRENT_CONSENT_VERSIONS.privacy);
   await app.request("/account/gender", {
@@ -81,13 +74,13 @@ async function onboard(
     headers: jsonHeaders(headers),
     body: JSON.stringify({ seeks: ["man", "non_binary"], ageWindow: { min: 25, max: 35 } }),
   });
-  await app.request("/account/pond", {
-    method: "PUT",
-    headers: jsonHeaders(headers),
-    body: JSON.stringify({ pondId }),
-  });
+}
+
+/** Every answer activation needs, the home last: its write sets the one pond (ADR-061 §8). */
+async function onboard(app: App, headers: Headers, options: { research?: boolean } = {}) {
+  await answerUpToTheHome(app, headers);
+  expect((await putHome(app, headers, "00530")).status).toBe(200);
   if (options.research) await consent(app, headers, "research", CURRENT_CONSENT_VERSIONS.research);
-  return pondId;
 }
 
 const PROFILE = {
@@ -103,6 +96,20 @@ const putProfile = (app: App, headers: Headers, body: unknown) =>
     headers: jsonHeaders(headers),
     body: JSON.stringify(body),
   });
+const profileOf = async (app: App, headers: Headers) =>
+  ProfileResponse.parse(await (await app.request("/profile", { headers })).json());
+const declare = (app: App, headers: Headers, gender: string) =>
+  app.request("/account/gender", {
+    method: "PUT",
+    headers: jsonHeaders(headers),
+    body: JSON.stringify({ gender }),
+  });
+/** A profile with an identity label, and a hide on it (#515). */
+const LABELLED = {
+  ...PROFILE,
+  fields: { intent: "casual", identityLabel: "genderfluid" },
+  hiddenFields: ["identityLabel"],
+};
 async function uploadPhotos(app: App, headers: Headers, n: number) {
   for (let i = 0; i < n; i += 1) {
     const form = new FormData();
@@ -195,7 +202,11 @@ describe("onboarding and consents", () => {
     expect((await status(app, a.headers)).missing).toEqual(
       ONBOARDING_STEPS.filter((step) => step !== "gender"),
     );
-    const pondId = await onboard(ctx, app, a.headers);
+    await answerUpToTheHome(app, a.headers);
+    const waiting = await status(app, a.headers);
+    expect(waiting.state).toBe("registered");
+    expect(waiting.missing).toEqual(["name", "intent", "home", "photos", "prompts_or_bio"]);
+    expect((await putHome(app, a.headers, "00530")).status).toBe(200);
     const after = await status(app, a.headers);
     // Active on the six of ADR-010 §6; the profile steps of the sheet stay open (#146).
     expect(after).toMatchObject({
@@ -203,7 +214,7 @@ describe("onboarding and consents", () => {
       complete: false,
       missing: ["name", "intent", "photos", "prompts_or_bio"],
       gender: "woman",
-      pond: { id: pondId, name: "Otaniemi", nameInessive: "Otaniemessä" },
+      home: { town: { fi: "Helsinki", sv: "Helsingfors" }, area: { fi: "Kallio", sv: "Berghäll" } },
       preferences: { seeks: ["man", "non_binary"], ageWindow: { min: 25, max: 35 } },
       consents: { specialCategory: CURRENT_CONSENT_VERSIONS.special_category },
     });
@@ -220,10 +231,25 @@ describe("onboarding and consents", () => {
     expect(JSON.stringify(logs())).not.toContain("non_binary");
   });
 
+  test("The home is a required step, asked after the age window", async ({ ctx }) => {
+    const { app } = await appWith(ctx);
+    const a = await signedInAccount(ctx.client, undefined, { state: "registered" });
+    await answerUpToTheHome(app, a.headers);
+    expect((await putProfile(app, a.headers, PROFILE)).status).toBe(200);
+    const before = await status(app, a.headers);
+    expect(before.missing).toEqual(["home", "photos"]);
+    expect(before.state).toBe("registered");
+    expect(before.home).toBeNull();
+    expect((await putHome(app, a.headers, "00530")).status).toBe(200);
+    const after = await status(app, a.headers);
+    expect(after.state).toBe("active");
+    expect(after.missing).toEqual(["photos"]);
+  });
+
   test("Research is never required for activation", async ({ ctx }) => {
     const { app } = await appWith(ctx);
     const a = await signedInAccount(ctx.client, undefined, { state: "registered" });
-    await onboard(ctx, app, a.headers);
+    await onboard(app, a.headers);
     const done = await status(app, a.headers);
     expect(done.state).toBe("active");
     expect(done.consents.research).toBeNull();
@@ -234,7 +260,7 @@ describe("onboarding and consents", () => {
   }) => {
     const { app } = await appWith(ctx);
     const a = await signedInAccount(ctx.client, undefined, { state: "registered" });
-    await onboard(ctx, app, a.headers, { research: true });
+    await onboard(app, a.headers, { research: true });
     expect(await consentRows(ctx, a.accountId)).toBe(4);
     const deleted = await app.request("/account/delete", {
       method: "POST",
@@ -252,21 +278,22 @@ describe("onboarding and consents", () => {
       state: string;
       gender: string | null;
       pond_id: string | null;
-    }>("SELECT state, gender, pond_id FROM account WHERE id = $1", [a.accountId]);
-    expect(rows[0]).toEqual({ state: "deleted", gender: null, pond_id: null });
+      home_place: string | null;
+    }>("SELECT state, gender, pond_id, home_place FROM account WHERE id = $1", [a.accountId]);
+    expect(rows[0]).toEqual({ state: "deleted", gender: null, pond_id: null, home_place: null });
   });
 
   test("The export lists gender, pond, preferences and every consent", async ({ ctx }) => {
     const { app } = await appWith(ctx);
     const a = await signedInAccount(ctx.client, undefined, { state: "registered" });
-    const pondId = await onboard(ctx, app, a.headers, { research: true });
+    await onboard(app, a.headers, { research: true });
     await app.request("/consents/research", { method: "DELETE", headers: a.headers });
     const exported = await exportOf(app, a.headers);
     expect(exported.account.gender).toBe("woman");
-    expect(exported.account.pond).toMatchObject({
-      id: pondId,
-      name: "Otaniemi",
-      nameInessive: "Otaniemessä",
+    expect(exported.account.pond).toEqual({
+      id: expect.any(String),
+      slug: "suomi",
+      name: "Suomi",
     });
     expect(exported.preferences).toEqual({
       seeks: ["man", "non_binary"],
@@ -307,7 +334,85 @@ describe("onboarding and consents", () => {
     expect(JSON.stringify(logs())).not.toContain("non_binary");
   });
 
-  test("unauthenticated: 401 on every onboarding, consent, pond and preference route", async ({
+  test("A change away from non-binary clears the identity label", async ({ ctx }) => {
+    const { app, logs } = await appWith(ctx);
+    const a = await signedInAccount(ctx.client, "a");
+    const b = await signedInAccount(ctx.client, "b");
+    for (const who of [a, b]) {
+      expect((await declare(app, who.headers, "non_binary")).status).toBe(204);
+      expect((await putProfile(app, who.headers, LABELLED)).status).toBe(200);
+    }
+    expect((await declare(app, a.headers, "woman")).status).toBe(204);
+    const { profile } = await profileOf(app, a.headers);
+    expect(profile?.fields).toEqual({ intent: "casual" });
+    expect(profile?.hiddenFields).toEqual(["identityLabel"]);
+    expect(profile?.displayName).toBe(PROFILE.displayName);
+    expect(profile?.bio).toBe(PROFILE.bio);
+    expect((await status(app, a.headers)).gender).toBe("woman");
+    // The caller's alone (rule 6).
+    expect((await profileOf(app, b.headers)).profile?.fields.identityLabel).toBe("genderfluid");
+    // What was left stays out of the log: a line of its own would say it.
+    expect(JSON.stringify(logs())).not.toContain("genderfluid");
+    expect(logs().filter((l) => l.msg === "gender declared")).toHaveLength(3);
+    expect(logs().filter((l) => /label/i.test(l.msg ?? ""))).toEqual([]);
+  });
+
+  test("the label stays through the same answer again, a change between other genders and a refused change", async ({
+    ctx,
+  }) => {
+    const { app } = await appWith(ctx);
+    const same = await signedInAccount(ctx.client, "same");
+    await declare(app, same.headers, "non_binary");
+    await putProfile(app, same.headers, LABELLED);
+    const stored = await profileOf(app, same.headers);
+    expect((await declare(app, same.headers, "non_binary")).status).toBe(204);
+    expect(await profileOf(app, same.headers)).toEqual(stored);
+
+    // The screens never offer it here, the API lets it through, and the rule is only about leaving non-binary.
+    const other = await signedInAccount(ctx.client, "other");
+    await declare(app, other.headers, "woman");
+    await putProfile(app, other.headers, LABELLED);
+    expect((await declare(app, other.headers, "man")).status).toBe(204);
+    expect((await profileOf(app, other.headers)).profile?.fields.identityLabel).toBe("genderfluid");
+
+    // The first change starts the limit, and a refusal changes nothing.
+    const refused = await signedInAccount(ctx.client, "refused");
+    await declare(app, refused.headers, "woman");
+    await declare(app, refused.headers, "non_binary");
+    await putProfile(app, refused.headers, LABELLED);
+    expect((await declare(app, refused.headers, "man")).status).toBe(429);
+    expect((await profileOf(app, refused.headers)).profile?.fields.identityLabel).toBe(
+      "genderfluid",
+    );
+    expect((await status(app, refused.headers)).gender).toBe("non_binary");
+  });
+
+  test("a change away from non-binary writes nothing to a profile with no label, or none at all", async ({
+    ctx,
+  }) => {
+    const { app } = await appWith(ctx);
+    const updatedAt = async (accountId: string) => {
+      const { rows } = await ctx.client.query<{ updated_at: Date }>(
+        "SELECT updated_at FROM profile WHERE account_id = $1",
+        [accountId],
+      );
+      return rows[0]?.updated_at;
+    };
+    const none = await signedInAccount(ctx.client, "no profile");
+    await declare(app, none.headers, "non_binary");
+    expect((await declare(app, none.headers, "man")).status).toBe(204);
+    expect((await status(app, none.headers)).gender).toBe("man");
+    expect(await updatedAt(none.accountId)).toBeUndefined();
+
+    const bare = await signedInAccount(ctx.client, "no label");
+    await declare(app, bare.headers, "non_binary");
+    await putProfile(app, bare.headers, PROFILE);
+    const before = await updatedAt(bare.accountId);
+    expect((await declare(app, bare.headers, "man")).status).toBe(204);
+    expect(await updatedAt(bare.accountId)).toEqual(before);
+  });
+
+  test("unauthenticated: 401 on every onboarding, consent, home and preference route", async ({
     ctx,
   }) => {
     const { app } = await appWith(ctx);
@@ -318,8 +423,7 @@ describe("onboarding and consents", () => {
       ["POST", "/consents"],
       ["DELETE", "/consents/research"],
       ["DELETE", "/consents/special_category"],
-      ["GET", "/ponds"],
-      ["PUT", "/account/pond"],
+      ["PUT", "/account/home"],
       ["GET", "/preferences"],
       ["PUT", "/preferences"],
     ] as const) {
@@ -389,7 +493,7 @@ describe("onboarding and consents", () => {
         "POST",
         { kind: "terms", version: CURRENT_CONSENT_VERSIONS.terms, locale: "de" },
       ],
-      ["/account/pond", "PUT", { pondId: "not-a-uuid" }],
+      ["/account/home", "PUT", { postalCode: "not-a-code" }],
     ] as const) {
       const response = await post(path, method, body);
       expect(response.status, JSON.stringify(body)).toBe(400);
@@ -490,7 +594,7 @@ describe("onboarding and consents", () => {
     const none = missingSteps({
       gender: null,
       preferences: { seeks: null, ageWindow: null },
-      pond: null,
+      home: null,
       terms: null,
       privacy: null,
       specialCategory: null,
@@ -500,7 +604,11 @@ describe("onboarding and consents", () => {
     const answered = {
       gender: "man" as const,
       preferences: { seeks: ["woman" as const], ageWindow: { min: 20, max: 30 } },
-      pond: { id: "p", slug: "s", name: "n", nameInessive: "i", parentId: null },
+      home: {
+        town: { fi: "Helsinki", sv: "Helsingfors" },
+        area: null,
+        showArea: false,
+      },
       terms: "v",
       privacy: "v",
       specialCategory: "v",
@@ -516,12 +624,16 @@ describe("onboarding and consents", () => {
     });
     expect(open).toEqual(["name", "seeks", "intent", "photos"]);
     expect(activationWaitsFor(open)).toEqual(["seeks"]);
+    // The home is asked after the age window, and holds activation back (ADR-061 §1).
+    const homeless = missingSteps({ ...answered, home: null });
+    expect(homeless).toEqual(["home"]);
+    expect(activationWaitsFor(homeless)).toEqual(["home"]);
   });
 
   test("The onboarding lists the profile steps the sheet asks, in its order", async ({ ctx }) => {
     const { app } = await appWith(ctx);
     const a = await signedInAccount(ctx.client, undefined, { state: "registered" });
-    await onboard(ctx, app, a.headers);
+    await onboard(app, a.headers);
     expect((await status(app, a.headers)).missing).toEqual([
       "name",
       "intent",
@@ -538,75 +650,12 @@ describe("onboarding and consents", () => {
     expect(done.state).toBe("active");
   });
 
-  test("An account gets the default pond without a pond step", async ({ ctx }) => {
-    const { app, logs } = await appWith(ctx);
-    // The seed pond, which matching_config.default_pond names (migration 0025); the test database has no seed.
-    // Migration 0027 writes the second pond into every database: this test wants the one-pond world (ADR-010 §12).
-    await ctx.client.query("DELETE FROM ponds WHERE slug = 'suomi'");
-    const { rows } = await ctx.client.query<{ id: string }>(
-      "INSERT INTO ponds (slug, name_nominative, name_inessive) VALUES ('paakaupunkiseutu', 'Pääkaupunkiseutu', 'Pääkaupunkiseudulla') RETURNING id",
-    );
-    const a = await signedInAccount(ctx.client, undefined, { state: "registered" });
-    const first = await status(app, a.headers);
-    expect(first.pond).toMatchObject({
-      id: rows[0]?.id,
-      slug: "paakaupunkiseutu",
-      nameInessive: "Pääkaupunkiseudulla",
-    });
-    expect(first.missing).not.toContain("pond");
-    expect(logs().filter((l) => l.msg === "pond assigned")).toHaveLength(1);
-    const stored = await ctx.client.query<{ pond_id: string }>(
-      "SELECT pond_id FROM account WHERE id = $1",
-      [a.accountId],
-    );
-    expect(stored.rows[0]?.pond_id).toBe(rows[0]?.id);
-    // Assigned once: the next read finds it and says nothing.
-    await status(app, a.headers);
-    expect(logs().filter((l) => l.msg === "pond assigned")).toHaveLength(1);
-  });
-
-  test("The default pond is assigned only while it is the only pond without a parent", async ({
-    ctx,
-  }) => {
-    const { app, logs } = await appWith(ctx);
-    // Two ponds side by side (#174, ADR-010 §12): the capital region, which the config names, and the rest of the country.
-    await ctx.client.query(
-      `INSERT INTO ponds (slug, name_nominative, name_inessive) VALUES
-         ('paakaupunkiseutu', 'Pääkaupunkiseutu', 'Pääkaupunkiseudulla'),
-         ('suomi', 'Suomi', 'Suomessa')
-       ON CONFLICT (slug) DO NOTHING`,
-    );
-    const a = await signedInAccount(ctx.client, undefined, { state: "registered" });
-    const first = await status(app, a.headers);
-    expect(first.pond).toBeNull();
-    expect(first.missing).toContain("pond");
-    expect(logs().filter((l) => l.msg === "pond assigned")).toHaveLength(0);
-    // The person chooses; the list carries both, and a child pond would be no choice.
-    const listed = PondList.parse(
-      await (await app.request("/ponds", { headers: a.headers })).json(),
-    );
-    expect(listed.ponds.map((p) => p.slug).sort()).toEqual(["paakaupunkiseutu", "suomi"]);
-    const suomi = listed.ponds.find((p) => p.slug === "suomi");
-    expect(
-      (
-        await app.request("/account/pond", {
-          method: "PUT",
-          headers: jsonHeaders(a.headers),
-          body: JSON.stringify({ pondId: suomi?.id }),
-        })
-      ).status,
-    ).toBe(204);
-    const chosen = await status(app, a.headers);
-    expect(chosen.pond?.slug).toBe("suomi");
-    expect(chosen.missing).not.toContain("pond");
-  });
-
   test("The seek consent is recorded with the answer and withdrawing it blanks the seek rows", async ({
     ctx,
   }) => {
     const { app, logs } = await appWith(ctx);
     const a = await signedInAccount(ctx.client, undefined, { state: "registered" });
-    await onboard(ctx, app, a.headers);
+    await onboard(app, a.headers);
     const saved = await putProfile(app, a.headers, {
       ...PROFILE,
       fields: { ...PROFILE.fields, politics: ["vihr"] },
@@ -638,33 +687,6 @@ describe("onboarding and consents", () => {
 });
 
 describe("onboarding and consents: the quiet branches", () => {
-  test("Without a default pond named in matching_config the pond step stays and nothing is assigned", async ({
-    ctx,
-  }) => {
-    const { app, logs } = await appWith(ctx);
-    // The one-pond world in which the default would otherwise be assigned (ADR-010 §12).
-    await ctx.client.query("DELETE FROM ponds WHERE slug = 'suomi'");
-    await ctx.client.query(
-      "INSERT INTO ponds (slug, name_nominative, name_inessive) VALUES ('paakaupunkiseutu', 'Pääkaupunkiseutu', 'Pääkaupunkiseudulla') ON CONFLICT (slug) DO NOTHING",
-    );
-    for (const value of ['""', "7"]) {
-      await ctx.client.query(
-        `INSERT INTO matching_config (version, key, value, created_by) VALUES (99, 'default_pond', $1::jsonb, 'test')
-         ON CONFLICT (key, version) DO UPDATE SET value = EXCLUDED.value`,
-        [value],
-      );
-      const a = await signedInAccount(ctx.client, undefined, { state: "registered" });
-      const read = await status(app, a.headers);
-      expect(read.pond, value).toBeNull();
-      expect(read.missing, value).toContain("pond");
-      const stored = await ctx.client.query("SELECT pond_id FROM account WHERE id = $1", [
-        a.accountId,
-      ]);
-      expect(stored.rows, value).toEqual([{ pond_id: null }]);
-    }
-    expect(logs().filter((l) => l.msg === "pond assigned")).toEqual([]);
-  });
-
   test("Withdrawing a special-category consent that was never given takes no answer with it", async ({
     ctx,
   }) => {
@@ -682,7 +704,7 @@ describe("onboarding and consents: the quiet branches", () => {
     });
     expect(res.status).toBe(200);
     expect(ConsentsResponse.parse(await res.json()).consents).toEqual([]);
-    // Nothing was there, so nothing goes: the seek row stays, and the cadence is not sidestepped (#147).
+    // Nothing was there, so nothing goes: the seek row stays.
     const seeks = await ctx.client.query(
       "SELECT value FROM preferences WHERE account_id = $1 AND field = 'seeks'",
       [a.accountId],

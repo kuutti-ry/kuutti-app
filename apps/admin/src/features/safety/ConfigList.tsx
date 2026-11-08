@@ -6,17 +6,34 @@ import {
   ConfigList as ConfigPage,
   type ConfigValue,
 } from "@kuutti/schema";
+import { ChevronRight, RefreshCw } from "lucide-react";
 import { type FormEvent, useEffect, useId, useRef, useState } from "react";
+import { Alert } from "../../components/ui/alert.tsx";
+import { Button } from "../../components/ui/button.tsx";
+import { Card, CardContent } from "../../components/ui/card.tsx";
+import { Input } from "../../components/ui/input.tsx";
+import { Label } from "../../components/ui/label.tsx";
+import { Loading } from "../../components/ui/spinner.tsx";
+import {
+  Table,
+  TableBody,
+  TableCaption,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "../../components/ui/table.tsx";
+import { Textarea } from "../../components/ui/textarea.tsx";
 import { api } from "../../lib/api.ts";
 import { ScreenTitle } from "../../lib/screen-title.tsx";
 import { useList } from "../../lib/use-list.ts";
 
 // The tunables (#304, #305, admins only): every key of matching_config with
 // its value and history, and a change with a reason, shown old and new before
-// it is sent. The API holds the value to the shape its key declared (the
-// first version); the form reads the input the same way, so a typo is caught
-// here first. A saved change updates its key in place: nothing else on the
-// screen moves. English only (TD-17); plain HTML, keyboard first.
+// it is sent. The API holds the value to the shape its key declared (its
+// newest version no admin wrote); the form reads the input the same way, so a
+// typo is caught here first. A saved change updates its key in place: nothing else on the
+// screen moves. English only (TD-17); keyboard first.
 
 /** A value as the panel shows it: an object as JSON, the rest as it is. */
 const shown = (value: ConfigValue) =>
@@ -89,57 +106,53 @@ export function ConfigList() {
   });
 
   return (
-    <section aria-labelledby="config-title">
-      <div className="row">
+    <section aria-labelledby="config-title" className="space-y-6">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <ScreenTitle id="config-title">{t("admin.config.title")}</ScreenTitle>
-        <button type="button" onClick={() => void reload()}>
+        <Button variant="outline" onClick={() => void reload()}>
+          <RefreshCw aria-hidden="true" />
           {t("admin.config.refresh")}
-        </button>
+        </Button>
       </div>
-      <p aria-live="polite">
-        {saved
-          ? t("admin.config.changed", {
-              key: saved.key,
-              value: shown(saved.value),
-              version: String(saved.version),
-            })
-          : ""}
+      <p aria-live="polite" className="font-medium empty:sr-only">
+        {saved ? t("admin.config.changed", { key: saved.key, value: shown(saved.value) }) : ""}
       </p>
-      {state.kind === "loading" && <p aria-busy="true">{t("admin.config.loading")}</p>}
-      {state.kind === "error" && <p role="alert">{t("admin.config.error")}</p>}
+      {state.kind === "loading" && <Loading>{t("load.loading")}</Loading>}
+      {state.kind === "error" && <Alert>{t("admin.loadFailed")}</Alert>}
       {state.kind === "ready" && (
-        <>
-          <p>{t("admin.config.total", { total: state.total })}</p>
-          <ul className="queue">
-            {state.items.map((item) => (
-              <Tunable
-                key={item.key}
-                item={item}
-                onChanged={(change) => {
-                  setSaved(change);
-                  update((items) =>
-                    items.map((i) => (i.key === change.key ? withChange(i, change) : i)),
-                  );
-                }}
-              />
-            ))}
-          </ul>
-        </>
+        <ul className="grid gap-3">
+          {state.items.map((item) => (
+            <Tunable
+              key={item.key}
+              item={item}
+              onOpen={() => setSaved(null)}
+              onChanged={(change) => {
+                setSaved(change);
+                update((items) =>
+                  items.map((i) => (i.key === change.key ? withChange(i, change) : i)),
+                );
+              }}
+            />
+          ))}
+        </ul>
       )}
     </section>
   );
 }
 
 type Step =
-  | { kind: "editing"; error?: "invalid" | "config_shape" | "config_conflict" | "failed" }
+  | { kind: "editing"; error?: "invalid" | "config_conflict" | "failed" }
   | { kind: "confirming"; value: ConfigValue }
   | { kind: "saving"; value: ConfigValue };
 
 function Tunable({
   item,
+  onOpen,
   onChanged,
 }: {
   item: ConfigKey;
+  /** The confirm step opens: the line of the last save clears, so the next one is heard. */
+  onOpen: () => void;
   onChanged: (change: ConfigChange) => void;
 }) {
   const { t, locale } = useT();
@@ -148,8 +161,8 @@ function Tunable({
   const [reason, setReason] = useState("");
   const [step, setStep] = useState<Step>({ kind: "editing" });
   const object = typeof item.value === "object";
-  // The shape the key declared: its first version, the migration's (the history is newest first).
-  const declared = item.versions.at(-1)?.value ?? item.value;
+  // The shape the key declared: its newest version no admin wrote, a migration's (the history is newest first).
+  const declared = item.versions.find((version) => version.reason === null)?.value ?? item.value;
   const whole = typeof declared === "number" && Number.isInteger(declared);
 
   // The focus follows the step: to the confirm sentence when it appears, back
@@ -169,6 +182,7 @@ function Tunable({
     event.preventDefault();
     const value = parseAs(declared, input);
     if (value === null) return setStep({ kind: "editing", error: "invalid" });
+    onOpen();
     setStep({ kind: "confirming", value });
   };
 
@@ -186,7 +200,8 @@ function Tunable({
       const code = (answer?.error as { error?: { code?: string } } | undefined)?.error?.code;
       return setStep({
         kind: "editing",
-        error: code === "config_shape" || code === "config_conflict" ? code : "failed",
+        // The API's refusal of a shape says what the form's own check does: one text serves both.
+        error: code === "config_shape" ? "invalid" : code === "config_conflict" ? code : "failed",
       });
     }
     // The answer held to its contract, as the list is (rules/admin.md).
@@ -199,103 +214,120 @@ function Tunable({
 
   const errorText = {
     invalid: t("admin.config.invalid"),
-    config_shape: t("admin.config.shape"),
     config_conflict: t("admin.config.conflict"),
     failed: t("admin.config.failed"),
   } as const;
 
   return (
-    <li className="item tunable">
-      <details>
-        <summary>
-          <code>{item.key}</code>{" "}
-          {t("admin.config.current", { version: String(item.version), value: shown(item.value) })}
-        </summary>
-        <table>
-          <caption>{t("admin.config.history")}</caption>
-          <thead>
-            <tr>
-              <th scope="col">{t("admin.config.col.version")}</th>
-              <th scope="col">{t("admin.config.col.value")}</th>
-              <th scope="col">{t("admin.config.col.from")}</th>
-              <th scope="col">{t("admin.config.col.by")}</th>
-              <th scope="col">{t("admin.config.col.why")}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {item.versions.map((v) => (
-              <tr key={v.version}>
-                <td>{v.version}</td>
-                <td>
-                  <code>{shown(v.value)}</code>
-                </td>
-                <td>{formatDateTime(locale, new Date(v.validFrom))}</td>
-                <td>{v.createdBy}</td>
-                <td>{v.reason ?? t("admin.config.noReason")}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        {step.kind === "confirming" || step.kind === "saving" ? (
-          <div className="actions">
-            <p ref={prompt} tabIndex={-1}>
-              {t("admin.config.confirm", {
-                key: item.key,
-                from: shown(item.value),
-                to: shown(step.value),
-              })}
-            </p>
-            <button
-              type="button"
-              disabled={step.kind === "saving"}
-              onClick={() => void send(step.value)}
-            >
-              {t("admin.config.apply")}
-            </button>
-            <button
-              type="button"
-              disabled={step.kind === "saving"}
-              onClick={() => setStep({ kind: "editing" })}
-            >
-              {t("admin.config.cancel")}
-            </button>
-          </div>
-        ) : (
-          <form className="actions" onSubmit={review}>
-            {step.kind === "editing" && step.error && <p role="alert">{errorText[step.error]}</p>}
-            <label htmlFor={`${ids}-value`}>{t("admin.config.newValue")}</label>
-            {object ? (
-              <textarea
-                id={`${ids}-value`}
-                ref={field}
-                value={input}
-                rows={3}
-                onChange={(event) => setInput(event.target.value)}
-              />
-            ) : (
-              <input
-                id={`${ids}-value`}
-                ref={field}
-                inputMode={whole ? "numeric" : typeof item.value === "number" ? "decimal" : "text"}
-                value={input}
-                onChange={(event) => setInput(event.target.value)}
-              />
-            )}
-            <label htmlFor={`${ids}-reason`}>{t("admin.config.reason")}</label>
-            <textarea
-              id={`${ids}-reason`}
-              required
-              maxLength={500}
-              rows={2}
-              value={reason}
-              onChange={(event) => setReason(event.target.value)}
+    <li>
+      <Card className="py-0 sm:py-0">
+        <details className="group">
+          {/* The browser's marker is hidden; the chevron turns as the disclosure opens. */}
+          <summary className="flex min-h-11 cursor-pointer list-none flex-wrap items-center gap-x-2 gap-y-1 px-4 py-3 sm:px-5 [&::-webkit-details-marker]:hidden">
+            <ChevronRight
+              aria-hidden="true"
+              className="size-4 shrink-0 transition-transform group-open:rotate-90 motion-reduce:transition-none"
             />
-            <button type="submit" disabled={reason.trim() === ""}>
-              {t("admin.config.save")}
-            </button>
-          </form>
-        )}
-      </details>
+            <code className="font-semibold">{item.key}</code>{" "}
+            <span className="text-muted-foreground wrap-anywhere">{shown(item.value)}</span>
+          </summary>
+          <CardContent className="gap-4 border-t pt-4 pb-4 sm:pb-5">
+            <Table className="[&_td]:align-top">
+              {/* The columns and the falling version numbers say it; a screen reader keeps the name. */}
+              <TableCaption className="sr-only">{t("admin.config.history")}</TableCaption>
+              <TableHeader>
+                <TableRow>
+                  <TableHead scope="col">{t("admin.config.col.version")}</TableHead>
+                  <TableHead scope="col">{t("admin.config.col.value")}</TableHead>
+                  <TableHead scope="col">{t("admin.config.col.from")}</TableHead>
+                  <TableHead scope="col">{t("admin.config.col.by")}</TableHead>
+                  <TableHead scope="col">{t("admin.config.col.why")}</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {item.versions.map((v) => (
+                  <TableRow key={v.version}>
+                    <TableCell className="tabular-nums">{v.version}</TableCell>
+                    <TableCell className="whitespace-normal">
+                      <code>{shown(v.value)}</code>
+                    </TableCell>
+                    <TableCell>{formatDateTime(locale, new Date(v.validFrom))}</TableCell>
+                    <TableCell>{v.createdBy}</TableCell>
+                    <TableCell className="min-w-48 whitespace-normal">{v.reason ?? "–"}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+            {step.kind === "confirming" || step.kind === "saving" ? (
+              <div className="grid gap-3 rounded-lg border bg-muted p-3">
+                <p ref={prompt} tabIndex={-1} className="font-medium wrap-anywhere">
+                  {t("admin.config.confirm", {
+                    key: item.key,
+                    from: shown(item.value),
+                    to: shown(step.value),
+                  })}
+                </p>
+                <div className="flex flex-wrap gap-3">
+                  <Button disabled={step.kind === "saving"} onClick={() => void send(step.value)}>
+                    {t("admin.config.apply")}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    disabled={step.kind === "saving"}
+                    onClick={() => setStep({ kind: "editing" })}
+                  >
+                    {t("admin.config.cancel")}
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <form className="grid max-w-2xl gap-4" onSubmit={review}>
+                {step.kind === "editing" && step.error && <Alert>{errorText[step.error]}</Alert>}
+                <div className="grid gap-2">
+                  <Label htmlFor={`${ids}-value`}>{t("admin.config.newValue")}</Label>
+                  {object ? (
+                    <Textarea
+                      id={`${ids}-value`}
+                      ref={field}
+                      value={input}
+                      rows={3}
+                      className="font-mono"
+                      onChange={(event) => setInput(event.target.value)}
+                    />
+                  ) : (
+                    <Input
+                      id={`${ids}-value`}
+                      ref={field}
+                      inputMode={
+                        whole ? "numeric" : typeof item.value === "number" ? "decimal" : "text"
+                      }
+                      value={input}
+                      className="font-mono sm:max-w-xs"
+                      onChange={(event) => setInput(event.target.value)}
+                    />
+                  )}
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor={`${ids}-reason`}>{t("admin.config.reason")}</Label>
+                  <Textarea
+                    id={`${ids}-reason`}
+                    required
+                    maxLength={500}
+                    rows={2}
+                    value={reason}
+                    onChange={(event) => setReason(event.target.value)}
+                  />
+                </div>
+                <div>
+                  <Button type="submit" disabled={reason.trim() === ""}>
+                    {t("admin.config.save")}
+                  </Button>
+                </div>
+              </form>
+            )}
+          </CardContent>
+        </details>
+      </Card>
     </li>
   );
 }

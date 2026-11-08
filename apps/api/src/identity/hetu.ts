@@ -24,10 +24,14 @@ export class InvalidHetuError extends Error {
 }
 
 export function deriveIdentity(hetu: string, key: Buffer, at: Date): DerivedIdentity {
-  const parsed = parseHetu(hetu);
-  if (parsed === null) throw new InvalidHetuError(hetuProblem(hetu) ?? "format");
+  // One canonical string for the parse and the HMAC: trimmed, as the kit's
+  // parser reads it, and upper-cased, so the same person is the same key however
+  // the code was written (#636, the audit of #609).
+  const code = hetu.trim().toUpperCase();
+  const parsed = parseHetu(code);
+  if (parsed === null) throw new InvalidHetuError(hetuProblem(code) ?? "format");
   return {
-    hetuHmac: createHmac("sha256", key).update(hetu.toUpperCase()).digest("hex"),
+    hetuHmac: createHmac("sha256", key).update(code).digest("hex"),
     birthYear: parsed.birthYear,
     birthMonth: parsed.birthMonth,
     adult: isAdult(parsed, at),

@@ -104,16 +104,16 @@ export async function countPhotos(db: Queryable, accountId: string): Promise<num
 /**
  * Appends after the account's last photo, and only while the account has
  * fewer than `maxPhotos` and is still live: both are the statement's HAVING
- * clause, so a request that arrives after another's commit (an upload that
- * outlived the erasure of its account, #51) is refused here even when it
- * passed the guard and the service's count. Null means the statement refused. Two
+ * clause. The live-account check holds a share lock until the insert commits:
+ * erasure (TD-7, #51) either deletes this photo afterwards or commits first
+ * and makes the check refuse the tombstone. A foreign key alone only checks
+ * that the retained account row exists. Null means the statement refused. Two
  * inserts that run at the same instant can still both see the old count
  * under READ COMMITTED and both succeed, one photo over the cap and on the
  * same position; the order stays stable through created_at and is renumbered
  * by the next reorder or delete, and the extra photo is the account's own to
- * remove. Closing that window needs a transaction with an advisory lock per
- * account, which the query seam does not offer yet; it is a product cap, not a
- * security boundary, so that waits for the seam.
+ * remove. Serialising those inserts would need an exclusive per-account lock;
+ * this shared lock preserves the existing product-cap behaviour.
  */
 export async function insertPhoto(
   db: Queryable,
@@ -131,7 +131,7 @@ export async function insertPhoto(
      SELECT $1, $2, $3, $4, $5, coalesce(max(position) + 1, 0) FROM photo
      WHERE account_id = $1 AND purpose = 'profile'
      HAVING count(*) < $6
-        AND EXISTS (SELECT 1 FROM account WHERE id = $1 AND state <> 'deleted')
+        AND EXISTS (SELECT 1 FROM account WHERE id = $1 AND state <> 'deleted' FOR SHARE)
      RETURNING ${COLUMNS}`,
     [input.accountId, input.key, input.blurhash, input.width, input.height, input.maxPhotos],
   );
@@ -154,23 +154,27 @@ export async function isAccountLive(db: Queryable, accountId: string): Promise<b
  * shadow-banned, suspended, banned or paused owner's photos stop for everyone
  * at once and come back with a lift (ADR-024 §6, the card's rule of ADR-009
  * §6). A block between the two, set by either, stops them for good (#84,
- * ADR-030 §2): `blocked_between` of migration 0051. Both branches carry the
- * caller's account id (rule 6); there is no third.
+ * ADR-030 §2): `blocked_between`. Another account's photo
+ * never in the full size (ADR-056 §3): the app asks for it only of one's own,
+ * so it is what a script would take that the app does not. Both branches
+ * carry the caller's account id (rule 6); there is no third.
  */
 export async function findVisiblePhoto(
   db: Queryable,
   accountId: string,
   photoId: string,
+  variant: PhotoVariant,
 ): Promise<PhotoRow | null> {
   const { rows } = await db.query<Row>(
     `SELECT ${COLUMNS} FROM photo
      WHERE id = $2 AND purpose = 'profile'
        AND (account_id = $1
-         OR (state = 'approved'
+         OR ($3::photo_variant <> 'full'
+           AND state = 'approved'
            AND EXISTS (SELECT 1 FROM card_shown WHERE account_id = $1 AND photo_id = photo.id)
            AND EXISTS (SELECT 1 FROM account owner WHERE owner.id = photo.account_id AND owner.state = 'active')
            AND NOT blocked_between($1, photo.account_id)))`,
-    [accountId, photoId],
+    [accountId, photoId, variant],
   );
   return rows[0] ? photoFrom(rows[0]) : null;
 }
@@ -225,6 +229,29 @@ export async function wasShown(
     [input.viewerAccountId, input.subjectAccountId],
   );
   return rows[0]?.shown === true;
+}
+
+/**
+ * One profile photo of the subject's that the viewer was shown (#476): the
+ * one a card's report may point at, as `wasShown` proves the card. Locked
+ * until the caller's transaction ends (`FOR KEY SHARE`, what a row naming it
+ * takes anyway), so it cannot go between this and the caller's write; the
+ * caller holds the subject's account first, in erasure's order. False for a
+ * photo of somebody else, one never shown, and one gone; scoped by the viewer
+ * (rule 6). Whatever its state now: one taken down since was still shown.
+ */
+export async function holdShownPhoto(
+  db: Queryable,
+  input: { viewerAccountId: string; subjectAccountId: string; photoId: string },
+): Promise<boolean> {
+  const { rows } = await db.query(
+    `SELECT 1 FROM photo p
+     WHERE p.id = $3 AND p.account_id = $2 AND p.purpose = 'profile'
+       AND EXISTS (SELECT 1 FROM card_shown s WHERE s.photo_id = p.id AND s.account_id = $1)
+     FOR KEY SHARE OF p`,
+    [input.viewerAccountId, input.subjectAccountId, input.photoId],
+  );
+  return rows.length > 0;
 }
 
 export type CardServed = {
@@ -283,7 +310,7 @@ export async function recordCardServed(
                       WHERE s.account_id = $1 AND s.at >= $5),
             used AS (SELECT count(*)::int AS n FROM today),
             allowed AS (SELECT EXISTS (SELECT 1 FROM live) AND NOT (SELECT b FROM blocked)
-                            AND ((SELECT n FROM used) < $6
+                            AND ($6 = 0 OR (SELECT n FROM used) < $6
                               OR EXISTS (SELECT 1 FROM today WHERE subject = $2)) AS ok),
             ins AS (INSERT INTO card_shown (account_id, photo_id, at)
                     SELECT $1, unnest($3::uuid[]), $4 FROM allowed WHERE allowed.ok
@@ -406,14 +433,16 @@ export async function insertPhotoAccess(
       blocked: boolean;
       inserted: number;
     }>(
-      `WITH live AS (SELECT 1 FROM account WHERE id = $1 AND state <> 'deleted'),
+      // Serialize the live check and child write against account erasure (TD-7).
+      `WITH live AS (SELECT 1 FROM account WHERE id = $1 AND state <> 'deleted' FOR SHARE),
           used AS (SELECT count(*)::int AS n FROM photo_access
                    WHERE account_id = $1 AND variant = $3 AND at >= $5 AND purpose = 'profile'),
           blocked AS (SELECT EXISTS (SELECT 1 FROM photo
                                      WHERE id = $2 AND account_id <> $1
                                        AND blocked_between($1, account_id)) AS b),
           ins AS (INSERT INTO photo_access (account_id, photo_id, variant, at)
-                  SELECT $1, $2, $3, $4 FROM live, used, blocked WHERE used.n < $6 AND NOT blocked.b
+                  SELECT $1, $2, $3, $4 FROM live, used, blocked
+                   WHERE ($6 = 0 OR used.n < $6) AND NOT blocked.b
                   RETURNING 1 AS one)
      SELECT EXISTS (SELECT 1 FROM live) AS live,
             (SELECT n FROM used) AS used,
@@ -438,7 +467,9 @@ export async function insertPhotoAccess(
  * `since`, and the earliest. A thumb never counts (the chat list asks one
  * per conversation on every read), nor the person's own photos, nor a
  * conversation's (purpose message); a photo deleted since drops out with
- * its owner unknown. Scoped by the account (rule 6).
+ * its owner unknown. Another's full size is refused since ADR-056 §3, so a
+ * full-size row of someone else's photo is one issued before it. Scoped by
+ * the account (rule 6).
  */
 export async function othersPhotoFetchesSince(
   db: Queryable,
@@ -496,7 +527,7 @@ export async function logPhotoAccess(
 ): Promise<void> {
   await db.query(
     `INSERT INTO photo_access (account_id, photo_id, variant, at, purpose)
-     SELECT $1, $2, $3, $4, $5 FROM account WHERE id = $1 AND state <> 'deleted'`,
+     SELECT $1, $2, $3, $4, $5 FROM account WHERE id = $1 AND state <> 'deleted' FOR SHARE`,
     [input.accountId, input.photoId, input.variant, input.at, input.purpose ?? "profile"],
   );
 }
@@ -512,7 +543,8 @@ export async function logMessagePhotoAccess(
   input: { accountId: string; photoIds: readonly string[]; at: Date; since: Date },
 ): Promise<{ live: boolean; written: number }> {
   const { rows } = await db.query<{ live: boolean; written: number }>(
-    `WITH live AS (SELECT 1 FROM account WHERE id = $1 AND state <> 'deleted'),
+    // The live result authorizes URL delivery even when deduplication writes no row.
+    `WITH live AS (SELECT 1 FROM account WHERE id = $1 AND state <> 'deleted' FOR SHARE),
           ins AS (
             INSERT INTO photo_access (account_id, photo_id, variant, at, purpose)
             SELECT $1, u.photo_id, v.variant, $3, 'message'
@@ -775,15 +807,17 @@ export async function findPhotoForStaff(
 
 /**
  * A person's decision: the photo's state and reason, and the review row with
- * who decided and when. Only a queued photo takes one (null otherwise, and
- * nothing is written), so an earlier decision is never overwritten. A queued
- * photo is rejected only here and by the night's limit below (#376); nothing
- * is ever deleted by a machine (rules/api.md).
+ * who decided and when. Keyed on the state the decision is for, `from`: a
+ * queued photo, or an approved one a person takes down (#477); null when the
+ * photo is not in it, and nothing is written, so a decision made meanwhile is
+ * never overwritten. A queued photo is rejected only here and by the night's
+ * limit below (#376); nothing is ever deleted by a machine (rules/api.md).
  */
 export async function decidePhoto(
   db: Queryable,
   input: {
     photoId: string;
+    from: "queued" | "approved";
     decision: "approved" | "rejected";
     reason: PhotoRejectionReason | null;
     decidedBy: string;
@@ -792,8 +826,8 @@ export async function decidePhoto(
 ): Promise<PhotoRow | null> {
   const { rows } = await db.query<Row>(
     `UPDATE photo SET state = $2, rejection_reason = $3
-     WHERE id = $1 AND purpose = 'profile' AND state = 'queued' RETURNING ${COLUMNS}`,
-    [input.photoId, input.decision, input.reason],
+     WHERE id = $1 AND purpose = 'profile' AND state = $4 RETURNING ${COLUMNS}`,
+    [input.photoId, input.decision, input.reason, input.from],
   );
   const row = rows[0];
   if (!row) return null;
@@ -813,8 +847,8 @@ export async function decidePhoto(
  * photo waiting since before `waitingSince`, from its upload or its owner's
  * appeal as the queue counts it (`listQueue`), is rejected as not_reviewed
  * with no appeal, and its review row says so with nobody named. Keyed on the
- * queued state like `decidePhoto`, so of a moderator and the night deciding
- * at once exactly one writes. The ids it moved.
+ * queued state, as `decidePhoto` is on a queued photo, so of a moderator and
+ * the night deciding at once exactly one writes. The ids it moved.
  */
 export async function rejectQueuedSince(
   db: Queryable,

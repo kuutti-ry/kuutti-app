@@ -205,7 +205,7 @@ describe("Dialog", () => {
   it("keeps the focus on a press beside the box, which goes no further", () => {
     const { dialog } = open();
     const backdrop = dialog.parentElement as HTMLElement;
-    expect(backdrop).toHaveClass("backdrop");
+    expect(backdrop).toHaveAttribute("data-slot", "dialog-overlay");
     // fireEvent answers false when the default, moving the focus, was prevented.
     expect(fireEvent.mouseDown(backdrop)).toBe(false);
     // A press inside the box is the browser's to handle.

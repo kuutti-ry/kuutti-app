@@ -15,7 +15,7 @@ import {
 } from "@kuutti/schema";
 import { AppError } from "../lib/errors.ts";
 import type { Logger } from "../lib/logger.ts";
-import { matchingConfigNumber } from "../lib/matching-config.ts";
+import { matchingConfigNumber, matchingConfigNumbers } from "../lib/matching-config.ts";
 import { issueConversationThumb, type MediaDeps } from "../media/index.ts";
 import { ageInYears } from "../profile/index.ts";
 import { track } from "../research/index.ts";
@@ -144,6 +144,7 @@ async function summaryOf(
         }
       : null,
     unread: row.unread,
+    yourTurn: state === "open" && row.yourTurn,
   };
 }
 
@@ -160,9 +161,14 @@ export async function listConversations(
   const rows = await repo.listConversations(deps.db, accountId, CONVERSATIONS_MAX * 2);
   const summaries: ConversationSummary[] = [];
   for (const row of rows) summaries.push(await summaryOf(deps, accountId, row, options.thumbs));
+  const { your_turn_limit: limit, your_turn_warning: warning } = await matchingConfigNumbers(
+    deps.db,
+    ["your_turn_limit", "your_turn_warning"],
+  );
   return {
     open: summaries.filter((s) => s.state === "open").slice(0, CONVERSATIONS_MAX),
     archived: summaries.filter((s) => s.state !== "open").slice(0, CONVERSATIONS_MAX),
+    yourTurn: { waiting: summaries.filter((s) => s.yourTurn).length, limit, warning },
   };
 }
 
@@ -243,10 +249,10 @@ export async function closeConversationsOf(
 
 /**
  * An unmatch (#351): the caller ends the conversation for both, blocking
- * nobody. Both read it as ended, "This conversation has ended", with nothing
+ * nobody. Both read it as ended, "Conversation ended", with nothing
  * saying who ended it or how, and both may still report it for
  * report_after_close_days. What either shared there ends with it (#103); the
- * other person is told by the socket (#349, migration 0055's trigger). One
+ * other person is told by the socket (#349, the `conversation_notify` trigger). One
  * already closed stays as it is, and the answer is the same. Not the caller's,
  * or hidden from them as its blocker: 404.
  */
@@ -294,38 +300,61 @@ export async function closeConversationsBetween(
 }
 
 /**
- * The conversation between two people, in any state, or null: the match's
- * record (ADR-031), so two people who have one are matched, or were (#100).
+ * The conversation between two people that a like can be part of, or null: the
+ * match's record (ADR-031, #100). One they can write in, or one opened since
+ * `since`, the day's start, so that a like which made a match today stays final
+ * after the conversation ended (ADR-038 §3); an older one, ended or archived, is
+ * no match of this like's, and they may match again (ADR-062 §7). The newest, in
+ * the one case of two: a match that ended and the one after it.
  */
 export async function conversationBetween(
   db: Queryable,
   accountId: string,
   otherAccountId: string,
+  since: Date,
 ): Promise<string | null> {
   const { rows } = await db.query<{ id: string }>(
-    `SELECT mine.conversation_id AS id
+    `SELECT c.id
        FROM conversation_participant mine
        JOIN conversation_participant other
          ON other.conversation_id = mine.conversation_id AND other.side <> mine.side
+       JOIN conversation c ON c.id = mine.conversation_id
       WHERE mine.account_id = $1 AND other.account_id = $2
-      ORDER BY mine.joined_at LIMIT 1`,
-    [accountId, otherAccountId],
+        AND ((c.closed_at IS NULL AND c.archived_at IS NULL) OR c.opened_at >= $3)
+      ORDER BY c.opened_at DESC LIMIT 1`,
+    [accountId, otherAccountId, since],
   );
   return rows[0]?.id ?? null;
 }
+
+/** How many conversations wait on the person's answer (ADR-062 §5): handed to the like path by app.ts. */
+export const conversationsOnTurn = repo.countOnTurn;
 
 /**
  * The match's conversation (#100, ADR-031 §2, ADR-038), written in the
  * statement of the second like and inside its transaction, the earlier liker
  * on side a. The caller holds the pair's lock and has asked that none
- * stands between the two. No trigger announces it (migration 0055 notifies
- * on updates and messages, not on this insert): the other person sees it at
- * their next read of the list (ADR-038 §1, Open 1).
+ * stands between the two that they can write in. A second match is a new
+ * conversation: one left archived between them is closed first, so a pair has
+ * one they can write in (ADR-062 §7). No trigger announces it (they notify on
+ * updates and messages, not on this insert): the other person sees
+ * it at their next read of the list (ADR-038 §1, Open 1).
  */
 export async function openConversation(
   tx: Queryable,
   input: { first: string; second: string; at: Date },
 ): Promise<string> {
+  // shortcut: a send takes no pair's lock, so one that brings the archived
+  // conversation back between the caller's read and this close lands in a closed
+  // conversation, beside the new one. It takes a message and a second match in
+  // the same moment, 90 days on; locking the pair's unclosed conversations before
+  // that read would close it.
+  await repo.closeConversationsOf(tx, {
+    accountIds: [input.second],
+    how: "unmatch",
+    at: input.at,
+    counterpartId: input.first,
+  });
   const { rows } = await tx.query<{ id: string }>(
     "INSERT INTO conversation (opened_at) VALUES ($1) RETURNING id",
     [input.at],
@@ -354,6 +383,21 @@ export async function lockReportedConversation(
 }
 
 /**
+ * Whether a line of the conversation is a photo the other person sent that
+ * the caller may read (#476, ADR-030 §13): the one a report may point at.
+ * Through the caller's own participant row and every rule of the reads, so a
+ * line a shadow ban withholds from the caller, the caller's own, a text and a
+ * photo gone are all no, and the answer never tells which.
+ */
+export async function counterpartPhotoAt(
+  db: Queryable,
+  input: { accountId: string; conversationId: string; seq: number },
+): Promise<boolean> {
+  const found = await repo.messageFor(db, input);
+  return found !== null && found.row.side !== found.side && found.row.photo !== null;
+}
+
+/**
  * A report's frozen copy of a conversation the caller locked (#351, ADR-030
  * §12): every message of both people, into the report the caller just wrote,
  * inside its transaction; the words never pass through the process. The
@@ -369,7 +413,7 @@ export async function copyConversation(
 export type ConversationErasure = {
   /** The participant rows whose link was cut. */
   conversations: number;
-  /** Messages the counterpart never received (an open shadow ban), deleted. */
+  /** Messages the counterpart never received (a shadow ban that withholds them), deleted. */
   withheld: number;
   /** Conversations nobody is linked to any more, the other person erased before, deleted. */
   emptied: number;
@@ -379,8 +423,9 @@ export type ConversationErasure = {
 
 /**
  * The chat's part of an erasure (ADR-007 §4, ADR-031 §5), inside its
- * transaction: what the counterpart never received goes while the shadow ban
- * that withheld it is still on record; the person's open and archived
+ * transaction: what the counterpart never received goes, and the read mark
+ * goes back to what they saw, while the shadow ban that withheld them is
+ * still on record (#470); the person's open and archived
  * conversations close, which ends what either person shared there (#103);
  * the person's stored contacts go; the person's link is cut. The messages
  * stay for the counterpart, under "Deleted user" (TD-7), and the shares as
@@ -392,6 +437,7 @@ export async function eraseConversationsOf(
   accountId: string,
 ): Promise<ConversationErasure> {
   const withheld = await repo.deleteWithheldMessagesOf(deps.db, accountId);
+  await repo.holdWithheldMarksOf(deps.db, accountId);
   // A photo a report's copy holds outlives the erasure (#351), but not in the
   // conversation: it reads "Photo removed" there, as any of the person's photos.
   await repo.detachPhotosOf(deps.db, accountId);

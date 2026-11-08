@@ -27,24 +27,27 @@ name: A photo with a caption reaches the other person, small in the thread and f
       PERSONA: Antti Nurmi
 - openLink: kuutti://chats
 - extendedWaitUntil:
-    visible: "Open|Avoimet|Öppna"
+    visible: "Your turn: \\d+|Their turn|Sinun vuorosi: \\d+|Toisen vuoro|Din tur: \\d+|Den andras tur"
     timeout: 15000
 - waitForAnimationToEnd
 - tapOn:
     text: "Ville, \\d+, .*"
-    below: "Open|Avoimet|Öppna"
+    below: "Your turn: \\d+|Their turn|Sinun vuorosi: \\d+|Toisen vuoro|Din tur: \\d+|Den andras tur"
 # The field is its label, and on iOS its placeholder after it.
 - extendedWaitUntil:
     visible: "(Message|Viesti|Meddelande)( .*)?"
     timeout: 15000
 - waitForAnimationToEnd
-# Add photo beside the field opens the library; the picture is attached above the field.
+# Add photo beside the field opens the library; the picture is attached above
+# the field, and it and Remove photo say so: the words are said aloud, not drawn
+# (#581). The picture is hidden from Maestro as from a screen reader (README).
 - runFlow:
     file: ../common/pick-photo.yaml
     env:
       BUTTON: "Add photo|Lisää kuva|Lägg till foto"
       INDEX: 0
-      COUNT: "Photo attached\\. The words in the field go under it\\.|Kuva liitetty\\. Kentän sanat tulevat sen alle\\.|Foto bifogat\\. Orden i fältet hamnar under det\\."
+      LANDED: "Remove photo|Poista kuva|Ta bort foto"
+- assertNotVisible: "Photo attached\\.|Kuva liitetty\\.|Foto bifogat\\."
 # The keyboard stays up (README): Send is above it, on the composer.
 - tapOn: "(Message|Viesti|Meddelande)( .*)?"
 - inputText: ${output.caption}

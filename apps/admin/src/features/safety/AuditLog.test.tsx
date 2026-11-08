@@ -117,19 +117,19 @@ describe("the audit log", () => {
     const second = deferred<Response>();
     fetchMock([answer(({ before }) => (before ? second.promise : json(numbered(1, "c1"))))]);
     show();
-    expect(screen.getByText("Loading the audit log…")).toHaveAttribute("aria-busy", "true");
+    expect(screen.getByText("Loading…")).toHaveAttribute("aria-busy", "true");
     expect(screen.queryByRole("table")).toBeNull();
     expect(screen.queryByRole("button", { name: "Older" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Newer" })).toBeNull();
     await shown();
-    expect(screen.queryByText("Loading the audit log…")).toBeNull();
+    expect(screen.queryByText("Loading…")).toBeNull();
 
     fireEvent.click(older());
-    expect(await screen.findByText("Loading the audit log…")).toBeInTheDocument();
+    expect(await screen.findByText("Loading…")).toBeInTheDocument();
     expect(screen.queryByRole("table")).toBeNull();
     second.resolve(json(numbered(2, null)));
     expect(await screen.findByText("page 2")).toBeInTheDocument();
-    expect(screen.queryByText("Loading the audit log…")).toBeNull();
+    expect(screen.queryByText("Loading…")).toBeNull();
   });
 
   it("asks for the first page with no filter and the admin's token", async () => {
@@ -141,7 +141,7 @@ describe("the audit log", () => {
     expect(calls[0]?.headers.get("authorization")).toBe(`Bearer ${"t".repeat(43)}`);
   });
 
-  it("shows every row in a table under its caption, newest first as the API gave them", async () => {
+  it("shows every row in a table named by the screen's heading, in the order the API gave them (#581)", async () => {
     fetchMock([
       pages({
         "": page([
@@ -160,8 +160,9 @@ describe("the audit log", () => {
       }),
     ]);
     show();
-    const table = await shown();
-    expect(within(table).getByText("Newest first, fifty a page")).toBeInTheDocument();
+    const table = await screen.findByRole("table", { name: "Audit log" });
+    // The dates and the Newer and Older buttons say the order and the page.
+    expect(table.querySelector("caption")).toBeNull();
     expect(
       within(table)
         .getAllByRole("columnheader")
@@ -233,7 +234,8 @@ describe("the audit log", () => {
     expect(cells?.slice(0, 4)).toEqual([
       formatDateTime("en", new Date(AT)),
       "The automatic rules",
-      "Not a person",
+      // They hold no role, and never held one: the panel's dash (#581).
+      "–",
       "sanction.apply",
     ]);
     expect(within(table).queryByText(ACTOR)).toBeNull();
@@ -297,9 +299,9 @@ describe("the audit log", () => {
     show();
     await screen.findByText("Nothing matches.");
     fill({
-      "Who (identity id)": `  ${ACTOR} `,
-      "What (such as sanction.apply)": " sanction.apply ",
-      "Subject type (account, photo, feedback, config)": " account",
+      Who: `  ${ACTOR} `,
+      What: " sanction.apply ",
+      "Subject type": " account",
       "Subject id": `${ACCOUNT}  `,
       // Summer time begins on the one and ends on the other in Finland.
       "From day": "2026-03-29",
@@ -321,9 +323,9 @@ describe("the audit log", () => {
     show();
     await screen.findByText("Nothing matches.");
     fill({
-      "Who (identity id)": "   ",
-      "What (such as sanction.apply)": " ",
-      "Subject type (account, photo, feedback, config)": "  ",
+      Who: "   ",
+      What: " ",
+      "Subject type": "  ",
       "Subject id": "",
       // The last day of a month: the end is the first of the next.
       "To day": "2026-02-28",
@@ -340,7 +342,7 @@ describe("the audit log", () => {
     const calls = fetchMock([answer(() => json(page([])))]);
     show();
     await screen.findByText("Nothing matches.");
-    fireEvent.change(filters().getByLabelText("What (such as sanction.apply)"), {
+    fireEvent.change(filters().getByLabelText("What"), {
       target: { value: "photo.view" },
     });
     expect(sent(calls)).toHaveLength(1);
@@ -388,7 +390,7 @@ describe("the audit log", () => {
     await waitFor(() => expect(sent(calls)).toHaveLength(2));
     await waitFor(() => expect(newer()).toBeEnabled());
 
-    fill({ "What (such as sanction.apply)": "photo.view" });
+    fill({ What: "photo.view" });
     expect(await screen.findByText("page 4")).toBeInTheDocument();
     expect(newer()).toBeDisabled();
     fireEvent.click(older());
@@ -409,14 +411,14 @@ describe("the audit log", () => {
     ]);
     show();
     await shown();
-    fill({ "Who (identity id)": "someone" });
+    fill({ Who: "someone" });
     expect(await screen.findByRole("alert")).toHaveTextContent(
-      "A filter is not valid: an id is a uuid, an action is two words with a dot.",
+      "A filter is not valid: an id is a uuid, an action is two words with a dot, a subject type is one word in small letters.",
     );
     expect(screen.queryByRole("table")).toBeNull();
     expect(screen.queryByRole("button", { name: "Older" })).toBeNull();
 
-    fill({ "Who (identity id)": ACTOR });
+    fill({ Who: ACTOR });
     expect(await shown()).toBeInTheDocument();
     expect(screen.queryByRole("alert")).toBeNull();
   });
@@ -425,7 +427,7 @@ describe("the audit log", () => {
     const first = deferred<Response>();
     fetchMock([answer(({ action }) => (action ? json(numbered(2, null)) : first.promise))]);
     show();
-    fill({ "What (such as sanction.apply)": "photo.view" });
+    fill({ What: "photo.view" });
     expect(await screen.findByText("page 2")).toBeInTheDocument();
     await act(async () => first.resolve(json(numbered(1, "c1"))));
     expect(screen.queryByText("page 1")).toBeNull();
@@ -442,9 +444,7 @@ describe("the audit log", () => {
       }),
     ]);
     show();
-    expect(await screen.findByRole("alert")).toHaveTextContent(
-      "The audit log could not be loaded.",
-    );
+    expect(await screen.findByRole("alert")).toHaveTextContent(/^Could not be loaded\.$/);
     fireEvent.click(filters().getByRole("button", { name: "Show" }));
     expect(await screen.findByText("page 2")).toBeInTheDocument();
     expect(screen.queryByRole("alert")).toBeNull();
@@ -458,12 +458,64 @@ describe("the audit log", () => {
     show();
     await screen.findByText("page 1");
     expect(document.body).toHaveFocus();
+    // The focus moves in the commit that shows the rows: nothing to wait for once they are there.
     fireEvent.click(older());
     const second = await screen.findByText("page 2");
-    await waitFor(() => expect(second.closest(".page")).toHaveFocus());
+    expect(second.closest('[tabindex="-1"]')).toHaveFocus();
     fireEvent.click(newer());
     const first = await screen.findByText("page 1");
-    await waitFor(() => expect(first.closest(".page")).toHaveFocus());
+    expect(first.closest('[tabindex="-1"]')).toHaveFocus();
+  });
+
+  it("gives the focus to the page Older reached when it is pressed the moment the first page shows", async () => {
+    fetchMock([pages({ "": numbered(1, "c1"), c1: numbered(2, null) })]);
+    // Older is pressed in the microtasks right after the commit that shows the
+    // first page, before React runs that commit's effects in a task of their own.
+    const watch = new MutationObserver(() => {
+      if (!screen.queryByText("page 1")) return;
+      watch.disconnect();
+      fireEvent.click(older());
+    });
+    watch.observe(document.body, { childList: true, subtree: true });
+    show();
+    const second = await screen.findByText("page 2");
+    expect(second.closest('[tabindex="-1"]')).toHaveFocus();
+  });
+
+  it("leaves the focus on Show after an Older whose page failed: a search is no paging (#458)", async () => {
+    fetchMock([
+      answer(({ before }) => (before ? failure("internal_error", 500) : json(numbered(1, "c1")))),
+    ]);
+    show();
+    await screen.findByText("page 1");
+    fireEvent.click(older());
+    expect(await screen.findByRole("alert")).toHaveTextContent(/^Could not be loaded\.$/);
+    // fireEvent.click does not move the focus as a person's click does.
+    const apply = filters().getByRole("button", { name: "Show" });
+    apply.focus();
+    fireEvent.click(apply);
+    const first = await screen.findByText("page 1");
+    expect(apply).toHaveFocus();
+    expect(first.closest('[tabindex="-1"]')).not.toHaveFocus();
+  });
+
+  it("leaves the focus on Show when it is pressed while Older's page loads (#458)", async () => {
+    const second = deferred<Response>();
+    fetchMock([answer(({ before }) => (before ? second.promise : json(numbered(1, "c1"))))]);
+    show();
+    await screen.findByText("page 1");
+    fireEvent.click(older());
+    expect(await screen.findByText("Loading…")).toBeInTheDocument();
+    const apply = filters().getByRole("button", { name: "Show" });
+    apply.focus();
+    fireEvent.click(apply);
+    const first = await screen.findByText("page 1");
+    expect(apply).toHaveFocus();
+    expect(first.closest('[tabindex="-1"]')).not.toHaveFocus();
+    // Older's answer, arriving last, is superseded and moves nothing.
+    await act(async () => second.resolve(json(numbered(2, null))));
+    expect(screen.queryByText("page 2")).toBeNull();
+    expect(apply).toHaveFocus();
   });
 
   it("leaves a superseded request's failure unsaid: the rows of the filters applied stay", async () => {
@@ -471,7 +523,7 @@ describe("the audit log", () => {
     const logged = vi.spyOn(console, "error").mockImplementation(() => undefined);
     fetchMock([answer(({ action }) => (action ? json(numbered(2, null)) : first.promise))]);
     show();
-    fill({ "What (such as sanction.apply)": "photo.view" });
+    fill({ What: "photo.view" });
     expect(await screen.findByText("page 2")).toBeInTheDocument();
     await act(async () => first.reject(new TypeError("Failed to fetch")));
     expect(screen.getByText("page 2")).toBeInTheDocument();
@@ -488,9 +540,7 @@ describe("the audit log", () => {
     show();
     await shown();
     fireEvent.click(older());
-    expect(await screen.findByRole("alert")).toHaveTextContent(
-      "The audit log could not be loaded.",
-    );
+    expect(await screen.findByRole("alert")).toHaveTextContent(/^Could not be loaded\.$/);
   });
 
   it("says the log could not be loaded when the API fails, cannot be reached, or answers outside the contract", async () => {
@@ -514,11 +564,9 @@ describe("the audit log", () => {
       const logged = vi.spyOn(console, "error").mockImplementation(() => undefined);
       fetchMock([answer(respond)]);
       show();
-      expect(await screen.findByRole("alert")).toHaveTextContent(
-        "The audit log could not be loaded.",
-      );
+      expect(await screen.findByRole("alert")).toHaveTextContent(/^Could not be loaded\.$/);
       expect(screen.queryByText(/A filter is not valid/)).toBeNull();
-      expect(screen.queryByText("Loading the audit log…")).toBeNull();
+      expect(screen.queryByText("Loading…")).toBeNull();
       expect(screen.queryByRole("table")).toBeNull();
       if (logs) expect(logged).toHaveBeenCalledWith("audit load failed", expect.anything());
       else expect(logged).not.toHaveBeenCalled();
@@ -531,7 +579,7 @@ describe("the audit log", () => {
   it("leaves a refused log to the shell: no rows, no paging and no failure of its own (#302)", async () => {
     const calls = fetchMock([answer(() => failure("admin_forbidden", 403))]);
     show();
-    await waitFor(() => expect(screen.queryByText("Loading the audit log…")).toBeNull());
+    await waitFor(() => expect(screen.queryByText("Loading…")).toBeNull());
     expect(screen.getByRole("heading", { level: 2, name: "Audit log" })).toBeInTheDocument();
     expect(screen.queryByRole("alert")).toBeNull();
     expect(screen.queryByRole("table")).toBeNull();
@@ -545,12 +593,7 @@ describe("the audit log", () => {
     fetchMock([pages({ "": page([]) })]);
     show();
     await screen.findByText("Nothing matches.");
-    for (const label of [
-      "Who (identity id)",
-      "What (such as sanction.apply)",
-      "Subject type (account, photo, feedback, config)",
-      "Subject id",
-    ]) {
+    for (const label of ["Who", "What", "Subject type", "Subject id"]) {
       expect(filters().getByLabelText(label)).toHaveAttribute("type", "text");
       expect(filters().getByLabelText(label)).toHaveValue("");
     }

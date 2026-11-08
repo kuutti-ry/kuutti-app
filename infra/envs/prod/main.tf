@@ -43,12 +43,18 @@ module "compute" {
   dokploy_version            = var.dokploy_version
   domain                     = var.domain
   manage_session_preferences = false
+
+  # No swap: a page can hold a hetu or the HMAC key, and the file outlives the
+  # process that let go of it (rule 1). The t4g.medium's 4 GB stands in for it
+  # (ADR-046).
+  swap_mb = 0
 }
 
 # Photos (#48, ADR-005): the media bucket and the CloudFront distribution that
-# fronts both the bucket (/media/*, signed URLs) and the API. Dormant until the
-# cutover (variable media_enabled); the public half of the signing key pair is
-# committed next to this file, the private half is in SSM only.
+# fronts the bucket (/media/*, signed URLs), the API and the rest of what the
+# box serves on 443 (#198). Dormant until the cutover (variable media_enabled);
+# the public half of the signing key pair is committed next to this file, the
+# private half is in SSM only.
 module "media" {
   count  = var.media_enabled ? 1 : 0
   source = "../../modules/media"
@@ -66,6 +72,52 @@ module "media" {
   signing_public_key_pem = fileexists("${path.module}/cloudfront-signing-key.pub.pem") ? file("${path.module}/cloudfront-signing-key.pub.pem") : ""
   # Rotation (ADR-005): cloudfront-signing-key.<anything>.pub.pem files are trusted too.
   additional_signing_public_keys_pem = [for f in fileset(path.module, "cloudfront-signing-key.*.pub.pem") : file("${path.module}/${f}")]
+
+  # Dokploy's control plane behind the same distribution, so that the box can
+  # admit CloudFront alone from the cutover on (ADR-005 §7, #198).
+  extra_aliases = ["dokploy.${var.domain}"]
+
+  # The proof of Kuutti's distribution, from the store below (ADR-066).
+  origin_proof_store_arn = aws_cloudfront_key_value_store.origin_proof.arn
+
+  # The edge's rate rule (#41, ADR-067), from the cutover on: two thousand
+  # requests from one address in any five minutes, signed photos and the two
+  # sign-in starts not counted (edge.json), the maintainer's number of
+  # 2026-11-06, as on staging.
+  edge_requests_per_five_minutes = 2000
+}
+
+# The store of the proof of Kuutti's distribution (ADR-066): its one key,
+# origin-secret, is written by hand with the CLI, never by OpenTofu, so the
+# value is in no state (ADR-001), and the plan role may not read it
+# (bootstrap, ci_plan_deny_data). The environment's rather than module
+# media's, so it exists, and can be filled, before the cutover.
+resource "aws_cloudfront_key_value_store" "origin_proof" {
+  name    = "kuutti-prod-origin-proof"
+  comment = "origin-secret, written by hand: the value the distribution sends as x-kuutti-origin (ADR-066)"
+
+  lifecycle {
+    # A new store is an empty one, and the plan would not say the value is
+    # lost: in cloudfront mode every request would then go unproven.
+    prevent_destroy = true
+  }
+}
+
+# The moderation panel's host (#313, ADR-025): a bucket and a distribution of
+# its own on the host admin-app-url and cors-allowed-origins name
+# (variables.tf). admin-deploy.yml writes the build to its root; production has
+# no previews, so nothing writes under pr-*.
+module "admin" {
+  source = "../../modules/admin"
+  providers = {
+    aws           = aws
+    aws.us_east_1 = aws.us_east_1
+  }
+
+  environment = local.environment
+  zone_id     = data.aws_route53_zone.main.zone_id
+  admin_fqdn  = "admin.${var.domain}"
+  api_origin  = "https://api.${var.domain}"
 }
 
 # Alarms, the alert topic and the saved log queries (#11).
@@ -82,6 +134,12 @@ module "observability" {
   db_identifier  = module.data.identifier
   log_group_name = module.compute.log_group_name
   alert_email    = var.alert_email
+  # Telia bills each identification (#471). The S package holds 200 a month,
+  # so a day of 50 spends a quarter of it; the maintainer resets this to twice a
+  # normal day once production has one.
+  bank_identifications_per_day = 50
+  # The edge's refusals mail too (#41, ADR-067), from the cutover on.
+  edge_web_acl_metric_name = var.media_enabled ? module.media[0].edge_web_acl_metric_name : null
 }
 
 # Non-secret configuration the API reads at boot from /kuutti/prod/ (TD-19).
@@ -101,12 +159,16 @@ resource "aws_ssm_parameter" "config" {
     # Mail through SES (#385, ADR-043 §4): the instance role sends as noreply@
     # through the domain's identity in infra/bootstrap.
     "mail" = "ses"
+    # No "push" here yet (#102, ADR-055 §8): production sends once its
+    # SecureString expo-access-token exists and EAS's enhanced push security is
+    # on, so nobody holding a stored token can send to its people's phones.
     # The staff login's return and the panel's origin (#49): without them a
     # deployed box sends the one-time code to localhost and refuses the panel's preflight.
     "admin-app-url"        = var.admin_app_url
     "cors-allowed-origins" = var.cors_allowed_origins
-    # The rate limiter's idea of the client address (#52, F19): flips to
-    # cloudfront together with cloudfront_only_ingress, never before.
+    # The rate limiter's idea of the client address (#52, F19): cloudfront
+    # only with cloudfront_only_ingress, and only once the box can tell
+    # Kuutti's distribution from anybody's (#198, ADR-008 History).
     "trusted-proxy" = var.trusted_proxy
     }, var.media_enabled ? {
     # Photos (#48): what the API needs besides the private key, which is
@@ -133,6 +195,8 @@ resource "aws_ssm_parameter" "config" {
     # ADR-008 §5, enforced: with the origin still open to the world, a
     # cloudfront trusted proxy would let anyone forge the header the rate
     # limiter keys on. The plan fails before the parameter can say so.
+    # Necessary, not sufficient: the prefix list admits every CloudFront
+    # distribution, and any of them can send the header too (#198).
     precondition {
       condition     = var.trusted_proxy != "cloudfront" || var.cloudfront_only_ingress
       error_message = "trusted_proxy = cloudfront needs cloudfront_only_ingress = true in the same apply (ADR-008 §5)."

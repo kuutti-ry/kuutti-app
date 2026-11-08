@@ -32,15 +32,20 @@ import {
   DEMO_PERSONAS,
   DemoCommandError,
   describeTarget,
+  openPonds,
 } from "@kuutti/db/demo";
 import { hmacKeyFromHex } from "../src/identity/index.ts";
-import { countGates } from "../src/jobs/pond-gate.ts";
-import { takeSnapshot } from "../src/jobs/waitlist-snapshot.ts";
+import { takeSnapshot } from "../src/jobs/pond-counter.ts";
 import { loadConfig } from "../src/lib/config.ts";
 import { createLogger } from "../src/lib/logger.ts";
 import { createMediaDeps } from "../src/media/index.ts";
 import { DemoError } from "./demo/bank.ts";
-import { giveConversations, givePhotoMessages, giveRounds } from "./demo/histories.ts";
+import {
+  giveCastStories,
+  giveConversations,
+  givePhotoMessages,
+  giveRounds,
+} from "./demo/histories.ts";
 import { loadAssets } from "./demo/photos.ts";
 import { giveStories, viaServices } from "./demo/services.ts";
 
@@ -118,14 +123,16 @@ try {
   console.log(JSON.stringify({ msg: "demo stories: photos in conversations", ...photos }));
   // The pond has other people in it now (ADR-018: nobody on staging is
   // anybody, so the counter of #54 is counted anew, as the population does).
-  await pool.query("DELETE FROM waitlist_snapshot");
+  await pool.query("DELETE FROM pond_counter");
   const counted = await takeSnapshot({ db: pool, logger, now });
   console.log(JSON.stringify({ msg: "demo stories: counter recounted", ...counted }));
-  const gates = await countGates({ db: pool, logger, now });
-  console.log(JSON.stringify({ msg: "demo stories: gates counted", ...gates }));
-  // Iida's round for the day (#379), once the gates are counted; told before, it stays.
+  const opened = await openPonds(pool);
+  console.log(JSON.stringify({ msg: "demo stories: ponds opened", opened }));
+  // Iida's round for the day (#379), once her pond is open; told before, it stays.
   const rounds = await giveRounds({ db: pool, logger, now }, results);
   console.log(JSON.stringify({ msg: "demo stories: rounds", ...rounds }));
+  const cast = await giveCastStories(pool, results, now());
+  console.log(JSON.stringify({ msg: "demo stories: the cast's stories", ...cast }));
 } catch (error) {
   if (error instanceof DemoCommandError || error instanceof DemoError) {
     console.error(`✖ ${error.message}`);

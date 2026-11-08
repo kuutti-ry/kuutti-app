@@ -45,6 +45,7 @@ export const LOCALE_FLAGS: Readonly<Record<AnyLocale, string>> = {
   en: "🇬🇧",
   fi: "🇫🇮",
   sv: "🇦🇽",
+  "fi-x-stadi": "",
   "en-XA": "",
 };
 

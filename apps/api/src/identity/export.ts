@@ -1,4 +1,4 @@
-import type { TFunction } from "@kuutti/i18n";
+import type { Locale, TFunction } from "@kuutti/i18n";
 import type { AccountExport } from "@kuutti/schema";
 import { strToU8, zipSync } from "fflate";
 import { AppError } from "../lib/errors.ts";
@@ -41,6 +41,7 @@ export async function exportArchive(
   deps: ExportDeps,
   accountId: string,
   t: TFunction,
+  locale?: Locale,
 ): Promise<ExportArchive> {
   const at = deps.now();
   const day = dayWindow(at);
@@ -61,7 +62,7 @@ export async function exportArchive(
   let document: AccountExport;
   let files: ExportedPhotoFile[];
   try {
-    ({ document, files } = await exportAccount(deps, accountId, t));
+    ({ document, files } = await exportAccount(deps, accountId, t, locale));
   } catch (error) {
     // A store or database failure is not a copy taken: the row goes back,
     // so three bad minutes do not lock the person out until midnight.

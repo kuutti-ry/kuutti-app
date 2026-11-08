@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { type Queryable, transaction } from "@kuutti/db";
-import { type ConfigChange, type ConfigKey, ConfigValue } from "@kuutti/schema";
+import { type ConfigChange, type ConfigKey, ConfigValue, InvitationReward } from "@kuutti/schema";
 import { AppError } from "../lib/errors.ts";
 import { recordAudit } from "./audit.ts";
 
@@ -71,14 +71,15 @@ function fitsNumber(declared: number, next: number): boolean {
 }
 
 /**
- * Whether a new value keeps the shape the key's first version declared (the
- * migration's value): the same JSON type; for an object the same keys with
- * values of the same type (the photo fetch budgets); for a number its
- * wholeness and sign, since a count is compared with SQL integers and parsed
- * as one (a fraction there answers 500 for everyone). The first version and
- * not the current one, so a fraction key set to 1 can still go back to 0.6.
- * A reader parses the value it expects; a change of shape is a migration's,
- * with the code that reads it.
+ * Whether a new value keeps the shape its key declared: the same JSON type;
+ * for an object the same keys with values of the same type (the photo fetch
+ * budgets); for a number its wholeness and sign, since a count is compared
+ * with SQL integers and parsed as one (a fraction there answers 500 for
+ * everyone). What a key declares is its newest version no admin wrote and not
+ * the current one, so a fraction key set to 1 can still go back to 0.6. A
+ * reader parses the value it expects; a change of shape is a migration's, with
+ * the code that reads it, so the panel follows the migration from then on
+ * (#503).
  */
 export function sameShape(declared: unknown, next: unknown): boolean {
   if (kindOf(declared) !== kindOf(next)) return false;
@@ -91,6 +92,13 @@ export function sameShape(declared: unknown, next: unknown): boolean {
   if (keys.length !== other.length || keys.some((k, i) => k !== other[i])) return false;
   return keys.every((k) => sameShape(a[k], b[k]));
 }
+
+/**
+ * The one key whose reader holds its value to a contract of its own, whose
+ * ceilings no shape can say: past one, every read would answer 500 from the
+ * next request on (ADR-044 §4).
+ */
+const INVITATION_REWARD_KEY = "invitation_reward";
 
 /**
  * A new version of a key (#305): the audit row first, then the row with the
@@ -110,12 +118,15 @@ export async function changeConfig(
   );
   const current = latest[0];
   if (!current) throw new AppError(404, "not_found", "No such key; keys are born in migrations");
-  const { rows: first } = await db.query<{ value: unknown }>(
-    "SELECT value FROM matching_config WHERE key = $1 ORDER BY version LIMIT 1",
+  // Only an admin's row has a reason (the column's comment), so this is a migration's or the seed's.
+  const { rows: unchanged } = await db.query<{ value: unknown }>(
+    "SELECT value FROM matching_config WHERE key = $1 AND reason IS NULL ORDER BY version DESC LIMIT 1",
     [input.key],
   );
-  const declared = first[0]?.value ?? current.value;
-  if (!sameShape(declared, input.value)) {
+  const declared = unchanged[0]?.value ?? current.value;
+  const readable =
+    input.key !== INVITATION_REWARD_KEY || InvitationReward.safeParse(input.value).success;
+  if (!readable || !sameShape(declared, input.value)) {
     throw new AppError(
       400,
       "config_shape",

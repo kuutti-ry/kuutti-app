@@ -54,6 +54,16 @@ export function requestLocale(offered: readonly Locale[] = LOCALES): MiddlewareH
   };
 }
 
+/**
+ * A t() fixed to a stored language, for what is worded outside a request: a
+ * push, in the language its device registered in (ADR-055 §1). A value that is
+ * not one of ours is English.
+ */
+export function tFor(locale: string): TFunction {
+  const parsed = RequestLocale.safeParse(locale);
+  return parsed.success ? typedT(i18n, parsed.data) : fallbackT;
+}
+
 /** The request's t(), or English where the locale middleware has not run (a bare test app). */
 export function tOf<E extends Env>(c: Context<E, string>): TFunction {
   const t: unknown = c.get("t" as never);
@@ -92,18 +102,19 @@ export const ERROR_MESSAGE_KEYS = {
   media_unavailable: "errors.media_unavailable",
   photo_budget_exceeded: "errors.photo_budget_exceeded",
   card_budget_exceeded: "errors.card_budget_exceeded",
-  export_budget_exceeded: "errors.export_budget_exceeded",
-  feedback_budget_exceeded: "errors.feedback_budget_exceeded",
+  export_budget_exceeded: "errors.enough_today",
+  feedback_budget_exceeded: "errors.enough_today",
   report_budget_exceeded: "errors.report_budget_exceeded",
   report_window_closed: "errors.report_window_closed",
   round_expired: "errors.round_expired",
+  your_turn_limit: "errors.your_turn_limit",
   like_budget_exceeded: "errors.like_budget_exceeded",
   fish_budget_exceeded: "errors.fish_budget_exceeded",
   invitation_not_yet: "errors.invitation_not_yet",
   invitations_full: "errors.invitations_full",
   invitation_not_for_you: "errors.invitation_not_for_you",
   invitation_unknown: "errors.invitation_unknown",
-  invitation_tries_exceeded: "errors.invitation_tries_exceeded",
+  invitation_tries_exceeded: "errors.enough_today",
   match_made: "errors.match_made",
   already_relaxed: "errors.already_relaxed",
   relaxations_changed: "errors.relaxations_changed",
@@ -124,7 +135,7 @@ export const ERROR_MESSAGE_KEYS = {
   too_many_changes: "errors.too_many_changes",
   change_too_soon: "errors.change_too_soon",
   filter_unanswered: "errors.filter_unanswered",
-  pond_unknown: "errors.pond_unknown",
+  postal_code_unknown: "errors.postal_code_unknown",
   admin_not_allowed: "errors.admin_not_allowed",
   admin_forbidden: "errors.admin_forbidden",
 } as const satisfies Record<string, MessageKey>;

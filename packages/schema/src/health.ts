@@ -20,6 +20,16 @@ export const HealthResponse = z
     migrations: z.enum(["current", "pending"]).meta({
       description: "Committed migrations compared with the ones applied to this database.",
     }),
+    // Optional, so an app or a panel built before the two fields reads the
+    // answer as it did, and one built after reads an older API's (#198).
+    trustedProxy: z.enum(["none", "traefik", "cloudfront"]).optional().meta({
+      description:
+        "Whose word the rate limiter takes for the client address, as the process read it at boot (ADR-008 §5).",
+    }),
+    originProof: z.enum(["valid", "missing", "wrong", "unset"]).optional().meta({
+      description:
+        "Whether this request carried the proof of Kuutti's own CloudFront distribution (ADR-066): unset when the process has no secret to check it against.",
+    }),
   })
   .meta({ id: "HealthResponse" });
 

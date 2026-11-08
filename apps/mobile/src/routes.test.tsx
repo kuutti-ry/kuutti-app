@@ -19,32 +19,28 @@ import PhotosRoute from "../app/photos/index";
 // biome-ignore lint/style/noRestrictedImports: a route file, not a slice internal
 import CardPreviewRoute from "../app/profile/card";
 // biome-ignore lint/style/noRestrictedImports: a route file, not a slice internal
-import DealBreakersRoute from "../app/profile/deal-breakers";
+import DealBreakerFieldRoute from "../app/profile/deal-breakers/[field]";
+// biome-ignore lint/style/noRestrictedImports: a route file, not a slice internal
+import GenderRoute from "../app/profile/gender";
 import ProfileRoute from "../app/profile/index";
 // biome-ignore lint/style/noRestrictedImports: a route file, not a slice internal
 import LaterFieldRoute from "../app/profile/later/[field]";
 // biome-ignore lint/style/noRestrictedImports: a route file, not a slice internal
+import PlaceRoute from "../app/profile/place";
+// biome-ignore lint/style/noRestrictedImports: a route file, not a slice internal
 import ProfileSectionRoute from "../app/profile/section/[id]";
+// biome-ignore lint/style/noRestrictedImports: a route file, not a slice internal
+import SeekAgesRoute from "../app/profile/seek/ages";
+// biome-ignore lint/style/noRestrictedImports: a route file, not a slice internal
+import SeekRoute from "../app/profile/seek/index";
+// biome-ignore lint/style/noRestrictedImports: a route file, not a slice internal
+import SeekWhomRoute from "../app/profile/seek/whom";
 import RoundRoute from "../app/round";
-import AccountSettingsRoute from "../app/settings/account";
-import ConsentRoute from "../app/settings/consent/[kind]";
-import ContactsSettingsRoute from "../app/settings/contacts";
-import DecisionButtonsRoute from "../app/settings/decision-buttons";
-import DeviceRoute from "../app/settings/device";
-import EmailSettingsRoute from "../app/settings/email";
-import FeedbackRoute from "../app/settings/feedback";
 import FoundThemRoute from "../app/settings/found-them";
 import SettingsRoute from "../app/settings/index";
-import InviteSettingsRoute from "../app/settings/invite";
-import LanguageRoute from "../app/settings/language";
-import LegalRoute from "../app/settings/legal/[kind]";
 import LicensesRoute from "../app/settings/licenses";
-import PackageLicenseRoute from "../app/settings/licenses/[id]";
-import LockSettingsRoute from "../app/settings/lock";
-import NotificationsSettingsRoute from "../app/settings/notifications";
-import PhotoDescriptionsRoute from "../app/settings/photo-descriptions";
-import SourceRoute from "../app/settings/source";
-import ThemeRoute from "../app/settings/theme";
+import LicenseTextsRoute from "../app/settings/licenses/texts";
+import SupportRoute from "../app/settings/support";
 import TechRoute from "../app/tech";
 
 // The route files of app/ (rules/layout.md: routes only, thin): each renders
@@ -71,7 +67,7 @@ jest.mock("@/features/identity", () => {
     LockProvider: provider("LockProvider"),
     OnboardingScreen: probe("OnboardingScreen"),
     SignInScreen: probe("SignInScreen"),
-    SignedOutToStart: probe("SignedOutToStart"),
+    SignedOutToStart: provider("SignedOutToStart"),
     SessionProvider: provider("SessionProvider"),
   };
 });
@@ -86,6 +82,14 @@ jest.mock("@/features/chat", () => {
     ChatPhotoScreen: probe("ChatPhotoScreen"),
     ConversationScreen: probe("ConversationScreen"),
     ConversationsScreen: probe("ConversationsScreen"),
+  };
+});
+jest.mock("@/features/notifications", () => {
+  const { createElement } = require("react") as typeof import("react");
+  const { Text } = require("react-native") as typeof import("react-native");
+  return {
+    PushNotifications: (props: object) =>
+      createElement(Text, { testID: "PushNotifications" }, JSON.stringify(props)),
   };
 });
 jest.mock("@/features/home", () => {
@@ -118,11 +122,16 @@ jest.mock("@/features/profile", () => {
     createElement(Text, { testID: name }, JSON.stringify(props));
   return {
     CardPreviewScreen: probe("CardPreviewScreen"),
-    DealBreakersScreen: probe("DealBreakersScreen"),
+    DealBreakerFieldScreen: probe("DealBreakerFieldScreen"),
+    GenderScreen: probe("GenderScreen"),
     holdLinkWhileUnsaved: jest.fn((path: string) => path),
     LaterFieldScreen: probe("LaterFieldScreen"),
+    PlaceScreen: probe("PlaceScreen"),
     ProfileScreen: probe("ProfileScreen"),
     SectionScreen: probe("SectionScreen"),
+    SeekAgesScreen: probe("SeekAgesScreen"),
+    SeekScreen: probe("SeekScreen"),
+    SeekWhomScreen: probe("SeekWhomScreen"),
   };
 });
 jest.mock("@/features/settings", () => {
@@ -131,30 +140,14 @@ jest.mock("@/features/settings", () => {
   const probe = (name: string) => (props: object) =>
     createElement(Text, { testID: name }, JSON.stringify(props));
   return {
-    AccountScreen: probe("AccountScreen"),
-    ConsentScreen: probe("ConsentScreen"),
-    consentKindOf: (value: unknown) => (value === "special_category" ? value : "research"),
-    ContactsSettingsScreen: probe("ContactsSettingsScreen"),
-    NotificationsSettingsScreen: probe("NotificationsSettingsScreen"),
-    DeviceScreen: probe("DeviceScreen"),
-    EmailSettingsScreen: probe("EmailSettingsScreen"),
-    FeedbackScreen: probe("FeedbackScreen"),
     FoundThemScreen: probe("FoundThemScreen"),
-    InvitationsSettingsScreen: probe("InvitationsSettingsScreen"),
-    LanguageScreen: probe("LanguageScreen"),
-    LegalScreen: probe("LegalScreen"),
-    legalKindOf: (value: unknown) => (value === "privacy" ? value : "terms"),
     LicensesScreen: probe("LicensesScreen"),
+    LicenseTextsScreen: probe("LicenseTextsScreen"),
     LockOfferScreen: probe("LockOfferScreen"),
-    LockSettingsScreen: probe("LockSettingsScreen"),
-    PackageLicenseScreen: probe("PackageLicenseScreen"),
-    DecisionButtonsScreen: probe("DecisionButtonsScreen"),
-    PhotoDescriptionsScreen: probe("PhotoDescriptionsScreen"),
     ScreenReaderHint: probe("ScreenReaderHint"),
     SettingsScreen: probe("SettingsScreen"),
-    SourceScreen: probe("SourceScreen"),
+    SupportScreen: probe("SupportScreen"),
     TechConfigScreen: probe("TechConfigScreen"),
-    ThemeScreen: probe("ThemeScreen"),
   };
 });
 
@@ -194,24 +187,17 @@ describe("the screens without params", () => {
     ["/photos", PhotosRoute, "PhotosScreen"],
     ["/profile", ProfileRoute, "ProfileScreen"],
     ["/profile/card", CardPreviewRoute, "CardPreviewScreen"],
-    ["/profile/deal-breakers", DealBreakersRoute, "DealBreakersScreen"],
+    ["/profile/gender", GenderRoute, "GenderScreen"],
+    ["/profile/place", PlaceRoute, "PlaceScreen"],
+    ["/profile/seek", SeekRoute, "SeekScreen"],
+    ["/profile/seek/ages", SeekAgesRoute, "SeekAgesScreen"],
+    ["/profile/seek/whom", SeekWhomRoute, "SeekWhomScreen"],
     ["/round", RoundRoute, "RoundScreen"],
     ["/settings", SettingsRoute, "SettingsScreen"],
-    ["/settings/account", AccountSettingsRoute, "AccountScreen"],
-    ["/settings/contacts", ContactsSettingsRoute, "ContactsSettingsScreen"],
-    ["/settings/notifications", NotificationsSettingsRoute, "NotificationsSettingsScreen"],
-    ["/settings/device", DeviceRoute, "DeviceScreen"],
-    ["/settings/email", EmailSettingsRoute, "EmailSettingsScreen"],
-    ["/settings/feedback", FeedbackRoute, "FeedbackScreen"],
     ["/settings/found-them", FoundThemRoute, "FoundThemScreen"],
-    ["/settings/invite", InviteSettingsRoute, "InvitationsSettingsScreen"],
-    ["/settings/language", LanguageRoute, "LanguageScreen"],
     ["/settings/licenses", LicensesRoute, "LicensesScreen"],
-    ["/settings/lock", LockSettingsRoute, "LockSettingsScreen"],
-    ["/settings/source", SourceRoute, "SourceScreen"],
-    ["/settings/theme", ThemeRoute, "ThemeScreen"],
-    ["/settings/photo-descriptions", PhotoDescriptionsRoute, "PhotoDescriptionsScreen"],
-    ["/settings/decision-buttons", DecisionButtonsRoute, "DecisionButtonsScreen"],
+    ["/settings/licenses/texts", LicenseTextsRoute, "LicenseTextsScreen"],
+    ["/settings/support", SupportRoute, "SupportScreen"],
     ["/tech", TechRoute, "TechConfigScreen"],
   ] as const)("%s renders its screen, with nothing to hand it", async (_path, Route, name) => {
     await render(<Route />);
@@ -223,26 +209,14 @@ describe("the screens without params", () => {
     expect(propsOf("Stack.Screen")).toEqual({ options: { gestureEnabled: false } });
   });
 
+  it("/onboarding turns it off too: its photos step holds the same grid, and nothing under it is a step to go back to (#581)", async () => {
+    await render(<OnboardingRoute />);
+    expect(propsOf("Stack.Screen")).toEqual({ options: { gestureEnabled: false } });
+  });
+
   it("sends a link it has no screen for to the start", async () => {
     await render(<NotFoundRoute />);
     expect(screen.getByTestId("Redirect").props.children).toBe("/");
-  });
-});
-
-describe("a package's licence, /settings/licenses/[id] (#416)", () => {
-  it.each([
-    ["its place", { id: "7" }, 7],
-    ["the first", { id: "0" }, 0],
-    ["the first of a repeated place", { id: ["3", "4"] }, 3],
-    ["no place, without one", {}, -1],
-    ["no place for a word", { id: "zod" }, -1],
-    ["no place for a fraction", { id: "1.5" }, -1],
-    ["no place for a negative", { id: "-2" }, -1],
-    ["no place for an empty one", { id: "" }, -1],
-  ] as const)("hands the screen %s", async (_what, given, index) => {
-    params(given);
-    await render(<PackageLicenseRoute />);
-    expect(propsOf("PackageLicenseScreen")).toEqual({ index });
   });
 });
 
@@ -274,18 +248,45 @@ describe("a conversation's photo full size, /chats/photo/[messageId] (#350)", ()
       conversation: CONVERSATION,
       seq: 4,
       blurhash: "LEHV6n",
+      report: null,
     });
   });
 
   it("takes the first of a param that came twice", async () => {
-    params({ messageId: [MESSAGE, "b"], conversation: [CONVERSATION, "d"], seq: ["7", "8"] });
+    params({
+      messageId: [MESSAGE, "b"],
+      conversation: [CONVERSATION, "d"],
+      seq: ["7", "8"],
+      report: ["ended", "open"],
+    });
     await render(<ChatPhotoRoute />);
     expect(propsOf("ChatPhotoScreen")).toEqual({
       messageId: MESSAGE,
       conversation: CONVERSATION,
       seq: 7,
       blurhash: "",
+      report: "ended",
     });
+  });
+
+  it.each(["open", "ended"])(
+    "hands the screen whether the conversation takes a report, %s (#476)",
+    async (report) => {
+      params({ messageId: MESSAGE, conversation: CONVERSATION, seq: "4", report });
+      await render(<ChatPhotoRoute />);
+      expect(propsOf("ChatPhotoScreen")).toMatchObject({ seq: 4, report });
+    },
+  );
+
+  it.each<Record<string, string | readonly string[]>>([
+    { report: "" },
+    { report: "yes" },
+    { report: "OPEN" },
+    { report: ["closed", "open"] },
+  ])("hands no report for %j, which no bubble sends (#476)", async (value) => {
+    params({ messageId: MESSAGE, conversation: CONVERSATION, seq: "4", ...value });
+    await render(<ChatPhotoRoute />);
+    expect(propsOf("ChatPhotoScreen")).toMatchObject({ seq: 4, report: null });
   });
 
   it.each<Record<string, string | readonly string[]>>([
@@ -303,6 +304,7 @@ describe("a conversation's photo full size, /chats/photo/[messageId] (#350)", ()
       conversation: "",
       seq: 0,
       blurhash: "",
+      report: null,
     });
   });
 });
@@ -326,23 +328,8 @@ describe("the bank login's return, /auth", () => {
 });
 
 describe("the photos screen, /photos", () => {
-  it("hands the onboarding's step as numbers when it opened the screen (#146)", async () => {
-    params({ step: "8", total: "10" });
-    await render(<PhotosRoute />);
-    expect(propsOf("PhotosScreen")).toEqual({ progress: { step: 8, total: 10 } });
-  });
-
-  it.each<Record<string, string | readonly string[]>>([
-    { step: "8" },
-    { total: "10" },
-    { step: "", total: "10" },
-    { step: "eight", total: "10" },
-    { step: "11", total: "10" },
-    { step: "0", total: "10" },
-    { step: "1.5", total: "10" },
-    { step: ["8", "9"], total: "10" },
-  ])("hands no step for %j, which no onboarding sends", async (value) => {
-    params(value);
+  it("hands no step, whatever a link says: onboarding's photos step is its own screen now (#581)", async () => {
+    params({ step: "7", total: "8" });
     await render(<PhotosRoute />);
     expect(propsOf("PhotosScreen")).toEqual({});
   });
@@ -417,51 +404,43 @@ describe("the profile's routes with a param", () => {
   it("hands a later field's key to its screen, and an empty one when the link has none", async () => {
     params({ field: "smoking" });
     const view = await render(<LaterFieldRoute />);
-    expect(propsOf("LaterFieldScreen")).toEqual({ field: "smoking" });
+    expect(propsOf("LaterFieldScreen")).toEqual({ field: "smoking", once: false });
     await view.unmount();
     params({});
     await render(<LaterFieldRoute />);
-    expect(propsOf("LaterFieldScreen")).toEqual({ field: "" });
+    expect(propsOf("LaterFieldScreen")).toEqual({ field: "", once: false });
   });
 
-  it.each([
-    [
-      "a consent's kind",
-      ConsentRoute,
-      "ConsentScreen",
-      { kind: "special_category" },
-      "special_category",
-    ],
-    [
-      "a consent's kind, the first of two",
-      ConsentRoute,
-      "ConsentScreen",
-      { kind: ["special_category", "research"] },
-      "special_category",
-    ],
-    ["the research consent for a link naming none", ConsentRoute, "ConsentScreen", {}, "research"],
-    [
-      "a legal text's kind, the first of two",
-      LegalRoute,
-      "LegalScreen",
-      { kind: ["privacy", "terms"] },
-      "privacy",
-    ],
-    ["the terms for a link naming no text", LegalRoute, "LegalScreen", {}, "terms"],
-  ] as const)("hands %s to its screen (#287)", async (_what, Route, name, given, kind) => {
-    params({ ...given });
-    await render(<Route />);
-    expect(propsOf(name)).toEqual({ kind });
+  it("hands a deal-breaker's route its field, none to an address without one (#551)", async () => {
+    params({ field: "smoking" });
+    const view = await render(<DealBreakerFieldRoute />);
+    expect(propsOf("DealBreakerFieldScreen")).toEqual({ field: "smoking" });
+    await view.unmount();
+    params({});
+    await render(<DealBreakerFieldRoute />);
+    expect(propsOf("DealBreakerFieldScreen")).toEqual({ field: "" });
+  });
+
+  it("says a later field was opened for its one answer when the link says once (#542)", async () => {
+    params({ field: "smoking", once: "1" });
+    await render(<LaterFieldRoute />);
+    expect(propsOf("LaterFieldScreen")).toEqual({ field: "smoking", once: true });
   });
 
   it("hands a section's id to its screen, and an empty one when the link has none", async () => {
     params({ id: "basics" });
     const view = await render(<ProfileSectionRoute />);
-    expect(propsOf("SectionScreen")).toEqual({ section: "basics" });
+    expect(propsOf("SectionScreen")).toEqual({ section: "basics", once: false });
     await view.unmount();
     params({});
     await render(<ProfileSectionRoute />);
-    expect(propsOf("SectionScreen")).toEqual({ section: "" });
+    expect(propsOf("SectionScreen")).toEqual({ section: "", once: false });
+  });
+
+  it("says a section was opened for its one answer when the link says once (#542)", async () => {
+    params({ id: "relationship", once: "1" });
+    await render(<ProfileSectionRoute />);
+    expect(propsOf("SectionScreen")).toEqual({ section: "relationship", once: true });
   });
 });
 
@@ -473,12 +452,16 @@ describe("the root layout", () => {
     );
   });
 
-  it("puts the stack without headers under the providers, with the signed-out watcher and the screen-reader hint beside it", async () => {
+  it("puts the stack without headers inside session navigation, with the push and the screen-reader hint beside it", async () => {
     await render(<RootLayout />);
     expect(propsOf("Stack")).toEqual({
       screenOptions: { headerShown: false, contentStyle: { backgroundColor: "transparent" } },
     });
     expect(screen.getByTestId("SignedOutToStart")).toBeTruthy();
+    let holder = screen.getByTestId("Stack").parent;
+    while (holder && holder.props.testID !== "SignedOutToStart") holder = holder.parent;
+    expect(holder?.props.testID).toBe("SignedOutToStart");
+    expect(screen.getByTestId("PushNotifications")).toBeTruthy();
     expect(screen.getByTestId("ScreenReaderHint")).toBeTruthy();
   });
 
@@ -494,7 +477,8 @@ describe("the root layout", () => {
       return names;
     };
     const around = ["ChatLiveProvider", "LockProvider", "SessionProvider"];
-    for (const inside of ["Stack", "SignedOutToStart", "ScreenReaderHint"]) {
+    // The push under the lock too: a tapped push opens its screen beneath it (#102).
+    for (const inside of ["Stack", "SignedOutToStart", "PushNotifications", "ScreenReaderHint"]) {
       expect([inside, providersAround(inside)]).toEqual([inside, around]);
     }
   });

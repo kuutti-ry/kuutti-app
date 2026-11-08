@@ -1,8 +1,15 @@
-import { ErrorResponse, Notices, NotificationChoices, type NotificationKind } from "@kuutti/schema";
+import {
+  ErrorResponse,
+  Notices,
+  NotificationChoices,
+  type NotificationKind,
+  type PushTokenRequest,
+} from "@kuutti/schema";
 import { ApiError, api } from "@/lib/api";
 
-// The notification choices and the notices as the app calls them (#176,
-// ADR-032), through the typed client; the zod contracts guard the runtime.
+// The notification choices, the notices and this phone's push token as the
+// app calls them (#176, ADR-032; #102, ADR-055), through the typed client;
+// the zod contracts guard the runtime.
 
 function failed(response: Response, error: unknown, what: string): ApiError {
   const parsed = ErrorResponse.safeParse(error);
@@ -43,4 +50,17 @@ export async function fetchNotices(): Promise<Notices> {
 export async function markNoticeRead(id: string): Promise<void> {
   const { error, response } = await api.POST("/notices/{id}/read", { params: { path: { id } } });
   if (!response.ok) throw failed(response, error, "notice");
+}
+
+/**
+ * This phone's push token for the caller's session (ADR-055 §2). The API
+ * words the pushes in the request's language, so it is named here: the app's
+ * own, which the person may have chosen over the phone's.
+ */
+export async function savePushToken(body: PushTokenRequest, locale: string): Promise<void> {
+  const { error, response } = await api.PUT("/push-token", {
+    body,
+    headers: { "accept-language": locale },
+  });
+  if (!response.ok) throw failed(response, error, "push token");
 }

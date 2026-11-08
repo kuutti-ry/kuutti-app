@@ -4,6 +4,7 @@ import {
   type Completeness,
   cardFields,
   type ProfileCard,
+  type ProfileDocument,
   type ProfileFields,
 } from "@kuutti/schema";
 import { AppError } from "../lib/errors.ts";
@@ -16,7 +17,7 @@ import {
   recordCardServed,
   secondsUntil,
 } from "../media/index.ts";
-import { findPondOfAccount } from "../pond/index.ts";
+import { homeRules, homeSummary, shownPlace } from "../pond/index.ts";
 import { completeness } from "./completeness.ts";
 import * as repo from "./repo.ts";
 
@@ -46,9 +47,10 @@ export type CardDeps = {
 
 /**
  * What both the viewer and the subject answered (#150): the hobbies and
- * languages the card marks "you too". Computed at build time from the two
- * documents, never stored, never a count or a score (the matching
- * document's invariant 6); nothing for the owner's own preview.
+ * languages the card marks as shared (#644). Computed at build time from the
+ * viewer's document and what the subject's card shows, so a hidden answer is
+ * never told this way (#515); never stored, never a count or a score (the
+ * matching document's invariant 6); nothing for the owner's own preview.
  */
 export function sharedAnswers(
   viewer: ProfileFields | null,
@@ -63,9 +65,18 @@ export function sharedAnswers(
   return { hobbies: both("hobbies"), languages: both("languages") };
 }
 
-/** The card's fields: the info and hard ones (ADR-019 §2), less the field of study when the person hides it (#150). */
-export function fieldsOnCard(fields: ProfileFields): ProfileFields {
+/**
+ * The card's fields: the info and hard ones (ADR-019 §2), less what the person
+ * hides: the answers they keep off it (#515) and the field of study under
+ * "hide me from my field" (#150). The one reader of the hidden set: nothing
+ * in matching asks it, so a hidden answer counts as a shown one does.
+ */
+export function fieldsOnCard({
+  fields,
+  hiddenFields,
+}: Pick<ProfileDocument, "fields" | "hiddenFields">): ProfileFields {
   const out: Record<string, unknown> = { ...cardFields(fields) };
+  for (const key of hiddenFields) delete out[key];
   if (fields.hideFromField === true) delete out.field;
   return out as ProfileFields;
 }
@@ -126,9 +137,9 @@ export async function buildCard(
   if (!own && (subject.state !== "active" || subject.blocked)) {
     throw new AppError(404, "not_found", "No such card");
   }
-  const [photos, pond, viewer] = await Promise.all([
+  const [photos, rules, viewer] = await Promise.all([
     listApprovedPhotos(deps.db, subject.accountId),
-    findPondOfAccount(deps.db, subject.accountId),
+    homeRules(deps.db),
     // The viewer's own answers, for what both answered; the owner previews without.
     own ? null : repo.findProfile(deps.db, input.viewerAccountId),
   ]);
@@ -178,6 +189,9 @@ export async function buildCard(
       "card served",
     );
   }
+  const onCard = fieldsOnCard(subject.profile);
+  // A name and never digits (ADR-061 §3). No band here: a band is the round's entry's (§5).
+  const home = homeSummary(subject.homePlace, subject.homeShowsArea, rules);
   const cardPhotos: CardPhoto[] = photos.map((p) => ({
     id: p.id,
     blurhash: p.blurhash,
@@ -192,14 +206,14 @@ export async function buildCard(
       displayName: subject.profile.displayName,
       age: { years: ageInYears(subject.birthYear, subject.birthMonth, at), verifiedByBank: true },
       gender: subject.gender,
-      pond,
+      place: home && shownPlace(home),
       photos: cardPhotos,
       // What is there to be seen and what both sides matched on; a soft value or a setting stays on the profile (ADR-019 §2).
-      fields: fieldsOnCard(subject.profile.fields),
+      fields: onCard,
       bio: subject.profile.bio,
       bioPreset: subject.profile.bioPreset,
       prompts: subject.profile.prompts,
-      shared: sharedAnswers(viewer?.fields ?? null, subject.profile.fields),
+      shared: sharedAnswers(viewer?.fields ?? null, onCard),
     },
     completeness: done,
   };

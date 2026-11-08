@@ -11,28 +11,30 @@ type GuardedRoute = { key: string; path: string; guards: string[]; roles: string
 /**
  * Every handler route with the guards that run before it. Registration order
  * is execution order: a guard counts only when it was registered on the
- * handler's exact path before the handler. Middleware is what takes (c, next);
- * everything else, on any method or pattern, is a route.
+ * handler's exact path before the handler, for every method (`use`) or for the
+ * handler's own. Middleware is what takes (c, next); everything else, on any
+ * method or pattern, is a route.
  */
 function guardedRoutes(app: ReturnType<typeof createApp>): GuardedRoute[] {
-  const guards: { name: string; path: string; index: number; roles: string[] }[] = [];
-  const routes: { key: string; path: string; index: number }[] = [];
+  const guards: { name: string; method: string; path: string; index: number; roles: string[] }[] =
+    [];
+  const routes: { key: string; method: string; path: string; index: number }[] = [];
   app.routes.forEach(({ method, path, handler }, index) => {
     // The product guard or the staff guard (#49).
     if (handler.name === "requireSession" || handler.name === "requireAdmin") {
       const { roles } = handler as { roles?: readonly string[] };
-      guards.push({ name: handler.name, path, index, roles: [...(roles ?? [])] });
+      guards.push({ name: handler.name, method, path, index, roles: [...(roles ?? [])] });
       return;
     }
     if (handler.length === 2) return;
-    routes.push({ key: `${method} ${path}`, path, index });
+    routes.push({ key: `${method} ${path}`, method, path, index });
   });
-  return routes.map(({ key, path, index }) => ({
-    key,
-    path,
-    guards: guards.filter((g) => g.path === path && g.index < index).map((g) => g.name),
-    roles: guards.filter((g) => g.path === path && g.index < index).map((g) => g.roles),
-  }));
+  return routes.map(({ key, method, path, index }) => {
+    const before = guards.filter(
+      (g) => g.path === path && g.index < index && (g.method === "ALL" || g.method === method),
+    );
+    return { key, path, guards: before.map((g) => g.name), roles: before.map((g) => g.roles) };
+  });
 }
 
 /** The staff routes that a product session could pass: no staff guard before them (#49). */
@@ -41,6 +43,112 @@ const adminRoutesWithoutStaffGuard = (routes: GuardedRoute[]) =>
     .filter(({ key, path }) => path.startsWith("/admin/") && !PUBLIC_ROUTES.has(key))
     .filter(({ guards }) => !guards.includes("requireAdmin"))
     .map(({ key }) => key);
+
+const STAFF = ["moderator", "admin", "researcher"];
+const MODERATORS = ["moderator", "admin"];
+const ADMINS = ["admin"];
+
+/**
+ * Who may call each staff route: the roles of the staff guard registered
+ * before it, never a check inside the handler (ADR-006 §5, ADR-024 §3). The
+ * guard is what refuses, whatever the panel shows (rules/admin.md). Grouped by
+ * the decision that set them.
+ */
+const STAFF_ROLES: { what: string; roles: string[]; keys: string[] }[] = [
+  {
+    what: "a staff session's own two routes, who is signed in and signing out, to every staff role, the researcher's too (#49)",
+    roles: STAFF,
+    keys: ["GET /admin/whoami", "POST /admin/auth/logout"],
+  },
+  {
+    what: "the photo queue, a photo's card and its decision to moderators and admins (#49)",
+    roles: MODERATORS,
+    keys: [
+      "GET /admin/photos/queue",
+      "GET /admin/photos/:id/card",
+      "POST /admin/photos/:id/decision",
+    ],
+  },
+  {
+    what: "the feedback and its handling to moderators and admins (#171, ADR-023 §6)",
+    roles: MODERATORS,
+    keys: ["GET /admin/feedback", "POST /admin/feedback/:id/handled"],
+  },
+  {
+    what: "the front page and a person's page to moderators and admins (#303, #306)",
+    roles: MODERATORS,
+    keys: ["GET /admin/overview", "GET /admin/accounts/:id"],
+  },
+  {
+    what: "a ban, its lift and its review to the admin role (#307, ADR-024 §3)",
+    roles: ADMINS,
+    keys: [
+      "POST /admin/accounts/:id/bans",
+      "POST /admin/bans/:id/lift",
+      "POST /admin/bans/:id/review",
+    ],
+  },
+  {
+    what: "a person's sanctions read, and the other sanctions, to moderators and admins (#307, ADR-024 §3)",
+    roles: MODERATORS,
+    keys: [
+      "GET /admin/accounts/:id/sanctions",
+      "POST /admin/accounts/:id/sanctions",
+      "POST /admin/sanctions/:id/lift",
+      "POST /admin/sanctions/:id/review",
+    ],
+  },
+  {
+    what: "the report queue, a report opened, its copy's photos, the photo a card's report points at and its decision to moderators and admins (#311, #312, #476)",
+    roles: MODERATORS,
+    keys: [
+      "GET /admin/reports",
+      "GET /admin/reports/:id",
+      "GET /admin/reports/:id/copy/:seq/photo",
+      "GET /admin/reports/:id/photo",
+      "POST /admin/reports/:id/decision",
+    ],
+  },
+  {
+    what: "the automatic shadow bans that wait for a review to moderators and admins (#105, ADR-033 §6)",
+    roles: MODERATORS,
+    keys: ["GET /admin/sanctions/automatic"],
+  },
+  {
+    what: "the ponds and their switch to the admin role (#500, ADR-060 §2)",
+    roles: ADMINS,
+    keys: ["GET /admin/ponds", "POST /admin/ponds/:id/matching"],
+  },
+  {
+    what: "the announcements, written, listed, approved by a second admin and deleted as drafts, to the admin role (#573, ADR-068 §2)",
+    roles: ADMINS,
+    keys: [
+      "GET /admin/announcements",
+      "POST /admin/announcements",
+      "DELETE /admin/announcements/:id",
+      "POST /admin/announcements/:id/approve",
+    ],
+  },
+  {
+    what: "the tunables, read and changed, to the admin role (#304, #305)",
+    roles: ADMINS,
+    keys: ["GET /admin/config", "POST /admin/config/:key"],
+  },
+  {
+    what: "the audit log and the staff list to the admin role (#309, #310)",
+    roles: ADMINS,
+    keys: ["GET /admin/audit", "GET /admin/staff"],
+  },
+];
+
+/** The staff routes outside PUBLIC_ROUTES whose roles STAFF_ROLES does not hold. */
+const staffRoutesNotPinned = (routes: GuardedRoute[]) => {
+  const pinned = new Set(STAFF_ROLES.flatMap(({ keys }) => keys));
+  return routes
+    .filter(({ key, path }) => path.startsWith("/admin/") && !PUBLIC_ROUTES.has(key))
+    .filter(({ key }) => !pinned.has(key))
+    .map(({ key }) => key);
+};
 
 async function bareApp() {
   const { logger } = await captureLogger();
@@ -74,47 +182,15 @@ describe("route table", () => {
     expect(adminRoutesWithoutStaffGuard(routes)).toEqual([]);
   });
 
-  it("holds a ban, its lift and its review to the admin role, and the other sanctions to moderators and admins (#307, ADR-024 §3)", async () => {
+  it.each(STAFF_ROLES)("holds $what", async ({ roles, keys }) => {
     const routes = guardedRoutes(await bareApp());
-    const rolesOf = (key: string) => routes.find((r) => r.key === key)?.roles;
-    for (const key of [
-      "POST /admin/accounts/:id/bans",
-      "POST /admin/bans/:id/lift",
-      "POST /admin/bans/:id/review",
-    ]) {
-      expect(rolesOf(key), key).toEqual([["admin"]]);
-    }
-    for (const key of [
-      "GET /admin/accounts/:id/sanctions",
-      "POST /admin/accounts/:id/sanctions",
-      "POST /admin/sanctions/:id/lift",
-      "POST /admin/sanctions/:id/review",
-    ]) {
-      expect(rolesOf(key), key).toEqual([["moderator", "admin"]]);
+    for (const key of keys) {
+      expect(routes.find((r) => r.key === key)?.roles, key).toEqual([roles]);
     }
   });
 
-  it("holds the report queue, a report opened, its copy's photos and its decision to moderators and admins (#311, #312)", async () => {
-    const routes = guardedRoutes(await bareApp());
-    const rolesOf = (key: string) => routes.find((r) => r.key === key)?.roles;
-    for (const key of [
-      "GET /admin/reports",
-      "GET /admin/reports/:id",
-      "GET /admin/reports/:id/copy/:seq/photo",
-      "POST /admin/reports/:id/decision",
-      // The automatic shadow bans waiting for a moderator (#105).
-      "GET /admin/sanctions/automatic",
-    ]) {
-      expect(rolesOf(key), key).toEqual([["moderator", "admin"]]);
-    }
-  });
-
-  it("holds the audit log and the staff list to the admin role (#309, #310)", async () => {
-    const routes = guardedRoutes(await bareApp());
-    const rolesOf = (key: string) => routes.find((r) => r.key === key)?.roles;
-    for (const key of ["GET /admin/audit", "GET /admin/staff"]) {
-      expect(rolesOf(key), key).toEqual([["admin"]]);
-    }
+  it("holds every staff route outside PUBLIC_ROUTES to a role list in STAFF_ROLES, so a new one is pinned the day it is added", async () => {
+    expect(staffRoutesNotPinned(guardedRoutes(await bareApp()))).toEqual([]);
   });
 
   it("would catch a staff route behind the product guard alone", async () => {
@@ -124,6 +200,25 @@ describe("route table", () => {
     app.use("/admin/probe", requireSession);
     app.get("/admin/probe", (c) => c.json({ ok: true }));
     expect(adminRoutesWithoutStaffGuard(guardedRoutes(app))).toEqual(["GET /admin/probe"]);
+  });
+
+  it("would catch a staff route whose path has a staff guard only for another method", async () => {
+    const app = await bareApp();
+    // The staff guard runs for the POST alone; the GET beside it has none.
+    const requireAdmin: MiddlewareHandler = async (_c, next) => next();
+    app.post("/admin/probe", Object.assign(requireAdmin, { roles: ADMINS }));
+    app.post("/admin/probe", (c) => c.json({ ok: true }));
+    app.get("/admin/probe", (c) => c.json({ ok: true }));
+    expect(adminRoutesWithoutStaffGuard(guardedRoutes(app))).toEqual(["GET /admin/probe"]);
+  });
+
+  it("would catch a staff route that STAFF_ROLES leaves out", async () => {
+    const app = await bareApp();
+    // Guarded as it should be, but a route nobody wrote down the roles of.
+    const requireAdmin: MiddlewareHandler = async (_c, next) => next();
+    app.use("/admin/probe", Object.assign(requireAdmin, { roles: ADMINS }));
+    app.get("/admin/probe", (c) => c.json({ ok: true }));
+    expect(staffRoutesNotPinned(guardedRoutes(app))).toEqual(["GET /admin/probe"]);
   });
 });
 
@@ -323,10 +418,13 @@ describe("no route grants or revokes a role", () => {
 });
 
 /** Every handler route as a request a crawler could make: params filled with plausible values. */
-function crawlable(app: ReturnType<typeof createApp>): { method: string; path: string }[] {
+function crawlable(
+  app: ReturnType<typeof createApp>,
+): { key: string; method: string; path: string }[] {
   return app.routes
     .filter(({ handler }) => handler.length !== 2)
     .map(({ method, path }) => ({
+      key: `${method} ${path}`,
       method,
       path: path
         .replace(/:id\b/g, "00000000-0000-4000-8000-000000000001")
@@ -347,8 +445,8 @@ describe("no web surface", () => {
     const { logger } = await captureLogger();
     const app = createApp({ config: testConfig(), logger, db: testPool() });
     const refused: string[] = [];
-    for (const { method, path } of crawlable(app)) {
-      if (PUBLIC_ROUTES.has(`${method} ${path}`)) continue;
+    for (const { key, method, path } of crawlable(app)) {
+      if (PUBLIC_ROUTES.has(key)) continue;
       const response = await app.request(path, { method });
       if (response.status !== 401) refused.push(`${method} ${path} -> ${response.status}`);
     }
@@ -379,7 +477,10 @@ describe("no web surface", () => {
   });
 
   it("the public list names no route with an id in its path", () => {
-    for (const key of PUBLIC_ROUTES) expect(key).not.toMatch(/[:{]/);
+    // The one exception: the one link's code (#574, ADR-044 §13), a redirect
+    // to a store that never looks the code up and names nobody (rewards/link.test.ts).
+    const valued = new Set(["GET /i/:code"]);
+    for (const key of PUBLIC_ROUTES) if (!valued.has(key)) expect(key).not.toMatch(/[:{]/);
   });
 
   it("every response says noindex", async () => {

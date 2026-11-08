@@ -12,6 +12,7 @@ The admin panel needs neither: Vite's `build.license` writes its `licenses.txt`.
 - **`shippedPackageDirs(sources, root)`**: the package directory of each bundled file, the path up to the name after the last `node_modules`, so a nested copy is its own package.
 - **`shippedFilesOf(dir)`**: the licence files (`LICENSE*`, `LICENCE*`, `COPYING*`) and NOTICE files at the top of a package, in any case, normalised.
 - **`splitNotice(text)`**: a licence file that is copyright lines over a body, under at most one title line, as the lines and the body; null for any other shape, which is kept whole.
+- **`providerOf(name, manifest)`**: who provides a package, for the app's list (#512): its npm scope, else the name of the package.json's `author`, else of the first of its `maintainers`, without an address; null when it names nobody. The API's notices do not print it.
 - **`collectNotices(dirs, upstream)`**: every package once by name and version, each body once however many packages share it, keyed by `textKey`, a digest of its paragraphs' words. A package with no licence file takes its rows of `upstream`: copyright lines and an address with the text of a named shipped package, or a file deeper in the package. It throws for a package with no text, for a row nothing needs and for a row whose text cannot be had.
 
 ## Tests

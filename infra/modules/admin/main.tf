@@ -21,8 +21,10 @@ locals {
 # ---------------------------------------------------------------------------
 # The bucket. Private; the only reader is the distribution (origin access
 # control). CI writes it: main's build at the root, a pull request's preview
-# under pr-<n>/ (ADR-025 §5-§7). Versioning stays off: every object is the
-# build of a commit, and CI rebuilds it.
+# under pr-<n>/ (ADR-025 §5-§7). The maintainer writes Saiga's faces under
+# fonts/ by hand, since no runner has them (ADR-052). Versioning stays off:
+# every object is the build of a commit, which CI rebuilds, or a face, which
+# the upload puts back.
 # ---------------------------------------------------------------------------
 
 resource "aws_s3_bucket" "admin" {
@@ -136,6 +138,9 @@ resource "aws_cloudfront_response_headers_policy" "admin" {
         "default-src 'none'",
         "script-src 'self'",
         "style-src 'self'",
+        # Saiga, Kuutti's typeface, from the bucket's fonts/, which the
+        # maintainer fills by hand and no workflow touches (ADR-052).
+        "font-src 'self'",
         "img-src 'self' ${var.api_origin}",
         "connect-src ${var.api_origin}",
         # No service worker: one registered from a preview's prefix could take

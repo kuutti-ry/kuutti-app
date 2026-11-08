@@ -1,8 +1,7 @@
 import { OnboardingStatus, PreferencesResponse } from "@kuutti/schema";
 import { describe, expect } from "vitest";
 import { createApp } from "../app.ts";
-import { SPECIAL_CATEGORY_CONSENT_VERSION } from "../profile/index.ts";
-import { signedInAccount } from "../test/account.ts";
+import { consentedAccount, signedInAccount } from "../test/account.ts";
 import { captureLogger, type TestContext, test, testConfig } from "../test/harness.ts";
 
 // features/matching/preferences.feature (#46): the two hard rows.
@@ -46,7 +45,7 @@ describe("The hard rows refuse what matching cannot use", () => {
 describe("preferences", () => {
   test("Seeks and the age window are stored as hard rows and read back", async ({ ctx }) => {
     const { app, logs } = await appWith(ctx);
-    const a = await signedInAccount(ctx.client);
+    const a = await consentedAccount(ctx.client);
     const wanted = { seeks: ["woman", "non_binary"], ageWindow: { min: 25, max: 35 } };
     const saved = await put(app, a.headers, wanted);
     expect(saved.status).toBe(200);
@@ -74,7 +73,7 @@ describe("preferences", () => {
   test("Whom one seeks and the age window are saved one at a time", async ({ ctx }) => {
     // Onboarding saves each on its own screen (ADR-010 §13): an app closed between them keeps the first.
     const { app, logs } = await appWith(ctx);
-    const a = await signedInAccount(ctx.client);
+    const a = await consentedAccount(ctx.client);
     const read = async () =>
       PreferencesResponse.parse(
         await (await app.request("/preferences", { headers: a.headers })).json(),
@@ -94,8 +93,8 @@ describe("preferences", () => {
     ctx,
   }) => {
     const { app } = await appWith(ctx);
-    const a = await signedInAccount(ctx.client, "a");
-    const b = await signedInAccount(ctx.client, "b");
+    const a = await consentedAccount(ctx.client, "a");
+    const b = await consentedAccount(ctx.client, "b");
     const window = { min: 20, max: 30 };
     expect((await put(app, a.headers, { seeks: ["man"], ageWindow: window })).status).toBe(200);
     expect((await put(app, b.headers, { seeks: ["woman"], ageWindow: window })).status).toBe(200);
@@ -107,7 +106,7 @@ describe("preferences", () => {
 
   test("The preferences of another account are never served", async ({ ctx }) => {
     const { app } = await appWith(ctx);
-    const a = await signedInAccount(ctx.client);
+    const a = await consentedAccount(ctx.client);
     const b = await signedInAccount(ctx.client);
     await put(app, a.headers, { seeks: ["man"], ageWindow: { min: 20, max: 30 } });
     const theirs = await app.request("/preferences", { headers: b.headers });
@@ -119,59 +118,87 @@ describe("preferences", () => {
   });
 });
 
-describe("the cadence of a change (#147, ADR-015 §9)", () => {
-  test("A change of whom one seeks is possible once in the cadence", async ({ ctx }) => {
-    const { app, logs } = await appWith(ctx);
-    const a = await signedInAccount(ctx.client);
-    const window = { min: 25, max: 35 };
-    const status = async () =>
-      OnboardingStatus.parse(
-        await (await app.request("/onboarding", { headers: a.headers })).json(),
+const stored = async (ctx: TestContext, accountId: string) =>
+  (
+    await ctx.client.query<{ field: string }>(
+      "SELECT field FROM preferences WHERE account_id = $1 ORDER BY field",
+      [accountId],
+    )
+  ).rows.map((row) => row.field);
+
+describe("Whom one seeks needs the consent of the current wording", () => {
+  test.for(["never given", "given for an older wording", "withdrawn"] as const)(
+    "%s",
+    async (consent, { ctx }) => {
+      const { app, logs } = await appWith(ctx);
+      const a =
+        consent === "never given"
+          ? await signedInAccount(ctx.client)
+          : await consentedAccount(ctx.client);
+      if (consent === "given for an older wording") {
+        await ctx.client.query(
+          "UPDATE consent SET version = '2026-01-older' WHERE account_id = $1",
+          [a.accountId],
+        );
+      }
+      if (consent === "withdrawn") {
+        const withdrawn = await app.request("/consents/special_category", {
+          method: "DELETE",
+          headers: a.headers,
+        });
+        expect(withdrawn.status).toBe(200);
+      }
+      const refused = await put(app, a.headers, {
+        seeks: ["non_binary"],
+        ageWindow: { min: 25, max: 35 },
+      });
+      expect(refused.status).toBe(403);
+      expect(((await refused.json()) as { error: { code: string } }).error.code).toBe(
+        "consent_required",
       );
-    // The first answer is no change, and the first change is free.
-    expect((await put(app, a.headers, { seeks: ["woman"], ageWindow: window })).status).toBe(200);
-    expect((await status()).nextChange.seeks).toBeNull();
-    expect((await put(app, a.headers, { seeks: ["man"], ageWindow: window })).status).toBe(200);
-    const from = (await status()).nextChange.seeks;
-    expect(from).not.toBeNull();
-    expect(Date.parse(from as string)).toBeGreaterThan(Date.now() + 29 * 86_400_000);
-    // The second change within the cadence is refused, said without a reason.
-    const refused = await put(app, a.headers, { seeks: ["non_binary"], ageWindow: window });
-    expect(refused.status).toBe(429);
-    expect(((await refused.json()) as { error: { code: string } }).error.code).toBe(
-      "change_too_soon",
-    );
-    expect(
-      PreferencesResponse.parse(
-        await (await app.request("/preferences", { headers: a.headers })).json(),
-      ).seeks,
-    ).toEqual(["man"]);
-    // The same answer again, and another window of ages, are no change.
-    expect(
-      (await put(app, a.headers, { seeks: ["man"], ageWindow: { min: 30, max: 40 } })).status,
-    ).toBe(200);
-    expect((await status()).nextChange.seeks).toBe(from);
-    // Withdrawing the special-category consent takes the seek row with it, and the
-    // answer after it counts as a change while one is on record: no way round.
-    const consent = await app.request("/consents", {
-      method: "POST",
-      headers: { ...a.headers, "content-type": "application/json" },
-      body: JSON.stringify({
-        kind: "special_category",
-        version: SPECIAL_CATEGORY_CONSENT_VERSION,
-        locale: "fi",
-      }),
-    });
-    expect(consent.status).toBe(200);
-    expect(
-      (await app.request("/consents/special_category", { method: "DELETE", headers: a.headers }))
-        .status,
-    ).toBe(200);
-    expect((await status()).preferences.seeks).toBeNull();
-    const again = await put(app, a.headers, { seeks: ["non_binary"], ageWindow: window });
-    expect(again.status).toBe(429);
-    expect((await status()).preferences.seeks).toBeNull();
-    // Nothing of what is sought reaches a log line (rule 5), the refusals included.
+      expect(await stored(ctx, a.accountId)).toEqual([]);
+      expect(JSON.stringify(logs())).not.toContain("non_binary");
+    },
+  );
+});
+
+test("The age window needs no consent", async ({ ctx }) => {
+  const { app } = await appWith(ctx);
+  const a = await signedInAccount(ctx.client);
+  expect((await put(app, a.headers, { ageWindow: { min: 25, max: 35 } })).status).toBe(200);
+  expect(await stored(ctx, a.accountId)).toEqual(["age_window"]);
+});
+
+test("another account's consent does not count", async ({ ctx }) => {
+  const { app } = await appWith(ctx);
+  await consentedAccount(ctx.client);
+  const a = await signedInAccount(ctx.client);
+  expect((await put(app, a.headers, { seeks: ["man"] })).status).toBe(403);
+  expect(await stored(ctx, a.accountId)).toEqual([]);
+});
+
+test("the reads that carry whom one seeks are kept by nobody on the way", async ({ ctx }) => {
+  const { app } = await appWith(ctx);
+  const a = await consentedAccount(ctx.client);
+  for (const path of ["/preferences", "/onboarding", "/profile"]) {
+    const read = await app.request(path, { headers: a.headers });
+    expect(read.headers.get("cache-control"), path).toBe("no-store");
+  }
+});
+
+describe("a change of whom one seeks (#500, ADR-060 §9)", () => {
+  test("Whom one seeks can be changed as often as one wishes", async ({ ctx }) => {
+    const { app, logs } = await appWith(ctx);
+    const a = await consentedAccount(ctx.client);
+    const ageWindow = { min: 25, max: 35 };
+    for (const seeks of [["woman"], ["man"], ["non_binary"], ["woman", "man"]]) {
+      const saved = await put(app, a.headers, { seeks, ageWindow });
+      expect(saved.status).toBe(200);
+      expect(PreferencesResponse.parse(await saved.json())).toEqual({ seeks, ageWindow });
+    }
+    const status = await app.request("/onboarding", { headers: a.headers });
+    expect(OnboardingStatus.parse(await status.json()).nextChange).toEqual({ gender: null });
+    // Nothing of what is sought reaches a log line (rule 5).
     expect(JSON.stringify(logs())).not.toContain("non_binary");
   });
 });

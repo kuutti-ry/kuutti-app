@@ -17,7 +17,7 @@ import {
   readDealBreakers,
   saveDealBreakers,
 } from "./deal-breakers.ts";
-import { readPreferences, savePreferences } from "./preferences.ts";
+import { readPreferences, type SeeksConsentReader, savePreferences } from "./preferences.ts";
 
 const errorContent = (description: string) => ({
   description,
@@ -45,17 +45,17 @@ const saveRoute = createRoute({
   path: "/preferences",
   summary: "Set whom the caller seeks, the age window, or both",
   description:
-    "Either or both, each replacing its row: a non-empty set of genders, an age window within 18 and 99 with min at most max. Onboarding saves each on its own screen (ADR-010 §13). Hard rows: the round builder never crosses them, in either direction.",
+    "Either or both, each replacing its row: a non-empty set of genders, an age window within 18 and 99 with min at most max. Onboarding saves each on its own screen (ADR-010 §13). Hard rows: the round builder never crosses them, in either direction. The set of genders needs the sensitive-answers consent of the current wording (ADR-010 §16).",
   ...bearer,
   request: { body: { required: true, ...json(PreferencesUpdate) } },
   responses: {
     200: { description: "Saved; the preferences as stored.", ...json(PreferencesResponse) },
     400: errorContent("Validation failed."),
     401: unauthenticated,
-    404: errorContent("No live account (erased meanwhile)."),
-    429: errorContent(
-      "change_too_soon: whom one seeks was changed within matching_config change_cadence_days; nothing was saved, and GET /onboarding's nextChange.seeks says from when.",
+    403: errorContent(
+      "consent_required: whom one seeks without the sensitive-answers consent of the current wording; nothing was saved, a window in the same request included.",
     ),
+    404: errorContent("No live account (erased meanwhile)."),
   },
 });
 
@@ -64,7 +64,7 @@ const dealBreakersRoute = createRoute({
   path: "/preferences/deal-breakers",
   summary: "The caller's deal-breakers",
   description:
-    "Each with whether it is paused: a deal-breaker waits while the person's own answer on its field is missing (#149, the disclose-to-filter rule). `max` is how many a person may have.",
+    "Each with whether it is paused: a deal-breaker waits while the person's own answer on its field is missing (#149, the disclose-to-filter rule). One on distance has no field and is never paused. `max` is how many a person may have.",
   ...bearer,
   responses: {
     200: { description: "The deal-breakers.", ...json(DealBreakersResponse) },
@@ -77,13 +77,13 @@ const saveDealBreakersRoute = createRoute({
   path: "/preferences/deal-breakers",
   summary: "Set the caller's deal-breakers",
   description:
-    "The whole set, at most `max`, each on a distinct whitelisted field the person has answered themselves, accepting options the field has. Hard rows: #87 applies them in the pool, both ways.",
+    "The whole set, at most `max`, each on a distinct whitelisted field the person has answered themselves, accepting options the field has. A person already past a lowered `max` may still remove or change what they hold; only a new field past it is refused. One on distance has no field: it accepts the bands up to nearby, close or around, and lets through those who did not answer whatever the request says, since nobody can leave it unanswered. Hard rows: #87 applies them in the pool, both ways.",
   ...bearer,
   request: { body: { required: true, ...json(DealBreakersUpdate) } },
   responses: {
     200: { description: "Saved; the deal-breakers as stored.", ...json(DealBreakersResponse) },
     400: errorContent(
-      "Validation failed: more than allowed, a field twice, or an answer the field has not.",
+      "Validation failed: a new field past what is allowed, a field twice, an answer the field has not, or bands that do not run up to one.",
     ),
     401: unauthenticated,
     404: errorContent("No live account (erased meanwhile)."),
@@ -93,11 +93,16 @@ const saveDealBreakersRoute = createRoute({
   },
 });
 
-/** `readOwnFields` hands in the caller's own profile answers; the app wires it from the profile slice. */
+/**
+ * `readOwnFields` hands in the caller's own profile answers and `seeksConsent`
+ * their consent to the answer on whom they seek; the app wires them from the
+ * profile and the identity slices.
+ */
 export function preferencesRoutes(
   deps: Deps,
   requireSession: MiddlewareHandler<AppEnv>,
   readOwnFields: OwnFieldsReader,
+  seeksConsent: SeeksConsentReader,
 ) {
   const app = new OpenAPIHono<AppEnv>();
   const routes = [readRoute, saveRoute, dealBreakersRoute, saveDealBreakersRoute];
@@ -135,7 +140,7 @@ export function preferencesRoutes(
   app.openapi(saveRoute, async (c) => {
     const update = c.req.valid("json");
     const { accountId } = callerOf(c);
-    if (!(await savePreferences(deps.db, accountId, update, new Date()))) {
+    if (!(await savePreferences(deps.db, accountId, update, new Date(), seeksConsent))) {
       throw new AppError(404, "not_found", "No live account");
     }
     // The values stay out of the log (rule 5): this line says only that they were set.

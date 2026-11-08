@@ -4,13 +4,22 @@
  * add opacity. Components never hardcode a colour; they use the Tailwind
  * names mapped to these variables in tailwind.config.js.
  *
- * Four sets: light (:root), dark (.dark:root, follows the system), and the
+ * The base sets: light (:root), dark (.dark:root, follows the system), and the
  * high-contrast pair, which is a second token set and not a separate mode
  * (CLAUDE.md Accessibility): ThemeProvider puts .high-contrast or
  * .high-contrast-dark on the root view and every descendant inherits it.
  *
+ * For the designers' try of neubrutalism (neubrutalism.com), outside
+ * production only: --stroke, in every set, is the one ink of the style's
+ * outline and hard shadow, light on dark; and three palettes from Gaiane's
+ * concept, "Ice" (today's blues, softened), "Dusk" (lavender dusk and peach)
+ * and "Birch" (cream, spruce and lingonberry), are classes ThemeProvider puts
+ * on the root view instead of the base sets, as it does the high-contrast
+ * pair. The base sets are today's colours, which a released app keeps.
+ *
  * `pnpm --filter mobile check:contrast` holds every text pair to WCAG AA
- * (4.5:1; 7:1 in the high-contrast sets) and control outlines to 3:1. It
+ * (4.5:1; 7:1 in the high-contrast sets), and control outlines, the stroke
+ * and the neighbours of the seeks bar to 3:1, in every set of this file. It
  * reads this file, so a value that fails never reaches main.
  */
 @layer base {
@@ -35,6 +44,18 @@
     --input: 215 16% 47%;
     --ring: 224 76% 48%;
     --overlay: 222 47% 11%;
+    --logo-plate: 0 0% 100%;
+    /*
+     * The bands of the bar of whom people seek (SeeksBar, #581), in all four
+     * sets. An agent's colours, tried by calculation, and the designer's to
+     * change: no pink and blue, and neighbours at least 3:1 apart, since the
+     * bar has no gap between them and its words carry the meaning.
+     */
+    --seeks-men: 224 76% 48%;
+    --seeks-everyone: 174 55% 59%;
+    --seeks-women: 273 67% 39%;
+    /* The ink: the structural stroke, and the hard shadow in the same colour. */
+    --stroke: 222 47% 11%;
     --radius: 8px;
   }
 
@@ -59,6 +80,11 @@
     --input: 215 16% 60%;
     --ring: 212 96% 78%;
     --overlay: 0 0% 0%;
+    --logo-plate: 0 0% 100%;
+    --seeks-men: 212 96% 78%;
+    --seeks-everyone: 175 77% 26%;
+    --seeks-women: 269 100% 92%;
+    --stroke: 220 14% 80%;
   }
 
   .high-contrast {
@@ -82,6 +108,11 @@
     --input: 0 0% 0%;
     --ring: 224 90% 25%;
     --overlay: 0 0% 0%;
+    --logo-plate: 0 0% 100%;
+    --seeks-men: 224 90% 25%;
+    --seeks-everyone: 175 80% 32%;
+    --seeks-women: 273 80% 22%;
+    --stroke: 0 0% 0%;
   }
 
   .high-contrast-dark {
@@ -105,5 +136,181 @@
     --input: 0 0% 100%;
     --ring: 212 100% 85%;
     --overlay: 0 0% 0%;
+    --logo-plate: 0 0% 100%;
+    --seeks-men: 212 100% 85%;
+    --seeks-everyone: 175 80% 24%;
+    --seeks-women: 269 100% 92%;
+    --stroke: 0 0% 100%;
+  }
+
+  /* Ice: today's blues, softened, a navy ink and pale ice fills. */
+  .palette-ice {
+    --background: 210 33% 97%;
+    --foreground: 222 40% 14%;
+    --card: 0 0% 100%;
+    --card-foreground: 222 40% 14%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 40% 14%;
+    --primary: 221 52% 40%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 213 62% 90%;
+    --secondary-foreground: 222 40% 14%;
+    --muted: 210 30% 93%;
+    --muted-foreground: 218 15% 35%;
+    --accent: 213 62% 93%;
+    --accent-foreground: 222 40% 14%;
+    --destructive: 0 65% 40%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 214 25% 82%;
+    --input: 218 20% 45%;
+    --ring: 221 52% 40%;
+    --overlay: 222 40% 14%;
+    --logo-plate: 0 0% 100%;
+    --seeks-men: 224 76% 48%;
+    --seeks-everyone: 174 55% 59%;
+    --seeks-women: 273 67% 39%;
+    --stroke: 222 40% 14%;
+  }
+
+  .palette-ice-dark {
+    --background: 222 40% 9%;
+    --foreground: 213 30% 94%;
+    --card: 222 32% 13%;
+    --card-foreground: 213 30% 94%;
+    --popover: 222 32% 13%;
+    --popover-foreground: 213 30% 94%;
+    --primary: 213 85% 76%;
+    --primary-foreground: 222 40% 11%;
+    --secondary: 222 25% 22%;
+    --secondary-foreground: 213 30% 94%;
+    --muted: 222 25% 17%;
+    --muted-foreground: 215 15% 70%;
+    --accent: 222 25% 22%;
+    --accent-foreground: 213 30% 94%;
+    --destructive: 0 90% 80%;
+    --destructive-foreground: 0 60% 15%;
+    --border: 222 20% 26%;
+    --input: 215 15% 58%;
+    --ring: 213 85% 76%;
+    --overlay: 0 0% 0%;
+    --logo-plate: 0 0% 100%;
+    --seeks-men: 212 96% 78%;
+    --seeks-everyone: 175 77% 26%;
+    --seeks-women: 269 100% 92%;
+    --stroke: 213 25% 76%;
+  }
+
+  /* Dusk: the lavender sky and periwinkle sea of the concept, peach to press. */
+  .palette-dusk {
+    --background: 250 33% 97%;
+    --foreground: 245 30% 16%;
+    --card: 0 0% 100%;
+    --card-foreground: 245 30% 16%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 245 30% 16%;
+    --primary: 244 42% 46%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 250 60% 91%;
+    --secondary-foreground: 245 30% 16%;
+    --muted: 250 25% 93%;
+    --muted-foreground: 245 12% 38%;
+    --accent: 22 85% 90%;
+    --accent-foreground: 245 30% 16%;
+    --destructive: 350 60% 40%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 250 20% 84%;
+    --input: 245 15% 48%;
+    --ring: 244 42% 46%;
+    --overlay: 245 30% 16%;
+    --logo-plate: 0 0% 100%;
+    --seeks-men: 224 76% 48%;
+    --seeks-everyone: 174 55% 59%;
+    --seeks-women: 273 67% 39%;
+    --stroke: 245 30% 16%;
+  }
+
+  .palette-dusk-dark {
+    --background: 245 30% 10%;
+    --foreground: 250 30% 94%;
+    --card: 245 25% 15%;
+    --card-foreground: 250 30% 94%;
+    --popover: 245 25% 15%;
+    --popover-foreground: 250 30% 94%;
+    --primary: 245 80% 82%;
+    --primary-foreground: 245 30% 12%;
+    --secondary: 245 22% 24%;
+    --secondary-foreground: 250 30% 94%;
+    --muted: 245 20% 18%;
+    --muted-foreground: 250 12% 72%;
+    --accent: 22 30% 24%;
+    --accent-foreground: 250 30% 94%;
+    --destructive: 350 85% 82%;
+    --destructive-foreground: 350 60% 15%;
+    --border: 245 18% 28%;
+    --input: 250 12% 60%;
+    --ring: 245 80% 82%;
+    --overlay: 0 0% 0%;
+    --logo-plate: 0 0% 100%;
+    --seeks-men: 212 96% 78%;
+    --seeks-everyone: 175 77% 26%;
+    --seeks-women: 269 100% 92%;
+    --stroke: 250 30% 80%;
+  }
+
+  /* Birch: bark cream, spruce ink and a muted lingonberry, sage to press. */
+  .palette-birch {
+    --background: 40 30% 96%;
+    --foreground: 165 18% 14%;
+    --card: 40 40% 99%;
+    --card-foreground: 165 18% 14%;
+    --popover: 40 40% 99%;
+    --popover-foreground: 165 18% 14%;
+    --primary: 8 48% 42%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 15 55% 90%;
+    --secondary-foreground: 165 18% 14%;
+    --muted: 40 20% 92%;
+    --muted-foreground: 160 8% 34%;
+    --accent: 140 22% 88%;
+    --accent-foreground: 165 18% 14%;
+    --destructive: 0 70% 36%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 40 15% 82%;
+    --input: 160 8% 44%;
+    --ring: 8 48% 42%;
+    --overlay: 165 18% 14%;
+    --logo-plate: 0 0% 100%;
+    --seeks-men: 224 76% 48%;
+    --seeks-everyone: 174 55% 59%;
+    --seeks-women: 273 67% 39%;
+    --stroke: 165 18% 14%;
+  }
+
+  .palette-birch-dark {
+    --background: 165 18% 9%;
+    --foreground: 40 30% 93%;
+    --card: 165 14% 13%;
+    --card-foreground: 40 30% 93%;
+    --popover: 165 14% 13%;
+    --popover-foreground: 40 30% 93%;
+    --primary: 10 70% 75%;
+    --primary-foreground: 165 18% 10%;
+    --secondary: 165 12% 22%;
+    --secondary-foreground: 40 30% 93%;
+    --muted: 165 12% 17%;
+    --muted-foreground: 40 10% 70%;
+    --accent: 140 15% 22%;
+    --accent-foreground: 40 30% 93%;
+    --destructive: 0 85% 80%;
+    --destructive-foreground: 0 60% 15%;
+    --border: 165 10% 26%;
+    --input: 40 8% 58%;
+    --ring: 10 70% 75%;
+    --overlay: 0 0% 0%;
+    --logo-plate: 0 0% 100%;
+    --seeks-men: 212 96% 78%;
+    --seeks-everyone: 175 77% 26%;
+    --seeks-women: 269 100% 92%;
+    --stroke: 40 20% 78%;
   }
 }

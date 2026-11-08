@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import type { Message, TranslatedLocale } from "./schema.ts";
+import type { Message, TextLocale } from "./schema.ts";
 
 /**
  * The mark a native review leaves on a translation (#55, TD-17): a hash of the
@@ -20,7 +20,7 @@ export function reviewHash(en: string, text: string): string {
 }
 
 /** True when `locale`'s text carries a review hash that no longer matches it and its English. */
-export function isStale(message: Message, locale: TranslatedLocale): boolean {
+export function isStale(message: Message, locale: TextLocale): boolean {
   const hash = message.reviewed?.[locale];
   const text = message[locale];
   return hash !== undefined && text !== undefined && hash !== reviewHash(message.en, text);

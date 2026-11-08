@@ -9,17 +9,21 @@ import { generateHetu } from "@kuutti-ry/tunnistus-oidc/hetu";
 import type { QueryResultRow } from "pg";
 import { describe, expect } from "vitest";
 import { createApp } from "../app.ts";
+import { invitationCountJob } from "../jobs/invitation-count.ts";
 import type { Mailer, MailMessage } from "../lib/mail.ts";
 import { signedInAccount, signInAs } from "../test/account.ts";
 import { CHALLENGE, VERIFIER } from "../test/attempt.ts";
 import { captureLogger, type TestContext, test, testConfig } from "../test/harness.ts";
-import { people, pondNamed } from "../test/people.ts";
+import { completed, invitationOf } from "../test/invitations.ts";
+import { HOME, people, pondNamed } from "../test/people.ts";
+import { pidOf, type Watched, waitsFor, watched, withTwoConnections } from "../test/races.ts";
 import { deriveArtificialIdentity, registerArtificial } from "./artificial.ts";
 import type { BrokerIdentity, IdentityBroker } from "./broker.ts";
-import { eraseAccount } from "./erasure.ts";
+import { type ErasureSummary, eraseAccount } from "./erasure.ts";
 import { deriveIdentity, hmacKeyFromHex } from "./hetu.ts";
 import { startLogin } from "./login.ts";
 import { CURRENT_CONSENT_VERSIONS } from "./onboarding.ts";
+import { pauseAccount } from "./pause.ts";
 import { sweepSessions } from "./sessions.ts";
 
 // What the slice answers when another request commits in the middle of one
@@ -143,9 +147,44 @@ async function accountRow(ctx: TestContext, accountId: string) {
     email: string | null;
     gender: string | null;
     pond_id: string | null;
-  }>("SELECT state, email, gender, pond_id FROM account WHERE id = $1", [accountId]);
+    home_place: string | null;
+    home_shows_area: boolean;
+  }>(
+    "SELECT state, email, gender, pond_id, home_place, home_shows_area FROM account WHERE id = $1",
+    [accountId],
+  );
   return rows[0];
 }
+
+describe("a break that begins between the session guard and the erasure", () => {
+  // Pausing signs out every device, so the deletion route meets a paused account
+  // only here, or on the one session pause.ts's shortcut leaves (#527).
+  test("A break begun while the deletion is under way leaves no earlier state on the tombstone", async ({
+    ctx,
+  }) => {
+    const me = await signedInAccount(ctx.client);
+    await ctx.client.query("UPDATE account SET state = 'shadow_banned' WHERE id = $1", [
+      me.accountId,
+    ]);
+    const { logger } = await captureLogger();
+    const db = interleaved(ctx.client, { after: GUARD_LOOKUP }, () =>
+      pauseAccount({ db: ctx.client, logger, now: () => new Date() }, me.accountId),
+    );
+    const { app } = await appOn(db);
+    const res = await send(app, me.headers, {
+      method: "POST",
+      path: "/account/delete",
+      body: { confirm: true },
+    });
+    expect(db.ran()).toBe(true);
+    expect(res.status).toBe(204);
+    const { rows } = await ctx.client.query<{ state: string; paused_from: string | null }>(
+      "SELECT state, paused_from FROM account WHERE id = $1",
+      [me.accountId],
+    );
+    expect(rows[0]).toEqual({ state: "deleted", paused_from: null });
+  });
+});
 
 describe("an erasure that commits between the session guard and the handler", () => {
   test("the e-mail routes and the deletion answer 404 and write nothing for the tombstone", async ({
@@ -286,6 +325,7 @@ describe("the status read racing another request", () => {
       state: "registered",
       gender: "woman",
       consented: true,
+      home: HOME,
     });
     await ctx.client.query(
       `INSERT INTO preferences (account_id, field, value, mode, include_unknown)
@@ -321,6 +361,39 @@ describe("the status read racing another request", () => {
     expect((await accountRow(ctx, me.accountId))?.state).toBe("active");
   });
 
+  test("a label saved just before a change away from non-binary goes with the change", async ({
+    ctx,
+  }) => {
+    const me = await signedInAccount(ctx.client);
+    const declare = (gender: string): Call => ({
+      method: "PUT",
+      path: "/account/gender",
+      body: { gender },
+    });
+    const profile = (fields: object): Call => ({
+      method: "PUT",
+      path: "/profile",
+      body: { displayName: "Aino", bio: null, bioPreset: null, fields, prompts: [] },
+    });
+    const plain = await appOn(ctx.client);
+    await send(plain.app, me.headers, declare("non_binary"));
+    await send(plain.app, me.headers, profile({ intent: "casual" }));
+    // The account row's lock is the last moment a save can land first and be
+    // cleared. One that waits for the commit writes what it was given
+    // (declareGender's shortcut).
+    const db = interleaved(ctx.client, { before: /SELECT gender, gender_changed_at/ }, async () =>
+      send(plain.app, me.headers, profile({ intent: "casual", identityLabel: "genderfluid" })),
+    );
+    const { app } = await appOn(db);
+    expect((await send(app, me.headers, declare("man"))).status).toBe(204);
+    expect(db.ran()).toBe(true);
+    const { rows } = await ctx.client.query<{ fields: Record<string, unknown> }>(
+      "SELECT fields FROM profile WHERE account_id = $1",
+      [me.accountId],
+    );
+    expect(rows[0]?.fields).toEqual({ intent: "casual" });
+  });
+
   test("an erasure just before the activation activates nothing and answers with the state it read", async ({
     ctx,
   }) => {
@@ -337,27 +410,51 @@ describe("the status read racing another request", () => {
     expect((await accountRow(ctx, me.accountId))?.state).toBe("deleted");
   });
 
-  test("an erasure just before the default pond is assigned puts no pond on the tombstone", async ({
+  test("an erasure just before the home is written answers 404 and leaves no home on the tombstone", async ({
     ctx,
   }) => {
-    // The one-pond world the default pond needs (ADR-010 §12), as onboarding.test.ts builds it.
-    await ctx.client.query("DELETE FROM ponds WHERE slug = 'suomi'");
-    await ctx.client.query(
-      "INSERT INTO ponds (slug, name_nominative, name_inessive) VALUES ('paakaupunkiseutu', 'Pääkaupunkiseutu', 'Pääkaupunkiseudulla') ON CONFLICT (slug) DO NOTHING",
-    );
     const me = await signedInAccount(ctx.client, undefined, { state: "registered" });
-    const db = interleaved(ctx.client, { before: /UPDATE account SET pond_id = \$2/ }, () =>
+    // Its last read before the transaction: here on one connection the transaction's
+    // rollback would take the other request's erasure with it, which a commit never would.
+    const db = interleaved(ctx.client, { before: /FROM matching_config WHERE key = ANY/ }, () =>
       eraseOnOtherDevice(ctx, me.accountId),
     );
     const { app, logs } = await appOn(db);
-    const res = await app.request("/onboarding", { headers: me.headers });
+    const res = await app.request("/account/home", {
+      method: "PUT",
+      headers: { ...me.headers, "content-type": "application/json" },
+      body: JSON.stringify({ postalCode: "00530", showArea: true }),
+    });
     expect(db.ran()).toBe(true);
-    expect(res.status).toBe(200);
-    const status = OnboardingStatus.parse(await res.json());
-    expect(status.pond).toBeNull();
-    expect(status.missing).toContain("pond");
-    expect(logs().filter((l) => l.msg === "pond assigned")).toEqual([]);
-    expect(await accountRow(ctx, me.accountId)).toMatchObject({ state: "deleted", pond_id: null });
+    expect(res.status).toBe(404);
+    expect(ErrorResponse.parse(await res.json()).error.code).toBe("not_found");
+    expect(logs().filter((l) => l.msg === "home set")).toEqual([]);
+    expect(await accountRow(ctx, me.accountId)).toMatchObject({
+      state: "deleted",
+      pond_id: null,
+      home_place: null,
+      home_shows_area: false,
+    });
+  });
+
+  test("an erasure just after the home is written clears what it wrote", async ({ ctx }) => {
+    const me = await signedInAccount(ctx.client, undefined, { state: "registered" });
+    const db = interleaved(ctx.client, { after: /UPDATE account\s+SET home_place/ }, () =>
+      eraseOnOtherDevice(ctx, me.accountId),
+    );
+    const { app } = await appOn(db);
+    await app.request("/account/home", {
+      method: "PUT",
+      headers: { ...me.headers, "content-type": "application/json" },
+      body: JSON.stringify({ postalCode: "00530", showArea: true }),
+    });
+    expect(db.ran()).toBe(true);
+    expect(await accountRow(ctx, me.accountId)).toMatchObject({
+      state: "deleted",
+      pond_id: null,
+      home_place: null,
+      home_shows_area: false,
+    });
   });
 });
 
@@ -598,6 +695,55 @@ describe("a bank login racing another request", () => {
     expect(attempt.rows).toEqual([
       { code_hash: null, account_id: null, outcome: "answered", spent: true },
     ]);
+  });
+
+  test("an erasure between the login's read of the identity and its read of the account sends the browser back with the cooldown, and no account is created", async ({
+    ctx,
+  }) => {
+    // The person has an account; the login reads their identity, their other
+    // device's erasure commits, and the login finds no account to resume while
+    // the identity it holds has no cooldown yet (#609, run 1, record 1).
+    const identity = await ctx.client.query<{ id: string }>(
+      "INSERT INTO identity (hetu_hmac) VALUES ($1) RETURNING id",
+      [HMAC],
+    );
+    const identityId = identity.rows[0]?.id ?? "";
+    const account = await ctx.client.query<{ id: string }>(
+      "INSERT INTO account (identity_id, state, birth_year, birth_month) VALUES ($1, 'active', 1985, 3) RETURNING id",
+      [identityId],
+    );
+    const accountId = account.rows[0]?.id ?? "";
+    const db = interleaved(
+      ctx.client,
+      { after: /SELECT \* FROM identity WHERE hetu_hmac = \$1/ },
+      () => eraseOnOtherDevice(ctx, accountId),
+    );
+    const { app, logs } = await appOn(db, { bank: true });
+    const state = await start(app);
+    const back = await app.request(`/auth/callback?code=ok&state=${encodeURIComponent(state)}`);
+    expect(db.ran()).toBe(true);
+    expect(back.status).toBe(302);
+    const location = new URL(back.headers.get("location") ?? "");
+    expect(location.protocol).toBe("kuutti:");
+    expect(location.searchParams.get("code")).toBeNull();
+    expect(location.searchParams.get("error")).toBe("auth_cooldown");
+    const { rows } = await ctx.client.query<{
+      until: Date;
+      refused: number;
+      live: string;
+      total: string;
+    }>(
+      `SELECT reregister_after AS until, refused_attempts AS refused,
+              (SELECT count(*) FROM account WHERE identity_id = $1 AND state <> 'deleted') AS live,
+              (SELECT count(*) FROM account WHERE identity_id = $1) AS total
+       FROM identity WHERE id = $1`,
+      [identityId],
+    );
+    expect(location.searchParams.get("until")).toBe(rows[0]?.until.toISOString());
+    // The tombstone is the identity's only account: the insert refused the
+    // identity inside its cooldown, and the next pass read the cooldown.
+    expect(rows[0]).toMatchObject({ refused: 1, live: "0", total: "1" });
+    expect(logs().find((l) => l.msg === "bank login")).toBeUndefined();
   });
 
   test("an erasure between the code's use and the session opens no session for the tombstone", async ({
@@ -1112,3 +1258,212 @@ async function liveAccounts(ctx: { client: Queryable }, hetuHmac: string) {
   );
   return rows[0]?.n;
 }
+
+describe("an erasure racing the night's count of invitations", () => {
+  // The night writes for both people of an invitation, so it locks both before
+  // it touches the invitation, and an erasure takes the account before the
+  // invitation (#503, rewards/repo.ts's lockParties). The other order leaves
+  // each waiting for the other: Postgres then ends one of them, 40P01, which
+  // `watched` turns into an outcome no test here expects. On connections of
+  // their own and committed rows, since a lock needs two; `interleaved` holds
+  // one of the two at the moment the other must meet what it holds.
+
+  /** 04:00 in Finland, the night of the count. */
+  const NIGHT = new Date("2026-10-23T01:00:00.000Z");
+
+  /** An inviter and the friend who used their code, both complete. */
+  async function invitedPair(db: Queryable) {
+    const [inviter, friend] = await people(db, null, 2);
+    if (!inviter || !friend) throw new Error("cast not written");
+    await completed(db, inviter);
+    await completed(db, friend);
+    await invitationOf(db, inviter, { redeemedBy: friend });
+    return { inviter, friend };
+  }
+
+  /** Whose units and notices are left, and what became of the invitation. */
+  const left = async (db: Queryable) => ({
+    units: (await db.query("SELECT account_id FROM reward")).rows,
+    notices: (await db.query("SELECT account_id, kind FROM notice")).rows,
+    invitations: (
+      await db.query(
+        "SELECT inviter_account_id, redeemed_by_account_id, counted_at FROM invitation",
+      )
+    ).rows,
+  });
+
+  test("an erasure of the friend that holds the account when the night reaches them makes the night wait, and the invitation goes uncounted", async () => {
+    await withTwoConnections("kuutti-503-friend-first", async (pool, erasing, counting) => {
+      const { friend } = await invitedPair(pool);
+      const { logger } = await captureLogger();
+      const erasingPid = await pidOf(erasing);
+      const countingPid = await pidOf(counting);
+      await erasing.query("BEGIN");
+      await counting.query("BEGIN");
+      let count: Watched<unknown> | undefined;
+      // The erasure holds the account, and has not reached the units or the invitation.
+      const db = interleaved(
+        erasing,
+        { before: /DELETE FROM reward WHERE account_id/ },
+        async () => {
+          count = watched(invitationCountJob({ db: counting, logger, now: () => NIGHT }).run());
+          expect(await waitsFor(pool, countingPid, erasingPid, count.settled)).toBe(true);
+        },
+      );
+      const erasure = await eraseAccount({ db, logger, now: () => NIGHT }, friend);
+      expect(db.ran()).toBe(true);
+      await erasing.query("COMMIT");
+      expect(await count?.outcome).toEqual({ counted: 0, fish: 0 });
+      await counting.query("COMMIT");
+      expect(erasure).toMatchObject({ rewardUnits: 0, notices: 0, usedInvitationsDeleted: 1 });
+      expect(await left(pool)).toEqual({ units: [], notices: [], invitations: [] });
+    });
+  });
+
+  test("an erasure of the friend that arrives while the night writes waits for the night, takes what it wrote of theirs and leaves the inviter's", async () => {
+    await withTwoConnections("kuutti-503-count-first", async (pool, counting, erasing) => {
+      const { inviter, friend } = await invitedPair(pool);
+      const { logger } = await captureLogger();
+      const countingPid = await pidOf(counting);
+      const erasingPid = await pidOf(erasing);
+      await counting.query("BEGIN");
+      await erasing.query("BEGIN");
+      let erasure: Watched<ErasureSummary> | undefined;
+      // The invitation is marked, and neither the units nor the notices are written.
+      const db = interleaved(
+        counting,
+        { after: /UPDATE invitation i SET counted_at/ },
+        async () => {
+          erasure = watched(eraseAccount({ db: erasing, logger, now: () => NIGHT }, friend));
+          expect(await waitsFor(pool, erasingPid, countingPid, erasure.settled)).toBe(true);
+        },
+      );
+      expect(await invitationCountJob({ db, logger, now: () => NIGHT }).run()).toEqual({
+        counted: 1,
+        fish: 2,
+      });
+      expect(db.ran()).toBe(true);
+      await counting.query("COMMIT");
+      expect(await erasure?.outcome).toMatchObject({
+        rewardUnits: 1,
+        notices: 1,
+        usedInvitationsDeleted: 0,
+        usedInvitationsKept: 1,
+      });
+      await erasing.query("COMMIT");
+      expect(await left(pool)).toEqual({
+        units: [{ account_id: inviter }],
+        notices: [{ account_id: inviter, kind: "invitation_counted" }],
+        invitations: [
+          { inviter_account_id: inviter, redeemed_by_account_id: null, counted_at: NIGHT },
+        ],
+      });
+    });
+  });
+
+  test("an erasure of the inviter that holds the account when the night reaches them makes the night wait, and the invitation counts for the friend alone", async () => {
+    await withTwoConnections("kuutti-503-inviter-first", async (pool, erasing, counting) => {
+      const { inviter, friend } = await invitedPair(pool);
+      const { logger } = await captureLogger();
+      const erasingPid = await pidOf(erasing);
+      const countingPid = await pidOf(counting);
+      await erasing.query("BEGIN");
+      await counting.query("BEGIN");
+      let count: Watched<unknown> | undefined;
+      const db = interleaved(
+        erasing,
+        { before: /DELETE FROM reward WHERE account_id/ },
+        async () => {
+          count = watched(invitationCountJob({ db: counting, logger, now: () => NIGHT }).run());
+          expect(await waitsFor(pool, countingPid, erasingPid, count.settled)).toBe(true);
+        },
+      );
+      await eraseAccount({ db, logger, now: () => NIGHT }, inviter);
+      await erasing.query("COMMIT");
+      expect(await count?.outcome).toEqual({ counted: 1, fish: 1 });
+      await counting.query("COMMIT");
+      expect(await left(pool)).toEqual({
+        units: [{ account_id: friend }],
+        notices: [{ account_id: friend, kind: "invitation_friend" }],
+        invitations: [
+          { inviter_account_id: null, redeemed_by_account_id: friend, counted_at: NIGHT },
+        ],
+      });
+    });
+  });
+
+  test("two erasures of a counted invitation's two people take turns, and the later takes the row away", async () => {
+    await withTwoConnections("kuutti-503-both-go", async (pool, earlier, later) => {
+      const [inviter, friend] = await people(pool, null, 2);
+      if (!inviter || !friend) throw new Error("cast not written");
+      await invitationOf(pool, inviter, { redeemedBy: friend, countedAt: NIGHT });
+      const { logger } = await captureLogger();
+      const earlierPid = await pidOf(earlier);
+      const laterPid = await pidOf(later);
+      await earlier.query("BEGIN");
+      await later.query("BEGIN");
+      let second: Watched<ErasureSummary> | undefined;
+      // The inviter's link is cut, not yet committed.
+      const db = interleaved(
+        earlier,
+        { after: /UPDATE invitation SET inviter_account_id = NULL/ },
+        async () => {
+          second = watched(eraseAccount({ db: later, logger, now: () => NIGHT }, friend));
+          expect(await waitsFor(pool, laterPid, earlierPid, second.settled)).toBe(true);
+        },
+      );
+      await eraseAccount({ db, logger, now: () => NIGHT }, inviter);
+      expect(db.ran()).toBe(true);
+      await earlier.query("COMMIT");
+      expect(await second?.outcome).toMatchObject({
+        usedInvitationsDeleted: 1,
+        usedInvitationsKept: 0,
+      });
+      await later.query("COMMIT");
+      expect(await left(pool)).toEqual({ units: [], notices: [], invitations: [] });
+    });
+  });
+
+  test("an erasure of the friend committed between the night's read of who is complete and its lock leaves nothing to write", async ({
+    ctx,
+  }) => {
+    const pair = await invitedPair(ctx.client);
+    const { logger } = await captureLogger();
+    const db = interleaved(ctx.client, { before: /FOR SHARE OF a/ }, () =>
+      eraseAccount({ db: ctx.client, logger, now: () => NIGHT }, pair.friend),
+    );
+    expect(await invitationCountJob({ db, logger, now: () => NIGHT }).run()).toEqual({
+      counted: 0,
+      fish: 0,
+    });
+    expect(db.ran()).toBe(true);
+    const nobody = [pair.inviter, pair.friend];
+    for (const table of ["reward", "notice"]) {
+      const { rows } = await ctx.client.query(
+        `SELECT 1 FROM ${table} WHERE account_id = ANY($1::uuid[])`,
+        [nobody],
+      );
+      expect(rows, table).toEqual([]);
+    }
+  });
+
+  test("an erasure of the inviter committed between the night's read of who is complete and its lock leaves the friend's side to write", async ({
+    ctx,
+  }) => {
+    const pair = await invitedPair(ctx.client);
+    const { logger } = await captureLogger();
+    const db = interleaved(ctx.client, { before: /FOR SHARE OF a/ }, () =>
+      eraseAccount({ db: ctx.client, logger, now: () => NIGHT }, pair.inviter),
+    );
+    expect(await invitationCountJob({ db, logger, now: () => NIGHT }).run()).toEqual({
+      counted: 1,
+      fish: 1,
+    });
+    expect(db.ran()).toBe(true);
+    const { rows } = await ctx.client.query(
+      "SELECT account_id FROM reward WHERE account_id = ANY($1::uuid[])",
+      [[pair.inviter, pair.friend]],
+    );
+    expect(rows).toEqual([{ account_id: pair.friend }]);
+  });
+});

@@ -56,10 +56,41 @@ Feature: The app lock
     Then the phone's prompt is asked with no fallback to the phone's code and with the weak class allowed
     And a cancel is told apart from a failure
 
+  Scenario: A pause by the phone after too many tries is said as a pause, not as a failure
+    Given the lock screen with the face, on a phone that has paused it after too many tries
+    When the lock asks for the face
+    Then it says the phone has paused face unlock and how that ends, and the face, the passcode and the bank are still there
+
+  Scenario: A pause keeps the button when the phone says on return that it has none
+    Given the lock screen with the face, on a phone that has paused it after too many tries
+    When the app comes back on Android and the phone's answer reads as no face or fingerprint, as Android 16's pause does
+    Then the face's button is still there
+    And once an ask answers other than the pause, none means none again
+
+  Scenario: The lock screen says why the face it was set with is gone
+    Given the lock set with the face, on an iPhone that does not let Kuutti use its Face ID
+    When the lock screen shows
+    Then it says so in the button's place, and the passcode and the bank are still there
+
   Scenario: Turning biometrics on asks for the face or finger once
     Given a person in the lock's settings on a phone with a face enrolled
     When they turn the face or fingerprint on
     Then the phone's prompt is asked once, and the lock is on only if it answered yes
+
+  Scenario: Face ID kept from Kuutti is said as that, with the way to turn it on
+    Given a person in the lock's settings on an iPhone that does not let Kuutti use its Face ID
+    When the lock's settings ask the phone
+    Then they say so with a button to the phone's settings, in place of the switch and of the line that the phone has none
+
+  Scenario: Don't Allow at iOS's question is said as that at once
+    Given a person in the lock's settings on an iPhone that has not yet asked about Kuutti
+    When they turn the face or fingerprint on and answer Don't Allow
+    Then the lock stays off, and the screen says the iPhone does not let Kuutti use Face ID, not that the face was not confirmed
+
+  Scenario: The lock's settings ask the phone again when the app comes back
+    Given a person in the lock's settings on a phone with no face or fingerprint set up
+    When they set up a finger in the phone's own settings and come back to Kuutti
+    Then the switch for the face or fingerprint is offered, and the line that the phone has none is gone
 
   Scenario: A lock that cannot be read keeps the app locked with the bank as the way out
     Given a person signed in, and a stored lock that cannot be read

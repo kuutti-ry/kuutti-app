@@ -2,6 +2,11 @@ output "instance_id" {
   value = module.compute.instance_id
 }
 
+output "headroom_document" {
+  description = "Run Command document that gives the running box its swap and the free-memory metric (#77, ADR-046); infra/README.md, The box's headroom."
+  value       = module.compute.headroom_document
+}
+
 output "public_ip" {
   description = "Point api.<domain> here."
   value       = module.compute.public_ip
@@ -31,6 +36,11 @@ output "backup_prefix" {
 output "preview_database_document" {
   description = "Run Command document preview-cleanup.yml sends to drop a pull request's database (#9)."
   value       = module.compute.preview_database_document
+}
+
+output "demo_reset_document" {
+  description = "Run Command document demo-reset.yml sends to return the demo personas to where they begin (#613, ADR-018 §8)."
+  value       = module.compute.demo_reset_document
 }
 
 output "api_url" {

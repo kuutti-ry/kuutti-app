@@ -3,6 +3,9 @@ import {
   AGE_MIN,
   DEAL_BREAKER_FIELDS,
   type DealBreaker,
+  DealBreakerField,
+  DISTANCE_FILTER_BANDS,
+  dealBreakerOptions,
   GENDERS,
   PROFILE_FIELD_KEYS,
   PROFILE_FIELDS,
@@ -11,22 +14,31 @@ import {
 } from "@kuutti/schema";
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
+import { pausedOf } from "./deal-breakers.ts";
 import {
   accepts,
+  bandBetween,
   type Intent,
   inEachOthersPool,
   intentsFit,
+  kmBetween,
+  type PoolHome,
   type PoolPerson,
   passesFiltersOf,
   relaxedBy,
 } from "./pool.ts";
 
-// features/pond/gate.feature (#94, #147, ADR-015): who is in whose pool;
+// features/matching/filters.feature (#94, #147, ADR-015): who is in whose pool;
 // features/safety/blocks.feature (#84, ADR-030): a block, set by either;
-// features/matching/filters.feature (#87): the deal-breakers, both ways, and
-// the soft answers, which no pool reads.
+// features/matching/filters.feature (#87, #514): the deal-breakers, both ways,
+// the one on distance among them, and the soft answers, which no pool reads;
+// features/matching/rounds.feature: the band of two homes (ADR-061 §5).
 
 type Gender = PoolPerson["gender"];
+
+const EDGES = { nearby: 5, close: 15, around: 50 };
+/** A home this many kilometres along one line, so that two of them are as far apart as they read. */
+const homeAt = (km: number): PoolHome => ({ x: km * 1000, y: 0, edges: EDGES });
 
 let identities = 0;
 const person = (
@@ -42,6 +54,7 @@ const person = (
   seeks: seeks.split(",") as Gender[],
   ageWindow: { min, max },
   intent,
+  home: homeAt(0),
   identityId: `identity-${++identities}`,
   blocks: new Set(),
   fields: { intent },
@@ -262,39 +275,67 @@ describe("The sheet's examples of who is shown to whom, by gender and seek", () 
   );
 });
 
-/** A field's options; every deal-breaker field and every soft field has them. */
-const optionsOf = (key: ProfileFieldKey): readonly string[] => {
-  const spec = PROFILE_FIELDS[key];
-  return "options" in spec ? spec.options : [];
-};
 const SOFT_FIELDS = PROFILE_FIELD_KEYS.filter(
   (key) => PROFILE_FIELDS[key].preferenceAbout === "soft",
 );
 
-/** A few of a field's options, at least one: what a deal-breaker accepts, or a list's answer. */
-const someOf = (key: ProfileFieldKey) =>
-  fc.subarray([...optionsOf(key)], { minLength: 1, maxLength: Math.min(3, optionsOf(key).length) });
+const { min: HEIGHT_MIN, max: HEIGHT_MAX, relations: HEIGHT_RELATIONS } = PROFILE_FIELDS.height;
+const heightArb = fc.integer({ min: HEIGHT_MIN, max: HEIGHT_MAX });
 
-/** An answer as the registry takes it: one option, or for a list one or more of them. */
-const answerArb = (key: ProfileFieldKey): fc.Arbitrary<unknown> =>
-  PROFILE_FIELDS[key].kind === "multi" ? someOf(key) : fc.constantFrom(...optionsOf(key));
+/** A few of a list's options, at least one: what a deal-breaker accepts, or the list's answer. */
+const someOf = (key: ProfileFieldKey) => {
+  const options = dealBreakerOptions(key);
+  return fc.subarray([...options], { minLength: 1, maxLength: Math.min(3, options.length) });
+};
+
+/** An answer as the registry takes it: one option, for a list one or more of them, a number in its range. */
+const answerArb = (key: ProfileFieldKey): fc.Arbitrary<unknown> => {
+  const spec = PROFILE_FIELDS[key];
+  if (spec.kind === "number") return fc.integer({ min: spec.min, max: spec.max });
+  return spec.kind === "multi" ? someOf(key) : fc.constantFrom(...dealBreakerOptions(key));
+};
 /** Any of the given fields answered or left open: an open one is a missing key, as the registry reads it. */
 const answersArb = (keys: readonly ProfileFieldKey[]) =>
   fc.record(Object.fromEntries(keys.map((key) => [key, answerArb(key)])), { requiredKeys: [] });
+/** What a filter on distance accepts: the bands up to one (ADR-061 §7). */
+const bandsArb = fc
+  .integer({ min: 1, max: DISTANCE_FILTER_BANDS.length })
+  .map((n): string[] => DISTANCE_FILTER_BANDS.slice(0, n));
+const acceptArb = (field: DealBreakerField): fc.Arbitrary<string[]> => {
+  if (field === "distance") return bandsArb;
+  // A number's deal-breaker is one relation (#508), a list's as many options as one accepts.
+  return field === "height" ? fc.constantFrom(...HEIGHT_RELATIONS).map((r) => [r]) : someOf(field);
+};
 const dealBreakerArb: fc.Arbitrary<DealBreaker> = fc
-  .constantFrom(...DEAL_BREAKER_FIELDS)
+  .constantFrom(...DealBreakerField.options)
   .chain((field) =>
     fc.record({
       field: fc.constant(field),
-      accept: someOf(field),
-      includeUnknown: fc.boolean(),
+      accept: acceptArb(field),
+      includeUnknown: field === "distance" ? fc.constant(true) : fc.boolean(),
     }),
   );
+
+/** What a deal-breaker asks of the other person: their answer, or the band of the two homes. */
+const askedOf = (dealBreaker: DealBreaker, holder: PoolPerson, other: PoolPerson) =>
+  dealBreaker.field === "distance"
+    ? bandBetween(holder.home, other.home)
+    : other.fields[dealBreaker.field];
+const ownOf = (dealBreaker: DealBreaker, holder: PoolPerson) =>
+  dealBreaker.field === "distance" ? undefined : holder.fields[dealBreaker.field];
+const lets = (dealBreaker: DealBreaker, holder: PoolPerson, other: PoolPerson) =>
+  accepts(dealBreaker, askedOf(dealBreaker, holder, other), ownOf(dealBreaker, holder));
 
 const genderArb = fc.constantFrom(...GENDERS);
 const intentArb = fc.constantFrom(...PROFILE_FIELDS.intent.options);
 // A few identities, so that two people drawn at random often have blocked each other, or one the other.
 const identityArb = fc.constantFrom("identity-a", "identity-b", "identity-c", "identity-d");
+// Within 85 km of each other, so that two people drawn at random fall into every band.
+const homeArb: fc.Arbitrary<PoolHome> = fc.record({
+  x: fc.integer({ min: 0, max: 60_000 }),
+  y: fc.integer({ min: 0, max: 60_000 }),
+  edges: fc.constant(EDGES),
+});
 const personArb: fc.Arbitrary<PoolPerson> = fc
   .record({
     gender: genderArb,
@@ -303,18 +344,21 @@ const personArb: fc.Arbitrary<PoolPerson> = fc
     a: fc.integer({ min: AGE_MIN, max: AGE_MAX }),
     b: fc.integer({ min: AGE_MIN, max: AGE_MAX }),
     intent: intentArb,
+    home: homeArb,
     identityId: identityArb,
     blocks: fc.uniqueArray(identityArb, { maxLength: 3 }),
     answers: answersArb([...DEAL_BREAKER_FIELDS, ...SOFT_FIELDS]),
-    // Up to the cap's two, each on a field of its own (#149); paused when the field is open.
+    // Up to two, each on a field of its own (#149), which leaves pairs in each other's pool to
+    // ask the rules of; paused when the field is open. The number is the config's (#508).
     dealBreakers: fc.uniqueArray(dealBreakerArb, { maxLength: 2, selector: (d) => d.field }),
   })
-  .map(({ gender, age, seeks, a, b, intent, identityId, blocks, answers, dealBreakers }) => ({
+  .map(({ gender, age, seeks, a, b, intent, home, identityId, blocks, answers, dealBreakers }) => ({
     gender,
     age,
     seeks,
     ageWindow: { min: Math.min(a, b), max: Math.max(a, b) },
     intent,
+    home,
     identityId,
     blocks: new Set(blocks),
     fields: { ...answers, intent } as ProfileFields,
@@ -389,8 +433,8 @@ describe("the pool, for any two people", () => {
           [b, a],
         ] as const) {
           for (const dealBreaker of holder.dealBreakers) {
-            if (holder.fields[dealBreaker.field] === undefined) continue;
-            expect(accepts(dealBreaker, other.fields[dealBreaker.field])).toBe(true);
+            if (pausedOf(dealBreaker.field, holder.fields)) continue;
+            expect(lets(dealBreaker, holder, other)).toBe(true);
           }
         }
         if (a.intent !== b.intent) {
@@ -429,7 +473,7 @@ describe("the pool, for any two people", () => {
       fc.property(personArb, personArb, (a, b) => {
         const excludes = (holder: PoolPerson, other: PoolPerson) =>
           holder.dealBreakers.some(
-            (d) => holder.fields[d.field] !== undefined && !accepts(d, other.fields[d.field]),
+            (d) => !pausedOf(d.field, holder.fields) && !lets(d, holder, other),
           );
         if (excludes(a, b) || excludes(b, a)) {
           expect(inEachOthersPool(a, b)).toBe(false);
@@ -442,7 +486,7 @@ describe("the pool, for any two people", () => {
   it("is the same with a paused deal-breaker as without it (#87)", () => {
     fc.assert(
       fc.property(fc.oneof(pairArb, fc.tuple(personArb, personArb)), ([a, b]) => {
-        const live = a.dealBreakers.filter((d) => a.fields[d.field] !== undefined);
+        const live = a.dealBreakers.filter((d) => !pausedOf(d.field, a.fields));
         expect(inEachOthersPool({ ...a, dealBreakers: live }, b)).toBe(inEachOthersPool(a, b));
         expect(inEachOthersPool(b, { ...a, dealBreakers: live })).toBe(inEachOthersPool(b, a));
       }),
@@ -484,6 +528,40 @@ describe("the pool, for any two people", () => {
   });
 });
 
+describe("the band of two homes (ADR-061 §5)", () => {
+  describe("Two homes are in the band of the straight line between their kept places", () => {
+    it.each([
+      [0, "nearby"],
+      [4.99, "nearby"],
+      [5, "close"],
+      [14.99, "close"],
+      [15, "around"],
+      [49.99, "around"],
+      [50, "far"],
+      [900, "far"],
+    ] as const)("%s km apart: %s", (km, band) => {
+      expect(bandBetween(homeAt(0), homeAt(km))).toBe(band);
+      expect(bandBetween(homeAt(km), homeAt(0))).toBe(band);
+    });
+  });
+
+  it("is the straight line, in kilometres, in any direction", () => {
+    const here = { x: 100_000, y: 200_000, edges: EDGES };
+    expect(kmBetween(here, { ...here, x: 103_000, y: 204_000 })).toBe(5);
+    expect(kmBetween(here, here)).toBe(0);
+  });
+
+  it("is the same asked from either side, for any two homes", () => {
+    fc.assert(
+      fc.property(homeArb, homeArb, (a, b) => {
+        expect(kmBetween(a, b)).toBe(kmBetween(b, a));
+        expect(bandBetween(a, b)).toBe(bandBetween(b, a));
+      }),
+      { seed: 514 },
+    );
+  });
+});
+
 describe("blocks", () => {
   it("A block takes two people out of each other's pool, whoever set it", () => {
     const fits = () =>
@@ -517,6 +595,7 @@ describe("deal-breakers", () => {
     languages: ["fi"],
     hasKids: "no",
     monogamy: "monogamous",
+    height: 170,
   };
   const answered = (field: string, answer: string) =>
     answer === "nothing" ? {} : { [field]: field === "languages" ? answer.split(",") : answer };
@@ -553,6 +632,111 @@ describe("deal-breakers", () => {
         expect(inEachOthersPool(other, holder)).toBe(expected === "in");
       },
     );
+  });
+
+  describe("A height deal-breaker compares the other person's height with the holder's own, asked from either side", () => {
+    it.each([
+      ["taller", "without", 171, "in"],
+      ["taller", "without", 170, "not in"],
+      ["taller", "without", 169, "not in"],
+      ["at_least_mine", "without", 171, "in"],
+      ["at_least_mine", "without", 170, "in"],
+      ["at_least_mine", "without", 169, "not in"],
+      ["shorter", "without", 169, "in"],
+      ["shorter", "without", 170, "not in"],
+      ["shorter", "without", 171, "not in"],
+      ["taller", "without", "nothing", "not in"],
+      ["taller", "with", "nothing", "in"],
+      ["shorter", "with", 171, "not in"],
+    ] as const)(
+      "a holder of 170 cm accepting %s, %s people who did not answer, and the other's height %s: %s",
+      (relation, unknown, theirs, expected) => {
+        const [first, second] = pair();
+        if (!first || !second) throw new Error("no pair");
+        const holder: PoolPerson = {
+          ...first,
+          fields: { ...first.fields, height: 170 },
+          dealBreakers: [
+            { field: "height", accept: [relation], includeUnknown: unknown === "with" },
+          ],
+        };
+        const other: PoolPerson = {
+          ...second,
+          fields: theirs === "nothing" ? second.fields : { ...second.fields, height: theirs },
+        };
+        // The holder first and second: the same answer from either side.
+        expect(inEachOthersPool(holder, other)).toBe(expected === "in");
+        expect(inEachOthersPool(other, holder)).toBe(expected === "in");
+      },
+    );
+  });
+
+  const asking = (base: PoolPerson, height: number, relation: string): PoolPerson => ({
+    ...base,
+    fields: { ...base.fields, height },
+    dealBreakers: [{ field: "height", accept: [relation], includeUnknown: false }],
+  });
+
+  it("Two height deal-breakers are each asked from their holder's own height", () => {
+    const [first, second] = pair();
+    if (!first || !second) throw new Error("no pair");
+    const shorter = asking(first, 165, "taller");
+    const taller = asking(second, 180, "shorter");
+    expect(inEachOthersPool(shorter, taller)).toBe(true);
+    expect(inEachOthersPool(taller, shorter)).toBe(true);
+    // Whatever the heights, one of two who both ask for somebody taller is refused.
+    fc.assert(
+      fc.property(heightArb, heightArb, (a, b) => {
+        expect(inEachOthersPool(asking(first, a, "taller"), asking(second, b, "taller"))).toBe(
+          false,
+        );
+      }),
+    );
+  });
+
+  it("A height deal-breaker waits for its holder's own height", () => {
+    const [first, second] = pair();
+    if (!first || !second) throw new Error("no pair");
+    const holder = asking(first, 170, "taller");
+    const other: PoolPerson = { ...second, fields: { ...second.fields, height: 165 } };
+    expect(inEachOthersPool(holder, other)).toBe(false);
+    // The holder takes their own height back: there is nothing to compare with, and the filter waits.
+    const paused: PoolPerson = { ...holder, fields: { intent: holder.intent } };
+    expect(inEachOthersPool(paused, other)).toBe(true);
+    expect(inEachOthersPool(other, paused)).toBe(true);
+    // Answering again takes it up again.
+    const again: PoolPerson = { ...paused, fields: { ...paused.fields, height: 170 } };
+    expect(inEachOthersPool(again, other)).toBe(false);
+    expect(inEachOthersPool(other, again)).toBe(false);
+  });
+
+  it("reads the three relations of any two heights as one comparison (#508)", () => {
+    const relation = (accept: string) => ({
+      field: "height" as const,
+      accept: [accept],
+      includeUnknown: false,
+    });
+    const taller = relation("taller");
+    const mine = relation("at_least_mine");
+    const shorter = relation("shorter");
+    fc.assert(
+      fc.property(heightArb, heightArb, (theirs, own) => {
+        // Taller seen from one side is shorter seen from the other.
+        expect(accepts(taller, theirs, own)).toBe(accepts(shorter, own, theirs));
+        // My height or taller is everything shorter than me is not.
+        expect(accepts(mine, theirs, own)).toBe(!accepts(shorter, theirs, own));
+        // And it is taller, or the very same number.
+        expect(accepts(mine, theirs, own)).toBe(accepts(taller, theirs, own) || theirs === own);
+      }),
+    );
+  });
+
+  it("refuses a height against a relation that left the registry, and a holder with no number (#508)", () => {
+    const retired = { field: "height" as const, accept: ["much_taller"], includeUnknown: true };
+    expect(accepts(retired, 180, 170)).toBe(false);
+    // A pause keeps this from the pool (`passesFiltersOf`); asked anyway, it refuses.
+    const taller = { field: "height" as const, accept: ["taller"], includeUnknown: true };
+    expect(accepts(taller, 180, undefined)).toBe(false);
   });
 
   it("The deal-breakers of both people are asked, each against the other's answers", () => {
@@ -601,9 +785,133 @@ describe("deal-breakers", () => {
   });
 });
 
+// features/matching/filters.feature (#514, ADR-061 §7): the deal-breaker on distance, the seventh.
+describe("a deal-breaker on distance", () => {
+  const onDistance = (accept: readonly string[]): DealBreaker => ({
+    field: "distance",
+    accept: [...accept],
+    includeUnknown: true,
+  });
+  /** Two women of thirty who seek women, in each other's pool by everything else, `km` apart. */
+  const apart = (km: number) =>
+    [
+      { ...person("woman", 30, "woman", 25, 40), home: homeAt(0) },
+      { ...person("woman", 30, "woman", 25, 40), home: homeAt(km) },
+    ] as const;
+
+  describe("A distance deal-breaker lets through only the bands its holder accepts, asked from either side", () => {
+    it.each([
+      ["nearby", 0, "in"],
+      ["nearby", 4.99, "in"],
+      ["nearby", 5, "not in"],
+      ["nearby,close", 5, "in"],
+      ["nearby,close", 14.99, "in"],
+      ["nearby,close", 15, "not in"],
+      ["nearby,close,around", 15, "in"],
+      ["nearby,close,around", 49.99, "in"],
+      ["nearby,close,around", 50, "not in"],
+      ["nearby,close,around", 900, "not in"],
+    ] as const)("accepting %s, %s km apart: %s", (accept, km, expected) => {
+      const [here, there] = apart(km);
+      const dealBreakers = [onDistance(accept.split(","))];
+      // Whichever of them holds it, asked from either side.
+      for (const [holder, other] of [
+        [{ ...here, dealBreakers }, there],
+        [{ ...there, dealBreakers }, here],
+      ] as const) {
+        expect(inEachOthersPool(holder, other)).toBe(expected === "in");
+        expect(inEachOthersPool(other, holder)).toBe(expected === "in");
+      }
+    });
+  });
+
+  it("Without a deal-breaker on distance the whole country is one pool", () => {
+    const [here, there] = apart(900);
+    expect(inEachOthersPool(here, there)).toBe(true);
+    expect(inEachOthersPool(there, here)).toBe(true);
+  });
+
+  it("Two distance deal-breakers are both asked, so the narrower decides", () => {
+    const [here, there] = apart(10);
+    const wide = { ...here, dealBreakers: [onDistance(["nearby", "close", "around"])] };
+    const narrow = { ...there, dealBreakers: [onDistance(["nearby"])] };
+    expect(inEachOthersPool(wide, narrow)).toBe(false);
+    expect(inEachOthersPool(narrow, wide)).toBe(false);
+    const nearer = { ...narrow, home: homeAt(3) };
+    expect(inEachOthersPool(wide, nearer)).toBe(true);
+    expect(inEachOthersPool(nearer, wide)).toBe(true);
+  });
+
+  it("A distance deal-breaker is never paused, for everybody has a home", () => {
+    const [here, there] = apart(10);
+    const holder = { ...here, fields: {}, dealBreakers: [onDistance(["nearby"])] };
+    expect(inEachOthersPool(holder, there)).toBe(false);
+    expect(inEachOthersPool(there, holder)).toBe(false);
+    expect(pausedOf("distance", holder.fields)).toBe(false);
+  });
+
+  it("asks the band alone: an answer of the same name on nobody's card lets nobody through", () => {
+    const [here, there] = apart(10);
+    const holder = { ...here, dealBreakers: [onDistance(["nearby"])] };
+    const named = { ...there, fields: { ...there.fields, distance: "nearby" } as ProfileFields };
+    expect(inEachOthersPool(holder, named)).toBe(false);
+  });
+
+  it("is set aside for the day like any other, and asked again of whoever is not the one who set it aside", () => {
+    const [here, there] = apart(10);
+    const holder = { ...here, dealBreakers: [onDistance(["nearby"])] };
+    const wider = relaxedBy(holder, [{ field: "distance", kind: "aside" }]);
+    expect(wider.dealBreakers).toEqual([]);
+    expect(inEachOthersPool(wider, there)).toBe(true);
+    const theirs = { ...there, dealBreakers: [onDistance(["nearby"])] };
+    expect(inEachOthersPool(wider, theirs)).toBe(false);
+    expect(inEachOthersPool(theirs, wider)).toBe(false);
+  });
+
+  it("holds for any two homes, any edges and any two filters, the same from either side (rule 7)", () => {
+    const edgesArb = fc.record({
+      // The panel holds an edge to being a number, so they may stand in any order.
+      nearby: fc.integer({ min: 0, max: 120 }),
+      close: fc.integer({ min: 0, max: 120 }),
+      around: fc.integer({ min: 0, max: 120 }),
+    });
+    fc.assert(
+      fc.property(
+        homeArb,
+        homeArb,
+        edgesArb,
+        fc.option(bandsArb),
+        fc.option(bandsArb),
+        (here, there, edges, mine, theirs) => {
+          const [first, second] = apart(0);
+          const a: PoolPerson = {
+            ...first,
+            home: { ...here, edges },
+            dealBreakers: mine ? [onDistance(mine)] : [],
+          };
+          const b: PoolPerson = {
+            ...second,
+            home: { ...there, edges },
+            dealBreakers: theirs ? [onDistance(theirs)] : [],
+          };
+          const band = bandBetween(a.home, b.home);
+          const passes = (accept: string[] | null) => accept === null || accept.includes(band);
+          const expected = passes(mine) && passes(theirs);
+          expect(inEachOthersPool(a, b)).toBe(expected);
+          expect(inEachOthersPool(b, a)).toBe(expected);
+          // Nobody passes one way and not the other: each side's own filter holds alone.
+          expect(passesFiltersOf(a, b)).toBe(passes(mine));
+          expect(passesFiltersOf(b, a)).toBe(passes(theirs));
+        },
+      ),
+      { seed: 514 },
+    );
+  });
+});
+
 describe("a person's deal-breakers relaxed for the day (#99, ADR-042 §3)", () => {
   const relaxationArb = fc.record({
-    field: fc.constantFrom(...DEAL_BREAKER_FIELDS),
+    field: fc.constantFrom(...DealBreakerField.options),
     kind: fc.constantFrom("unanswered" as const, "aside" as const),
   });
 

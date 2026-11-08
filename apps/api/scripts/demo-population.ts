@@ -3,9 +3,9 @@
  * pull request's own, replacing the one that was there.
  *
  *   pnpm demo:population                      three hundred people, the usual seed
- *   pnpm demo:population -- --size 5000       as many as the round builder must carry
+ *   pnpm demo:population -- --size 5000       as many as the queue must walk
  *   pnpm demo:population -- --seed 7          other people, the same ponds
- *   pnpm demo:population -- --photos          with faces of the release, drawn by seed, through the pipeline (#142)
+ *   pnpm demo:population -- --photos          with faces of the release, drawn by seed, through the pipeline (#142), and the cast (#560)
  *   pnpm demo:population -- --remove          removes them and writes nobody
  *   pnpm demo:population -- --dry-run         counts per pond, nothing written, no connection
  *
@@ -33,35 +33,42 @@
  * removal takes it away, and either leaves the pictures' objects without a
  * row, so both delete the orphans through the media slice afterwards, and
  * both refuse while there are pictures and no store to delete from.
+ *
+ * The cast (#560) comes with faces or not at all: without them nobody shows them
+ * to anybody. Each has a set of their own. Replacing the population takes them
+ * with it, and with them the likes and chats they gave the members, so the demo
+ * reset comes after this: that is what gives those.
  */
 import { networkInterfaces } from "node:os";
-import { createPool, MATCHING_CONFIG_V1 } from "@kuutti/db";
+import { createPool } from "@kuutti/db";
 import {
   assertDemoTarget,
   assertStagingProcess,
   assetsFor,
+  barOf,
+  castFaces,
   DEMO_LABEL_PREFIX,
   DEMO_SUBJECT_PREFIX,
   DemoCommandError,
   type DemoEnvironment,
   describeTarget,
   facesForPopulation,
-  generatePopulation,
+  openPonds,
   type PhotoAsset,
+  PLACEHOLDER_PHOTO_PREFIX,
   parseDemoCommand,
   plannedPonds,
   removePopulation,
-  uncrossed,
   writePopulation,
 } from "@kuutti/db/demo";
 import { CURRENT_CONSENT_VERSIONS } from "../src/identity/index.ts";
-import { countGates } from "../src/jobs/pond-gate.ts";
-import { takeSnapshot } from "../src/jobs/waitlist-snapshot.ts";
+import { takeSnapshot } from "../src/jobs/pond-counter.ts";
 import { type Config, loadConfig, parseConfig } from "../src/lib/config.ts";
 import { createLogger } from "../src/lib/logger.ts";
 import { createMediaDeps, deleteOrphanedObjects, type MediaDeps } from "../src/media/index.ts";
 import { SPECIAL_CATEGORY_CONSENT_VERSION } from "../src/profile/index.ts";
 import { DemoError, whyNotTheLocalStore } from "./demo/bank.ts";
+import { peopleToWrite } from "./demo/homes.ts";
 import { loadAssets, uploadFaces } from "./demo/photos.ts";
 
 function fail(message: string, code = 1): never {
@@ -80,17 +87,10 @@ const command = (() => {
 const { env, size, seed, action, photos } = command;
 
 const ponds = plannedPonds(size);
-// What this size does not show, against the first version of the config: a
-// small population is allowed, it is only said what it is too small for.
-const notShown = uncrossed(ponds, {
-  gateK: MATCHING_CONFIG_V1.gate_k,
-  majorityShareMax: MATCHING_CONFIG_V1.majority_share_max,
-  counterK: MATCHING_CONFIG_V1.waitlist_k,
-});
 
 if (action === "dry-run") {
   console.log(
-    JSON.stringify({ msg: "demo population (dry run)", env, size, seed, ponds, notShown }, null, 2),
+    JSON.stringify({ msg: "demo population (dry run)", env, size, seed, ponds }, null, 2),
   );
   process.exit(0);
 }
@@ -139,13 +139,13 @@ function storeOf(
   return { media: media.deps, moderation: media.setup.moderation };
 }
 
-/** The content keys of the population's pictures: what a write or a removal would leave without a row. */
+/** The content keys of the population's pictures: what a write or a removal would leave without a row. A placeholder has no object to leave. */
 async function populationPhotoKeys(db: ReturnType<typeof createPool>): Promise<string[]> {
   const { rows } = await db.query<{ key: string }>(
     `SELECT DISTINCT p.key FROM photo p
        JOIN account a ON a.id = p.account_id JOIN identity i ON i.id = a.identity_id
-     WHERE i.broker_subject LIKE $1`,
-    [`${DEMO_SUBJECT_PREFIX}${DEMO_LABEL_PREFIX}%`],
+     WHERE i.broker_subject LIKE $1 AND p.key NOT LIKE $2`,
+    [`${DEMO_SUBJECT_PREFIX}${DEMO_LABEL_PREFIX}%`, `${PLACEHOLDER_PHOTO_PREFIX}%`],
   );
   return rows.map((r) => r.key);
 }
@@ -198,14 +198,18 @@ try {
     const result = await removePopulation(pool);
     console.log(JSON.stringify({ msg: "demo population removed", env, ...result }));
   } else {
-    const people = generatePopulation({ size, seed });
+    const { drawn, people } = peopleToWrite({ size, seed, photos });
     const result = await writePopulation(pool, people, {
       ...CURRENT_CONSENT_VERSIONS,
       special_category: SPECIAL_CATEGORY_CONSENT_VERSION,
     });
-    console.log(JSON.stringify({ msg: "demo population", env, size, seed, ...result, notShown }));
+    const bar = barOf(people);
+    console.log(JSON.stringify({ msg: "demo population", env, size, seed, ...result, bar }));
     if (assets && store) {
-      const faces = facesForPopulation(people, assetsFor(assets.manifest, "pool"), seed);
+      const faces = new Map([
+        ...facesForPopulation(drawn, assetsFor(assets.manifest, "pool"), seed),
+        ...castFaces(assets.manifest),
+      ]);
       const accounts = await accountsByLabel(pool, [...faces.keys()]);
       const byAccount = new Map<string, readonly PhotoAsset[]>();
       for (const [label, own] of faces) {
@@ -232,12 +236,12 @@ try {
   }
   // The figures the counter stood on are of the ponds as they were: gone, and
   // counted anew. Only here, where the target has been asked what it is.
-  await pool.query("DELETE FROM waitlist_snapshot");
+  await pool.query("DELETE FROM pond_counter");
   const counted = await takeSnapshot({ db: pool, logger, now: () => new Date() });
   console.log(JSON.stringify({ msg: "demo population: counter recounted", ...counted }));
-  // And the gates (#94): who is let into each pond, and for whom matching is open.
-  const gates = await countGates({ db: pool, logger, now: () => new Date() });
-  console.log(JSON.stringify({ msg: "demo population: gates counted", ...gates }));
+  // And the ponds open, so that these people have rounds (ADR-060 Open 1).
+  const opened = await openPonds(pool);
+  console.log(JSON.stringify({ msg: "demo population: ponds opened", opened }));
 } catch (error) {
   if (error instanceof DemoCommandError || error instanceof DemoError) {
     console.error(`✖ ${error.message}`);

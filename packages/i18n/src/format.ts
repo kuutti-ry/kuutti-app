@@ -6,7 +6,8 @@ import { PSEUDO_LOCALE } from "./locales.ts";
  * `en` is the United States (9/20/26, 5:14 PM) and bare `sv` is Sweden
  * (2026-09-20); `en-FI` and `sv-FI` are Finland's conventions (24-hour time,
  * space-grouped numbers with a decimal comma). The pseudo-locale has no Intl
- * data; it is English with odd letters.
+ * data; it is English with odd letters. Stadi has none either; it writes
+ * dates and numbers as Finnish does.
  */
 export function intlLocale(locale: AnyLocale | string): string {
   switch (locale) {
@@ -15,6 +16,8 @@ export function intlLocale(locale: AnyLocale | string): string {
       return "en-FI";
     case "sv":
       return "sv-FI";
+    case "fi-x-stadi":
+      return "fi-FI";
     default:
       return locale;
   }
@@ -81,26 +84,4 @@ export function formatNumber(
 /** A height on a card and under its field: centimetres with the unit, the number through Intl, a non-breaking space before the unit (#150). */
 export function formatHeight(locale: AnyLocale, cm: number): string {
   return `${formatNumber(locale, cm, { maximumFractionDigits: 0 })} cm`;
-}
-
-/** The grammatical cases a pond's name is stored in (#4: `ponds.name_inessive`). */
-export type PondCase = "nominative" | "inessive";
-
-/**
- * A pond as the API hands it over (`PondSummary` in packages/schema): the name
- * in every case form a sentence may need. Every form is required, so a caller
- * that drops one is a type error instead of a sentence silently back in the
- * nominative (#55).
- */
-export type PondName = { name: string; nameInessive: string };
-
-/**
- * A pond's name in the case a sentence needs, read from the stored form and
- * never built: Finnish inflects proper nouns irregularly ("Helsinki",
- * "Helsingissä"), so TD-17 stores each form per pond. English and Swedish
- * use the nominative.
- */
-export function formatPond(pond: PondName, grammaticalCase: PondCase, locale: AnyLocale): string {
-  if (locale === "fi" && grammaticalCase === "inessive") return pond.nameInessive;
-  return pond.name;
 }

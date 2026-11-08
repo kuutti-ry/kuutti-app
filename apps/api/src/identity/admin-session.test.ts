@@ -151,6 +151,7 @@ describe("staff sessions", () => {
 
     const res = await exchange(app, "/admin/auth/exchange", code);
     expect(res.status).toBe(200);
+    expect(res.headers.get("cache-control")).toBe("no-store");
     const session = AdminSession.parse(await res.json());
     expect(session.role).toBe("moderator");
     const ttl = new Date(session.expiresAt).getTime() - Date.now();
@@ -518,6 +519,22 @@ describe("staff sessions: refusals, validation and the sweep", () => {
     );
     expect(attempt.rows).toEqual([{ outcome: "answered", spent: true }]);
     expect(await count(ctx, "SELECT count(*) AS n FROM admin_session")).toBe(0);
+  });
+
+  test("A staff bank login is counted as an identification of the platform admin, refused or let in (#471)", async ({
+    ctx,
+  }) => {
+    const { app, logs } = await appWith(ctx);
+    const refused = await callback(app, await start(app));
+    expect(new URLSearchParams(refused.hash.slice(1)).get("error")).toBe("admin_not_allowed");
+    await allowlisted(ctx);
+    const letIn = await callback(app, await start(app));
+    expect(new URLSearchParams(letIn.hash.slice(1)).get("code")).toMatch(/^[A-Za-z0-9_-]{43}$/);
+    expect(
+      logs()
+        .filter((l) => l.msg === "identified at the bank")
+        .map((l) => l.platform),
+    ).toEqual(["admin", "admin"]);
   });
 
   test("The staff start and exchange validate their input", async ({ ctx }) => {

@@ -31,7 +31,7 @@ export type LoginDeps = {
   broker: IdentityBroker;
   hmacKey: Buffer;
   now: () => Date;
-  /** Bound to the request (its id is in it): a login leaves one line, method and decision, nothing of the person. */
+  /** Bound to the request (its id is in it): a login leaves its identification and its decision, nothing of the person. */
   logger: Logger;
   /** Where an admin login's browser is sent back to (#49). */
   adminAppUrl: string;
@@ -178,6 +178,11 @@ async function finishLogin(
   ) {
     throw new BrokerError("authentication predates this login attempt");
   }
+  // One line for each identification the bank passed on (#471, ADR-016 §3):
+  // in production Telia bills it, whatever the rule decides from here on, and
+  // the claim lets each callback this far once (ADR-026 §8). The platform
+  // alone, nothing of the person; the boot's line is "bank identification".
+  deps.logger.info({ platform: request.platform }, "identified at the bank");
   if (!derived.adult) {
     throw new AppError(403, "auth_under_18", "Kuutti is for adults only");
   }
@@ -207,8 +212,8 @@ async function finishLogin(
       outcome,
     });
     if (attached) {
-      // The one line a login leaves (#33): the level, the method as the broker
-      // names it, and what was decided. No claim, no code, no token.
+      // The line a login's decision leaves (#33): the level, the method as the
+      // broker names it, and what was decided. No claim, no code, no token.
       deps.logger.info(
         { acr: derived.reference.acr, amr: derived.reference.amr, outcome },
         "bank login",
@@ -229,7 +234,10 @@ type Derived = Awaited<ReturnType<typeof deriveFromBroker>>;
  * an identity is never deleted (outside the demo tools' resets), so its
  * insert is lost once at most, and an account lost to another login is live
  * when the next pass reads it (erasing it in between leaves a cooldown, which
- * refuses).
+ * refuses). An erasure that commits between the read of the identity and the
+ * read of its live account leaves this pass an identity without a cooldown
+ * and no account to resume: the insert itself refuses an identity inside its
+ * cooldown (repo.insertAccount), and the next pass reads it.
  */
 async function resolveAccount(
   deps: LoginDeps,
@@ -270,6 +278,7 @@ async function resolveAccount(
           identityId: created.id,
           birthYear: derived.birthYear,
           birthMonth: derived.birthMonth,
+          now,
         });
         if (!account) continue;
         return { accountId: account.id, outcome: "created" };
@@ -280,6 +289,7 @@ async function resolveAccount(
           identityId: decision.identityId,
           birthYear: derived.birthYear,
           birthMonth: derived.birthMonth,
+          now,
         });
         if (!account) continue;
         return { accountId: account.id, outcome: "created" };

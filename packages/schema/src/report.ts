@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { MESSAGE_BODY_CEILING, MESSAGE_SEQ_MAX, MessageKind } from "./chat.ts";
+import { PhotoId, PhotoState } from "./media.ts";
 import { Sanction, SanctionReason } from "./sanction.ts";
 
 // Reports and blocks (#84, ADR-030): a person blocks somebody whose card they
@@ -37,6 +38,10 @@ export const ReportRequest = z
     accountId: z.uuid().meta({ description: "The account of the card the person was shown." }),
     reason: SanctionReason,
     note: z.string().trim().min(1).max(REPORT_NOTE_MAX).optional(),
+    photoId: PhotoId.optional().meta({
+      description:
+        "The one photo of the card the report is about (#476). Kept only for a photo of that person the reporter was shown; any other is left out, and the answer is the same.",
+    }),
   })
   .strict()
   .meta({ id: "ReportRequest" });
@@ -47,7 +52,13 @@ export type ReportRequest = z.infer<typeof ReportRequest>;
  * conversation names: the card's reason and note. The report freezes a copy
  * of the conversation for the moderators, blocks both ways and closes it.
  */
-export const ConversationReportRequest = ReportRequest.omit({ accountId: true })
+export const ConversationReportRequest = ReportRequest.omit({ accountId: true, photoId: true })
+  .extend({
+    seq: z.int().min(1).max(MESSAGE_SEQ_MAX).optional().meta({
+      description:
+        "The line of the one photo the report is about (#476). Kept only for a photo the other person sent that the reporter could read; any other line is left out, and the answer is the same.",
+    }),
+  })
   .strict()
   .meta({ id: "ConversationReportRequest" });
 export type ConversationReportRequest = z.infer<typeof ConversationReportRequest>;
@@ -188,10 +199,31 @@ export const ReportActable = Sanction.pick({
 export type ReportActable = z.infer<typeof ReportActable>;
 
 /**
+ * The photo a card's report points at (#476), as the panel shows it: removed
+ * once its owner deleted it; otherwise its id and state for a take-down beside
+ * it (#477), and how many approved profile photos its owner has now, so the
+ * take-down's step can say what follows. The picture itself is fetched on
+ * request (`GET /admin/reports/{id}/photo`, an audit row about the report).
+ */
+export const ReportPointedPhoto = z
+  .discriminatedUnion("removed", [
+    z.object({ removed: z.literal(true) }),
+    z.object({
+      removed: z.literal(false),
+      id: PhotoId,
+      state: PhotoState,
+      approvedPhotos: z.int().min(0),
+    }),
+  ])
+  .meta({ id: "ReportPointedPhoto" });
+export type ReportPointedPhoto = z.infer<typeof ReportPointedPhoto>;
+
+/**
  * One report opened (#312): the queue's item, the reporter's note, who
- * decided and with which sanction, the frozen copy of a conversation, and the
- * sanctions that may close it. Answered after its audit row, never to a
- * member of staff who is a party to it (ADR-030 §6).
+ * decided and with which sanction, the frozen copy of a conversation, the
+ * photo the report points at (#476), and the sanctions that may close it.
+ * Answered after its audit row, never to a member of staff who is a party to
+ * it (ADR-030 §6).
  */
 export const ReportDetail = ReportListItem.extend({
   note: z.string().max(REPORT_NOTE_MAX).nullable(),
@@ -199,6 +231,12 @@ export const ReportDetail = ReportListItem.extend({
   sanctionId: z.uuid().nullable(),
   /** Null for a card's report; the whole conversation otherwise, as the export answers one (ExportedConversation's bound). */
   copy: z.array(ReportCopyLine).max(1_000_000).nullable(),
+  // Both null when absent, so a panel newer than its API still reads the
+  // answer: a pull request's panel runs against staging's API (ADR-025).
+  /** The copy's line the reporter pointed at (#476): a photo the other person sent; null when none, and always for a card's. */
+  lineSeq: z.int().min(1).max(MESSAGE_SEQ_MAX).nullable().default(null),
+  /** The card's photo the reporter pointed at; null when none, and always for a conversation's. */
+  pointedPhoto: ReportPointedPhoto.nullable().default(null),
   /** Newest first; empty once decided. */
   actable: z.array(ReportActable).max(100),
 }).meta({ id: "ReportDetail" });

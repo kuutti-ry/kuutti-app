@@ -1,5 +1,6 @@
 import { z } from "zod";
-import { DEAL_BREAKER_FIELDS, type ProfileFieldKey } from "./profile-fields.ts";
+import { DISTANCE_FILTER_BANDS } from "./distance.ts";
+import { DEAL_BREAKER_FIELDS, PROFILE_FIELDS, type ProfileFieldKey } from "./profile-fields.ts";
 
 /**
  * Deal-breakers (#149, TD-16, the field sheet's disclose-to-filter rule):
@@ -7,21 +8,43 @@ import { DEAL_BREAKER_FIELDS, type ProfileFieldKey } from "./profile-fields.ts";
  * `matching_config.deal_breakers_max` of them, each only on a field the
  * person has answered themselves. A deal-breaker whose own answer was taken
  * back is paused, which is read, never stored. #87 applies them in the pool,
- * both ways.
+ * both ways. `distance` is one with no field of the registry (ADR-061 §7): it
+ * reads the home everybody has, so it is never paused, and it stores
+ * `includeUnknown` true since nobody can leave it unanswered.
  */
 
-/** The contract's ceiling; the rule is the tunable (2 at launch). */
-export const DEAL_BREAKERS_CAP = 5;
+type DealBreakerKey = ProfileFieldKey | "distance";
+const DEAL_BREAKER_KEYS: readonly DealBreakerKey[] = [...DEAL_BREAKER_FIELDS, "distance"];
+
+/** One per field and the distance is the contract's ceiling; the number is the tunable's alone (the maintainer, #508). */
+export const DEAL_BREAKERS_CAP = DEAL_BREAKER_KEYS.length;
 
 export const DealBreakerField = z
-  .enum(DEAL_BREAKER_FIELDS as unknown as [ProfileFieldKey, ...ProfileFieldKey[]])
+  .enum(DEAL_BREAKER_KEYS as [DealBreakerKey, ...DealBreakerKey[]])
   .meta({ id: "DealBreakerField" });
 export type DealBreakerField = z.infer<typeof DealBreakerField>;
+
+/**
+ * What a deal-breaker on the field may accept: the options of a list, the
+ * relations of a number (#508), the bands of the distance. Never a list's
+ * "other", which names no answer two people can be known to share: two who
+ * chose Another language may speak none in common (the maintainer,
+ * 07/11/2026, #616). A stored filter that accepted it reads without it, and
+ * one that accepted nothing else reads as none (`dealBreakersFrom`).
+ */
+export function dealBreakerOptions(field: DealBreakerField): readonly string[] {
+  if (field === "distance") return DISTANCE_FILTER_BANDS;
+  const spec = PROFILE_FIELDS[field];
+  if (spec.kind === "number") return spec.relations;
+  return spec.kind === "single" || spec.kind === "multi"
+    ? spec.options.filter((option) => option !== "other")
+    : [];
+}
 
 export const DealBreaker = z
   .object({
     field: DealBreakerField,
-    /** The answers of others the person accepts; at least one, each an option of the field (the API holds that). */
+    /** The answers of others the person accepts; at least one, each an option of the field, and one alone on a number (the API holds that). */
     accept: z.array(z.string().min(1).max(40)).min(1).max(60),
     /** Whether a person who left the field unanswered passes. */
     includeUnknown: z.boolean(),

@@ -2,6 +2,7 @@ import { createHash, randomBytes } from "node:crypto";
 import type { Queryable } from "@kuutti/db";
 import type { ModeratorRole } from "@kuutti/schema";
 import { hashToken } from "../lib/auth-middleware.ts";
+import { SPECIAL_CATEGORY_CONSENT_VERSION } from "../profile/index.ts";
 
 /**
  * A verified account with one live device session, written straight into the
@@ -33,24 +34,31 @@ export async function signedInAccount(
   );
   const identityId = identity.rows[0]?.id;
   if (!identityId) throw new Error("test identity not written");
+  // A minute back, since `blockStandsBetween` compares this, the database's clock, with a block's
+  // time, the API's: a database ahead of this machine by more than a test's few milliseconds read
+  // a block as older than both accounts, and a report's proof failed (reports.test.ts, 01/11/2026).
   const account = await db.query<{ id: string }>(
-    "INSERT INTO account (identity_id, state, birth_year, birth_month) VALUES ($1, $2, 1990, 6) RETURNING id",
+    `INSERT INTO account (identity_id, state, birth_year, birth_month, registered_at)
+     VALUES ($1, $2, 1990, 6, now() - interval '1 minute') RETURNING id`,
     [identityId, options.state ?? "active"],
   );
   const accountId = account.rows[0]?.id;
   if (!accountId) throw new Error("test account not written");
 
   const accessToken = randomBytes(32).toString("base64url");
-  const refreshToken = randomBytes(32).toString("base64url");
+  // The refresh token's shape (ADR-059): the session's secret, a dot, the rotating part.
+  const family = randomBytes(32).toString("base64url");
+  const refreshToken = `${family}.${randomBytes(32).toString("base64url")}`;
   const now = Date.now();
   const session = await db.query<{ id: string }>(
-    `INSERT INTO session (account_id, platform, access_hash, access_expires_at, refresh_hash, expires_at)
-     VALUES ($1, 'ios', $2, $3, $4, $5) RETURNING id`,
+    `INSERT INTO session (account_id, platform, access_hash, access_expires_at, refresh_hash, family_hash, expires_at)
+     VALUES ($1, 'ios', $2, $3, $4, $5, $6) RETURNING id`,
     [
       accountId,
       hashToken(accessToken),
       new Date(now + 15 * 60 * 1000),
       hashToken(refreshToken),
+      hashToken(family),
       new Date(now + 90 * 24 * 60 * 60 * 1000),
     ],
   );
@@ -65,6 +73,17 @@ export async function signedInAccount(
   };
 }
 
+/** A signed-in account with the sensitive-answers consent of the current wording, which a save of whom one seeks needs (ADR-010 §16). */
+export async function consentedAccount(db: Queryable, label?: string): Promise<SignedIn> {
+  const account = await signedInAccount(db, label);
+  await db.query(
+    `INSERT INTO consent (account_id, kind, version, locale_shown)
+     VALUES ($1, 'special_category', $2, 'fi')`,
+    [account.accountId, SPECIAL_CATEGORY_CONSENT_VERSION],
+  );
+  return account;
+}
+
 /**
  * A device session for an account that exists already, such as one of
  * `people()`: what a route test needs to call as that person.
@@ -74,31 +93,37 @@ export async function signInAs(
   accountId: string,
 ): Promise<{ accountId: string; headers: { authorization: string } }> {
   const accessToken = randomBytes(32).toString("base64url");
-  const refreshToken = randomBytes(32).toString("base64url");
+  const family = randomBytes(32).toString("base64url");
+  const refreshToken = `${family}.${randomBytes(32).toString("base64url")}`;
   const now = Date.now();
   await db.query(
-    `INSERT INTO session (account_id, platform, access_hash, access_expires_at, refresh_hash, expires_at)
-     VALUES ($1, 'ios', $2, $3, $4, $5)`,
+    `INSERT INTO session (account_id, platform, access_hash, access_expires_at, refresh_hash, family_hash, expires_at)
+     VALUES ($1, 'ios', $2, $3, $4, $5, $6)`,
     [
       accountId,
       hashToken(accessToken),
       new Date(now + 15 * 60 * 1000),
       hashToken(refreshToken),
+      hashToken(family),
       new Date(now + 90 * 24 * 60 * 60 * 1000),
     ],
   );
   return { accountId, headers: { authorization: `Bearer ${accessToken}` } };
 }
 
-/** matching_config rows a test needs, upserted inside its transaction (rolled back with it). */
+/**
+ * matching_config values a test needs, inside its transaction (rolled back
+ * with it): each the key's next version, as the panel writes one, so it is
+ * the value read whatever version a migration left last.
+ */
 export async function withMatchingConfig(
   db: Queryable,
   values: Record<string, unknown>,
 ): Promise<void> {
   for (const [key, value] of Object.entries(values)) {
     await db.query(
-      `INSERT INTO matching_config (version, key, value, created_by) VALUES (1, $1, $2::jsonb, 'test')
-       ON CONFLICT (key, version) DO UPDATE SET value = EXCLUDED.value`,
+      `INSERT INTO matching_config (version, key, value, created_by)
+       SELECT coalesce(max(version), 0) + 1, $1, $2::jsonb, 'test' FROM matching_config WHERE key = $1`,
       [key, JSON.stringify(value)],
     );
   }

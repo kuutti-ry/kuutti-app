@@ -5,22 +5,31 @@ appId: fi.kuutti.app
 name: Log out everywhere ends this device's session, and reopening the app does not bring it back
 ---
 - runFlow: ../common/sign-in.yaml
-- openLink: kuutti://settings
+# Logging out opens under its row (#511), by its link as common/sign-out.yaml
+# opens it: on Android a swipe through Settings can pass over its row (CI,
+# 27/10/2026: thirty swipes, the row never seen, Settings left at its foot).
+# sign-in-links taps the row itself. Log out everywhere asks first (the
+# maintainer, 29/10/2026), and the question's own button carries it out.
+# The scroll goes to the line under the button, which puts the whole button
+# in sight (the row is the list's foot, where nothing can be centred), and
+# the list's own scroll to the row ends before the tap.
+- openLink: kuutti://settings?open=device
 - extendedWaitUntil:
     visible: "Settings|Asetukset|Inställningar"
     timeout: 15000
-# This device's session has a screen of its own, behind its row under "Account"
-# (#287), below the fold on a phone: scrolled to, then tapped.
 - scrollUntilVisible:
-    element: "This device|Tämä laite|Den här enheten"
+    element: "For a lost or lent phone\\.|Kadonnutta tai lainattua puhelinta varten\\.|För en borttappad eller utlånad telefon\\."
     direction: DOWN
-    centerElement: true
     timeout: 60000
-- tapOn: "This device|Tämä laite|Den här enheten"
-- extendedWaitUntil:
-    visible: "Log out everywhere|Kirjaudu ulos kaikkialta|Logga ut överallt"
-    timeout: 15000
+- waitForAnimationToEnd
 - tapOn: "Log out everywhere|Kirjaudu ulos kaikkialta|Logga ut överallt"
+- extendedWaitUntil:
+    visible: "Log out on every phone\\?|Kirjaudutaanko ulos kaikilla puhelimilla\\?|Logga ut på alla telefoner\\?"
+    timeout: 15000
+# The question's own button answers it in its words, a name of its own: on
+# Android the row's button behind the dialog, and its text, are matches too
+# for the row's words.
+- tapOn: "Log out on every phone|Kirjaudu ulos kaikilla puhelimilla|Logga ut på alla telefoner"
 - openLink: kuutti://
 - extendedWaitUntil:
     visible: "Sign in with your bank|Kirjaudu pankkitunnuksilla|Logga in med din bank"
@@ -28,4 +37,4 @@ name: Log out everywhere ends this device's session, and reopening the app does 
 - stopApp
 - runFlow: ../common/open-app.yaml
 - assertVisible: "Sign in with your bank|Kirjaudu pankkitunnuksilla|Logga in med din bank"
-- assertNotVisible: "Your area|Alueesi|Ditt område"
+- assertNotVisible: "Your profile|Profiilisi|Din profil"

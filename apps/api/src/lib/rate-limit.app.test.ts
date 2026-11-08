@@ -121,9 +121,9 @@ describe("a budget per person (ADR-026 §1-2)", () => {
     statuses.push((await get("/auth/session", b)).status);
     expect(statuses).toEqual([200, 200, 429, 200]);
     // Four requests from the address, none of them left on its count.
-    expect((await get("/waitlist")).status).toBe(200);
-    expect((await get("/waitlist")).status).toBe(200);
-    expect((await get("/waitlist")).status).toBe(429);
+    expect((await get("/ponds/counter")).status).toBe(200);
+    expect((await get("/ponds/counter")).status).toBe(200);
+    expect((await get("/ponds/counter")).status).toBe(429);
   });
 
   test("a token that opens no session stays on the address's count, whatever is wrong with it", async ({
@@ -152,7 +152,7 @@ describe("a budget per person (ADR-026 §1-2)", () => {
       expect(res.status).toBe(401);
       expect(await errorCode(res)).toBe(code);
     }
-    const spent = await get("/waitlist");
+    const spent = await get("/ponds/counter");
     expect(spent.status).toBe(429);
     expect(await errorCode(spent)).toBe("rate_limited");
     expect(requests().at(-1)).not.toHaveProperty("accountId");
@@ -166,8 +166,8 @@ describe("a budget per person (ADR-026 §1-2)", () => {
   }) => {
     const { get } = await appAt(ctx);
     const a = await signedInAccount(ctx.client, "rate-a");
-    await get("/waitlist");
-    await get("/waitlist");
+    await get("/ponds/counter");
+    await get("/ponds/counter");
     const refused = await get("/auth/session", a);
     expect(refused.status).toBe(429);
     expect(await errorCode(refused)).toBe("rate_limited");
@@ -201,8 +201,28 @@ describe("a budget per member of staff (ADR-026 §1-3)", () => {
 
     expect((await get("/admin/whoami", moderator)).status).toBe(200);
     // And the address was given back every one of them.
-    expect((await get("/waitlist")).status).toBe(200);
-    expect((await get("/waitlist")).status).toBe(200);
+    expect((await get("/ponds/counter")).status).toBe(200);
+    expect((await get("/ponds/counter")).status).toBe(200);
+  });
+});
+
+describe("the counter, which takes a session when one is offered (ADR-013 §18)", () => {
+  test("a read with a session is the person's, and one without is the address's", async ({
+    ctx,
+  }) => {
+    const { get, requests } = await appAt(ctx);
+    const me = await signedInAccount(ctx.client, "rate-counter");
+    // More than the address's two: each is given back once the person's limiter counts it.
+    expect((await get("/ponds/counter", me)).status).toBe(200);
+    expect(requests().at(-1)).toMatchObject({ accountId: me.accountId });
+    expect((await get("/ponds/counter", me)).status).toBe(200);
+    expect((await get("/ponds/counter", me)).status).toBe(429);
+    expect(requests().at(-1)).toMatchObject({ accountId: me.accountId, status: 429 });
+
+    expect((await get("/ponds/counter")).status).toBe(200);
+    expect(requests().at(-1)).not.toHaveProperty("accountId");
+    expect((await get("/ponds/counter")).status).toBe(200);
+    expect((await get("/ponds/counter")).status).toBe(429);
   });
 });
 
@@ -233,8 +253,8 @@ describe("a sign-in start the address's limit refuses (ADR-026 §4)", () => {
   }) => {
     const { app, get, refusedSignIns, logs } = await appAt(ctx);
     // Spent on a route nobody signs in for.
-    expect((await get("/waitlist")).status).toBe(200);
-    expect((await get("/waitlist")).status).toBe(200);
+    expect((await get("/ponds/counter")).status).toBe(200);
+    expect((await get("/ponds/counter")).status).toBe(200);
 
     const appStart = await get("/auth/start?platform=ios");
     expect(appStart.status).toBe(302);
@@ -254,7 +274,7 @@ describe("a sign-in start the address's limit refuses (ADR-026 §4)", () => {
     for (const res of [
       await get("/auth/callback?code=x&state=y"),
       exchange,
-      await get("/waitlist"),
+      await get("/ponds/counter"),
     ]) {
       expect(res.status).toBe(429);
       expect(await errorCode(res)).toBe("rate_limited");
@@ -321,7 +341,7 @@ describe("the routes that end a session (ADR-026 §2)", () => {
       expect(await errorCode(res)).toBe("not_active");
     }
     // Neither was given back: the address is spent, for anybody and for these routes too.
-    expect((await get("/waitlist")).status).toBe(429);
+    expect((await get("/ponds/counter")).status).toBe(429);
     const refused = await post("/auth/logout-all", a);
     expect(refused.status).toBe(429);
     expect(await errorCode(refused)).toBe("rate_limited");

@@ -67,6 +67,13 @@ resource "aws_budgets_budget" "monthly" {
   limit_unit   = "USD"
   time_unit    = "MONTHLY"
 
+  # Usage before credits (ADR-049): netted, as Budgets does by default, the
+  # association's credit would keep the budget near zero while it lasts and
+  # hide a cost that runs away.
+  cost_types {
+    include_credit = false
+  }
+
   notification {
     comparison_operator       = "GREATER_THAN"
     threshold                 = 80

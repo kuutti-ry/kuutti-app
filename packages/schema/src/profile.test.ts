@@ -15,7 +15,7 @@ import {
   ProfileUpdate,
   PromptAnswer,
 } from "./profile.ts";
-import { PROFILE_FIELDS } from "./profile-fields.ts";
+import { CARD_FIELD_KEYS, PROFILE_FIELDS } from "./profile-fields.ts";
 
 // The profile as written and the card as seen (#47, ADR-009): trimmed text at
 // its bounds, a bio or a placeholder, each prompt once, and a card that says
@@ -152,6 +152,7 @@ describe("the profile as its owner reads it back", () => {
     bioPreset: null,
     fields: { smoking: "never" },
     prompts: [{ key: "sunday", answer: "sauna" }],
+    hiddenFields: ["smoking"],
     specialCategoryConsent: { version: "2026-09-01", at },
     updatedAt: at,
   };
@@ -170,8 +171,24 @@ describe("the profile as its owner reads it back", () => {
     const response = {
       profile: null,
       completeness: { complete: false, missing: ["display_name", "photos"] },
+      home: null,
     };
     expect(ProfileResponse.parse(response)).toEqual(response);
+  });
+
+  it("carries the home in names beside the document, never in what is saved (ADR-061 §3)", () => {
+    const home = {
+      town: { fi: "Helsinki", sv: "Helsingfors" },
+      area: { fi: "Kallio", sv: "Berghäll" },
+      showArea: true,
+    };
+    const response = { profile: null, completeness: { complete: true, missing: [] }, home };
+    expect(ProfileResponse.parse(response).home).toEqual(home);
+    expect(codes(ProfileResponse, { ...response, home: undefined })).toEqual(["invalid_type"]);
+    expect(ProfileDocument.shape).not.toHaveProperty("home");
+    expect(ProfileUpdate.safeParse({ ...profile, home }).error?.issues[0]?.code).toBe(
+      "unrecognized_keys",
+    );
   });
 
   it("refuses an unknown missing item", () => {
@@ -190,7 +207,7 @@ describe("the card another person sees", () => {
     displayName: "Aino",
     age: { years: 34, verifiedByBank: true },
     gender: "woman",
-    pond: null,
+    place: null,
     photos: [
       {
         id: uuid(2),
@@ -207,6 +224,20 @@ describe("the card another person sees", () => {
     prompts: [],
     shared: { hobbies: ["sauna"], languages: [] },
   };
+
+  it("names the person's place in both languages, or says nothing, and no longer a pond (ADR-061 §3)", () => {
+    const place = { fi: "Helsinki", sv: "Helsingfors" };
+    expect(ProfileCard.parse({ ...card, place }).place).toEqual(place);
+    expect(ProfileCard.parse(card).place).toBeNull();
+    expect(codes(ProfileCard, { ...card, place: "00530" })).toEqual(["invalid_type"]);
+    expect(codes(ProfileCard, { ...card, place: undefined })).toEqual(["invalid_type"]);
+    expect(ProfileCard.shape).not.toHaveProperty("pond");
+    expect(ProfileCard.parse({ ...card, pond: { slug: "suomi" } })).not.toHaveProperty("pond");
+  });
+
+  it("carries no band: a band is the round's, frozen on its entry (ADR-061 §5)", () => {
+    expect(ProfileCard.shape).not.toHaveProperty("distance");
+  });
 
   it("carries the owner's caption of a photo (#296), null when the API did not say", () => {
     const withLine = { ...card, photos: [{ ...card.photos[0], caption: "summer_day" }] };
@@ -321,5 +352,37 @@ describe("the words that count for completeness", () => {
     expect(words(null)).toBe(false);
     expect(words("")).toBe(false);
     expect(words("x".repeat(49), null, 1)).toBe(false);
+  });
+});
+
+describe("the hidden fields of a profile (#515)", () => {
+  const document = {
+    displayName: "Aino",
+    bio: null,
+    bioPreset: null,
+    fields: {},
+    prompts: [],
+    specialCategoryConsent: null,
+    updatedAt: "2026-10-31T10:00:00.000Z",
+  };
+  const update = { displayName: "Aino", bio: null, bioPreset: null, fields: {}, prompts: [] };
+
+  it("reads an answer without them as none hidden", () => {
+    expect(ProfileDocument.parse(document).hiddenFields).toEqual([]);
+  });
+
+  it("takes an update without them, which leaves what is stored, and tells that from an empty list", () => {
+    expect(ProfileUpdate.parse(update).hiddenFields).toBeUndefined();
+    expect(ProfileUpdate.parse({ ...update, hiddenFields: [] }).hiddenFields).toEqual([]);
+  });
+
+  it("refuses to hide what no card carries, and more than a card carries", () => {
+    expect(ProfileUpdate.safeParse({ ...update, hiddenFields: ["education"] }).success).toBe(false);
+    expect(ProfileUpdate.safeParse({ ...update, hiddenFields: [...CARD_FIELD_KEYS] }).success).toBe(
+      true,
+    );
+    expect(
+      ProfileUpdate.safeParse({ ...update, hiddenFields: [...CARD_FIELD_KEYS, "intent"] }).success,
+    ).toBe(false);
   });
 });

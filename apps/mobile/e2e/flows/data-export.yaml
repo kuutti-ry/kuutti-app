@@ -3,47 +3,48 @@
 # that is the share sheet, on Android the system's folder picker; both are
 # the system's, in the phone's language, so the flow asserts only that the
 # app's own failure line never shows, and closes what opened. The file's
-# contents are held by erasure.test.ts. Sanna; read only: the day's three
-# copies are not spent by one run, and the cap is counted per account.
+# contents are held by erasure.test.ts. Sanna; read only: on Android the
+# folder is asked for before the API (#465), so a run spends none of the
+# day's three copies; iOS's sheet needs the file, so a run there spends one,
+# and the cap is counted per account.
 appId: fi.kuutti.app
 name: Download my data hands the person's file over
 ---
 - runFlow: ../common/sign-in.yaml
 - openLink: kuutti://settings
-# The export is on the account screen, behind its row (#287).
-# The row is the last of the list, below the fold on a phone: scrolled to, then tapped.
-- scrollUntilVisible:
-    element: "Your account|Tilisi|Ditt konto"
-    direction: DOWN
-    centerElement: true
-    timeout: 60000
-- tapOn: "Your account|Tilisi|Ditt konto"
-- extendedWaitUntil:
-    visible: "Download my data|Lataa tietoni|Ladda ner mina uppgifter"
-    timeout: 15000
-- assertVisible: "A file with everything Kuutti holds about you, and nothing about anyone else\\.|Tiedosto, jossa on kaikki, mitä Kuutti tietää sinusta, eikä mitään kenestäkään muusta\\.|En fil med allt Kuutti har om dig, och inget om någon annan\\."
+# The export opens under its own row, A copy of your data, under Privacy and
+# security (#511), below the fold on a phone.
+- runFlow:
+    file: ../common/open-settings-row.yaml
+    env:
+      ROW: "(A copy of your data|Kopio tiedoistasi|En kopia av dina uppgifter)(, .*)?"
+      INSIDE: "Download my data|Lataa tietoni|Ladda ner mina uppgifter"
 - tapOn: "Download my data|Lataa tietoni|Ladda ner mina uppgifter"
 # The sheet, or the picker, covers the app.
 - extendedWaitUntil:
     notVisible: "Download my data|Lataa tietoni|Ladda ner mina uppgifter"
     timeout: 20000
-# iOS's sheet is swiped down by its top; Android's folder picker is closed
-# by the back key, which the app takes as a cancelled download.
+# iOS's sheet is swiped down by its top, which on iOS 27 lies under the
+# screen's middle: a swipe that starts above it closes the sheet and goes on to
+# scroll the list behind. Android's folder picker is closed by the back key,
+# which the app takes as a cancelled download, before anything is fetched.
 - runFlow:
     when:
       platform: iOS
     commands:
       - swipe:
-          start: "50%, 45%"
+          start: "50%, 63%"
           end: "50%, 98%"
 - runFlow:
     when:
       platform: Android
     commands:
       - back
-# The account screen comes back, the button still on it.
+# Settings comes back, the row still open with its button, and nothing says
+# a file was saved.
 - extendedWaitUntil:
     visible: "Download my data|Lataa tietoni|Ladda ner mina uppgifter"
     timeout: 15000
-- assertNotVisible: "The download did not work\\. Try again\\.|Lataus ei onnistunut\\. Yritä uudelleen\\.|Nedladdningen misslyckades\\. Försök igen\\."
-- assertNotVisible: "That is enough copies for today\\..*|Tältä päivältä kopioita on jo tarpeeksi\\..*|Det räcker med kopior för i dag\\..*"
+- assertNotVisible: "That did not go through\\. Try again\\.|Se ei onnistunut\\. Yritä uudelleen\\.|Det gick inte\\. Försök igen\\."
+- assertNotVisible: "That is enough for today\\..*|Tältä päivältä riittää\\..*|Det räcker för i dag\\..*"
+- assertNotVisible: "Done\\.|Valmis\\.|Klart\\."

@@ -14,17 +14,17 @@ Code is organised by feature slice, not by layer. There is no `controllers/`, `s
 | slice | api | mobile | admin | primary TDs |
 |---|---|---|---|---|
 | identity | heavy | thin | auth only | TD-1, TD-7 |
-| profile | medium | heavy | read | TD-16 |
+| profile | medium | heavy | none | TD-16 |
 | media | heavy | medium | queue | TD-2, TD-8 |
-| pond | medium | thin | read | TD-10, TD-13 |
+| pond | medium | thin | switch | TD-10, TD-13 |
 | matching | heavy | heavy | none | TD-11, TD-12, TD-14 |
-| chat | heavy | heavy | snapshots | TD-3 |
+| chat | heavy | heavy | none | TD-3 |
 | safety | medium | thin | heavy | TD-5, TD-6 |
-| research | medium | none | read | TD-5 |
+| research | medium | none | none | TD-5 |
 | rewards | light | light | none | TD-15 |
 | notifications | light | light | none | TD-3, TD-18 |
 
-Not every slice appears in every app, and the asymmetry is informative: a slice heavy in two apps and absent from the third is where the integration risk is.
+Not every slice appears in every app, and the asymmetry is informative: a slice heavy in two apps and absent from the third is where the integration risk is. The panel shows a person's profile and a report's frozen copy of a conversation in safety's screens, and a researcher has no screen until #194.
 
 ## A feature is a name, not a directory
 
@@ -47,7 +47,7 @@ The seam between apps is shared vocabulary and one shared contract, never shared
 apps/api/src/
   <slice>/      routes.ts  service.ts  repo.ts  index.ts  *.test.ts
   lib/          db.ts  config.ts  logger.ts  s3.ts  ssm.ts  auth-middleware.ts
-  jobs/         the nightly runner and its jobs (waitlist snapshot, pond gate, the slices' sweeps)
+  jobs/         the nightly runner, and what reads across slices: the pond counter and the invitation count, who of a pond is complete, the queue's builder, the Starred list. A slice's own sweep stays in its slice
   app.ts
 
 apps/mobile/
@@ -67,6 +67,6 @@ apps/mobile/
 
 ## Specs and tests
 
-- Rules-layer slices (`identity`, `matching`, `media`'s photo check, `pond`, `safety`, `chat`, erasure) have `features/<slice>/*.feature`. The rest have ordinary tests.
+- Rules-layer slices (`identity`, `matching`, `media`'s photo check, `pond`, `safety`, `chat`, erasure, and `notifications`' whom a push tells, ADR-055) have `features/<slice>/*.feature`. The rest have ordinary tests.
 - Scenario name = test name, verbatim. `Scenario Outline` = `describe(<name>)` around `it.each(rows)`. `@pending` for spec-before-code.
 - `pnpm check:scenarios` runs in CI. Renaming a scenario without renaming its test fails the build; that is the point.

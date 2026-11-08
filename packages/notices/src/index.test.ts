@@ -8,6 +8,7 @@ import {
   collectNotices,
   licenseOf,
   normaliseText,
+  providerOf,
   shippedFilesOf,
   shippedPackageDirs,
   splitNotice,
@@ -61,6 +62,80 @@ describe("the licence a package.json declares", () => {
     expect(licenseOf({})).toBe("unknown");
     expect(licenseOf({ license: 7 })).toBe("unknown");
     expect(licenseOf({ license: { url: "https://example.invalid" } })).toBe("unknown");
+  });
+});
+
+describe("who provides a package (#512)", () => {
+  const ann = { name: "Ann Example", email: "ann@example.invalid" };
+
+  it("is the npm scope, before anything the package.json says", () => {
+    expect(providerOf("@expo/ui", { author: ann })).toBe("expo");
+    expect(providerOf("@react-native/js-polyfills", {})).toBe("react-native");
+  });
+
+  it("is the author without a scope, then the first maintainer", () => {
+    expect(providerOf("zod", { author: ann, maintainers: ["Bo"] })).toBe("Ann Example");
+    expect(providerOf("zod", { maintainers: ["Bo", "Cy"] })).toBe("Bo");
+    expect(providerOf("zod", { author: { email: "a@example.invalid" }, maintainers: [ann] })).toBe(
+      "Ann Example",
+    );
+  });
+
+  it.each([
+    ["a name alone", "Ann Example", "Ann Example"],
+    ["a name and an address", "Ann Example <ann@example.invalid>", "Ann Example"],
+    ["a name and a home page", "Ann Example (https://example.invalid)", "Ann Example"],
+    [
+      "a name, an address and a home page",
+      "Ann Example <ann@example.invalid> (https://example.invalid)",
+      "Ann Example",
+    ],
+    ["the spaces around a name", "  Ann Example  ", "Ann Example"],
+    ["a name outside ASCII", "Jan Mühlemann <jan@example.invalid>", "Jan Mühlemann"],
+    ["an object's name, the same way", { name: "Ann <ann@example.invalid>" }, "Ann"],
+  ])("reads %s, never the address", (_what, author, provider) => {
+    expect(providerOf("zod", { author })).toBe(provider);
+  });
+
+  it.each([
+    ["nothing", {}],
+    ["an empty author", { author: "" }],
+    ["an author of spaces", { author: "   " }],
+    ["an address with no name", { author: "<ann@example.invalid>" }],
+    ["an author of another type", { author: 7 }],
+    ["an object with no name", { author: { email: "ann@example.invalid" } }],
+    ["a null author", { author: null }],
+    ["an empty list of maintainers", { maintainers: [] }],
+    ["maintainers that are no list", { maintainers: "Bo" }],
+  ])("is nobody for %s", (_what, manifest) => {
+    expect(providerOf("zod", manifest)).toBeNull();
+  });
+
+  it("gives the start of any author's string, up to its address, or nobody", () => {
+    fc.assert(
+      fc.property(
+        fc.oneof(
+          fc.string(),
+          fc
+            .tuple(fc.string(), fc.string())
+            .map(([name, rest]) => `${name} <${rest}@example.invalid> (https://${rest})`),
+        ),
+        (author) => {
+          const provider = providerOf("zod", { author });
+          if (provider === null) return;
+          expect(provider).not.toMatch(/[<(]/);
+          expect(provider).toBe(provider.trim());
+          expect(author.trimStart().startsWith(provider)).toBe(true);
+        },
+      ),
+      { seed: 512 },
+    );
+  });
+
+  it("takes no scope from a name that has none whole", () => {
+    expect(providerOf("@", {})).toBeNull();
+    expect(providerOf("@scope", {})).toBeNull();
+    expect(providerOf("/@scope/name", {})).toBeNull();
   });
 });
 
@@ -341,7 +416,7 @@ describe("the notices of a bundle's packages (#416)", () => {
     const dirs = [
       pkg(
         "a/node_modules/zeta",
-        { name: "zeta", version: "1.0.0", license: "MIT" },
+        { name: "zeta", version: "1.0.0", license: "MIT", author: "Zed <zed@example.invalid>" },
         {
           LICENSE: `MIT License\n\nCopyright (c) 2019 Zeta\n\n${MIT_BODY}`,
         },
@@ -363,6 +438,7 @@ describe("the notices of a bundle's packages (#416)", () => {
           name: "alpha",
           version: "2.0.0",
           license: "MIT",
+          provider: null,
           licences: [{ file: "license", copyright: ["Copyright (c) Alpha"], text: key }],
           notices: [],
         },
@@ -370,6 +446,7 @@ describe("the notices of a bundle's packages (#416)", () => {
           name: "zeta",
           version: "1.0.0",
           license: "MIT",
+          provider: "Zed",
           licences: [{ file: "LICENSE", copyright: ["Copyright (c) 2019 Zeta"], text: key }],
           notices: [],
         },
@@ -461,6 +538,7 @@ describe("the notices of a bundle's packages (#416)", () => {
       name: "@scope/bare",
       version: "0.1.0",
       license: "MIT",
+      provider: "scope",
       licences: [
         { file: null, copyright: expo.copyright, text: textKey(MIT_BODY), from: expo.from },
         {

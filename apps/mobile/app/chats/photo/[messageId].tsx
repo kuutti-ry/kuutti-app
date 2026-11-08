@@ -12,6 +12,12 @@ function seqOf(value: Param): number {
   return Number.isInteger(seq) && seq > 0 ? seq : 0;
 }
 
+/** Whether the conversation took a report as the bubble saw it (#476): open or ended, else none. */
+function reportOf(value: Param): "open" | "ended" | null {
+  const report = first(value);
+  return report === "open" || report === "ended" ? report : null;
+}
+
 /** A conversation's photo full size (#350), by what the photo bubble put in the link; the screen asks the API whether it is the person's. */
 export default function ChatPhotoRoute() {
   const params = useLocalSearchParams<{
@@ -19,6 +25,7 @@ export default function ChatPhotoRoute() {
     conversation?: string | string[];
     seq?: string | string[];
     blurhash?: string | string[];
+    report?: string | string[];
   }>();
   return (
     <ChatPhotoScreen
@@ -26,6 +33,7 @@ export default function ChatPhotoRoute() {
       conversation={first(params.conversation)}
       seq={seqOf(params.seq)}
       blurhash={first(params.blurhash)}
+      report={reportOf(params.report)}
     />
   );
 }

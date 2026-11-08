@@ -1,0 +1,40 @@
+# A later question has its Save and its Ask me later, so an answer not saved is
+# never dropped without the person's word (the maintainer, 14/10/2026): the
+# arrow asks and is kept on the word; a link from outside the app waits for the
+# word the same way (app/+native-intent.ts) and is followed on it. Sanna has not
+# answered what she thinks of drugs, and nothing of it is stored.
+appId: fi.kuutti.app
+name: A later question left unsaved asks first, on the arrow and on a link from outside
+---
+- runFlow: ../common/sign-in.yaml
+- openLink: kuutti://profile/later/drugsAttitude
+- extendedWaitUntil:
+    visible: "Drugs, your attitude|Suhtautuminen huumeisiin|Inställning till droger"
+    timeout: 15000
+- waitForAnimationToEnd
+- tapOn: "Not my thing|Ei minun juttuni|Inte min grej"
+- assertVisible: "✓ Not my thing|✓ Ei minun juttuni|✓ Inte min grej"
+
+- tapOn: "Back to your profile|Takaisin profiiliisi|Tillbaka till din profil"
+- extendedWaitUntil:
+    visible: "Leave without saving\\?|Poistutaanko tallentamatta\\?|Lämna utan att spara\\?"
+    timeout: 15000
+- tapOn: "Keep editing|Jatka muokkaamista|Fortsätt redigera"
+- assertVisible: "✓ Not my thing|✓ Ei minun juttuni|✓ Inte min grej"
+
+- openLink: kuutti://
+- extendedWaitUntil:
+    visible: "Leave without saving\\?|Poistutaanko tallentamatta\\?|Lämna utan att spara\\?"
+    timeout: 15000
+- tapOn: "Leave without saving|Poistu tallentamatta|Lämna utan att spara"
+# Home, by the profile's button under the gate's card: the card of how many
+# people are on Kuutti comes last (#581), and may lie below the fold.
+- extendedWaitUntil:
+    visible: "See people|Katso ihmisiä|Se människor"
+    timeout: 15000
+
+# Nothing of it is stored: its words without the tick.
+- openLink: kuutti://profile/later/drugsAttitude
+- extendedWaitUntil:
+    visible: "Not my thing|Ei minun juttuni|Inte min grej"
+    timeout: 15000

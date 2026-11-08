@@ -91,7 +91,7 @@ jobs:
 
       # No Gradle cache: the dev client is cached whole, and a Gradle cache
       # would be restored on every run for the few that build.
-      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
         if: steps.dev-client.outputs.cache-hit != 'true'
         with:
           distribution: temurin
@@ -140,7 +140,7 @@ jobs:
       - uses: ./.github/actions/pnpm
 
       # Java for Maestro.
-      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
         with:
           distribution: temurin
           java-version: "17"
@@ -168,7 +168,14 @@ jobs:
           mkdir -p "$ANDROID_AVD_HOME"
           echo "$ANDROID_HOME/platform-tools" >> "$GITHUB_PATH"
           (yes || true) | "$tools/sdkmanager" --licenses > /dev/null
-          "$tools/sdkmanager" emulator platform-tools "$image" > /dev/null
+          # A download can arrive broken (CI, 27/10/2026: the system image's
+          # zip unreadable): tried three times, what the last try left of its
+          # download thrown away, so that the next one fetches it afresh.
+          for attempt in 1 2 3; do
+            "$tools/sdkmanager" emulator platform-tools "$image" > /dev/null && break
+            [ "$attempt" = 3 ] && exit 1
+            rm -rf "$ANDROID_HOME/.temp" "$ANDROID_HOME/.downloadIntermediates"
+          done
           echo no | "$tools/avdmanager" create avd --name e2e --package "$image" --device pixel_7 \
             || { "$tools/avdmanager" list device --compact; exit 1; }
           # 4 GB, not the 2560 MB the emulator gives this image by itself: with
@@ -208,7 +215,7 @@ jobs:
       - name: The cast's stories
         run: pnpm demo:reset
 
-      # The home screen shows an area's numbers from ten people up.
+      # Home's card says its number from ten finished profiles and its bar from ten in each band.
       - name: The synthetic population
         run: pnpm demo:population
 
@@ -320,13 +327,16 @@ jobs:
       # Maestro keeps a flow's device log only once a flow runs; a failure
       # before the first (Android restarting as Maestro installed its driver,
       # #364) left nothing to read. The whole log goes with the artifact.
+      # Bounded: with no device adb waits for one without end, and a run
+      # whose emulator never started sat here until the job's limit (CI,
+      # 27/10/2026: a broken download, then 33 minutes of waiting).
       - name: The device log on failure
         if: failure()
-        run: adb logcat -d -b all > device-logcat.txt 2>&1 || true
+        run: timeout 60 adb logcat -d -b all > device-logcat.txt 2>&1 || true
 
       - name: Keep what the run saw
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: e2e-android-${{ matrix.shard }}
           path: |

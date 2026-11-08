@@ -23,6 +23,11 @@ describe("Label", () => {
     // The wrapper is accessible={false}: nothing here for the a11y check to flag.
     expect(pressables(screen.toJSON() as HostNode).flatMap((n) => a11yProblems(n))).toEqual([]);
     expect(rootOf("Name").props.className).not.toMatch(/opacity-50/);
+    expect(screen.getByText("Name").props.className).toMatch(/(^| )text-foreground( |$)/);
+    // A label is Saiga's small words (#408).
+    expect(screen.getByText("Name").props.className.split(" ")).toEqual(
+      expect.arrayContaining(["font-sans", "text-label"]),
+    );
   });
 
   it("is dimmed and ignores presses when disabled", async () => {
@@ -34,7 +39,10 @@ describe("Label", () => {
     );
     await fireEvent.press(screen.getByText("Name"));
     expect(pressed).not.toHaveBeenCalled();
-    expect(rootOf("Name").props.className).toMatch(/\bopacity-50\b/);
+    // In the muted token, never faded below the set's contrast (#467).
+    expect(rootOf("Name").props.className).not.toMatch(/opacity-/);
+    expect(screen.getByText("Name").props.className).toMatch(/\btext-muted-foreground\b/);
+    expect(screen.getByText("Name").props.className).not.toMatch(/\btext-foreground\b/);
   });
 
   it("shrinks beside a control, its text wrapping, instead of pushing the control off the screen", async () => {

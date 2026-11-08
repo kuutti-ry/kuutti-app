@@ -6,9 +6,9 @@ import * as repo from "./repo.ts";
 
 // Taking a break (#170, ADR-022): the account to `paused` with the state it
 // had kept aside, every device signed out, and nothing else touched. The
-// profile, the photos, the preferences, the consents and the place at the
-// gate stay as they are; the pool, the counter and the card leave a paused
-// account out on their own (ADR-013 §2, ADR-015 §3, profile/card.ts). The
+// profile, the photos, the preferences and the consents stay as they are; the
+// pool, the counter and the card leave a paused account out on their own
+// (ADR-013 §2, ADR-060 §3, profile/card.ts). The
 // next bank login brings the state back (login.ts). Nothing here deletes:
 // erasure.ts is the only delete.
 // shortcut: the login exchange takes the account row's share lock

@@ -1,8 +1,8 @@
 /**
  * doctor: is this machine ready for `pnpm env:up`?
  *
- * Checks Node, pnpm through Corepack, the git hooks, Docker with compose, the
- * root .env, a reachable database path, and the local ports. Prints the exact fix for each
+ * Checks Node, pnpm through Corepack, the git hooks, Saiga, Docker with
+ * compose, the root .env, a reachable database path, and the local ports. Prints the exact fix for each
  * failure. Exit 1 when something required is missing.
  *
  *   pnpm env:doctor   (pnpm doctor is pnpm's own command)
@@ -65,6 +65,16 @@ else
   bad(
     "git hooks are off: an unsigned or unformatted commit is only refused by CI",
     "git config core.hooksPath .githooks",
+    false,
+  );
+
+// Saiga, the typeface (ADR-052): members of Kuutti ry only, so a warning.
+const fonts = sh(process.execPath, [resolve(ROOT, "scripts/fonts.ts"), "--check"]);
+if (fonts.code === 0) ok("Saiga in ~/.cache/kuutti-fonts");
+else
+  bad(
+    "Saiga is not on this computer: the app and the panel are in the system font",
+    "pnpm fonts (with your own gh login; members of Kuutti ry)",
     false,
   );
 

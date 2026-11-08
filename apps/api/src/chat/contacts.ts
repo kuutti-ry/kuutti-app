@@ -15,8 +15,9 @@ import { type ChatDeps, readConversation, requireConversation } from "./conversa
 import * as repo from "./repo.ts";
 
 // Contacts shared in a conversation (#103, ADR-031 §11; the maintainer's
-// decisions of 18/10/2026). A person keeps up to four pieces (a phone number,
-// WhatsApp, Telegram, Instagram), seen by nobody, and shares one in a
+// decisions of 18/10/2026, Snapchat's of 28/10/2026). A person keeps up to
+// five pieces (a phone number, WhatsApp, Telegram, Instagram, Snapchat), seen
+// by nobody, and shares one in a
 // conversation with one press: the other person sees it at once, until its
 // owner stops sharing it, removes or changes it, or the conversation closes.
 // No agreement step, no obligation to share back. A value reaches no log
@@ -47,8 +48,8 @@ export async function exportContacts(
 /**
  * Keeps a piece in the one form of its kind (normaliseContact), replacing the
  * one stored before; a changed piece that is shared shows its new value at
- * once (migration 0059 tells the conversations). Held against an erasure, so
- * a request that outlived one writes nothing.
+ * once (the `contact_notify` trigger tells the conversations). Held against an
+ * erasure, so a request that outlived one writes nothing.
  */
 export async function keepContact(
   deps: Deps,

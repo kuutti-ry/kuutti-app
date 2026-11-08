@@ -11,6 +11,7 @@ import { conversationBetween } from "../test/chat.ts";
 import { exportOf, openExport } from "../test/export.ts";
 import { captureLogger, englishT, type TestContext, test, testConfig } from "../test/harness.ts";
 import { fixtureJpeg, fixturePng, testMediaDeps } from "../test/media.ts";
+import { queued } from "../test/queue.ts";
 import { eraseAccount, exportAccount } from "./erasure.ts";
 import { REREGISTER_COOLDOWN_DAYS } from "./registration.ts";
 
@@ -159,6 +160,25 @@ describe("account erasure", () => {
     expect(identity.rows[0]?.hetu_hmac).toBeTruthy(); // the identity row stays
   });
 
+  test("Erasure leaves no home on the tombstone", async ({ ctx }) => {
+    const { app } = await appWith(ctx);
+    const a = await signedInAccount(ctx.client);
+    const res = await app.request("/account/home", {
+      method: "PUT",
+      headers: { ...a.headers, "content-type": "application/json" },
+      body: JSON.stringify({ postalCode: "00530", showArea: true }),
+    });
+    expect(res.status).toBe(200);
+    expect((await del(app, a.headers)).status).toBe(204);
+    const { rows } = await ctx.client.query(
+      "SELECT state, home_place, home_shows_area, pond_id FROM account WHERE id = $1",
+      [a.accountId],
+    );
+    expect(rows).toEqual([
+      { state: "deleted", home_place: null, home_shows_area: false, pond_id: null },
+    ]);
+  });
+
   test("A photo another account also uploaded keeps its objects", async ({ ctx }) => {
     const { app, store } = await appWith(ctx);
     const a = await signedInAccount(ctx.client, "a");
@@ -236,6 +256,7 @@ describe("account erasure", () => {
         accessHash: "h1",
         accessExpiresAt: new Date(Date.now() + 60_000),
         refreshHash: "h2",
+        familyHash: "h3",
         expiresAt: new Date(Date.now() + 60_000),
         at: new Date(),
       }),
@@ -374,6 +395,147 @@ describe("account erasure", () => {
     expect(text).not.toContain(staff.identityId);
   });
 
+  describe("the home in the export (ADR-061 §9)", () => {
+    const putHome = (app: ReturnType<typeof createApp>, headers: object, body: unknown) =>
+      app.request("/account/home", {
+        method: "PUT",
+        headers: { ...headers, "content-type": "application/json" },
+        body: JSON.stringify(body),
+      });
+
+    test("The export says the home in words, never a key", async ({ ctx }) => {
+      const { app } = await appWith(ctx);
+      const a = await signedInAccount(ctx.client);
+      expect((await putHome(app, a.headers, { postalCode: "00530" })).status).toBe(200);
+      const { document, raw } = await openExport(
+        await app.request("/account/export", { headers: a.headers }),
+      );
+      expect(document.account.home).toEqual({
+        place: "Kallio",
+        shownOnCard: "Helsinki",
+      });
+      expect(raw).not.toContain('"00530"');
+      expect(raw).not.toMatch(/homePlace|home_place|movedAt/);
+    });
+
+    test("says what the card shows where the person chose their area, and the Swedish names in Swedish", async ({
+      ctx,
+    }) => {
+      const { app } = await appWith(ctx);
+      const a = await signedInAccount(ctx.client);
+      await putHome(app, a.headers, { postalCode: "00530", showArea: true });
+      expect((await exportOf(app, a.headers)).account.home).toEqual({
+        place: "Kallio",
+        shownOnCard: "Kallio",
+      });
+      const swedish = await openExport(
+        await app.request("/account/export", {
+          headers: { ...a.headers, "accept-language": "sv" },
+        }),
+      );
+      expect(swedish.document.account.home).toEqual({
+        place: "Berghäll",
+        shownOnCard: "Berghäll",
+      });
+    });
+
+    test("says the municipality kept, which is not the town the card names", async ({ ctx }) => {
+      const { app } = await appWith(ctx);
+      const a = await signedInAccount(ctx.client);
+      await putHome(app, a.headers, { postalCode: "83960" });
+      const { document, raw } = await openExport(
+        await app.request("/account/export", { headers: a.headers }),
+      );
+      expect(document.account.home).toEqual({
+        place: "Lieksa",
+        shownOnCard: "Joensuu",
+      });
+      expect(raw).not.toContain('"422"');
+    });
+
+    test("is null without a home, and for a place the list no longer knows", async ({ ctx }) => {
+      const { app } = await appWith(ctx);
+      const a = await signedInAccount(ctx.client);
+      expect((await exportOf(app, a.headers)).account.home).toBeNull();
+      await ctx.client.query("UPDATE account SET home_place = '12345' WHERE id = $1", [
+        a.accountId,
+      ]);
+      expect((await exportOf(app, a.headers)).account.home).toBeNull();
+    });
+
+    test("reads the place through the floor, as everything does", async ({ ctx }) => {
+      const { app } = await appWith(ctx);
+      const a = await signedInAccount(ctx.client);
+      await putHome(app, a.headers, { postalCode: "00530", showArea: true });
+      await withMatchingConfig(ctx.client, { home_min_inhabitants: 20000 });
+      expect((await exportOf(app, a.headers)).account.home).toEqual({
+        place: "Helsinki",
+        shownOnCard: "Helsinki",
+      });
+    });
+  });
+
+  test("The export says a skip in words and marks a second pass, and names nobody (ADR-062 §3, §6)", async ({
+    ctx,
+  }) => {
+    const { app } = await appWith(ctx);
+    const a = await signedInAccount(ctx.client);
+    const [skipped, passed, undecided] = [
+      await signedInAccount(ctx.client),
+      await signedInAccount(ctx.client),
+      await signedInAccount(ctx.client),
+    ];
+    const at = new Date("2026-10-16T09:00:00.000Z");
+    const round = await queued(
+      ctx.client,
+      a.accountId,
+      [skipped.accountId, passed.accountId, undecided.accountId],
+      at,
+    );
+    await ctx.client.query(
+      `UPDATE round_entries SET
+         decision = (CASE position WHEN 1 THEN 'skip' ELSE 'pass' END)::round_decision,
+         decided_at = $2, second_pass = position = 2
+       WHERE round_id = $1 AND position < 3`,
+      [round, at],
+    );
+    const { document, raw } = await openExport(
+      await app.request("/account/export", { headers: a.headers }),
+    );
+    expect(
+      document.rounds.items[0]?.entries.map((entry) => ({
+        position: entry.position,
+        decision: entry.decision,
+        decisionInWords: entry.decisionInWords,
+        decidedAt: entry.decidedAt,
+        secondPass: entry.secondPass,
+      })),
+    ).toEqual([
+      {
+        position: 1,
+        decision: "skip",
+        decisionInWords: "Left for later",
+        decidedAt: at.toISOString(),
+        secondPass: false,
+      },
+      {
+        position: 2,
+        decision: "pass",
+        decisionInWords: "Passed",
+        decidedAt: at.toISOString(),
+        secondPass: true,
+      },
+      {
+        position: 3,
+        decision: null,
+        decisionInWords: null,
+        decidedAt: null,
+        secondPass: false,
+      },
+    ]);
+    for (const other of [skipped, passed, undecided]) expect(raw).not.toContain(other.accountId);
+  });
+
   test("The export works without object storage, with no photo files", async ({ ctx }) => {
     const { app } = await appWith(ctx, { media: false });
     const a = await signedInAccount(ctx.client);
@@ -501,9 +663,9 @@ describe("account erasure and export: the edges", () => {
     const { app } = await appWith(ctx, { media: false });
     const a = await signedInAccount(ctx.client);
     const { rows } = await ctx.client.query<{ id: string; platform: string }>(
-      `INSERT INTO session (account_id, platform, access_hash, access_expires_at, refresh_hash, expires_at, revoked_at)
-       VALUES ($1, 'android', 'edge-a1', now() + interval '15 minutes', 'edge-r1', now() + interval '90 days', NULL),
-              ($1, 'android', 'edge-a2', now() + interval '15 minutes', 'edge-r2', now() + interval '90 days', now())
+      `INSERT INTO session (account_id, platform, access_hash, access_expires_at, refresh_hash, family_hash, expires_at, revoked_at)
+       VALUES ($1, 'android', 'edge-a1', now() + interval '15 minutes', 'edge-r1', 'edge-f1', now() + interval '90 days', NULL),
+              ($1, 'android', 'edge-a2', now() + interval '15 minutes', 'edge-r2', 'edge-f2', now() + interval '90 days', now())
        RETURNING id, platform`,
       [a.accountId],
     );

@@ -5,7 +5,6 @@ import {
   formatDateTime,
   formatHeight,
   formatNumber,
-  formatPond,
   formatTime,
   parseAcceptLanguage,
   RELEASED_LOCALES,
@@ -16,8 +15,8 @@ import { enXA } from "./pseudo.ts";
 
 describe("t()", () => {
   it("renders a key in English and in Finnish", () => {
-    expect(typedT(createI18n({ locale: "en" }))("onboarding.retry")).toBe("Try again");
-    expect(typedT(createI18n({ locale: "fi" }))("onboarding.retry")).toBe("Yritä uudelleen");
+    expect(typedT(createI18n({ locale: "en" }))("load.retry")).toBe("Try again");
+    expect(typedT(createI18n({ locale: "fi" }))("load.retry")).toBe("Yritä uudelleen");
   });
 
   it("formats ICU arguments and plurals per locale", () => {
@@ -38,18 +37,18 @@ describe("t()", () => {
   });
 
   it("offers en-XA only when a dev build hands the catalogue in", () => {
-    expect(typedT(createI18n({ locale: "en-XA", pseudo: enXA }))("onboarding.retry")).toBe(
+    expect(typedT(createI18n({ locale: "en-XA", pseudo: enXA }))("load.retry")).toBe(
       "［Trýý áágááííñ］",
     );
-    expect(typedT(createI18n({ locale: "en-XA" }))("onboarding.retry")).toBe("Try again");
+    expect(typedT(createI18n({ locale: "en-XA" }))("load.retry")).toBe("Try again");
   });
 
   it("changes language on one instance, and a fixed t ignores the change (the API's per-request t)", async () => {
     const i18n = createI18n({ locale: "en" });
     const fixedFi = typedT(i18n, "fi");
     await i18n.changeLanguage("sv");
-    expect(typedT(i18n)("onboarding.retry")).toBe("Försök igen");
-    expect(fixedFi("onboarding.retry")).toBe("Yritä uudelleen");
+    expect(typedT(i18n)("load.retry")).toBe("Försök igen");
+    expect(fixedFi("load.retry")).toBe("Yritä uudelleen");
   });
 
   it("makes an unknown key and wrong arguments type errors", () => {
@@ -61,8 +60,8 @@ describe("t()", () => {
     t("errors.rate_limited");
     // @ts-expect-error seconds is a number
     t("errors.rate_limited", { seconds: "3" });
-    // @ts-expect-error onboarding.retry takes no arguments
-    t("onboarding.retry", { extra: 1 });
+    // @ts-expect-error load.retry takes no arguments
+    t("load.retry", { extra: 1 });
     expect(t("home.title")).toBe("Kuutti");
   });
 });
@@ -136,14 +135,5 @@ describe("formatting", () => {
     // ICU's own "short" date is a two-digit year, and a message has no time
     // zone, so the hour is the runner's: day first and the 24-hour dot are the point.
     expect(i18n.t("test.when", { at })).toMatch(/^19\/09\/26 \d\d\.\d\d$/);
-  });
-
-  it("reads a pond's case form from the database and never builds one", () => {
-    // The shape of PondSummary: every case form is required, so none is dropped silently.
-    const helsinki = { name: "Helsinki", nameInessive: "Helsingissä" };
-    expect(formatPond(helsinki, "inessive", "fi")).toBe("Helsingissä");
-    expect(formatPond(helsinki, "inessive", "en")).toBe("Helsinki");
-    expect(formatPond(helsinki, "inessive", "sv")).toBe("Helsinki");
-    expect(formatPond(helsinki, "nominative", "fi")).toBe("Helsinki");
   });
 });

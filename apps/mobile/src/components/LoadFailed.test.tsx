@@ -1,45 +1,49 @@
 import { act, fireEvent, screen, waitFor } from "@testing-library/react-native";
-import { Linking } from "react-native";
+import { AccessibilityInfo, Linking } from "react-native";
 import { ApiError } from "@/lib/api";
 import { updateApp } from "@/lib/app-update";
 import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
 import { renderWithTheme } from "@/test/render";
 import { LoadFailed } from "./LoadFailed";
 
-// What a screen shows when something did not load (outside production): its
-// own line, why in words, and the way out that fits the failure.
+// What a screen shows when something did not load (outside production): why in
+// words, heard at once, and the way out that fits the failure (#581).
 
 jest.mock("@/lib/app-update", () => ({ updateApp: jest.fn() }));
 const update = updateApp as jest.Mock;
 
 const outdated = Object.assign(new Error("contract"), { name: "ZodError" });
+const heard = AccessibilityInfo.announceForAccessibilityWithOptions as jest.Mock;
 
 async function show(error: unknown, onRetry = jest.fn()) {
-  await renderWithTheme(
-    <LoadFailed headline="Your profile could not be loaded." error={error} onRetry={onRetry} />,
-  );
+  await renderWithTheme(<LoadFailed error={error} onRetry={onRetry} />);
   return onRetry;
 }
 
-beforeEach(() => update.mockReset());
+beforeEach(() => {
+  update.mockReset();
+  heard.mockClear();
+});
 
 describe("LoadFailed", () => {
   it.each([
     [
       "no answer",
       new TypeError("Network request failed"),
-      "Kuutti could not be reached. Check your connection and try again.",
+      "Kuutti could not be reached. Check your connection.",
     ],
     [
       "a server error",
       new ApiError("profile answered 500", 500),
       "Kuutti's server had a problem. Try again in a moment.",
     ],
-    ["anything else", new Error("boom"), "Something unexpected went wrong. Try again."],
+    ["anything else", new Error("boom"), "Something unexpected went wrong."],
   ])("says why after %s, and tries again on request", async (_, error, why) => {
     const onRetry = await show(error);
-    expect(screen.getByText("Your profile could not be loaded.")).toBeTruthy();
-    expect(screen.getByText(why)).toBeTruthy();
+    // The reason takes over what a screen reader hears at once: a live region, and aloud on iOS.
+    expect(screen.getByText(why).props.accessibilityLiveRegion).toBe("assertive");
+    expect(screen.getByText(why).props.className).toMatch(/\btext-center\b/);
+    expect(heard).toHaveBeenCalledWith(why, { queue: true });
     expect(screen.queryByRole("button", { name: "Update the app" })).toBeNull();
     fireEvent.press(screen.getByRole("button", { name: "Try again" }));
     expect(onRetry).toHaveBeenCalledTimes(1);
@@ -50,11 +54,7 @@ describe("LoadFailed", () => {
   it("offers to update an app older than its API, and no retry that cannot help", async () => {
     update.mockReturnValue(new Promise(() => undefined));
     const onRetry = await show(outdated);
-    expect(
-      screen.getByText(
-        "This version of the app is older than Kuutti's server and cannot read its answer. Update the app to continue.",
-      ),
-    ).toBeTruthy();
+    expect(screen.getByText("This version of the app is older than Kuutti's server.")).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Try again" })).toBeNull();
     await act(async () => {
       fireEvent.press(screen.getByRole("button", { name: "Update the app" }));

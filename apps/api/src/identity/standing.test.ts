@@ -830,12 +830,13 @@ describe("endSessionsForSanction", () => {
   /** One signed-in device of the account, as `signInAs` writes it, with its id. */
   async function sessionOf(db: Queryable, accountId: string) {
     const { rows } = await db.query<{ id: string }>(
-      `INSERT INTO session (account_id, platform, access_hash, access_expires_at, refresh_hash, expires_at)
-       VALUES ($1, 'ios', $2, $3, $4, $5) RETURNING id`,
+      `INSERT INTO session (account_id, platform, access_hash, access_expires_at, refresh_hash, family_hash, expires_at)
+       VALUES ($1, 'ios', $2, $3, $4, $5, $6) RETURNING id`,
       [
         accountId,
         hashToken(randomBytes(32).toString("base64url")),
         at("2026-10-20T09:15:00Z"),
+        hashToken(randomBytes(32).toString("base64url")),
         hashToken(randomBytes(32).toString("base64url")),
         at("2027-01-18T09:00:00Z"),
       ],

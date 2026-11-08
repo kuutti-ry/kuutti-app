@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { PhotoCaption, PhotoDescription, PhotoId } from "./media.ts";
-import { Gender, PondSummary } from "./onboarding.ts";
-import { PROFILE_FIELDS, ProfileFields } from "./profile-fields.ts";
+import { Gender, HomeSummary, PlaceName } from "./onboarding.ts";
+import { CARD_FIELD_KEYS, HiddenField, PROFILE_FIELDS, ProfileFields } from "./profile-fields.ts";
 
 /**
  * The profile as the person writes it and the card as others see it (#47,
@@ -82,6 +82,8 @@ export const ProfileUpdate = z
     bioPreset: BioPreset.nullable(),
     fields: ProfileFields,
     prompts: z.array(PromptAnswer).max(PROMPTS_MAX),
+    /** The fields kept off the card (#515). Left out, what is stored stays: an app from before them must not put a hidden answer back on a card. */
+    hiddenFields: z.array(HiddenField).max(CARD_FIELD_KEYS.length).optional(),
     // The special-category consent is not part of the document: it is given
     // once at the seeks step and withdrawn in Settings (the consent routes),
     // and the API reads it from the consent rows (ADR-019 §4, #204).
@@ -120,6 +122,8 @@ export const ProfileDocument = z
     bioPreset: BioPreset.nullable(),
     fields: ProfileFields,
     prompts: z.array(PromptAnswer).max(PROMPTS_MAX),
+    /** The fields kept off the card (#515); the owner's alone, never on anybody's card. */
+    hiddenFields: z.array(HiddenField).max(CARD_FIELD_KEYS.length).default([]),
     /** The special-category consent as the consent rows hold it: the current wording's version and when it was given, or null (ADR-019 §4). Read-only here. */
     specialCategoryConsent: z
       .object({ version: z.string().max(40), at: z.iso.datetime() })
@@ -134,6 +138,8 @@ export const ProfileResponse = z
     /** Null until the first save. */
     profile: ProfileDocument.nullable(),
     completeness: Completeness,
+    /** The home as its owner reads it (ADR-061 §3): read-only here, since a home is written by its own route and never by the document. */
+    home: HomeSummary.nullable(),
   })
   .meta({ id: "ProfileResponse" });
 export type ProfileResponse = z.infer<typeof ProfileResponse>;
@@ -169,15 +175,15 @@ export const ProfileCard = z
     }),
     /** Self-declared (#146), display only (ADR-019 §1); null before the gender step. The identity label, if any, is in `fields`. */
     gender: Gender.nullable(),
-    /** Where the person matches (#46); null until onboarding set it. */
-    pond: PondSummary.nullable(),
+    /** The name the person's home shows (ADR-061 §3): the nearest town, or their area where they chose it, never digits; null without a home. */
+    place: PlaceName.nullable(),
     photos: z.array(CardPhoto).max(50),
-    /** The info and hard fields of the registry (ADR-019 §2), less a field the person hides (#150). */
+    /** The info and hard fields of the registry (ADR-019 §2), less what the person hides (#150, #515). */
     fields: ProfileFields,
     bio: z.string().max(BIO_MAX).nullable(),
     bioPreset: BioPreset.nullable(),
     prompts: z.array(PromptAnswer).max(PROMPTS_MAX),
-    /** What both the viewer and the subject answered (#150): marked in words on the card, never a count. Empty on the owner's preview. */
+    /** What both the viewer and the subject answered (#150), from what the card shows, so never a hidden answer (#515): marked in words on the card, never a count. Empty on the owner's preview. */
     shared: z.object({
       hobbies: z.array(z.string().max(40)).max(PROFILE_FIELDS.hobbies.options.length),
       languages: z.array(z.string().max(40)).max(PROFILE_FIELDS.languages.options.length),

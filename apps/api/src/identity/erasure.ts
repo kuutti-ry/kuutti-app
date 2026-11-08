@@ -1,5 +1,5 @@
 import { type Queryable, transaction } from "@kuutti/db";
-import { describePhoto, type TFunction } from "@kuutti/i18n";
+import { DEFAULT_LOCALE, describePhoto, type Locale, type TFunction } from "@kuutti/i18n";
 import type { AccountExport, ExportedPhotoCheck } from "@kuutti/schema";
 import { eraseConversationsOf, exportContacts, exportConversations } from "../chat/index.ts";
 import { AppError } from "../lib/errors.ts";
@@ -7,7 +7,9 @@ import type { Logger } from "../lib/logger.ts";
 import {
   deletePreferencesOfAccount,
   eraseRoundsOf,
+  eraseStarsOf,
   exportRounds,
+  exportStars,
   readDealBreakers,
   readPreferences,
 } from "../matching/index.ts";
@@ -19,8 +21,13 @@ import {
   type MediaDeps,
   type PhotoErasure,
 } from "../media/index.ts";
-import { eraseNotificationsOf, exportNotifications } from "../notifications/index.ts";
-import { deleteGateOfAccount, exportGate, findPondOfAccount } from "../pond/index.ts";
+import {
+  eraseNotificationsOf,
+  erasePushTokensOf,
+  exportNotifications,
+  exportPushTokens,
+} from "../notifications/index.ts";
+import { exportHome, findPondOfAccount } from "../pond/index.ts";
 import { eraseProfileOfAccount, exportProfile } from "../profile/index.ts";
 import { exportResearch, removeResearchSubject } from "../research/index.ts";
 import { eraseInvitationsOf, exportInvitations } from "../rewards/index.ts";
@@ -46,9 +53,9 @@ import { visibleState } from "./standing.ts";
 // attempts, photos with their review rows and objects, the fetch log, and the
 // age on the account row, which stays as an anonymised tombstone. Kept: the
 // identity row (with one more deletion and the cooldown), the audit log,
-// staff rows. Likes, matches, bookmarks and push tokens join here as their
-// slices land; the research_id mapping goes (#50), the events keyed by it stay.
-// The place at the pond gate (#94) goes, and is in the export as it is held.
+// staff rows. Likes, matches and push tokens join here as their slices land, and
+// TD-7's bookmarks are the stars (#575, ADR-064): those the person put and those
+// put on them go. The research_id mapping goes (#50), the events keyed by it stay.
 // The photo check's notes (#253) go too, and are in the export in plain words.
 // The consent rows go (ADR-010 §14): what they proved goes in the same
 // transaction, and the research events carry their own consent_version.
@@ -68,7 +75,8 @@ import { visibleState } from "./standing.ts";
 // The conversations (#348, ADR-031 §5): the person's link goes and their open
 // conversations close; the messages stay for the counterpart, who reads
 // "Deleted user" (TD-7's kept side), except those the counterpart never
-// received (sent under a shadow ban still open), which go; a conversation
+// received (sent under a shadow ban that withholds them, ADR-031 §4), which
+// go, with their read mark put back to what the counterpart saw; a conversation
 // whose other person was erased before goes whole. The export carries the
 // person's own messages and the counterpart's as a time and a length.
 // The stored contacts go (#103, ADR-031 §11); the shares, ended by the
@@ -77,12 +85,13 @@ import { visibleState } from "./standing.ts";
 // The notification choices and the notices go (#176, ADR-032); the export
 // carries both.
 // The invitations the person made go while open, and the units they earned
-// and their notices go with the account (#107, ADR-044 §10); a redeemed one
-// stays for its redeemer, the link to the person cut. The invitation the
-// person joined with goes until it counts, and once counted stays for its
-// inviter without the person; one that would name nobody goes. The export
-// carries the invitations made, the one used by its two times, and the
-// units; never a code and never the other person.
+// and their notices go with the account, whichever side of an invitation
+// earned them (#107, #503, ADR-044 §10); a redeemed one stays for its
+// redeemer, the link to the person cut. The invitation the person joined with
+// goes until it counts, and once counted stays for its inviter without the
+// person; one that would name nobody goes. The export carries the invitations
+// made, the one used by its two times, and the units; never a code and never
+// the other person.
 
 export type ErasureDeps = {
   db: Queryable;
@@ -96,6 +105,8 @@ export type ExportDeps = ErasureDeps & { version: string };
 
 export type ErasureSummary = {
   sessions: number;
+  /** The devices' push tokens (#102, ADR-055 §3), counted before the sessions take them. */
+  pushTokens: number;
   authRequests: number;
   /** 0 or 1: the profile row (#47). */
   profileRows: number;
@@ -105,6 +116,8 @@ export type ErasureSummary = {
   rounds: number;
   /** The entries in which the person was somebody's card, decisions on them included (#96). */
   roundEntriesAsCandidate: number;
+  /** The stars the person put (#575). Those put on them go too, and are in no count (ADR-064 §8). */
+  stars: number;
   /** The consent rows (ADR-010 §14). */
   consents: number;
   /** The export requests (#237). */
@@ -117,7 +130,7 @@ export type ErasureSummary = {
   researchSubjects: number;
   /** The conversations whose link to the person was cut (#348); their messages stay for the counterpart. */
   conversations: number;
-  /** The person's messages the counterpart never received, under a shadow ban still open (#348). */
+  /** The person's messages the counterpart never received, under a shadow ban that withholds them (#348, #470). */
   withheldMessages: number;
   /** Conversations whose other person was erased before: nobody is left to keep them for (#348). */
   emptiedConversations: number;
@@ -130,7 +143,7 @@ export type ErasureSummary = {
   madeInvitationsDeleted: number;
   /** The invitations the person made that somebody redeemed, kept for their redeemers without the person (#107). */
   madeInvitationsKept: number;
-  /** The units of the reward ledger the person's invitations earned (#107). */
+  /** The units of the reward ledger invitations earned the person (#107, #503). */
   rewardUnits: number;
   /** 0 or 1: the invitation the person joined with, gone because it had not counted or its inviter was erased before (#107). */
   usedInvitationsDeleted: number;
@@ -161,6 +174,8 @@ export async function eraseAccount(deps: ErasureDeps, accountId: string): Promis
     }
     const identity = await repo.findIdentitySummaryForAccount(tx, accountId);
     if (!identity) throw new Error("account without identity");
+    // Before the sessions, whose cascade would take them uncounted (ADR-055 §3).
+    const pushTokens = await erasePushTokensOf(tx, accountId);
     const sessions = await repo.deleteAccountSessions(tx, accountId);
     const authRequests = await repo.deleteAuthRequestsOfAccount(tx, accountId);
     // A photo a report's frozen copy holds stays its twelve months (#351, ADR-030 §12).
@@ -169,11 +184,12 @@ export async function eraseAccount(deps: ErasureDeps, accountId: string): Promis
     // Not in the summary: the line that logs it carries the account id.
     await deletePhotoCheckNotesOfAccount(tx, accountId);
     const profileRows = await eraseProfileOfAccount(tx, accountId);
-    // The two hard rows go (TD-7), and the tombstone keeps neither gender nor pond.
+    // The two hard rows go (TD-7), and the tombstone keeps neither gender, pond nor home.
     const preferences = await deletePreferencesOfAccount(tx, accountId);
     // The person's rounds, and the entries in which they are somebody's card,
     // others' likes on them included (TD-7, #96).
     const rounds = await eraseRoundsOf(tx, accountId);
+    const stars = await eraseStarsOf(tx, accountId);
     // The consent rows go (ADR-010 §14): the terms were the condition of use,
     // the sensitive answers they covered went just above, and the events keep
     // the version they were written under; nothing is left to prove.
@@ -183,7 +199,7 @@ export async function eraseAccount(deps: ErasureDeps, accountId: string): Promis
     // tombstone nulls the address and its confirmation. Not in the summary.
     await repo.deleteEmailRows(tx, accountId);
     const feedback = await deleteFeedbackOfAccount(tx, accountId);
-    // Before the sanctions go: what an open shadow ban withheld is known by it (ADR-031 §5).
+    // Before the sanctions go: what a shadow ban withheld is known by it (ADR-031 §5).
     const chat = await eraseConversationsOf(
       { db: tx, logger: deps.logger, now: () => at },
       accountId,
@@ -194,8 +210,6 @@ export async function eraseAccount(deps: ErasureDeps, accountId: string): Promis
     const invitations = await eraseInvitationsOf(tx, accountId);
     const sanctions = await deleteSanctionsOfAccount(tx, accountId);
     // Kept: the reports either way and the blocks on the identity (ADR-030 §8).
-    // The place at the pond gate (#94): where the person stood is theirs, and goes.
-    await deleteGateOfAccount(tx, accountId);
     const researchSubjects = await removeResearchSubject(tx, accountId);
     // A second deletion racing the first sees the live row above and the
     // tombstone here (READ COMMITTED re-evaluates after the other commit).
@@ -206,11 +220,13 @@ export async function eraseAccount(deps: ErasureDeps, accountId: string): Promis
     await repo.recordIdentityDeletion(tx, identity.identityId, deletion);
     return {
       sessions,
+      pushTokens,
       authRequests,
       photos,
       profileRows,
       preferences,
       rounds,
+      stars,
       consents,
       exports,
       feedback,
@@ -232,11 +248,13 @@ export async function eraseAccount(deps: ErasureDeps, accountId: string): Promis
     : 0;
   const summary: ErasureSummary = {
     sessions: result.sessions,
+    pushTokens: result.pushTokens,
     authRequests: result.authRequests,
     profileRows: result.profileRows,
     preferences: result.preferences,
     rounds: result.rounds.rounds,
     roundEntriesAsCandidate: result.rounds.entriesAsCandidate,
+    stars: result.stars,
     consents: result.consents,
     exports: result.exports,
     feedback: result.feedback,
@@ -294,17 +312,21 @@ const EXPORT_HISTORY_LIMIT = 1000;
 
 /**
  * Everything Kuutti holds about the person, as of now: the document, and the
- * photo files it points to (#237). `t` is the request's language.
+ * photo files it points to (#237). `t` is the request's language, and `locale`
+ * says it for what the catalogue does not hold: a place's name is the list's
+ * (ADR-061 §3).
  */
 export async function exportAccount(
   deps: ExportDeps,
   accountId: string,
   t: TFunction,
+  locale: Locale = DEFAULT_LOCALE,
 ): Promise<{ document: AccountExport; files: ExportedPhotoFile[] }> {
   const account = await repo.findAccountById(deps.db, accountId);
   const identity = await repo.findIdentitySummaryForAccount(deps.db, accountId);
   if (!account || !identity) throw new AppError(404, "not_found", "No such account");
   const sessions = await repo.listSessionsForAccount(deps.db, accountId);
+  const pushes = await exportPushTokens(deps.db, accountId);
   const media = deps.media
     ? { ...deps.media, db: deps.db, logger: deps.logger, now: deps.now }
     : { db: deps.db, logger: deps.logger, now: deps.now };
@@ -316,10 +338,10 @@ export async function exportAccount(
   );
   const [
     pond,
+    home,
     preferences,
     consents,
     research,
-    gate,
     dealBreakers,
     photoCheck,
     exports,
@@ -331,13 +353,14 @@ export async function exportAccount(
     contacts,
     notifications,
     rounds,
+    stars,
     invitations,
   ] = await Promise.all([
     findPondOfAccount(deps.db, accountId),
+    exportHome(deps.db, accountId, locale),
     readPreferences(deps.db, accountId),
     exportConsents(deps.db, accountId),
     exportResearch(deps.db, accountId),
-    exportGate(deps.db, accountId),
     readDealBreakers(deps.db, accountId, profile?.fields ?? {}),
     exportPhotoCheck(deps, accountId, t),
     repo.listExportsOfAccount(deps.db, accountId, EXPORT_HISTORY_LIMIT),
@@ -357,6 +380,7 @@ export async function exportAccount(
     exportContacts(deps, accountId),
     exportNotifications(deps.db, accountId),
     exportRounds(deps.db, accountId, EXPORT_HISTORY_LIMIT),
+    exportStars(deps.db, accountId),
     exportInvitations(deps.db, accountId),
   ]);
   const document: AccountExport = {
@@ -372,8 +396,8 @@ export async function exportAccount(
       birthMonth: account.birthMonth,
       gender: account.gender,
       pond,
+      home,
       genderChangedAt: account.genderChangedAt?.toISOString() ?? null,
-      seeksChangedAt: account.seeksChangedAt?.toISOString() ?? null,
       email: account.email,
       foundThemAnswered: account.foundThemAnswered,
       emailConfirmedAt: account.emailConfirmedAt?.toISOString() ?? null,
@@ -398,6 +422,7 @@ export async function exportAccount(
       createdAt: s.createdAt.toISOString(),
       lastUsedAt: s.lastUsedAt.toISOString(),
       expiresAt: s.expiresAt.toISOString(),
+      push: pushes.get(s.id) ?? null,
     })),
     profile,
     // The check's description in words too (#296): what the person's photo is
@@ -410,7 +435,6 @@ export async function exportAccount(
     cardsShown: photos.cardsShown,
     photoCheck,
     research,
-    gate,
     exports: exports.map((e) => ({ at: e.at.toISOString() })),
     feedback,
     // In words in the request's language too, as the photo check's notes are.
@@ -471,8 +495,16 @@ export async function exportAccount(
             ? t(`account.export.round.decision.${entry.decision}`)
             : null,
           decidedAt: entry.decidedAt?.toISOString() ?? null,
+          secondPass: entry.secondPass,
+          distance: entry.distance,
+          distanceInWords: entry.distance ? t(`profile.option.distance.${entry.distance}`) : null,
         })),
       })),
+    },
+    // When the person put each star (#575, ADR-064 §9); never on whom.
+    stars: {
+      about: t("account.export.star.about"),
+      items: stars.map((at) => ({ at: at.toISOString() })),
     },
     // The invitations made and the one used, and the units (#107, ADR-044 §10); never a code or whom.
     invitations,

@@ -1,8 +1,9 @@
-import { fireEvent, screen } from "@testing-library/react-native";
-import { Text } from "react-native";
+import { act, fireEvent, screen } from "@testing-library/react-native";
+import Sun from "lucide-react-native/icons/sun";
+import { Platform, Text } from "react-native";
 import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
-import { renderWithTheme } from "@/test/render";
-import { RowGroup } from "./RowGroup";
+import { renderWithTheme, underProviders } from "@/test/render";
+import { type Row, RowGroup } from "./RowGroup";
 
 // The rows of a list (#227, #287): a row that opens a screen is a button named
 // by its title, with the summary as the hint and the state as the value; a
@@ -38,11 +39,195 @@ describe("RowGroup", () => {
     const theme = screen.getByRole("button", { name: "Theme" });
     expect(theme.props.accessibilityValue).toEqual({ text: "Dark" });
     expect(theme.props.accessibilityHint).toBeUndefined();
+    // Only a hairline under each row but the last, not the Button's own
+    // border on every side (#467).
+    for (const row of [basics, prompts]) {
+      expect(row.props.className).toMatch(/\bborder-0\b.*\bborder-b border-border\b/);
+      expect(row.props.className).not.toMatch(/(^| )border( |$)/);
+    }
+    expect(theme.props.className).toMatch(/\bborder-0\b/);
+    expect(theme.props.className).not.toMatch(/(^| )border(-b)?( |$)/);
+    // A row is read: its words are in the phone's font, not the Button's
+    // Saiga, the title at body size and the summary smaller (#408).
+    const words = (text: string) => String(screen.getByText(text).props.className).split(" ");
+    expect(words("The basics")).toEqual(expect.arrayContaining(["font-system", "text-body"]));
+    expect(words("Name and height")).toEqual(expect.arrayContaining(["font-system", "text-small"]));
+    for (const text of ["The basics", "Name and height"]) {
+      expect(words(text)).not.toContain("font-sans");
+      expect(words(text)).not.toContain("text-control");
+    }
     await fireEvent.press(basics);
     expect(open).toHaveBeenCalledTimes(1);
     expect(pressables(screen.toJSON() as HostNode).flatMap((node) => a11yProblems(node))).toEqual(
       [],
     );
+  });
+
+  it("says a hint to a screen reader and draws none, where the title says enough to the eye (#581)", async () => {
+    await renderWithTheme(
+      <RowGroup
+        rows={[
+          { key: "a", title: "The basics", hint: "Name and height", onPress: () => {} },
+          {
+            key: "b",
+            title: "Theme",
+            hint: "Light, dark or the phone's",
+            summary: "Dark",
+            value: "Dark",
+            onPress: () => {},
+          },
+        ]}
+      />,
+    );
+    const basics = screen.getByRole("button", { name: "The basics" });
+    expect(basics.props.accessibilityHint).toBe("Name and height");
+    expect(screen.queryByText("Name and height")).toBeNull();
+    expect(screen.queryByText("Name and height", { includeHiddenElements: true })).toBeNull();
+    // The hint is the hint, whatever is drawn under the title beside it.
+    const theme = screen.getByRole("button", { name: "Theme" });
+    expect(theme.props.accessibilityHint).toBe("Light, dark or the phone's");
+    expect(screen.getByText("Dark")).toBeTruthy();
+    expect(theme.props.accessibilityValue).toEqual({ text: "Dark" });
+  });
+
+  it("stars a row that holds what something needs, and says so in words before its hint, its label still the title (#616)", async () => {
+    await renderWithTheme(
+      <RowGroup
+        rows={[
+          { key: "a", title: "Photos", needed: "Needed for the card", onPress: () => {} },
+          {
+            key: "b",
+            title: "What you seek",
+            summary: "Women, 25 to 35",
+            needed: "Needed for the card",
+            onPress: () => {},
+          },
+          { key: "c", title: "Hobbies", onPress: () => {} },
+        ]}
+      />,
+    );
+    const photos = screen.getByRole("button", { name: "Photos" });
+    expect(photos.props.accessibilityHint).toBe("Needed for the card");
+    expect(screen.getByText("Photos *")).toBeTruthy();
+    const seek = screen.getByRole("button", { name: "What you seek" });
+    expect(seek.props.accessibilityHint).toBe("Needed for the card, Women, 25 to 35");
+    // A row that needs nothing has no star and no words for one.
+    expect(screen.getByText("Hobbies")).toBeTruthy();
+    expect(screen.queryByText("Hobbies *")).toBeNull();
+    expect(screen.getByRole("button", { name: "Hobbies" }).props.accessibilityHint).toBeUndefined();
+  });
+
+  describe("a row that holds its panel (#511)", () => {
+    const toggle = jest.fn();
+    const rows = (expanded: boolean, extra: Partial<Row> = {}): Row[] => [
+      {
+        key: "theme",
+        title: "Theme",
+        summary: "Dark",
+        value: "Dark",
+        panel: <Text>the choices</Text>,
+        expanded,
+        onPress: toggle,
+        ...extra,
+      },
+      { key: "licences", title: "Licences", onPress: () => {} },
+    ];
+    const theme = () => screen.getByRole("button", { name: "Theme" });
+    beforeEach(() => toggle.mockReset());
+    afterEach(() => jest.restoreAllMocks());
+
+    it("opens under itself, with the hairline under the panel, not between them", async () => {
+      const view = await renderWithTheme(<RowGroup rows={rows(false)} />);
+      expect(screen.queryByText("the choices")).toBeNull();
+      await fireEvent.press(theme());
+      expect(toggle).toHaveBeenCalledTimes(1);
+      await view.rerender(underProviders(<RowGroup rows={rows(true)} />));
+      expect(screen.getByText("the choices")).toBeTruthy();
+      expect(theme().props.className).not.toMatch(/\bborder-b\b/);
+      expect(pressables(screen.toJSON() as HostNode).flatMap((node) => a11yProblems(node))).toEqual(
+        [],
+      );
+    });
+
+    it("on iOS says its state in words after its value, since iOS says no collapsed", async () => {
+      jest.replaceProperty(Platform, "OS", "ios");
+      const view = await renderWithTheme(<RowGroup rows={rows(false)} />);
+      expect(theme().props.accessibilityValue).toEqual({ text: "Dark, closed" });
+      expect(theme().props.accessibilityState?.expanded).toBeUndefined();
+      await view.rerender(underProviders(<RowGroup rows={rows(true, { value: undefined })} />));
+      expect(theme().props.accessibilityValue).toEqual({ text: "open" });
+      // A row that opens a screen says nothing of open or closed.
+      expect(
+        screen.getByRole("button", { name: "Licences" }).props.accessibilityValue?.text,
+      ).toBeUndefined();
+    });
+
+    it("on Android is heard as expanded or collapsed, and TalkBack's action opens it", async () => {
+      jest.replaceProperty(Platform, "OS", "android");
+      await renderWithTheme(<RowGroup rows={rows(false)} />);
+      expect(theme().props.accessibilityState).toMatchObject({ expanded: false });
+      expect(theme().props.accessibilityValue).toEqual({ text: "Dark" });
+      expect(theme().props.accessibilityActions).toEqual([{ name: "expand", label: "Theme" }]);
+      await fireEvent(theme(), "accessibilityAction", { nativeEvent: { actionName: "expand" } });
+      expect(toggle).toHaveBeenCalledTimes(1);
+      expect(
+        screen.getByRole("button", { name: "Licences" }).props.accessibilityActions,
+      ).toBeUndefined();
+    });
+
+    it("keeps a panel once opened mounted while closed, out of sight and of a screen reader's reach", async () => {
+      await renderWithTheme(<RowGroup rows={rows(false, { kept: true })} />);
+      expect(screen.queryByText("the choices")).toBeNull();
+      const hidden = screen.getByText("the choices", { includeHiddenElements: true });
+      let wrapper = hidden.parent;
+      while (wrapper && wrapper.props.importantForAccessibility === undefined)
+        wrapper = wrapper.parent;
+      expect(wrapper?.props).toMatchObject({
+        accessibilityElementsHidden: true,
+        importantForAccessibility: "no-hide-descendants",
+      });
+      expect(wrapper?.props.className).toMatch(/\bhidden\b/);
+    });
+
+    it("tells once for each opening, a frame after its panel is drawn", async () => {
+      const opened = jest.fn();
+      const frame = () => act(() => new Promise<void>((resolve) => setTimeout(resolve, 20)));
+      const view = await renderWithTheme(<RowGroup rows={rows(true, { onOpened: opened })} />);
+      await frame();
+      expect(opened).toHaveBeenCalledTimes(1);
+      expect(opened.mock.calls[0]?.[0]).toEqual({
+        wrapper: expect.anything(),
+        header: expect.anything(),
+      });
+      // Drawn again while open, it tells nothing more.
+      await view.rerender(underProviders(<RowGroup rows={rows(true, { onOpened: opened })} />));
+      await frame();
+      expect(opened).toHaveBeenCalledTimes(1);
+      await view.rerender(
+        underProviders(<RowGroup rows={rows(false, { onOpened: opened, kept: true })} />),
+      );
+      await frame();
+      await view.rerender(
+        underProviders(<RowGroup rows={rows(true, { onOpened: opened, kept: true })} />),
+      );
+      await frame();
+      expect(opened).toHaveBeenCalledTimes(2);
+    });
+
+    it("never lets its wrapper be flattened away, which would measure as its header alone", async () => {
+      await renderWithTheme(<RowGroup rows={rows(true)} />);
+      let node = screen.getByText("the choices").parent;
+      while (node && node.props.collapsable === undefined) node = node.parent;
+      expect(node?.props.collapsable).toBe(false);
+    });
+
+    it("draws a picture before the title, silent, and sets it and the chevron by the first line", async () => {
+      await renderWithTheme(<RowGroup rows={rows(false, { icon: Sun })} />);
+      expect(theme().props.className).toMatch(/\bitems-start\b/);
+      expect(pressables(screen.toJSON() as HostNode).flatMap((node) => a11yProblems(node))).toEqual(
+        [],
+      );
+    });
   });
 
   it("reads a row with nothing to open, its detail as the value", async () => {

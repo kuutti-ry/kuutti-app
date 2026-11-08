@@ -179,11 +179,30 @@ describe("a moderator's decision", () => {
   });
 
   it.each([
+    "nudity",
+    "no_person",
+    "several_people",
+    "minor",
+    "violence",
+    "contact_details",
+    "other",
+  ])("takes an approved photo down for the reason %s (#477)", (reason) => {
+    expect(PhotoDecisionRequest.parse({ decision: "take_down", reason })).toEqual({
+      decision: "take_down",
+      reason,
+    });
+  });
+
+  it.each([
     ["a rejection without a reason", { decision: "reject" }],
     ["a rejection for a reason outside the list", { decision: "reject", reason: "ugly" }],
     ["a rejection for the night's reason (#376)", { decision: "reject", reason: "not_reviewed" }],
+    ["a take-down without a reason", { decision: "take_down" }],
+    ["a take-down for a reason outside the list", { decision: "take_down", reason: "ugly" }],
+    ["a take-down for the night's reason", { decision: "take_down", reason: "not_reviewed" }],
+    ["a take-down with a key outside it", { decision: "take_down", reason: "other", note: "x" }],
     ["an approval that carries a reason", { decision: "approve", reason: "other" }],
-    ["a decision outside the two", { decision: "queue" }],
+    ["a decision outside the three", { decision: "queue" }],
     ["no decision", {}],
   ])("refuses %s", (_, body) => {
     expect(PhotoDecisionRequest.safeParse(body).success).toBe(false);

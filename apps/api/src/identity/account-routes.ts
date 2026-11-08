@@ -89,7 +89,7 @@ const pauseRoute = createRoute({
   path: "/account/pause",
   summary: "Take a break: pause this account",
   description:
-    "The account goes to paused (#170, ADR-022): the profile leaves every pool, counter and round, and every session of the account ends, this one included. Nothing is erased: the profile, the photos, the preferences, the consents and the place at the gate stay as they are, and the next bank login brings the account back as it was. The body confirms; the screen asks first.",
+    "The account goes to paused (#170, ADR-022): the profile leaves every pool, counter and round, and every session of the account ends, this one included. Nothing is erased: the profile, the photos, the preferences and the consents stay as they are, and the next bank login brings the account back as it was. The body confirms; the screen asks first.",
   ...bearer,
   request: { body: { required: true, ...json(AccountPauseRequest) } },
   responses: {
@@ -324,6 +324,7 @@ export function accountRoutes(deps: Deps, requireSession: MiddlewareHandler<AppE
         { ...erasureDeps, version: deps.config.APP_VERSION },
         callerOf(c).accountId,
         tOf(c),
+        c.get("locale"),
       );
     } catch (error) {
       // The wait until the day rolls, as the photo and card routes say it.
@@ -336,7 +337,6 @@ export function accountRoutes(deps: Deps, requireSession: MiddlewareHandler<AppE
     }
     c.header("Content-Type", "application/zip");
     c.header("Content-Disposition", `attachment; filename="${archive.name}"`);
-    c.header("Cache-Control", "no-store");
     return c.body(archive.bytes, 200);
   });
 

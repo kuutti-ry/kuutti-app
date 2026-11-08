@@ -1,9 +1,9 @@
 # What a finished profile needs, and what the card leaves out (#47, #94,
-# ADR-006, ADR-019 §5). Noa has one approved photo; her second face and four
+# ADR-006, ADR-019 §5). Noa has one approved photo; a second face and four
 # more pictures wait in review, so onboarding is done (it counts
 # photos uploaded) but the gate and the profile wait for two approved ones,
-# and the card shows the approved one only. She hides herself from her field:
-# the field leaves the card, the
+# and the card shows the approved one only, under what it still lacks. Noa hides
+# from people in the same field: the field leaves the card, the
 # work stays. Read only. Locally the check queues everything; on staging
 # Rekognition decides, so this flow holds locally.
 appId: fi.kuutti.app
@@ -15,22 +15,26 @@ name: With one approved photo the gate says the profile lacks something, and a h
       PERSONA: Noa Salmi
 - assertVisible: "Matching opens for finished profiles\\. Yours still lacks something\\.|Seuranhaku avautuu valmiille profiileille\\. Sinun profiilistasi puuttuu vielä jotakin\\.|Matchningen öppnar för färdiga profiler\\. I din saknas ännu något\\."
 
-# Six photos, the grid full: one visible to others, five in review.
+# Six photos, the grid full: the one that is through says only that it is the
+# main one, and the five waiting, for the check or for a person, say In review (#581).
 - openLink: kuutti://photos
 - extendedWaitUntil:
-    visible: "6 photos, at most 6|6 kuvaa, enintään 6|6 foton, högst 6"
+    visible: "Main photo|Pääkuva|Huvudfoto"
     timeout: 15000
-- assertVisible: "Visible to others|Näkyy muille|Syns för andra"
+- assertNotVisible: "Visible to others|Näkyy muille|Syns för andra"
 - scrollUntilVisible:
-    element: "Being reviewed|Tarkistuksessa|Granskas|Waiting for review|Odottaa tarkistusta|Väntar på granskning"
+    element: "In review|Tarkistuksessa|Under granskning"
     direction: DOWN
     centerElement: true
     timeout: 60000
+- assertNotVisible: "Being reviewed|Granskas|Waiting for review|Odottaa tarkistusta|Väntar på granskning"
+# At the limit the count is drawn, beside the button it stops (#581).
 - scrollUntilVisible:
     element: "Add a photo|Lisää kuva|Lägg till ett foto"
     direction: DOWN
     centerElement: true
     timeout: 60000
+- assertVisible: "6 photos, at most 6|6 kuvaa, enintään 6|6 foton, högst 6"
 - assertVisible:
     text: "Add a photo|Lisää kuva|Lägg till ett foto"
     enabled: false
@@ -43,16 +47,33 @@ name: With one approved photo the gate says the profile lacks something, and a h
 - assertVisible: "Before your card can be shown|Ennen kuin korttisi voidaan näyttää|Innan ditt kort kan visas"
 - assertVisible: "At least 2 approved photos|Vähintään 2 hyväksyttyä kuvaa|Minst 2 godkända foton"
 
-# The card: the approved photos only; the work, not the field.
+# The card: the approved photos only; the work, not the field. What it lacks
+# stands above it, and nobody sees it yet, so nothing says others do (#581).
 - openLink: kuutti://profile/card
 - extendedWaitUntil:
     visible: "Your card|Korttisi|Ditt kort"
     timeout: 15000
 - assertVisible: "Photo 1 of 1|Kuva 1 / 1|Foto 1 av 1"
+- assertVisible:
+    text: "Before your card can be shown|Ennen kuin korttisi voidaan näyttää|Innan ditt kort kan visas"
+    above: "Photo 1 of 1|Kuva 1 / 1|Foto 1 av 1"
+- assertVisible: "At least 2 approved photos|Vähintään 2 hyväksyttyä kuvaa|Minst 2 godkända foton"
+- assertNotVisible: "This is what others see\\.|Tämän muut näkevät\\.|Det här ser andra\\."
+# The work is on the whole card (#644), a chip heard with its question.
 - scrollUntilVisible:
-    element: "Work|Työ|Arbete"
+    element: "Show the whole card|Näytä koko kortti|Visa hela kortet"
     direction: DOWN
     centerElement: true
     timeout: 60000
-- assertVisible: "Science and research|Tiede ja tutkimus|Vetenskap och forskning"
-- assertNotVisible: "Field|Ala|Bransch"
+- tapOn: "Show the whole card|Näytä koko kortti|Visa hela kortet"
+- scrollUntilVisible:
+    element: "Work and education|Työ ja koulutus|Arbete och utbildning"
+    direction: DOWN
+    centerElement: true
+    timeout: 60000
+- scrollUntilVisible:
+    element: "(Work|Työ|Arbete): (Science and research|Tiede ja tutkimus|Vetenskap och forskning)"
+    direction: DOWN
+    centerElement: true
+    timeout: 60000
+- assertNotVisible: "(Field|Ala|Bransch): .*"

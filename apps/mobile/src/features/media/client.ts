@@ -12,7 +12,13 @@ import {
 } from "@kuutti/schema";
 import { Platform } from "react-native";
 import { ApiError, api, apiBaseUrl } from "@/lib/api";
-import { accessTokenIsStale, currentSession, refreshSession } from "@/lib/session";
+import {
+  accessTokenIsStale,
+  currentSession,
+  isCurrentSession,
+  refreshSession,
+  sessionGeneration,
+} from "@/lib/session";
 import type { PickedPhoto } from "./pick";
 
 // The photo routes as the app calls them (#48). Reads and small writes go
@@ -180,14 +186,27 @@ export async function uploadPicture(
   fields: Readonly<Record<string, string>> = {},
   onProgress?: (fraction: number) => void,
 ): Promise<UploadAnswer> {
+  const generation = sessionGeneration();
+  const requireOwner = () => {
+    if (!isCurrentSession(generation)) {
+      throw new ApiError("signed out", 401, "session_revoked");
+    }
+  };
   let session = currentSession();
   if (session && accessTokenIsStale(session)) session = await refreshSession();
   if (!session) throw new ApiError("no session", 401, "unauthenticated");
-  let sent = await send(path, session.accessToken, await formFor(photo, fields), onProgress);
+  requireOwner();
+  const form = await formFor(photo, fields);
+  requireOwner();
+  let sent = await send(path, session.accessToken, form, onProgress);
   if (sent.status === 401) {
+    requireOwner();
     const next = await refreshSession();
     if (!next) throw new ApiError("signed out", 401, "session_revoked");
-    sent = await send(path, next.accessToken, await formFor(photo, fields), onProgress);
+    requireOwner();
+    const retryForm = await formFor(photo, fields);
+    requireOwner();
+    sent = await send(path, next.accessToken, retryForm, onProgress);
   }
   let body: unknown = null;
   try {

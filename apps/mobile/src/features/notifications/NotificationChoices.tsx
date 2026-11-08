@@ -3,20 +3,29 @@ import type { NotificationChoice, NotificationKind } from "@kuutti/schema";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { View } from "react-native";
 import { LoadFailed } from "@/components/LoadFailed";
+import { Notice } from "@/components/Notice";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Text } from "@/components/ui/text";
 import { useT } from "@/lib/locale";
+import { useRowData } from "@/lib/row-data";
 import { useHapticTap } from "@/theme/haptics";
 import { fetchChoices, saveChoice } from "./client";
+import { PhoneLine } from "./PhoneLine";
+import { usePhonePermission } from "./usePhonePermission";
 
-const WORDS: Record<NotificationKind, { label: PlainMessageKey; hint: PlainMessageKey }> = {
-  round: { label: "notifications.kind.round.label", hint: "notifications.kind.round.hint" },
-  message: { label: "notifications.kind.message.label", hint: "notifications.kind.message.hint" },
-  match: { label: "notifications.kind.match.label", hint: "notifications.kind.match.hint" },
+/** A kind's name; a line under it only where the switch does less than it seems to. */
+const WORDS: Record<NotificationKind, { label: PlainMessageKey; hint?: PlainMessageKey }> = {
+  message: { label: "notifications.kind.message.label" },
+  match: { label: "notifications.kind.match.label" },
   moderation: {
     label: "notifications.kind.moderation.label",
     hint: "notifications.kind.moderation.hint",
+  },
+  // Off stops the push and the email, never the notice (#573, ADR-068 §6).
+  announcement: {
+    label: "notifications.kind.announcement.label",
+    hint: "notifications.kind.announcement.hint",
   },
 };
 
@@ -27,19 +36,25 @@ type ChoicesView =
 
 /**
  * What a person may be notified of (#176, ADR-032): one switch per kind, in
- * the API's order, each with its line, each on until switched off, stored on
- * the server so every phone of the person's and every later sender reads the
- * same. A press saves at once; while it is on its way the switch waits, and a
- * failure is said in words with the switch as it was. Nothing is sent to the
- * phone yet (#102), and the opening line says so. Whether the phone itself
- * lets Kuutti notify comes with #102's native update.
+ * the API's order, each on until switched off, stored on the server so every
+ * phone of the person's and every later sender reads the same. A press saves
+ * at once; while it is on its way the switch waits, and a failure is said in
+ * words with the switch as it was. First, what this phone's answer leaves to
+ * do (#102, ADR-055 §9), then what a notification says. The choices as read
+ * or stored go to `onStored`, for the row above (#511).
  */
-export function NotificationChoices() {
+export function NotificationChoices({
+  onStored,
+}: {
+  onStored?: (choices: readonly NotificationChoice[]) => void;
+}) {
   const { t } = useT();
   const tap = useHapticTap();
   const [view, setView] = useState<ChoicesView>({ status: "loading" });
   const [busy, setBusy] = useState<NotificationKind | null>(null);
   const [failed, setFailed] = useState(false);
+  // Which failure the words are, so a second one is said again.
+  const [failures, setFailures] = useState(0);
   const mounted = useRef(true);
   useEffect(() => {
     mounted.current = true;
@@ -56,6 +71,9 @@ export function NotificationChoices() {
     );
   }, []);
   useEffect(read, [read]);
+  useEffect(() => {
+    if (view.status === "ready") onStored?.(view.choices);
+  }, [view, onStored]);
 
   const set = async (kind: NotificationKind, enabled: boolean) => {
     tap();
@@ -65,7 +83,10 @@ export function NotificationChoices() {
       const { choices } = await saveChoice(kind, enabled);
       if (mounted.current) setView({ status: "ready", choices });
     } catch {
-      if (mounted.current) setFailed(true);
+      if (mounted.current) {
+        setFailed(true);
+        setFailures((n) => n + 1);
+      }
     } finally {
       if (mounted.current) setBusy(null);
     }
@@ -73,16 +94,16 @@ export function NotificationChoices() {
 
   return (
     <>
+      <PhoneLine />
       <Text>{t("notifications.intro")}</Text>
       {view.status === "loading" && (
-        <Text accessibilityLiveRegion="polite">{t("notifications.loading")}</Text>
+        <Text accessibilityLiveRegion="polite">{t("load.loading")}</Text>
       )}
-      {view.status === "failed" && (
-        <LoadFailed headline={t("notifications.failed")} error={view.error} onRetry={read} />
-      )}
+      {view.status === "failed" && <LoadFailed error={view.error} onRetry={read} />}
       {view.status === "ready" &&
         view.choices.map(({ kind, enabled }) => {
-          const label = t(WORDS[kind].label);
+          const { label: labelKey, hint } = WORDS[kind];
+          const label = t(labelKey);
           return (
             <View key={kind} className="gap-1">
               <View className="flex-row items-center justify-between gap-4">
@@ -94,11 +115,42 @@ export function NotificationChoices() {
                   onCheckedChange={(on) => void set(kind, on)}
                 />
               </View>
-              <Text variant="muted">{t(WORDS[kind].hint)}</Text>
+              {hint && <Text variant="muted">{t(hint)}</Text>}
             </View>
           );
         })}
-      {failed && <Text accessibilityLiveRegion="assertive">{t("notifications.saveFailed")}</Text>}
+      {failed && <Notice refused words={t("load.failed.press")} answer={failures} />}
     </>
   );
+}
+
+/** The choices alone, for the row's value; a module's function, so the row's read stays the same one. */
+const readChoices = () => fetchChoices().then(({ choices }) => choices);
+
+/**
+ * The Notifications row's value in Settings (#376, #511): that the phone
+ * refuses them, marked, since nothing then reaches the person whatever the
+ * switches say; that the phone was not asked yet; or all on, all off, or how
+ * many of them are on.
+ */
+export function useNotificationsSummary(enabled: boolean) {
+  const { t } = useT();
+  const { data, stored } = useRowData<readonly NotificationChoice[]>(readChoices, enabled);
+  const { permission } = usePhonePermission();
+  const on = data?.filter((choice) => choice.enabled).length ?? 0;
+  const blocked = enabled && permission === "denied";
+  const summary = !enabled
+    ? undefined
+    : blocked
+      ? t("settings.notifications.blocked")
+      : permission === "undetermined"
+        ? t("settings.notifications.notAsked")
+        : data === undefined
+          ? undefined
+          : on === data.length
+            ? t("settings.notifications.allOn")
+            : on === 0
+              ? t("settings.notifications.allOff")
+              : t("settings.notifications.someOn", { on, off: data.length - on });
+  return { summary, alert: blocked, stored };
 }

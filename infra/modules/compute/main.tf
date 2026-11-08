@@ -1,8 +1,10 @@
-# The one API box per environment (TD-4, project context §2): t4g.small, Ubuntu
-# 24.04 arm64, an Elastic IP, and an instance role that reaches exactly its own
-# SSM prefix, its own log group and its backup prefix (TD-19, TD-4 access rule).
+# The one API box per environment (TD-4, project context §2): a t4g.small on
+# staging and a t4g.medium in production (ADR-046), Ubuntu 24.04 arm64, an
+# Elastic IP, and an instance role that reaches exactly its own SSM prefix, its
+# own log group and its backup prefix (TD-19, TD-4 access rule).
 # The bucket (modules/media, #48) and Rekognition (#49) arrived with M3, SES
-# sending with #385 (ADR-043 §5).
+# sending with #385 (ADR-043 §5), the box's swap and its free-memory metric
+# with #77 (ADR-046).
 
 data "aws_caller_identity" "current" {}
 data "aws_region" "current" {}
@@ -26,6 +28,18 @@ locals {
   # The API's MAIL_FROM default (apps/api/src/lib/config.ts) without its
   # display name, which ses:FromAddress does not include.
   mail_from = "noreply@${var.domain}"
+  # Where the box's free memory goes, which modules/observability's
+  # memory-low alarm reads (#77). A namespace of its own, not Kuutti/<env>:
+  # the box may write here and nowhere else, so nothing on it (the API, a
+  # preview) can push into the log filters' metrics and quiet their alarms.
+  metric_namespace = "Kuutti/${var.environment}/box"
+  # One text for first boot (user_data) and for a running box (the Run
+  # Command document below), #77, ADR-046.
+  headroom = templatefile("${path.module}/templates/headroom.sh.tpl", {
+    region    = local.region
+    namespace = local.metric_namespace
+    swap_mb   = var.swap_mb
+  })
 }
 
 # ---------------------------------------------------------------------------
@@ -170,6 +184,22 @@ data "aws_iam_policy_document" "api" {
     ]
   }
 
+  # The box's free memory, once a minute (#77, ADR-046), into this
+  # environment's namespace alone. PutMetricData takes no resource; the
+  # namespace is its one condition key.
+  statement {
+    sid       = "OwnMetrics"
+    effect    = "Allow"
+    actions   = ["cloudwatch:PutMetricData"]
+    resources = ["*"]
+
+    condition {
+      test     = "StringEquals"
+      variable = "cloudwatch:namespace"
+      values   = [local.metric_namespace]
+    }
+  }
+
   # The agent checks the session log group exists before it streams to it.
   statement {
     sid       = "DescribeLogGroups"
@@ -178,10 +208,13 @@ data "aws_iam_policy_document" "api" {
     resources = ["*"]
   }
 
-  # Nightly Dokploy backup. SSE-KMS is required so the objects stay unreadable
-  # to the plan role, which may read the state bucket but is explicitly denied
-  # kms:Decrypt (bootstrap). The box may read its own backups back for a
-  # rebuild (README); it can never delete them or touch state.
+  # Nightly Dokploy backup, write only. SSE-KMS is required so the objects stay
+  # unreadable to the plan role, which may read the state bucket but is
+  # explicitly denied kms:Decrypt (bootstrap). The box never reads them back:
+  # on staging a preview holds this role, and a backup carries every
+  # certificate key on the box, so a rebuild fetches it through a link the
+  # maintainer presigns (README, ADR-054). It can never delete them or touch
+  # state.
   statement {
     sid       = "DokployBackupWrite"
     effect    = "Allow"
@@ -192,26 +225,6 @@ data "aws_iam_policy_document" "api" {
       test     = "StringEquals"
       variable = "s3:x-amz-server-side-encryption"
       values   = ["aws:kms"]
-    }
-  }
-
-  statement {
-    sid       = "DokployBackupRead"
-    effect    = "Allow"
-    actions   = ["s3:GetObject"]
-    resources = ["arn:aws:s3:::${var.backup_bucket}/${local.backup_prefix}*"]
-  }
-
-  statement {
-    sid       = "DokployBackupList"
-    effect    = "Allow"
-    actions   = ["s3:ListBucket"]
-    resources = ["arn:aws:s3:::${var.backup_bucket}"]
-
-    condition {
-      test     = "StringLike"
-      variable = "s3:prefix"
-      values   = ["${local.backup_prefix}*"]
     }
   }
 }
@@ -333,6 +346,92 @@ resource "aws_ssm_document" "preview_database" {
 }
 
 # ---------------------------------------------------------------------------
+# The demo's reset (#613, ADR-018 §8). The personas are returned to where they
+# begin by the reset that lives inside the API's container and nowhere else
+# (ADR-018 §2 to §4); this document is how demo-reset.yml says "now" from
+# GitHub, without a terminal on the box. Sent by the plan role, which the
+# bootstrap allows to send exactly this document to exactly this box, as it
+# sends the preview database's. It takes no parameter. Runs as root on the box:
+# finds the task of Dokploy's api application (<environment>-api-<id>.1.<task>,
+# infra/README.md), fetches the pictures' release into the container's cache
+# (the cache is the container's own, and a new container starts without it),
+# then runs the reset, whose exit code is the command's: 2 names the personas
+# it spared, 3 says no api container runs. Nothing here holds a secret: both
+# commands read the environment's parameters through the instance role, as the
+# API does, and the lines they print carry keys and counts (ADR-018 §2).
+# ---------------------------------------------------------------------------
+
+resource "aws_ssm_document" "demo_reset" {
+  count = var.demo_reset ? 1 : 0
+
+  name            = "${local.name}-demo-reset"
+  document_type   = "Command"
+  document_format = "JSON"
+
+  content = jsonencode({
+    schemaVersion = "2.2"
+    description   = "Returns the demo personas of ${local.name} to where they begin, inside the API's container: demo-assets, then demo-reset --env ${var.environment} (#613, ADR-018 §8). Sent by demo-reset.yml."
+    parameters    = {}
+    mainSteps = [{
+      action = "aws:runShellScript"
+      name   = "resetPersonas"
+      inputs = {
+        timeoutSeconds = "1800"
+        runCommand = [
+          # The agent runs these lines with sh (dash), which has no pipefail; the one pipe here is a head.
+          "set -eu",
+          "export PATH=\"$PATH:/snap/bin\"",
+          # By id, not by a Go template: {{ }} is a parameter to Run Command.
+          "c=$(docker ps -q --filter \"name=^${var.environment}-api-\" | head -n 1)",
+          "[ -n \"$c\" ] || { echo \"no running ${var.environment}-api container\"; exit 3; }",
+          "docker ps --filter \"name=^${var.environment}-api-\"",
+          "docker exec \"$c\" node dist/demo-assets.js",
+          "docker exec \"$c\" node dist/demo-reset.js --env ${var.environment}",
+        ]
+      }
+    }]
+  })
+}
+
+# ---------------------------------------------------------------------------
+# Headroom on a running box (#77, ADR-046). user_data gives a new box its
+# swap and the free-memory metric at first boot, and
+# ignore_changes keeps a running box from ever seeing an edit of it. So the
+# maintainer sends this document, the same text, to a box that predates the
+# change, and again after a change of swap_mb
+# (infra/README.md, The box's headroom). A second run changes nothing.
+# Nothing in CI sends it.
+# ---------------------------------------------------------------------------
+
+resource "aws_ssm_document" "headroom" {
+  name            = "${local.name}-headroom"
+  document_type   = "Command"
+  document_format = "JSON"
+
+  content = jsonencode({
+    schemaVersion = "2.2"
+    description   = "Swap and the free-memory metric on ${local.name} (#77). Sent by the maintainer; a second run changes nothing."
+    mainSteps = [{
+      action = "aws:runShellScript"
+      name   = "headroom"
+      inputs = {
+        timeoutSeconds = "600"
+        runCommand     = split("\n", local.headroom)
+      }
+    }]
+  })
+
+  lifecycle {
+    # Run Command reads {{ name }} in a document as its parameter; this one
+    # has none, so a brace pair in the script would break the document.
+    precondition {
+      condition     = !strcontains(local.headroom, "{{")
+      error_message = "templates/headroom.sh.tpl holds a double brace, which a Run Command document reads as a parameter."
+    }
+  }
+}
+
+# ---------------------------------------------------------------------------
 # The box.
 # ---------------------------------------------------------------------------
 
@@ -366,8 +465,6 @@ resource "aws_instance" "api" {
   # so what runs as root at first boot is exactly what was reviewed here.
   user_data = templatefile("${path.module}/templates/user_data.sh.tpl", {
     hostname        = local.name
-    environment     = var.environment
-    domain          = var.domain
     region          = local.region
     log_group       = local.log_group_name
     backup_bucket   = var.backup_bucket
@@ -381,6 +478,7 @@ resource "aws_instance" "api" {
     # The same RDS bundle the API image carries (apps/api/certs); the box's own
     # psql (preview cleanup) verifies the database with it.
     rds_ca_sha256 = filesha256("${path.module}/../../../apps/api/certs/rds-eu-central-1-bundle.pem")
+    headroom      = base64gzip(local.headroom)
   })
 
   # A newer AMI or an edited first-boot script must not replace the running

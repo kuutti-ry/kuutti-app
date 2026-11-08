@@ -103,7 +103,7 @@ vi.mock("@anthropic-ai/sdk", () => ({
           );
           if (answer instanceof Error) throw answer;
           return {
-            model: "claude-opus-5",
+            model: "claude-opus-5-5",
             stop_reason: "end_turn",
             stop_details: null,
             usage: { input_tokens: 1, output_tokens: 1 },

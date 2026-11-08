@@ -12,6 +12,9 @@ describe("profileErrorText", () => {
     expect(profileErrorText({ kind: "error", code: "consent_required" }, t)).toBe(
       "errors.special_category_locked",
     );
+    expect(profileErrorText({ kind: "error", code: "filter_unanswered" }, t)).toBe(
+      "profile.dealBreakers.gated",
+    );
   });
 
   it("says the generic line for any other code, for none, and for no notice", () => {
@@ -20,5 +23,16 @@ describe("profileErrorText", () => {
     );
     expect(profileErrorText({ kind: "error", code: undefined }, t)).toBe("profile.error.generic");
     expect(profileErrorText(null, t)).toBe("profile.error.generic");
+  });
+
+  it("says a screen's own line for the rest where it names one, and its words still for what has them", () => {
+    const fallback = "load.failed.press";
+    expect(profileErrorText({ kind: "error", code: "validation_failed" }, t, fallback)).toBe(
+      fallback,
+    );
+    expect(profileErrorText({ kind: "error", code: undefined }, t, fallback)).toBe(fallback);
+    expect(profileErrorText({ kind: "error", code: "filter_unanswered" }, t, fallback)).toBe(
+      "profile.dealBreakers.gated",
+    );
   });
 });

@@ -1,4 +1,10 @@
-import { sentryEnvironment, sentryOptions, stripBreadcrumb, stripUser } from "./sentry";
+import {
+  sentryEnvironment,
+  sentryOptions,
+  stripBreadcrumb,
+  stripSupportView,
+  stripUser,
+} from "./sentry";
 
 describe("sentry options", () => {
   const on = sentryOptions({ dsn: "https://k@o1.ingest.de.sentry.io/2", channel: "staging" });
@@ -41,6 +47,80 @@ describe("sentry options", () => {
     expect(stripUser({ user: { id: "a" }, other: 1 })).toEqual({ user: undefined, other: 1 });
   });
 
+  describe("the support page, which no report names (#510)", () => {
+    it.each([
+      [
+        "going there",
+        {
+          category: "navigation",
+          message: "Navigation to settings/support",
+          data: { from: "settings/index", to: "settings/support" },
+        },
+      ],
+      [
+        "coming back",
+        {
+          category: "navigation",
+          message: "Navigation to settings/index",
+          data: { from: "settings/support", to: "settings/index" },
+        },
+      ],
+      [
+        "by the full path",
+        {
+          category: "navigation",
+          message: "Navigation to /settings/support",
+          data: { to: "/settings/support" },
+        },
+      ],
+      [
+        "the press that leads there",
+        {
+          category: "navigation.dispatch",
+          message: "Dispatched PUSH to settings/support",
+          data: { action_type: "PUSH", to: "settings/support" },
+        },
+      ],
+      [
+        "a crumb with its route in the message alone",
+        { category: "navigation.dispatch", message: "Dispatched PUSH to settings/support" },
+      ],
+    ])("drops the crumb of %s", (_case, crumb) => {
+      expect(stripBreadcrumb(crumb)).toBeNull();
+    });
+
+    it("keeps the crumbs of other routes, and a crumb of another category that says the words", () => {
+      const licences = {
+        category: "navigation",
+        message: "Navigation to settings/licenses",
+        data: { from: "settings/index", to: "settings/licenses" },
+      };
+      expect(stripBreadcrumb(licences)).toEqual(licences);
+      const log = { category: "console", message: "settings/support" };
+      expect(stripBreadcrumb(log)).toEqual(log);
+    });
+
+    it("sends an event from the page without the view's name, the rest of its app context kept", () => {
+      const send = on.beforeSend;
+      if (typeof send !== "function") throw new Error("beforeSend must be set");
+      const event = {
+        message: "x",
+        contexts: { app: { view_names: ["settings/support"], app_version: "0.81.0" } },
+      };
+      const sent = send(event as never, {}) as { contexts: { app: Record<string, unknown> } };
+      expect(sent.contexts.app).toEqual({ app_version: "0.81.0" });
+      expect(JSON.stringify(sent)).not.toContain("settings/support");
+    });
+
+    it.each([
+      ["another view", { contexts: { app: { view_names: ["settings/index"] } } }],
+      ["an app context with no view", { contexts: { app: { app_version: "0.81.0" } } }],
+      ["no contexts", {}],
+    ])("leaves an event with %s as it was", (_case, event) => {
+      expect(stripSupportView(event)).toEqual(event);
+    });
+  });
+
   it("maps the update channel to the environment", () => {
     expect(sentryEnvironment(null)).toBe("development");
     expect(sentryEnvironment("staging")).toBe("staging");
@@ -53,12 +133,12 @@ describe("sentry options", () => {
       category: "navigation",
       data: { from: "/pond", to: "/chat/[id]", params: { id: "chat-7", email: "a@b.fi" } },
     });
-    expect(nav.data).toEqual({ from: "/pond", to: "/chat/[id]" });
+    expect(nav?.data).toEqual({ from: "/pond", to: "/chat/[id]" });
     const http = stripBreadcrumb({
       category: "http",
       data: { method: "GET", status_code: 500, url: "https://api/x?hetu=010190-123A" },
     });
-    expect(http.data).toEqual({ method: "GET", status_code: 500 });
+    expect(http?.data).toEqual({ method: "GET", status_code: 500 });
     expect(JSON.stringify([nav, http])).not.toMatch(/a@b\.fi|010190-123A|chat-7/);
   });
 
@@ -68,10 +148,10 @@ describe("sentry options", () => {
         stripBreadcrumb({
           category,
           data: { method: "POST", status_code: 201, url: "https://api/photos?x=1", body: "secret" },
-        }).data,
+        })?.data,
       ).toEqual({ method: "POST", status_code: 201 });
     }
-    expect(stripBreadcrumb({ category: "fetch" }).data).toEqual({
+    expect(stripBreadcrumb({ category: "fetch" })?.data).toEqual({
       method: undefined,
       status_code: undefined,
     });
@@ -113,8 +193,8 @@ describe("sentry options", () => {
         path,
       },
     });
-    expect(rage.message).toBe("Text");
-    expect(rage.data).toMatchObject({ clickCount: 3 });
+    expect(rage?.message).toBe("Text");
+    expect(rage?.data).toMatchObject({ clickCount: 3 });
     expect(JSON.stringify([touch, rage])).not.toMatch(/ville|Sanna|nähdään|3f9a2c1e/);
     // A touch without a path, or with a root the SDK could not name, says nothing.
     expect(
@@ -124,7 +204,7 @@ describe("sentry options", () => {
       message: undefined,
       data: { path: [] },
     });
-    expect(stripBreadcrumb({ category: "touch", data: { path: [{ label: "x" }] } }).message).toBe(
+    expect(stripBreadcrumb({ category: "touch", data: { path: [{ label: "x" }] } })?.message).toBe(
       undefined,
     );
   });

@@ -1,8 +1,9 @@
 # The age window's bounds (AGE_MIN 18, AGE_MAX 99; #146): at 99 the window
 # starts at 94 to 99, the oldest cannot go past 99 and the youngest cannot
-# pass the oldest. A woman is not offered the identity label, and there are
-# two areas to choose from (#174). Siiri (99) is a newcomer; the flow stops at
-# the photos, so one run per `pnpm demo:reset`.
+# pass the oldest. A woman is not offered the identity label, and her home is
+# an area too small to keep, so the card has nothing to choose from (ADR-061
+# §2, §3). Siiri (99) is a newcomer; the flow stops at the photos, so one run
+# per `pnpm demo:reset`.
 appId: fi.kuutti.app
 name: At 99 the age window starts at 94 to 99 and neither end can leave the bounds
 ---
@@ -20,7 +21,9 @@ name: At 99 the age window starts at 94 to 99 and neither end can leave the boun
 - extendedWaitUntil:
     visible: "What should we call you\\?|Miksi sinua kutsutaan\\?|Vad ska vi kalla dig\\?"
     timeout: 15000
-- tapOn: "Name on your card|Nimi kortillasi|Namn på ditt kort"
+# The field, below its name drawn over it (#581); an empty field has no text to match.
+- tapOn:
+    below: "Name on your card|Nimi kortillasi|Namn på ditt kort"
 - inputText: "Siiri"
 # A tap on the question, which is no button, closes the keyboard (README, the keyboard).
 - tapOn: "What should we call you\\?|Miksi sinua kutsutaan\\?|Vad ska vi kalla dig\\?"
@@ -84,13 +87,23 @@ name: At 99 the age window starts at 94 to 99 and neither end can leave the boun
 - assertVisible: "98"
 - tapOn: "Continue|Jatka|Fortsätt"
 
-# Two areas without a parent: the choice is hers.
+# Koli has 271 people, under what is kept, so the card can only say the town:
+# with no question to ask, what it says takes the question's place as the
+# step's heading, and no line says why (#581).
 - extendedWaitUntil:
     visible: "Where do you live\\?|Missä asut\\?|Var bor du\\?"
     timeout: 15000
-- assertVisible: "Kuutti matches people inside one area\\. Choose yours\\.|Kuutti yhdistää ihmisiä yhden alueen sisällä\\. Valitse omasi\\.|Kuutti matchar människor inom ett område\\. Välj ditt\\."
-- assertVisible: "Capital Area|Pääkaupunkiseutu|Huvudstadsregionen"
-- tapOn: "Finland|Suomi"
+- tapOn:
+    below: "Postal code|Postinumero|Postnummer"
+- inputText: "83960"
+- tapOn: "Where do you live\\?|Missä asut\\?|Var bor du\\?"
+- tapOn: ".*Koli.*"
+- extendedWaitUntil:
+    visible: "On your card: Joensuu|Kortillasi: Joensuu|På ditt kort: Joensuu"
+    timeout: 15000
+- assertNotVisible: "What should your card show\\?|Mitä korttisi näyttää\\?|Vad ska ditt kort visa\\?"
+- assertNotVisible: "Your card shows the nearest town\\.|Korttisi näyttää lähimmän kaupungin\\.|Ditt kort visar närmaste stad\\."
+- tapOn: "Continue|Jatka|Fortsätt"
 - extendedWaitUntil:
     visible: "Two photos of you|Kaksi kuvaa sinusta|Två bilder på dig"
     timeout: 15000

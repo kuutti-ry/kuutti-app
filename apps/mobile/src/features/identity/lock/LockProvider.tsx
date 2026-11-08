@@ -8,8 +8,8 @@ import { useSession } from "../session";
 import {
   askBiometrics,
   type BiometricAnswer,
-  type Biometrics,
   biometricsOnThisPhone,
+  type PhoneBiometrics,
 } from "./biometrics";
 import { LockScreen, type PasscodeAnswer } from "./LockScreen";
 import { hashPasscode, PASSCODE_TRIES, passcodeMatches } from "./passcode";
@@ -25,16 +25,31 @@ import {
   writeTries,
 } from "./store";
 
-/** What Settings and the offer read and change. */
+/** What Settings and the offer read and change, and what the push waits for. */
 export type LockApi = {
   /** The lock as stored; null while it is off. */
   settings: LockSettings | null;
-  /** What this phone can open it with; null when nothing is enrolled, undefined while asked. */
-  biometrics: Biometrics | null | undefined;
-  /** Asks the phone again what it has, as Settings opens. */
+  /**
+   * Whether the lock holds the screens: shown, still deciding at a cold
+   * start, or covering them while the app is away, whence it may come back
+   * locked. A tap on a push waits while it holds (#102), since a screen
+   * opened under the lock would run before anybody unlocked it.
+   */
+  holding: boolean;
+  /**
+   * What this phone can open it with; null when nothing is enrolled, "denied"
+   * when an iPhone is not letting Kuutti use Face ID (#505), undefined while
+   * asked. On Android it is kept through a pause the lock saw (#499).
+   */
+  biometrics: PhoneBiometrics | undefined;
+  /** Asks the phone again what it has, as Settings opens and as the app comes back to it. */
   recheck: () => Promise<void>;
-  /** Turning biometrics on asks for the face or finger once; "failed" leaves it off. */
-  setBiometrics: (on: boolean) => Promise<"ok" | "failed">;
+  /**
+   * Turning biometrics on asks for the face or finger once; anything but a
+   * yes leaves it off. "lockout" says the phone has paused it (#464), "denied"
+   * that iOS said no for Kuutti (#505), which `biometrics` then says too.
+   */
+  setBiometrics: (on: boolean) => Promise<"ok" | "failed" | "lockout" | "denied">;
   setPasscode: (code: string) => Promise<void>;
   removePasscode: () => Promise<void>;
   setGrace: (minutes: GraceMinutes) => Promise<void>;
@@ -73,7 +88,7 @@ export function LockProvider({ children }: { children: React.ReactNode }) {
   // undefined until read; null when there is none.
   const [settings, setSettings] = React.useState<LockSettings | null | undefined>(undefined);
   const [unreadable, setUnreadable] = React.useState(false);
-  const [biometrics, setAvailable] = React.useState<Biometrics | null | undefined>(undefined);
+  const [biometrics, setAvailable] = React.useState<PhoneBiometrics | undefined>(undefined);
   // "start" until the first moment signed in with the store read: a cold start.
   const [phase, setPhase] = React.useState<"start" | "open" | "locked">("start");
   const [covered, setCovered] = React.useState(false);
@@ -102,9 +117,22 @@ export function LockProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
   // The phone's face or finger may be added or removed while Kuutti is away:
-  // asked again as the lock comes back, and as Settings opens (`recheck`).
+  // asked again as the lock comes back, and as Settings opens or comes back
+  // (`recheck`, #464).
+  // The phone's last answer on Android was its pause (#499). Android 16 then
+  // answers a recheck with its pause's own code, which the module reads as
+  // nothing enrolled, so a recheck that finds none keeps the kind the pause
+  // came with, until an ask answers otherwise, a recheck finds a kind, or the
+  // session ends. iOS's module counts a pause as enrolled already.
+  // shortcut: a pause the lock did not see (from before a cold start, or
+  // another app's) still reads as none, and a face or finger removed while a
+  // seen pause is remembered keeps its button and switch until the next ask
+  // answers; a native read of the phone's own answer lifts both (ADR-045 §5).
+  const paused = React.useRef(false);
   const recheck = React.useCallback(async () => {
-    setAvailable(await biometricsOnThisPhone());
+    const kind = await biometricsOnThisPhone();
+    if (kind !== null) paused.current = false;
+    setAvailable((known) => (kind === null && paused.current ? known : kind));
   }, []);
 
   const on = unreadable || lockIsOn(settings ?? null);
@@ -121,6 +149,7 @@ export function LockProvider({ children }: { children: React.ReactNode }) {
   React.useEffect(() => {
     if (status === "loading" || settings === undefined) return;
     if (status === "signed-out") {
+      paused.current = false;
       setPhase("open");
       if (settings !== null || unreadable) {
         setSettings(null);
@@ -202,6 +231,8 @@ export function LockProvider({ children }: { children: React.ReactNode }) {
         prompt: t("lock.biometrics.prompt"),
         cancel: t("lock.biometrics.cancel"),
       });
+      paused.current = Platform.OS === "android" && answer === "lockout";
+      if (answer === "denied") setAvailable("denied");
       return answer;
     } finally {
       asking.current = false;
@@ -270,23 +301,6 @@ export function LockProvider({ children }: { children: React.ReactNode }) {
     [settings],
   );
 
-  const api = React.useMemo<LockApi>(
-    () => ({
-      settings: settings ?? null,
-      biometrics,
-      recheck,
-      setBiometrics: async (wanted) => {
-        if (wanted && (await ask()) !== "ok") return "failed";
-        await change((current) => ({ ...current, biometrics: wanted }));
-        return "ok";
-      },
-      setPasscode: (code) => change((current) => ({ ...current, passcode: hashPasscode(code) })),
-      removePasscode: () => change((current) => ({ ...current, passcode: null })),
-      setGrace: (minutes) => change((current) => ({ ...current, graceMinutes: minutes })),
-    }),
-    [settings, biometrics, recheck, change, ask],
-  );
-
   const signedIn = status === "signed-in";
   // Signed in at a cold start: locked while the stored lock is on, and
   // covered while it is not read yet, or while the phone is still asked
@@ -299,6 +313,30 @@ export function LockProvider({ children }: { children: React.ReactNode }) {
   const cover =
     signedIn &&
     ((covered && on) || (deciding && settings === undefined) || (wantsLock && kindPending));
+  // The cover counts while away: the return that locks lifts it in the same render.
+  const holding = signedIn && (phase === "locked" || deciding || (covered && on));
+
+  const api = React.useMemo<LockApi>(
+    () => ({
+      settings: settings ?? null,
+      holding,
+      biometrics,
+      recheck,
+      setBiometrics: async (wanted) => {
+        if (wanted) {
+          const answer = await ask();
+          if (answer === "lockout" || answer === "denied") return answer;
+          if (answer !== "ok") return "failed";
+        }
+        await change((current) => ({ ...current, biometrics: wanted }));
+        return "ok";
+      },
+      setPasscode: (code) => change((current) => ({ ...current, passcode: hashPasscode(code) })),
+      removePasscode: () => change((current) => ({ ...current, passcode: null })),
+      setGrace: (minutes) => change((current) => ({ ...current, graceMinutes: minutes })),
+    }),
+    [settings, holding, biometrics, recheck, change, ask],
+  );
 
   // A lock that shows with its tries spent goes to the bank at once.
   React.useEffect(() => {
@@ -314,9 +352,12 @@ export function LockProvider({ children }: { children: React.ReactNode }) {
     };
   }, [locked, settings, leave]);
 
+  // What the phone says of the way the person chose; never of one they did not.
+  const chosen = settings?.biometrics ? (biometrics ?? null) : null;
   const lockScreen = (
     <LockScreen
-      biometrics={settings?.biometrics ? (biometrics ?? null) : null}
+      biometrics={chosen === "denied" ? null : chosen}
+      denied={chosen === "denied"}
       passcode={Boolean(settings?.passcode)}
       onBiometrics={unlockWithBiometrics}
       onPasscode={unlockWithPasscode}

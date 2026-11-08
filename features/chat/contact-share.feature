@@ -1,20 +1,22 @@
 # features/chat/contact-share.feature
 Feature: Contacts shared in a conversation
   Messages and profiles refuse contact details; this is the one way through
-  (#103, ADR-031 §11, the maintainer's decisions of 18/10/2026). A person
-  keeps up to four pieces in Settings (a phone number, WhatsApp, Telegram,
-  Instagram), each in the one form of its kind, and nobody sees them. In an
+  (#103, ADR-031 §11, the maintainer's decisions of 18/10/2026, Snapchat's of
+  28/10/2026). A person keeps up to five pieces in Settings (a phone number,
+  WhatsApp, Telegram, Instagram, Snapchat), each in the one form of its kind, and nobody sees them. In an
   open conversation one press shares a piece: the other person sees it at
   once, until its owner stops sharing it, removes or changes it, or the
   conversation closes. No agreement step, no obligation to share back. A
   share is withheld as a message is: across a block, a close, or a shadow
   ban still open when it began or when its piece last changed (ADR-024 §6,
   ADR-030). A value reaches no log line, error detail, event or socket
-  frame, and a share's record holds none.
+  frame, and a share's record holds none. The other person opens a shared
+  piece at its service or copies it with one press, and nobody hears of
+  either (#473, the maintainer's word of 30/10/2026).
 
   Scenario: A person keeps a contact of each kind in its one form, seen by nobody
     Given "A" keeps no contacts and is in a conversation with "B"
-    When "A" keeps a phone number from 0, a WhatsApp number from 00, a Telegram username with its @ and an Instagram one in capitals
+    When "A" keeps a phone number from 0, a WhatsApp number from 00, a Telegram username with its @, an Instagram one in capitals and a Snapchat one with its @ in capitals
     Then each is kept in its one form, the list answers them in the kinds' order, and "B" sees none of them
 
   Scenario Outline: A contact that is not of its kind is refused in words, and nothing is kept
@@ -26,6 +28,7 @@ Feature: Contacts shared in a conversation
       | a phone number with letters in it            | contact_invalid   |
       | a Telegram username of four characters       | contact_invalid   |
       | an Instagram username with two dots in a row | contact_invalid   |
+      | a Snapchat username ending with a hyphen     | contact_invalid   |
       | empty                                        | validation_failed |
       | over sixty-four characters                   | validation_failed |
       | of a kind there is none of                   | validation_failed |
@@ -154,3 +157,35 @@ Feature: Contacts shared in a conversation
   Scenario: No contact reaches a log line, an error detail or an error report
     When "A" keeps a phone number and a username, is refused one, shares one, reads the conversation, and a fault interrupts a keep
     Then no value appears in any log line, error detail or report, and the refusal names the kind
+
+  Scenario Outline: A shared contact opens at its kind's own address
+    Given "A" shares <what> with "B"
+    When "B" presses <button> beside it
+    Then the phone opens <address>
+
+    Examples:
+      | what                  | button | address                              |
+      | a phone number        | Call   | tel:+358401234567                    |
+      | a WhatsApp number     | Open   | https://wa.me/358401234567           |
+      | a Telegram username   | Open   | https://t.me/ville_k                 |
+      | an Instagram username | Open   | https://www.instagram.com/ville.k/   |
+      | a Snapchat username   | Open   | https://www.snapchat.com/add/ville.k |
+
+  Scenario: A contact not in the one form of its kind opens nothing and can still be copied
+    Given "A" shares a contact whose value is not in the one form of its kind
+    Then "B" sees it as text with Copy beside it and no Open
+
+  Scenario: Copy puts the contact on the phone's clipboard and says so without the value
+    Given "A" shares an Instagram username with "B"
+    When "B" presses Copy beside it
+    Then the value is on the clipboard and the screen says Instagram was copied, with no value in the words
+
+  Scenario: A contact the phone cannot open says so in words, and Copy stays
+    Given "A" shares a phone number with "B", on a phone that makes no calls
+    When "B" presses Call beside it
+    Then the refusal is said in words with no value in them, nothing is logged, and Copy is still there
+
+  Scenario: Opening or copying a contact tells nobody
+    Given "A" shares an Instagram username with "B"
+    When "B" opens it and copies it
+    Then no request leaves B's phone, so "A" learns of neither and nothing counts them

@@ -9,7 +9,7 @@ import {
 } from "./chat.ts";
 import { FeedbackKind } from "./feedback.ts";
 import { FoundReason } from "./found-them.ts";
-import { ROUND_ENTRIES_MAX, RoundOrdering, RoundReason, SinceSeenBand } from "./matching.ts";
+import { ROUND_POSITION_MAX, RoundReason, SinceSeenBand } from "./matching.ts";
 import { Gender } from "./onboarding.ts";
 import { PROFILE_FIELD_KEYS, PROFILE_FIELDS, type ProfileFieldKey } from "./profile-fields.ts";
 
@@ -25,8 +25,7 @@ import { PROFILE_FIELD_KEYS, PROFILE_FIELDS, type ProfileFieldKey } from "./prof
 
 const props = <T extends z.ZodRawShape>(shape: T) => z.object(shape).strict();
 
-const roundCount = z.int().min(0).max(ROUND_ENTRIES_MAX);
-const roundPosition = z.int().min(1).max(ROUND_ENTRIES_MAX);
+const roundPosition = z.int().min(1).max(ROUND_POSITION_MAX);
 /** A like or a pass: its place and reason, the band since the card was seen (null when never reported seen), and whether it changed the day's earlier decision. */
 const decisionShape = {
   position: roundPosition,
@@ -128,19 +127,6 @@ export const RESEARCH_EVENTS = {
   // Today's round (#96, ADR-034, the maintainer's of 19/10/2026): places,
   // reasons and coarse times only; never the candidate, a score, the day or
   // a seen time.
-  round_built: {
-    question:
-      "How large are rounds, how many of their cards are there for each reason, and how were the rest ordered (#96, #95, TD-11, TD-12)?",
-    props: props({
-      ordering: RoundOrdering,
-      size: roundCount,
-      matchesFilters: roundCount,
-      likedYou: roundCount,
-      seenBefore: roundCount,
-      relaxed: roundCount,
-      fish: roundCount,
-    }),
-  },
   profile_viewed: {
     question:
       "Which cards of a round are looked at, by their place and the reason they are there (#96)?",
@@ -203,7 +189,7 @@ export const RESEARCH_FIELD_KEYS = PROFILE_FIELD_KEYS.filter((key) => PROFILE_FI
  * The floor of k for the research block (ADR-011 §9): a cell of pond, age band
  * and snapshot must hold at least this many pseudonyms in any copy that leaves
  * the operational database, and the nightly census warns when the live table
- * has a cell under it. The waitlist's floor (rules/schema.md), and like the
+ * has a cell under it. The counter's floor (rules/schema.md), and like the
  * retention a rule, not a `matching_config` row.
  */
 export const RESEARCH_K_MIN = 10;

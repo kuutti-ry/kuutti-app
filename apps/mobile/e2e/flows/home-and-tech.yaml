@@ -1,29 +1,77 @@
-# The home screen of an onboarded person (#53, #54, #94): the area in the
-# person's language with its numbers in steps of ten, where they stand at the
-# gate in words, and the way to the profile, which holds the photos, the
-# deal-breakers and the later questions (#239). Outside production the wrench opens
-# the tech screen, which names the environment and the API it talks to.
-# The numbers need the synthetic population (`pnpm demo:population`): an area
-# shows them from ten people up. The release of pictures has no pool, so
-# Sanna's gate says how many more people are needed. Read only.
+# The home screen of an onboarded person (#53, #54, #500, #581): first whether
+# matching is open, in its sentence alone, with See people; then the way to the
+# profile, which holds the photos, the deal-breakers and the later questions
+# (#239), and the conversations; last how many people have completed their
+# profiles, in the person's language, in one sentence that leads into the bar of
+# whom they seek, with no line on a profile that is not complete. Outside
+# production the wrench opens the tech screen, which names the environment and
+# the API it talks to.
+# The number and the bar need the synthetic population (`pnpm demo:population`):
+# its fifty people who count as finished for the counter and for nothing else
+# carry both over the threshold. The sentence with no bar, and the card below ten
+# finished profiles, which says no number, are
+# `apps/mobile/src/features/pond/PondCard.test.tsx`'s. The demo commands open the
+# pond, so matching is open for Sanna;
+# `apps/mobile/src/features/pond/GateCard.test.tsx` has the other two states.
+# Read only.
 appId: fi.kuutti.app
-name: Home names the area with its numbers and the gate in words, and the wrench names the API
+name: Home says how many people have completed their profiles and the gate in words, and the wrench names the API
 ---
 - runFlow: ../common/sign-in.yaml
-- assertVisible: "Your area|Alueesi|Ditt område"
-- assertVisible: "Capital Area|Pääkaupunkiseutu|Huvudstadsregionen"
-- assertVisible: "\\d+ people have identified with their bank|\\d+ ihmistä on tunnistautunut pankkitunnuksilla|\\d+ personer har identifierat sig med bank-id"
-- assertVisible: "\\d+ women, \\d+ men, \\d+ non-binary|\\d+ naista, \\d+ miestä, \\d+ muunsukupuolista|\\d+ kvinnor, \\d+ män, \\d+ icke-binära"
-- assertVisible: "Matching|Seuranhaku|Matchning"
-- assertVisible: "About \\d+ more people are needed before matching opens for you\\.|Tarvitaan vielä noin \\d+ ihmistä, ennen kuin seuranhaku avautuu sinulle\\.|Det behövs ungefär \\d+ personer till innan matchningen öppnar för dig\\.|You are among the next \\d+ in line for your area\\.|Olet alueesi jonossa seuraavien \\d+ joukossa\\.|Du är bland de \\d+ närmaste i kön till ditt område\\.|Matching is open for you\\.|Seuranhaku on sinulle auki\\.|Matchningen är öppen för dig\\."
+# The sentence says Matching, so no word of it stands over the sentence (#581).
+- assertVisible: "Matching is open for you\\.|Seuranhaku on sinulle auki\\.|Matchningen är öppen för dig\\."
+- assertNotVisible: "Matching|Seuranhaku|Matchning"
 - assertNotVisible: "Matching opens for finished profiles\\. Yours still lacks something\\.|Seuranhaku avautuu valmiille profiileille\\. Sinun profiilistasi puuttuu vielä jotakin\\.|Matchningen öppnar för färdiga profiler\\. I din saknas ännu något\\."
+# The things to do first, in this order, in sight with the offer of notifications
+# above the two buttons (#581). The second button's name says what is unread.
+- assertVisible:
+    text: "See people|Katso ihmisiä|Se människor"
+    below: "Matching is open for you\\.|Seuranhaku on sinulle auki\\.|Matchningen är öppen för dig\\."
+- assertVisible:
+    text: "Your profile|Profiilisi|Din profil"
+    below: "See people|Katso ihmisiä|Se människor"
+- assertVisible:
+    text: "(Conversations|Keskustelut|Samtal)(, .*)?"
+    below: "Your profile|Profiilisi|Din profil"
+# How many people have completed their profiles last, at the foot of the list,
+# where nothing can be centred: reached by its lines, each wholly in sight, with no
+# centring (README).
 - scrollUntilVisible:
-    element: "Your profile|Profiilisi|Din profil"
+    element: "\\d+ people have completed their profiles and are looking for:|\\d+ ihmistä on saanut profiilinsa valmiiksi ja etsii:|\\d+ personer har gjort klart sina profiler och söker:"
     direction: DOWN
-    centerElement: true
     timeout: 60000
-- assertNotVisible: "Your deal-breakers|Ehdottomat rajasi|Dina absoluta gränser"
-- assertNotVisible: "Fill in the rest while you wait|Täydennä loput odotellessasi|Fyll i resten medan du väntar"
+- assertVisible:
+    text: "People on Kuutti|Ihmiset Kuutissa|Människor på Kuutti"
+    below: "(Conversations|Keskustelut|Samtal)(, .*)?"
+# The bar is one element, read as a screen reader hears it. The percentages under
+# it are drawn inside that element, so only Android reads them as text of their
+# own (as contact-share.yaml's shared line), each with its word, never the colour
+# alone. Android gives an element the bounds it has in sight, so the bar counts as
+# whole from its first line of pixels, and the last percentage is scrolled to by
+# itself (CI, 05/11/2026, with the card at the foot of a Home that holds the offer).
+- scrollUntilVisible:
+    element: ".*\\d+ percent are looking for everyone.*|.*\\d+ prosenttia etsii kaikkia.*|.*\\d+ procent söker alla.*"
+    direction: DOWN
+    timeout: 60000
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - scrollUntilVisible:
+          element: "\\d+ % women|\\d+ % naisia|\\d+ % kvinnor"
+          direction: DOWN
+          timeout: 60000
+      - assertVisible: "\\d+ % men|\\d+ % miehiä|\\d+ % män"
+      - assertVisible: "\\d+ % everyone|\\d+ % kaikkia|\\d+ % alla"
+      - assertVisible: "\\d+ % women|\\d+ % naisia|\\d+ % kvinnor"
+# Nothing on the card says that a profile can be unfinished, in any of that
+# line's forms (the maintainer's word of 04/11/2026, #581). The sentence on the
+# bank, the bar's own title and the line on the steps are gone too.
+- assertNotVisible: ".*still finishing.*|Everyone has finished their profile\\.|.*viimeistelee vielä.*|Kaikki ovat saaneet profiilinsa valmiiksi\\.|.*håller fortfarande på.*|Alla har gjort klart sin profil\\."
+- assertNotVisible: "\\d+ people have identified with their bank|\\d+ ihmistä on tunnistautunut pankkitunnuksilla|\\d+ personer har identifierat sig med bank-id"
+- assertNotVisible: "Whom people with a finished profile are looking for|Ketä valmiin profiilin tehneet etsivät|Vem personer med färdig profil söker"
+- assertNotVisible: "The numbers change only in steps of .*|Luvut muuttuvat vain vähintään .*|Siffrorna ändras bara i steg om .*"
+- assertNotVisible: "Fill in the rest when you have a moment|Täydennä loput, kun sinulla on hetki|Fyll i resten när du har en stund"
 
 - openLink: kuutti://tech
 - extendedWaitUntil:

@@ -1,0 +1,87 @@
+import type { PlainMessageKey } from "@kuutti/i18n";
+import { View } from "react-native";
+import { Choice } from "@/components/Choice";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { Text } from "@/components/ui/text";
+import { type ButtonStyle, type Hand, useDecisionButtons } from "@/lib/decision-buttons";
+import { useT } from "@/lib/locale";
+
+/** The two hands, in the order they are offered; the right is the default. */
+const HANDS: ReadonlyArray<{ value: Hand; label: PlainMessageKey }> = [
+  { value: "right", label: "settings.decisionButtons.right" },
+  { value: "left", label: "settings.decisionButtons.left" },
+];
+
+/** The marks Like and Pass can carry, Kuutti's own first and the default; none names a console (#520). */
+const STYLES: ReadonlyArray<{
+  value: ButtonStyle;
+  label: PlainMessageKey;
+  spoken?: PlainMessageKey;
+}> = [
+  { value: "kuutti", label: "settings.decisionButtons.style.kuutti" },
+  {
+    value: "shapes",
+    label: "settings.decisionButtons.style.shapes",
+    spoken: "settings.decisionButtons.style.shapes.spoken",
+  },
+  { value: "letters", label: "settings.decisionButtons.style.letters" },
+];
+
+/**
+ * The decision buttons (#82), in their Settings row (#511): which hand the round's Like and Pass
+ * are placed for, one-handed mode, which puts Undo, the star, the fish, Later, Pass and Like
+ * in one column on that side, and the marks Like and Pass carry (#520). Kept
+ * on the phone (src/lib/decision-buttons.tsx); the buttons keep their words
+ * and shapes wherever they sit and whatever they carry.
+ */
+export function DecisionButtonChoices() {
+  const { t } = useT();
+  const { settings, set } = useDecisionButtons();
+  return (
+    <>
+      <View
+        accessibilityRole="radiogroup"
+        accessibilityLabel={t("settings.decisionButtons.hand")}
+        className="flex-row flex-wrap gap-2"
+      >
+        {HANDS.map(({ value, label }) => (
+          <Choice
+            key={value}
+            label={t(label)}
+            chosen={settings.hand === value}
+            onPress={() => set({ hand: value })}
+          />
+        ))}
+      </View>
+      <View className="flex-row items-center justify-between gap-4">
+        <Label onPress={() => set({ oneHanded: !settings.oneHanded })}>
+          {t("settings.decisionButtons.oneHanded")}
+        </Label>
+        <Switch
+          accessibilityLabel={t("settings.decisionButtons.oneHanded")}
+          checked={settings.oneHanded}
+          onCheckedChange={(on) => set({ oneHanded: on })}
+        />
+      </View>
+      <View className="gap-2">
+        <Text variant="small">{t("settings.decisionButtons.style")}</Text>
+        <View
+          accessibilityRole="radiogroup"
+          accessibilityLabel={t("settings.decisionButtons.style")}
+          className="flex-row flex-wrap gap-2"
+        >
+          {STYLES.map(({ value, label, spoken }) => (
+            <Choice
+              key={value}
+              label={t(label)}
+              spoken={spoken && t(spoken)}
+              chosen={settings.style === value}
+              onPress={() => set({ style: value })}
+            />
+          ))}
+        </View>
+      </View>
+    </>
+  );
+}

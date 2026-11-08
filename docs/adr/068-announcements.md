@@ -1,0 +1,39 @@
+# ADR-068: Announcements: one text to everybody, approved by a second admin
+
+- Status: proposed (#573, built as written here on the maintainer's decisions of 2026-11-07, #573's comment of that day: a push, a notice in the app and an email; the `admin` role and a second admin's approval; English and Finnish required, Swedish falling back to English; the push in the app's own words; every confirmed address mailed; one switch for the push and the email; no cap; kept for good; the email in the language of the person's terms; accepting it is the maintainer's)
+- Date: 2026-11-07
+- Follows: TD-3 (one box, the work in process), TD-18 (mail and notices only with a reason; its reading changes here for one kind, §5), ADR-032 (the notices and the switches, amended here), ADR-055 (the push, amended here), ADR-043 (the confirmed address, amended here), ADR-024 §7 (a shadow ban tells nobody anything), ADR-007 §3 and §4 (export and erasure), ADR-009 (the plain-text rule), CLAUDE.md Product constraints (no real-time engagement push); issues #573, #196, #188, #176, #102, #385
+
+## Context
+
+Whoever runs Kuutti has had no way to tell everybody something they must know, such as a service break or a change in the rules, short of a new release. The push says only that there is something (ADR-055 §1), a notice holds no text of its own (ADR-032 §2), and a confirmed address receives nothing but its code (ADR-043 §1). #573 asked the maintainer what an announcement should be. His answers of 2026-11-07 are this record.
+
+## Decision
+
+1. **An announcement is a title and a body in each language,** written by a person in the panel. English and Finnish are required. Swedish is optional, a title and a body together or neither. A title is at most `ANNOUNCEMENT_TITLE_MAX` (80) characters and a body at most `ANNOUNCEMENT_BODY_MAX` (1,000), plain text, each trimmed and never empty, and each under the plain-text rule (ADR-009, `contactDetailsIn`): no address, link, phone number or handle. The table `announcement` holds the texts, who wrote it and when, and who approved it and when.
+2. **Two admins.** An admin writes it (`POST /admin/announcements`). It goes once **another** admin approves it (`POST /admin/announcements/{id}/approve`); the one who wrote it cannot, and a check in the database holds that. Until then any admin may delete it (`DELETE /admin/announcements/{id}`), and once approved nothing takes it back. Writing, approving and deleting each write an `audit_log` row whose detail carries no text a person typed. The panel lists them newest first, and with them how many it would reach: the accounts, the people with a phone that would be pushed, and the confirmed addresses that would be mailed. The role is `admin`, and no new one.
+3. **Everybody, at once.** The approval writes, in its transaction, a notice of the kind `announcement` for every account that is not erased: a shadow-banned one too (ADR-024 §7), and one on a break, suspended or banned, which sees it when it comes back. Nobody is chosen: no segments and no single person, which would be profiling and is the `moderation` kind's place. Somebody who signs up afterwards is not told. The notice stays on the home screen until Got it, as every notice does, and `GET /notices` answers its title and body in the request's language: Finnish for Stadi, and English for Swedish where the announcement has no Swedish.
+4. **The push says only that there is an announcement** (ADR-055 §1 holds): `push.announcement` in the phone's language, `data` of the kind `announcement` alone, so nothing typed in the panel passes through Expo, Apple or Google. After the approval commits, it goes to each person whose notice of it is still unread, whose switch is on, and who has a live device, one account at a time as every push goes. Unlike a message's, an announcement's push is not dropped in the quiet hours: approved then, it waits in the process until they end, and goes then to those who have not read it meanwhile.
+5. **The email carries the text,** to every confirmed address whose person has the switch on, as a service message about what they must know (the maintainer, 2026-11-07). It is outside #196's consent for each kind of mail, so TD-18's reading as #196 and ADR-043 §1 state it changes for this one kind. It is worded in the language the person read the terms in (their newest `terms` consent's `locale_shown`), with the same fallback as the notice: the title as the subject after the app's name, the body, a line saying why it came and that Settings turns it off, and the signature. Plain text, no link (ADR-043 §3). One message at a time, 100 ms apart, so ten a second at most, under SES's rate. A failed send is logged by its reason alone (`MailFailed`) and the rest go on; nothing is retried.
+6. **One switch.** The notification kind `announcement` (ADR-032 §1), on until the person switches it off. Off, neither the push nor the email goes; the notice always does, so nobody misses what they must know.
+7. **No cap.** The second admin's approval is the guard against an announcement becoming a call to come back (the maintainer, 2026-11-07).
+8. **Records.** A sent announcement is kept for good, the record of what Kuutti told everybody; a draft deleted goes at once. Erasure deletes the person's notices and switches as it deletes every kind (ADR-032 §5); the announcement stays, naming the two members of staff, a member of staff's work, and no export carries it. The person's export lists the notice with when it came and when it was read, as every notice.
+
+## Consequences
+
+- ADR-032 §1 and §2 gain the kind `announcement` for the switches and for the notices, and the notice its `announcement_id`; ADR-055 §1 a third line and kind, and §7 an exception for the announcement's push; ADR-043 §1 the announcement as the second mail a confirmed address receives.
+- The app shows the notice's title and body and the switch, in the same change as the API, since it reads the notices and the switches through the shared contracts and would refuse a kind it does not know. The panel's screen comes after it, so nothing can be sent before the app can show it.
+- The privacy notice on kuutti.app gains a line on the announcement email and the switch: the maintainer's wording, in kuutti-ry/kuutti-app-site.
+- Production sends no push until it has its Expo token (ADR-055, Consequences); the notice and the email reach people there regardless.
+
+## Left out on purpose
+
+- **Editing a draft:** delete it and write it again, so that what the second admin approves is what one admin wrote. A typo seen at approval costs a rewrite.
+- **Taking an announcement back once sent,** or a later one correcting it in place: a new announcement says the correction.
+- **A time to send it,** segments, a single person, and HTML mail, which waits for #404's frame.
+- **Sending past a restart:** the pushes and the emails go from the process's memory after the approval (`shortcut:` in `announcements.ts` and `push.ts`). A restart while they go, or before the quiet hours end, loses what is left; every notice was written in the approval's transaction and stays. A column on the announcement for how far its sending got would lift it.
+
+## History
+
+- 2026-11-07: written with #573's first pull request, on the maintainer's decisions of that day.
+- 2026-11-07: the panel's screen, #573's second pull request: `/announcements`, admins only. One admin writes in English and Finnish, and Swedish or not, the form saying who the Swedish fallback reaches; the draft lists its languages, Swedish's absence said in words; its writer is offered no approval, and why; another admin approves through a confirm step that says to how many accounts, addresses and people it goes, and that nothing takes it back; either deletes a draft through a step of its own.

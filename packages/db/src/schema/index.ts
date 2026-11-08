@@ -21,7 +21,6 @@ export {
 export { consent, consentKind } from "./consent.ts";
 export { feedback, feedbackKind, feedbackPlatform } from "./feedback.ts";
 export { foundReason, foundThemCount } from "./found-them.ts";
-export { gate } from "./gate.ts";
 export {
   type Account,
   account,
@@ -31,14 +30,16 @@ export {
   identity,
   identityStanding,
 } from "./identity.ts";
-// Today's round and its entries (#96, ADR-034).
+// Today's round and its entries (#96, ADR-034), and the stars (#575, ADR-064).
 export {
+  distanceBand,
   relaxationKind,
   roundDecision,
   roundEntries,
   roundReason,
   roundRelaxation,
   rounds,
+  star,
 } from "./matching.ts";
 export { matchingConfig } from "./matching-config.ts";
 export {
@@ -53,11 +54,15 @@ export {
   photoVariant,
 } from "./media.ts";
 export {
+  announcement,
   notice,
   noticeKind,
   notificationKind,
   notificationPreference,
+  pushPlatform,
+  pushToken,
 } from "./notifications.ts";
+export { pondCounter } from "./pond-counter.ts";
 export { ponds } from "./ponds.ts";
 export {
   preferenceMode,
@@ -83,4 +88,3 @@ export {
   sanctionRule,
 } from "./safety.ts";
 export { session } from "./sessions.ts";
-export { waitlistSnapshot } from "./waitlist.ts";

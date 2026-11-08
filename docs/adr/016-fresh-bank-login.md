@@ -1,6 +1,6 @@
 # ADR-016: The bank, every time: `prompt=login` and an `auth_time` no older than the attempt
 
-- Status: proposed (built as written here; the maintainer's planning handoff of 2026-10-07 names `prompt=login` as a Kuutti requirement, and this record is the ADR that CLAUDE.md asks for when the identity flow changes)
+- Status: proposed (built as written here; the maintainer's planning handoff of 2026-10-07 names `prompt=login` as a Kuutti requirement, and this record is the ADR that CLAUDE.md asks for when the identity flow changes), amended by ADR-058 on 2026-10-28 (§3: a session ends ninety days after its last use and a year after its bank login, #472; see History)
 - Date: 2026-10-07
 - Follows: TD-1 (one identity per person, verified at the bank), TD-7 (standing and re-registration decided at the callback), CLAUDE.md rules 1 and 6, `docs/vendors/telia.md` (guide 2.4.3: `prompt`, `max_age`; 2.6.4: `auth_time`), `.claude/rules/api.md` Identity and auth; issues #32, #33
 
@@ -17,13 +17,13 @@ Until now the request object carried neither lever, and the confirmations table 
 ## Decision
 
 1. **Every request object carries `prompt=login`.** The adapter adds it in `startLogin` for both dialects (Telia and the mock IdP), so that the local flow is the deployed flow. `max_age` is not sent: `prompt=login` is the guide's named mechanism for exactly this, and one lever is one thing to verify at the first pre-production login.
-2. **An `auth_time` earlier than the attempt is refused.** At the callback, after the broker's answer is verified and before anything is derived or written, the login compares the broker's `auth_time` with the attempt's own `created_at`. An authentication more than two minutes older than the attempt (`AUTH_TIME_TOLERANCE_MS`, `login.ts`) is answered `auth_provider_error`, like any other answer that is not a login of this person; nothing is created or counted. The tolerance is for clocks: the broker's and the database's are both disciplined by NTP and differ by seconds, and a reused session is minutes or hours old.
-3. **What this costs.** Every sign-in is an identification event at the broker and, in production, a billed one. Sessions are device-bound and long-lived (#35), so a sign-in happens at registration, on a new device, and after a revocation, not at every app open. The number stays small by the session design, not by skipping the bank.
+2. **An `auth_time` earlier than the attempt is refused.** At the callback, after the broker's answer is verified and the HMAC, the year and month and the age are derived in memory (`deriveFromBroker`, which writes nothing), and before anything of the person is written, the login compares the broker's `auth_time` with the attempt's own `created_at`. An authentication more than two minutes older than the attempt (`AUTH_TIME_TOLERANCE_MS`, `login.ts`) is answered `auth_provider_error`, like any other answer that is not a login of this person; nothing is created or counted. The tolerance is for clocks: the broker's and the database's are both disciplined by NTP and differ by seconds, and a reused session is minutes or hours old.
+3. **What this costs.** Every sign-in is an identification event at the broker and, in production, a billed one. Sessions are device-bound and long-lived (#35), so a sign-in happens at registration, on a new device, and after a revocation, not at every app open; since ADR-058 also after ninety days without use and a year after the bank login. The number stays small by the session design, not by skipping the bank. It is counted (#471): each identification the bank passes on, verified and fresh, leaves one line, `identified at the bank`, with the platform and nothing of the person, before the rule decides anything, since a refusal is billed too; the observability module sums the lines and mails on a day at or above `bank_identifications_per_day` (`docs/runbooks/alerts.md`, `docs/vendors/telia.md`, The bill).
 
 ## Consequences
 
 - `docs/vendors/telia.md`: the open question about `prompt=login` becomes this record; what remains to confirm at the first pre-production login is that Telia honours `prompt=login` with a fresh bank authentication and an `auth_time` to match.
-- The fake Telia (`src/test/fake-telia.ts`) and the conformance test assert `prompt: "login"` in the request object; the bank-login feature gains the scenario for a stale `auth_time`.
+- The fake Telia (`src/testing/fake-telia.ts` in kuutti-ry/tunnistus-oidc since ADR-017 §6) and the conformance test assert `prompt: "login"` in the request object; the bank-login feature gains the scenario for a stale `auth_time`.
 - The mock IdP shows its login page on every request anyway; `prompt=login` changes nothing locally. Its `auth_time` is the token's issue time when it sends none, which is after the attempt began.
 - A person who leaves the bank page open for longer than the attempt's ten minutes (`AUTH_REQUEST_TTL_MS`) is refused by the state check as before; this decision adds no new timeout.
 
@@ -31,3 +31,9 @@ Until now the request object carried neither lever, and the confirmations table 
 
 - PKCE (`code_challenge`, S256): the broker advertises it, the guide does not mention it, and with `private_key_jwt` and a confidential client it defends against code injection only. It needs a column for the verifier; it is a change of its own if wanted. The app's own one-time code is bound to its attempt by ADR-027; this item is Telia's code only.
 - Whether `max_age` is also sent, should Telia turn out to honour one lever and not the other. The first pre-production login answers that.
+
+## History
+
+- 2026-10-28, ADR-058 (#472): §3's long-lived sessions end ninety days after their last refresh and a year after the bank login at most. Until then the ninety days ran from the bank login, so a phone in daily use met the bank every quarter, a billed sign-in §3 did not name.
+- 2026-10-29 (#471): §3 gains the count of identifications and its alarm, which follows TD-19 as the observability module's other alarms do (#11).
+- 2026-11-04 (#250): §2 said the check comes before anything is derived. The callback derives the HMAC, the year and month and the age in memory first and compares after, writing nothing of the person before either, and §2 now says so. Nothing in the code changed.

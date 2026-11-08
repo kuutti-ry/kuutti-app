@@ -10,6 +10,7 @@ import {
   EMAIL_MAX,
   ExportedPhoto,
 } from "./account.ts";
+import { DEAL_BREAKERS_CAP } from "./deal-breakers.ts";
 
 // The account's own lifecycle (#51, #148): the optional e-mail, the deletion
 // request and the export, at their boundaries.
@@ -162,14 +163,12 @@ function anExport(): Record<string, unknown> {
       gender: "woman",
       pond: {
         id: uuid(2),
-        slug: "helsinki",
-        name: "Helsinki",
-        nameInessive: "Helsingissä",
-        parentId: null,
+        slug: "suomi",
+        name: "Suomi",
       },
+      home: { place: "Kallio", shownOnCard: "Helsinki" },
       stateChangedAt: null,
       genderChangedAt: null,
-      seeksChangedAt: null,
       email: null,
       emailConfirmedAt: null,
       foundThemAnswered: false,
@@ -195,6 +194,7 @@ function anExport(): Record<string, unknown> {
         createdAt: at,
         lastUsedAt: at,
         expiresAt: at,
+        push: null,
       },
     ],
     profile: null,
@@ -207,7 +207,6 @@ function anExport(): Record<string, unknown> {
       carefulCheckUntil: at,
     },
     research: { enrolled: false, since: null, consentVersion: null, events: [] },
-    gate: null,
     exports: [{ at }],
     feedback: [
       {
@@ -263,7 +262,6 @@ function anExport(): Record<string, unknown> {
     contacts: [{ kind: "phone", value: "+358401234567", updatedAt: at }],
     notifications: {
       choices: [
-        { kind: "round", enabled: true },
         { kind: "message", enabled: false },
         { kind: "match", enabled: true },
         { kind: "moderation", enabled: true },
@@ -299,11 +297,16 @@ function anExport(): Record<string, unknown> {
               decision: "like",
               decisionInWords: "Liked",
               decidedAt: at,
+              secondPass: false,
+              distance: "close",
+              distanceInWords: "Close",
             },
           ],
         },
       ],
     },
+    // When each star was put (#575), never on whom.
+    stars: { about: "Your stars", items: [{ at }] },
     // The invitations made and used, and what they earned (#107), never a code or whom.
     invitations: {
       made: [{ createdAt: at, state: "counted", countedAt: at }],
@@ -355,9 +358,26 @@ describe("the account export", () => {
       birthMonth: null,
       gender: null,
       pond: null,
+      home: null,
     };
     erased.preferences = { seeks: null, ageWindow: null };
     expect(AccountExport.safeParse(erased).success).toBe(true);
+  });
+
+  it("says the home in words: the place kept and the name the card shows (ADR-061 §9)", () => {
+    const home = (value: unknown) => {
+      const copy = anExport();
+      copy.account = { ...(copy.account as object), home: value };
+      return copy;
+    };
+    const kept = { place: "Kallio", shownOnCard: "Helsinki" };
+    expect(AccountExport.parse(anExport()).account.home).toEqual(kept);
+    expect(AccountExport.safeParse(home({ place: "Kallio" })).success).toBe(false);
+    expect(AccountExport.safeParse(home("00530")).success).toBe(false);
+    const long = "n".repeat(81);
+    expect(AccountExport.safeParse(home({ ...kept, place: long })).success).toBe(false);
+    expect(AccountExport.safeParse(home({ ...kept, shownOnCard: long })).success).toBe(false);
+    expect(AccountExport.safeParse(home(undefined)).success).toBe(false);
   });
 
   it("names the photo check's kinds from a closed list, and the end of the closer look or null (#253)", () => {
@@ -387,7 +407,7 @@ describe("the account export", () => {
   it.each<[string, number, () => unknown]>([
     [
       "dealBreakers",
-      5,
+      DEAL_BREAKERS_CAP,
       () => ({ field: "smoking", accept: ["never"], includeUnknown: true, paused: false }),
     ],
     ["photos", 50, () => photo(0)],
@@ -451,6 +471,39 @@ describe("the account export", () => {
     const negative = anExport();
     negative.identity = { ...(negative.identity as object), refusedAttempts: -1 };
     expect(codes(AccountExport, negative)).toEqual(["too_small"]);
+  });
+
+  it("says whether a device gets pushes, its platform, language and since when, and never its token (#102)", () => {
+    const pushed = anExport();
+    const push = {
+      platform: "android",
+      locale: "fi",
+      registeredAt: at,
+      token: "ExponentPushToken[abc]",
+    };
+    pushed.sessions = [{ ...(pushed.sessions as object[])[0], push }];
+    const [session] = AccountExport.parse(pushed).sessions;
+    expect(session?.push).toEqual({ platform: "android", locale: "fi", registeredAt: at });
+    expect(JSON.stringify(AccountExport.parse(pushed))).not.toContain("ExponentPushToken");
+    const missing = anExport();
+    const { push: _, ...withoutPush } =
+      (missing.sessions as Array<Record<string, unknown>>)[0] ?? {};
+    missing.sessions = [withoutPush];
+    expect(codes(AccountExport, missing)).toEqual(["invalid_type"]);
+    for (const [field, value, code] of [
+      ["platform", "web", "invalid_value"],
+      ["locale", "de", "invalid_value"],
+      ["registeredAt", "25.10.2026", "invalid_format"],
+    ] as const) {
+      const wrong = anExport();
+      wrong.sessions = [
+        {
+          ...(wrong.sessions as object[])[0],
+          push: { platform: "ios", locale: "en", registeredAt: at, [field]: value },
+        },
+      ];
+      expect(codes(AccountExport, wrong), field).toEqual([code]);
+    }
   });
 
   it("refuses an unknown session platform and a timestamp that is not ISO 8601", () => {

@@ -15,7 +15,11 @@
 - a job's permissions are a list of scopes, never a word (write-all), and a
   job that calls a reusable workflow is held to the same scopes;
 - every checkout sets persist-credentials: false;
-- every third-party action is pinned to a 40-character commit SHA.
+- every third-party action is pinned to a 40-character commit SHA;
+- no workflow or action fetches Saiga, holds its credential or names its
+  cache (ADR-052): the typeface is never public as a file, and a runner's
+  caches, artifacts and logs are. The fetch's self-test, against stand-ins,
+  is the one mention allowed.
 """
 
 import pathlib
@@ -166,6 +170,16 @@ for path in WORKFLOWS:
                 problems.append(f"{name}/{job_id}: checkout without persist-credentials: false")
             if not uses.startswith("./") and not SHA_PIN.match(uses):
                 problems.append(f"{name}/{job_id}: {uses} is not pinned to a commit SHA")
+
+# Saiga's fetch (scripts/fonts.ts, `pnpm fonts`), its token, its repository,
+# its cache. check-fonts.ts, the guard, is another script.
+SAIGA = re.compile(r"FONTS_TOKEN|kuutti-app-fonts|kuutti-fonts|pnpm (?:run )?fonts\b|(?<![\w-])fonts\.ts(?! --self-test)")
+for path in [*WORKFLOWS, *sorted((ROOT.parent / "actions").glob("*/action.yml"))]:
+    for number, line in enumerate(path.read_text().splitlines(), 1):
+        if SAIGA.search(line):
+            problems.append(
+                f"{path.relative_to(ROOT.parent)}:{number}: names Saiga's fetch, credential or cache; no workflow ever has the typeface (ADR-052)"
+            )
 
 for path in sorted((ROOT.parent / "actions").glob("*/action.yml")):
     doc = yaml.safe_load(path.read_text())

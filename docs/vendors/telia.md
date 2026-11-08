@@ -16,6 +16,30 @@ Where things stand (2026-10-07):
 
 Sales entry, for the record: https://www.telia.fi/yrityksille/palvelut/tietoturva/tunnistautuminen (*Telia Tunnistus*, "ota yhteyttä").
 
+## The bill (#471)
+
+Production is billed from the move to production, not from the signature: the offer of 07.10.2026 says invoicing starts once the service has been transferred to production, and the pre-production bed is free. No production connection has been requested yet (#25). The agreement is Telia's service agreement 5261020255146 of 20.10.2026 (*Palvelusopimus*, with its price list annex, Telia Tunnistus version 12.0), e-signed on 20 to 22 October by Mika Loukola for Telia and by the chair and the vice-chair for Kuutti ry; TVP00648 is Telia's reference for it, the one to quote to id-maintenance. Its prices, excluding VAT, bank and Mobiilivarmenne alike:
+
+| package | a month | events included | each event past them |
+|---|---|---|---|
+| S (the one ordered) | 60 € | 200 | 0.20 € |
+| L | 220 € | 1,000 | 0.05 € |
+| XL | 500 € | 10,000 | 0.045 € |
+
+No set-up fee. The package can be changed at a month boundary, asked for two weeks ahead (before the middle of the month, to mika.loukola@teliacompany.com, for the first of the next). S and L cost the same at 1,000 events a month, so past that L is cheaper; the alarm's 50 a day is a 1,500-a-month pace. Telia may change these prices mid-term only when law or a regulator forces it, with 14 days' notice; the service ends on two months' notice. No support or discount exists for a non-profit (Mika Loukola, 07.10.2026). In the trust network the law caps what a bank may charge a broker at 3 cents for each identification it passes on (Act 617/2009 §12 c).
+
+What Kuutti counts: one API line `identified at the bank` for each callback whose broker answer is verified and fresh, before the rule decides anything, so a new account, a resume, the end of a break, a staff sign-in and a refusal each count once; a cancel at the bank, a failed token call and an answer older than its attempt (ADR-016 §2) do not. The observability module sums the lines as `BankIdentifications` in `Kuutti/<env>` and mails when a day reaches `bank_identifications_per_day` (`docs/runbooks/alerts.md`). The month's count, to choose the package from, is the metric's sum over the month (the alarm's row has the command); a package change asked for before the middle of a month applies from the next.
+
+Questions for the commercial contact, with the date and the answer once they come:
+
+| question | why it matters | answer |
+|---|---|---|
+| Which events are billed: only an identification whose data reaches us, or also a chooser opened and left, a cancel at the bank, or an answer from Telia's own web session? | whether the count above is the bill, or a starting point; if starts or cancels are billed, the doors' numbers (ADR-026 §5) and the WAF rule of #41 are the bound to revisit | Only completed identifications (Mika Loukola, 05.11.2026, by mail to the chair and the vice-chair: "Only completed identification events are invoiced"). A request the person cancels or abandons at the bank is not billed, so the count above is the bill, and the doors' numbers and the WAF rule stand. The agreement itself says less: it defines an identification event as the chain in which the holder identifies themselves to the service and the service uses the broker to establish their identity, and says a request the person rejects or leaves unaccepted is reported to us as a failure. |
+| What does a login past the package cost, and what are the larger packages? | the price of a day the alarm mails about | The price list of 20.10.2026, above: 0.20 € past the S package's 200, and L and XL at 220 € and 500 € a month. |
+| Did TVP00648 change anything in the 2025 offer? | the figures above | Yes (the offer of 07.10.2026, the agreement of 20.10.2026): S is 60 € a month, not 55; the 200 events and the shape of the packages are unchanged. |
+
+Months counted: none, since billing starts at the move to production and none has been requested.
+
 ## What Telia needs from us (guide section 2.1)
 
 | item | ours |
@@ -108,7 +132,7 @@ What the bed returned when each test user logged in to staging (#139, the simula
 | Danske `88888888` / `4545` | `010108-000Z` | 1.1.1908 | refused: not a valid code (individual number 000) |
 | Mobiilivarmenne emulator, `0401234567` | `010132-998W` | 1.1.1932 | completed (a new account, 94 years old) |
 
-Two things changed on the bed since the published list: Danske now returns `010108-000Z` (not `280453-111A`), and Ålandsbanken and S-Pankki return codes with impossible days, so neither is Mikael (`010170-960x`) any more; the mock bank's Mikael has no working test user on staging. Every refusal of an invalid code reaches the person as "the identification service did not complete the login; try again in a while", which promises a retry that cannot help.
+Two things changed on the bed since the published list: Danske now returns `010108-000Z` (not `280453-111A`), and Ålandsbanken and S-Pankki return codes with impossible days, so neither is Mikael (`010170-960x`) any more; the mock bank's Mikael has no working test user on staging. Every refusal of an invalid code reaches the person as the sign-in card's title, "Sign-in did not complete", over Try again (#581), which promises a retry that cannot help.
 
 ## The four confirmations we need in writing
 

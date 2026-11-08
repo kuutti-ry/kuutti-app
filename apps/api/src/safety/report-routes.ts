@@ -22,8 +22,9 @@ import { REPORTS_PER_DAY_KEY, recordConversationReport, recordReport } from "./r
 // (#351, ADR-030 §12). Both answer 204 whatever stood before, so neither
 // tells the caller anything about the other person, and from a card both
 // answer the same 404 for a card never shown, oneself and nobody.
-// What a request names (the other account, the reason, the note) reaches no
-// log line, no error detail and no research event (rule 5): the request line
+// What a request names (the other account, the reason, the note, the photo
+// or line it points at, #476) reaches no log line, no error detail and no
+// research event (rule 5): the request line
 // says that the caller did it, a refusal its code, and the cap's refusal how
 // many and until when.
 
@@ -61,16 +62,16 @@ const reportRoute = createRoute({
   path: "/reports",
   summary: "Report the person of a card one was shown, and block them",
   description:
-    "A reason from the closed list and, if the person likes, a few lines for the moderators, who read it in the panel. The report blocks both ways in the same transaction. The reported person learns nothing. At most matching_config reports_per_day a day per account, the Finnish calendar day; one open report per pair.",
+    "A reason from the closed list and, if the person likes, a few lines for the moderators, who read it in the panel, and the one photo of the card it is about (#476). The report blocks both ways in the same transaction. The reported person learns nothing. At most matching_config reports_per_day a day per account, the Finnish calendar day; one open report per pair.",
   ...bearer,
   request: { body: { required: true, ...json(ReportRequest) } },
   responses: {
     204: {
       description:
-        "Filed and blocked; or a report of the same person is still open, and nothing more is written.",
+        "Filed and blocked; or a report of the same person is still open, and nothing more is written. A photo that is not one of the card the person was shown is left out, and the answer is the same.",
     },
     400: errorContent(
-      "Validation failed: a missing or unknown reason, a note blank or over 500 characters, a malformed account id, an unknown key.",
+      "Validation failed: a missing or unknown reason, a note blank or over 500 characters, a malformed account or photo id, an unknown key.",
     ),
     401: unauthenticated,
     404: notShown,
@@ -110,7 +111,7 @@ const conversationReportRoute = createRoute({
   path: "/conversations/{id}/report",
   summary: "Report the other person of a conversation, with a copy of it, and block them",
   description:
-    "The card's reason and note (#351, ADR-030 §12). In one transaction: the report naming the conversation, a frozen copy of every message it holds now, both people's, for the moderators, who read it in the panel, the block both ways and the conversation's close. Taken while the conversation is open or archived, and for matching_config report_after_close_days after it closed, so a person blocked can still report what was said. At most matching_config reports_per_day a day, one open report per pair, as from a card. The reported person learns nothing.",
+    "The card's reason and note (#351, ADR-030 §12), and the line of the one photo it is about (#476). In one transaction: the report naming the conversation, a frozen copy of every message it holds now, both people's, for the moderators, who read it in the panel, the block both ways and the conversation's close. Taken while the conversation is open or archived, and for matching_config report_after_close_days after it closed, so a person blocked can still report what was said. At most matching_config reports_per_day a day, one open report per pair, as from a card. The reported person learns nothing.",
   ...bearer,
   request: {
     params: ConversationParams,
@@ -119,10 +120,10 @@ const conversationReportRoute = createRoute({
   responses: {
     204: {
       description:
-        "Filed, copied, blocked and closed; or a report of the same person is still open, and nothing more is written.",
+        "Filed, copied, blocked and closed; or a report of the same person is still open, and nothing more is written. A line that is not a photo the other person sent, as the reporter could read it, is left out, and the answer is the same.",
     },
     400: errorContent(
-      "Validation failed: a missing or unknown reason, a note blank or over 500 characters, an unknown key, an id that is not a uuid.",
+      "Validation failed: a missing or unknown reason, a note blank or over 500 characters, a line that is not a whole number from 1, an unknown key, an id that is not a uuid.",
     ),
     401: unauthenticated,
     404: conversationNotFound,
@@ -198,6 +199,7 @@ export function reportRoutes(deps: Deps, guard: MiddlewareHandler<AppEnv>) {
       reportedAccountId: body.accountId,
       reason: body.reason,
       note: body.note ?? null,
+      photoId: body.photoId ?? null,
       at,
       since: day.start,
       limit,
@@ -236,6 +238,7 @@ export function reportRoutes(deps: Deps, guard: MiddlewareHandler<AppEnv>) {
       conversationId: id,
       reason: body.reason,
       note: body.note ?? null,
+      seq: body.seq ?? null,
       at,
       since: day.start,
       limit,

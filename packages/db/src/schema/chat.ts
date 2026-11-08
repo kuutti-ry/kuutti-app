@@ -67,9 +67,10 @@ export const conversation = pgTable(
 
 /**
  * One row per side. `read_up_to` is the highest sequence the person has read
- * (#349 fans it out as the read receipt); it never goes down. `account_id`
- * goes null at the person's erasure and the row stays, so the counterpart
- * keeps the conversation under "Deleted user".
+ * (#349 fans it out as the read receipt); it never goes down, except at the
+ * person's erasure, where a shadow ban's held mark goes back to what the
+ * counterpart saw (#470). `account_id` goes null at the person's erasure and
+ * the row stays, so the counterpart keeps the conversation under "Deleted user".
  */
 export const conversationParticipant = pgTable(
   "conversation_participant",
@@ -130,10 +131,17 @@ export const message = pgTable(
 
 /**
  * The kinds of contact a person may keep and share in a conversation (#103,
- * the maintainer's decision of 18/10/2026): a phone number, WhatsApp (a
- * number), Telegram and Instagram (a username).
+ * the maintainer's decisions of 18/10/2026 and, for Snapchat, 28/10/2026): a
+ * phone number, WhatsApp (a number), Telegram, Instagram and Snapchat (a
+ * username).
  */
-export const contactKind = pgEnum("contact_kind", ["phone", "whatsapp", "telegram", "instagram"]);
+export const contactKind = pgEnum("contact_kind", [
+  "phone",
+  "whatsapp",
+  "telegram",
+  "instagram",
+  "snapchat",
+]);
 /** How a share ended: its owner stopped it, the stored piece was removed, or the conversation closed. */
 export const contactShareEnd = pgEnum("contact_share_end", ["stopped", "removed", "closed"]);
 

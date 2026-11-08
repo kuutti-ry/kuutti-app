@@ -1,4 +1,5 @@
 import { act, fireEvent, screen } from "@testing-library/react-native";
+import { useLocales } from "expo-localization";
 import { AccessibilityInfo, Platform } from "react-native";
 import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
 import { renderWithTheme, underProviders } from "@/test/render";
@@ -11,8 +12,29 @@ import { LockScreen, type PasscodeAnswer } from "./LockScreen";
 
 const FIELD = "Your Kuutti passcode";
 const BANK = "Sign in with the bank instead";
-const FAILED =
-  "Your face or fingerprint did not unlock Kuutti. Try again, or use another way below.";
+const FAILED = "Your face did not unlock Kuutti.";
+/** The way back from the phone's pause, the same for every kind. */
+const PAUSED_UNTIL = "Lock the phone and open it with its own code, then try again.";
+/** A refusal in the words of the kind the button names (#464). */
+const REFUSAL = {
+  failed: {
+    face: FAILED,
+    fingerprint: "Your fingerprint did not unlock Kuutti.",
+    either: "Your face or fingerprint did not unlock Kuutti.",
+  },
+  lockout: {
+    face: `The phone has paused face unlock after too many tries. ${PAUSED_UNTIL}`,
+    fingerprint: `The phone has paused fingerprint unlock after too many tries. ${PAUSED_UNTIL}`,
+    either: `The phone has paused face or fingerprint unlock after too many tries. ${PAUSED_UNTIL}`,
+  },
+} as const;
+const DENIED =
+  "This iPhone does not let Kuutti use Face ID. You can allow it in the phone's settings.";
+const UNLOCK = {
+  face: "Unlock with your face",
+  fingerprint: "Unlock with your fingerprint",
+  either: "Unlock with your face or fingerprint",
+} as const;
 
 const announced = () =>
   (AccessibilityInfo.announceForAccessibility as jest.Mock).mock.calls.map(([words]) => words);
@@ -31,6 +53,7 @@ function deferred<T>() {
 
 type Props = {
   biometrics: Biometrics | null;
+  denied: boolean;
   passcode: boolean;
   onBiometrics: jest.Mock<Promise<BiometricAnswer>, []>;
   onPasscode: jest.Mock<Promise<PasscodeAnswer>, [string]>;
@@ -41,6 +64,7 @@ type Props = {
 async function show(over: Partial<Props> = {}) {
   const props: Props = {
     biometrics: null,
+    denied: false,
     passcode: true,
     onBiometrics: jest.fn(async (): Promise<BiometricAnswer> => "cancelled"),
     onPasscode: jest.fn(async (_code: string): Promise<PasscodeAnswer> => ({ ok: false, left: 4 })),
@@ -61,6 +85,7 @@ async function typeCode(code: string) {
 
 beforeEach(() => {
   (AccessibilityInfo.announceForAccessibility as jest.Mock).mockClear();
+  (useLocales as jest.Mock).mockReturnValue([{ languageTag: "en-US" }]);
 });
 afterEach(() => jest.restoreAllMocks());
 
@@ -150,13 +175,18 @@ describe("LockScreen", () => {
       expect(announced()).toEqual([FAILED]);
     });
 
-    it("leaves the announcing to the live region on Android", async () => {
-      jest.replaceProperty(Platform, "OS", "android");
-      const onBiometrics = jest.fn(async (): Promise<BiometricAnswer> => "failed");
-      await show({ biometrics: "face", onBiometrics });
-      expect(screen.getByText(FAILED)).toBeTruthy();
-      expect(announced()).toEqual([]);
-    });
+    it.each(["failed", "lockout"] as const)(
+      "leaves the announcing of %s to the live region on Android",
+      async (answer) => {
+        jest.replaceProperty(Platform, "OS", "android");
+        const onBiometrics = jest.fn(async (): Promise<BiometricAnswer> => answer);
+        await show({ biometrics: "face", onBiometrics });
+        expect(screen.getByText(REFUSAL[answer].face).props.accessibilityLiveRegion).toBe(
+          "assertive",
+        );
+        expect(announced()).toEqual([]);
+      },
+    );
 
     it.each(["cancelled", "ok"] as const)(
       "says nothing when the prompt answers %s",
@@ -164,10 +194,97 @@ describe("LockScreen", () => {
         jest.replaceProperty(Platform, "OS", "ios");
         const onBiometrics = jest.fn(async (): Promise<BiometricAnswer> => answer);
         await show({ biometrics: "face", onBiometrics });
-        expect(screen.queryByText(FAILED)).toBeNull();
+        expect(screen.queryByText(REFUSAL.failed.face)).toBeNull();
+        expect(screen.queryByText(REFUSAL.lockout.face)).toBeNull();
         expect(announced()).toEqual([]);
       },
     );
+
+    it.each(["face", "fingerprint", "either"] as const)(
+      "says a failure of the phone's %s in the words its button names",
+      async (kind) => {
+        const onBiometrics = jest.fn(async (): Promise<BiometricAnswer> => "failed");
+        await show({ biometrics: kind, onBiometrics });
+        expect(button(UNLOCK[kind])).toBeTruthy();
+        expect(screen.getByText(REFUSAL.failed[kind])).toBeTruthy();
+        for (const other of ["face", "fingerprint", "either"] as const) {
+          if (other !== kind) expect(screen.queryByText(REFUSAL.failed[other])).toBeNull();
+        }
+      },
+    );
+
+    // Android pauses after about five wrong fingers, for 30 seconds or until
+    // the phone's own code; iOS until that code. No prompt shows meanwhile.
+    it.each(["face", "fingerprint", "either"] as const)(
+      "says the phone's pause of its %s and how it ends, aloud on iOS, never a failure",
+      async (kind) => {
+        jest.replaceProperty(Platform, "OS", "ios");
+        const onBiometrics = jest.fn(async (): Promise<BiometricAnswer> => "lockout");
+        await show({ biometrics: kind, onBiometrics });
+        const notice = screen.getByText(REFUSAL.lockout[kind]);
+        expect(notice.props.accessibilityLiveRegion).toBe("assertive");
+        expect(announced()).toEqual([REFUSAL.lockout[kind]]);
+        expect(screen.queryByText(/did not unlock/)).toBeNull();
+        // The button stays for after the pause, and the other ways in are there.
+        expect(button(UNLOCK[kind])).toBeEnabled();
+        expect(field()).toBeTruthy();
+        expect(button(BANK)).toBeEnabled();
+        noProblems();
+      },
+    );
+
+    it("says the pause again in a fresh live region when the button is pressed during it", async () => {
+      const onBiometrics = jest.fn(async (): Promise<BiometricAnswer> => "lockout");
+      await show({ biometrics: "fingerprint", onBiometrics });
+      const first = screen.getByText(REFUSAL.lockout.fingerprint);
+      await fireEvent.press(button(UNLOCK.fingerprint));
+      await act(async () => undefined);
+      expect(onBiometrics).toHaveBeenCalledTimes(2);
+      expect(screen.getByText(REFUSAL.lockout.fingerprint)).not.toBe(first);
+    });
+
+    it("trades a failure for the pause when the phone pauses on a later try, and takes it back on a yes", async () => {
+      const onBiometrics = jest
+        .fn<Promise<BiometricAnswer>, []>()
+        .mockResolvedValueOnce("failed")
+        .mockResolvedValueOnce("lockout")
+        .mockResolvedValueOnce("ok");
+      await show({ biometrics: "face", onBiometrics });
+      expect(screen.getByText(REFUSAL.failed.face)).toBeTruthy();
+      await fireEvent.press(button(UNLOCK.face));
+      await act(async () => undefined);
+      expect(screen.queryByText(REFUSAL.failed.face)).toBeNull();
+      expect(screen.getByText(REFUSAL.lockout.face)).toBeTruthy();
+      await fireEvent.press(button(UNLOCK.face));
+      await act(async () => undefined);
+      expect(screen.queryByText(REFUSAL.lockout.face)).toBeNull();
+    });
+
+    it.each([
+      [
+        "fi-FI",
+        "Avaa sormenjäljelläsi",
+        "Sormenjälkesi ei avannut Kuuttia.",
+        "Puhelin on keskeyttänyt sormenjäljentunnistuksen liian monen yrityksen jälkeen. Lukitse puhelin ja avaa se puhelimen omalla koodilla. Yritä sitten uudelleen.",
+      ],
+      [
+        "sv-FI",
+        "Lås upp med fingeravtrycket",
+        "Ditt fingeravtryck låste inte upp Kuutti.",
+        "Telefonen har pausat upplåsning med fingeravtryck efter för många försök. Lås telefonen och öppna den med telefonens egen kod. Försök sedan igen.",
+      ],
+    ])("speaks %s, in the agreement of the kind", async (languageTag, unlock, failed, paused) => {
+      (useLocales as jest.Mock).mockReturnValue([{ languageTag }]);
+      const onBiometrics = jest
+        .fn<Promise<BiometricAnswer>, []>()
+        .mockResolvedValueOnce("failed")
+        .mockResolvedValueOnce("lockout");
+      await show({ biometrics: "fingerprint", onBiometrics });
+      expect(screen.getByText(failed)).toBeTruthy();
+      await fireEvent.press(button(unlock));
+      await act(async () => undefined);
+      expect(screen.getByText(paused)).toBeTruthy();
+    });
 
     it("says a second failure in a fresh live region, so Android says it again", async () => {
       const onBiometrics = jest.fn(async (): Promise<BiometricAnswer> => "failed");
@@ -201,6 +318,48 @@ describe("LockScreen", () => {
       await act(async () => answer.resolve("cancelled"));
       expect(button("Unlock with your face")).toBeEnabled();
       expect(button(BANK)).toBeEnabled();
+    });
+  });
+
+  describe("an iPhone not letting Kuutti use Face ID (#505)", () => {
+    it("says so where the button would be, above the passcode and the bank, and asks nothing", async () => {
+      const { onBiometrics } = await show({ denied: true });
+      expect(screen.getByText(DENIED)).toBeTruthy();
+      expect(screen.queryByRole("button", { name: /Unlock with/ })).toBeNull();
+      expect(field()).toBeTruthy();
+      expect(button(BANK)).toBeTruthy();
+      expect(onBiometrics).not.toHaveBeenCalled();
+      const flat = JSON.stringify(screen.toJSON());
+      expect(flat.indexOf(DENIED)).toBeLessThan(flat.indexOf(FIELD));
+      noProblems();
+    });
+
+    it("is said aloud when an ask meets it, and shown only for as long as the phone says it", async () => {
+      const { view, props } = await show({
+        biometrics: "face",
+        onBiometrics: jest.fn(async (): Promise<BiometricAnswer> => "denied"),
+      });
+      expect(announced()).toEqual([DENIED]);
+      await view.rerender(underProviders(<LockScreen {...props} biometrics={null} denied />));
+      expect(screen.getByText(DENIED)).toBeTruthy();
+      await view.rerender(underProviders(<LockScreen {...props} />));
+      expect(screen.queryByText(DENIED)).toBeNull();
+      expect(button(UNLOCK.face)).toBeTruthy();
+    });
+
+    it.each([
+      [
+        "fi-FI",
+        "Tämä iPhone ei anna Kuutin käyttää Face ID:tä. Voit sallia sen puhelimen asetuksista.",
+      ],
+      [
+        "sv-FI",
+        "Den här iPhonen låter inte Kuutti använda Face ID. Du kan tillåta det i telefonens inställningar.",
+      ],
+    ])("speaks %s", async (languageTag, words) => {
+      (useLocales as jest.Mock).mockReturnValue([{ languageTag }]);
+      await show({ denied: true });
+      expect(screen.getByText(words)).toBeTruthy();
     });
   });
 

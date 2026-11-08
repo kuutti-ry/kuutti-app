@@ -16,6 +16,11 @@ Feature: Account deletion per the erasure table
     Then the account is deleted with a deletion time and no year or month of birth
     And the identity row has one more deletion and a cooldown of thirty days
 
+  Scenario: A break begun while the deletion is under way leaves no earlier state on the tombstone
+    Given "A" is shadow banned and deletes the account on one device
+    When "A" takes a break on another device just after the deletion has passed the session guard
+    Then the account is deleted and keeps no trace of the state before the break
+
   Scenario: A photo another account also uploaded keeps its objects
     Given "A" and "B" uploaded the same picture
     When "A" deletes the account
@@ -139,9 +144,10 @@ Feature: Account deletion per the erasure table
     Then each report says whether it came from a card or a conversation, and nothing of the copy or C's words is in the export
 
   Scenario: Erasure leaves the counterpart "Deleted user" and the messages, and closes the conversation
-    Given "A" and "B" wrote to each other, and "A" wrote once more under a shadow ban still open
+    Given "A" and "B" wrote to each other, and "A" wrote once more under a shadow ban still open and read it
     When "A" deletes the account
     Then "B" reads every message "B" could read before, under "Deleted user", in a conversation closed as deleted
+    And "A"'s read mark where "B" saw it, never past what "B" can read
     And "A"'s link to it is gone, the withheld message too, and "B" cannot write
 
   Scenario: The export carries the person's own messages and the counterpart's as a time and a length
@@ -171,25 +177,48 @@ Feature: Account deletion per the erasure table
     Then the export carries every kind with its state and the notice with when it was read
     And the erasure takes the choices and the notices
 
+  Scenario: The devices' push tokens go with the account, and the export names the devices that had one, never a token
+    Given "A" is signed in on three devices, two of which registered a push token, and "B" on one that did
+    When "A" exports the account, and then deletes it
+    Then the export says of each device whether it is pushed, with its platform, language and since when, and carries no token
+    And the erasure counts and takes A's two tokens and leaves B's
+
   Scenario: An erased inviter's open invitations go, their units and notices with the account, and the redeemed ones stay for their redeemers
     Given "A" made an open invitation, one that "B" used and that has counted, earning "A" a fish and a notice, and one that "C" used and has not finished
     When "A" deletes the account
     Then A's open invitation, units and notices are gone, and B's and C's invitations stay theirs, naming no inviter
     And neither "B" nor "C" may type another code, and each one's export still says when they typed theirs
 
-  Scenario: An invitation whose inviter was erased never counts
+  Scenario: An invitation whose inviter was erased counts for the friend alone
     Given "C" used a code of "A"'s and has not finished, and "A" deleted the account
     When C's profile passes the test and the night counts
-    Then C's invitation stays uncounted, and nobody gets a unit or a notice for it
+    Then C's invitation counts, "C" gets their fish and their notice, and nobody else gets anything for it
 
   Scenario: An erased redeemer's invitation goes until it counts, and once counted stays for its inviter without them
     Given "B" used a code of "A"'s and has not finished, and "C" used another that has counted
     When "B" and then "C" delete their accounts
     Then B's invitation is gone, C's stays counted naming nobody, and "A" keeps the count and the fish it earned
 
+  Scenario: An erased inviter leaves the friend the fish the invitation earned them
+    Given "B" used a code of "A"'s, it has counted, and each of the two holds a fish and a notice from it
+    When "A" deletes the account
+    Then A's fish and notice are gone, and "B" keeps theirs with the invitation naming no inviter
+
+  Scenario: An erased friend leaves the inviter the fish the invitation earned them
+    Given "B" used a code of "A"'s, it has counted, and each of the two holds a fish and a notice from it
+    When "B" deletes the account
+    Then B's fish and notice are gone, and "A" keeps theirs and the count
+
   Scenario: The export lists the invitations made, the one used and the units, never a code or the other person
     Given "A" made an open invitation and one that "B" used and that has counted, and "A" used the fish it earned
     When "A" and "B" export their accounts
     Then A's export lists both invitations with their state, none used, and the fish with when it was earned and used
-    And B's lists when B typed the code and when it counted
+    And B's lists when B typed the code and when it counted, and the fish it earned them
     And neither carries a code, its hash or the other's account id
+
+
+  Scenario: An object no photo row names goes in the night's sweep once it is a day old
+    Given the bucket holds the variants of a photo whose row is gone, written two days ago
+    And the variants of a photo that has a row, and of one written an hour ago whose row is not in yet
+    When the night's sweep runs
+    Then the first photo's objects are gone and the other two's remain

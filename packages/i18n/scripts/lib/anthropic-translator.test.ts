@@ -127,15 +127,16 @@ describe("the Anthropic translator", () => {
     expect(sent.examples).toEqual(context.examples);
   });
 
-  it("asks for the server-side fallback, and marks the tone guide and glossary for the cache", async () => {
+  it("asks for high effort and the server-side fallback, and marks the tone guide and glossary for the cache", async () => {
     const { client, requests } = fakeClient();
     await anthropicTranslator({ client })("fi", items, context);
     const [request] = requests;
     expect(request).toMatchObject({
-      model: "claude-opus-5",
+      model: "claude-opus-5-5",
       betas: ["server-side-fallback-2026-07-01"],
       fallbacks: "default",
       thinking: { type: "adaptive" },
+      output_config: { effort: "high" },
     });
     const system = request?.system as { text: string; cache_control?: unknown }[];
     expect(system[1]?.cache_control).toEqual({ type: "ephemeral" });
@@ -213,7 +214,11 @@ describe("batch mode", () => {
     for (const { params } of sent) {
       expect(params).not.toHaveProperty("fallbacks");
       expect(params).not.toHaveProperty("betas");
-      expect(params).toMatchObject({ model: MODEL, thinking: { type: "adaptive" } });
+      expect(params).toMatchObject({
+        model: MODEL,
+        thinking: { type: "adaptive" },
+        output_config: { effort: "high" },
+      });
     }
   });
 

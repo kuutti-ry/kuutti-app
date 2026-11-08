@@ -2,7 +2,7 @@
 
 What to do when Kuutti breaks or leaks (#191): how an incident is noticed, how bad it is, who does what in an association with one maintainer, what the code can do to stop it, whom to tell, and the review afterwards. The staging outage of 2026-09-27 is the worked example. The last section is the restore drill, written and not yet run.
 
-Companions: `alerts.md` (each alarm and its first three commands), `custody.md` (who holds which account and key), `rotation.md` (each key's rotation), `police-disclosure.md` (a lawful request from the police is not an incident), `SECURITY.md` (how outsiders report a vulnerability). `<env>` is `staging` or `prod`, `<id>` the box's instance id (`tofu output -raw instance_id` in `infra/envs/<env>`). Every AWS and box command needs the maintainer's session (`pnpm aws:login`); an agent never runs them.
+Companions: `alerts.md` (each alarm and its first three commands), `abuse.md` (the limits, a flood, and what to do), `custody.md` (who holds which account and key), `rotation.md` (each key's rotation), `police-disclosure.md` (a lawful request from the police is not an incident), `SECURITY.md` (how outsiders report a vulnerability). `<env>` is `staging` or `prod`, `<id>` the box's instance id (`tofu output -raw instance_id` in `infra/envs/<env>`). Every AWS and box command needs the maintainer's session (`pnpm aws:login`); an agent never runs them.
 
 Staging holds no real person (ADR-018 §1), and production has nobody until the first release (#25). Until then an incident is an outage or an exposed key, never a personal data breach. The sections on people and the Data Protection Ombudsman are written for the day production has people.
 
@@ -69,6 +69,7 @@ From the person's page in the panel (`/accounts/<id>`, reached by account id onl
 - **The photo-budget alarm** (`kuutti-<env>-photo-budget-refusals`; `alerts.md` has no row for it yet). First: `aws logs tail /kuutti/<env>/api --since 24h --filter-pattern '{ $.msg = "photo refused" && $.reason = "budget" }'`. Each line names the `accountId`, the `variant`, `used` and `limit` (`apps/api/src/media/photos.ts`). One account with many lines is a script: suspend it (One person, above). Many accounts each just over the limit means the budget is too low: raise it, as in the next item.
 - Lower or raise `photo_fetches_per_day` in the panel under `/config` (an admin; a new version with a reason, written to the audit log first). It takes effect without a restart.
 - The request limits are parameters read at boot: `/kuutti/<env>/rate-limit-per-minute` and `/kuutti/<env>/sign-in-rate-limit-per-minute` (ADR-026 §5). Set them with `aws ssm put-parameter --type String --overwrite`, then redeploy the API.
+- In front of them, the edge refuses an address past 2,000 requests in five minutes (ADR-067), a number in `infra/envs/<env>/main.tf`. `abuse.md` has every layer, its two alarms (`kuutti-<env>-edge-rate-limited`, `kuutti-<env>-api-refusals`), how to read a flood and how to move each number.
 
 ### Taking the API down, and bringing it back
 
@@ -112,11 +113,19 @@ Every rotation is in `rotation.md`. What an exposure means:
 | `/kuutti/<env>/telia-signing-key`, `-encryption-key` | The signing key lets somebody act as our client towards Telia; the encryption key opens ID tokens, which carry the identity code (rule 1). Rotate (`rotation.md`, section 4), and tell Telia (below). |
 | `/kuutti/<env>/cloudfront-signing-key` | Anyone holding it can sign photo URLs. Rotate: a second public key, the switch, the removal (`rotation.md`, section 7). |
 | `/kuutti/<env>/db-app-password` | The database admits port 5432 from the box's security group only (`infra/modules/network`), so the password alone opens nothing from outside. Rotate (`rotation.md`, section 1). |
-| `EXPO_TOKEN` | S1 from any environment: it can publish to `production` (ADR-004). Revoke it first: The update path, above, and `rotation.md`, section 10. |
+| `EXPO_TOKEN` | S1 from any environment: it can publish to `production` (ADR-004). Revoke it first: The update path, above, and `rotation.md`, section 10. Through EAS it also reaches Google Play, the Play key and the upload key (ADR-057 §3), and App Store Connect with the App Store Connect key and the Apple team's distribution certificate (ADR-063 §3), which section 10 replaces too. |
 | `DOKPLOY_TOKEN` | The `staging` and `prod` copies deploy the API; the `ci-preview` member's reaches only the `previews` project. Rotate (`rotation.md`, section 9). |
 | `SENTRY_AUTH_TOKEN` | Uploads source maps (`project:releases`, `org:read`). Rotate (`rotation.md`, section 11). |
+| `FONTS_TOKEN` | Reads `kuutti-app-fonts` alone: Saiga's files, which are licensed to Kuutti only. Revoke it (`rotation.md`, section 13); whether Spoke is told is the maintainer's call (ADR-052). |
+| the Google Play service account's key, at EAS | Releases bundles on any of the app's testing tracks and halts them on closed and open ones, and uploads a bundle signed with any key to internal app sharing, whose list is the team's and which shows in no track's history. Delete it in Google Cloud first (`rotation.md`, section 14). A leak of `EXPO_TOKEN`, or of EAS itself, puts it and the upload key out together: both are reset in the same section. |
+| the App Store Connect API key, at EAS | A team key that reads Admin on EAS (ADR-063, Open 6): for every app of the association's Apple team it creates versions and submits them for Apple's review, changes listings and prices, and manages TestFlight's groups and testers, and as Admin also the team's users and keys and the removal of apps; only Apple's review stands between it and the App Store. Revoke it in App Store Connect first (`rotation.md`, section 15), then read the app's versions, TestFlight's builds and groups, and Users and Access. A leak of `EXPO_TOKEN`, or of EAS itself, puts it out with the Play key. |
+| the maintainer's `asc` key, in the Keychain | A second App Store Connect key, its role not read; it has at least written the listing (ADR-063, Open 7). Revoke it in App Store Connect (Users and Access, Integrations), then read what the row above says to read. A lost laptop puts it out. |
+| the APNs key, at EAS | With a phone's device token it can send that phone a notification that reads as Kuutti's, whatever ADR-055 says a push may say. Put a new key on EAS and revoke the old one at Apple (`rotation.md`, section 15). |
+| a font file pushed to `kuutti-app` | Public at once, and still reachable after a squash (`refs/pull/<n>/head`). Ask GitHub Support to purge it; whether Spoke is told is the maintainer's call (ADR-052 §7). |
 | the box, or its instance role `kuutti-api-<env>` | The role reads every `/kuutti/<env>/*` parameter, the secret ones included; on staging, every preview runs pull-request code with the same role (`infra/README.md`, Previews, Trust). First the maintainer takes a snapshot of the box's root volume: the rebuild destroys it (`delete_on_termination` in `infra/modules/compute`), and with it the containers' files, Docker's volumes and `/var/log/dokploy-backup.log`. No command for that is in the repository (`aws ec2 create-snapshot` of the instance's root volume; check `--help` first); the snapshot holds secrets, so delete it when the review is done. Then rebuild as `infra/README.md`, Backups and rebuilding the box, says, with the alert address set as in the restore drill below (part 2, step 2). Then rotate every secret under the prefix: `rotation.md` sections 1, 2 (staging), 4 and 7. The HMAC key is the first row of this table. |
 | an owner's GitHub or Expo login, the AWS session | `SECURITY.md`, Maintainer accounts: tell the other owners the same day, revoke sessions and tokens, new second factor first. Recovery paths are in `custody.md`. |
+| the maintainer's Google login at the Workspace (on a laptop, its `gcloud` session) | Play Console's owner, production included, and in Google Cloud the organisation's administrator and the one principal that mints `eas-submit`'s tokens without a key (`docs/vendors/google-play.md`, Reading Play from the command line). Sign it out everywhere, revoke Google Cloud SDK's access to it, and run `gcloud auth revoke` on the laptop; remove the Token Creator binding until the login is safe (a token minted before keeps its hour); then read back `eas-submit`'s IAM policy and user-managed keys, the key-creation constraint and Play Console's users for anything added, and the tracks as `rotation.md`, section 14, says. |
+| the maintainer's Apple Account, the Account Holder of the association's Apple team | Everything of the team: App Store Connect, its users and API keys, the certificates, identifiers and keys of the developer site, and the App Store, production included. Change its password and sign it out of other devices on Apple's account page, then read Users and Access, the API keys and Certificates, Identifiers & Profiles for anything added, and the app's versions and TestFlight's builds as `rotation.md`, section 15, says. |
 
 ### Error reports with personal data
 
@@ -174,10 +183,10 @@ When the incident touches the bank login (the Telia keys, logins nobody made, th
 
 ### Apple and Google
 
-Steps for the maintainer. None of these names is in the repository yet.
+Steps for the maintainer.
 
-- **Apple**: the app is under the maintainer's individual Apple developer account (`apps/mobile/README.md`). A released binary that must stop reaching people is removed from sale in App Store Connect; a TestFlight build is expired there. Apple is told through App Store Connect when it must know, for example when the developer account itself is affected.
-- **Google**: the Play Console account does not exist yet (M6). Once it does: halt the rollout of a bad release there. Add the account to `custody.md` when it is created.
+- **Apple**: the association's Apple team, Kuutti ry (`custody.md`), carries the staging app on TestFlight's internal testing (ADR-063). A bad TestFlight build is expired in App Store Connect, and the next staging build replaces it (`docs/vendors/app-store.md`, When something goes wrong); a released binary that must stop reaching people is removed from sale there. A lost or leaked App Store Connect or APNs key is `rotation.md`, section 15; Apple is told through App Store Connect's Contact Us when the developer account itself is affected.
+- **Google**: the association's Play developer account (`custody.md`) carries the staging app on the internal testing track (ADR-057). A bad release on a closed or open track is halted there in Play Console; an internal testing release cannot be halted, and a new staging build replaces it (`docs/vendors/google-play.md`, When something goes wrong). A lost or leaked Play credential is `rotation.md`, section 14; Google is told through Play Console's help when the developer account itself is affected.
 - A bad JavaScript update is stopped at EAS (The update path), not in the stores.
 
 ## After: the review
@@ -226,9 +235,9 @@ The chain of events, not a person.
 
 **What did not.** Nothing measured memory. The cleanup depended on a person.
 
-**Actions.** ADR-012, the same day: previews are removed unattended, by a sweep from `main` that every merge starts (#76). #77, still open: swap in the box's first-boot script, a memory limit on Dokploy, a memory alarm, and the `api-unreachable` row's memory commands.
+**Actions.** ADR-012, the same day: previews are removed unattended, by a sweep from `main` that every merge starts (#76). #77 (ADR-046): swap in the box's first-boot script, a memory alarm, and the `api-unreachable` row's memory commands; a memory limit on Dokploy was tried and withdrawn (ADR-046 §2).
 
-**It came back on 2026-10-08**, 17:39 to about 18:20 Helsinki time (#77). Two merges two minutes apart and a preview deploy hit the box at once; six API containers ran; a reboot alone brought the loop back. Fixed by hand through one SSM Run Command: `docker service scale api-pr-152-ccsysx=0` (a merged pull request's preview the sweep could not reach) and a 2 GB `/swapfile`. EC2's status check saw a healthy instance the whole time. The live box has its swap by hand; a rebuilt box will not have it until #77 lands, which part 2 of the drill below has to allow for.
+**It came back on 2026-10-08**, 17:39 to about 18:20 Helsinki time (#77). Two merges two minutes apart and a preview deploy hit the box at once; six API containers ran; a reboot alone brought the loop back. Fixed by hand through one SSM Run Command: `docker service scale api-pr-152-ccsysx=0` (a merged pull request's preview the sweep could not reach) and a 2 GB `/swapfile`. EC2's status check saw a healthy instance the whole time. The live box had its swap by hand from then; since #77 (ADR-046) a rebuilt box has it from first boot, and a running one from the headroom document.
 
 ## The restore drill
 
@@ -297,7 +306,7 @@ The four steps of `infra/README.md`, "Backups and rebuilding the box", on stagin
 
    Read the plan. It replaces the instance and changes what refers to it, and it destroys no `aws_sns_topic_subscription`. If it shows anything else, stop.
 3. In the same shell, run the four steps as written. Step 1 is a local `tofu apply -replace=module.compute.aws_instance.api`, while the README's Environments section otherwise keeps applies to CI, and the README's rebuild steps do not name the variable of step 2: write both down as gaps, and fix the README after the drill.
-4. The new box has no swap (#77, above). Until #77 lands, add it by hand as on 2026-10-08, or expect the out-of-memory loop as soon as previews deploy.
+4. The new box has its swap and the free-memory metric from first boot (#77, ADR-046). Once `cloud-init status --wait` reports done, `free -m` shows 2 GB of swap, and `kuutti-staging-memory-low` returns to OK within minutes; until then it says ALARM, since no data counts as breaching.
 5. Check: `curl -sS https://api.staging.kuutti.app/health` answers `"status":"ok"`; Dokploy's UI signs in at `https://dokploy.staging.kuutti.app` with its two-factor login; re-run `main`'s latest `build.yml` run and see `deploy.yml` deploy; a pull request's preview deploys; `/etc/cron.d/dokploy-backup` exists and the next night's object appears; the probe and the status-check alarm return to OK. The alarm state says nothing about delivery, so also check both subscriptions, still in `infra/envs/staging`:
 
    ```sh

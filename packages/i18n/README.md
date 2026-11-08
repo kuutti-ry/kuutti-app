@@ -9,7 +9,13 @@
 3. `pnpm i18n:build`, and commit `src/generated/` with the YAML. CI fails when they drift, like the OpenAPI types (ADR-003).
 4. Use it: `t("profile.bio.required")`, `t("errors.rate_limited", { seconds })`. An unknown key, a missing argument or a wrong argument type does not compile.
 
-Never inflect a dynamic value: `in {pond}` and `{pond}ssa` fail the check. A pond's case form comes from the database through `formatPond(pond, "inessive", locale)`.
+Never inflect a dynamic value: `in {name}` and `{name}ssa` fail the check. A sentence that would need a case form is written so that it does not.
+
+## Stadi (#521)
+
+`fi-x-stadi` is Stadin slangi, a made-up language beside the real ones, marked as one in `FICTIONAL_LOCALES` (`src/locales.ts`). It stays out of `RELEASED_LOCALES`, and a person only reaches it by choosing it in the app.
+
+A key may carry a `slangi:` text with `machine: { slangi: true }`. A key without one is the Finnish text, so nothing is ever missing, and `pnpm i18n:translate` never fills it. `pnpm i18n:check` refuses a `slangi:` text outside `isSlangKey` (`scripts/lib/schema.ts`): it stands in the round, home, the profile editor and settings, never on a failure, consent, a person's data, safety, a session or an answer that says who somebody is. Keep it kind, never mocking, and use no gendered word (kundi, friidu, mimmi): gender in Kuutti is self-declared.
 
 ## The native review (#55)
 
@@ -32,7 +38,7 @@ A native reviewer reads machine text and approves it; `docs/i18n/translation-rev
 |---|---|
 | `messages.yaml`, `glossary.yaml` | the text and the product vocabulary |
 | `src/generated/` | one catalogue per locale, the `en-XA` pseudo-locale, and `MessageKey` / `MessageParams`; generated, committed |
-| `src/index.ts` | `createI18n`, `typedT`, `resolveLocale`, `parseAcceptLanguage`, `formatDate`, `formatNumber`, `formatPond` |
+| `src/index.ts` | `createI18n`, `typedT`, `resolveLocale`, `realLocale`, `parseAcceptLanguage`, `formatDate`, `formatNumber` |
 | `src/react.tsx` (`@kuutti/i18n/react`) | `createReactI18n`, `I18nProvider`, `useT` for app and admin; the API never imports it |
 | `src/pseudo.ts` (`@kuutti/i18n/pseudo`) | the `en-XA` catalogue, a separate entry so only a dev build bundles it |
 | `src/legal.ts` | `legalPageUrl`: the full text of a legal wording on the website, at the anchor of its version (#208) |
@@ -40,17 +46,17 @@ A native reviewer reads machine text and approves it; `docs/i18n/translation-rev
 
 ## Runtimes
 
-- **App**: `src/lib/locale.tsx` resolves the phone's languages (`expo-localization`) to a catalogue, lets a stored in-app choice beat it, and offers `en-XA` in dev builds. Locales fall back to English per key.
+- **App**: `src/lib/locale.tsx` resolves the phone's languages (`expo-localization`) to a catalogue, lets a stored in-app choice beat it, and offers `en-XA` in dev builds. Finnish and Swedish fall back to English per key, Stadi to Finnish.
 - **API**: `src/lib/i18n.ts` gives each request `c.get("t")` and `c.get("locale")` from `Accept-Language`. Error envelopes keep their stable `code`; the `message` follows the request's language.
 - **Admin**: English only by decision; it still reads its text from here.
 
 ## Checks
 
-`pnpm i18n:check` (CI job `i18n`): the file validates, every key has `fi` (fail) and `sv` (warn), every locale is valid ICU with the source's arguments, every plural form its language needs (CLDR) and the English's exact cases and select options, no dynamic value is inflected, `max_length` holds, and every fi and sv text is machine text or carries a review that still matches it. `--release` (a `v*` tag, a production EAS build) also fails on machine text in a released language (`RELEASED_LOCALES`: en and fi) and on draft legal text. `pnpm lint` fails on a user-facing string literal in the clients' TSX.
+`pnpm i18n:check` (CI job `i18n`): the file validates, every key has `fi` (fail) and `sv` (warn), every locale is valid ICU with the source's arguments, every plural form its language needs (CLDR) and the English's exact cases and select options, no dynamic value is inflected, `max_length` holds, every fi, sv and slangi text is machine text or carries a review that still matches it, and slang stands only where `isSlangKey` allows it. `--release` (a `v*` tag, a production EAS build) also fails on machine text in a released language (`RELEASED_LOCALES`: en and fi) and on draft legal text. `pnpm lint` fails on a user-facing string literal in the clients' TSX.
 
 `pnpm check:legal-versions` (CI job `i18n`, #208, ADR-010 §4): each kind's version in `CONSENT_VERSIONS` is the one the website publishes in `https://kuutti.app/legal/versions.json`, the app's link to the full text (`legalPageUrl`) is the address the site gives for it, and the site's research and sensitive-answers text is this package's Finnish `legal.<kind>.title` and summary (by the site's fingerprint, `siteFingerprint`). The site's full Finnish page binds and leads: a new version is published there first, and the app follows with the same `consent_version`. `--file <path>` reads a local copy instead of the deployed file.
 
-`pnpm i18n:translate` sends message text (with approved translations from the same namespace as examples), the glossary and the tone guide to the Claude API (`claude-opus-5`), and nothing else; credentials come from the developer's environment (`ANTHROPIC_API_KEY` or an `ant auth login` profile) and are never committed. Every answer is validated and written as machine text.
+`pnpm i18n:translate` sends message text (with approved translations from the same namespace as examples), the glossary and the tone guide to the Claude API (`claude-opus-5-5`), and nothing else; credentials come from the developer's environment (`ANTHROPIC_API_KEY` or an `ant auth login` profile) and are never committed. Every answer is validated and written as machine text.
 
 | command | does |
 |---|---|

@@ -70,7 +70,11 @@ describe("a preview's build", () => {
       (element) => element.getAttribute("src") ?? element.getAttribute("href") ?? "",
     );
     expect(references).toEqual(
-      expect.arrayContaining([expect.stringMatching(/\.js$/), expect.stringMatching(/\.css$/)]),
+      expect.arrayContaining([
+        expect.stringMatching(/\.js$/),
+        expect.stringMatching(/\.css$/),
+        expect.stringMatching(/\/favicon-[\w-]+\.png$/),
+      ]),
     );
     for (const url of references) {
       expect(url).toMatch(/^\/pr-7\/assets\/[^/]+$/);
@@ -97,6 +101,11 @@ describe("a preview's build", () => {
       "zod",
       "i18next",
       "intl-messageformat",
+      // shadcn/ui's runtime (ADR-050).
+      "class-variance-authority",
+      "clsx",
+      "tailwind-merge",
+      "lucide-react",
     ]) {
       expect(licences).toMatch(new RegExp(`^## ${name} - \\d`, "m"));
     }
@@ -107,5 +116,24 @@ describe("a preview's build", () => {
     // Our own packages are the repository's licence, not a third party's.
     expect(licences).not.toMatch(/^## @kuutti\//m);
     expect([...emitted.values()].join("\n")).toContain("/pr-7/licenses.txt");
+  });
+
+  it("ships one stylesheet, Tailwind's, which keeps its licence line and names Saiga's faces and no image (ADR-050, ADR-052)", () => {
+    const sheets = [...emitted.keys()].filter((name) => name.endsWith(".css"));
+    expect(sheets).toHaveLength(1);
+    const css = emitted.get(sheets[0] ?? "") ?? "";
+    // The preflight and utilities are Tailwind's, under MIT: the notice travels with them.
+    expect(css).toMatch(
+      /^\/\*! tailwindcss v4\.\d+\.\d+ \| MIT License \| https:\/\/tailwindcss\.com \*\//,
+    );
+    // The CSP's font-src 'self' takes Saiga's faces from the origin's root,
+    // where the maintainer puts them (ADR-052): the same for a preview under
+    // /pr-7/. Nothing else a stylesheet names, and no image (default-src 'none').
+    expect(css.match(/@font-face/g)).toHaveLength(4);
+    expect([...css.matchAll(/url\(([^)]*)\)/g)].map(([, url]) => url)).toEqual(
+      ["Regular", "Italic", "Medium", "Bold"].map(
+        (face) => `/fonts/saiga-1.002/Saiga-${face}.woff2`,
+      ),
+    );
   });
 });

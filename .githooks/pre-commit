@@ -21,6 +21,13 @@ if ! git diff --cached --quiet -- package.json apps/api/package.json apps/admin/
     exit 1
   fi
 fi
+# No font file in the index, ever (ADR-052): Saiga is never public as a file,
+# and a commit is the last moment it is still only on this machine.
+if command -v node >/dev/null 2>&1 && ! node scripts/check-fonts.ts >/dev/null; then
+  node scripts/check-fonts.ts >&2
+  echo "pre-commit: a font file is staged. Unstage it (git rm --cached <file>); no font is ever committed here." >&2
+  exit 1
+fi
 biome=node_modules/.bin/biome
 if [ ! -x "$biome" ]; then
   echo "pre-commit: Biome is not installed here (pnpm install), so the staged files go unchecked." >&2

@@ -1,0 +1,12 @@
+# The logos of the support page: sources and terms
+
+The files in this directory stand on the tiles of Settings, Support when it's hard (#510), each to name its service, beside its name in words. They are not under the repository's licence (`LICENSE`): each is its owner's mark, shown only to name the service, and implies no partnership. They were fetched on 30/10/2026 from each service's own site. None of the four states terms for using its logo, so each owner is still to be asked: the maintainer's decision of 30/10/2026 is to list the services first, ask them afterwards, and replace one that says no.
+
+| file | source | terms | owner of the mark | what was done | SHA-256 |
+|---|---|---|---|---|---|
+| `mieli.png` | [mieli.fi, the site's logo file](https://mieli.fi/wp-content/themes/mieli/dist/images/mieli-symbol-d7f2f21f45.svg) | the owner's mark; none stated, logos are asked for through its communications ([Logot ja graafinen ilme](https://mieli.fi/logot-ja-graafinen-ilme/)) | MIELI Suomen Mielenterveys ry | rendered from the SVG to a 594-pixel PNG with librsvg: the iPhone's image decoder misreads the SVG's compact arc paths and draws the word broken | `e5468f9720281ac865a552e10333f7a8afc7fefb3aa7b70137dcc581eba2cf5a` |
+| `nollalinja.png` | [nollalinja.fi, the site's header logo](https://nollalinja.fi/wp-content/uploads/sites/8/2026/03/Nollalinja_logo_punainen_RGB.png) | the owner's mark; none stated | Nollalinja (organised by THL, provided by Setlementti Tampere ry); THL's own logo is not used, its rules keep that from third parties | — | `73931c998434196072db64bc7ed53c6f7c8621e4f7bf386beeeb920aaab8d692` |
+| `riku.png` | [riku.fi, the site's header logo](https://www.riku.fi/content/themes/rikufi/assets/img/logo.png) | the owner's mark; none stated | Rikosuhripäivystys (RIKU) | — | `123a0743bf94a1620d497c83624e838e32f0cd2c415b15aaac792ed9f56e3634` |
+| `tukinainen.png` | [tukinainen.fi, the site's icon](https://tukinainen.fi/wp-content/uploads/2021/01/cropped-cropped-cropped-Logo_2021_Tukinainen_Suomi_.png) | the owner's mark; none stated | Tukinainen ry | cropped to the symbol's own box, without a stray mark at the file's right edge; the full logo's lettering is unreadable at a tile's size, so the name is in words beside it | `ace74a627cf043d1fd04cc0a503b793bcfe4e9bb1019476c2c7ee80a05fb0780` |
+
+An owner who wants its mark shown differently, or not at all, is answered by a change here.

@@ -90,7 +90,7 @@ const readRoute = createRoute({
   path: "/conversations/{id}",
   summary: "One conversation",
   description:
-    "The summary, the longest message the composer may send, the highest sequence the counterpart has read, and the contacts (#103): the caller's stored pieces, each shared here or not, and the counterpart's pieces shared with the caller now. In a closed conversation nothing is shared either way.",
+    "The summary, the longest message the composer may send, how far the counterpart has read as the caller may see it (a shadow ban of the counterpart's holds it where the ban began, #470), and the contacts (#103): the caller's stored pieces, each shared here or not, and the counterpart's pieces shared with the caller now. In a closed conversation nothing is shared either way.",
   ...bearer,
   request: { params: ConversationParams },
   responses: {
@@ -106,7 +106,7 @@ const pageRoute = createRoute({
   path: "/conversations/{id}/messages",
   summary: "A page of messages",
   description:
-    "With before, the messages under that sequence, newest first; with after, the ones above it, oldest first (what is new since the last one the phone holds); with neither, the newest. At most limit, 50 by default, 100 at most. A counterpart's message sent during a shadow ban still open is not among them.",
+    "With before, the messages under that sequence, newest first; with after, the ones above it, oldest first (what is new since the last one the phone holds); with neither, the newest. At most limit, 50 by default, 100 at most. A counterpart's message sent during a shadow ban that is still open, or that was lifted only after the conversation ended, is not among them.",
   ...bearer,
   request: { params: ConversationParams, query: MessagesQuery },
   responses: {
@@ -221,7 +221,7 @@ const contactsRoute = createRoute({
   path: "/contacts",
   summary: "The caller's stored contacts",
   description:
-    "Up to one phone number, WhatsApp number, Telegram and Instagram username, in that order, each in its stored form. Nobody else sees them until the caller shares one in a conversation.",
+    "Up to one phone number, WhatsApp number, Telegram, Instagram and Snapchat username, in that order, each in its stored form. Nobody else sees them until the caller shares one in a conversation.",
   ...bearer,
   responses: {
     200: { description: "The stored pieces.", ...json(StoredContacts) },
@@ -234,7 +234,7 @@ const keepContactRoute = createRoute({
   path: "/contacts/{kind}",
   summary: "Keep a contact",
   description:
-    "Stores the piece of that kind in its one form (normaliseContact: a number in E.164, a Finnish one from 0 to +358; a username without its @, Instagram's in lower case), replacing the one kept before. A shared piece that changes shows its new value in the conversations where it is shared, at once. Counts against matching_config messages_per_minute.",
+    "Stores the piece of that kind in its one form (normaliseContact: a number in E.164, a Finnish one from 0 to +358; a username without its @, Instagram's and Snapchat's in lower case), replacing the one kept before. A shared piece that changes shows its new value in the conversations where it is shared, at once. Counts against matching_config messages_per_minute.",
   ...bearer,
   request: {
     params: ContactKindParams,
@@ -328,12 +328,16 @@ const stopShareRoute = createRoute({
 /**
  * `opened` is the safety slice's check after a conversation's first message
  * (#105, ADR-033), handed in by app.ts so the chat never imports safety;
- * awaited after the send has committed, it changes no answer.
+ * `pushed` is the notifications slice's push after every new message (#102,
+ * ADR-055 §4), handed in the same way. `opened` is awaited after the send
+ * has committed and changes no answer; `pushed` only starts the push, which
+ * runs after the answer, so the answer's timing says nothing of it.
  */
 export function chatRoutes(
   deps: Deps,
   guard: MiddlewareHandler<AppEnv>,
   opened?: (accountId: string, conversationId: string) => Promise<void>,
+  pushed?: (accountId: string, conversationId: string, seq: number) => void,
 ) {
   const app = new OpenAPIHono<AppEnv>();
   const chat = (): ChatDeps => ({
@@ -446,6 +450,7 @@ export function chatRoutes(
       body: body.body,
     });
     if (sent.created && sent.message.seq === 1) await opened?.(accountId, id);
+    if (sent.created) pushed?.(accountId, id, sent.message.seq);
     return sent.created ? c.json(sent.message, 201) : c.json(sent.message, 200);
   });
 
@@ -463,6 +468,7 @@ export function chatRoutes(
         bytes: new Uint8Array(await form.photo.arrayBuffer()),
       });
       if (sent.created && sent.message.seq === 1) await opened?.(accountId, id);
+      if (sent.created) pushed?.(accountId, id, sent.message.seq);
       return sent.created ? c.json(sent.message, 201) : c.json(sent.message, 200);
     } catch (error) {
       // The wait goes in the header, as a limiter's refusal says it.

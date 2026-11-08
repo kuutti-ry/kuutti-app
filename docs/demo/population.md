@@ -10,15 +10,15 @@ Data dictionary of `pnpm demo:population` (#73, ADR-014 §8 to §10). The popula
 pnpm demo:population
 ```
 
-Writes three hundred people into the database of the local environment, replacing the synthetic population that was there. The pond comes from the seed, which `pnpm env:up` has run. The pictures are a release of the private photos repository (`docs/demo/photo-prompts.md`), fetched and verified by `pnpm demo:assets` into `~/.cache/kuutti-demo-photos/v2`; this repository holds the manifest (`packages/db/src/seed/photos-manifest.ts`) and never a picture.
+Writes three hundred people into the database of the local environment, replacing the synthetic population that was there. The pond is the one every database has (the migrations write it). The pictures are a release of the public photos repository (`docs/demo/photo-prompts.md`), fetched and verified by `pnpm demo:assets` into `~/.cache/kuutti-demo-photos/v3`; this repository holds the manifest (`packages/db/src/seed/photos-manifest.ts`) and never a picture.
 
-After a write or a removal the public counter (#54) is counted anew over what is in the database now, so `GET /waitlist` and the card in the app show the ponds of the population at once. Left to itself the counter would not move: it counts once a day and moves in steps of ten people, which is right among people and would leave a demo showing yesterday's ponds. What may be said of a pond is decided as ever; the app keeps an answer for up to an hour.
+After a write or a removal the public counter (#54) is counted anew over what is in the database now, so `GET /ponds/counter` and the card in the app show the population at once. Left to itself the counter would not move: it counts once a day and moves in steps of ten people, which is right among people and would leave a demo showing yesterday's figures. What may be said of a pond is decided as ever.
 
 | option | what it does |
 |---|---|
-| `-- --size 5000` | as many people as asked, 1 to 5,000. From 235 people up the population shows everything it is there for; a smaller one is written too, and the command says what it does not show (`notShown`) |
-| `-- --seed 7` | other people in the same ponds |
-| `-- --photos` | faces of the release for the people, drawn by seed (none, a few or the whole grid), through the upload pipeline like anybody's; `pnpm demo:assets` fetches the release first. Locally the faces are approved as a moderator would (the local check queues everything); on staging Rekognition decides |
+| `-- --size 5000` | as many people as asked, 1 to 5,000. From 250 people up the population shows everything it is there for, the bar among it, whatever the seed; a smaller one is written too, and may show no bar (the command's `bar` says what it filled, below) |
+| `-- --seed 7` | other people in the same pond, in other homes |
+| `-- --photos` | faces of the release for the people, drawn by seed (none, a few or the whole grid), through the upload pipeline like anybody's; `pnpm demo:assets` fetches the release first. Locally the faces are approved as a moderator would (the local check queues everything); on staging Rekognition decides. With them come the cast (below), each with faces of their own |
 | `-- --dry-run` | prints the counts per pond and writes nothing; it does not connect |
 | `-- --remove` | removes the synthetic population and writes nobody |
 | `-- --env preview` | for a pull request's own database, `kuutti_pr_<n>` |
@@ -26,7 +26,7 @@ After a write or a removal the public counter (#54) is counted anew over what is
 
 ## Where it refuses to write
 
-Three hundred accounts that look bank-verified, among real people, would enter the public counter, count toward the gate and appear on people's cards. So:
+Three hundred accounts that look bank-verified, among real people, would enter the public counter and appear on people's cards. So:
 
 - it goes ahead only when the environment is `development`, `test` or `preview`, by `--env` and by `APP_ENV`, both when both are given;
 - it refuses an argument it does not know, so a mistyped `--dryrun` is not a write, and an argument given twice, so `--env production --env development` does not talk its own first word away;
@@ -34,16 +34,35 @@ Three hundred accounts that look bank-verified, among real people, would enter t
 
 ## Who lives where, and why
 
-One pond for now, the capital region (#146, ADR-010 §11): everybody who onboarded is in Pääkaupunkiseutu, and the pond has to show everything at once.
+One pond, the whole country (ADR-061 §8): everybody who onboarded is in Suomi. Where in the country each of them lives is their home, below.
 
 | pond | people | women | men | non-binary | why |
 |---|---|---|---|---|---|
-| Pääkaupunkiseutu | 276 | 88 | 171 | 17 | over `gate_k` (30); men are 62 %, over `majority_share_max` (0.6), so the admission rule holds them back; every cell at ten or more, so the counter shows the split |
-| none | 24 | | | | registered at the bank and gone before the first onboarding step: no gender, no pond, no consent |
+| Suomi | 276 | 88 | 171 | 17 | the whole country, so everybody who onboarded is here |
+| none | 24 | | | | registered at the bank and gone before the first onboarding step: no gender, no pond, no home, no consent |
 
-These are exact counts, apportioned from shares by largest remainder, not draws: the thresholds are crossed by construction, from a population of 174 up (a test goes through every size; below that the non-binary cell is under the counter's k, and under 33 people the pond is under the gate). At another size 8 % never onboarded and the rest is in Pääkaupunkiseutu with the same gender shares.
+These are exact counts, apportioned from shares by largest remainder, not draws. At another size 8 % never onboarded and the rest is in Suomi with the same gender shares.
 
-Everybody with a pond has a gender, because the app asks for the gender before the pond is assigned.
+Everybody with a pond has a gender and a home: the app asks for the gender before the home, and writing the home is what sets the pond (ADR-061 §8).
+
+### Where the homes are
+
+The real list, by inhabitants: everybody is drawn a postal area as likely as its people make it, and keeps what a person there keeps (ADR-061 §2). So the population is spread as Finland is, and most people are far from any one home. These are what the defaults make on the list of 2026, of the 276 who onboarded; a new list moves them.
+
+| what | people | |
+|---|---|---|
+| a postal area of their own | 187 | an area of at least `home_min_inhabitants` (3,000) with as many left in the rest of its municipality; 68 % of them, where 71 % of the country's people do. 41 show the area's name on the card |
+| a municipality | 89 | their area is too small, so its municipality is kept, or the nearest large enough where that is too small as well. The card shows the town, and nothing else can be chosen |
+
+| seen from | nearby | close | around | far |
+|---|---|---|---|---|
+| Kallio, 00530 | 10 | 38 | 28 | 200 |
+
+By the nearest town, which is what every card but those 41 says, they are in 49: Helsinki 28, Seinäjoki 17, Oulu 14, Kuopio and Pori 10 each, Hämeenlinna 9, and the rest fewer.
+
+The list and the rule are the API's, and there is one of each (ADR-061 §2, §4), so the generator in `packages/db` is handed the places with the people behind them, by `populationHomes` in `apps/api/scripts/demo/homes.ts`, as the writer is handed the consents' versions. Nobody here types a code: the key goes straight onto the account, the same key a person's code would leave there. The personas do type theirs, through the route (`packages/db/src/seed/histories.ts`).
+
+The homes are drawn last, from a stream of their own: a test holds that a person is the same to the byte with any list or none, so what is said of the people below did not move when they got homes. Without the places everybody has a pond and no home, which nobody's pool would hold and nothing would report, so the writer refuses them.
 
 ## What is drawn
 
@@ -54,14 +73,52 @@ Everybody with a pond has a gender, because the app asks for the gender before t
 | language | Finnish 70 %, Swedish 8 %, English 22 %: the language the consents were shown in and the profile is written in |
 | seeks | by own gender. Women: men 78 %, women 8 %, several 14 %. Men: women 82 %, men 7 %, several 11 %. Non-binary people: all three 50 %, two of them 40 %, non-binary only 10 % |
 | age window | from 2 to 8 years under the person's age (never under 18) to 2 to 10 years over it (never over 99) |
-| consents | terms, privacy and the special-category consent of the seek screen for everybody who onboarded (#146); the profile's own record of that consent, the one politics and religion need (ADR-019 §4), for 35 % of those with a profile, given with the others. No research consent: the product writes it together with its mapping row, synthetic people emit no events, and theirs would muddy the first real numbers |
+| home | a kept place by the people behind it, as above; of those who keep an area, 20 % show its name on the card, and the rest the town, where a home starts |
+| consents | terms, privacy and the special-category consent of the seek screen for everybody who onboarded (#146); the profile's own record of that consent, the one politics and religion need (ADR-019 §4), for 35 % of those with a profile, given with the others. No research consent: the product writes it together with its mapping row, synthetic people emit no events, and theirs would muddy the first real numbers. After a new version of a wording the reset gives each of them the new one beside the old, in the language the old was shown in, as a person who accepts it gets one (#560, ADR-014 §12): the population is not written again for it, and the terms of an older wording below stay older |
 | profile | 88 % of those who onboarded have one |
 | display name | a given name from the list of the person's gender; the lists hold names with å, ä and ö and one in another script (Юлия) |
 | bio | a bio 65 % (a few of the bios are too short to count for completeness, on purpose), a canned line 12 %, nothing 23 % |
 | prompts | none 25 %, one 20 %, two 35 %, three 20 % |
 | fields | the registry of `packages/schema` (ADR-019), options straight from it. Everybody with a profile has an intent (an onboarding step, #146): long-term 55 %, casual 20 %, open to either 25 %. Then, of those with a profile: monogamy 50 % (monogamous 85 %), kids 60 % (none 70 %, living with me 18 %, not with me 12 %), kids in the future 55 %, smoking 65 % (never 58 %, sometimes 18 %, regularly 10 %, quitting 7 %, vaping 7 %), other nicotine 50 % (neither 70 %, snus 15 %, pouches 10 %, both 5 %), languages 85 % (the person's own and up to two more), education 65 %, drinking 65 % (never 15 %, rarely 30 %, socially 45 %, often 10 %), attitude to drugs 40 %, one to five hobbies 70 %, a height of 152 to 198 cm 55 %, exercise 55 %, pets 50 % (none 35 %, a dog 25 %, a cat 25 %, both 8 %, other 4 %, allergic 3 %), one to three fields of study or work 45 % (one for 70 % of them; and 15 % of those hide themselves from their field), one to three lines of work 50 % (one for 70 % of them), a job title 30 % (titles only: no employer is named), a star sign 45 %. Politics (one to three parties, or "none of them" alone, 70 %) and religion (60 %) only among the 35 % who gave the special-category consent, as the API would have it |
 
-With `--photos` (#142) the people get faces of the release's pool, drawn from the population's own seed so that two machines give the same people the same pictures: none, a few or the whole grid of six, by weight, and only for somebody with a profile. The pictures go through `uploadPhoto` (sharp, EXIF stripped, three WebP variants, a blurhash, the check), so a person with three approved faces has a complete profile and counts at the gate. A write replaces the population that was there and a removal takes it away; either leaves the pictures' objects without a row, so both delete the orphans through the media slice afterwards, and both refuse while there are pictures and no store to delete from. Without the flag, or while the release does not exist (the manifest is empty), nobody has a photo and nobody is complete.
+With `--photos` (#142) the people get faces of the release's pool, drawn from the population's own seed so that two machines give the same people the same pictures: none, a few or the whole grid of six, by weight, and only for somebody with a profile. The pictures go through `uploadPhoto` (sharp, EXIF stripped, three WebP variants, a blurhash, the check), so a person with three approved faces has a complete profile and a queue. A write replaces the population that was there and a removal takes it away; either leaves the pictures' objects without a row, so both delete the orphans through the media slice afterwards, and both refuse while there are pictures and no store to delete from. Without the flag, or while the release holds no pool (it holds none yet), nobody has a face, and nobody is complete but the fifty below.
+
+## The people who fill the bar
+
+The home card's bar of whom people seek (#507, ADR-013 §12) counts finished profiles, at least ten in every band, and without a pool nobody here would have one. So fifty of the people the generator drew anyway count as finished: the first in each band with a bio, a ready line or two prompts, eighteen who seek men, twelve who seek both women and men and twenty who seek women (`BAR_PEOPLE`). The bar reads 35, 25 and 40 %.
+
+| what they have | why |
+|---|---|
+| two approved `photo` rows with a `demo-placeholder-` key and no object | a finished profile needs two approved photos; no picture exists, and the rows are never asked for one. `--remove` and a replacement do not look for their objects |
+| a terms consent of an older wording | it reads as none, as a real person's does until they accept the new one. So they are not complete: they are in nobody's pool, on nobody's card and in no queue, and the personas' queues and the e2e flows stand as they were |
+| everything else as drawn | their seek answers, consents and profiles are the population's own |
+
+They are the pond's number too: the card says these fifty, with anybody else whose profile is finished, a persona or somebody the pictures finish. A test in `apps/api/src/pond/counter.test.ts` holds the whole of it, from the write to the shares, and that none of them is in anybody's pool. The bar shows after a write; the command refuses production. The command's line says how many it filled (`bar`). From 250 people up every band is full whatever the seed, which a test holds; smaller populations may fall short in the middle band and then show no bar.
+
+## The cast (#560)
+
+Forty-eight more people, for the accounts a staging phone can sign in as to go through: nobody without faces is anybody's card, so they are written only with `--photos`, and a write without it, which the e2e jobs make, is what it always was. They are made by hand, not drawn (`packages/db/src/seed/cast.ts`): each has three faces of their own in the release (`faces/cast/<key>/`, never another's), a bio written for them, and a postal code of which the API's own rule keeps what it keeps. Their labels are `demo-cast-<key>`. They are marked, written and removed as everybody here is, nobody signs in as them, and none has a code.
+
+| who | people | ages | seek | age window | here for |
+|---|---|---|---|---|---|
+| men for the members | 22 | 40 to 53 | women, non-binary people | 30 to 62 | long-term |
+| women for the members | 4 | 45 to 52 | women, non-binary people | 40 to 60 | long-term |
+| non-binary people | 2 | 34, 38 | anyone | 25 to 55 | open to either |
+| younger men | 10 | 28 to 31 | anyone | 21 to 45 | open to either |
+| younger women | 10 | 24 to 31 | anyone | 21 to 45 | open to either |
+
+A card never shows whom its person seeks or their age window, so these are wide and one man fits three members. What sets the number is Sanna, who seeks only men. Wider windows on the members' side would not lower it: filters run both ways. A test holds all of it against the product's filters on every month to the end of 2028 (`apps/api/scripts/demo/demo-cast.test.ts`), and that nobody here fits Iida's window, so her round stays what her flow expects.
+
+| account | test bank | cards | waiting first | open chats |
+|---|---|---|---|---|
+| Sanna | Nordea `DEMOUSER4` | 20, men | Jere's fish, likes of Risto and Karim | Juha, on her turn; Mika, on his |
+| Noa | Nordea `DEMOUSER3` | 26, every gender | Jere's fish, likes of Robin and Timo | Harri, on their turn; Leena, on hers |
+| Kerttu | Säästöpankki `22222222` | 25, women and men | Jere's fish, a like of Tiina | Seppo, on her turn, once she has accepted the terms again |
+| Aino, Onni | Nordea `DEMOUSER2`, `DEMOUSER1` | 8 to 10 after onboarding, at the window the app offers | nothing | nothing |
+
+The reset and the stories give the likes, the fish and the chats (`giveCastStories`), as rows, the likes on the day before. So the population comes first: a write replaces the people, and takes what they gave the members with it, so after a later write the reset runs again. Where no cast has been written, the reset gives nothing and says so. An erased member's chats would stay for the other side, who will never read them, so each giving takes those away first.
+
+They count for the counter and the bar, since they have finished profiles: with them the bar leans towards those who seek both and those who seek women.
 
 ## What makes a synthetic person unmistakable
 

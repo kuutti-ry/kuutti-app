@@ -13,15 +13,25 @@ const store = (SecureStore as unknown as { __store: Map<string, string> }).__sto
 const token = (seed: string) => (seed + "x".repeat(43)).slice(0, 43);
 const NOW = new Date("2026-10-17T12:00:00.000Z");
 const minutes = (n: number) => new Date(NOW.getTime() + n * 60_000).toISOString();
-const tokens = (seed: string, expiresInMinutes = 15): SessionTokens => ({
-  sessionId: "6f1c1c4e-9a8e-4a0b-9c3a-0c8d1e2f3a4b",
+const SESSION_ID = "6f1c1c4e-9a8e-4a0b-9c3a-0c8d1e2f3a4b";
+const OTHER_SESSION_ID = "7f1c1c4e-9a8e-4a0b-9c3a-0c8d1e2f3a4b";
+const tokens = (seed: string, expiresInMinutes = 15, sessionId = SESSION_ID): SessionTokens => ({
+  sessionId,
   accessToken: token(`access${seed}`),
   accessExpiresAt: minutes(expiresInMinutes),
-  refreshToken: token(`refresh${seed}`),
+  refreshToken: `${token("family")}.${token(`refresh${seed}`)}`,
   refreshExpiresAt: "2030-04-01T00:00:00.000Z",
 });
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((done) => {
+    resolve = done;
+  });
+  return { promise, resolve };
+}
 
 const ID = "3f9a2c1e-5b7d-4f01-8a2b-1c3d4e5f6a70";
 const MESSAGE = {
@@ -394,6 +404,92 @@ describe("the chat's socket", () => {
     stop = connect(handlers);
     await advance(60_000);
     expect(sockets()).toBe(0);
+  });
+
+  it.each([
+    { change: "a different session", clearFirst: false, sessionId: OTHER_SESSION_ID },
+    { change: "a clear followed by the same session id", clearFirst: true, sessionId: SESSION_ID },
+  ])("ignores an old socket's callbacks after $change", async ({ clearFirst, sessionId }) => {
+    const asked = refreshes(() => json(tokens("unexpected", 30, sessionId)));
+    stop = connect(handlers);
+    const old = FakeWebSocket.latest();
+    if (clearFirst) await clearSession();
+    const replacement = tokens("replacement", 30, sessionId);
+    await saveSession(replacement);
+    // Native callbacks may already be queued when the session changes.
+    old.open();
+    old.receive({ type: "ready" });
+    old.receive(MESSAGE);
+    old.receive({ type: "error", code: "session_expired" });
+    old.drop(1008);
+    await advance(60_000);
+    expect(old.sent).toEqual([]);
+    expect(handlers.onFrame).not.toHaveBeenCalled();
+    expect(handlers.onStatus).not.toHaveBeenCalled();
+    expect(sockets()).toBe(1);
+    expect(asked()).toBe(0);
+    expect(currentSession()).toEqual(replacement);
+  });
+
+  it("does not reconnect an old connection with a replacement session's token", async () => {
+    stop = connect(handlers);
+    ready().drop();
+    handlers.onStatus.mockClear();
+    const replacement = tokens("replacement", 30, OTHER_SESSION_ID);
+    await saveSession(replacement);
+    await advance(60_000);
+    expect(sockets()).toBe(1);
+    expect(handlers.onStatus).not.toHaveBeenCalled();
+    expect(currentSession()).toEqual(replacement);
+  });
+
+  it("does not open a socket when an earlier refresh finishes after the session was replaced", async () => {
+    await saveSession(tokens("1", 0.25));
+    const response = deferred<Response>();
+    const asked = refreshes(() => response.promise);
+    stop = connect(handlers);
+    await advance(0);
+    expect(asked()).toBe(1);
+    expect(sockets()).toBe(0);
+    const replacement = tokens("replacement", 30, OTHER_SESSION_ID);
+    await saveSession(replacement);
+    response.resolve(json(tokens("old-refresh", 30)));
+    await advance(60_000);
+    expect(currentSession()).toEqual(replacement);
+    expect(sockets()).toBe(0);
+    expect(asked()).toBe(1);
+    expect(handlers.onFrame).not.toHaveBeenCalled();
+    expect(handlers.onStatus).not.toHaveBeenCalled();
+  });
+
+  it("does not refresh replacement credentials or publish old frames from an open connection", async () => {
+    const asked = refreshes(() => json(tokens("unexpected", 45, OTHER_SESSION_ID)));
+    stop = connect(handlers);
+    const old = ready();
+    handlers.onStatus.mockClear();
+    const replacement = tokens("replacement", 30, OTHER_SESSION_ID);
+    await saveSession(replacement);
+    old.receive(MESSAGE);
+    await advance(30 * 60_000);
+    expect(handlers.onFrame).not.toHaveBeenCalled();
+    expect(handlers.onStatus).not.toHaveBeenCalled();
+    expect(asked()).toBe(0);
+    expect(sockets()).toBe(1);
+    expect(currentSession()).toEqual(replacement);
+  });
+
+  it("keeps the connection through a token rotation and reconnects with that session's latest token", async () => {
+    stop = connect(handlers);
+    const first = ready();
+    await saveSession(tokens("rotated"));
+    first.receive(MESSAGE);
+    expect(handlers.onFrame).toHaveBeenCalledWith(MESSAGE);
+    first.drop();
+    await advance(1000);
+    expect(sockets()).toBe(2);
+    const second = FakeWebSocket.latest();
+    second.open();
+    expect(second.sent).toEqual([{ type: "auth", token: token("accessrotated") }]);
   });
 
   it("closes when stopped, and nothing comes after: no frame, no reconnect, no socket from a refresh under way", async () => {

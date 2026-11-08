@@ -64,6 +64,22 @@ describe("deriveIdentity", () => {
     );
   });
 
+  it("does not care about whitespace around the code, as the kit's parser does not (#636)", () => {
+    fc.assert(
+      fc.property(
+        hetuArb,
+        fc.stringMatching(/^[ \t\n]{0,3}$/),
+        fc.stringMatching(/^[ \t\n]{0,3}$/),
+        (hetu, before, after) => {
+          expect(deriveIdentity(`${before}${hetu}${after}`, key, AT)).toEqual(
+            deriveIdentity(hetu, key, AT),
+          );
+        },
+      ),
+      SEEDED,
+    );
+  });
+
   it("keeps two codes that differ only in a century sign of the same century apart", () => {
     // The 2023 reform issues the same date and number again under a new sign:
     // another person, so another hash, born in the same year and month.

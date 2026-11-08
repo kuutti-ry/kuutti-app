@@ -13,7 +13,7 @@ Build links are on the project's builds page on expo.dev (`apps/mobile/README.md
 gh workflow run eas-build.yml -f profile=preview -f platform=android
 ```
 
-Each build counts against Expo's free tier (30 a month, at most 15 iOS). Every profile uploads its source maps to Sentry during the build (`docs/runbooks/sentry-setup.md`): a build without readable stack traces fails, it does not ship.
+Each build counts against Expo's free tier (30 a month, at most 15 iOS). Every profile uploads its source maps to Sentry during the build (`docs/runbooks/sentry-setup.md`). A build of the `production` environment without them fails and does not ship. A build of the `preview` environment (development, preview, staging) goes on without them since 2026-11-02, when Sentry's gateway answered the upload with a 504 and failed two iOS staging builds in a row: EAS's `preview` environment holds `SENTRY_ALLOW_FAILURE=true`, the maintainer's choice. Such a build says `warning: sentry-cli` in its Xcode or Gradle log, and its stack traces are unreadable in Sentry.
 
 ## Android (any phone, no cable needed)
 
@@ -25,14 +25,14 @@ With a cable instead (useful for logs): Settings, About phone, tap the MIUI or O
 
 ## iPhone
 
-Needs the paid Apple Developer membership (done 2026-09-20). Apple allows ad hoc installs only on registered devices, 100 a year.
+For the development and preview builds, which install ad hoc. The staging app needs none of this: it comes from TestFlight to the team's Apple Accounts (`docs/vendors/app-store.md`). Builds are signed on the association's Apple team, Kuutti ry (`2NC5W5B372`, these ad hoc builds since 2026-11-04; before that the maintainer's individual team `HM4J7X495K`, ADR-063 §4). Apple allows ad hoc installs only on registered devices, 100 a year per team, so a phone registered on the old team is registered again on the new one.
 
 1. **On the iPhone:** Settings, Privacy & Security, **Developer Mode**, on; the phone restarts. Without it an internal build installs but will not open.
 2. **Register the phone**, on the Mac, as the Expo admin member (never the owner login):
    ```sh
    cd apps/mobile && pnpm exec eas device:create
    ```
-   Choose the Apple team, then "Website": it prints a URL and a QR code. Open it on the iPhone, install the profile it offers (Settings, Profile Downloaded, Install). The device now shows under `eas device:list`.
+   Choose the Apple team Kuutti ry, then "Website": it prints a URL and a QR code. Open it on the iPhone, install the profile it offers (Settings, Profile Downloaded, Install). The device now shows under `eas device:list`.
 3. **First build, interactive, once.** EAS creates and keeps the distribution certificate and the ad hoc provisioning profile; nothing lands in the repository:
    ```sh
    pnpm exec eas build --profile preview --platform ios
@@ -45,7 +45,7 @@ Needs the paid Apple Developer membership (done 2026-09-20). Apple allows ad hoc
    ```
    A new device later means `eas device:create` again and one more build: the profile lists devices at build time.
 
-Push notification credentials (`eas credentials`: FCM service account, APNs key) can wait for push (#102); uploading them now saves a native rebuild then.
+Push notification credentials (`eas credentials`: FCM service account, APNs key) are needed since push (#102); an APNs key belongs to one Apple team, so the move to the association's team makes a new one (`docs/vendors/app-store.md`, step 3).
 
 ## The dev client against your Mac
 
@@ -59,10 +59,12 @@ Phone and Mac on the same network. `pnpm env:up` on the Mac; open the `developme
 
 The bank login returns to the app by deep link. Today that link is the custom scheme `kuutti://auth?code=…`, which both platforms open in the app without a dialog (iOS through the scheme, Android through the intent filter Expo derives from `scheme`). The https form `https://api.<env>.kuutti.app/auth/return?code=…` needs verified links, which are a native change (`ios.associatedDomains` and `android.intentFilters` with `autoVerify` in `app.json`): batch it with the next fingerprint move (#184). The API already serves the two files from configuration:
 
-- `https://api.<env>.kuutti.app/.well-known/assetlinks.json` from `ANDROID_CERT_FINGERPRINTS`. The fingerprint is the release keystore's SHA-256: `eas credentials --platform android` prints it under the keystore. List the `development` and the `preview` build's fingerprints while they differ, comma separated.
-- `https://api.<env>.kuutti.app/.well-known/apple-app-site-association` from `IOS_TEAM_ID` (`HM4J7X495K`).
+- `https://api.<env>.kuutti.app/.well-known/assetlinks.json` from `ANDROID_CERT_FINGERPRINTS`. The fingerprint is the release keystore's SHA-256: `eas credentials --platform android` prints it under the keystore. List the `development` and the `preview` build's fingerprints while they differ, and for the copy installed from Google Play its three app signing fingerprints (`docs/vendors/google-play.md`, step 8), comma separated.
+- `https://api.<env>.kuutti.app/.well-known/apple-app-site-association` from `IOS_TEAM_ID`: the association's team `2NC5W5B372` once `fi.kuutti.app` has moved there (ADR-063 §4), the individual team `HM4J7X495K` before.
 
 Both are SSM parameters of those names under `/kuutti/<env>/` (plain String; the values are public). Until they are set the files answer 404 and nothing else changes.
+
+The one link of an invitation (`/i/{code}`, #574, ADR-044 §13) reads two more of the same kind, `APP_STORE_URL` and `PLAY_STORE_URL`: each listing's https address (`https://apps.apple.com/app/id<n>`, `https://play.google.com/store/apps/details?id=fi.kuutti.app`), set once that listing is public (#193). Until then the link sends that phone to `https://kuutti.app/`.
 
 Checking, once the native batch is installed:
 
@@ -71,16 +73,24 @@ Checking, once the native batch is installed:
 
 ## The lock's face and fingerprint (#418, ADR-045)
 
-Maestro has no biometric command, so the lock's face and fingerprint are checked by hand, on a real iPhone and a real Android phone, once a build with `expo-local-authentication` is installed (the native batch, ADR-045 §8; the tech config screen names the native build). jest covers the rest with the module mocked. Sign in as Sanna; enrol a face or a finger in the phone's own settings first.
+Maestro has no biometric command, so the lock's face and fingerprint are checked by hand, on a real iPhone and a real Android phone, once a build with `expo-local-authentication` is installed (the native batch, ADR-045 §8; the tech config screen names the native build). jest covers the rest with the module mocked. Sign in as Sanna, on a phone with no face or finger enrolled yet (remove them for the walk if needed): step 1 enrols one.
+
+Whether a build carries the Face ID purpose can be read from the build itself (#505). In `apps/mobile`, `npx --no-install eas build:list --platform ios --status finished --limit 5 --json --non-interactive` names the builds and `artifacts.applicationArchiveUrl` is the `.ipa` of each. Then:
+
+```bash
+unzip -p kuutti.ipa 'Payload/*.app/Info.plist' | plutil -p - | grep NSFaceIDUsageDescription
+```
+
+The config gives it to every build with the module, and a local simulator build has it (ADR-045 §8); this read has not been done on an `.ipa` from EAS yet. With it taken out of a build by hand, the simulator offers the switch, shows no prompt when it is pressed, and says it was not confirmed; no real iPhone has been tried that way. A build without the module does not start: `Cannot find native module 'ExpoLocalAuthentication'`.
 
 On each phone:
 
-1. **Turning it on.** Settings › Lock, Face or fingerprint on. On an iPhone with Face ID, iOS first asks whether Kuutti may use Face ID, with the purpose in the phone's language: check it once each in Finnish, Swedish and English. Then the prompt; a face or finger that passes turns the switch on, and a cancel leaves it off with the line that says so.
-2. **No fallback to the phone's code.** Fail the prompt until it gives up (look away, or the wrong finger). iOS shows no Enter Password; Android's prompt offers no PIN, pattern or password. The lock screen says the face or finger did not unlock, and the passcode (if set) and Sign in with the bank instead are still there.
+1. **Turning it on.** Before a face or finger is enrolled, Settings › Lock says the phone has none Kuutti can use; enrol one in the phone's own settings and come back without leaving the screen: the switch is there (#464). Face or fingerprint on. On an iPhone with Face ID, iOS first asks whether Kuutti may use Face ID, with the purpose in the phone's language: check it once each in Finnish, Swedish and English. Then the prompt; a face or finger that passes turns the switch on, and a cancel leaves it off with the line that says so.
+2. **No fallback to the phone's code, and the phone's pause.** Fail the prompt until it gives up (look away, or the wrong finger). iOS shows no Enter Password; Android's prompt offers no PIN, pattern or password. On iOS the lock screen then says the face or finger did not unlock, in the kind its button names. On Android a wrong finger does not end the prompt, so failing goes on to the pause. Go on failing until the phone pauses its face or fingerprint (Android after about five wrong fingers, for 30 seconds, and until the phone's own code after repeated pauses; iOS until the phone's own code): the lock screen says the phone has paused it and that opening the phone with its own code ends it, never that it did not unlock, and the button pressed during the pause says so again with no prompt (#464). Press Home and come back while it lasts: the button and the line are still there, though the module then reads Android 16's answer (its pause's code, 7) as none (#499). Android 16 may instead lock the whole phone at the fifth wrong try. That ends Kuutti's prompt as a cancel (no line on the lock screen; in Settings, that it was not confirmed), and the phone's own code then ends the pause too: note which the phone did. Lock the phone and open it with its own code: the button's prompt comes back. In Settings, turning Face or fingerprint on during the pause leaves it off with the pause's own line. The passcode (if set) and Sign in with the bank instead are there throughout.
 3. **When it locks.** Straight away chosen: home, then back, and the lock asks for the face or finger at once. One minute chosen: back within it, no lock. Close the app and open it again: locked.
 4. **The cover.** Open the app switcher (iOS) or recents (Android): the app's name on its background, never the last screen. On Android the thumbnail can be taken before the cover is drawn (ADR-045 §4): note what the phone shows.
-5. **Android's face.** On a phone whose face unlock is class 2 (most camera face unlocks, Xiaomi's among them), with only a face enrolled: the switch is offered, and the prompt takes the face.
-6. **Refused by the phone.** iPhone: Settings, Face ID & Passcode, Other Apps, Kuutti off. The lock then offers no face, or its button says it did not unlock, and the passcode or the bank still opens the app.
+5. **Android's face.** On a phone whose face unlock is class 2, with only a face enrolled: the switch is offered, and the prompt takes the face. Which phones those are, nothing official says (ADR-045 §5), so the comment names the phone. On a phone that declares face hardware whose face only unlocks the phone itself (the Pixel 7's, a class 1 face by second-hand reports), with a finger enrolled too, the button says face or fingerprint while the prompt takes the finger alone: the known ceiling of ADR-045 §5, after which the refusal and pause lines must claim nothing about the face. With only such a face enrolled, Settings › Lock says the phone has no face or fingerprint unlock Kuutti can use.
+6. **Refused by the phone.** iPhone: Settings, Face ID & Passcode, Other Apps, Kuutti off (the same switch is on Kuutti's own page in Settings, under Apps). Settings › Lock then says the iPhone does not let Kuutti use Face ID, in place of the switch, with Open the phone's settings. That button opens the phone's settings: note whether it lands on Kuutti's page. Turn Face ID on for Kuutti and come back without leaving the screen: the line is gone and the switch is there (#505). With the lock already on with the face, the switch stays beside the line, so it can be turned off; the lock screen says the same in the button's place, and the passcode or the bank still opens the app; once Face ID is on for Kuutti again, the button is back and asks. Also Don't Allow on iOS's first question whether Kuutti may use Face ID, in step 1 (reinstalling the app brings the question back): the same line at once, never that it was not confirmed.
 7. **The way out.** Sign in with the bank instead: the sign-in screen says the lock signed this phone out; after the bank, Settings › Lock reads Off.
 
-A comment on the issue of the check names each phone, its system version, the build, and any step that failed. For a quick look before a phone is at hand, the iOS Simulator has Features › Face ID (Enrolled, Matching Face, Non-matching Face), and an Android emulator with a fingerprint enrolled in its settings takes `adb -e emu finger touch 1`; neither stands in for the check, since neither has the phone's own classes or prompts.
+A comment on the issue of the check names each phone, its system version, the build, and any step that failed. For a quick look before a phone is at hand, the iOS Simulator has Features › Face ID (Enrolled, Matching Face, Non-matching Face), and an Android emulator with a fingerprint enrolled in its settings takes `adb -e emu finger touch 1`; neither stands in for the check, since neither has the phone's own classes or prompts. The simulator of iOS 27 never shows iOS's question and has no Face ID row for the app, so step 6 needs a real iPhone (#505).

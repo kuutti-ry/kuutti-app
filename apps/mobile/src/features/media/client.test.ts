@@ -19,7 +19,7 @@ const session = {
   sessionId: "6f1c1c4e-9a8e-4a0b-9c3a-0c8d1e2f3a4b",
   accessToken: token("access"),
   accessExpiresAt: "2030-01-01T00:15:00.000Z",
-  refreshToken: token("refresh"),
+  refreshToken: `${token("family")}.${token("refresh")}`,
   refreshExpiresAt: "2030-04-01T00:00:00.000Z",
 };
 const stored = {
@@ -88,7 +88,11 @@ describe("uploading a photo", () => {
 
   it("answers one 401 with one refresh and one retry", async () => {
     await saveSession(session);
-    const refreshed = { ...session, accessToken: token("fresh"), refreshToken: token("fresh-r") };
+    const refreshed = {
+      ...session,
+      accessToken: token("fresh"),
+      refreshToken: `${token("family")}.${token("fresh-r")}`,
+    };
     globalThis.fetch = jest.fn(
       async () =>
         new Response(JSON.stringify(refreshed), {
@@ -411,6 +415,149 @@ describe("uploading a picture to another route (#350)", () => {
     await uploadPicture("/conversations/c1/photos", picked, { clientId: "id-1" });
     expect(partsOf(FakeXhr.sent[0]).map((part) => part.fieldName)).toEqual(["clientId", "photo"]);
   });
+});
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((done) => {
+    resolve = done;
+  });
+  return { promise, resolve };
+}
+
+describe.each([
+  { name: "uploadPhoto", upload: (photo: typeof picked) => uploadPhoto(photo) },
+  {
+    name: "uploadPicture",
+    upload: (photo: typeof picked) =>
+      uploadPicture("/conversations/c1/photos", photo, { clientId: "id-1" }),
+  },
+])("$name keeps the session that began the upload", ({ upload }) => {
+  const replacement = {
+    ...session,
+    sessionId: "7f1c1c4e-9a8e-4a0b-9c3a-0c8d1e2f3a4b",
+    accessToken: token("replacement-access"),
+    refreshToken: `${token("replacement-family")}.${token("replacement-refresh")}`,
+  };
+  const webPhoto = { ...picked, uri: "blob:http://localhost/held-photo" };
+
+  afterEach(() => jest.restoreAllMocks());
+
+  it("does not refresh or retry a delayed 401 with a replacement session", async () => {
+    await saveSession(session);
+    const responseReady = deferred<() => void>();
+    class HeldFirstXhr extends FakeXhr {
+      override send(body: FormData | null): void {
+        if (FakeXhr.sent.length === 0) {
+          const complete = this.onload;
+          this.onload = () => responseReady.resolve(() => complete?.());
+        }
+        super.send(body);
+      }
+    }
+    (globalThis as { XMLHttpRequest: unknown }).XMLHttpRequest = HeldFirstXhr;
+    FakeXhr.answers = [
+      {
+        status: 401,
+        body: JSON.stringify({ error: { code: "session_expired", message: "x", requestId: "r" } }),
+      },
+      { status: 201, body: JSON.stringify(stored) },
+    ];
+    const seen = answering(json({ ...replacement, accessToken: token("replacement-fresh") }));
+    const result = upload(picked).catch((error: unknown) => error);
+    const answerFirst = await responseReady.promise;
+    expect(FakeXhr.sent[0]?.headers.authorization).toBe(`Bearer ${session.accessToken}`);
+
+    await saveSession(replacement);
+    answerFirst();
+
+    expect(await result).toMatchObject({ status: 401 });
+    expect(FakeXhr.sent).toHaveLength(1);
+    expect(seen).toEqual([]);
+    expect(currentSession()).toEqual(replacement);
+  });
+
+  it.each(["clear", "replace"] as const)(
+    "sends nothing after %s while preparing the first web body",
+    async (change) => {
+      await saveSession(session);
+      jest.replaceProperty(Platform, "OS", "web");
+      const reading = deferred<void>();
+      const bytes = deferred<Blob>();
+      const response = new Response();
+      jest.spyOn(response, "blob").mockImplementation(() => {
+        reading.resolve();
+        return bytes.promise;
+      });
+      const seen = answering(response);
+      FakeXhr.answers = [{ status: 201, body: JSON.stringify(stored) }];
+      const result = upload(webPhoto).catch((error: unknown) => error);
+      await reading.promise;
+
+      if (change === "clear") await clearSession();
+      else await saveSession(replacement);
+      bytes.resolve(new Blob(["jpeg bytes"], { type: "image/jpeg" }));
+
+      expect(await result).toMatchObject({ status: 401 });
+      expect(FakeXhr.sent).toHaveLength(0);
+      expect(seen.map((request) => request.url)).toEqual([webPhoto.uri]);
+      expect(currentSession()).toEqual(change === "clear" ? null : replacement);
+    },
+  );
+
+  it.each(["clear", "replace"] as const)(
+    "does not retry after %s while preparing the refreshed web body",
+    async (change) => {
+      await saveSession(session);
+      jest.replaceProperty(Platform, "OS", "web");
+      const refreshed = {
+        ...session,
+        accessToken: token("fresh"),
+        refreshToken: `${token("family")}.${token("fresh-r")}`,
+      };
+      const reading = deferred<void>();
+      const bytes = deferred<Blob>();
+      const response = new Response();
+      jest.spyOn(response, "blob").mockImplementation(() => {
+        reading.resolve();
+        return bytes.promise;
+      });
+      const seen = answering(
+        new Response(new Blob(["jpeg bytes"], { type: "image/jpeg" })),
+        json(refreshed),
+        response,
+      );
+      FakeXhr.answers = [
+        {
+          status: 401,
+          body: JSON.stringify({
+            error: { code: "session_expired", message: "x", requestId: "r" },
+          }),
+        },
+        { status: 201, body: JSON.stringify(stored) },
+      ];
+      const result = upload(webPhoto).catch((error: unknown) => error);
+      await reading.promise;
+      expect(currentSession()).toEqual(refreshed);
+      expect(FakeXhr.sent[0]?.headers.authorization).toBe(`Bearer ${session.accessToken}`);
+
+      if (change === "clear") await clearSession();
+      else await saveSession(replacement);
+      bytes.resolve(new Blob(["jpeg bytes"], { type: "image/jpeg" }));
+
+      expect(await result).toMatchObject({ status: 401 });
+      expect(FakeXhr.sent).toHaveLength(1);
+      expect(seen.map((request) => request.url)).toEqual([
+        webPhoto.uri,
+        expect.stringMatching(/\/auth\/refresh$/),
+        webPhoto.uri,
+      ]);
+      expect(JSON.parse(await (seen[1] as Request).text())).toEqual({
+        refreshToken: session.refreshToken,
+      });
+      expect(currentSession()).toEqual(change === "clear" ? null : replacement);
+    },
+  );
 });
 
 describe("readPhotoList", () => {

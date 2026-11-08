@@ -5,6 +5,16 @@
 
 export { renderBankPage } from "./bank-page.ts";
 export {
+  CAST,
+  CAST_CONVERSATIONS,
+  CAST_LIKES,
+  type CastPerson,
+  castAccounts,
+  castFaces,
+  castPeople,
+  removeCastLeftovers,
+} from "./cast.ts";
+export {
   assertDemoTarget,
   assertStagingProcess,
   DEMO_ENVIRONMENTS,
@@ -57,29 +67,33 @@ export {
 export { PHOTOS_MANIFEST } from "./photos-manifest.ts";
 export {
   apportion,
+  BAR_PEOPLE,
+  barOf,
   DEMO_EPOCH,
   DEMO_LABEL_PREFIX,
   DEMO_SEED,
   DEMO_SIZE,
   DEMO_SIZE_MAX,
   generatePopulation,
+  type HomePlaces,
   NEVER_ONBOARDED_SHARE,
   POND_PLANS,
   type PondPlan,
   type PopulationOptions,
   plannedPonds,
   planSizes,
+  type SyntheticHome,
   type SyntheticPerson,
   type SyntheticProfile,
   summarise,
-  type Thresholds,
-  uncrossed,
 } from "./population.ts";
 export {
+  openPonds,
   PERSONA_ROUNDS,
   type PersonaRound,
   type RoundsResult,
   writeRounds,
+  writeWaitingLikes,
 } from "./rounds.ts";
 export { everyText } from "./words.ts";
 export {
@@ -87,8 +101,11 @@ export {
   DEMO_SUBJECT_PREFIX,
   deleteIdentities,
   demoHetuHmac,
+  PLACEHOLDER_PHOTO_PREFIX,
   type RemoveResult,
+  type RenewResult,
   removePopulation,
+  renewPopulationConsents,
   type WriteResult,
   writePopulation,
 } from "./write-population.ts";

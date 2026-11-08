@@ -2,13 +2,13 @@ import type { PlainMessageKey } from "@kuutti/i18n";
 import type { FoundReason } from "@kuutti/schema";
 import { useEffect, useState } from "react";
 import { View } from "react-native";
+import { Choice } from "@/components/Choice";
 import { Button } from "@/components/ui/button";
 import { Text } from "@/components/ui/text";
 import { useSession } from "@/features/identity";
 import { ApiError } from "@/lib/api";
 import { useT } from "@/lib/locale";
 import { useHapticTap } from "@/theme/haptics";
-import { Choice } from "./Choice";
 import { readFoundThem, tellFoundThem } from "./found-them-client";
 import { SettingsPage } from "./SettingsPage";
 
@@ -24,8 +24,7 @@ type State = "checking" | "asking" | "sending" | "failed" | "thanked";
 /**
  * "Löysin hänet" (#83, ADR-040): the person tells Kuutti they found somebody,
  * and why, from three choices, and Kuutti thanks them. It is an indication
- * and nothing more: the screen says that nothing in the app changes, and
- * where the break and the deletion are for someone who wants to step away.
+ * and nothing more: the screen says that nothing in the app changes.
  * An account that told Kuutti before is thanked again, never asked twice.
  * The choice is said in words (the ticked option, never a colour alone); a
  * failure keeps it.
@@ -68,7 +67,7 @@ export function FoundThemScreen() {
       {!signedIn ? (
         <Text variant="muted">{t("settings.session.none")}</Text>
       ) : state === "checking" ? (
-        <Text accessibilityLiveRegion="polite">{t("home.loading")}</Text>
+        <Text accessibilityLiveRegion="polite">{t("load.loading")}</Text>
       ) : state === "thanked" ? (
         <View className="gap-3" accessibilityLiveRegion="polite">
           <Text variant="h3" accessibilityRole="header">
@@ -105,7 +104,7 @@ export function FoundThemScreen() {
           </View>
           <Text variant="muted">{t("account.foundThem.unchanged")}</Text>
           {state === "failed" && (
-            <Text accessibilityLiveRegion="assertive">{t("account.foundThem.failed")}</Text>
+            <Text accessibilityLiveRegion="assertive">{t("load.failed.press")}</Text>
           )}
           <Button
             disabled={!reason || state === "sending"}

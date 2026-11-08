@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
+import { POND_COUNTER_K_MIN } from "./pond-counter.ts";
 import { PROFILE_FIELD_KEYS, PROFILE_FIELDS, SPECIAL_CATEGORY_FIELDS } from "./profile-fields.ts";
 import {
   AGE_BANDS,
@@ -11,7 +12,6 @@ import {
   ResearchSnapshot,
   researchFieldsOf,
 } from "./research.ts";
-import { WAITLIST_K_MIN } from "./waitlist.ts";
 
 // The event registry and the coarse snapshot (#50, ADR-011, rules/schema.md).
 
@@ -102,16 +102,6 @@ function valid(name: (typeof RESEARCH_EVENT_NAMES)[number]): Record<string, unkn
       return { sinceOpened: "1d_7d", messages: "6-20" };
     case "contact_unshared":
       return {};
-    case "round_built":
-      return {
-        ordering: "count",
-        size: 12,
-        matchesFilters: 9,
-        likedYou: 2,
-        seenBefore: 1,
-        relaxed: 0,
-        fish: 0,
-      };
     case "profile_viewed":
       return { position: 3, reason: "liked_you" };
     case "like":
@@ -157,9 +147,9 @@ describe("the coarse snapshot", () => {
     expect(RESEARCH_FIELD_KEYS).toEqual(["intent"]);
   });
 
-  it("holds k to the waitlist's floor of ten", () => {
+  it("holds k to the counter's floor of ten", () => {
     expect(RESEARCH_K_MIN).toBe(10);
-    expect(RESEARCH_K_MIN).toBe(WAITLIST_K_MIN);
+    expect(RESEARCH_K_MIN).toBe(POND_COUNTER_K_MIN);
   });
 
   it("keeps a stored value only while the registry still knows it, and drops the rest", () => {

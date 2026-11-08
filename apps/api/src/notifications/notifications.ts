@@ -9,6 +9,7 @@ import {
   type SanctionReason,
 } from "@kuutti/schema";
 import { AppError } from "../lib/errors.ts";
+import { announcementTextFor } from "./announcements.ts";
 import * as repo from "./repo.ts";
 
 // The notification choices and the notices in the app (#176, ADR-032). A
@@ -37,20 +38,34 @@ export async function setChoice(
   return choicesOf(deps.db, input.accountId);
 }
 
-/** One notice as the contract has it: a warning with its reason, a counted invitation with what it earned. */
-function noticeOf(row: repo.NoticeRow): Notice {
+/**
+ * One notice as the contract has it: a warning with its reason, a counted
+ * invitation with what it earned the person, an announcement with its words
+ * in the reader's language (ADR-068 §3).
+ */
+function noticeOf(row: repo.NoticeRow, locale: string): Notice {
   const base = { id: row.id, at: row.at.toISOString(), readAt: row.readAt?.toISOString() ?? null };
-  if (row.kind === "invitation_counted") {
-    return { ...base, kind: row.kind, reward: { fish: row.fish, likes: row.likes } };
+  if (row.kind === "warning") {
+    // A warning holds its sanction (notice_warning_check), so its reason is there.
+    return { ...base, kind: row.kind, reason: row.reason as SanctionReason };
   }
-  // A warning holds its sanction (notice_warning_check), so its reason is there.
-  return { ...base, kind: row.kind, reason: row.reason as SanctionReason };
+  if (row.kind === "announcement") {
+    // An announcement's notice holds it (notice_announcement_check), and goes with it.
+    if (!row.texts) throw new Error(`notice ${row.id}: an announcement's notice without its words`);
+    const { text } = announcementTextFor(row.texts, locale);
+    return { ...base, kind: row.kind, title: text.title, body: text.body };
+  }
+  return { ...base, kind: row.kind, reward: { fish: row.fish } };
 }
 
-/** The caller's newest notices. */
-export async function noticesOf(db: Queryable, accountId: string): Promise<Notices> {
+/** The caller's newest notices, an announcement's in `locale`, the request's language. */
+export async function noticesOf(
+  db: Queryable,
+  accountId: string,
+  locale: string,
+): Promise<Notices> {
   const rows = await repo.listNotices(db, accountId, NOTICES_MAX);
-  return { notices: rows.map(noticeOf) };
+  return { notices: rows.map((row) => noticeOf(row, locale)) };
 }
 
 /** Marks one of the caller's notices read; one not theirs is 404. */
@@ -71,10 +86,14 @@ export async function recordWarningNotice(
   await repo.insertWarningNotice(db, input);
 }
 
-/** A counted invitation tells its inviter (ADR-044 §9), in the night's count's transaction. */
+/** A counted invitation tells its inviter and its friend (ADR-044 §9), in the night's count's transaction. */
 export async function recordInvitationNotices(
   db: Queryable,
-  input: { counted: ReadonlyArray<{ accountId: string; invitationId: string }>; at: Date },
+  input: {
+    kind: "invitation_counted" | "invitation_friend";
+    counted: ReadonlyArray<{ accountId: string; invitationId: string }>;
+    at: Date;
+  },
 ): Promise<void> {
   await repo.insertInvitationNotices(db, input);
 }

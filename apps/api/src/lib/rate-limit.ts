@@ -4,18 +4,26 @@ import type { Context, MiddlewareHandler } from "hono";
 import type { AppEnv } from "./env.ts";
 import { envelope } from "./errors.ts";
 import { tOf } from "./i18n.ts";
+import { ORIGIN_PROOF_HEADER, originProofOf } from "./origin-proof.ts";
 
 /**
  * Whose word the API takes for the client address (#52, audit F19). A hop a
  * client can write is never trusted: `traefik` reads the last X-Forwarded-For
  * entry, the one Traefik itself appends on the box; `cloudfront` reads the
- * viewer address CloudFront adds, and is only right once the box admits
- * CloudFront alone (cloudfront_only_ingress), because until then anyone
- * reaching the origin could send that header; `none` is the socket, for a
- * process nothing fronts (development, tests).
+ * viewer address CloudFront adds, and only on a request that carries the
+ * proof of Kuutti's own distribution (ADR-066), since the box admits every
+ * distribution's servers and anybody's may send that header too (#198,
+ * ADR-008 History); `none` is the socket, for a process nothing fronts
+ * (development, tests).
  */
 export const TRUSTED_PROXIES = ["none", "traefik", "cloudfront"] as const;
 export type TrustedProxy = (typeof TRUSTED_PROXIES)[number];
+
+/** The part of the configuration the client's address depends on. */
+export type AddressSource = {
+  readonly TRUSTED_PROXY: TrustedProxy;
+  readonly originSecrets: readonly string[];
+};
 
 export type RateLimitOptions = {
   /**
@@ -136,12 +144,14 @@ export function personOf(c: Context<AppEnv>): string | null {
  * asks for a wider prefix (the sign-in doors count a /56, §4).
  */
 export function addressOf(
-  trusted: TrustedProxy,
+  source: AddressSource,
   options: { ipv6Prefix?: number } = {},
 ): (c: Context<AppEnv>) => string | null {
   const ipv6Prefix = options.ipv6Prefix ?? 64;
+  const proof = originProofOf(source.originSecrets);
+  const proven = (c: Context<AppEnv>) => proof(c.req.header(ORIGIN_PROOF_HEADER)) === "valid";
   return (c) => {
-    const address = clientAddress(c, trusted);
+    const address = clientAddress(c, source.TRUSTED_PROXY, proven);
     return address === null ? null : addressKey(address, ipv6Prefix);
   };
 }
@@ -183,13 +193,23 @@ function addressKey(address: string, prefix: number): string | null {
 }
 
 /** The client's address by the trusted proxy's account, or null when it left none. */
-function clientAddress(c: Context<AppEnv>, trusted: TrustedProxy): string | null {
+function clientAddress(
+  c: Context<AppEnv>,
+  trusted: TrustedProxy,
+  proven: (c: Context<AppEnv>) => boolean,
+): string | null {
   const hops = (c.req.header("x-forwarded-for") ?? "")
     .split(",")
     .map((hop) => hop.trim())
     .filter((hop) => hop.length > 0);
   switch (trusted) {
     case "cloudfront": {
+      // Only Kuutti's own distribution's word counts (ADR-066). A request
+      // without its proof came through somebody else's distribution, or the
+      // function or its store is wrong: either way it has no address and
+      // shares the one bucket of no address, which a flood then fills for the
+      // unproven alone.
+      if (!proven(c)) return null;
       // CloudFront-Viewer-Address is "ip:port", the port after the last colon
       // (IPv6 included); any other shape is no address. Without the header
       // there is no guess: the origin request policy forwards it

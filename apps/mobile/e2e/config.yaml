@@ -21,34 +21,37 @@ executionOrder:
     - Once there are kids, the future-kids answers read want more, no more, not sure anymore
     # Sanna: her profile and photos, the later fields, the deal-breakers, home,
     # Settings, the app's lock, the sign-in links, and logging out everywhere last.
-    - The card leads with the photo, the name and the age, and shows the information fields but nothing soft
-    - A section saves on going back, and the card shows what it saved
+    - The card leads with the name, the photo and the key facts, and opens the rest in place but nothing soft
+    - A section saves on going back, the card shows what it saved, and a hidden answer leaves it
     - A phone number in the bio is refused on leaving with the reason, and the stored bio stays
     - A photo opens full size and back, and removing one asks first
     - Fill in the rest walks the unanswered fields in order, and Ask me later writes nothing
     - Field and work take as many choices as apply, Ask me later keeps what was stored, and long lists can be searched
     - A party and a star sign saved on their screens show on the card, and clearing them takes them off
     - The parties screen lists the parties and none of them, which stands alone, with no note and no search
-    - At most two deal-breakers, each with an accepted answer; a third is refused in words
+    - A later question left unsaved asks first, on the arrow and on a link from outside
+    - A deal-breaker starts on Everyone, says what it accepts on its row, and going back saves it
     - Taking one's own answer back pauses the deal-breaker on it, and answering again lifts the pause
-    - Home names the area with its numbers and the gate in words, and the wrench names the API
+    - Height takes one relation of its four buttons, kept by going back, and Everyone takes it off
+    - Distance takes a band of its four buttons, kept by going back, and Everyone takes it off
+    - The home changes by a new postal code, the card says the name chosen, and digits are never shown back
+    - Home says how many people have completed their profiles and the gate in words, and the wrench names the API
     - A malformed e-mail is refused in words, a valid one is saved, and it can be removed
-    - The research switch in Settings records the opt-in and withdraws it again
     - The messages switch in Settings, Notifications, goes off, is kept on the server, and goes on again
     - An invitation made in Settings shows its code once, is shared, and is withdrawn after asking
     - Download my data hands the person's file over
     - Feedback sent from Settings is thanked, the kind chosen in words
     - The language choice in Settings changes the app's language at once
     - The photo descriptions setting shows them under the photos and chooses what they tell
-    - The decision buttons setting places Like and Pass for either hand, and one-handed
+    - The Like and Pass setting places them for either hand, and one-handed
     - The session, the theme and the language survive closing and reopening the app
     - A passcode set in Settings locks the app at a cold start and back from the background, and the bank is the way out
-    - A sign-in link not asked for is refused without touching the session, and every refusal is said in its own words
+    - A sign-in link not asked for is refused without touching the session, and a refusal has words only for a fact of its own
     - Log out everywhere ends this device's session, and reopening the app does not bring it back
     # Helmi, who takes a break and comes back.
     - Taking a break signs the person out everywhere, and the next bank login brings them back
     # Noa.
-    - A deal-breaker is offered only on what the person answered, and Answer it opens the field
+    - A deal-breaker is offered only on what the person answered, and a row that says to share first opens the question
     - With one approved photo the gate says the profile lacks something, and a hidden field leaves the card
     - Withdrawing the sensitive-answers consent asks whom one seeks again with the consent, and keeps the age window
     # Antti and Ville, the chat's pair (#348), with Antti's silent match with Sanna.
@@ -57,10 +60,19 @@ executionOrder:
     - A message the other person writes arrives on an open conversation, and is marked read at once
     # Elina and Jussi, the contact share's pair (#103), in a conversation of their own.
     - A contact kept in Settings is shared from a conversation's header and shows under the other person's header, then sharing stops and it is removed
+    # Jussi, whose gender the flow changes: the limit holds it, so once per reset.
+    - The gender changes on its own screen, offers a word after non-binary, and the limit then says its date
+    # Ritva, whose answers What you seek's flow changes and puts back (#542).
+    - What you seek lists whom, the ages, why and the deal-breakers, and each change is kept by going back
     # Laura and Emmi, the report's pair (#351): a block is final, so once per reset.
     - A report from a conversation takes it from the reporter's list, and the other finds it ended and can still report it
-    # Iida, the round's (#379): a match and a report are final, so once per reset.
-    - Today's round shows one card at a time, liking back makes a match, Undo takes a decision back, and a report takes a card away
+    # Iida, the star's (#575), which decides nothing and leaves her queue as it found it.
+    - A star on a card brings the person to a Starred list only they see, and taking it off leaves everything as it was
+    # Iida, the queue's (#379): a match and a report are final, so once per reset.
+    - The queue shows one card at a time, liking back makes a match, Later and Undo leave a decision open, and a report takes a card away
+    # Riikka, a card of that queue, whose filters the short pool's flow changes and puts
+    # back (#99, #581): after it, so that one stopping half-way takes no card from it.
+    - With few people left, the queue's end offers the deal-breakers to relax for today in two groups, and reading them relaxes nothing
     # Aino, who tells Kuutti she found someone, then whose account goes: last.
     - I found someone tells Kuutti the reason once, thanks the person, and asks no more
     - Deleting the account asks first, signs the person out, and the next login is refused until the cooldown ends

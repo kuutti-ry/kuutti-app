@@ -1,0 +1,51 @@
+# The distance as a deal-breaker (#514, #551, ADR-061 §7, features/matching/filters.feature):
+# a band and the nearer ones with it, or Everyone, which is having none. It reads
+# the home everybody has, so it asks nobody to share theirs first and says nothing
+# of those who did not answer. Far is on a card and not here: accepting it is no
+# filter. Sanna has no deal-breaker; the flow ends as it began.
+appId: fi.kuutti.app
+name: Distance takes a band of its four buttons, kept by going back, and Everyone takes it off
+---
+- runFlow: ../common/sign-in.yaml
+- openLink: kuutti://profile/deal-breakers/distance
+- extendedWaitUntil:
+    visible: "✓ Everyone|✓ Kaikki|✓ Alla"
+    timeout: 15000
+- waitForAnimationToEnd
+- assertVisible: "Distance|Etäisyys|Avstånd"
+- assertVisible: "Nearby|Lähellä|I närheten"
+- assertNotVisible: "Far|Kauempana|Längre bort"
+- assertNotVisible: "Also people who did not answer|Myös ne, jotka eivät vastanneet|Även de som inte svarade"
+
+# One button at a time: the second replaces the first, and nothing asks after
+# those who did not answer, since nobody lacks a home.
+- tapOn: "Close|Melko lähellä|Ganska nära"
+- assertVisible: "✓ Close|✓ Melko lähellä|✓ Ganska nära"
+- tapOn: "Around|Samoilla seuduilla|I trakten"
+- assertVisible: "✓ Around|✓ Samoilla seuduilla|✓ I trakten"
+- assertVisible: "Close|Melko lähellä|Ganska nära"
+- assertVisible: "Everyone|Kaikki|Alla"
+- assertNotVisible: "Also people who did not answer|Myös ne, jotka eivät vastanneet|Även de som inte svarade"
+
+# Kept by going back: it is there when the screen opens again.
+- tapOn: "Back|Takaisin|Tillbaka"
+- extendedWaitUntil:
+    notVisible: "Fine with me|Sopii minulle|Okej för mig"
+    timeout: 15000
+- openLink: kuutti://profile/deal-breakers/distance
+- extendedWaitUntil:
+    visible: "✓ Around|✓ Samoilla seuduilla|✓ I trakten"
+    timeout: 15000
+- waitForAnimationToEnd
+
+# Everyone takes it off, and going back, she is back as she began.
+- tapOn: "Everyone|Kaikki|Alla"
+- assertVisible: "✓ Everyone|✓ Kaikki|✓ Alla"
+- tapOn: "Back|Takaisin|Tillbaka"
+- extendedWaitUntil:
+    notVisible: "Fine with me|Sopii minulle|Okej för mig"
+    timeout: 15000
+- openLink: kuutti://profile/deal-breakers/distance
+- extendedWaitUntil:
+    visible: "✓ Everyone|✓ Kaikki|✓ Alla"
+    timeout: 15000

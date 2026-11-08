@@ -1,10 +1,12 @@
 import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
+import { DEFAULT_LOCALE } from "@kuutti/i18n";
 import {
   ErrorResponse,
   NoticeParams,
   Notices,
   NotificationChoices,
   NotificationKindParams,
+  PushTokenRequest,
   PutNotificationChoice,
 } from "@kuutti/schema";
 import type { MiddlewareHandler } from "hono";
@@ -12,10 +14,12 @@ import type { Deps } from "../app.ts";
 import { callerOf } from "../lib/auth-middleware.ts";
 import type { AppEnv } from "../lib/env.ts";
 import { choicesOf, noticesOf, readNotice, setChoice } from "./notifications.ts";
+import { registerPushToken } from "./tokens.ts";
 
-// The notification choices and the notices in the app (#176, ADR-032),
-// behind the session guard, each statement naming the caller's account
-// (rule 6). Nothing here sends anything.
+// The notification choices and the notices in the app (#176, ADR-032), and
+// the device's push token (#102, ADR-055 §2), behind the session guard, each
+// statement naming the caller's account (rule 6) but the token's one move,
+// which says why in tokens.ts. Nothing here sends anything.
 
 const errorContent = (description: string) => ({
   description,
@@ -30,7 +34,7 @@ const choicesRoute = createRoute({
   path: "/account/notifications",
   summary: "What the caller may be notified of",
   description:
-    "Every kind (a new round, a message, a match, a moderator's decision), in that order, each on unless the person switched it off. The senders read it when they exist (#102 the message).",
+    "Every kind (a message, a match, a moderator's decision), in that order, each on unless the person switched it off. The push reads it for a message and a match; nothing is sent for a moderator's decision yet.",
   ...bearer,
   responses: {
     200: { description: "Every kind and whether it is on.", ...json(NotificationChoices) },
@@ -60,7 +64,7 @@ const noticesRoute = createRoute({
   path: "/notices",
   summary: "The caller's notices in the app",
   description:
-    "What must reach the person even without a push, newest first, at most 20: a moderator's warning, with its reason, until it is lifted, and an invitation of the person's that counted, with what it earned and never who was invited. A notice holds no text of its own; the app says it.",
+    "What must reach the person even without a push, newest first, at most 20: a moderator's warning, with its reason, until it is lifted; an invitation of the person's that counted, with what it earned and never who was invited; and an announcement to everybody (#573, ADR-068), with its title and body in the request's language, Swedish falling back to English and Stadi reading Finnish. Every other notice holds no text of its own; the app says it.",
   ...bearer,
   responses: {
     200: { description: "The notices.", ...json(Notices) },
@@ -82,11 +86,34 @@ const readNoticeRoute = createRoute({
   },
 });
 
+const pushTokenRoute = createRoute({
+  method: "put",
+  path: "/push-token",
+  summary: "Register this device's push token",
+  description:
+    "The caller's session's Expo push token, which its pushes go to (ADR-055): one per session, replacing the session's earlier one, and taken from any other session it was registered to. The pushes are worded in the request's language. It goes when the session ends. A session revoked meanwhile writes nothing.",
+  ...bearer,
+  request: { body: { required: true, ...json(PushTokenRequest) } },
+  responses: {
+    204: { description: "Registered, or nothing to register for a session that ended." },
+    400: errorContent(
+      "validation_failed: not an Expo push token, an unknown platform, an unknown key.",
+    ),
+    401: unauthenticated,
+  },
+});
+
 export function notificationRoutes(deps: Deps, guard: MiddlewareHandler<AppEnv>) {
   const app = new OpenAPIHono<AppEnv>();
   const now = deps.now ?? (() => new Date());
   // On the routing paths themselves, which app.test.ts holds every guarded route to.
-  for (const route of [choicesRoute, setChoiceRoute, noticesRoute, readNoticeRoute]) {
+  for (const route of [
+    choicesRoute,
+    setChoiceRoute,
+    noticesRoute,
+    readNoticeRoute,
+    pushTokenRoute,
+  ]) {
     app.use(route.getRoutingPath(), guard);
   }
 
@@ -107,13 +134,28 @@ export function notificationRoutes(deps: Deps, guard: MiddlewareHandler<AppEnv>)
 
   app.openapi(noticesRoute, async (c) => {
     const { accountId } = callerOf(c);
-    return c.json(await noticesOf(deps.db, accountId), 200);
+    return c.json(await noticesOf(deps.db, accountId, c.get("locale")), 200);
   });
 
   app.openapi(readNoticeRoute, async (c) => {
     const { accountId } = callerOf(c);
     const { id } = c.req.valid("param");
     await readNotice({ db: deps.db, now }, { accountId, noticeId: id });
+    return c.body(null, 204);
+  });
+
+  app.openapi(pushTokenRoute, async (c) => {
+    const { accountId, sessionId } = callerOf(c);
+    const { token, platform } = c.req.valid("json");
+    await registerPushToken(deps.db, {
+      accountId,
+      sessionId,
+      token,
+      platform,
+      // The language the request was answered in, one this environment serves (#55).
+      locale: c.get("locale") ?? DEFAULT_LOCALE,
+      at: now(),
+    });
     return c.body(null, 204);
   });
 

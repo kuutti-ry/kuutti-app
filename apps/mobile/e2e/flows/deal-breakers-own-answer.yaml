@@ -1,29 +1,93 @@
 # A deal-breaker only on what the person answered themselves (#149, the
 # disclose-to-filter rule): a filter on what one will not say about oneself
-# is the one-sidedness the design document targets. Of the five fields Noa
-# answered only the languages, so the other four ask her to share hers first,
-# and Answer it opens that field's screen. Nothing is saved.
+# is the one-sidedness the design document targets. Of the six fields Noa
+# answered only the languages, so the other five say to share theirs first, and
+# such a row opens the question itself, with no screen between, and comes back
+# (#551, #581). A typed address to one still holds one line and one Answer it,
+# which opens that field's screen. The distance, a seventh row, asks nothing:
+# everybody has a home. Nothing is saved.
 appId: fi.kuutti.app
-name: A deal-breaker is offered only on what the person answered, and Answer it opens the field
+name: A deal-breaker is offered only on what the person answered, and a row that says to share first opens the question
 ---
 - runFlow:
     file: ../common/sign-in.yaml
     env:
       PERSONA: Noa Salmi
-- openLink: kuutti://profile/deal-breakers
+- openLink: kuutti://profile/seek
 - extendedWaitUntil:
-    visible: "Deal-breakers|Ehdottomat rajat|Absoluta gränser"
+    visible: "These work both ways.*|Nämä toimivat molempiin suuntiin.*|De här gäller åt båda håll.*"
     timeout: 15000
-- assertVisible: "(Deal-breaker: Languages|Ehdoton raja: Kielet|Absolut gräns: Språk)(, .*)?"
-- assertNotVisible: "(Deal-breaker: Smoking|Ehdoton raja: Tupakointi|Absolut gräns: Rökning)(, .*)?"
-- assertNotVisible: "(Deal-breaker: Kids|Ehdoton raja: Lapset|Absolut gräns: Barn)(, .*)?"
-- assertVisible: "To filter on this, share yours first\\.|Suodattaaksesi tällä kerro ensin omasi\\.|För att filtrera på det här, dela ditt eget först\\."
-# The second Answer it is the kids', which has a screen of its own among the later fields.
-- tapOn:
-    text: "Answer it|Vastaa|Svara"
-    index: 1
+- waitForAnimationToEnd
+# Under whom, the ages and what one is here for: Smoking in the middle has Kids and the languages in view.
+- scrollUntilVisible:
+    element: "(Smoking|Tupakointi|Rökning)(, .*)?"
+    direction: DOWN
+    centerElement: true
+    timeout: 60000
+- assertVisible: "((Languages|Kielet|Språk), )?(Everyone|Kaikki|Alla)"
+- assertVisible: "((Kids|Lapset|Barn), )?(Share yours first|Kerro ensin omasi|Dela ditt eget först)"
+- assertVisible: "((Smoking|Tupakointi|Rökning), )?(Share yours first|Kerro ensin omasi|Dela ditt eget först)"
+- scrollUntilVisible:
+    element: "(Distance|Etäisyys|Avstånd)(, .*)?"
+    direction: DOWN
+    centerElement: true
+    timeout: 60000
+- assertVisible: "((Distance|Etäisyys|Avstånd), )?(Everyone|Kaikki|Alla)"
+
+# Noa's languages are open: Everyone chosen, and what is fine to choose. The
+# languages are a long list, so chips, which say they are chosen as selected.
+- scrollUntilVisible:
+    element: "(Languages|Kielet|Språk)(, .*)?"
+    direction: UP
+    centerElement: true
+    timeout: 60000
+- tapOn: "(Languages|Kielet|Språk)(, .*)?"
 - extendedWaitUntil:
-    visible: "While you wait|Odotellessasi|Medan du väntar"
+    visible:
+      text: "Everyone|Kaikki|Alla"
+      selected: true
     timeout: 15000
+- waitForAnimationToEnd
+- assertVisible: "Finnish|Suomi|Finska"
+- tapOn: "Back|Takaisin|Tillbaka"
+- extendedWaitUntil:
+    visible: "((Kids|Lapset|Barn), )?(Share yours first|Kerro ensin omasi|Dela ditt eget först)"
+    timeout: 15000
+- waitForAnimationToEnd
+
+# Noa's kids are not: the row opens the question itself, and its arrow comes back
+# with nothing saved, so the row still says Share yours first.
+- scrollUntilVisible:
+    element: "(Kids|Lapset|Barn)(, .*)?"
+    direction: UP
+    centerElement: true
+    timeout: 60000
+- tapOn: "(Kids|Lapset|Barn)(, .*)?"
+- extendedWaitUntil:
+    visible: "When you have a moment|Kun sinulla on hetki|När du har en stund"
+    timeout: 15000
+- waitForAnimationToEnd
 - assertVisible: "Kids|Lapset|Barn"
 - assertVisible: "No kids|Ei lapsia|Inga barn"
+- assertNotVisible: "To filter on this, share yours first\\.|Suodattaaksesi tällä kerro ensin omasi\\.|För att filtrera på det här, dela ditt eget först\\."
+- assertNotVisible: "Fine with me|Sopii minulle|Okej för mig"
+- tapOn: "Back to your deal-breakers|Takaisin ehdottomiin rajoihisi|Tillbaka till dina absoluta gränser"
+- extendedWaitUntil:
+    visible: "((Kids|Lapset|Barn), )?(Share yours first|Kerro ensin omasi|Dela ditt eget först)"
+    timeout: 15000
+- waitForAnimationToEnd
+
+# A typed address has its screen: one line and one way to the answer, nothing to choose.
+- openLink: kuutti://profile/deal-breakers/smoking
+- extendedWaitUntil:
+    visible: "To filter on this, share yours first\\.|Suodattaaksesi tällä kerro ensin omasi\\.|För att filtrera på det här, dela ditt eget först\\."
+    timeout: 15000
+- waitForAnimationToEnd
+- assertNotVisible: "Everyone|Kaikki|Alla"
+- assertNotVisible: "Fine with me|Sopii minulle|Okej för mig"
+- tapOn: "Answer it|Vastaa|Svara"
+- extendedWaitUntil:
+    visible: "When you have a moment|Kun sinulla on hetki|När du har en stund"
+    timeout: 15000
+- assertVisible: "Smoking|Tupakointi|Rökning"
+- assertVisible: "Never|En koskaan|Aldrig"

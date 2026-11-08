@@ -72,7 +72,10 @@ describe("the screen-reader hint", () => {
     const reader = screenReader(true);
     await renderWithTheme(<ScreenReaderHint />);
     await fireEvent.press(await screen.findByRole("button", { name: "Open the setting" }));
-    expect(router.push).toHaveBeenCalledWith("/settings/photo-descriptions");
+    expect(router.push).toHaveBeenCalledWith({
+      pathname: "/settings",
+      params: { open: "photoDescriptions" },
+    });
     await waitFor(() => expect(store.get(SEEN)).toBe("true"));
     // The screen reader switched off and on again this launch: nothing more.
     await reader.change(false);
@@ -124,7 +127,7 @@ describe("the screen-reader hint", () => {
       sessionId: "6f1c1c4e-9a8e-4a0b-9c3a-0c8d1e2f3a4b",
       accessToken: `access${"x".repeat(37)}`,
       accessExpiresAt: "2030-01-01T00:15:00.000Z",
-      refreshToken: `refresh${"x".repeat(36)}`,
+      refreshToken: `${"f".repeat(43)}.refresh${"x".repeat(36)}`,
       refreshExpiresAt: "2030-04-01T00:00:00.000Z",
     });
     await renderWithTheme(<ScreenReaderHint />);

@@ -4,6 +4,7 @@ import { useEffect, useRef } from "react";
 import { ScrollView, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LoadFailed } from "@/components/LoadFailed";
+import { sayAloud } from "@/components/Notice";
 import { ScreenHeader } from "@/components/ScreenHeader";
 import { Button } from "@/components/ui/button";
 import { Text } from "@/components/ui/text";
@@ -19,6 +20,10 @@ import { useProfile } from "../useProfile";
 export const laterPath = (field: ProfileFieldKey) => `/profile/later/${field}` as const;
 export const FIRST_LATER_FIELD = LATER_FIELD_ORDER[0] as ProfileFieldKey;
 
+/** A later screen opened for its one answer: back to where it was opened, not on through the questions (#542). */
+export const laterAnswerPath = (field: ProfileFieldKey) =>
+  ({ pathname: "/profile/later/[field]", params: { field, once: "1" } }) as const;
+
 /**
  * Whether a later screen still asks something: its field is unanswered, or a
  * companion whose answer counts is (other nicotine on the smoking screen; not
@@ -32,6 +37,27 @@ export function screenOpen(fields: Record<string, unknown>, key: ProfileFieldKey
     fields[key] === undefined ||
     (companion !== undefined && countsAsAnswer(companion) && fields[companion] === undefined)
   );
+}
+
+/**
+ * The fields a later screen draws: its own and its companion, or only the half
+ * still open where both count and one is answered (#616): someone who answered
+ * smoking before other nicotine existed is asked other nicotine alone, and took
+ * smoking shown again, already chosen, for a mistake. Read off the stored
+ * document, so that a half answered on the screen stays in view. A screen
+ * opened for its one answer (`once`) draws both, its field being the reason it
+ * was opened, as does the profile's own section.
+ */
+export function laterFieldsShown(
+  saved: Record<string, unknown>,
+  key: ProfileFieldKey,
+  once: boolean,
+): readonly ProfileFieldKey[] {
+  const companion = LATER_COMPANIONS[key];
+  if (companion === undefined) return [key];
+  if (once || !countsAsAnswer(companion)) return [key, companion];
+  const open = [key, companion].filter((field) => saved[field] === undefined);
+  return open.length === 1 ? open : [key, companion];
 }
 
 /** The first later screen after the index that still asks something; none when every one is done. */
@@ -55,13 +81,15 @@ export function laterProgress(fields: Record<string, unknown>): {
 
 /**
  * The optional fields, one per screen, in the field sheet's order (#148,
- * TD-16): asked while the person waits at the gate, each with "Ask me
+ * TD-16): asked after onboarding, each with "Ask me
  * later", which writes nothing, and "Save and continue", which saves the
  * whole document and moves on. The article 9 fields carry no note on their
  * consent: Settings is the one place for it (#239). The last screen leads to
- * the optional e-mail, which is the account's.
+ * the optional e-mail, which is the account's. Opened for one answer (`once`,
+ * from a deal-breaker's row or its "Answer it"), either button and the arrow go
+ * back to the screen that opened it (#542).
  */
-export function LaterFieldScreen({ field }: { field: string }) {
+export function LaterFieldScreen({ field, once = false }: { field: string; once?: boolean }) {
   const { t } = useT();
   const router = useRouter();
   const tap = useHapticTap();
@@ -79,21 +107,29 @@ export function LaterFieldScreen({ field }: { field: string }) {
   const loadedFields = profile.status === "ready" ? profile.draft.fields : null;
   const key = index < 0 ? null : (LATER_FIELD_ORDER[index] as ProfileFieldKey);
   useEffect(() => {
-    if (index !== 0 || !key || !loadedFields || entered.current) return;
+    if (once || index !== 0 || !key || !loadedFields || entered.current) return;
     entered.current = true;
     if (screenOpen(loadedFields, key)) return;
     const next = nextUnanswered(loadedFields, 0);
     if (next) router.replace(laterPath(next));
-  }, [index, key, loadedFields, router]);
+  }, [once, index, key, loadedFields, router]);
   const leaving = useConfirmLeave(profile.status === "ready" && profile.dirty, () => update(saved));
+  // Left while its save was on the way, the screen moves on no more: with
+  // `once`, a second pop would take what opened it.
+  const here = useRef(true);
+  useEffect(() => {
+    here.current = true;
+    return () => {
+      here.current = false;
+    };
+  }, []);
   if (index < 0 || !key) return null;
-  const companion = LATER_COMPANIONS[key];
 
   if (profile.status === "loading") {
     return (
       <SafeAreaView className="flex-1 bg-background">
         <View className="flex-1 items-center justify-center p-6">
-          <Text accessibilityLiveRegion="polite">{t("profile.loading")}</Text>
+          <Text accessibilityLiveRegion="polite">{t("load.loading")}</Text>
         </View>
       </SafeAreaView>
     );
@@ -102,11 +138,7 @@ export function LaterFieldScreen({ field }: { field: string }) {
     return (
       <SafeAreaView className="flex-1 bg-background">
         <View className="flex-1 items-center justify-center gap-4 p-6">
-          <LoadFailed
-            headline={t("profile.failed")}
-            error={profile.error}
-            onRetry={() => void profile.reload()}
-          />
+          <LoadFailed error={profile.error} onRetry={() => void profile.reload()} />
         </View>
       </SafeAreaView>
     );
@@ -115,6 +147,12 @@ export function LaterFieldScreen({ field }: { field: string }) {
   const progress = laterProgress(draft.fields);
   // Onward to the next field without an answer; answered ones are the profile screen's to change.
   const moveOn = () => {
+    if (once) {
+      // Saved or passed over a breath ago, which the leaving must not ask about.
+      leaving.letGo();
+      router.back();
+      return;
+    }
     const next = nextUnanswered(draft.fields, index);
     if (next) router.push(laterPath(next));
     else router.push("/account/email");
@@ -126,8 +164,8 @@ export function LaterFieldScreen({ field }: { field: string }) {
           one is pushed on the last, so a plain back would step back one. */}
       <ScreenHeader
         title={t("profile.later.title")}
-        backLabel={t("profile.later.back")}
-        onBack={() => router.dismissTo("/profile")}
+        backLabel={t(once ? "profile.later.backOnce" : "profile.later.back")}
+        onBack={() => (once ? router.back() : router.dismissTo("/profile"))}
       />
       <ScrollView
         contentContainerClassName="flex-grow gap-6 p-6"
@@ -142,19 +180,21 @@ export function LaterFieldScreen({ field }: { field: string }) {
           <Text>{t("profile.later.explain")}</Text>
         )}
 
-        <FieldEditor field={key} draft={draft} update={update} />
-        {companion && <FieldEditor field={companion} draft={draft} update={update} />}
+        {laterFieldsShown(saved.fields, key, once).map((shown) => (
+          <FieldEditor key={shown} field={shown} draft={draft} update={update} alone />
+        ))}
 
         {profile.notice?.kind === "error" && (
           <Text accessibilityLiveRegion="assertive">{profileErrorText(profile.notice, t)}</Text>
         )}
-        {profile.saving && <Text accessibilityLiveRegion="polite">{t("profile.saving")}</Text>}
         <Button
           disabled={profile.saving}
           onPress={() => {
             tap();
+            // The buttons go read-only for that breath: heard, not drawn (#581).
+            sayAloud(t("profile.saving"));
             void profile.save().then((refusal) => {
-              if (!refusal) moveOn();
+              if (!refusal && here.current) moveOn();
             });
           }}
         >

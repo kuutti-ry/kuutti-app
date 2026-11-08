@@ -1,10 +1,22 @@
-import { fireEvent, screen } from "@testing-library/react-native";
+import { fireEvent, screen, waitFor } from "@testing-library/react-native";
+import * as SecureStore from "expo-secure-store";
 import X from "lucide-react-native/icons/x";
-import { StyleSheet } from "react-native";
-import { renderWithTheme } from "@/test/render";
+import { useContext } from "react";
+import { Text as RNText, StyleSheet } from "react-native";
+import { renderWithTheme, underProviders } from "@/test/render";
 import { Button } from "./button";
 import { Icon } from "./icon";
-import { Text } from "./text";
+import { Text, TextClassContext } from "./text";
+
+// The ink a phone reads from the root view's token set; the test runner has no
+// compiled stylesheet to read it from.
+jest.mock("nativewind", () => ({
+  ...jest.requireActual("nativewind"),
+  useUnstableNativeVariable: (name: string) =>
+    name === "--stroke" ? [222, "40%", "14%"] : undefined,
+}));
+
+const store = (SecureStore as unknown as { __store: Map<string, string> }).__store;
 
 // The button (#12, TD-9): a 44 pt target whatever its size, a role a screen
 // reader announces, plain text that labels itself, and a disabled state that
@@ -31,9 +43,78 @@ describe("Button", () => {
     );
     const button = screen.getByRole("button", { name: "Save" });
     expect(button.props.accessibilityState).toEqual({ disabled: true });
-    expect(button.props.className).toMatch(/\bopacity-50\b/);
     await fireEvent.press(button);
     expect(pressed).not.toHaveBeenCalled();
+  });
+
+  // Drawn, not faded (#467): opacity took the label to about 3:1 in the
+  // high-contrast sets. Every variant, disabled, is the same shape.
+  it.each(["default", "destructive", "outline", "secondary", "ghost"] as const)(
+    "draws the %s variant disabled as a dashed outline with a muted label, never faded",
+    async (variant) => {
+      await renderWithTheme(
+        <Button variant={variant} disabled>
+          Save
+        </Button>,
+      );
+      const classes = screen.getByRole("button", { name: "Save" }).props.className as string;
+      expect(classes).not.toMatch(/opacity-/);
+      expect(classes).toMatch(/(^| )border( |$)/);
+      expect(classes).toMatch(/\bborder-dashed\b/);
+      expect(classes).not.toMatch(/\bborder-solid\b/);
+      expect(classes).toMatch(/\bborder-input\b/);
+      expect(classes).toMatch(/(^| )bg-transparent( |$)/);
+      expect(classes).not.toMatch(/(^| )bg-(primary|destructive|secondary|background)( |$)/);
+      // No pressed fill either, which the web also draws under a hover.
+      expect(classes).toMatch(/\bactive:bg-transparent\b/);
+      expect(classes).not.toMatch(/\bactive:bg-(primary|destructive|secondary|accent)\b/);
+      const label = screen.getByText("Save").props.className as string;
+      expect(label).toMatch(/\btext-muted-foreground\b/);
+      expect(label).not.toMatch(/\btext-(primary|destructive|secondary)-foreground\b/);
+    },
+  );
+
+  // Android keeps a border's dash when its style goes away, so a button enabled
+  // again has to say solid, on the same element (#548).
+  it.each(["default", "destructive", "outline", "secondary", "ghost"] as const)(
+    "says solid when the %s variant is enabled again, so Android drops the dash",
+    async (variant) => {
+      const { rerender } = await renderWithTheme(
+        <Button variant={variant} disabled>
+          Save
+        </Button>,
+      );
+      await rerender(underProviders(<Button variant={variant}>Save</Button>));
+      const classes = screen.getByRole("button", { name: "Save" }).props.className as string;
+      expect(classes).toMatch(/\bborder-solid\b/);
+      expect(classes).not.toMatch(/\bborder-dashed\b/);
+    },
+  );
+
+  it("hands an icon of a disabled button the muted colour too, through the text class", async () => {
+    // Icon takes its colour from TextClassContext, which jest cannot see on the
+    // svg once NativeWind has turned it into style: read the context itself.
+    function Probe() {
+      return <RNText testID="probe">{useContext(TextClassContext)}</RNText>;
+    }
+    await renderWithTheme(
+      <Button variant="outline" size="icon" accessibilityLabel="Fewer" disabled>
+        <Icon as={X} />
+        <Probe />
+      </Button>,
+    );
+    expect(screen.getByTestId("probe").props.children).toMatch(/\btext-muted-foreground\b/);
+    expect(screen.getByRole("button", { name: "Fewer" }).props.className).toMatch(
+      /\bborder-dashed\b/,
+    );
+  });
+
+  it("draws an enabled button solid and in its own colours", async () => {
+    await renderWithTheme(<Button variant="outline">Cancel</Button>);
+    const classes = screen.getByRole("button", { name: "Cancel" }).props.className as string;
+    expect(classes).not.toMatch(/\bborder-dashed\b/);
+    expect(classes).toMatch(/\bbg-background\b/);
+    expect(screen.getByText("Cancel").props.className).toMatch(/(^| )text-foreground( |$)/);
   });
 
   it("takes a caller's role and state, keeping its own disabled flag", async () => {
@@ -57,6 +138,16 @@ describe("Button", () => {
     expect(screen.getByRole("button", { name: "Close" })).toBeTruthy();
   });
 
+  it.each(["destructive", "secondary", "ghost"] as const)(
+    "gives the %s variant the same transparent 1 px border, so disabling it never resizes it (#239, #467)",
+    async (variant) => {
+      await renderWithTheme(<Button variant={variant}>Block</Button>);
+      const classes = screen.getByRole("button", { name: "Block" }).props.className as string;
+      expect(classes).toMatch(/(^| )border( |$)/);
+      expect(classes).toMatch(/\bborder-transparent\b/);
+    },
+  );
+
   it("draws a chosen choice (default) and an unchosen one (outline) the same size: both have a 1 px border (#239)", async () => {
     await renderWithTheme(
       <>
@@ -73,6 +164,16 @@ describe("Button", () => {
     expect(unchosen).toMatch(/(^| )border( |$)/);
   });
 
+  // Saiga Regular, as dark as the system font's Semibold, the weight a phone
+  // gives a button's words (#408).
+  it("draws its words in Saiga Regular on one line at body size", async () => {
+    await renderWithTheme(<Button>Save</Button>);
+    const words = String(screen.getByText("Save").props.className).split(" ");
+    expect(words).toEqual(expect.arrayContaining(["font-sans", "text-control", "font-normal"]));
+    expect(words).not.toContain("font-system");
+    expect(words).not.toContain("font-semibold");
+  });
+
   it.each([
     ["destructive", /text-destructive-foreground/],
     ["outline", /text-foreground/],
@@ -85,5 +186,84 @@ describe("Button", () => {
       </Button>,
     );
     expect(screen.getByText("Label").props.className).toMatch(pattern);
+  });
+});
+
+// Today's look is what a released app draws: no hard shadow, no press offset.
+describe("Button in today's look", () => {
+  it("lies flat and stays put when pressed", async () => {
+    await renderWithTheme(<Button>Send</Button>);
+    const button = () => screen.getByRole("button", { name: "Send" });
+    expect(StyleSheet.flatten(button().props.style).boxShadow).toBeUndefined();
+    await fireEvent(button(), "pressIn");
+    expect(StyleSheet.flatten(button().props.style).transform).toBeUndefined();
+  });
+});
+
+// The designers' try, chosen on the tech screen outside production: a 2 px
+// stroke in the ink, and a hard shadow the button moves into when pressed.
+describe("Button in the neubrutalism try", () => {
+  beforeEach(() => store.set("kuutti.preference.look", "neubrutalism"));
+  afterEach(() => store.delete("kuutti.preference.look"));
+
+  const shown = async (ui: React.ReactElement, name: string) => {
+    await renderWithTheme(ui);
+    const button = () => screen.getByRole("button", { name });
+    await waitFor(() => expect(String(button().props.className).split(" ")).toContain("border-2"));
+    return button;
+  };
+
+  it.each([
+    ["default", "border-stroke"],
+    ["destructive", "border-stroke"],
+    ["outline", "border-stroke"],
+    ["secondary", "border-stroke"],
+    ["ghost", "border-transparent"],
+  ] as const)("gives the %s variant the same 2 px border, here %s", async (variant, colour) => {
+    const button = await shown(<Button variant={variant}>Block</Button>, "Block");
+    const classes = String(button().props.className).split(" ");
+    expect(classes).toContain(colour);
+    expect(classes).not.toContain("border");
+  });
+
+  it("lies on its hard shadow, and pressed moves down into it", async () => {
+    const button = await shown(<Button>Send</Button>, "Send");
+    expect(StyleSheet.flatten(button().props.style)).toMatchObject({
+      boxShadow: "2px 2px 0px 0px hsl(222, 40%, 14%)",
+      minHeight: 44,
+    });
+    await fireEvent(button(), "pressIn");
+    const pressed = StyleSheet.flatten(button().props.style);
+    expect(pressed.boxShadow).toBeUndefined();
+    expect(pressed.transform).toEqual([{ translateX: 2 }, { translateY: 2 }]);
+    await fireEvent(button(), "pressOut");
+    expect(StyleSheet.flatten(button().props.style).boxShadow).toBe(
+      "2px 2px 0px 0px hsl(222, 40%, 14%)",
+    );
+  });
+
+  it("still tells a caller's own press handlers", async () => {
+    const pressIn = jest.fn();
+    const pressOut = jest.fn();
+    const button = await shown(
+      <Button onPressIn={pressIn} onPressOut={pressOut}>
+        Send
+      </Button>,
+      "Send",
+    );
+    await fireEvent(button(), "pressIn");
+    await fireEvent(button(), "pressOut");
+    expect(pressIn).toHaveBeenCalledTimes(1);
+    expect(pressOut).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    ["a ghost button, a row or a link", { variant: "ghost" as const }],
+    ["a disabled button, which lies flat", { disabled: true }],
+  ])("draws no shadow on %s", async (_what, props) => {
+    const button = await shown(<Button {...props}>Later</Button>, "Later");
+    expect(StyleSheet.flatten(button().props.style).boxShadow).toBeUndefined();
+    await fireEvent(button(), "pressIn");
+    expect(StyleSheet.flatten(button().props.style).transform).toBeUndefined();
   });
 });

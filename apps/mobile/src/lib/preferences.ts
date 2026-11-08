@@ -10,7 +10,9 @@ import { Platform } from "react-native";
  * sent anywhere, since whether a person uses a screen reader is theirs
  * alone), the versions of the terms and the privacy summary this phone
  * recorded after a bank login and whether the app's lock was offered here
- * (#418). expo-secure-store is already in the binary, so no storage module
+ * (#418), whether the home screen's offer of notifications was answered
+ * here (#102, ADR-055 §9), which of Settings' rows were left open (#511),
+ * and the style and palette tried on the tech screen outside production. expo-secure-store is already in the binary, so no storage module
  * is added for a few strings; the web preview uses localStorage. Session
  * tokens and the lock itself do not go through here (rules/mobile.md).
  */
@@ -23,7 +25,11 @@ export type PreferenceKey =
   | "photoDescriptionsHintSeen"
   | "decisionButtons"
   | "agreedVersions"
-  | "lockOffered";
+  | "lockOffered"
+  | "pushAsked"
+  | "settingsOpen"
+  | "look"
+  | "palette";
 
 const storageKey = (key: PreferenceKey): string => `kuutti.preference.${key}`;
 

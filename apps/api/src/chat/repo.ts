@@ -36,14 +36,64 @@ const VISIBLE_TO_CALLER = `NOT ${CALLER_BLOCKED}
   AND (c.closed_how IS DISTINCT FROM 'block' OR c.closed_by IS DISTINCT FROM me.side)`;
 
 /**
+ * A shadow ban (`s`) of the account that withholds from the other person of
+ * conversation `c` what the account did under it (ADR-024 §6, #105): one
+ * still open, or one lifted only after the conversation had ended, so a lift
+ * never shows an ended conversation anything new (#470).
+ */
+// shortcut: the lift's time and the close's are each the request's, not the
+// commit's, so an admin's ban and a moderator's lift of the same person within
+// one wait on the sanction lock can be stored in the wrong order; taking the
+// time after `lockAccountForSanction` in the sanctions' writes would close it.
+const withholdingBan = (account: string) => `s.account_id = ${account} AND s.kind = 'shadow_ban'
+    AND (s.lifted_at IS NULL OR s.lifted_at > c.closed_at)`;
+const WITHHOLDING_BAN = withholdingBan("them.account_id");
+
+/** A read mark held to the newest message of conversation `c` from before `began`. */
+const markBefore = (mark: string, began: string) => `least(${mark}, coalesce((
+      SELECT max(pm.seq) FROM message pm
+      WHERE pm.conversation_id = c.id AND pm.created_at < ${began}), 0))`;
+
+/**
  * The messages the caller may read: their own, and the counterpart's except
- * those sent during a shadow ban that is still open (ADR-024 §6, #105),
- * which appear once it is lifted.
+ * those sent during a shadow ban that withholds them, which appear once it
+ * is lifted while the conversation is open.
  */
 const MESSAGE_VISIBLE = `(m.side = me.side OR NOT EXISTS (
   SELECT 1 FROM sanction s
-  WHERE s.account_id = them.account_id AND s.kind = 'shadow_ban'
-    AND s.lifted_at IS NULL AND s.created_at <= m.created_at))`;
+  WHERE ${WITHHOLDING_BAN} AND s.created_at <= m.created_at))`;
+
+/** The newest contact share the caller may see, under the same rule as a message: a shared contact is an answer (the maintainer, 01/11/2026). */
+const LAST_SHARE = `LEFT JOIN LATERAL (
+    SELECT sh.side, sh.shared_at FROM contact_share sh
+    WHERE sh.conversation_id = c.id AND (sh.side = me.side OR NOT EXISTS (
+      SELECT 1 FROM sanction s WHERE ${WITHHOLDING_BAN} AND s.created_at <= sh.shared_at))
+    ORDER BY sh.shared_at DESC LIMIT 1) ls ON true`;
+
+/**
+ * Whether conversation `c` waits on the caller's answer (ADR-062 §5), from what
+ * the caller may see, so a shadow ban shows nothing here: open and not archived,
+ * and the last thing said, a message or a shared contact, came from the other
+ * person. Nothing said yet is both people's turn.
+ */
+const YOUR_TURN = `(c.closed_at IS NULL AND c.archived_at IS NULL AND CASE
+    WHEN lm.created_at IS NULL AND ls.shared_at IS NULL THEN true
+    WHEN ls.shared_at IS NULL OR lm.created_at >= ls.shared_at THEN lm.side <> me.side
+    ELSE ls.side <> me.side END)`;
+
+/**
+ * The counterpart's read mark as the caller sees it. Under a shadow ban that
+ * withholds, it goes no further than the newest message from before the
+ * earliest such ban began, as presence shows nobody online (ADR-031 §9):
+ * a mark moving beside a missing photo and no Online is a pattern only a
+ * shadow ban makes (#470). The mark only rises, so nothing read before the
+ * ban stops showing as read, and the true mark shows at the lift.
+ */
+// shortcut: a line from before the ban that the person reads only after it
+// began still shows as read; the mark as it stood when the ban began, a
+// column written by the ban, would close that.
+const COUNTERPART_READ_UP_TO = `CASE WHEN wb.began IS NULL THEN them.read_up_to
+    ELSE ${markBefore("them.read_up_to", "wb.began")} END`;
 
 const FROM_CALLER = `FROM conversation_participant me
   JOIN conversation c ON c.id = me.conversation_id
@@ -75,6 +125,7 @@ export type ConversationRow = {
     createdAt: Date;
   } | null;
   unread: number;
+  yourTurn: boolean;
 };
 
 type Row = Record<string, unknown>;
@@ -106,13 +157,14 @@ const conversationFrom = (r: Row): ConversationRow => ({
           createdAt: r.last_created_at as Date,
         },
   unread: r.unread as number,
+  yourTurn: r.your_turn === true,
 });
 
 // Nothing is unread in a closed conversation: its marks stand still
 // (`markRead`), so a count there could never be read away.
 const CONVERSATION_COLUMNS = `c.id, c.opened_at, c.last_message_at, c.next_seq, c.archived_at,
   c.closed_at, c.closed_how, me.side, me.read_up_to,
-  them.account_id AS counterpart_id, them.read_up_to AS counterpart_read_up_to,
+  them.account_id AS counterpart_id, ${COUNTERPART_READ_UP_TO} AS counterpart_read_up_to,
   (them.account_id IS NOT NULL AND blocked_between(me.account_id, them.account_id)) AS blocked,
   p.display_name AS counterpart_name, a.birth_year, a.birth_month,
   lm.seq AS last_seq, lm.side AS last_side, lm.kind AS last_kind, lm.body AS last_body,
@@ -120,14 +172,37 @@ const CONVERSATION_COLUMNS = `c.id, c.opened_at, c.last_message_at, c.next_seq, 
   CASE WHEN c.closed_at IS NOT NULL THEN 0 ELSE
     (SELECT count(*)::int FROM message m
      WHERE m.conversation_id = c.id AND m.side <> me.side AND m.seq > me.read_up_to
-       AND ${MESSAGE_VISIBLE}) END AS unread`;
+       AND ${MESSAGE_VISIBLE}) END AS unread,
+  ${YOUR_TURN} AS your_turn`;
 
-const CONVERSATION_JOINS = `LEFT JOIN account a ON a.id = them.account_id
-  LEFT JOIN profile p ON p.account_id = them.account_id
-  LEFT JOIN LATERAL (
+const LAST_MESSAGE = `LEFT JOIN LATERAL (
     SELECT m.seq, m.side, m.kind, m.body, m.created_at FROM message m
     WHERE m.conversation_id = c.id AND ${MESSAGE_VISIBLE}
     ORDER BY m.seq DESC LIMIT 1) lm ON true`;
+
+const CONVERSATION_JOINS = `LEFT JOIN account a ON a.id = them.account_id
+  LEFT JOIN profile p ON p.account_id = them.account_id
+  ${LAST_MESSAGE}
+  ${LAST_SHARE}
+  LEFT JOIN LATERAL (
+    SELECT min(s.created_at) AS began FROM sanction s WHERE ${WITHHOLDING_BAN}) wb ON true`;
+
+/**
+ * How many conversations are on the person's turn (ADR-062 §5), as the list's
+ * own rows read it: what the like path asks before it asks anything of the other
+ * person, so it reads no lock and takes none.
+ */
+export async function countOnTurn(db: Queryable, accountId: string): Promise<number> {
+  const { rows } = await db.query<{ n: number }>(
+    `SELECT count(*)::int AS n
+     ${FROM_CALLER}
+     ${LAST_MESSAGE}
+     ${LAST_SHARE}
+     WHERE me.account_id = $1 AND ${VISIBLE_TO_CALLER} AND ${YOUR_TURN}`,
+    [accountId],
+  );
+  return rows[0]?.n ?? 0;
+}
 
 /** The caller's conversations, newest first by the last message they may see, else by the opening. */
 export async function listConversations(
@@ -525,20 +600,38 @@ export async function detachPhotosOf(db: Queryable, accountId: string): Promise<
 
 /**
  * The erased person's messages that the counterpart never received: sent
- * during a shadow ban still open (ADR-024 §6). The ban goes with the
- * erasure (ADR-024 §8), so they would appear afterwards; they go first.
+ * during a shadow ban that withholds them (ADR-024 §6). The ban goes with
+ * the erasure (ADR-024 §8), so they would appear afterwards; they go first.
  */
 export async function deleteWithheldMessagesOf(db: Queryable, accountId: string): Promise<number> {
   const result = await db.query(
     `DELETE FROM message m
-     USING conversation_participant me
+     USING conversation_participant me, conversation c
      WHERE me.account_id = $1 AND m.conversation_id = me.conversation_id AND m.side = me.side
+       AND c.id = me.conversation_id
        AND EXISTS (SELECT 1 FROM sanction s
-                   WHERE s.account_id = $1 AND s.kind = 'shadow_ban'
-                     AND s.lifted_at IS NULL AND s.created_at <= m.created_at)`,
+                   WHERE ${withholdingBan("$1")} AND s.created_at <= m.created_at)`,
     [accountId],
   );
   return result.rowCount ?? 0;
+}
+
+/**
+ * The erased person's read marks as the counterpart saw them: held where a
+ * shadow ban withheld them (#470). The ban goes with the erasure, so the mark
+ * the person moved under it would show afterwards, under "Deleted user";
+ * it goes back to what was shown, first. Nobody saw it higher.
+ */
+export async function holdWithheldMarksOf(db: Queryable, accountId: string): Promise<void> {
+  await db.query(
+    `UPDATE conversation_participant me
+     SET read_up_to = ${markBefore("me.read_up_to", "wb.began")}
+     FROM conversation c,
+          LATERAL (SELECT min(s.created_at) AS began FROM sanction s
+                   WHERE ${withholdingBan("$1")}) wb
+     WHERE me.account_id = $1 AND c.id = me.conversation_id AND wb.began IS NOT NULL`,
+    [accountId],
+  );
 }
 
 /** Cuts the person's link to their conversations (TD-7): the rows stay for the counterpart. The conversations it was cut from. */
@@ -822,7 +915,7 @@ export async function copyConversation(
   return result.rowCount ?? 0;
 }
 
-// The socket's fan-out (#349, ADR-031 §5). A notification names a
+// The socket's fan-out (#349, ADR-031 §9). A notification names a
 // conversation, a session or a block, never a person's text; the listener
 // finds whom it concerns with the two routing reads below, and then reads
 // what each of them may see through their own participant row (rule 6), with
@@ -845,7 +938,7 @@ export async function participantsOf(
  * The blocker's side of each conversation between the accounts of two
  * identities: whom a block between them turns the conversation gone for.
  * The blocked side is told by the close's own notification, never by the
- * block's (ADR-030 §6, migration 0063). The listener reads this after the
+ * block's (ADR-030 §6). The listener reads this after the
  * commit, and the blocked person's erasure may have cut their link by then:
  * a conversation of the blocker's whose other side is unlinked and whose
  * close is the blocker's own block counts too, so the blocker's phones still
@@ -942,7 +1035,7 @@ export async function listContacts(db: Queryable, accountId: string): Promise<Co
 
 /**
  * Keeps the caller's piece of that kind, the one stored before replaced
- * (migration 0059 announces a shared one's change). `updated_at` is when the
+ * (the `contact_notify` trigger announces a shared one's change). `updated_at` is when the
  * value last changed: the same value kept again leaves it, so it changes
  * nothing that SHARE_VISIBLE reads under a shadow ban.
  */

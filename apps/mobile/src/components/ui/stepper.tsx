@@ -1,24 +1,27 @@
 import Minus from "lucide-react-native/icons/minus";
 import Plus from "lucide-react-native/icons/plus";
-import { View } from "react-native";
+import { useEffect, useRef } from "react";
+import { AccessibilityInfo, Platform, View } from "react-native";
 import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
 import { Text } from "@/components/ui/text";
-import { cn } from "@/lib/utils";
 import { useHapticTap } from "@/theme/haptics";
 
 /**
- * A number between a minus and a plus: every answer a button (ADR-010 §9),
- * each with its own spoken label, the number announced as it changes. The
- * age window of onboarding and the height of the profile (#146, #148).
+ * A number between a minus and a plus, which stand well clear of it (the
+ * maintainer, 04/11/2026): every answer a button (ADR-010 §9), each with its
+ * own spoken label, the number announced as it changes: from its live region,
+ * and aloud on iOS, which has none, queued behind the button's own name (#542).
+ * The age window of onboarding and of What you seek, and the height of the
+ * profile (#146, #148).
  * The label is left out where the field above already names the number: the
  * height said "Height" twice (#238).
  * It takes no flex of its own: as `flex-1` in a column it could shrink to
- * nothing while its buttons still drew over the hint below (#238), so a row
- * that shares out its width passes `flex-1` itself.
+ * nothing while its buttons still drew over the hint below (#238). It takes the
+ * width of a line, with what it shows wrapping before its buttons do, so two
+ * stand one above the other, never side by side: there they overflow a small phone.
  */
 export function Stepper({
-  className,
   label,
   value,
   shown,
@@ -28,7 +31,6 @@ export function Stepper({
   canUp,
   onChange,
 }: {
-  className?: string;
   label?: string;
   value: number;
   /** The number as text, with its unit where it has one. */
@@ -40,10 +42,19 @@ export function Stepper({
   onChange: (next: number) => void;
 }) {
   const tap = useHapticTap();
+  // Said when it changes, not when the screen opens.
+  const before = useRef(shown);
+  useEffect(() => {
+    if (before.current === shown) return;
+    before.current = shown;
+    if (Platform.OS === "ios") {
+      AccessibilityInfo.announceForAccessibilityWithOptions(shown, { queue: true });
+    }
+  }, [shown]);
   return (
-    <View className={cn("items-center gap-1", className)}>
+    <View className="items-center gap-1">
       {label !== undefined && <Text variant="small">{label}</Text>}
-      <View className="flex-row items-center gap-2">
+      <View className="flex-row items-center gap-6">
         <Button
           variant="outline"
           size="icon"
@@ -56,7 +67,13 @@ export function Stepper({
         >
           <Icon as={Minus} />
         </Button>
-        <Text variant="h2" accessibilityLiveRegion="polite">
+        {/* A value, not a heading: drawn as one and heard as what it is. */}
+        <Text
+          variant="h2"
+          role="none"
+          className="shrink text-center"
+          accessibilityLiveRegion="polite"
+        >
           {shown}
         </Text>
         <Button

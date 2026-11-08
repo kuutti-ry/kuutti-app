@@ -36,6 +36,16 @@ output "distribution_domain_name" {
   value = aws_cloudfront_distribution.this.domain_name
 }
 
+output "distribution_hosted_zone_id" {
+  description = "With distribution_domain_name, the target of the extra aliases' records in the environment's dns.tf."
+  value       = aws_cloudfront_distribution.this.hosted_zone_id
+}
+
 output "certificate_arn" {
   value = aws_acm_certificate_validation.api.certificate_arn
+}
+
+output "edge_web_acl_metric_name" {
+  description = "The web ACL's metric name in AWS/WAFV2, us-east-1, for the edge's alarm (modules/observability, ADR-067 §6)."
+  value       = local.edge_metric_name
 }

@@ -11,7 +11,7 @@ const tokens = (n: number, accessExpiresInMs: number): SessionTokens => ({
   sessionId: "6f1c1c4e-9a8e-4a0b-9c3a-0c8d1e2f3a4b",
   accessToken: token(`access${n}`),
   accessExpiresAt: new Date(BASE + accessExpiresInMs).toISOString(),
-  refreshToken: token(`refresh${n}`),
+  refreshToken: `${token("family")}.${token(`refresh${n}`)}`,
   refreshExpiresAt: new Date(BASE + 90 * 24 * 3600 * 1000).toISOString(),
 });
 const health = {

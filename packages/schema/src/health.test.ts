@@ -33,4 +33,26 @@ describe("HealthResponse", () => {
   it("rejects an unknown status", () => {
     expect(HealthResponse.safeParse({ ...base, status: "fine" }).success).toBe(false);
   });
+
+  // #198, ADR-066: optional, so an app or panel built before the two fields
+  // reads a newer API's answer, and one built after reads an older API's.
+  it("reads an answer with or without the proxy mode and the origin proof", () => {
+    expect(HealthResponse.safeParse(base).success).toBe(true);
+    const parsed = HealthResponse.parse({
+      ...base,
+      trustedProxy: "cloudfront",
+      originProof: "valid",
+    });
+    expect(parsed.trustedProxy).toBe("cloudfront");
+    expect(parsed.originProof).toBe("valid");
+    for (const originProof of ["valid", "missing", "wrong", "unset"]) {
+      expect(HealthResponse.safeParse({ ...base, originProof }).success).toBe(true);
+    }
+  });
+
+  it("refuses a proxy mode or a proof it does not know", () => {
+    expect(HealthResponse.safeParse({ ...base, trustedProxy: "nginx" }).success).toBe(false);
+    expect(HealthResponse.safeParse({ ...base, originProof: "maybe" }).success).toBe(false);
+    expect(HealthResponse.safeParse({ ...base, originProof: true }).success).toBe(false);
+  });
 });

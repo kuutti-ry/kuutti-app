@@ -15,11 +15,11 @@ autoInstallPeers: false
 # react-native and typescript; everything else follows those.
 catalog:
   typescript: ~6.0.3
-  vitest: ^5.0.3
+  vitest: ^5.0.5
   # Its peer is the exact vitest version: the two move together.
-  "@vitest/coverage-v8": ^5.0.3
-  react: 19.3.0
-  react-dom: 19.3.0
+  "@vitest/coverage-v8": ^5.0.5
+  react: 19.3.1
+  react-dom: 19.3.1
   "@types/react": ~19.3.0
   "@types/react-dom": ~19.3.0
 
@@ -37,6 +37,10 @@ allowBuilds:
 
 # Supply chain: a version must be at least one day old before pnpm installs it
 # (pnpm's default, stated explicitly). Exclusions are a decision, not a convenience.
+# Stating it also makes it strict since pnpm 12.3: with no version old enough, a
+# refusal rather than a fallback. On 12.3.2 to 12.4.1 strict refused Dependabot's
+# `update --no-save` outright, so no security update could open (#586,
+# dependabot/dependabot-core#16375): packageManager stays past them.
 minimumReleaseAge: 1440
 
 # Patched transitive versions the audit gate requires. The first three and joi
@@ -52,13 +56,48 @@ overrides:
   "brace-expansion@1": ">=1.1.20 <2"
   "brace-expansion@2": ">=2.1.6 <3"
   "brace-expansion@5": ">=5.0.11 <6"
-  "joi@17": ">=17.13.7 <18"
+  "joi@17": ">=17.13.9 <18"
+  # node-forge under the Expo tooling's code signing and eas-cli, and joi
+  # above: GHSA-7wch-p9px-956x, GHSA-jc66-7q78-782g, GHSA-8hrf-8g6f-7xwp,
+  # GHSA-hqq3-7jhf-c5jx and GHSA-5x38-2vff-x55p, and for joi GHSA-4528-x5fx-h6hg,
+  # failing the audit gate since 2026-10-31 (#541). Both are patched within
+  # their major. 1.4.1 also fixes GHSA-86w9-cpqp-85rv (CVE-2026-85393), which
+  # auditConfig below set aside until a patched version existed.
+  "node-forge@1": ">=1.4.1 <2"
   # shell-quote under react-devtools-core (react-native's developer tooling)
   # and source-map-js under postcss (vite: the admin panel's build and the
   # tests): GHSA-pqg4-j6r4-53mv and GHSA-68fv-2mgg-jv7q, failing the audit
   # gate since 2026-10-07. Both are patched within their major.
   "shell-quote@1": ">=1.11.0 <2"
   "source-map-js@1": ">=1.2.2 <2"
+  # undici under @sentry/cli (Sentry's upload tool, run at build time) and
+  # under jsdom (the tests' DOM): GHSA-xjj6-f33q-929c, failing the audit gate
+  # since 2026-10-24. Both majors are patched within themselves.
+  "undici@6": ">=6.29.1 <7"
+  "undici@8": ">=8.12.2 <9"
+  # zod 4 under the Telia kit (which runs in the API), knip and eas-cli's
+  # packages, whose ranges already take 4.6.7: no copy of zod 4 stays below
+  # GHSA-mrhx-c7xc-m3w5's fix (our own ask for ^4.6.7).
+  "zod@4": ">=4.6.7 <5"
+  # uuid 7 under xcode (the Expo config plugins, at prebuild) and uuid 8 under
+  # eas-cli's analytics and logger: GHSA-w5hq-g745-h8pq, moderate, so below the
+  # audit gate but on Dependabot's page (#586). Unlike the entries above these
+  # cross a major: neither has a fixed release. Each caller takes v1 or v4 from
+  # require('uuid'), which 11 still exports. Remove them when those packages ask
+  # for 11.1.1 or later.
+  "uuid@7": ">=11.1.1 <12"
+  "uuid@8": ">=11.1.1 <12"
+  # zod 3 under @expo/cli, GHSA-mrhx-c7xc-m3w5 again (#586), and across a major
+  # for the same reason: zod 3 has no fixed release. The CLI's one use of it is
+  # the schemas of its DevTools plugins, and zod 4 has everything they call
+  # (apps/mobile/plugins/expo-cli-zod.test.js). Remove this when @expo/cli stops
+  # asking for zod 3, which SDK 58's does.
+  "zod@3": ">=4.6.7 <5"
+  # Not installed at all. drizzle-kit lists @esbuild-kit/esm-loader and none of
+  # its files import it. Its core-utils, deprecated upstream, pinned ~0.18.20, the
+  # one copy of esbuild below GHSA-67mh-4wv8-2f99's fix (#586). Remove this when
+  # drizzle-kit drops the dependency.
+  "drizzle-kit>@esbuild-kit/esm-loader": "-"
   # Not installed at all. @sentry/node 11 lists its bundler plugins as a
   # dependency for the entry points ./vite, ./rollup, ./webpack and ./esbuild,
   # which the API does not import, and they bring Sentry's command-line tool
@@ -69,30 +108,29 @@ overrides:
   # Remove this when the plugins are an optional peer.
   "@sentry/node>@sentry/bundler-plugins": "-"
 
-# pnpm audit: two advisories set aside, each with its reason. Neither has a
-# patched version, and neither package is in the API's image or the app's
-# bundle. Remove an entry when a patched version exists or the package is gone
-# from the tree. Every other advisory still fails the job.
+# pnpm audit: one advisory set aside, with its reason: it ships in the app and is
+# patched in place, which the audit cannot see. Every other high or critical
+# advisory still fails the job.
 #
-# GHSA-86w9-cpqp-85rv (node-forge <= 1.4.0): a forged RSA PKCS#1 v1.5 signature
-# is accepted for keys with a low exponent. node-forge is asked for by
-# @expo/code-signing-certificates, @expo/pkcs12 and eas-cli only: tooling on a
-# developer's machine and in CI, which checks certificates and signatures it
-# made itself. The app verifies an update's signature with the platform's own
-# cryptography, not with this package.
-#
-# GHSA-vfj7-8cjw-p6xm (braces <= 3.0.3): a deeply nested brace pattern
-# exhausts the stack. braces is asked for by micromatch only, under fast-glob,
-# jest, Metro's file map and tailwindcss: build and test tools that expand the
-# patterns of our own configuration, never a pattern somebody sends us.
+# GHSA-qr28-fpjm-wq7f (decode-uri-component <= 0.5.0): a string of many distinct
+# percent-encoded runs takes quadratic time to decode. 0.2.2 ships in the app's
+# bundle under query-string 7, which asks for ^0.2.2: expo-router builds paths
+# with it, and the React Navigation getStateFromPath it bundles would parse a
+# link's query with it, but expo-router passes its own, which reads the query
+# with URL. No link reaches the decoder today; the patch (below) keeps it safe
+# if one comes to. The one fixed release, 0.5.1, is an ES module: query-string
+# 7's require() would get its namespace, not the function it calls. The audit
+# reads the version alone and still counts it;
+# apps/mobile/src/decode-uri-component.test.ts holds the installed copy to the
+# fix. Remove this, and the patch, when query-string under expo-router asks for
+# 0.5.1 or later.
 auditConfig:
   ignoreGhsas:
-    - GHSA-86w9-cpqp-85rv
-    - GHSA-vfj7-8cjw-p6xm
+    - GHSA-qr28-fpjm-wq7f
 
 # Fixes taken from a newer release onto the version Expo's SDK pins, each with
-# its reason. Remove an entry once the pinned version carries the fix (pnpm
-# refuses to install while a patch goes unused).
+# its reason. Remove an entry once the pinned version carries the fix, or as its
+# own note says (pnpm refuses to install while a patch goes unused).
 #
 # react-native-screens: on Android a cold start or a reload registers the
 # screen-removal listener from two threads at once, and 4.26.2 makes it lazily
@@ -100,7 +138,29 @@ auditConfig:
 # MountingCoordinator::pullTransaction at the first render (#360). The patch is
 # 4.28.0's code (software-mansion/react-native-screens#4413) on 4.26.2; Expo
 # SDK 57 pins ~4.26. Patching the package moves the dev client's fingerprint.
+#
+# decode-uri-component: 0.5.1's decoder, one linear pass over the input, on
+# 0.2.2's own entry point (which, unlike 0.5.1, still reads `+` as a space), for
+# GHSA-qr28-fpjm-wq7f above; query-string 7 under expo-router pins ^0.2.2. It
+# answers every case of 0.2.2's own tests as 0.2.2 does, and every case of
+# 0.5.1's as 0.5.1 does, `+` aside. On four of those 0.2.2 itself was wrong:
+# three decode its own output again (%25C2%zz gives %C2%zz, where 0.2.2 gave
+# �%zz), and in %41%FE%FF its BOM rule replaced inside the run first, leaving
+# %41 undecoded. JavaScript only: the fingerprint does not move.
+#
+# expo-image: on Android Glide decodes blurhashes on several threads, and
+# BlurhashDecoder shares cosine tables between them that it fills while it reads
+# them. A decode that starts meanwhile reads the rows not yet filled as zeros and
+# paints them black, and Glide keeps that bitmap on disk under the blurhash, so
+# the band comes back on later launches (#547). The patch makes the decoder take
+# one bitmap at a time. An Android build takes expo-image from its prebuilt
+# library unless told otherwise, so apps/mobile/package.json's buildFromSource
+# goes with this entry. No release carries a fix yet: remove both, and
+# apps/mobile/src/expo-image.test.ts with them, once one does. It moves Android's
+# fingerprint, not the iPhone's, and it does not mend what a phone has stored.
 patchedDependencies:
+  decode-uri-component@0.2.2: patches/decode-uri-component@0.2.2.patch
+  expo-image@57.0.5: patches/expo-image@57.0.5.patch
   react-native-screens@4.26.2: patches/react-native-screens@4.26.2.patch
 
 # The kit's first release, approved at the prompt on 2026-10-23, the day it

@@ -6,8 +6,9 @@ import { readersOf, withoutComments } from "../test/sources.ts";
 // and being blocked is not counted against anybody, since being blocked is
 // too often only being unwanted. A report feeds moderation and nothing else,
 // and so does a conversation's frozen copy (`report_message`, #351, ADR-030
-// §12), which holds both people's words. So the statements that name any of
-// the three tables, or the database's block test, are in the files listed
+// §12), which holds both people's words. A star is its owner's and nobody else's
+// (#575, ADR-064 §8). So the statements that name any of
+// the four tables, or the database's block test, are in the files listed
 // here and nowhere else in the apps or the database package; a new reader is
 // a decision, made here in review. Tests and
 // comments are not read; SQL across lines, the schema-qualified name and
@@ -34,6 +35,7 @@ const readsReport = (source: string) => names(source, "report");
 const readsMessage = (source: string) => names(source, "message");
 const readsReportCopy = (source: string) =>
   names(source, "report_message") || names(source, "reportMessage");
+const readsStar = (source: string) => names(source, "star");
 
 describe("the guard's own reading", () => {
   it.each([
@@ -79,8 +81,8 @@ describe("blocks and reports", () => {
     expect(readersOf(readsBlock)).toEqual([
       // The conversation: a block ends it for both, and its blocker never sees it again (ADR-030 §2, ADR-031 §2).
       "apps/api/src/chat/repo.ts",
-      // The gate's count: who is in whose pool (ADR-015 §1).
-      "apps/api/src/jobs/pond-gate.ts",
+      // Who is complete, and what their pools ask (ADR-060 §5).
+      "apps/api/src/jobs/pool.ts",
       // Today's round: seen and the decision ask at the write (ADR-030 §2, ADR-034).
       "apps/api/src/matching/rounds.ts",
       // The photos a card showed (ADR-008 §3).
@@ -109,6 +111,23 @@ describe("blocks and reports", () => {
       "apps/api/src/chat/repo.ts",
       // The demo's stories write their conversations' lines.
       "packages/db/src/seed/conversations.ts",
+    ]);
+  });
+
+  // Used for anybody's order, the inbox stop, exposure or an event, a star would be
+  // a desirability signal, which is never built (#575, ADR-064 §8).
+  it("a star is read by its owner's list and queue alone", () => {
+    expect(readersOf(readsStar)).toEqual([
+      // Whom the person's own queue leaves out as ordinary cards.
+      "apps/api/src/jobs/round-builder.ts",
+      // The person's own list.
+      "apps/api/src/jobs/stars.ts",
+      // The person's own card says it, leaves their queue, and a like or a pass takes it off.
+      "apps/api/src/matching/rounds.ts",
+      // Putting, clearing and opening one, its erasure and the person's own export.
+      "apps/api/src/matching/stars.ts",
+      // The demo's reset and the synthetic population's removal.
+      "packages/db/src/seed/write-population.ts",
     ]);
   });
 

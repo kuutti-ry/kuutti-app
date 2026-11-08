@@ -56,7 +56,7 @@ beforeEach(() => {
   state.built.length = 0;
   state.sent.length = 0;
   state.parse = {
-    model: "claude-opus-5",
+    model: "claude-opus-5-5",
     stop_reason: "end_turn",
     stop_details: null,
     usage,

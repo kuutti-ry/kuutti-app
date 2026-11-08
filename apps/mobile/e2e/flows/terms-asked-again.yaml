@@ -7,7 +7,7 @@
 # accepting it leads home. On a fresh phone bank-login.yaml accepts them before
 # the bank, they land right after the exchange, and no welcome step comes.
 # CI takes the first way: an earlier flow of the same job has signed in on its
-# phone. Research is asked before the bank, never after it, so home follows.
+# phone. Research is not asked (#545), so home follows.
 # Her profile is finished (four approved photos, two prompts), so home does
 # not say it lacks anything. One run per `pnpm demo:reset`: afterwards she has
 # accepted the current wording.
@@ -19,7 +19,7 @@ name: A person who accepted an older wording of the terms is asked for the curre
     env:
       PERSONA: Kerttu Åkerlund
 - extendedWaitUntil:
-    visible: "How we do things here|Näin täällä toimitaan|Så här gör vi här|Your area|Alueesi|Ditt område"
+    visible: "How we do things here|Näin täällä toimitaan|Så här gör vi här|Your profile|Profiilisi|Din profil"
     timeout: 15000
 # The welcome step, on a phone that remembered: asked as `notVisible`, in half
 # a second, and accepted behind a flag the condition clears (README).
@@ -33,8 +33,10 @@ name: A person who accepted an older wording of the terms is asked for the curre
     when:
       true: ${output.welcomeStep}
     commands:
-      # Under onboarding's title, with no step line: nothing else is asked.
-      - assertVisible: "Welcome to Kuutti|Tervetuloa Kuuttiin|Välkommen till Kuutti"
+      # The norms under their one heading, which greets nobody months in (#581),
+      # with no step line: nothing else is asked.
+      - assertVisible: "No contact details before a match\\.|Ei yhteystietoja ennen matchia\\.|Inga kontaktuppgifter före en match\\."
+      - assertNotVisible: "Welcome to Kuutti|Tervetuloa Kuuttiin|Välkommen till Kuutti"
       - assertNotVisible: "Step \\d+ of \\d+|Vaihe \\d+ / \\d+|Steg \\d+ av \\d+"
       - scrollUntilVisible:
           element: "I'm in, and I accept both|Olen mukana ja hyväksyn molemmat|Jag är med och godkänner båda"
@@ -44,8 +46,8 @@ name: A person who accepted an older wording of the terms is asked for the curre
       - tapOn: "I'm in, and I accept both|Olen mukana ja hyväksyn molemmat|Jag är med och godkänner båda"
 
 # Home either way, nothing else asked: the name, the gender, whom she seeks
-# and the rest stand, and research is no step of onboarding.
+# and the rest stand.
 - extendedWaitUntil:
-    visible: "Your area|Alueesi|Ditt område"
+    visible: "Your profile|Profiilisi|Din profil"
     timeout: 15000
 - assertNotVisible: "Matching opens for finished profiles\\. Yours still lacks something\\.|Seuranhaku avautuu valmiille profiileille\\. Sinun profiilistasi puuttuu vielä jotakin\\.|Matchningen öppnar för färdiga profiler\\. I din saknas ännu något\\."

@@ -8,8 +8,6 @@ import {
   INVITATION_CODE_INPUT_MAX,
   INVITATION_CODE_LENGTH,
   INVITATION_CODE_PATTERN,
-  INVITATION_REWARD_FISH_MAX,
-  INVITATION_REWARD_LIKES_MAX,
   INVITATIONS_OPEN_CAP,
   InvitationCreated,
   InvitationParams,
@@ -130,31 +128,52 @@ describe("a typed code", () => {
 });
 
 describe("the reward of matching_config", () => {
-  it("is one fish and no likes by default, and either kind may be switched off", () => {
-    expect(InvitationReward.parse({ fish: 1, likes: 0 })).toEqual({ fish: 1, likes: 0 });
-    expect(InvitationReward.parse({ fish: 0, likes: 0 })).toEqual({ fish: 0, likes: 0 });
-    expect(
-      InvitationReward.parse({
-        fish: INVITATION_REWARD_FISH_MAX,
-        likes: INVITATION_REWARD_LIKES_MAX,
-      }),
-    ).toEqual({ fish: 10, likes: 50 });
+  it.each([
+    ["one fish each, the default", { inviterFish: 1, friendFish: 1 }],
+    ["nothing for either", { inviterFish: 0, friendFish: 0 }],
+    ["the inviter's side switched off", { inviterFish: 0, friendFish: 1 }],
+    ["the friend's side switched off", { inviterFish: 1, friendFish: 0 }],
+    ["ten on each side, the ceiling", { inviterFish: 10, friendFish: 10 }],
+  ])("takes %s", (_case, value) => {
+    expect(InvitationReward.parse(value)).toEqual(value);
   });
 
   it.each([
-    ["more fish than the ceiling", { fish: 11, likes: 0 }, "too_big"],
-    ["more likes than the ceiling", { fish: 0, likes: 51 }, "too_big"],
-    ["a negative amount", { fish: -1, likes: 0 }, "too_small"],
-    ["a fraction", { fish: 1, likes: 0.5 }, "invalid_type"],
-    ["an amount as a string", { fish: "1", likes: 0 }, "invalid_type"],
-    ["a kind left out", { fish: 1 }, "invalid_type"],
-    ["a kind it does not know", { fish: 1, likes: 0, boosts: 1 }, "unrecognized_keys"],
+    ["the inviter past the ceiling", { inviterFish: 11, friendFish: 0 }, "too_big"],
+    ["the friend past the ceiling", { inviterFish: 0, friendFish: 11 }, "too_big"],
+    ["a negative for the inviter", { inviterFish: -1, friendFish: 0 }, "too_small"],
+    ["a negative for the friend", { inviterFish: 0, friendFish: -1 }, "too_small"],
+    ["a fraction for the inviter", { inviterFish: 1.5, friendFish: 0 }, "invalid_type"],
+    ["a fraction for the friend", { inviterFish: 0, friendFish: 1.5 }, "invalid_type"],
+    ["an amount as a string", { inviterFish: "1", friendFish: 0 }, "invalid_type"],
+    ["an amount of null", { inviterFish: null, friendFish: 0 }, "invalid_type"],
+    ["the inviter left out", { friendFish: 1 }, "invalid_type"],
+    ["the friend left out", { inviterFish: 1 }, "invalid_type"],
+    ["a key it does not know", { inviterFish: 1, friendFish: 1, boosts: 1 }, "unrecognized_keys"],
+    ["likes beside the fish", { inviterFish: 1, friendFish: 1, likes: 0 }, "unrecognized_keys"],
   ])("refuses %s", (_case, value, code) => {
     expect(codes(InvitationReward, value)).toEqual([code]);
   });
 
-  it("names its units like or fish", () => {
-    expect(RewardKind.options).toEqual(["like", "fish"]);
+  it.each([
+    ["nothing", undefined],
+    ["a number", 1],
+    ["a list", [1, 1]],
+  ])("refuses %s for the whole", (_case, value) => {
+    expect(codes(InvitationReward, value)).toEqual(["invalid_type"]);
+  });
+
+  it("refuses the shape of fish and likes, from when an invitation earned likes (#503)", () => {
+    expect(codes(InvitationReward, { fish: 1, likes: 0 })).toEqual([
+      "invalid_type",
+      "invalid_type",
+      "unrecognized_keys",
+    ]);
+  });
+
+  it("names its units fish, and a like is no unit any more", () => {
+    expect(RewardKind.options).toEqual(["fish"]);
+    expect(codes(RewardKind, "like")).toEqual(["invalid_value"]);
   });
 });
 
@@ -162,16 +181,22 @@ describe("what the app is told", () => {
   const invitations = {
     canInvite: true,
     redeemable: false,
-    reward: { fish: 1, likes: 0 },
+    reward: { inviterFish: 1, friendFish: 1 },
     open: [{ id: uuid(1), createdAt: at }],
     counted: 2,
-    earned: { fish: 2, likes: 0 },
+    earned: { fish: 2 },
   };
 
   it("is whether the person may invite and redeem, the reward, the open ones, how many counted and what is left", () => {
     expect(Invitations.parse(invitations)).toEqual(invitations);
     // Earned units have no ceiling: they bank.
-    expect(RewardUnits.parse({ fish: 40, likes: 500 })).toEqual({ fish: 40, likes: 500 });
+    expect(RewardUnits.parse({ fish: 500 })).toEqual({ fish: 500 });
+    expect(RewardUnits.parse({ fish: 0 })).toEqual({ fish: 0 });
+  });
+
+  it("counts fish alone: a count of likes an older answer held is not read", () => {
+    expect(RewardUnits.parse({ fish: 1, likes: 2 })).toEqual({ fish: 1 });
+    expect(codes(RewardUnits, { likes: 2 })).toEqual(["invalid_type"]);
   });
 
   it.each([
@@ -181,9 +206,11 @@ describe("what the app is told", () => {
       "too_big",
     ],
     ["a negative count", { counted: -1 }, "too_small"],
-    ["a negative unit left", { earned: { fish: -1, likes: 0 } }, "too_small"],
-    ["a fractional unit left", { earned: { fish: 1.5, likes: 0 } }, "invalid_type"],
-    ["a reward past its ceiling", { reward: { fish: 11, likes: 0 } }, "too_big"],
+    ["a negative unit left", { earned: { fish: -1 } }, "too_small"],
+    ["a fractional unit left", { earned: { fish: 1.5 } }, "invalid_type"],
+    ["no count of units left", { earned: {} }, "invalid_type"],
+    ["a reward past its ceiling", { reward: { inviterFish: 1, friendFish: 11 } }, "too_big"],
+    ["a reward with a side left out", { reward: { inviterFish: 1 } }, "invalid_type"],
     ["an open invitation without its id", { open: [{ createdAt: at }] }, "invalid_type"],
     [
       "a date that is not ISO 8601",
@@ -224,7 +251,7 @@ describe("the export", () => {
     used: { redeemedAt: at, countedAt: null },
     rewards: [
       { kind: "fish", earnedAt: at, spentAt: at },
-      { kind: "like", earnedAt: at, spentAt: null },
+      { kind: "fish", earnedAt: at, spentAt: null },
     ],
   };
 
@@ -254,6 +281,11 @@ describe("the export", () => {
     [
       "a unit of another kind",
       { rewards: [{ kind: "boost", earnedAt: at, spentAt: null }] },
+      "invalid_value",
+    ],
+    [
+      "a like, which no unit is any more",
+      { rewards: [{ kind: "like", earnedAt: at, spentAt: null }] },
       "invalid_value",
     ],
     ["an invitation used without when", { used: { countedAt: null } }, "invalid_type"],

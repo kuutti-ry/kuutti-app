@@ -9,8 +9,8 @@ import { wasShown } from "../media/index.ts";
  * is shown to a person (rule 7), and their conversations are over. The row is
  * between the two identities, so it holds for a later account of either, and
  * it is final: no list, no unblock. Nobody is told, and nothing counts
- * blocks: the filters read them (`inEachOthersPool`, `blocked_between` of
- * migration 0051) and nothing else does (no-signal.test.ts).
+ * blocks: the filters read them (`inEachOthersPool`, `blocked_between`) and
+ * nothing else does (no-signal.test.ts).
  */
 
 /**

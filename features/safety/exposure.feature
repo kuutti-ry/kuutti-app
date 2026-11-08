@@ -4,10 +4,14 @@ Feature: Exposure is budgeted and counted
   of a profile photo is a fetch-log row; the day's fetches of a variant are
   counted against matching_config.photo_fetches_per_day in the statement that
   writes the row, and another account's photo is served only from a card the
-  account was shown. A photo sent in a conversation is logged with the
+  account was shown, and never in the full size, which the app asks for only
+  of one's own (ADR-056). A photo sent in a conversation is logged with the
   purpose message and never counted (ADR-031 §10, ADR-008). A refusal is said
   in plain words and counted; nobody is limited in silence. The day is the
-  calendar day in Finland (#52, ADR-008).
+  calendar day in Finland (#52, ADR-008). A ceiling of 0 is off, as a threshold
+  of 0 is: there is none on cards or on card-size photos, and what stands is the
+  alarms of features/safety/velocity.feature (ADR-062 §9), so the records go on
+  being written.
 
   Scenario Outline: The photo fetch budget of a day
     Given matching_config allows <limit> fetches of the <variant> variant per day
@@ -30,6 +34,16 @@ Feature: Exposure is budgeted and counted
     When it fetches the variant once more
     Then Retry-After is the number of seconds until the next midnight in Helsinki
 
+  Scenario: A ceiling of 0 is off for the size it names, and the other sizes stay limited
+    Given photo_fetches_per_day is 0 for the card size, and a number for the thumb and the full size
+    When the account fetches the card size again and again, and the other two past their numbers
+    Then every card-size fetch is issued and written to the fetch log, and the other two are refused at their numbers
+
+  Scenario: A day's cards with a ceiling of 0 are all recorded, and the day's count goes on
+    Given exposure_cards_per_day is 0
+    When the account is served one card after another
+    Then each is recorded, and a ceiling set later in the panel reads the same day's count
+
   Scenario: The count resets at the day boundary
     Given the account used the whole budget of a variant two days ago
     When it fetches the variant today
@@ -42,8 +56,13 @@ Feature: Exposure is budgeted and counted
 
   Scenario: A photo on a card the account was shown is served
     Given an approved photo of another account on a card this account was shown
-    When this account fetches its card and full variants
+    When this account fetches its card and thumb variants
     Then both are issued and written to the fetch log under this account
+
+  Scenario: Another account's photo is never served in the full size, from a shown card too
+    Given an approved photo of another account on a card this account was shown
+    When this account fetches its full variant
+    Then the answer is 404 as for a photo never shown, nothing is written to the fetch log, and the owner is still served it in the full size
 
   Scenario: A photo shown twice is one shown record
     Given a photo of another account on a card this account was shown

@@ -1,7 +1,10 @@
 import type { Queryable } from "@kuutti/db";
+import { it } from "vitest";
 import { describe, expect, test } from "../test/harness.ts";
 import { AppError } from "./errors.ts";
 import {
+  asHour,
+  distanceEdges,
   matchingConfigNumber,
   matchingConfigNumbers,
   readMatchingConfig,
@@ -96,4 +99,90 @@ describe("matchingConfigNumbers", () => {
     const nulled = await refusal(matchingConfigNumbers(ctx.client, ["lib_test.b"]));
     expect(nulled.message).toBe("matching_config lib_test.b is not a number");
   });
+});
+
+// The push's quiet hours (#102, ADR-055 §7): the panel keeps a number whole and
+// from 0, with no ceiling.
+describe("distanceEdges", () => {
+  test("are the three bands' keys, the latest version of each", async ({ ctx }) => {
+    expect(await distanceEdges(ctx.client)).toEqual({ nearby: 5, close: 15, around: 50 });
+    await row(ctx.client, "distance_close_km", 2, 20);
+    expect(await distanceEdges(ctx.client)).toEqual({ nearby: 5, close: 20, around: 50 });
+  });
+
+  test("an edge that is not a number fails the read and is named", async ({ ctx }) => {
+    await row(ctx.client, "distance_around_km", 2, "fifty");
+    await expect(distanceEdges(ctx.client)).rejects.toMatchObject({
+      status: 500,
+      detail: { key: "distance_around_km" },
+    });
+  });
+});
+
+describe("the queue's numbers (ADR-062)", () => {
+  test("read through to the latest version of each key, the maintainer's of 29/10 and 01/11/2026", async ({
+    ctx,
+  }) => {
+    expect(
+      await matchingConfigNumbers(ctx.client, [
+        "pass_cooldown_days",
+        "second_pass_cooldown_days",
+        "liked_cooldown_days",
+        "ended_cooldown_days",
+        "like_expiry_days",
+        "inbox_stop",
+        "your_turn_limit",
+        "your_turn_warning",
+        "exposure_cards_per_day",
+        "auto_shadow_ban_cards_served",
+        "auto_shadow_ban_cards_served_minutes",
+        "auto_shadow_ban_photo_fetches",
+        "auto_shadow_ban_photo_fetches_minutes",
+      ]),
+    ).toEqual({
+      pass_cooldown_days: 30,
+      second_pass_cooldown_days: 365,
+      liked_cooldown_days: 90,
+      ended_cooldown_days: 90,
+      like_expiry_days: 14,
+      inbox_stop: 30,
+      your_turn_limit: 8,
+      your_turn_warning: 6,
+      exposure_cards_per_day: 0,
+      auto_shadow_ban_cards_served: 300,
+      auto_shadow_ban_cards_served_minutes: 10,
+      auto_shadow_ban_photo_fetches: 1500,
+      auto_shadow_ban_photo_fetches_minutes: 60,
+    });
+    expect(await readMatchingConfig(ctx.client, "photo_fetches_per_day")).toEqual({
+      thumb: 600,
+      card: 0,
+      full: 60,
+    });
+  });
+});
+
+describe("asHour", () => {
+  it.each([0, 1, 9, 22, 23])("takes %i as an hour of the day", (hour) => {
+    expect(asHour("lib_test.hour", hour)).toBe(hour);
+  });
+
+  it.each([-1, 24, 2.5, Number.NaN, Number.POSITIVE_INFINITY])(
+    "refuses %d as no hour, naming the key, as a missing row is refused",
+    (value) => {
+      let error: unknown;
+      try {
+        asHour("lib_test.hour", value);
+      } catch (e) {
+        error = e;
+      }
+      expect(error).toBeInstanceOf(AppError);
+      expect(error).toMatchObject({
+        status: 500,
+        code: "internal_error",
+        message: "matching_config lib_test.hour is not an hour",
+        detail: { key: "lib_test.hour" },
+      });
+    },
+  );
 });

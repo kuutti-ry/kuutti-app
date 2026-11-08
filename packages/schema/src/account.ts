@@ -4,9 +4,8 @@ import { CONVERSATIONS_MAX, ExportedConversation } from "./chat.ts";
 import { StoredContact } from "./contact.ts";
 import { DEAL_BREAKERS_CAP, StoredDealBreaker } from "./deal-breakers.ts";
 import { ExportedFeedback } from "./feedback.ts";
-import { ExportedGate } from "./gate.ts";
 import { AuthPlatform, IdentityStanding, USER_AGENT_MAX } from "./identity.ts";
-import { ExportedRounds } from "./matching.ts";
+import { ExportedRounds, ExportedStars } from "./matching.ts";
 import {
   EXPORT_DESCRIPTION_TEXT_MAX,
   EXPORT_PHOTO_PATH_MAX,
@@ -15,8 +14,14 @@ import {
   PhotoCheckKind,
   PhotoVariant,
 } from "./media.ts";
-import { ExportedNotifications } from "./notifications.ts";
-import { ConsentRecord, Gender, PondSummary, PreferencesResponse } from "./onboarding.ts";
+import { ExportedNotifications, ExportedPush } from "./notifications.ts";
+import {
+  ConsentRecord,
+  Gender,
+  PLACE_NAME_MAX,
+  PondSummary,
+  PreferencesResponse,
+} from "./onboarding.ts";
 import { ProfileDocument } from "./profile.ts";
 import { ExportedBlocks, ExportedReports } from "./report.ts";
 import { ResearchExport } from "./research.ts";
@@ -151,9 +156,15 @@ export const AccountExport = z
       /** Self-declared (#46); null before onboarding and after erasure. */
       gender: Gender.nullable(),
       pond: PondSummary.nullable(),
-      /** When the gender, or whom one seeks, last changed from an earlier answer (#147); null until then and after erasure. */
+      /** The home in words (ADR-061 §9): the place kept and the name the card shows, never a key; null before the step and after erasure. */
+      home: z
+        .object({
+          place: z.string().max(PLACE_NAME_MAX),
+          shownOnCard: z.string().max(PLACE_NAME_MAX),
+        })
+        .nullable(),
+      /** When the gender last changed from an earlier answer (#147); null until then and after erasure. */
       genderChangedAt: z.iso.datetime().nullable(),
-      seeksChangedAt: z.iso.datetime().nullable(),
       /** The optional e-mail (#148): the person's own, in their own download; null when none is set. */
       email: z.string().max(EMAIL_MAX).nullable(),
       /** Whether the person told Kuutti they found somebody (#83); the reason is kept by no one's name. */
@@ -190,6 +201,8 @@ export const AccountExport = z
         createdAt: z.iso.datetime(),
         lastUsedAt: z.iso.datetime(),
         expiresAt: z.iso.datetime(),
+        /** Whether the device gets pushes, and in which language (#102); never its token. Null when it has none. */
+        push: ExportedPush.nullable(),
       }),
     ),
     /** The profile as written (#47); null when never saved. */
@@ -205,8 +218,6 @@ export const AccountExport = z
     photoCheck: ExportedPhotoCheck,
     /** What research holds (#50, ADR-011 §7 and §10): the enrolment, never the events and never the research_id. */
     research: ResearchExport,
-    /** The place at the pond gate (#94, ADR-015); null before the first count. */
-    gate: ExportedGate.nullable(),
     /** The person's own requests for a copy (#237), this one included, newest first, at most 1000; at most matching_config exports_per_day are answered per Finnish day. */
     exports: z.array(z.object({ at: z.iso.datetime() })).max(1000),
     /** What the person sent as feedback (#171), newest first, at most 1000, with whether a moderator has read it. */
@@ -225,7 +236,9 @@ export const AccountExport = z
     notifications: ExportedNotifications,
     /** The person's own rounds (#96, ADR-034): places, reasons and their own decisions; never whom, and never a round in which the person was somebody's card. */
     rounds: ExportedRounds,
-    /** The invitations the person made and the one they joined with, and what theirs earned (#107, ADR-044 §10); never a code and never the other person. */
+    /** When the person put each star that stands (#575, ADR-064 §9); never on whom, and never a star put on the person. */
+    stars: ExportedStars,
+    /** The invitations the person made and the one they joined with, and what these earned them (#107, ADR-044 §10); never a code and never the other person. */
     invitations: ExportedInvitations,
   })
   .meta({ id: "AccountExport" });

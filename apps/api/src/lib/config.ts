@@ -78,6 +78,14 @@ const Env = z.object({
   MAIL: z.enum(["ses", "log", "off"]).optional(),
   // The sender of every message: the SES identity kuutti.app (infra/bootstrap/mail.tf).
   MAIL_FROM: z.string().min(1).default("Kuutti <noreply@kuutti.app>"),
+  // Push (#102, ADR-055 §8): expo through Expo's push service (the SSM
+  // parameter `push`); log on a developer's machine and in tests, which writes
+  // the kind of each push to the log and sends nothing; off sends nothing.
+  // Unset, it is log in development and test and off everywhere else.
+  PUSH: z.enum(["expo", "log", "off"]).optional(),
+  // Expo's enhanced push security (EAS), once the maintainer switches it on:
+  // the SecureString /kuutti/<env>/expo-access-token, never a resource (ADR-001).
+  EXPO_ACCESS_TOKEN: z.string().trim().min(1).optional(),
   // Where a staff bank login returns to (#49): the moderation panel's origin,
   // which is also on the CORS allowlist. Vite's dev server by default.
   ADMIN_APP_URL: z.url().default("http://localhost:5173"),
@@ -115,6 +123,10 @@ const Env = z.object({
     .string()
     .regex(/^[A-Z0-9]{10}$/, "ten characters")
     .optional(),
+  // The stores' listings for the one link (#574, rewards/link.ts): public
+  // values, unset until each listing is out (#193), the website meanwhile.
+  APP_STORE_URL: z.url({ protocol: /^https$/ }).optional(),
+  PLAY_STORE_URL: z.url({ protocol: /^https$/ }).optional(),
   // The key of HMAC-SHA256(hetu), 32 bytes as hex, from /kuutti/<env>/hetu-hmac-key
   // (rule 2: fetched at boot, never rotated, one offline copy). Without it the
   // auth routes answer 503; the login never runs with a key from anywhere else.
@@ -150,7 +162,7 @@ const Env = z.object({
   // starts, with an IPv6 client counted by its /56 (ADR-026 §4-5); SSM
   // sign-in-rate-limit-per-minute.
   SIGN_IN_RATE_LIMIT_PER_MINUTE: z.coerce.number().int().min(1).optional(),
-  // The chat's socket (#349, ADR-031 §5): open sockets per account (the next
+  // The chat's socket (#349, ADR-031 §9): open sockets per account (the next
   // closes the oldest), the first frame's deadline, the ping's interval and
   // the pong's wait. Operational settings, not product rules, so not
   // matching_config; SSM ws-sockets-per-account and so on.
@@ -160,9 +172,16 @@ const Env = z.object({
   WS_PONG_TIMEOUT_MS: z.coerce.number().int().min(100).max(60_000).default(10_000),
   // Whose word the rate limiter takes for the client address (#52, F19,
   // lib/rate-limit.ts). Unset: the socket in development and test, Traefik on
-  // a deployed box. /kuutti/<env>/trusted-proxy says cloudfront the day the
-  // box admits CloudFront alone (cloudfront_only_ingress), never before.
+  // a deployed box. /kuutti/<env>/trusted-proxy says cloudfront only once the
+  // box can tell Kuutti's distribution from anybody's, which admitting
+  // CloudFront alone (cloudfront_only_ingress) does not (#198).
   TRUSTED_PROXY: z.enum(TRUSTED_PROXIES).optional(),
+  // How the box tells Kuutti's distribution from anybody's (ADR-066): the
+  // value its CloudFront Function sends as x-kuutti-origin, from the
+  // SecureString /kuutti/<env>/origin-secret, written by hand and never a
+  // resource (ADR-001). Two values separated by a space while one replaces
+  // the other. Required with TRUSTED_PROXY=cloudfront (parseConfig).
+  ORIGIN_SECRET: z.string().trim().optional(),
   SSM_PARAMETER_PREFIX: z.string().min(1).optional(),
 
   // Pull-request preview (#9): the process creates and seeds kuutti_pr_<n>
@@ -177,9 +196,9 @@ const Env = z.object({
 /** Previews throttle harder than staging: nothing real runs there (#9). */
 const RATE_LIMIT_DEFAULT = { preview: 30, other: 120 } as const;
 /**
- * Production's doors are tight; elsewhere looser (ADR-026 §5): staging keys on
- * the CloudFront edge until its ingress switch (ADR-008 History), and the
- * demo's reset signs many personas in from one address.
+ * Production's doors are tight; elsewhere looser (ADR-026 §5): a laptop's demo
+ * reset signs many personas in from one address, and staging keeps sixty on
+ * the maintainer's word (ADR-026 History, #198).
  */
 const SIGN_IN_RATE_LIMIT_DEFAULT = { production: 10, other: 60 } as const;
 
@@ -195,12 +214,15 @@ export type PreviewConfig = {
 
 export type Config = Omit<
   z.infer<typeof Env>,
-  "RATE_LIMIT_PER_MINUTE" | "SIGN_IN_RATE_LIMIT_PER_MINUTE" | "TRUSTED_PROXY" | "MAIL"
+  "RATE_LIMIT_PER_MINUTE" | "SIGN_IN_RATE_LIMIT_PER_MINUTE" | "TRUSTED_PROXY" | "MAIL" | "PUSH"
 > & {
   RATE_LIMIT_PER_MINUTE: number;
   SIGN_IN_RATE_LIMIT_PER_MINUTE: number;
   TRUSTED_PROXY: TrustedProxy;
+  /** ORIGIN_SECRET's values, none when it is unset (lib/origin-proof.ts). */
+  originSecrets: readonly string[];
   MAIL: "ses" | "log" | "off";
+  PUSH: "expo" | "log" | "off";
   databaseUrl: string;
   corsAllowedOrigins: ReadonlySet<string>;
   preview?: PreviewConfig;
@@ -303,15 +325,49 @@ export function parseConfig(raw: Record<string, string | undefined>): Config {
   }
   const mail =
     env.MAIL ?? (env.APP_ENV === "development" || env.APP_ENV === "test" ? "log" : "off");
+  // As mail's: a deployed environment sends through Expo or not at all (ADR-055 §8).
+  if (env.PUSH === "log" && env.APP_ENV !== "development" && env.APP_ENV !== "test") {
+    throw new ConfigError(["PUSH"], [`PUSH: log is for development and test, not ${env.APP_ENV}`]);
+  }
+  // Production sends only with Expo's access token, so that nobody holding a
+  // stored token can send to its people's phones (ADR-055 §8).
+  if (env.PUSH === "expo" && env.APP_ENV === "production" && !env.EXPO_ACCESS_TOKEN) {
+    throw new ConfigError(
+      ["EXPO_ACCESS_TOKEN"],
+      ["EXPO_ACCESS_TOKEN: production sends pushes only with Expo's access token"],
+    );
+  }
+  const push =
+    env.PUSH ?? (env.APP_ENV === "development" || env.APP_ENV === "test" ? "log" : "off");
   const trustedProxy: TrustedProxy =
     env.TRUSTED_PROXY ??
     (env.APP_ENV === "development" || env.APP_ENV === "test" ? "none" : "traefik");
+  const originSecrets = (env.ORIGIN_SECRET ?? "").split(/\s+/).filter((value) => value !== "");
+  if (originSecrets.length > 2 || originSecrets.some((value) => value.length < 32)) {
+    throw new ConfigError(
+      [],
+      ["ORIGIN_SECRET: one value of at least 32 characters, or two separated by a space (ADR-066)"],
+    );
+  }
+  // CloudFront's servers are every distribution's (ADR-008, History): with no
+  // secret, no request could prove it came through Kuutti's, and the limiter
+  // would put everybody in the one bucket of no address.
+  if (trustedProxy === "cloudfront" && originSecrets.length === 0) {
+    throw new ConfigError(
+      ["ORIGIN_SECRET"],
+      [
+        "ORIGIN_SECRET: trusted-proxy cloudfront needs origin-secret, the proof of Kuutti's distribution (ADR-066)",
+      ],
+    );
+  }
   return {
     ...env,
     RATE_LIMIT_PER_MINUTE: rateLimit,
     SIGN_IN_RATE_LIMIT_PER_MINUTE: signInRateLimit,
     TRUSTED_PROXY: trustedProxy,
+    originSecrets,
     MAIL: mail,
+    PUSH: push,
     databaseUrl: preview ? withDatabase(baseUrl, preview.database) : baseUrl,
     corsAllowedOrigins: allowedOrigins(env),
     ...(preview
@@ -372,7 +428,7 @@ function composeDatabaseUrl(env: z.infer<typeof Env>, preview: boolean): string 
 /**
  * Browser origins are refused unless named here (rule 8: no product web
  * surface). Development allows the Metro web target and the admin SPA's Vite
- * server; deployed environments name exactly the admin SPA, the waitlist site,
+ * server; deployed environments name exactly the admin SPA, the public site,
  * or the preview's own origin.
  */
 function allowedOrigins(env: z.infer<typeof Env>): ReadonlySet<string> {

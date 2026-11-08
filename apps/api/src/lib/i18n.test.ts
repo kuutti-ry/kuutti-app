@@ -5,7 +5,7 @@ import { createApp } from "../app.ts";
 import { captureLogger, test, testConfig } from "../test/harness.ts";
 import type { AppEnv } from "./env.ts";
 import { AppError } from "./errors.ts";
-import { isLocalisedErrorCode, requestLocale, servedLocales, tOf } from "./i18n.ts";
+import { isLocalisedErrorCode, requestLocale, servedLocales, tFor, tOf } from "./i18n.ts";
 
 describe("localised responses", () => {
   test("an API error response for a request with Accept-Language: fi carries the Finnish message", async ({
@@ -41,8 +41,8 @@ describe("localised responses", () => {
     ctx,
   }) => {
     expect(servedLocales("production")).toEqual(["en", "fi"]);
-    expect(servedLocales("staging")).toEqual(["en", "fi", "sv"]);
-    expect(servedLocales("preview")).toEqual(["en", "fi", "sv"]);
+    expect(servedLocales("staging")).toEqual(["en", "fi", "sv", "fi-x-stadi"]);
+    expect(servedLocales("preview")).toEqual(["en", "fi", "sv", "fi-x-stadi"]);
     const production = new Hono<AppEnv>();
     production.use("*", requestLocale(servedLocales("production")));
     production.get("/x", (c) => c.text("ok"));
@@ -56,6 +56,20 @@ describe("localised responses", () => {
     // Staging and previews keep all three, so a reviewer can read Swedish there.
     const res = await ctx.app.request("/nope", { headers: { "accept-language": "sv" } });
     expect(res.headers.get("content-language")).toBe("sv");
+  });
+
+  test("a request naming Stadi is answered in Finnish everywhere: nothing the API says is in slang (#521)", async ({
+    ctx,
+  }) => {
+    const res = await ctx.app.request("/nope", { headers: { "accept-language": "fi-x-stadi" } });
+    expect(res.headers.get("content-language")).toBe("fi");
+    const body = ErrorResponse.parse(await res.json());
+    expect(body.error.message).toBe("Ei löytynyt.");
+    const production = new Hono<AppEnv>();
+    production.use("*", requestLocale(servedLocales("production")));
+    production.get("/x", (c) => c.text("ok"));
+    const answer = await production.request("/x", { headers: { "accept-language": "fi-x-stadi" } });
+    expect(answer.headers.get("content-language")).toBe("fi");
   });
 
   test("no header: English", async ({ ctx }) => {
@@ -140,4 +154,23 @@ describe("the request's language where the middleware has or has not run", () =>
       expect(isLocalisedErrorCode(code), code).toBe(false);
     }
   });
+});
+
+// A push is worded in the language its device registered in (#102, ADR-055 §1).
+describe("a stored language's t()", () => {
+  test.each([
+    ["en", "You have a new message", "You have a new match"],
+    ["fi", "Sinulle on uusi viesti", "Sinulle on uusi mätsi"],
+    ["sv", "Du har ett nytt meddelande", "Du har en ny matchning"],
+  ])("tFor(%j) words the pushes in it", (locale, message, match) => {
+    const t = tFor(locale);
+    expect([t("push.message"), t("push.match")]).toEqual([message, match]);
+  });
+
+  test.each(["de", "", "FI", "fi-FI", "en-XA", "toString", "__proto__"])(
+    "a value that is not one of ours, %j, is English",
+    (locale) => {
+      expect(tFor(locale)("push.message")).toBe("You have a new message");
+    },
+  );
 });

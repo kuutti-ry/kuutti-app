@@ -123,17 +123,14 @@ describe("GET /admin/config", () => {
       "SELECT DISTINCT key FROM matching_config ORDER BY key",
     );
     expect(items.map((i) => i.key)).toEqual(rows.map((r) => r.key));
-    expect(items.find((i) => i.key === "default_pond")).toMatchObject({
-      value: "paakaupunkiseutu",
-      version: 2,
-      versions: [
-        { version: 2, value: "paakaupunkiseutu", createdBy: "migration:0025", reason: null },
-        { version: 1, value: "suomi", createdBy: "migration:0020", reason: null },
-      ],
+    expect(items.find((i) => i.key === "deal_breakers_max")).toMatchObject({
+      value: 7,
+      version: 1,
+      versions: [{ version: 1, value: 7, createdBy: "migration:0001", reason: null }],
     });
     expect(items.find((i) => i.key === "photo_fetches_per_day")?.value).toEqual({
       thumb: 600,
-      card: 300,
+      card: 0,
       full: 60,
     });
   });
@@ -144,32 +141,26 @@ describe("GET /admin/config", () => {
   }) => {
     const staff = await admin(ctx);
     expect(
-      (await change(api, staff.headers, "round_size", { value: 8, reason: REASON })).status,
+      (await change(api, staff.headers, "like_budget_balanced", { value: 8, reason: REASON }))
+        .status,
     ).toBe(200);
     const { items } = ConfigList.parse(await (await list(api, staff.headers)).json());
-    const round = items.find((i) => i.key === "round_size");
-    expect(round).toMatchObject({ value: 8, version: 3 });
-    expect(round?.versions).toEqual([
+    const likes = items.find((i) => i.key === "like_budget_balanced");
+    expect(likes).toMatchObject({ value: 8, version: 2 });
+    expect(likes?.versions).toEqual([
       {
-        version: 3,
+        version: 2,
         value: 8,
         validFrom: T.toISOString(),
         createdBy: staff.identityId,
         reason: REASON,
       },
-      // The first cut's ten (#95, ADR-035), a migration's version.
-      {
-        version: 2,
-        value: 10,
-        validFrom: expect.any(String),
-        createdBy: "migration:0069",
-        reason: null,
-      },
+      // The first cut's ten (#98, ADR-036), as the migrations write it.
       {
         version: 1,
-        value: 12,
+        value: 10,
         validFrom: expect.any(String),
-        createdBy: "migration:0007",
+        createdBy: "migration:0001",
         reason: null,
       },
     ]);
@@ -201,7 +192,7 @@ describe("POST /admin/config/{key}", () => {
     );
     expect(listed?.versions.map((v) => [v.version, v.value, v.createdBy, v.reason])).toEqual([
       [2, 45, staff.identityId, REASON],
-      [1, 60, "migration:0010", null],
+      [1, 0, "migration:0001", null],
     ]);
 
     const lines = api.logs().filter((l) => l.msg === "config changed");
@@ -219,10 +210,10 @@ describe("POST /admin/config/{key}", () => {
     ctx,
     api,
   }) => {
-    await withMatchingConfig(ctx.client, { config_routes_flag: true });
+    await withMatchingConfig(ctx.client, { config_routes_flag: true, config_routes_word: "one" });
     const staff = await admin(ctx);
     for (const [key, value, version] of [
-      ["default_pond", "suomi", 3],
+      ["config_routes_word", "another", 2],
       ["config_routes_flag", false, 2],
       ["photo_fetches_per_day", { full: 30, card: 300, thumb: 600 }, 2],
     ] as const) {
@@ -237,7 +228,7 @@ describe("POST /admin/config/{key}", () => {
   test("an app without a clock of its own dates the version by the wall clock", async ({ ctx }) => {
     const staff = await admin(ctx);
     const before = Date.now();
-    const response = await ctx.app.request("/admin/config/impression_cap_per_day", {
+    const response = await ctx.app.request("/admin/config/like_expiry_days", {
       method: "POST",
       headers: { ...staff.headers, "content-type": "application/json" },
       body: JSON.stringify({ value: 35, reason: REASON }),
@@ -254,7 +245,7 @@ describe("POST /admin/config/{key}", () => {
     api,
   }) => {
     const staff = await admin(ctx);
-    const spaced = await change(api, staff.headers, "liked_you_cap", {
+    const spaced = await change(api, staff.headers, "like_expiry_days", {
       value: 9,
       reason: `  ${REASON}\n `,
     });
@@ -262,7 +253,10 @@ describe("POST /admin/config/{key}", () => {
     expect(ConfigChange.parse(await spaced.json()).reason).toBe(REASON);
 
     const longest = REASON_OF(500);
-    const full = await change(api, staff.headers, "liked_you_cap", { value: 8, reason: longest });
+    const full = await change(api, staff.headers, "like_expiry_days", {
+      value: 8,
+      reason: longest,
+    });
     expect(full.status).toBe(200);
     expect(ConfigChange.parse(await full.json())).toMatchObject({
       version: 3,
@@ -271,24 +265,24 @@ describe("POST /admin/config/{key}", () => {
   });
 
   test.for([
-    ["a key in upper case", "ROUND_SIZE", { value: 10, reason: REASON }],
-    ["a key with a dash", "round-size", { value: 10, reason: REASON }],
-    ["a key that starts with a digit", "1round_size", { value: 10, reason: REASON }],
+    ["a key in upper case", "MAX_PHOTOS", { value: 10, reason: REASON }],
+    ["a key with a dash", "max-photos", { value: 10, reason: REASON }],
+    ["a key that starts with a digit", "1max_photos", { value: 10, reason: REASON }],
     ["a key of 65 characters", "a".repeat(65), { value: 10, reason: REASON }],
-    ["a missing reason", "round_size", { value: 10 }],
-    ["an empty reason", "round_size", { value: 10, reason: "" }],
-    ["a reason of spaces", "round_size", { value: 10, reason: " \t\n " }],
-    ["a reason of 501 characters", "round_size", { value: 10, reason: REASON_OF(501) }],
-    ["a reason that is not a string", "round_size", { value: 10, reason: 7 }],
-    ["a missing value", "round_size", { reason: REASON }],
-    ["an extra key in the body", "round_size", { value: 10, reason: REASON, note: MARK }],
-    ["a value that is an array", "round_size", { value: [10], reason: REASON }],
+    ["a missing reason", "max_photos", { value: 10 }],
+    ["an empty reason", "max_photos", { value: 10, reason: "" }],
+    ["a reason of spaces", "max_photos", { value: 10, reason: " \t\n " }],
+    ["a reason of 501 characters", "max_photos", { value: 10, reason: REASON_OF(501) }],
+    ["a reason that is not a string", "max_photos", { value: 10, reason: 7 }],
+    ["a missing value", "max_photos", { reason: REASON }],
+    ["an extra key in the body", "max_photos", { value: 10, reason: REASON, note: MARK }],
+    ["a value that is an array", "max_photos", { value: [10], reason: REASON }],
     [
       "a value that is a nested object",
       "photo_fetches_per_day",
       { value: { thumb: { x: 600 }, card: 300, full: 60 }, reason: REASON },
     ],
-    ["a value that is null", "round_size", { value: null, reason: REASON }],
+    ["a value that is null", "max_photos", { value: null, reason: REASON }],
   ] as const)(
     "refuses %s with validation_failed, and nothing is written",
     async ([, key, body], { ctx, api }) => {
@@ -316,15 +310,76 @@ describe("POST /admin/config/{key}", () => {
     expect(await footprint(ctx)).toEqual(before);
   });
 
-  test("a value of another shape is config_shape, logged with the kind it expects, and nothing is written", async ({
+  test("the invitation's reward takes the shape its latest migration gave it, not the one its first version had (#503, ADR-044 §4)", async ({
+    ctx,
+    api,
+  }) => {
+    const staff = await admin(ctx);
+    const value = { inviterFish: 2, friendFish: 0 };
+    const written = await change(api, staff.headers, "invitation_reward", {
+      value,
+      reason: REASON,
+    });
+    expect(written.status).toBe(200);
+    expect(ConfigChange.parse(await written.json())).toMatchObject({
+      key: "invitation_reward",
+      value,
+    });
+  });
+
+  test("the invitation's reward refuses the shape of its first version, which the night and the app would refuse (#503)", async ({
     ctx,
     api,
   }) => {
     const staff = await admin(ctx);
     const before = await footprint(ctx);
+    await refused(
+      await change(api, staff.headers, "invitation_reward", {
+        value: { fish: 2, likes: 0 },
+        reason: REASON,
+      }),
+      400,
+      "config_shape",
+    );
+    expect(await footprint(ctx)).toEqual(before);
+  });
+
+  test.for([
+    ["inviterFish", { inviterFish: 11, friendFish: 1 }],
+    ["friendFish", { inviterFish: 1, friendFish: 11 }],
+  ] as const)(
+    "the invitation's reward refuses %s past the ceiling its reader holds, which would answer 500 to everybody (#503)",
+    async ([, value], { ctx, api }) => {
+      const staff = await admin(ctx);
+      const before = await footprint(ctx);
+      await refused(
+        await change(api, staff.headers, "invitation_reward", { value, reason: REASON }),
+        400,
+        "config_shape",
+      );
+      expect(await footprint(ctx)).toEqual(before);
+    },
+  );
+
+  test("the invitation's reward takes the ceiling itself (#503)", async ({ ctx, api }) => {
+    const staff = await admin(ctx);
+    const written = await change(api, staff.headers, "invitation_reward", {
+      value: { inviterFish: 10, friendFish: 10 },
+      reason: REASON,
+    });
+    expect(written.status).toBe(200);
+  });
+
+  test("a value of another shape is config_shape, logged with the kind it expects, and nothing is written", async ({
+    ctx,
+    api,
+  }) => {
+    await withMatchingConfig(ctx.client, { config_routes_word: "one" });
+    const staff = await admin(ctx);
+    const before = await footprint(ctx);
     for (const [key, value, expected] of [
-      ["round_size", "10", "number"],
-      ["default_pond", 1, "string"],
+      ["max_photos", "10", "number"],
+      ["config_routes_word", 1, "string"],
       ["photo_fetches_per_day", { thumb: 600, card: 300 }, "object"],
       ["photo_fetches_per_day", 600, "object"],
       // A count keeps its wholeness and sign: a fraction there answers 500 for everyone.
@@ -386,7 +441,7 @@ describe("POST /admin/config/{key}", () => {
       "SELECT version, value, created_by FROM matching_config WHERE key = 'pass_cooldown_days' ORDER BY version",
     );
     expect(rows).toEqual([
-      { version: 1, value: 90, created_by: "migration:0007" },
+      { version: 1, value: 30, created_by: "migration:0001" },
       { version: 2, value: 60, created_by: second.identityId },
     ]);
     const audit = await ctx.client.query<{ actor_identity_id: string }>(
@@ -430,7 +485,7 @@ describe("POST /admin/config/{key}", () => {
     expect(listed?.versions.map((v) => [v.version, v.value, v.createdBy])).toEqual([
       [3, 5, second.identityId],
       [2, 6, first.identityId],
-      [1, 7, "migration:0007"],
+      [1, 7, "migration:0001"],
     ]);
     expect(raced.logs().find((l) => l.msg === "config changed")).toMatchObject({
       staffIdentityId: first.identityId,
@@ -450,7 +505,7 @@ describe("the admin guard on both routes", () => {
     ["GET /admin/config", (api: Api, h: Headers) => list(api, h)],
     [
       "POST /admin/config/{key}",
-      (api: Api, h: Headers) => change(api, h, "round_size", { value: 10, reason: REASON }),
+      (api: Api, h: Headers) => change(api, h, "max_photos", { value: 10, reason: REASON }),
     ],
   ] as const;
 

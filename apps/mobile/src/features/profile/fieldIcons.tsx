@@ -1,6 +1,6 @@
 import type { PlainMessageKey } from "@kuutti/i18n";
-import type { HobbyGroup, ProfileFieldKey } from "@kuutti/schema";
-import type { LucideIcon, LucideProps } from "lucide-react-native";
+import type { DealBreakerField, HobbyGroup } from "@kuutti/schema";
+import type { LucideIcon } from "lucide-react-native";
 import Baby from "lucide-react-native/icons/baby";
 import Beer from "lucide-react-native/icons/beer";
 import BookOpen from "lucide-react-native/icons/book-open";
@@ -18,6 +18,7 @@ import House from "lucide-react-native/icons/house";
 import IdCard from "lucide-react-native/icons/id-card";
 import Languages from "lucide-react-native/icons/languages";
 import Leaf from "lucide-react-native/icons/leaf";
+import MapPin from "lucide-react-native/icons/map-pin";
 import MoonStar from "lucide-react-native/icons/moon-star";
 import Palette from "lucide-react-native/icons/palette";
 import PawPrint from "lucide-react-native/icons/paw-print";
@@ -33,52 +34,13 @@ import Users from "lucide-react-native/icons/users";
 import Utensils from "lucide-react-native/icons/utensils";
 import Volleyball from "lucide-react-native/icons/volleyball";
 import Vote from "lucide-react-native/icons/vote";
-import type * as React from "react";
-import { forwardRef } from "react";
 import { View } from "react-native";
-import Svg, { Ellipse, Path } from "react-native-svg";
-import { Icon } from "@/components/ui/icon";
+import { Ellipse, Path } from "react-native-svg";
+import { drawn, Icon } from "@/components/ui/icon";
 import { Text } from "@/components/ui/text";
 import { useT } from "@/lib/locale";
 import { cn } from "@/lib/utils";
 import { fieldLabelKey } from "./keys";
-
-/**
- * An icon drawn here in Lucide's grid and line (24 points, a 2-point stroke
- * in the text colour, round ends), for what Lucide has no icon for. Taken by
- * Icon like any of Lucide's.
- */
-function drawn(name: string, children: React.ReactNode): LucideIcon {
-  const Drawn = forwardRef<Svg, LucideProps>(
-    (
-      {
-        size = 24,
-        color = "currentColor",
-        strokeWidth = 2,
-        absoluteStrokeWidth: _absolute,
-        ...props
-      },
-      ref,
-    ) => (
-      <Svg
-        ref={ref}
-        width={size}
-        height={size}
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke={color}
-        strokeWidth={strokeWidth}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        {...props}
-      >
-        {children}
-      </Svg>
-    ),
-  );
-  Drawn.displayName = name;
-  return Drawn as LucideIcon;
-}
 
 /** A round tin of snus, lid and rim, seen from a little above. */
 const SnusCan = drawn(
@@ -104,9 +66,10 @@ const PalmsUp = drawn(
  * sections, the later screens, the deal-breakers and on the card: a beer for
  * drinking, a cigarette for smoking, a tin for snus. Placeholders until the
  * designer draws the set; decorative, so the label alone names the field.
- * The religion's options keep their own symbols (glyphs.tsx).
+ * The religion's options keep their own symbols (glyphs.tsx). The distance
+ * among the deal-breakers has one too, being no field of the registry (ADR-061 §7).
  */
-export const FIELD_ICONS: Readonly<Record<ProfileFieldKey, LucideIcon>> = {
+export const FIELD_ICONS: Readonly<Record<DealBreakerField, LucideIcon>> = {
   intent: Compass,
   identityLabel: User,
   monogamy: HeartHandshake,
@@ -129,10 +92,11 @@ export const FIELD_ICONS: Readonly<Record<ProfileFieldKey, LucideIcon>> = {
   politics: Vote,
   religion: PalmsUp,
   zodiac: MoonStar,
+  distance: MapPin,
 };
 
 /** A field's label with its icon before it. */
-export function FieldLabel({ field, className }: { field: ProfileFieldKey; className?: string }) {
+export function FieldLabel({ field, className }: { field: DealBreakerField; className?: string }) {
   const { t } = useT();
   return (
     <View className={cn("flex-row items-center gap-2", className)}>

@@ -1,11 +1,11 @@
 import { act, fireEvent, screen, waitFor } from "@testing-library/react-native";
 import { Directory } from "expo-file-system";
 import type * as React from "react";
-import { Platform, Share } from "react-native";
+import { AccessibilityInfo, Platform, Share } from "react-native";
 import { clearSession, currentSession, saveSession } from "@/lib/session";
 import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
 import { renderWithTheme } from "@/test/render";
-import { AccountActions, shareExport } from "./AccountActions";
+import { AccountActions, ExportData, shareExport } from "./AccountActions";
 
 const { __router: router } = jest.requireMock("expo-router") as {
   __router: { push: jest.Mock };
@@ -15,15 +15,16 @@ const { __files: cache } = jest.requireMock("expo-file-system") as {
 };
 const pickDirectory = Directory.pickDirectoryAsync as jest.Mock;
 
-// The account card (#51): export handed to the share sheet, deletion only
-// after the confirmation, the device signed out when the API says 204.
+// The account card (#51): export handed to the share sheet (Android's folder
+// picked before the API is asked, #465), deletion only after the
+// confirmation, the device signed out when the API says 204.
 
 const token = (seed: string) => (seed + "x".repeat(43)).slice(0, 43);
 const session = {
   sessionId: "6f1c1c4e-9a8e-4a0b-9c3a-0c8d1e2f3a4b",
   accessToken: token("access"),
   accessExpiresAt: "2030-01-01T00:15:00.000Z",
-  refreshToken: token("refresh"),
+  refreshToken: `${token("family")}.${token("refresh")}`,
   refreshExpiresAt: "2030-04-01T00:00:00.000Z",
 };
 // The API answers a zip (#237); what is inside is held by the API's tests.
@@ -40,6 +41,15 @@ const zip = () =>
     },
   });
 const bytesOf = (file: Uint8Array | undefined) => (file ? Array.from(file) : undefined);
+const exportFile = () => jest.fn(async () => ({ name: ZIP_NAME, bytes: ZIP }));
+const exportRequests = (requests: Request[]) =>
+  requests.filter((r) => new URL(r.url).pathname === "/account/export");
+const SAVED = "Done.";
+// Said aloud through the shared Notice, queued behind what is being said (#511).
+const announced = () =>
+  (AccessibilityInfo.announceForAccessibilityWithOptions as jest.Mock).mock.calls.map(
+    ([words]) => words,
+  );
 
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
@@ -58,6 +68,8 @@ function fetchMock(handlers: Array<(req: Request) => Response | null>) {
   return calls;
 }
 const settle = () => act(() => new Promise<void>((resolve) => setTimeout(resolve, 10)));
+/** Every text on the screen, in order. */
+const drawn = () => screen.queryAllByText(/./).map((node) => node.props.children);
 const show = async (ui: React.ReactElement) => {
   await act(async () => {
     renderWithTheme(ui);
@@ -67,27 +79,39 @@ const show = async (ui: React.ReactElement) => {
 
 beforeEach(async () => {
   await saveSession(session);
+  (AccessibilityInfo.announceForAccessibilityWithOptions as jest.Mock).mockClear();
 });
 afterEach(async () => {
   await clearSession();
 });
 
 describe("AccountActions", () => {
-  it("shows the four labelled buttons and nothing pressable is unlabelled or too small", async () => {
+  it("shows its three labelled buttons and no line, the deletion last, and nothing pressable is unlabelled or too small (#581)", async () => {
     fetchMock([]);
     await show(<AccountActions />);
-    expect(
-      await screen.findByText(
-        "A file with everything Kuutti holds about you, and nothing about anyone else.",
-      ),
-    ).toBeTruthy();
-    // Its screen carries the title (#287): the card does not repeat it.
+    // Its row carries the title (#287, #511): the panel does not repeat it.
     expect(screen.queryByText("Your account")).toBeNull();
     const found = pressables(screen.toJSON() as HostNode);
-    expect(found).toHaveLength(4);
+    expect(found.map((node) => node.props.accessibilityLabel)).toEqual([
+      "I found someone",
+      "Take a break",
+      "Delete my account",
+    ]);
     expect(found.flatMap((node) => a11yProblems(node))).toEqual([]);
-    // The consents are the app's settings now, not the account's (#170).
-    expect(screen.queryByLabelText("Take part in research")).toBeNull();
+    // Each press only opens what says the rest: the deletion's question says the 30 days.
+    expect(drawn()).toEqual(["I found someone", "Take a break", "Delete my account"]);
+    // The export is a row of its own now (#511), and the consents the app's settings (#170).
+    expect(screen.queryByRole("button", { name: "Download my data" })).toBeNull();
+    expect(screen.queryByLabelText("Store my sensitive answers")).toBeNull();
+  });
+
+  it("holds the copy of one's data as its one button, with no line (#511, #581)", async () => {
+    fetchMock([]);
+    await show(<ExportData />);
+    expect(drawn()).toEqual(["Download my data"]);
+    const found = pressables(screen.toJSON() as HostNode);
+    expect(found.map((node) => node.props.accessibilityLabel)).toEqual(["Download my data"]);
+    expect(found.flatMap((node) => a11yProblems(node))).toEqual([]);
   });
 
   it("opens the found-them screen from its button, and nothing happens before that (#83)", async () => {
@@ -119,7 +143,7 @@ describe("AccountActions", () => {
       whileOpen = bytesOf(cache.get(`file:///cache/${ZIP_NAME}`));
       return { action: "sharedAction" as const };
     });
-    await show(<AccountActions share={share as never} />);
+    await show(<ExportData share={share as never} />);
     await fireEvent.press(screen.getByRole("button", { name: "Download my data" }));
     await waitFor(() => expect(share).toHaveBeenCalled());
     expect(share.mock.calls[0]).toEqual([
@@ -131,14 +155,43 @@ describe("AccountActions", () => {
     expect(calls[0]?.headers.get("authorization")).toBe(`Bearer ${session.accessToken}`);
   });
 
+  it("says Done once the sheet shares the file, and no more, aloud on iOS (#465, #581)", async () => {
+    fetchMock([(req) => (new URL(req.url).pathname === "/account/export" ? zip() : null)]);
+    const share = jest.fn(async () => ({ action: "sharedAction" as const }));
+    await show(<ExportData share={share as never} />);
+    expect(screen.queryByText(SAVED)).toBeNull();
+    await fireEvent.press(screen.getByRole("button", { name: "Download my data" }));
+    const line = await screen.findByText(SAVED);
+    expect(line.props.accessibilityLiveRegion).toBe("polite");
+    expect(announced()).toEqual([SAVED]);
+    expect(screen.queryByText("Preparing your data…")).toBeNull();
+    expect(
+      screen.getByRole("button", { name: "Download my data" }).props.accessibilityState?.disabled,
+    ).toBe(false);
+  });
+
+  it("says nothing when the sheet is closed without sharing, and deletes the cached copy (#465)", async () => {
+    fetchMock([(req) => (new URL(req.url).pathname === "/account/export" ? zip() : null)]);
+    const share = jest.fn(async () => ({ action: "dismissedAction" as const }));
+    await show(<ExportData share={share as never} />);
+    await fireEvent.press(screen.getByRole("button", { name: "Download my data" }));
+    await waitFor(() => expect(share).toHaveBeenCalled());
+    await settle();
+    expect(screen.queryByText(SAVED)).toBeNull();
+    expect(screen.queryByText("That did not go through. Try again.")).toBeNull();
+    expect(screen.queryByText("Preparing your data…")).toBeNull();
+    expect(announced()).toEqual([]);
+    expect(cache.has(`file:///cache/${ZIP_NAME}`)).toBe(false);
+  });
+
   it("deletes the cached copy even when the sheet fails", async () => {
     fetchMock([(req) => (new URL(req.url).pathname === "/account/export" ? zip() : null)]);
     const share = jest.fn(async () => {
       throw new Error("no sheet");
     });
-    await show(<AccountActions share={share as never} />);
+    await show(<ExportData share={share as never} />);
     await fireEvent.press(screen.getByRole("button", { name: "Download my data" }));
-    expect(await screen.findByText("The download did not work. Try again.")).toBeTruthy();
+    expect(await screen.findByText("That did not go through. Try again.")).toBeTruthy();
     expect(cache.has(`file:///cache/${ZIP_NAME}`)).toBe(false);
   });
 
@@ -150,15 +203,13 @@ describe("AccountActions", () => {
           : null,
     ]);
     const share = jest.fn();
-    await show(<AccountActions share={share as never} />);
+    await show(<ExportData share={share as never} />);
     await fireEvent.press(screen.getByRole("button", { name: "Download my data" }));
     expect(
-      await screen.findByText(
-        "That is enough copies for today. You can download your data again after midnight.",
-      ),
+      await screen.findByText("That is enough for today. You can try again after midnight."),
     ).toBeTruthy();
     expect(share).not.toHaveBeenCalled();
-    expect(screen.queryByText("The download did not work. Try again.")).toBeNull();
+    expect(screen.queryByText("That did not go through. Try again.")).toBeNull();
   });
 
   it("says so when the export fails", async () => {
@@ -168,9 +219,12 @@ describe("AccountActions", () => {
           ? json({ error: { code: "internal_error", message: "x", requestId: "r" } }, 500)
           : null,
     ]);
-    await show(<AccountActions share={jest.fn() as never} />);
+    await show(<ExportData share={jest.fn() as never} />);
     await fireEvent.press(screen.getByRole("button", { name: "Download my data" }));
-    expect(await screen.findByText("The download did not work. Try again.")).toBeTruthy();
+    const line = await screen.findByText("That did not go through. Try again.");
+    expect(line.props.accessibilityLiveRegion).toBe("assertive");
+    expect(announced()).toEqual(["That did not go through. Try again."]);
+    expect(screen.queryByText(SAVED)).toBeNull();
   });
 
   it("deletes only after the confirmation, with confirm true, and signs the device out", async () => {
@@ -180,7 +234,7 @@ describe("AccountActions", () => {
           ? new Response(null, { status: 204 })
           : null,
     ]);
-    // The card reads the consents on mount (the research switch); only writes count here.
+    // Only writes count here.
     const calls = {
       get length() {
         return requests.filter((r) => r.method !== "GET").length;
@@ -206,13 +260,7 @@ describe("AccountActions", () => {
     expect(JSON.parse(await (calls.at(0) as Request).text())).toEqual({ confirm: true });
     await waitFor(() => expect(currentSession()).toBeNull());
     // Signed out: the card is gone with the session.
-    await waitFor(() =>
-      expect(
-        screen.queryByText(
-          "A file with everything Kuutti holds about you, and nothing about anyone else.",
-        ),
-      ).toBeNull(),
-    );
+    await waitFor(() => expect(drawn()).toEqual([]));
   });
 
   it("keeps the session when the deletion fails and says so", async () => {
@@ -232,24 +280,24 @@ describe("AccountActions", () => {
   it("hands the export to the phone's own share sheet when no other is given", async () => {
     fetchMock([(req) => (new URL(req.url).pathname === "/account/export" ? zip() : null)]);
     const share = jest.spyOn(Share, "share").mockResolvedValue({ action: "sharedAction" });
-    await show(<AccountActions />);
+    await show(<ExportData />);
     await fireEvent.press(screen.getByRole("button", { name: "Download my data" }));
     await waitFor(() => expect(share).toHaveBeenCalledTimes(1));
     share.mockRestore();
   });
 
-  it("says it is preparing the data while the export runs, and holds both buttons", async () => {
+  it("says it is preparing the data while the export runs, and holds its button", async () => {
     fetchMock([
       (req) =>
         new URL(req.url).pathname === "/account/export"
           ? (new Promise<Response>(() => undefined) as unknown as Response)
           : null,
     ]);
-    await show(<AccountActions share={jest.fn() as never} />);
+    await show(<ExportData share={jest.fn() as never} />);
     await fireEvent.press(screen.getByRole("button", { name: "Download my data" }));
     expect(await screen.findByText("Preparing your data…")).toBeTruthy();
     expect(
-      screen.getByRole("button", { name: "Delete my account" }).props.accessibilityState?.disabled,
+      screen.getByRole("button", { name: "Download my data" }).props.accessibilityState?.disabled,
     ).toBe(true);
   });
 
@@ -268,11 +316,101 @@ describe("AccountActions", () => {
     await clearSession();
     fetchMock([]);
     await show(<AccountActions />);
+    expect(drawn()).toEqual([]);
+  });
+});
+
+describe("ExportData on Android", () => {
+  let os: jest.ReplaceProperty<typeof Platform.OS>;
+  beforeEach(() => {
+    os = jest.replaceProperty(Platform, "OS", "android");
+  });
+  afterEach(() => {
+    os.restore();
+    pickDirectory.mockReset();
+    pickDirectory.mockImplementation(async () => new Directory("content://picked"));
+    cache.clear();
+  });
+
+  it("asks for the folder before the API, so backing out of the picker spends no copy (#465)", async () => {
+    const requests = fetchMock([
+      (req) => (new URL(req.url).pathname === "/account/export" ? zip() : null),
+    ]);
+    pickDirectory.mockRejectedValueOnce(
+      Object.assign(new Error("The file picker was cancelled by the user"), {
+        code: "ERR_PICKER_CANCELLED",
+      }),
+    );
+    await show(<ExportData />);
+    await fireEvent.press(screen.getByRole("button", { name: "Download my data" }));
+    await waitFor(() => expect(pickDirectory).toHaveBeenCalledTimes(1));
+    await settle();
+    expect(exportRequests(requests)).toHaveLength(0);
+    expect(cache.size).toBe(0);
+    expect(screen.queryByText(SAVED)).toBeNull();
+    expect(screen.queryByText("That did not go through. Try again.")).toBeNull();
+    expect(screen.queryByText("Preparing your data…")).toBeNull();
+  });
+
+  it("says nothing while the picker is open and holds the buttons, then prepares once a folder is chosen (#465)", async () => {
+    const requests = fetchMock([
+      (req) =>
+        new URL(req.url).pathname === "/account/export"
+          ? (new Promise<Response>(() => undefined) as unknown as Response)
+          : null,
+    ]);
+    let choose: (folder: Directory) => void = () => undefined;
+    pickDirectory.mockImplementationOnce(
+      () =>
+        new Promise<Directory>((resolve) => {
+          choose = resolve;
+        }),
+    );
+    await show(<ExportData />);
+    await fireEvent.press(screen.getByRole("button", { name: "Download my data" }));
+    await waitFor(() => expect(pickDirectory).toHaveBeenCalledTimes(1));
+    await settle();
+    expect(screen.queryByText("Preparing your data…")).toBeNull();
     expect(
-      screen.queryByText(
-        "A file with everything Kuutti holds about you, and nothing about anyone else.",
-      ),
-    ).toBeNull();
+      screen.getByRole("button", { name: "Download my data" }).props.accessibilityState?.disabled,
+    ).toBe(true);
+    expect(exportRequests(requests)).toHaveLength(0);
+    await act(async () => choose(new Directory("content://picked")));
+    expect(await screen.findByText("Preparing your data…")).toBeTruthy();
+    expect(exportRequests(requests)).toHaveLength(1);
+  });
+
+  it("fetches once the folder is chosen, writes the zip there and says Done (#465, #581)", async () => {
+    const requests = fetchMock([
+      (req) => (new URL(req.url).pathname === "/account/export" ? zip() : null),
+    ]);
+    await show(<ExportData />);
+    await fireEvent.press(screen.getByRole("button", { name: "Download my data" }));
+    const line = await screen.findByText(SAVED);
+    expect(line.props.accessibilityLiveRegion).toBe("polite");
+    expect(exportRequests(requests)).toHaveLength(1);
+    expect(pickDirectory.mock.invocationCallOrder[0]).toBeLessThan(
+      (globalThis.fetch as jest.Mock).mock.invocationCallOrder[0] as number,
+    );
+    expect(bytesOf(cache.get(`content://picked/${ZIP_NAME}`))).toEqual(Array.from(ZIP));
+    // Android's live region says it; the announcement is iOS's alone.
+    expect(announced()).toEqual([]);
+  });
+
+  it("says the day's copies are used up after the folder is chosen, and writes nothing", async () => {
+    fetchMock([
+      (req) =>
+        new URL(req.url).pathname === "/account/export"
+          ? json({ error: { code: "export_budget_exceeded", message: "x", requestId: "r" } }, 429)
+          : null,
+    ]);
+    await show(<ExportData />);
+    await fireEvent.press(screen.getByRole("button", { name: "Download my data" }));
+    expect(
+      await screen.findByText("That is enough for today. You can try again after midnight."),
+    ).toBeTruthy();
+    expect(cache.size).toBe(0);
+    expect(screen.queryByText(SAVED)).toBeNull();
   });
 });
 
@@ -286,7 +424,7 @@ describe("shareExport on Android", () => {
     const os = jest.replaceProperty(Platform, "OS", "android");
     try {
       const share = jest.fn();
-      await shareExport({ name: ZIP_NAME, bytes: ZIP }, "Your Kuutti data", share);
+      await expect(shareExport(exportFile(), "Your Kuutti data", share)).resolves.toBe("saved");
       expect(share).not.toHaveBeenCalled();
       expect(bytesOf(cache.get(`content://picked/${ZIP_NAME}`))).toEqual(Array.from(ZIP));
       expect(cache.has(`file:///cache/${ZIP_NAME}`)).toBe(false);
@@ -296,7 +434,7 @@ describe("shareExport on Android", () => {
     }
   });
 
-  it("treats a cancelled picker as nothing to do, and any other failure as one", async () => {
+  it("treats a cancelled picker as nothing to do and asks for no file, and any other failure as one", async () => {
     const os = jest.replaceProperty(Platform, "OS", "android");
     try {
       pickDirectory.mockRejectedValueOnce(
@@ -304,14 +442,15 @@ describe("shareExport on Android", () => {
           code: "ERR_PICKER_CANCELLED",
         }),
       );
-      await expect(
-        shareExport({ name: ZIP_NAME, bytes: ZIP }, "Your Kuutti data", jest.fn()),
-      ).resolves.toBeUndefined();
+      const getFile = exportFile();
+      await expect(shareExport(getFile, "Your Kuutti data", jest.fn())).resolves.toBe("cancelled");
+      expect(getFile).not.toHaveBeenCalled();
       expect(cache.size).toBe(0);
       pickDirectory.mockRejectedValueOnce(new Error("no storage"));
-      await expect(
-        shareExport({ name: ZIP_NAME, bytes: ZIP }, "Your Kuutti data", jest.fn()),
-      ).rejects.toThrow("no storage");
+      await expect(shareExport(getFile, "Your Kuutti data", jest.fn())).rejects.toThrow(
+        "no storage",
+      );
+      expect(getFile).not.toHaveBeenCalled();
     } finally {
       os.restore();
     }
@@ -336,7 +475,7 @@ describe("shareExport on the web preview", () => {
     globals.URL.revokeObjectURL = revoked;
     try {
       const share = jest.fn();
-      await shareExport({ name: ZIP_NAME, bytes: ZIP }, "Your Kuutti data", share);
+      await expect(shareExport(exportFile(), "Your Kuutti data", share)).resolves.toBe("saved");
       expect(share).not.toHaveBeenCalled();
       expect(anchor).toMatchObject({ href: "blob:kuutti/1", download: ZIP_NAME });
       expect(click).toHaveBeenCalledTimes(1);

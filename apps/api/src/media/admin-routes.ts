@@ -74,9 +74,9 @@ const cardRoute = createRoute({
 const decisionRoute = createRoute({
   method: "post",
   path: "/admin/photos/{id}/decision",
-  summary: "Approve or reject a photo",
+  summary: "Approve or reject a queued photo, or take an approved one down",
   description:
-    "approve makes the photo visible to others; reject hides it and tells the owner the reason in words. Only a queued photo takes a decision, once. Only a person rejects. Written to audit_log.",
+    "approve makes a queued photo visible to others; reject hides it and tells the owner the reason in words. take_down rejects an approved profile photo (#477): nobody else is given it, and the owner is told the reason, with no appeal. Each decision is taken once, on the state it is for. Nothing is deleted. Written to audit_log.",
   ...bearer,
   request: { params: PhotoParams, body: { required: true, ...json(PhotoDecisionRequest) } },
   responses: {
@@ -85,7 +85,7 @@ const decisionRoute = createRoute({
     ...staffErrors,
     404: errorContent("No such photo."),
     409: errorContent(
-      "photo_not_queued: the photo is not waiting for a decision (already decided, or still being checked).",
+      "photo_not_queued: approve or reject on a photo not waiting for a decision (already decided, or still being checked). photo_not_approved: take_down on a photo that is not approved (taken down already, or never approved).",
     ),
   },
 });
@@ -159,31 +159,40 @@ export function photoAdminRoutes(deps: Deps, requireModerator: MiddlewareHandler
     const body = c.req.valid("json");
     const before = await repo.findPhotoForStaff(deps.db, id);
     if (!before) throw new AppError(404, "not_found", "No such photo");
-    const notQueued = () =>
-      new AppError(409, "photo_not_queued", "Only a queued photo takes a decision");
-    if (before.state !== "queued") throw notQueued();
+    // approve and reject decide a queued photo; take_down rejects an approved
+    // one (#477, ADR-006 §2), which is not a sanction, and nothing of it is
+    // deleted. The decision names the state it is for, never the state found,
+    // so a rejection sent from a queue read before another moderator's
+    // approval is refused, and the first decision stands.
+    const from = body.decision === "take_down" ? "approved" : "queued";
+    const refused = () =>
+      from === "approved"
+        ? new AppError(409, "photo_not_approved", "Only an approved photo is taken down")
+        : new AppError(409, "photo_not_queued", "Only a queued photo takes a decision");
+    if (before.state !== from) throw refused();
     const decision = body.decision === "approve" ? "approved" : "rejected";
-    const reason = body.decision === "reject" ? body.reason : null;
+    const reason = body.decision === "approve" ? null : body.reason;
     // The audit row and the decision are one unit: neither exists without the
-    // other. The update is keyed on the queued state, so of two moderators
-    // deciding at once exactly one writes, and the other's audit row is
-    // rolled back with the refusal.
+    // other. The update is keyed on the state the decision is for, so of two
+    // moderators deciding at once exactly one writes, and the other's audit
+    // row is rolled back with the refusal.
     const row = await transaction(deps.db, async (tx) => {
       await recordAudit(tx, {
         actorIdentityId: staff.identityId,
         action: body.decision === "approve" ? "photo.approve" : "photo.reject",
         subjectType: "photo",
         subjectId: id,
-        detail: { from: before.state, to: decision, reason },
+        detail: { from, to: decision, reason },
       });
       const updated = await repo.decidePhoto(tx, {
         photoId: id,
+        from,
         decision,
         reason,
         decidedBy: staff.identityId,
         at: now(),
       });
-      if (!updated) throw notQueued();
+      if (!updated) throw refused();
       // Approved on appeal: the check was wrong, and its note goes (#253).
       if (decision === "approved") {
         await withdrawPhotoCheckNote(tx, { accountId: before.accountId, photoId: id });
@@ -191,7 +200,7 @@ export function photoAdminRoutes(deps: Deps, requireModerator: MiddlewareHandler
       return updated;
     });
     deps.logger.info(
-      { staffIdentityId: staff.identityId, photoId: id, from: before.state, to: decision, reason },
+      { staffIdentityId: staff.identityId, photoId: id, from, to: decision, reason },
       "photo decided",
     );
     return c.json({ photoId: row.id, state: row.state, rejectionReason: row.rejectionReason }, 200);

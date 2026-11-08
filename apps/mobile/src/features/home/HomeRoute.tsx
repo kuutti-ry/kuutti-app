@@ -17,7 +17,7 @@ export function HomeRoute() {
     return (
       <SafeAreaView className="flex-1 bg-background">
         <View className="flex-1 items-center justify-center p-6">
-          <Text accessibilityLiveRegion="polite">{t("home.loading")}</Text>
+          <Text accessibilityLiveRegion="polite">{t("load.loading")}</Text>
         </View>
       </SafeAreaView>
     );

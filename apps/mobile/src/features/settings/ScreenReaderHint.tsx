@@ -62,7 +62,10 @@ export function ScreenReaderHint() {
     seen.current = true;
     setOpen(false);
     void writePreference("photoDescriptionsHintSeen", "true");
-    if (thenOpenTheSetting) router.push("/settings/photo-descriptions");
+    // The setting is a row of Settings that opens in place (#511): opened for the person.
+    if (thenOpenTheSetting) {
+      router.push({ pathname: "/settings", params: { open: "photoDescriptions" } });
+    }
   };
 
   return (

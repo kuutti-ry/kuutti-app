@@ -8,12 +8,14 @@ import { apiBaseUrl } from "@/lib/api-url";
 import {
   accessTokenIsStale,
   currentSession,
+  isCurrentSession,
   refreshSession,
   type StoredSession,
+  sessionGeneration,
 } from "@/lib/session";
 import { messageWithKnownDescription } from "./known";
 
-// The chat's socket (#349, ADR-031 §5): one connection at a time, which says
+// The chat's socket (#349, ADR-031 §9): one connection at a time, which says
 // what changed; writing stays on the HTTP routes. The access token goes in
 // the first frame, never in the URL.
 
@@ -79,7 +81,9 @@ function parsed(data: unknown): ServerFrame | null {
  */
 export function connect(handlers: SocketHandlers): () => void {
   const random = handlers.random ?? Math.random;
+  const generation = sessionGeneration();
   let stopped = false;
+  const ownsSession = () => !stopped && isCurrentSession(generation);
   // Pushed out by the person's own sixth app: this one waits until the app is
   // next brought to the front, or six of them would take turns pushing each
   // other out every second.
@@ -92,10 +96,12 @@ export function connect(handlers: SocketHandlers): () => void {
   let retry: ReturnType<typeof setTimeout> | undefined;
   let refresher: ReturnType<typeof setTimeout> | undefined;
 
-  const send = (ws: WebSocket, frame: ClientFrame) => ws.send(JSON.stringify(frame));
+  const send = (ws: WebSocket, frame: ClientFrame) => {
+    if (ownsSession()) ws.send(JSON.stringify(frame));
+  };
 
   const later = (wasOpen: boolean) => {
-    if (stopped) return;
+    if (!ownsSession()) return;
     failures += 1;
     if (wasOpen || failures >= LOST_AFTER_FAILURES) handlers.onStatus("lost");
     // Spread over the second half of the wait, so the phones a restart closed
@@ -111,7 +117,7 @@ export function connect(handlers: SocketHandlers): () => void {
   // never end.
   const keepFresh = (justRefreshed = false) => {
     const session = currentSession();
-    if (stopped || !live || !session) return;
+    if (!ownsSession() || !live || !session) return;
     const wait = new Date(session.accessExpiresAt).getTime() - REFRESH_LEAD_MS - Date.now();
     if (wait > 0) {
       refresher = setTimeout(() => keepFresh(), Math.min(wait, TIMER_MAX_MS));
@@ -127,6 +133,7 @@ export function connect(handlers: SocketHandlers): () => void {
   };
 
   const attempt = async () => {
+    if (!ownsSession()) return;
     let session: StoredSession | null;
     let ws: WebSocket;
     try {
@@ -135,7 +142,7 @@ export function connect(handlers: SocketHandlers): () => void {
         session = await refreshSession();
       }
       refreshFirst = false;
-      if (stopped || !session) return;
+      if (!ownsSession() || !session) return;
       ws = new globalThis.WebSocket(socketUrl());
     } catch {
       later(false);
@@ -144,9 +151,12 @@ export function connect(handlers: SocketHandlers): () => void {
     const token = session.accessToken;
     socket = ws;
     // React Native's send throws while the socket is still connecting.
-    ws.onopen = () => send(ws, { type: "auth", token });
+    ws.onopen = () => {
+      if (!ownsSession()) return ws.close();
+      send(ws, { type: "auth", token });
+    };
     ws.onmessage = (event) => {
-      const frame = socket === ws ? parsed(event.data) : null;
+      const frame = ownsSession() && socket === ws ? parsed(event.data) : null;
       if (!frame) return;
       if (frame.type === "ready") {
         live = true;
@@ -172,6 +182,7 @@ export function connect(handlers: SocketHandlers): () => void {
       const wasOpen = live;
       live = false;
       clearTimeout(refresher);
+      if (!ownsSession()) return;
       if (parked) {
         handlers.onStatus("lost");
         return;

@@ -10,8 +10,11 @@ Kuutti:
   fi: Kuutti
   sv: Kuutti
 
-pond:
-  definition: The group of people a member meets within, usually a city or region. One of the app's own words, used as a common noun ("your pond"). Pond names themselves come from the database with their case forms and are never built in a message.
+home:
+  definition: The one place a member says they live, given as a postal code and asked of everybody. The postal code is what they type; others see a name, a town or their area, never the digits. Not a word for the app's home screen, and not a word for a town or an area in general.
+
+distance bands:
+  definition: How far another person lives, always one of four words, nearest first - Nearby, Close, Around, Far. They stand alone on a card and on the buttons of a filter, and never mean a number of kilometres, which is a setting behind them. Far says only that; it must not read as a judgement of the person.
 
 round:
   definition: The small, fixed set of profiles a member receives once a day. There is no feed and nothing loads after it; the word should sound finite and calm.
@@ -21,6 +24,9 @@ like:
 
 pass:
   definition: Deciding not to talk to someone in this round. Neutral and kind; it must not read as rejection or as a judgement of the other person.
+
+star:
+  definition: A private mark a member puts on somebody's card, to come back to them later without a like or a pass. Only the member sees it; a bookmark, never a rating or a super like. Starred means having one.
 
 standing:
   definition: Whether a verified person is in good standing, suspended or banned. Used in moderation and account notices; formal, factual register.
@@ -35,7 +41,7 @@ moderator:
   definition: A person of the association who reads reports and checks photos, and may warn, suspend or ban (ADR-024). A person, never "the system" or an algorithm; plain register, not a legal or police word.
 
 contact:
-  definition: A way to reach a person outside the app that they keep in Settings, under Your contacts (#103) - a phone number, WhatsApp, Telegram or Instagram. Nobody sees one until its owner shares it in one conversation, and it disappears there when they stop sharing it, change or remove it, or the conversation ends. Not an address-book entry and not a social "connection"; sharing asks nothing back. The brand names stay as they are in every language.
+  definition: A way to reach a person outside the app that they keep in Settings, under Ways to reach you (#103) - a phone number, WhatsApp, Telegram, Instagram or Snapchat. Nobody sees one until its owner shares it in one conversation, and it disappears there when they stop sharing it, change or remove it, or the conversation ends. Not an address-book entry and not a social "connection"; sharing asks nothing back. The brand names stay as they are in every language.
 
 end a conversation:
   definition: Either person's choice to close a conversation for both of them (#351, the unmatch of #101). Nobody can write in it again, nobody is blocked, and either can still report it for a while. Neither person is told who ended it or how. Plain and calm; not a word for rejecting, breaking up or blocking, and not "unmatch".

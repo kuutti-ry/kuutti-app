@@ -182,6 +182,7 @@ describe("the contacts a person keeps", () => {
       value: "aino.koskinen",
       updatedAt: expect.any(String),
     });
+    expect((await kept(ctx.app, a, "snapchat", "@Aino.Snaps")).value).toBe("aino.snaps");
     expect((await kept(ctx.app, a, "telegram", "@aino_k")).value).toBe("aino_k");
     expect((await kept(ctx.app, a, "whatsapp", "00 46 (70) 123-45-67")).value).toBe("+46701234567");
     expect((await kept(ctx.app, a, "phone", "040 123 4567")).value).toBe("+358401234567");
@@ -193,8 +194,9 @@ describe("the contacts a person keeps", () => {
       ["whatsapp", "+46701234567"],
       ["telegram", "aino_k"],
       ["instagram", "aino.koskinen"],
+      ["snapchat", "aino.snaps"],
     ]);
-    expect(await storedOf(ctx, a)).toHaveLength(4);
+    expect(await storedOf(ctx, a)).toHaveLength(5);
     // A's view of the conversation offers them, none shared; B sees none of them.
     expect((await detailOf(ctx.app, a, id)).contacts).toEqual({
       mine: list.contacts.map((c) => ({ kind: c.kind, value: c.value, shared: false })),
@@ -218,6 +220,7 @@ describe("the contacts a person keeps", () => {
         "aino..koskinen",
         "contact_invalid",
       ],
+      ["a Snapchat username ending with a hyphen", "snapchat", "aino-", "contact_invalid"],
       ["empty", "phone", "", "validation_failed"],
       ["over sixty-four characters", "instagram", "ainokoskinen".repeat(6), "validation_failed"],
       ["of a kind there is none of", "signal", "+358401234567", "validation_failed"],

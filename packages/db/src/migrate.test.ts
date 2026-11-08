@@ -1,14 +1,12 @@
 import { spawn } from "node:child_process";
-import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { resolve } from "node:path";
 import { ConfigKeyName, ConfigVersion } from "@kuutti/schema";
 import { describe, expect, it } from "vitest";
 import { readJournal } from "./journal.ts";
 import { migrate } from "./migrate.ts";
 import { migrationsStatus } from "./migrations.ts";
-import { createPool } from "./pool.ts";
-import { MATCHING_CONFIG_V1, MATCHING_CONFIG_V2 } from "./seed.ts";
+import { createPool, type Queryable } from "./pool.ts";
+import { MATCHING_CONFIG_V1 } from "./seed.ts";
 import { withTemporaryDatabase } from "./test/temporary-database.ts";
 
 const MIGRATIONS = resolve(import.meta.dirname, "..", "drizzle");
@@ -56,7 +54,7 @@ describe("migrate", () => {
     });
   });
 
-  it("carries matching_config versions 1 and 2, the same rows as the seed", async () => {
+  it("carries matching_config's version 1, the same rows as the seed, and no later version", async () => {
     await withTemporaryDatabase(async (url) => {
       const pool = createPool({ connectionString: url, max: 2 });
       try {
@@ -69,133 +67,154 @@ describe("migrate", () => {
             rows.filter((r) => r.version === version).map((r) => [r.key, r.value]),
           );
         expect(at(1)).toEqual(MATCHING_CONFIG_V1);
-        expect(at(2)).toEqual(MATCHING_CONFIG_V2);
+        expect(rows.filter((r) => r.version !== 1)).toEqual([]);
       } finally {
         await pool.end();
       }
     });
   });
 
-  it("migration 0026 turns a stored single field or line of work into an array and leaves arrays alone (#178)", async () => {
+  it("starts a database with the one pond, closed, the tunables, and no other row (ADR-060, ADR-061 §8)", async () => {
     await withTemporaryDatabase(async (url) => {
-      const pool = createPool({ connectionString: url, max: 1 });
+      const pool = createPool({ connectionString: url, max: 2 });
       try {
         await migrate(pool, MIGRATIONS);
-        // A profile written before the registry made the two fields multi-choice (ADR-019 §1, amended).
-        const identity = await pool.query<{ id: string }>(
-          "INSERT INTO identity (hetu_hmac) VALUES ($1) RETURNING id",
-          ["f".repeat(64)],
+        const ponds = await pool.query("SELECT slug, name_nominative, matching_open FROM ponds");
+        expect(ponds.rows).toEqual([
+          { slug: "suomi", name_nominative: "Suomi", matching_open: false },
+        ]);
+        const { rows: tables } = await pool.query<{ table_name: string }>(
+          `SELECT table_name FROM information_schema.tables
+            WHERE table_schema = 'public' AND table_type = 'BASE TABLE' ORDER BY 1`,
         );
-        const account = await pool.query<{ id: string }>(
-          "INSERT INTO account (identity_id) VALUES ($1) RETURNING id",
-          [identity.rows[0]?.id],
-        );
-        const accountId = account.rows[0]?.id;
+        const holding: Record<string, number> = {};
+        for (const { table_name: table } of tables) {
+          const { rows } = await pool.query<{ n: string }>(`SELECT count(*) AS n FROM "${table}"`);
+          if (Number(rows[0]?.n) > 0) holding[table] = Number(rows[0]?.n);
+        }
+        expect(holding).toEqual({
+          matching_config: Object.keys(MATCHING_CONFIG_V1).length,
+          ponds: 1,
+        });
+      } finally {
+        await pool.end();
+      }
+    });
+  });
+
+  it("writes every row so that it reads in the panel as a version without a reason, and a later version may carry one (#304, #305)", async () => {
+    await withTemporaryDatabase(async (url) => {
+      const pool = createPool({ connectionString: url, max: 2 });
+      try {
+        await migrate(pool, MIGRATIONS);
+        const { rows } = await pool.query<{
+          key: string;
+          version: number;
+          value: unknown;
+          valid_from: Date;
+          created_by: string;
+          reason: string | null;
+        }>("SELECT key, version, value, valid_from, created_by, reason FROM matching_config");
+        expect(rows.length).toBeGreaterThan(0);
+        for (const row of rows) {
+          expect(row.reason, row.key).toBeNull();
+          expect(ConfigKeyName.safeParse(row.key).success, row.key).toBe(true);
+          expect(
+            ConfigVersion.safeParse({
+              version: row.version,
+              value: row.value,
+              validFrom: row.valid_from.toISOString(),
+              createdBy: row.created_by,
+              reason: row.reason,
+            }).error,
+            row.key,
+          ).toBeUndefined();
+        }
+
+        // A row without a reason is still written, as the seed writes one; the panel's carries its reason.
         await pool.query(
-          `INSERT INTO profile (account_id, display_name, bio, bio_preset, fields, prompts, created_at, updated_at)
-           VALUES ($1, 'A', NULL, NULL, $2::jsonb, '[]'::jsonb, now(), now())`,
-          [accountId, JSON.stringify({ field: "arts", occupation: ["science"], smoking: "never" })],
+          `INSERT INTO matching_config (version, key, value, created_by)
+           VALUES (2, 'stars_max', '12'::jsonb, 'seed')`,
         );
-        const sql = readFileSync(
-          resolve(MIGRATIONS, "0026_profile_fields_multi_occupation_field.sql"),
-          "utf8",
+        await pool.query(
+          `INSERT INTO matching_config (version, key, value, created_by, reason)
+           VALUES (2, 'inbox_stop', '25'::jsonb, 'admin', 'Smaller piles first')`,
         );
-        const fields = async () =>
-          (
-            await pool.query<{ fields: Record<string, unknown> }>(
-              "SELECT fields FROM profile WHERE account_id = $1",
-              [accountId],
-            )
-          ).rows[0]?.fields;
-        await pool.query(sql);
-        expect(await fields()).toEqual({
-          field: ["arts"],
-          occupation: ["science"],
-          smoking: "never",
-        });
-        // Idempotent: a second run changes nothing.
-        await pool.query(sql);
-        expect(await fields()).toEqual({
-          field: ["arts"],
-          occupation: ["science"],
-          smoking: "never",
-        });
+        const written = await pool.query<{ key: string; reason: string | null }>(
+          `SELECT key, reason FROM matching_config WHERE version = 2 ORDER BY key`,
+        );
+        expect(written.rows).toEqual([
+          { key: "inbox_stop", reason: "Smaller piles first" },
+          { key: "stars_max", reason: null },
+        ]);
       } finally {
         await pool.end();
       }
     });
   });
 
-  it("migration 0037 takes the coffee party out of stored politics and leaves none of them alone (#239)", async () => {
+  it("refuses a database whose journal still ends at the chain folded into the baseline, leaves it as it was, and has nothing to apply once its journal is stamped (ADR-065)", async () => {
     await withTemporaryDatabase(async (url) => {
-      const pool = createPool({ connectionString: url, max: 1 });
+      const pool = createPool({ connectionString: url, max: 2 });
       try {
         await migrate(pool, MIGRATIONS);
-        // Answers written while the registry still listed the coffee party and allowed a mix.
-        const stored: Record<string, Record<string, unknown>> = {
-          joke: { politics: ["kahvipuolue"], smoking: "never" },
-          jokeAmong: { politics: ["vihr", "kahvipuolue", "sdp"] },
-          mix: { politics: ["none_of_them", "kok"] },
-          all: { politics: ["kok", "none_of_them", "kahvipuolue"] },
-          noneAndJoke: { politics: ["none_of_them", "kahvipuolue"] },
-          none: { politics: ["none_of_them"] },
-          parties: { politics: ["vas", "vihr"] },
-          unanswered: { religion: "atheist" },
-          empty: {},
-        };
-        const ids: Record<string, string> = {};
-        for (const [index, [name, fields]] of Object.entries(stored).entries()) {
-          const identity = await pool.query<{ id: string }>(
-            "INSERT INTO identity (hetu_hmac) VALUES ($1) RETURNING id",
-            [index.toString(16).padStart(64, "e")],
+        await accountOf(pool, "9");
+        const journal = () =>
+          pool.query<{ hash: string; created_at: string }>(
+            "SELECT hash, created_at FROM drizzle.__drizzle_migrations ORDER BY created_at",
           );
-          const account = await pool.query<{ id: string }>(
-            "INSERT INTO account (identity_id) VALUES ($1) RETURNING id",
-            [identity.rows[0]?.id],
-          );
-          ids[name] = account.rows[0]?.id ?? "";
+        const stamped = (await journal()).rows;
+        // 0109_pond_counter_finished, the chain's last, as the journal of a database that ran it ends.
+        await pool.query("DELETE FROM drizzle.__drizzle_migrations");
+        await pool.query(
+          "INSERT INTO drizzle.__drizzle_migrations (hash, created_at) VALUES ('the chain', 1793827411048)",
+        );
+        const before = await pool.query("SELECT count(*) AS n FROM matching_config");
+
+        await expect(migrate(pool, MIGRATIONS)).rejects.toMatchObject({
+          cause: { code: "42710" },
+        });
+
+        expect((await journal()).rows).toEqual([
+          { hash: "the chain", created_at: "1793827411048" },
+        ]);
+        expect((await pool.query("SELECT count(*) AS n FROM matching_config")).rows).toEqual(
+          before.rows,
+        );
+        expect((await pool.query("SELECT count(*) AS n FROM account")).rows).toEqual([{ n: "1" }]);
+        const journalNames = (readJournal(MIGRATIONS) ?? []).map((entry) => entry.tag);
+        expect(await migrationsStatus(pool, MIGRATIONS)).toEqual({
+          state: "pending",
+          applied: 0,
+          pending: journalNames,
+        });
+
+        // The way across where the schema is the one the chain left: the folder's own rows in the journal.
+        await pool.query("DELETE FROM drizzle.__drizzle_migrations");
+        for (const row of stamped) {
           await pool.query(
-            `INSERT INTO profile (account_id, display_name, bio, bio_preset, fields, prompts, created_at, updated_at)
-             VALUES ($1, 'A', NULL, NULL, $2::jsonb, '[]'::jsonb, now(), now())`,
-            [ids[name], JSON.stringify(fields)],
+            "INSERT INTO drizzle.__drizzle_migrations (hash, created_at) VALUES ($1, $2)",
+            [row.hash, row.created_at],
           );
         }
-        const sql = readFileSync(resolve(MIGRATIONS, "0037_politics_options.sql"), "utf8");
-        const after = async () => {
-          const rows = await pool.query<{ account_id: string; fields: Record<string, unknown> }>(
-            "SELECT account_id, fields FROM profile",
-          );
-          const byId = new Map(rows.rows.map((row) => [row.account_id, row.fields]));
-          return Object.fromEntries(
-            Object.keys(stored).map((name) => [name, byId.get(ids[name] ?? "")]),
-          );
-        };
-        const expected = {
-          joke: { smoking: "never" },
-          jokeAmong: { politics: ["vihr", "sdp"] },
-          mix: { politics: ["kok"] },
-          all: { politics: ["kok"] },
-          noneAndJoke: { politics: ["none_of_them"] },
-          none: { politics: ["none_of_them"] },
-          parties: { politics: ["vas", "vihr"] },
-          unanswered: { religion: "atheist" },
-          empty: {},
-        };
-        await pool.query(sql);
-        expect(await after()).toEqual(expected);
-        // Idempotent: a second run changes nothing.
-        await pool.query(sql);
-        expect(await after()).toEqual(expected);
+        expect(await migrate(pool, MIGRATIONS)).toEqual({ state: "nothing-to-do", applied: 0 });
+        expect((await migrationsStatus(pool, MIGRATIONS)).state).toBe("current");
+        expect((await pool.query("SELECT count(*) AS n FROM account")).rows).toEqual([{ n: "1" }]);
       } finally {
         await pool.end();
       }
     });
   });
 
-  /**
-   * A migrated temporary database with one identity and account, and an
-   * insert of a sanction row that defaults to a plain warning.
-   */
+  const accountOf = async (pool: Queryable, n: string) => {
+    const { rows } = await pool.query<{ id: string }>(
+      `WITH i AS (INSERT INTO identity (hetu_hmac) VALUES ($1) RETURNING id)
+       INSERT INTO account (identity_id) SELECT id FROM i RETURNING id`,
+      [n.repeat(64)],
+    );
+    return rows[0]?.id as string;
+  };
+
   async function withSanctionTable(
     fn: (
       insert: (row: Record<string, unknown>) => Promise<unknown>,
@@ -242,7 +261,7 @@ describe("migrate", () => {
   const END = "2026-10-21T21:00:00Z";
   const AT = "2026-10-20T09:00:00Z";
 
-  it("migration 0046 holds a sanction's end, note, lift and review together in the database (#307)", async () => {
+  it("holds a sanction's end, note, lift and review together in the database (#307)", async () => {
     await withSanctionTable(async (insert, { identityId, pool }) => {
       // Only a suspension has an end, and a suspension always has one.
       await expect(insert({ kind: "suspend" })).rejects.toMatchObject(
@@ -285,7 +304,7 @@ describe("migrate", () => {
     });
   });
 
-  it("migration 0046 refuses a review with its time and who but without a note (#307)", async () => {
+  it("refuses a review with its time and who but without a note (#307)", async () => {
     // A review's note is one to 500 characters (ADR-024 §1); a missing one is not a review.
     await withSanctionTable(async (insert, { identityId }) => {
       await expect(insert({ reviewed_at: AT, reviewed_by: identityId })).rejects.toMatchObject(
@@ -294,26 +313,15 @@ describe("migrate", () => {
     });
   });
 
-  it("migration 0079 holds an invitation open, redeemed or counted, a unit to its spending, and a notice to what it is about, from an empty database in one transaction (#107)", async () => {
-    // The whole folder in one transaction, as the migrator applies it: the
-    // notice's check names the old kind, so the kind 0079 adds is never used
-    // before its commit (ADR-044 §3).
+  it("holds an invitation open, redeemed or counted, a unit to its spending, and a notice to what it is about (#107)", async () => {
     await withTemporaryDatabase(async (url) => {
       const pool = createPool({ connectionString: url, max: 1 });
       try {
         await migrate(pool, MIGRATIONS);
-        const accountOf = async (n: string) => {
-          const { rows } = await pool.query<{ id: string }>(
-            `WITH i AS (INSERT INTO identity (hetu_hmac) VALUES ($1) RETURNING id)
-             INSERT INTO account (identity_id) SELECT id FROM i RETURNING id`,
-            [n.repeat(64)],
-          );
-          return rows[0]?.id as string;
-        };
         const [inviter, friend, other] = [
-          await accountOf("6"),
-          await accountOf("7"),
-          await accountOf("8"),
+          await accountOf(pool, "6"),
+          await accountOf(pool, "7"),
+          await accountOf(pool, "8"),
         ];
         let codes = 0;
         const invite = (row: Record<string, unknown> = {}) => {
@@ -391,43 +399,49 @@ describe("migrate", () => {
         const entryId = entries[0]?.id;
         await expect(
           pool.query(
-            "INSERT INTO reward (account_id, kind, invitation_id, spent_entry_id) VALUES ($1, 'like', $2, $3)",
+            "INSERT INTO reward (account_id, kind, invitation_id, spent_entry_id) VALUES ($1, 'fish', $2, $3)",
             [inviter, usedId, entryId],
           ),
         ).rejects.toMatchObject(refused("reward_spent_check"));
         await pool.query(
           `INSERT INTO reward (account_id, kind, invitation_id, spent_at, spent_entry_id)
-           VALUES ($1, 'like', $2, $3, $4), ($1, 'fish', $2, NULL, NULL)`,
+           VALUES ($1, 'fish', $2, $3, $4), ($1, 'fish', $2, NULL, NULL)`,
           [inviter, usedId, AT, entryId],
         );
-        await expect(
-          pool.query(
-            "INSERT INTO reward (account_id, kind, invitation_id) VALUES ($1, 'boost', $2)",
-            [inviter, usedId],
-          ),
-        ).rejects.toMatchObject({ code: "22P02" });
+        // Earned likes went with #503.
+        for (const kind of ["boost", "like"]) {
+          await expect(
+            pool.query("INSERT INTO reward (account_id, kind, invitation_id) VALUES ($1, $3, $2)", [
+              inviter,
+              usedId,
+              kind,
+            ]),
+          ).rejects.toMatchObject({ code: "22P02" });
+        }
         await pool.query("DELETE FROM round_entries WHERE id = $1", [entryId]);
         const spent = await pool.query<{ kind: string; spent: boolean; entry: string | null }>(
-          `SELECT kind, spent_at IS NOT NULL AS spent, spent_entry_id AS entry FROM reward ORDER BY kind`,
+          `SELECT kind, spent_at IS NOT NULL AS spent, spent_entry_id AS entry FROM reward
+           ORDER BY spent_at NULLS LAST`,
         );
-        // In the enum's order: like, then fish.
         expect(spent.rows).toEqual([
-          { kind: "like", spent: true, entry: null },
+          { kind: "fish", spent: true, entry: null },
           { kind: "fish", spent: false, entry: null },
         ]);
 
-        // A counted invitation's notice points at its invitation, and only it does.
+        // An invitation's notice, either side's, points at its invitation, and only it does.
         const notice = (kind: string, invitationId: string | null) =>
           pool.query("INSERT INTO notice (account_id, kind, invitation_id) VALUES ($1, $2, $3)", [
             inviter,
             kind,
             invitationId,
           ]);
-        await expect(notice("invitation_counted", null)).rejects.toMatchObject(
-          refused("notice_invitation_check"),
-        );
+        for (const kind of ["invitation_counted", "invitation_friend"]) {
+          await expect(notice(kind, null)).rejects.toMatchObject(
+            refused("notice_invitation_check"),
+          );
+          await notice(kind, usedId);
+        }
         await expect(notice("warning", usedId)).rejects.toMatchObject({ code: "23514" });
-        await notice("invitation_counted", usedId);
 
         // The units and the notice go with their invitation.
         await pool.query("DELETE FROM invitation WHERE id = $1", [usedId]);
@@ -441,139 +455,101 @@ describe("migrate", () => {
     });
   });
 
-  /**
-   * A copy of the migrations folder whose journal ends just before `tag`, so a
-   * database can be brought to the state a deployed one had before it.
-   */
-  function migrationsBefore(tag: string): string {
-    const journal = readJournal(MIGRATIONS) ?? [];
-    const end = journal.findIndex((entry) => entry.tag === tag);
-    expect(end, tag).toBeGreaterThan(0);
-    const dir = mkdtempSync(join(tmpdir(), "kuutti-db-"));
-    mkdirSync(join(dir, "meta"));
-    const entries = journal.slice(0, end);
-    for (const entry of entries) {
-      copyFileSync(resolve(MIGRATIONS, `${entry.tag}.sql`), join(dir, `${entry.tag}.sql`));
-    }
-    writeFileSync(join(dir, "meta", "_journal.json"), JSON.stringify({ version: "7", entries }));
-    return dir;
-  }
+  it("holds a session to a family hash of its own (#490, ADR-059)", async () => {
+    await withTemporaryDatabase(async (url) => {
+      const pool = createPool({ connectionString: url, max: 1 });
+      try {
+        await migrate(pool, MIGRATIONS);
+        const accountId = await accountOf(pool, "a");
+        const insert = (family: string | null, refresh: string) =>
+          pool.query(
+            `INSERT INTO session (account_id, platform, access_hash, access_expires_at, refresh_hash, family_hash, expires_at)
+             VALUES ($1, 'ios', $2, now() + interval '15 minutes', $2, $3, now() + interval '90 days')`,
+            [accountId, refresh, family],
+          );
+        await insert("f1", "r1");
+        await expect(insert(null, "r2")).rejects.toMatchObject({ code: "23502" });
+        await expect(insert("f1", "r3")).rejects.toMatchObject({
+          code: "23505",
+          constraint: "session_family_hash_unique",
+        });
+      } finally {
+        await pool.end();
+      }
+    });
+  });
 
-  it("migration 0047 adds the reason to matching_config, nullable, and keeps every row as it was (#305)", async () => {
-    const before0047 = migrationsBefore("0047_config_reason");
-    // 0047 alone: a later migration's rows are not this one's to keep.
-    const through0047 = migrationsBefore("0048_moderation_response_hours");
-    try {
-      await withTemporaryDatabase(async (url) => {
-        const pool = createPool({ connectionString: url, max: 2 });
-        try {
-          await migrate(pool, before0047);
-          const reasonColumn = () =>
-            pool.query<{ data_type: string; is_nullable: string; column_default: string | null }>(
-              `SELECT data_type, is_nullable, column_default FROM information_schema.columns
-               WHERE table_schema = 'public' AND table_name = 'matching_config' AND column_name = 'reason'`,
-            );
-          expect((await reasonColumn()).rows).toEqual([]);
-          const columns = "id, key, version, value, valid_from, created_by";
-          const order = "ORDER BY key, version";
-          const rows = (
-            await pool.query<Record<string, unknown>>(
-              `SELECT ${columns} FROM matching_config ${order}`,
-            )
-          ).rows;
-          // Versions 1 and 2 of the migrations before it, every one of them;
-          // the keys a later migration adds (0072, #378; 0048, #303; 0052, #84; 0054, #348; 0057, #350; 0061, #351; 0065, #105; 0068, #376; 0075, #86; 0078, #385; 0080, #107) are not there yet.
-          const later = new Set([
-            "moderation_response_hours",
-            "reports_per_day",
-            "message_max_length",
-            "messages_per_minute",
-            "message_photos_per_day",
-            "message_photo_attempts_per_day",
-            "report_after_close_days",
-            "auto_shadow_ban_reports",
-            "auto_shadow_ban_reports_days",
-            "auto_shadow_ban_first_messages",
-            "auto_shadow_ban_first_messages_minutes",
-            "auto_shadow_ban_same_first_message",
-            "auto_shadow_ban_same_first_message_hours",
-            "auto_shadow_ban_review_hours",
-            "auto_shadow_ban_photo_fetches",
-            "auto_shadow_ban_photo_fetches_minutes",
-            "auto_shadow_ban_cards_served",
-            "auto_shadow_ban_cards_served_minutes",
-            "auto_shadow_ban_round_reads",
-            "auto_shadow_ban_round_reads_minutes",
-            "photo_queue_reject_days",
-            "fish_budget",
-            "fish_window_days",
-            "email_code_minutes",
-            "email_code_attempts",
-            "email_codes_per_day",
-            "invitation_reward",
-            "invitations_open",
-            "invitation_tries_per_day",
-          ]);
-          // A key's second version a later migration writes (0069, #95; 0070, #98) is not there yet either.
-          const laterVersions = new Set(["round_size", "like_budget_balanced"]);
-          expect(rows).toHaveLength(
-            Object.keys(MATCHING_CONFIG_V1).filter((key) => !later.has(key)).length +
-              Object.keys(MATCHING_CONFIG_V2).filter((key) => !laterVersions.has(key)).length,
+  it("lets only a pass carry the second pass's mark (#502, ADR-062 §6)", async () => {
+    await withTemporaryDatabase(async (url) => {
+      const pool = createPool({ connectionString: url, max: 1 });
+      try {
+        await migrate(pool, MIGRATIONS);
+        const [one, other] = [await accountOf(pool, "b"), await accountOf(pool, "c")];
+        const { rows: rounds } = await pool.query<{ id: string }>(
+          "INSERT INTO rounds (account_id, day) VALUES ($1, '2026-10-30') RETURNING id",
+          [one],
+        );
+        await pool.query(
+          `INSERT INTO round_entries (round_id, position, candidate_id, reason, decision, decided_at)
+           VALUES ($1, 1, $2, 'matches_filters', 'pass', now())`,
+          [rounds[0]?.id, other],
+        );
+        // A pass is a first pass until it says otherwise.
+        const entries = await pool.query("SELECT second_pass FROM round_entries");
+        expect(entries.rows).toEqual([{ second_pass: false }]);
+        const mark = (value: boolean, decision: string) =>
+          pool.query(
+            "UPDATE round_entries SET decision = $2::round_decision, second_pass = $1 RETURNING second_pass",
+            [value, decision],
           );
-
-          expect(await migrate(pool, through0047)).toEqual({ state: "applied", applied: 1 });
-          expect((await reasonColumn()).rows).toEqual([
-            { data_type: "text", is_nullable: "YES", column_default: null },
-          ]);
-          const after = await pool.query<{
-            key: string;
-            version: number;
-            value: unknown;
-            valid_from: Date;
-            created_by: string;
-            reason: string | null;
-          }>(`SELECT ${columns}, reason FROM matching_config ${order}`);
-          expect(after.rows).toEqual(rows.map((row) => ({ ...row, reason: null })));
-          // Each row reads in the panel as a version without a reason (#304).
-          for (const row of after.rows) {
-            expect(ConfigKeyName.safeParse(row.key).success, row.key).toBe(true);
-            expect(
-              ConfigVersion.safeParse({
-                version: row.version,
-                value: row.value,
-                validFrom: row.valid_from.toISOString(),
-                createdBy: row.created_by,
-                reason: row.reason,
-              }).error,
-              row.key,
-            ).toBeUndefined();
-          }
-
-          // A row without a reason is still written, as the seed writes one; the panel's carries its reason.
-          await pool.query(
-            `INSERT INTO matching_config (version, key, value, valid_from, created_by)
-             VALUES (3, 'default_pond', '"suomi"'::jsonb, '2026-10-16T09:00:00Z', 'seed')`,
+        expect((await mark(true, "pass")).rows).toEqual([{ second_pass: true }]);
+        expect((await mark(false, "skip")).rows).toEqual([{ second_pass: false }]);
+        for (const decision of ["like", "skip"]) {
+          await expect(mark(true, decision), decision).rejects.toThrow(
+            /round_entries_second_pass_check/,
           );
-          await pool.query(
-            `INSERT INTO matching_config (version, key, value, valid_from, created_by, reason)
-             VALUES (2, 'gate_k', '25'::jsonb, '2026-10-16T09:00:00Z', 'admin', 'Smaller ponds first')`,
-          );
-          const written = await pool.query<{ key: string; reason: string | null }>(
-            `SELECT key, reason FROM matching_config
-             WHERE (key, version) IN (('default_pond', 3), ('gate_k', 2)) ORDER BY key`,
-          );
-          expect(written.rows).toEqual([
-            { key: "default_pond", reason: null },
-            { key: "gate_k", reason: "Smaller ponds first" },
-          ]);
-        } finally {
-          await pool.end();
         }
-      });
-    } finally {
-      rmSync(before0047, { recursive: true, force: true });
-      rmSync(through0047, { recursive: true, force: true });
-    }
+      } finally {
+        await pool.end();
+      }
+    });
+  });
+
+  it("stands a counter's row that names no number at zero, and never at null (#581)", async () => {
+    await withTemporaryDatabase(async (url) => {
+      const pool = createPool({ connectionString: url, max: 1 });
+      try {
+        await migrate(pool, MIGRATIONS);
+        const { rows } = await pool.query<{ finished: number }>(
+          `INSERT INTO pond_counter (pond_id, day)
+           SELECT id, '2026-11-04' FROM ponds WHERE slug = 'suomi' RETURNING finished`,
+        );
+        expect(rows).toEqual([{ finished: 0 }]);
+        await expect(pool.query("UPDATE pond_counter SET finished = NULL")).rejects.toMatchObject({
+          code: "23502",
+        });
+      } finally {
+        await pool.end();
+      }
+    });
+  });
+
+  it("refuses a TRUNCATE of events while no partition stands to refuse it itself (ADR-011)", async () => {
+    // Each partition carries its own guard from the boot (ensureEventPartitions), and a
+    // TRUNCATE of the parent fires the partitions' too; before the first, only the parent's stands.
+    await withTemporaryDatabase(async (url) => {
+      const pool = createPool({ connectionString: url, max: 1 });
+      try {
+        await migrate(pool, MIGRATIONS);
+        const partitions = await pool.query(
+          "SELECT count(*) AS n FROM pg_inherits WHERE inhparent = 'events'::regclass",
+        );
+        expect(partitions.rows).toEqual([{ n: "0" }]);
+        await expect(pool.query("TRUNCATE events")).rejects.toMatchObject({ code: "42501" });
+      } finally {
+        await pool.end();
+      }
+    });
   });
 
   it("is a no-op the second time", async () => {
@@ -589,6 +565,8 @@ describe("migrate", () => {
           "account",
           "account_export",
           "admin_session",
+          // What Kuutti told everybody, kept for good (#573, ADR-068).
+          "announcement",
           "audit_log",
           "auth_request",
           "block",
@@ -603,7 +581,6 @@ describe("migrate", () => {
           "events",
           "feedback",
           "found_them_count",
-          "gate",
           "identity",
           "invitation",
           "matching_config",
@@ -615,9 +592,11 @@ describe("migrate", () => {
           "photo_access",
           "photo_check_note",
           "photo_review",
+          "pond_counter",
           "ponds",
           "preferences",
           "profile",
+          "push_token",
           "report",
           "report_message",
           "research_subject",
@@ -627,7 +606,7 @@ describe("migrate", () => {
           "rounds",
           "sanction",
           "session",
-          "waitlist_snapshot",
+          "star",
         ]);
       } finally {
         await pool.end();

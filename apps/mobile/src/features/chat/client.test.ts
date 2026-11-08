@@ -72,7 +72,7 @@ beforeEach(async () => {
     sessionId: "6f1c1c4e-9a8e-4a0b-9c3a-0c8d1e2f3a4b",
     accessToken: token("access"),
     accessExpiresAt: "2030-01-01T00:15:00.000Z",
-    refreshToken: token("refresh"),
+    refreshToken: `${token("family")}.${token("refresh")}`,
     refreshExpiresAt: "2030-04-01T00:00:00.000Z",
   });
 });
@@ -177,6 +177,7 @@ describe("the contacts' routes (#103)", () => {
     counterpart: { deleted: false, name: "Sanna", age: 31, thumb: null },
     lastMessage: null,
     unread: 0,
+    yourTurn: true,
     limits: { maxLength: 30 },
     counterpartReadUpTo: 0,
     contacts: { mine: [{ kind: "instagram", value: "aino.k", shared: true }], theirs: [] },

@@ -1,5 +1,7 @@
 import type { Queryable } from "@kuutti/db";
 import type {
+  PhotoId,
+  PhotoState,
   ReportActable,
   ReportCopyLine,
   ReportDecision,
@@ -8,6 +10,7 @@ import type {
   ReportListItem,
   ReportMessageSide,
   ReportOutcome,
+  ReportPointedPhoto,
   ReportQueueQuery,
   ReportSource,
   SanctionKind,
@@ -22,9 +25,10 @@ import { recordAudit } from "./audit.ts";
 // account of their identity, past or present, is not shown it, cannot open or
 // decide it, and it counts in no figure they read (ADR-030 §6, Open 17): a
 // moderator never learns who reported them, and every statement here holds
-// that in its own WHERE. The reporter's note and the conversation's frozen
-// copy are read only when a report is opened, after its audit row (the
-// route's), and their words go nowhere but the answer (rule 5).
+// that in its own WHERE. The reporter's note, the conversation's frozen copy
+// and the photo the report points at (#476) are read only when a report is
+// opened, after its audit row (the route's), and their words go nowhere but
+// the answer (rule 5).
 
 /** The reading member of staff's accounts, the CTE every statement here starts with; `$1` is their identity. */
 const MINE = "WITH mine AS (SELECT id FROM account WHERE identity_id = $1)";
@@ -170,11 +174,32 @@ type ActableRow = {
   lifted_at: Date | null;
 };
 
+type PointerRow = {
+  line_seq: number | null;
+  photo_pointed: boolean;
+  photo_id: string | null;
+  photo_state: PhotoState | null;
+  approved_photos: number;
+};
+
+/** A card's pointed photo as the panel reads it (#476): none, removed since, or held with what a take-down needs. */
+function pointedPhotoOf(row: PointerRow): ReportPointedPhoto | null {
+  if (!row.photo_pointed) return null;
+  if (row.photo_id === null || row.photo_state === null) return { removed: true };
+  return {
+    removed: false,
+    id: row.photo_id as PhotoId,
+    state: row.photo_state,
+    approvedPhotos: row.approved_photos,
+  };
+}
+
 /**
  * One report as a moderator opens it, after the route has written the look's
  * audit row in the same transaction: the queue's item, the note, the
- * decision, the frozen copy for a conversation's report, and the sanctions
- * that may close it while it waits. Null for an unknown id or a party.
+ * decision, the frozen copy for a conversation's report, the photo it points
+ * at (#476), and the sanctions that may close it while it waits. Null for an
+ * unknown id or a party.
  */
 export async function openReport(
   db: Queryable,
@@ -182,10 +207,16 @@ export async function openReport(
   id: string,
 ): Promise<ReportDetail | null> {
   const { rows } = await db.query<
-    ItemRow & { note: string | null; decided_by: string | null; sanction_id: string | null }
+    ItemRow &
+      PointerRow & { note: string | null; decided_by: string | null; sanction_id: string | null }
   >(
-    `${MINE} SELECT ${ITEM}, r.note, r.decided_by, r.sanction_id
-       FROM report r WHERE r.id = $2 AND ${visible("r")}`,
+    `${MINE} SELECT ${ITEM}, r.note, r.decided_by, r.sanction_id,
+            r.line_seq, r.photo_pointed, p.id AS photo_id, p.state AS photo_state,
+            (SELECT count(*)::int FROM photo q
+              WHERE q.account_id = r.reported_account_id AND q.purpose = 'profile'
+                AND q.state = 'approved') AS approved_photos
+       FROM report r LEFT JOIN photo p ON p.id = r.photo_id
+      WHERE r.id = $2 AND ${visible("r")}`,
     [staffIdentityId, id],
   );
   const row = rows[0];
@@ -229,6 +260,8 @@ export async function openReport(
     decidedBy: row.decided_by,
     sanctionId: row.sanction_id,
     copy,
+    lineSeq: row.line_seq,
+    pointedPhoto: pointedPhotoOf(row),
     actable: actable.rows.map(
       (s): ReportActable => ({
         id: s.id,
@@ -254,6 +287,21 @@ export async function copyPhotoOf(
        JOIN photo p ON p.id = rm.photo_id
       WHERE r.id = $2 AND ${visible("r")}`,
     [staffIdentityId, id, seq],
+  );
+  const row = rows[0];
+  return row ? { photoId: row.id, key: row.key } : null;
+}
+
+/** The photo a card's report points at (#476), its id and stored key; null for an unknown report, a party, no pointer or a photo removed since. */
+export async function pointedPhotoKeyOf(
+  db: Queryable,
+  staffIdentityId: string,
+  id: string,
+): Promise<{ photoId: string; key: string } | null> {
+  const { rows } = await db.query<{ id: string; key: string }>(
+    `${MINE} SELECT p.id, p.key FROM report r JOIN photo p ON p.id = r.photo_id
+      WHERE r.id = $2 AND ${visible("r")}`,
+    [staffIdentityId, id],
   );
   const row = rows[0];
   return row ? { photoId: row.id, key: row.key } : null;

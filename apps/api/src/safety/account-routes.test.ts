@@ -308,7 +308,6 @@ async function seededPerson(ctx: TestContext, api: Api, moderator: Staff) {
   return {
     person,
     bug,
-    pondName: `Pond ${pondSlug}`,
     hetuHmac,
     researchId,
     approved,
@@ -339,7 +338,6 @@ describe("GET /admin/accounts/{id}", () => {
       suspensionEndsAt: SUSPENSION_ENDS,
       age: 36,
       gender: "woman",
-      pond: s.pondName,
       profile: {
         displayName: DISPLAY_NAME,
         bio: BIO,
@@ -435,6 +433,25 @@ describe("GET /admin/accounts/{id}", () => {
       expect(text, what).not.toContain(value);
     }
     expect(text).not.toMatch(/hetu|broker|research|mail|check_?note|sanctioned_?from/i);
+  });
+
+  test("A moderator reads no home", async ({ ctx, api }) => {
+    const moderator = await staffSession(ctx.client, "moderator");
+    const a = await signedInAccount(ctx.client);
+    const given = await api.app.request("/account/home", {
+      method: "PUT",
+      headers: { ...a.headers, "content-type": "application/json" },
+      body: JSON.stringify({ postalCode: "00530", showArea: true }),
+    });
+    expect(given.status).toBe(200);
+
+    const response = await open(api, moderator.headers, a.accountId);
+    expect(response.status).toBe(200);
+    const text = await response.text();
+    expect(JSON.parse(text)).not.toHaveProperty("home");
+    expect(text).not.toContain('"00530"');
+    expect(text).not.toMatch(/Kallio|Berghäll|Helsinki|Helsingfors/);
+    expect(text).not.toMatch(/homePlace|home_place|homeShowsArea|postalCode/);
   });
 
   test("lists the audit rows about the account and its photos, and none about another person or the person's feedback", async ({
@@ -612,7 +629,6 @@ describe("GET /admin/accounts/{id}", () => {
       // June 1990 at October 2026.
       age: 36,
       gender: null,
-      pond: null,
       profile: null,
       photos: [],
       feedback: [],
@@ -674,6 +690,24 @@ describe("GET /admin/accounts/{id}", () => {
     );
     const page = await pageOf(await open(api, moderator.headers, person.accountId));
     // The issue: "the card's own presenter, so the moderator sees what others see".
+    expect(page.profile?.fields).toEqual({ intent: "long_term" });
+  });
+
+  test("leaves out the answers the person hides from the card, as the card does (#515)", async ({
+    ctx,
+    api,
+  }) => {
+    const moderator = await staffSession(ctx.client, "moderator");
+    const person = await signedInAccount(ctx.client);
+    await profileOf(
+      ctx,
+      person.accountId,
+      ProfileFields.parse({ intent: "long_term", smoking: "never" }),
+    );
+    await ctx.client.query("UPDATE profile SET hidden_fields = '{smoking}' WHERE account_id = $1", [
+      person.accountId,
+    ]);
+    const page = await pageOf(await open(api, moderator.headers, person.accountId));
     expect(page.profile?.fields).toEqual({ intent: "long_term" });
   });
 
@@ -753,7 +787,6 @@ describe("GET /admin/accounts/{id}", () => {
       suspensionEndsAt: null,
       age: null,
       gender: null,
-      pond: null,
       profile: null,
       photos: [],
       feedback: [],
@@ -844,7 +877,6 @@ describe("the account.view row", () => {
     ["the identity's standing", /SELECT standing, standing_changed_at/],
     ["the profile", /FROM profile WHERE account_id/],
     ["the photos", /FROM photo WHERE account_id/],
-    ["the pond", /JOIN ponds/],
     ["the feedback", /FROM feedback WHERE account_id/],
     ["the audit rows", /FROM audit_log\s+WHERE/],
   ] as const;

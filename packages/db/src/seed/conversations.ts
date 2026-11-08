@@ -120,9 +120,10 @@ export const PERSONA_CONVERSATIONS: readonly PersonaConversation[] = [
     readUpTo: { a: 4, b: 5 },
   },
   {
-    // The report's flow (#351): Laura reports Emmi from here, which blocks and
-    // ends it; Emmi then finds it ended and can still report it. Everything
-    // read on both sides; the words carry no way to reach either of them.
+    // The report's flow (#351): Laura reports the photo Emmi sent her (#476),
+    // which blocks and ends it; Emmi then finds it ended and can still report
+    // it. The words read on both sides, the photo not yet by Laura; they carry
+    // no way to reach either of them.
     between: ["laura", "emmi"],
     openedHoursAgo: 30,
     messages: [
@@ -139,6 +140,17 @@ export const PERSONA_CONVERSATIONS: readonly PersonaConversation[] = [
       { from: "a", hoursAgo: 8, body: "Enimmäkseen kissaani. Se ei pidä siitä." },
     ],
     readUpTo: { a: 3, b: 3 },
+    // The photo the report points at, the fourth message (the maintainer,
+    // 28/10/2026). Ville's landscape: a photo's objects are named by its
+    // content, so the two share them, and the reset takes the copy's with the
+    // report (resetPersonas).
+    photo: {
+      from: "b",
+      hoursAgo: 6,
+      asset: "negatives/no-face.jpg",
+      caption: "Arvaa, missä olen. Asutko itse lähellä?",
+      clientId: "20dc9cba-b67c-4681-81c9-2fe0fdb204b5",
+    },
   },
 ];
 
@@ -157,10 +169,11 @@ export async function writeConversations(
   db: Queryable,
   accounts: ReadonlyMap<string, string>,
   now: Date,
+  conversations: readonly PersonaConversation[] = PERSONA_CONVERSATIONS,
 ): Promise<ConversationsResult> {
   const result: ConversationsResult = { written: 0, already: 0, missing: 0 };
   const hoursAgo = (hours: number) => new Date(now.getTime() - hours * HOUR_MS);
-  for (const told of PERSONA_CONVERSATIONS) {
+  for (const told of conversations) {
     const a = accounts.get(told.between[0]);
     const b = accounts.get(told.between[1]);
     if (!a || !b) {

@@ -1,21 +1,23 @@
 # features/identity/onboarding.feature
 Feature: Onboarding and consents
   Matching cannot start without four answers (gender, seeks, an age window,
-  a pond) and nothing may start without two consents given for the exact
+  a home) and nothing may start without two consents given for the exact
   wording and version the person read (TD-17: the Finnish text is binding).
   The research opt-in has its own yes and can be withdrawn, and so can the
   special-category consent that the seek answer needs (ADR-019 §4). The
   account becomes active when everything required is there; the steps of
   the field sheet (name, intent, photos, prompts or a bio) are asked in the
-  same flow and keep it incomplete until done (#46, #146, ADR-010).
+  same flow and keep it incomplete until done (#46, #146, ADR-010). The home,
+  and the pond its write sets, are features/pond/home.feature's (ADR-061).
 
-  The app asks the four norms, the terms, the privacy summary and research
-  before the bank login (#418, ADR-010 §15). With no account yet, it holds
-  the answers in memory and posts them through the same route right after
-  the exchange, and a phone that recorded the current wordings goes straight
-  to the bank. Onboarding's welcome step is the fallback for consents missing
-  after the sign-in, and onboarding asks nothing about research; Settings
-  keeps its switch.
+  The app asks the norms, the terms and the privacy summary before the
+  bank login (#418, ADR-010 §15). With no account yet, it holds the answers in
+  memory and posts them through the same route right after the exchange, and
+  a phone that recorded the current wordings goes straight to the bank.
+  Onboarding's welcome step is the fallback for consents missing after the
+  sign-in. Until there is a researcher the app asks nothing about research,
+  before the bank, in onboarding or in Settings (#545, ADR-010 §19); the API
+  keeps the opt-in's routes, which the scenarios here hold, for R3 Research.
 
   Scenario: A consent counts only for the current version of its wording
     Given the terms have a current consent version
@@ -38,7 +40,7 @@ Feature: Onboarding and consents
 
   Scenario: The account becomes active when every required answer is there
     Given a registered account that has answered nothing
-    When it gives both consents, declares a gender, gives the special-category consent, sets seeks and an age window, and is given a pond
+    When it gives both consents, declares a gender, gives the special-category consent, sets seeks and an age window, and gives a postal code
     Then the status lists fewer missing steps after each answer, in the order the app asks, and the account is active at the end with the profile steps still open
 
   Scenario: The onboarding lists the profile steps the sheet asks, in its order
@@ -46,10 +48,10 @@ Feature: Onboarding and consents
     When it saves a name, an intent and a bio, then uploads three photos
     Then the missing steps shrink from name, intent, photos and prompts or a bio to photos alone, and then to none
 
-  Scenario: An account gets the default pond without a pond step
-    Given a pond whose slug matching_config names as the default pond
-    When a registered account reads its onboarding
-    Then the account is in that pond and no pond step is missing
+  Scenario: A change away from non-binary clears the identity label
+    Given a non-binary person whose profile has an identity label and a hide on it
+    When they change their gender to another
+    Then the label is gone from the profile and the rest of it stays, the hide with it
 
   Scenario: The seek consent is recorded with the answer and withdrawing it blanks the seek rows
     Given an onboarded account with a politics answer on its profile
@@ -68,7 +70,7 @@ Feature: Onboarding and consents
   Scenario: The export lists gender, pond, preferences and every consent
     Given an onboarded account with a withdrawn research consent
     When it downloads its export
-    Then the export carries the gender, the pond with both case forms, the two hard preferences and every consent row
+    Then the export carries the gender, the pond, the two hard preferences and every consent row
 
   Scenario: The research opt-in creates the research_id mapping and withdrawal removes it
     Given the account gave the research consent
@@ -85,23 +87,18 @@ Feature: Onboarding and consents
     Given a phone that has not recorded the current versions of the terms and the privacy summary
     When the sign-in screen opens
     Then the norms, the terms and the privacy summary stand where the bank button would be
-    And the bank button shows only once both are accepted and the research question is answered
+    And the bank button shows only once both are accepted
 
-  Scenario: Research before the bank is a yes or a no, and either goes on to the bank
-    Given the person accepted the terms and the privacy summary before the bank
-    When they answer the research question with a yes, or with a no
-    Then neither answer was chosen beforehand, and either is held with the versions shown and goes on to the bank
+  Scenario: Nothing is asked about research before the bank
+    Given a phone that has not recorded the current versions of the terms and the privacy summary
+    When the person accepts both
+    Then the bank button shows at once, and no research question stood on the way
 
   Scenario: The answers given before the bank become consent rows right after the exchange
-    Given the person accepted both and said yes to research before the bank
+    Given the person accepted both before the bank
     When the bank login's code is exchanged
-    Then the terms, the privacy summary and research are posted for the versions shown before the app goes home
+    Then the terms and the privacy summary are posted for the versions shown before the app goes home, and nothing about research, so a research consent the account already has stays
     And the phone remembers the versions it recorded
-
-  Scenario: A no to research before the bank posts nothing about research
-    Given the person accepted both and said no to research before the bank
-    When the bank login's code is exchanged
-    Then the terms and the privacy summary are posted and nothing about research, so a research consent the account already has stays
 
   Scenario: A phone that recorded the current wordings goes straight to the bank
     Given this phone recorded the current versions of the terms and the privacy summary after an earlier sign-in
@@ -118,3 +115,8 @@ Feature: Onboarding and consents
     Given an account with no research consent whose only open step is the prompts or a bio
     When it saves a bio
     Then onboarding goes home and asks nothing about research
+
+  Scenario: Settings has no research switch, whatever the account said before
+    Given an account that said yes to research before the question went, and one that never answered
+    When Settings opens
+    Then no row or switch names research, and nothing is given or withdrawn

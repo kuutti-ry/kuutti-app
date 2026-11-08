@@ -9,6 +9,12 @@ import {
   SUSPENSION_DAYS_MAX,
 } from "@kuutti/schema";
 import { type FormEvent, useEffect, useId, useRef, useState } from "react";
+import { Alert } from "../../components/ui/alert.tsx";
+import { Button } from "../../components/ui/button.tsx";
+import { Input } from "../../components/ui/input.tsx";
+import { Label } from "../../components/ui/label.tsx";
+import { NativeSelect } from "../../components/ui/native-select.tsx";
+import { Textarea } from "../../components/ui/textarea.tsx";
 import { api } from "../../lib/api.ts";
 import { Dialog } from "../../lib/dialog.tsx";
 import { useStaffRole } from "../../lib/role.ts";
@@ -109,20 +115,24 @@ type Step = { kind: "lift"; item: SanctionEntry } | { kind: "review"; item: Sanc
 
 /**
  * The actions on a person, the gentlest first, and the confirm step of each
- * (#308): on the person's page under Sanctions, and on a report's (#312),
- * where `also` says in the step what more applying one does there. Only an
- * apply reaches `onApplied`, with the sanction the API answered and the kind
- * the step asked for; a lift and a second look are the person's page's own.
+ * (#308): on the person's page under Sanctions, whose heading stands right
+ * above them, so the group's name is only heard there (`legendHidden`); and on
+ * a report's (#312), which shows two people, so its name is drawn, and where
+ * `also` says in the step what more applying one does there. Only an apply
+ * reaches `onApplied`, with the sanction the API answered and the kind the
+ * step asked for; a lift and a second look are the person's page's own.
  */
 export function SanctionActions({
   accountId,
   legend,
+  legendHidden = false,
   also,
   onOpen,
   onApplied,
 }: {
   accountId: string;
   legend: string;
+  legendHidden?: boolean;
   also?: string;
   /** A step opens: the line that said the last change is cleared, so the next one is heard. */
   onOpen: () => void;
@@ -133,21 +143,23 @@ export function SanctionActions({
   const [step, setStep] = useState<SanctionKind | null>(null);
   return (
     <>
-      <fieldset className="actions">
-        <legend>{legend}</legend>
-        {ORDER.filter((kind) => kind !== "ban" || admin).map((kind) => (
-          <button
-            key={kind}
-            type="button"
-            className={kind === "ban" ? "apart" : undefined}
-            onClick={() => {
-              onOpen();
-              setStep(kind);
-            }}
-          >
-            {t(STEPS[kind].action)}
-          </button>
-        ))}
+      <fieldset>
+        <legend className={legendHidden ? "sr-only" : "mb-2 text-sm font-medium"}>{legend}</legend>
+        <div className="flex flex-wrap gap-3">
+          {ORDER.filter((kind) => kind !== "ban" || admin).map((kind) => (
+            <Button
+              key={kind}
+              variant={kind === "ban" ? "destructive" : "outline"}
+              className={kind === "ban" ? "sm:ms-auto" : undefined}
+              onClick={() => {
+                onOpen();
+                setStep(kind);
+              }}
+            >
+              {t(STEPS[kind].action)}
+            </Button>
+          ))}
+        </div>
       </fieldset>
       {step && (
         <ApplyStep
@@ -206,37 +218,39 @@ export function Sanctions({
 
   return (
     <>
+      {items === null && <Alert>{t("admin.loadFailed")}</Alert>}
       <SanctionActions
         accountId={accountId}
         legend={t("admin.sanction.actions")}
+        legendHidden
         onOpen={() => setDone("")}
         onApplied={(_, asked) =>
           finish(t("admin.sanction.done.apply", { kind: t(KIND_WORDS[asked]) }))
         }
       />
-      <p ref={status} role="status" tabIndex={-1}>
+      <p ref={status} role="status" tabIndex={-1} className="font-medium empty:sr-only">
         {done}
       </p>
-      {items === null ? (
-        <p role="alert">{t("admin.account.sanctionsError")}</p>
-      ) : items.length === 0 ? (
-        <p>{t("admin.account.none")}</p>
+      {items === null ? null : items.length === 0 ? (
+        <p className="text-muted-foreground">{t("admin.account.none")}</p>
       ) : (
-        <ul className="sanctions">
+        <ul className="grid gap-2">
           {items.map((s) => {
             const line = `${ids}-${s.id}`;
             const mayAct = s.kind !== "ban" || admin;
             return (
-              <li key={s.id}>
+              <li key={s.id} className="space-y-1 rounded-lg border px-3 py-2">
                 <p id={line}>
                   <strong>{t(KIND_WORDS[s.kind])}</strong> · {t(REASON_WORDS[s.reason])} ·{" "}
                   {when(s.createdAt)}
                   {s.endsAt && ` · ${t("admin.account.until", { time: when(s.endsAt) })}`}
                 </p>
-                <p>{s.note}</p>
-                <p>{t("admin.sanction.appliedBy", { who: who(s.createdBy, s.createdByRole) })}</p>
+                <p className="whitespace-pre-wrap wrap-anywhere">{s.note}</p>
+                <p className="text-muted-foreground">
+                  {t("admin.sanction.appliedBy", { who: who(s.createdBy, s.createdByRole) })}
+                </p>
                 {s.liftedAt && (
-                  <p>
+                  <p className="text-muted-foreground">
                     {t("admin.sanction.liftedBy", {
                       time: when(s.liftedAt),
                       who: who(s.liftedBy, s.liftedByRole),
@@ -244,7 +258,7 @@ export function Sanctions({
                   </p>
                 )}
                 {s.reviewedAt && (
-                  <p>
+                  <p className="text-muted-foreground wrap-anywhere">
                     {t("admin.sanction.reviewedBy", {
                       time: when(s.reviewedAt),
                       who: who(s.reviewedBy, s.reviewedByRole),
@@ -253,10 +267,10 @@ export function Sanctions({
                   </p>
                 )}
                 {mayAct && (!s.liftedAt || !s.reviewedAt) && (
-                  <div className="actions">
+                  <div className="flex flex-wrap gap-3 pt-1">
                     {!s.liftedAt && (
-                      <button
-                        type="button"
+                      <Button
+                        variant="outline"
                         aria-describedby={line}
                         onClick={() => {
                           setDone("");
@@ -264,11 +278,11 @@ export function Sanctions({
                         }}
                       >
                         {t("admin.sanction.lift")}
-                      </button>
+                      </Button>
                     )}
                     {!s.reviewedAt && (
-                      <button
-                        type="button"
+                      <Button
+                        variant="outline"
                         aria-describedby={line}
                         onClick={() => {
                           setDone("");
@@ -276,7 +290,7 @@ export function Sanctions({
                         }}
                       >
                         {t("admin.sanction.review")}
-                      </button>
+                      </Button>
                     )}
                   </div>
                 )}
@@ -356,46 +370,50 @@ function ApplyStep({
 
   return (
     <Dialog title={t(meta.title)} onClose={onCancel}>
-      <form className="actions" onSubmit={submit}>
+      <form className="grid gap-4" onSubmit={submit}>
         <p>{t(meta.effect)}</p>
-        {also && <p>{also}</p>}
-        {refused && <p role="alert">{t(refused)}</p>}
-        <label htmlFor={`${ids}-reason`}>{t("admin.sanction.reason.label")}</label>
-        <select
-          id={`${ids}-reason`}
-          required
-          value={reason}
-          onChange={(event) => setReason(event.target.value as SanctionReason)}
-        >
-          <option value="" disabled>
-            {t("admin.sanction.reason.choose")}
-          </option>
-          {REASONS.map((r) => (
-            <option key={r.value} value={r.value}>
-              {t(r.label)}
+        {also && <p className="text-muted-foreground">{also}</p>}
+        {refused && <Alert>{t(refused)}</Alert>}
+        <div className="grid gap-2">
+          <Label htmlFor={`${ids}-reason`}>{t("admin.sanction.reason.label")}</Label>
+          <NativeSelect
+            id={`${ids}-reason`}
+            required
+            value={reason}
+            onChange={(event) => setReason(event.target.value as SanctionReason)}
+          >
+            <option value="" disabled>
+              {t("admin.sanction.reason.choose")}
             </option>
-          ))}
-        </select>
-        <label htmlFor={`${ids}-note`}>{t("admin.sanction.note")}</label>
-        <textarea
-          id={`${ids}-note`}
-          required
-          rows={3}
-          maxLength={SANCTION_NOTE_MAX}
-          aria-describedby={`${ids}-count`}
-          value={note}
-          onChange={(event) => setNote(event.target.value)}
-        />
-        <p id={`${ids}-count`}>
-          {t("admin.sanction.noteCount", {
-            characters: String(note.length),
-            max: String(SANCTION_NOTE_MAX),
-          })}
-        </p>
+            {REASONS.map((r) => (
+              <option key={r.value} value={r.value}>
+                {t(r.label)}
+              </option>
+            ))}
+          </NativeSelect>
+        </div>
+        <div className="grid gap-2">
+          <Label htmlFor={`${ids}-note`}>{t("admin.sanction.note")}</Label>
+          <Textarea
+            id={`${ids}-note`}
+            required
+            rows={3}
+            maxLength={SANCTION_NOTE_MAX}
+            aria-describedby={`${ids}-count`}
+            value={note}
+            onChange={(event) => setNote(event.target.value)}
+          />
+          <p id={`${ids}-count`} className="text-xs text-muted-foreground">
+            {t("admin.sanction.noteCount", {
+              characters: String(note.length),
+              max: String(SANCTION_NOTE_MAX),
+            })}
+          </p>
+        </div>
         {sanction === "suspend" && (
-          <>
-            <label htmlFor={`${ids}-ends`}>{t("admin.sanction.endsOn")}</label>
-            <input
+          <div className="grid gap-2">
+            <Label htmlFor={`${ids}-ends`}>{t("admin.sanction.endsOn")}</Label>
+            <Input
               id={`${ids}-ends`}
               type="date"
               required
@@ -403,21 +421,33 @@ function ApplyStep({
               max={dayFromToday(SUSPENSION_DAYS_MAX)}
               value={endsOn}
               onChange={(event) => setEndsOn(event.target.value)}
+              className="sm:w-fit"
             />
-          </>
+          </div>
         )}
-        <button type="submit" disabled={!ready} aria-busy={sending || undefined}>
-          {t("admin.sanction.apply")}
-        </button>
-        <button type="button" onClick={onCancel}>
-          {t("admin.sanction.cancel")}
-        </button>
+        <div className="flex flex-wrap gap-3">
+          <Button
+            type="submit"
+            variant={sanction === "ban" ? "destructive" : "default"}
+            disabled={!ready}
+            aria-busy={sending || undefined}
+          >
+            {t("admin.sanction.apply")}
+          </Button>
+          <Button variant="outline" onClick={onCancel}>
+            {t("admin.sanction.cancel")}
+          </Button>
+        </div>
       </form>
     </Dialog>
   );
 }
 
 const liftPath = (item: Pick<Sanction, "id">) => ({ params: { path: { id: item.id } } });
+
+/** A radio and its words as one bordered target of 44 px, the dot saying which is chosen. */
+const CHOICE =
+  "flex min-h-11 cursor-pointer items-center gap-3 rounded-md border border-input px-3 has-checked:bg-accent has-checked:font-semibold has-checked:text-accent-foreground";
 
 function LiftStep({ item, onCancel, onShell, onDone }: StepProps & { item: SanctionEntry }) {
   const { t } = useT();
@@ -432,25 +462,26 @@ function LiftStep({ item, onCancel, onShell, onDone }: StepProps & { item: Sanct
       title={t("admin.sanction.liftTitle", { kind: t(KIND_WORDS[item.kind]) })}
       onClose={onCancel}
     >
-      <div className="actions">
+      <div className="grid gap-4">
         <p>{t(LIFT_EFFECT[item.kind])}</p>
-        {refused && <p role="alert">{t(refused)}</p>}
-        <button
-          type="button"
-          aria-busy={sending || undefined}
-          onClick={() =>
-            void send(() =>
-              item.kind === "ban"
-                ? api.POST("/admin/bans/{id}/lift", liftPath(item))
-                : api.POST("/admin/sanctions/{id}/lift", liftPath(item)),
-            )
-          }
-        >
-          {t("admin.sanction.lift")}
-        </button>
-        <button type="button" onClick={onCancel}>
-          {t("admin.sanction.cancel")}
-        </button>
+        {refused && <Alert>{t(refused)}</Alert>}
+        <div className="flex flex-wrap gap-3">
+          <Button
+            aria-busy={sending || undefined}
+            onClick={() =>
+              void send(() =>
+                item.kind === "ban"
+                  ? api.POST("/admin/bans/{id}/lift", liftPath(item))
+                  : api.POST("/admin/sanctions/{id}/lift", liftPath(item)),
+              )
+            }
+          >
+            {t("admin.sanction.lift")}
+          </Button>
+          <Button variant="outline" onClick={onCancel}>
+            {t("admin.sanction.cancel")}
+          </Button>
+        </div>
       </div>
     </Dialog>
   );
@@ -469,7 +500,11 @@ export type FixedReview = {
   submit: string;
 };
 
-/** A second look at a sanction (#307): a note, and keep it or lift it; on a person's page and the automatic bans' list. */
+/**
+ * A second look at a sanction (#307): a note, and keep it or lift it, with
+ * what a lift does said beside Lift it; on a person's page and the automatic
+ * bans' list. One already lifted offers only Keep it.
+ */
 export function ReviewStep({
   item,
   fixed,
@@ -504,30 +539,33 @@ export function ReviewStep({
       title={fixed?.title ?? t("admin.sanction.reviewTitle", { kind: t(KIND_WORDS[item.kind]) })}
       onClose={onCancel}
     >
-      <form className="actions" onSubmit={submit}>
-        <p>{fixed?.effect ?? t("admin.sanction.reviewExplain")}</p>
-        {refused && <p role="alert">{t(refused)}</p>}
-        <label htmlFor={`${ids}-note`}>{t("admin.sanction.reviewNote")}</label>
-        <textarea
-          id={`${ids}-note`}
-          required
-          rows={3}
-          maxLength={SANCTION_NOTE_MAX}
-          aria-describedby={`${ids}-count`}
-          value={note}
-          onChange={(event) => setNote(event.target.value)}
-        />
-        <p id={`${ids}-count`}>
-          {t("admin.sanction.noteCount", {
-            characters: String(note.length),
-            max: String(SANCTION_NOTE_MAX),
-          })}
-        </p>
+      <form className="grid gap-4" onSubmit={submit}>
+        {fixed && <p>{fixed.effect}</p>}
+        {refused && <Alert>{t(refused)}</Alert>}
+        <div className="grid gap-2">
+          <Label htmlFor={`${ids}-note`}>{t("admin.sanction.reviewNote")}</Label>
+          <Textarea
+            id={`${ids}-note`}
+            required
+            rows={3}
+            maxLength={SANCTION_NOTE_MAX}
+            aria-describedby={`${ids}-count`}
+            value={note}
+            onChange={(event) => setNote(event.target.value)}
+          />
+          <p id={`${ids}-count`} className="text-xs text-muted-foreground">
+            {t("admin.sanction.noteCount", {
+              characters: String(note.length),
+              max: String(SANCTION_NOTE_MAX),
+            })}
+          </p>
+        </div>
         {!fixed && (
-          <fieldset>
-            <legend>{t("admin.sanction.outcome")}</legend>
-            <label>
+          <fieldset className="grid gap-2">
+            <legend className="mb-2 text-sm font-medium">{t("admin.sanction.outcome")}</legend>
+            <label className={CHOICE}>
               <input
+                className="size-4 accent-primary"
                 type="radio"
                 name={`${ids}-outcome`}
                 value="keep"
@@ -537,25 +575,34 @@ export function ReviewStep({
               {t("admin.sanction.keep")}
             </label>
             {!item.liftedAt && (
-              <label>
-                <input
-                  type="radio"
-                  name={`${ids}-outcome`}
-                  value="lift"
-                  checked={outcome === "lift"}
-                  onChange={() => setOutcome("lift")}
-                />
-                {t("admin.sanction.liftIt")}
-              </label>
+              <>
+                <label className={CHOICE}>
+                  <input
+                    className="size-4 accent-primary"
+                    type="radio"
+                    name={`${ids}-outcome`}
+                    value="lift"
+                    checked={outcome === "lift"}
+                    aria-describedby={`${ids}-lift`}
+                    onChange={() => setOutcome("lift")}
+                  />
+                  {t("admin.sanction.liftIt")}
+                </label>
+                <p id={`${ids}-lift`} className="text-muted-foreground">
+                  {t(LIFT_EFFECT[item.kind])}
+                </p>
+              </>
             )}
           </fieldset>
         )}
-        <button type="submit" disabled={!ready} aria-busy={sending || undefined}>
-          {fixed?.submit ?? t("admin.sanction.apply")}
-        </button>
-        <button type="button" onClick={onCancel}>
-          {t("admin.sanction.cancel")}
-        </button>
+        <div className="flex flex-wrap gap-3">
+          <Button type="submit" disabled={!ready} aria-busy={sending || undefined}>
+            {fixed?.submit ?? t("admin.sanction.apply")}
+          </Button>
+          <Button variant="outline" onClick={onCancel}>
+            {t("admin.sanction.cancel")}
+          </Button>
+        </div>
       </form>
     </Dialog>
   );

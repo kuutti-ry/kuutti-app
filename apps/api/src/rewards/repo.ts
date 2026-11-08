@@ -1,5 +1,5 @@
 import type { Queryable } from "@kuutti/db";
-import type { InvitationReward, RewardKind, RewardUnits } from "@kuutti/schema";
+import type { RewardKind, RewardUnits } from "@kuutti/schema";
 
 // The invitations and the reward ledger (#107, ADR-044). Raw parameterised
 // SQL, as in the other slices; every statement that reads or writes a
@@ -96,13 +96,11 @@ export async function countCounted(db: Queryable, accountId: string): Promise<nu
 
 /** The person's units not used yet, by kind. */
 export async function unspentOf(db: Queryable, accountId: string): Promise<RewardUnits> {
-  const { rows } = await db.query<{ fish: number; likes: number }>(
-    `SELECT count(*) FILTER (WHERE kind = 'fish')::int AS fish,
-            count(*) FILTER (WHERE kind = 'like')::int AS likes
-       FROM reward WHERE account_id = $1 AND spent_at IS NULL`,
+  const { rows } = await db.query<{ fish: number }>(
+    "SELECT count(*)::int AS fish FROM reward WHERE account_id = $1 AND spent_at IS NULL",
     [accountId],
   );
-  return { fish: rows[0]?.fish ?? 0, likes: rows[0]?.likes ?? 0 };
+  return { fish: rows[0]?.fish ?? 0 };
 }
 
 /** Withdraws an open invitation of the person's own; false for one redeemed, another's or nobody's. */
@@ -135,112 +133,125 @@ export async function redeem(
   return result.rowCount === 1;
 }
 
-/** An invitation the night may count, and whose: its redeemer has a gate row. */
-const COUNTABLE = `i.counted_at IS NULL AND i.redeemed_by_account_id IS NOT NULL
-  AND EXISTS (SELECT 1 FROM gate g WHERE g.account_id = i.redeemed_by_account_id)`;
+/** An invitation the night may count: redeemed, not counted, by one of the redeemers it found complete. */
+const COUNTABLE = `i.counted_at IS NULL AND i.redeemed_by_account_id = ANY($1::uuid[])`;
 
-/**
- * The inviters of the invitations the night may count, locked in id order
- * (`FOR SHARE`), before any invitation of theirs is touched: an erasure takes
- * the account first and its invitations after, and the count writes units
- * that point at the account, so the other order would leave each waiting for
- * the other. The gate is asked in SQL here, not through the pond slice's
- * reader, which reads one person's row: the night asks it of every
- * invitation in one statement, the same as the update that follows.
- */
-export async function lockInviters(db: Queryable): Promise<string[]> {
+/** Who redeemed an invitation that has not counted: the people the night asks completeness of. */
+export async function uncountedRedeemers(db: Queryable): Promise<string[]> {
   const { rows } = await db.query<{ id: string }>(
-    `SELECT a.id FROM account a
-      WHERE a.id IN (SELECT i.inviter_account_id FROM invitation i WHERE ${COUNTABLE})
-      ORDER BY a.id FOR SHARE OF a`,
+    `SELECT redeemed_by_account_id AS id FROM invitation
+      WHERE counted_at IS NULL AND redeemed_by_account_id IS NOT NULL
+      ORDER BY redeemed_by_account_id`,
   );
   return rows.map((row) => row.id);
 }
 
 /**
- * Counts what can be counted of the locked inviters' invitations, once: a
- * second run finds `counted_at` set. Each counted invitation with its inviter.
+ * The two people of the invitations the night may count, locked in id order
+ * (`FOR SHARE`), before any invitation of theirs is touched: an erasure takes
+ * the account first and its invitations after, and the count writes units
+ * that point at both accounts, so the other order would leave each waiting for
+ * the other.
+ */
+export async function lockParties(db: Queryable, redeemers: readonly string[]): Promise<string[]> {
+  const { rows } = await db.query<{ id: string }>(
+    `SELECT a.id FROM account a
+      WHERE a.id IN (SELECT i.inviter_account_id FROM invitation i WHERE ${COUNTABLE})
+         OR a.id IN (SELECT i.redeemed_by_account_id FROM invitation i WHERE ${COUNTABLE})
+      ORDER BY a.id FOR SHARE OF a`,
+    [redeemers],
+  );
+  return rows.map((row) => row.id);
+}
+
+/**
+ * Counts what can be counted of the locked people's invitations, once: a
+ * second run finds `counted_at` set. Each counted invitation with its two, the
+ * inviter null once erased: it then counts for the friend alone (ADR-044 §10).
  */
 export async function markCounted(
   db: Queryable,
-  input: { inviters: readonly string[]; at: Date },
-): Promise<Array<{ invitationId: string; inviterId: string }>> {
-  const { rows } = await db.query<{ id: string; inviter_account_id: string }>(
-    `UPDATE invitation i SET counted_at = $2
-      WHERE i.inviter_account_id = ANY($1::uuid[]) AND ${COUNTABLE}
-      RETURNING i.id, i.inviter_account_id`,
-    [input.inviters, input.at],
+  input: { parties: readonly string[]; redeemers: readonly string[]; at: Date },
+): Promise<Array<{ invitationId: string; inviterId: string | null; redeemerId: string }>> {
+  const { rows } = await db.query<{
+    id: string;
+    inviter_account_id: string | null;
+    redeemed_by_account_id: string;
+  }>(
+    `UPDATE invitation i SET counted_at = $3
+      WHERE ${COUNTABLE} AND (i.inviter_account_id IS NULL OR i.inviter_account_id = ANY($2::uuid[]))
+        AND i.redeemed_by_account_id = ANY($2::uuid[])
+      RETURNING i.id, i.inviter_account_id, i.redeemed_by_account_id`,
+    [input.redeemers, input.parties, input.at],
   );
-  return rows.map((row) => ({ invitationId: row.id, inviterId: row.inviter_account_id }));
+  return rows.map((row) => ({
+    invitationId: row.id,
+    inviterId: row.inviter_account_id,
+    redeemerId: row.redeemed_by_account_id,
+  }));
 }
 
-/** Each counted invitation's units for its inviter, one row a unit, as the reward reads. */
+/** This many fish for each earner of a counted invitation, one row a unit. */
 export async function insertUnits(
   db: Queryable,
   input: {
-    counted: ReadonlyArray<{ invitationId: string; inviterId: string }>;
-    reward: InvitationReward;
+    earners: ReadonlyArray<{ invitationId: string; accountId: string }>;
+    fish: number;
     at: Date;
   },
 ): Promise<void> {
   await db.query(
     `INSERT INTO reward (account_id, kind, invitation_id, earned_at)
-     SELECT c.inviter, k.kind::reward_kind, c.invitation, $3
-       FROM unnest($1::uuid[], $2::uuid[]) AS c(invitation, inviter)
-       CROSS JOIN (SELECT 'fish' AS kind FROM generate_series(1, $4::int)
-                   UNION ALL SELECT 'like' FROM generate_series(1, $5::int)) AS k`,
+     SELECT c.account, 'fish', c.invitation, $3
+       FROM unnest($1::uuid[], $2::uuid[]) AS c(invitation, account)
+       CROSS JOIN generate_series(1, $4::int)`,
     [
-      input.counted.map((c) => c.invitationId),
-      input.counted.map((c) => c.inviterId),
+      input.earners.map((e) => e.invitationId),
+      input.earners.map((e) => e.accountId),
       input.at,
-      input.reward.fish,
-      input.reward.likes,
+      input.fish,
     ],
   );
 }
 
 /**
- * Spends the person's oldest unit of the kind not used yet on a round entry;
- * false with none left. `SKIP LOCKED`: a unit another transaction is spending
- * or giving back is not this one's to wait for.
+ * Spends the person's oldest unit not used yet on a round entry; false with
+ * none left. `SKIP LOCKED`: a unit another transaction is spending or giving
+ * back is not this one's to wait for.
  */
 export async function spendOldest(
   db: Queryable,
-  input: { accountId: string; kind: RewardKind; entryId: string; at: Date },
+  input: { accountId: string; entryId: string; at: Date },
 ): Promise<boolean> {
   const result = await db.query(
-    `UPDATE reward SET spent_at = $4, spent_entry_id = $3
+    `UPDATE reward SET spent_at = $3, spent_entry_id = $2
       WHERE account_id = $1 AND id = (
-        SELECT id FROM reward WHERE account_id = $1 AND kind = $2 AND spent_at IS NULL
+        SELECT id FROM reward WHERE account_id = $1 AND spent_at IS NULL
          ORDER BY earned_at, id LIMIT 1 FOR UPDATE SKIP LOCKED)`,
-    [input.accountId, input.kind, input.entryId, input.at],
+    [input.accountId, input.entryId, input.at],
   );
   return result.rowCount === 1;
 }
 
-/** Gives back the person's units of these kinds spent on an entry. */
+/** Gives back the person's units spent on an entry. */
 export async function releaseOn(
   db: Queryable,
-  input: { accountId: string; entryId: string; kinds: readonly RewardKind[] },
+  input: { accountId: string; entryId: string },
 ): Promise<number> {
   const result = await db.query(
     `UPDATE reward SET spent_at = NULL, spent_entry_id = NULL
-      WHERE account_id = $1 AND spent_entry_id = $2 AND kind = ANY($3::reward_kind[])`,
-    [input.accountId, input.entryId, input.kinds],
+      WHERE account_id = $1 AND spent_entry_id = $2`,
+    [input.accountId, input.entryId],
   );
   return result.rowCount ?? 0;
 }
 
-/** The round entries the person's units of a kind paid for. */
-export async function paidEntries(
-  db: Queryable,
-  accountId: string,
-  kind: RewardKind,
-): Promise<string[]> {
+/** The round entries the person's units paid for. */
+export async function paidEntries(db: Queryable, accountId: string): Promise<string[]> {
   const { rows } = await db.query<{ spent_entry_id: string }>(
     `SELECT spent_entry_id FROM reward
-      WHERE account_id = $1 AND kind = $2 AND spent_entry_id IS NOT NULL`,
-    [accountId, kind],
+      WHERE account_id = $1 AND spent_entry_id IS NOT NULL`,
+    [accountId],
   );
   return rows.map((row) => row.spent_entry_id);
 }
@@ -304,17 +315,26 @@ export type InvitationErasure = {
 };
 
 /**
- * Erasure (ADR-044 §10). The person's units go, by account: every unit is its
- * invitation's inviter's, so this takes all of a counted invitation's units
- * before its row is touched, and the cascade from an invitation deleted below
- * reaches nobody else's unit or notice. Of the invitations the person made,
- * the open ones go; a redeemed one stays for its redeemer with the link cut,
- * so the redeemer has still redeemed one, ever, and their export still says
- * when. The invitation the person redeemed goes until it counts, and once
- * counted stays for its inviter without the person. A row that would name
- * nobody goes on either side (`invitation_named_check`).
+ * Erasure (ADR-044 §10). The person's units go, by account, whichever side of
+ * an invitation earned them, before its row is touched. The cascade from an
+ * invitation deleted below reaches nobody else's unit or notice: one that
+ * counted goes only once its other person is gone too, and one that has not
+ * earned nobody anything. Of the invitations the person made, the open ones
+ * go; a redeemed one stays for its redeemer with the link cut, so the redeemer
+ * has still redeemed one, ever, keeps what it earned them, and their export
+ * still says when. The invitation the person redeemed goes until it counts,
+ * and once counted stays for its inviter without the person. A row that would
+ * name nobody goes on either side (`invitation_named_check`). The person's rows
+ * are held first, in one order: of two people erased at once the later then reads
+ * the earlier's cut and takes the row away, where it would have cut the second
+ * link and been refused.
  */
 export async function eraseOf(db: Queryable, accountId: string): Promise<InvitationErasure> {
+  await db.query(
+    `SELECT 1 FROM invitation WHERE inviter_account_id = $1 OR redeemed_by_account_id = $1
+      ORDER BY id FOR UPDATE`,
+    [accountId],
+  );
   const units = await db.query("DELETE FROM reward WHERE account_id = $1", [accountId]);
   const madeDeleted = await db.query(
     `DELETE FROM invitation WHERE inviter_account_id = $1

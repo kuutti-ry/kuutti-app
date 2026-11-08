@@ -1,11 +1,13 @@
 import { fireEvent, screen } from "@testing-library/react-native";
+import { AccessibilityInfo, Platform } from "react-native";
 import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
-import { renderWithTheme } from "@/test/render";
+import { hasCutText } from "@/test/layout";
+import { renderWithTheme, underProviders } from "@/test/render";
 import { Stepper } from "./stepper";
 
 // A number between a minus and a plus (ADR-010 §9, #146, #148): both answers
-// are labelled buttons, the number is announced as it changes, and a step past
-// either end is not offered.
+// are labelled buttons that stand well clear of the number (#581), the number
+// is announced as it changes, and a step past either end is not offered.
 
 function show(props: Partial<React.ComponentProps<typeof Stepper>> = {}) {
   const onChange = jest.fn();
@@ -33,6 +35,12 @@ describe("Stepper", () => {
     await fireEvent.press(screen.getByRole("button", { name: "One centimetre more" }));
     expect(onChange.mock.calls).toEqual([[169], [171]]);
     expect(pressables(screen.toJSON() as HostNode).flatMap((n) => a11yProblems(n))).toEqual([]);
+  });
+
+  it("is no heading, drawn as large as one, and keeps its live region (#542)", async () => {
+    await show();
+    expect(screen.queryByRole("heading")).toBeNull();
+    expect(screen.getByText("170 cm").props.accessibilityLiveRegion).toBe("polite");
   });
 
   it("does not step below the lower end", async () => {
@@ -65,9 +73,24 @@ describe("Stepper", () => {
     expect(rootClass()).not.toMatch(/\bflex-1\b/);
   });
 
-  it("takes the flex a row gives it", async () => {
-    await show({ className: "flex-1" });
-    expect(rootClass()).toMatch(/\bflex-1\b/);
+  it("stands its minus and plus well clear of the number (#581)", async () => {
+    await show();
+    const minus = screen.getByRole("button", { name: "One centimetre less" });
+    const number = screen.getByText("170 cm");
+    // The minus, the number and the plus are the one row's three children.
+    const row = minus.parent;
+    expect(row?.props.className).toMatch(/\bflex-row\b/);
+    expect(row?.props.className).toMatch(/\bgap-6\b/);
+    expect(row?.props.className).not.toMatch(/\bgap-[0-5]\b/);
+    expect(number.parent).toBe(row);
+    expect(screen.getByRole("button", { name: "One centimetre more" }).parent).toBe(row);
+  });
+
+  it("lets what it shows wrap before its buttons do, never cut at the largest text (#581)", async () => {
+    await show({ shown: "No answer yet, and a long way from one" });
+    const shown = screen.getByText("No answer yet, and a long way from one");
+    expect(shown.props.className).toMatch(/\bshrink\b/);
+    expect(hasCutText(screen.toJSON() as HostNode)).toBe(false);
   });
 
   /** The children of every host Text drawn: a label left empty still takes a line of the column. */
@@ -87,5 +110,66 @@ describe("Stepper", () => {
     // The number is the one text: no empty label line above it.
     expect(texts()).toEqual([["170 cm"]]);
     expect(screen.getByRole("button", { name: "One centimetre more" })).toBeTruthy();
+  });
+
+  describe("said aloud as it changes (#542)", () => {
+    const stepper = (value: number, shown: string) => (
+      <Stepper
+        value={value}
+        shown={shown}
+        downLabel="One centimetre less"
+        upLabel="One centimetre more"
+        canDown
+        canUp
+        onChange={jest.fn()}
+      />
+    );
+    /** What was said, spied from now on: the default platform in a test is iOS, so each test names its own. */
+    const hearing = (os: "ios" | "android") => {
+      jest.replaceProperty(Platform, "OS", os);
+      const said = jest.spyOn(AccessibilityInfo, "announceForAccessibilityWithOptions");
+      said.mockClear();
+      return said;
+    };
+
+    afterEach(() => jest.restoreAllMocks());
+
+    it("says the number on iOS, which has no live region, queued behind the button's name", async () => {
+      const said = hearing("ios");
+      const view = await renderWithTheme(stepper(170, "170 cm"));
+      await view.rerender(underProviders(stepper(171, "171 cm")));
+      expect(said.mock.calls).toEqual([["171 cm", { queue: true }]]);
+    });
+
+    it("says nothing when the screen opens", async () => {
+      const said = hearing("ios");
+      await renderWithTheme(stepper(170, "170 cm"));
+      expect(said).not.toHaveBeenCalled();
+    });
+
+    it("says nothing while what is shown stays, whatever else renders", async () => {
+      const said = hearing("ios");
+      const view = await renderWithTheme(stepper(170, "No answer yet"));
+      await view.rerender(underProviders(stepper(170, "No answer yet")));
+      // Unset, the value moves and the words do not: nothing a person would hear change.
+      await view.rerender(underProviders(stepper(171, "No answer yet")));
+      expect(said).not.toHaveBeenCalled();
+    });
+
+    it("says each change, the number it came from too", async () => {
+      const said = hearing("ios");
+      const view = await renderWithTheme(stepper(170, "170 cm"));
+      await view.rerender(underProviders(stepper(171, "171 cm")));
+      await view.rerender(underProviders(stepper(170, "170 cm")));
+      expect(said.mock.calls.map(([words]) => words)).toEqual(["171 cm", "170 cm"]);
+    });
+
+    it("leaves it to the live region on Android, which would say it twice", async () => {
+      const said = hearing("android");
+      const view = await renderWithTheme(stepper(170, "170 cm"));
+      await view.rerender(underProviders(stepper(171, "171 cm")));
+      expect(said).not.toHaveBeenCalled();
+      expect(screen.getByText("171 cm").props.accessibilityLiveRegion).toBe("polite");
+    });
   });
 });

@@ -1,41 +1,31 @@
-import { Image } from "expo-image";
 import { useRouter } from "expo-router";
 import Settings from "lucide-react-native/icons/settings";
 import Wrench from "lucide-react-native/icons/wrench";
-import { cssInterop } from "nativewind";
-import { Platform, ScrollView, View } from "react-native";
+import { ScrollView, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LoadFailed } from "@/components/LoadFailed";
 import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
+import { Ink } from "@/components/ui/ink";
 import { Text } from "@/components/ui/text";
 import { ChatsButton } from "@/features/chat";
 import { useOnboardingGate, useSession } from "@/features/identity";
-import { RoundButton } from "@/features/matching";
-import { Notices } from "@/features/notifications";
-import { GateCard, WaitlistCard } from "@/features/pond";
+import { RoundButton, StarsButton } from "@/features/matching";
+import { Notices, PushOffer } from "@/features/notifications";
+import { GateCard, PondCard } from "@/features/pond";
 import { isProduction } from "@/lib/environment";
 import { useT } from "@/lib/locale";
-import { cn } from "@/lib/utils";
-import { DECORATIVE } from "@/theme/a11y";
 import { useHapticTap } from "@/theme/haptics";
 
 // The mark is black ink on transparency (assets/logo-mark.png, made by
-// scripts/logo from docs/design/logo), tinted with the foreground token so it
-// follows all four theme sets: the text colour class is handed over as
-// tintColor, the way Icon does it for lucide. That hand-over is native only;
-// on the web target the ink is inverted under the dark class instead, and both
-// dark foregrounds are near white.
-const Mark = cssInterop(Image, {
-  className: { target: "style", nativeStyleToProp: { color: "tintColor" } },
-});
+// scripts/logo from docs/design/logo), tinted with the foreground token.
 const MARK = require("../../../assets/logo-mark.png");
-const MARK_CLASS = cn("h-24 w-24 text-foreground", Platform.select({ web: "dark:invert" }));
 
 /**
- * The home screen of a signed-in person (#143): where their pond and their
- * gate stand, the way to the profile (which holds the photos, the
- * deal-breakers and the later questions, #239), and the settings. The
+ * The home screen of a signed-in person (#143): whether matching is open and the
+ * way to the people, the way to the profile (which holds the photos, the
+ * deal-breakers and the later questions, #239), the conversations, how many
+ * people have completed their profiles last (#54, #581), and the settings. The
  * technical view (the API, the commits, a test error) is one tap away outside
  * production and absent in the store's build. An account that has not
  * finished onboarding (#46) is sent there first; until the status is known
@@ -51,19 +41,9 @@ export function HomeScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-background">
+      {/* The wrench left and the gear right (#511), the gear alone on the right in production. */}
       <View className="flex-row justify-between px-2">
-        <Button
-          variant="ghost"
-          size="icon"
-          accessibilityLabel={t("home.settings.open")}
-          onPress={() => {
-            tap();
-            router.push("/settings");
-          }}
-        >
-          <Icon as={Settings} />
-        </Button>
-        {technical && (
+        {technical ? (
           <Button
             variant="ghost"
             size="icon"
@@ -75,10 +55,23 @@ export function HomeScreen() {
           >
             <Icon as={Wrench} />
           </Button>
+        ) : (
+          <View />
         )}
+        <Button
+          variant="ghost"
+          size="icon"
+          accessibilityLabel={t("home.settings.open")}
+          onPress={() => {
+            tap();
+            router.push("/settings");
+          }}
+        >
+          <Icon as={Settings} />
+        </Button>
       </View>
       <ScrollView contentContainerClassName="flex-grow items-center justify-center gap-4 p-6">
-        <Mark source={MARK} contentFit="contain" className={MARK_CLASS} {...DECORATIVE} />
+        <Ink source={MARK} className="h-24 w-24 text-foreground" />
         <Text variant="h1" accessibilityRole="header">
           {t("home.title")}
         </Text>
@@ -90,11 +83,11 @@ export function HomeScreen() {
         )}
 
         {gate.status === "checking" && (
-          <Text accessibilityLiveRegion="polite">{t("home.gate.checking")}</Text>
+          <Text accessibilityLiveRegion="polite">{t("load.loading")}</Text>
         )}
         {gate.status === "unknown" && (
           <View className="w-full max-w-md gap-3">
-            <LoadFailed headline={t("home.gate.failed")} error={gate.error} onRetry={gate.retry} />
+            <LoadFailed error={gate.error} onRetry={gate.retry} />
           </View>
         )}
 
@@ -102,10 +95,19 @@ export function HomeScreen() {
           <View className="w-full max-w-md gap-4">
             {/* What must reach the person even without a push, unread, first (#176). */}
             <Notices />
-            {/* How the person's own pond is filling up (#54), and where they stand themselves (#94);
-                once matching is open, the way to today's round (#379). */}
-            {gate.pond && <WaitlistCard pond={gate.pond} />}
-            {gate.pond && <GateCard whenOpen={<RoundButton />} />}
+            {/* Whether matching is open for the person (#500); once it is, the way to the
+                queue (#379), the way to the people the person starred while there are any
+                (#575), and the one offer of notifications, since now there is something to
+                tell (#102, ADR-055 §9). */}
+            <GateCard
+              whenOpen={
+                <>
+                  <RoundButton />
+                  <StarsButton />
+                  <PushOffer />
+                </>
+              }
+            />
             <Button
               variant="outline"
               accessibilityLabel={t("profile.home.open")}
@@ -118,6 +120,8 @@ export function HomeScreen() {
             </Button>
             {/* The conversations a match opens, with what is unread (#348). */}
             <ChatsButton />
+            {/* How many people are on Kuutti (#54): last, under the things to do (#581). */}
+            <PondCard />
           </View>
         )}
       </ScrollView>

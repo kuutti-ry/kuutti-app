@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Kuutti API",
-    "version": "0.64.2",
+    "version": "0.118.1",
     "description": "Free, non-commercial dating app for Finland. Every account is verified through a Finnish bank. Source: AGPL-3.0 with App Store exception."
   },
   "components": {
@@ -67,12 +67,25 @@
               "pond": {
                 "$ref": "#/components/schemas/PondSummary"
               },
-              "genderChangedAt": {
-                "type": "string",
+              "home": {
+                "type": "object",
                 "nullable": true,
-                "format": "date-time"
+                "properties": {
+                  "place": {
+                    "type": "string",
+                    "maxLength": 80
+                  },
+                  "shownOnCard": {
+                    "type": "string",
+                    "maxLength": 80
+                  }
+                },
+                "required": [
+                  "place",
+                  "shownOnCard"
+                ]
               },
-              "seeksChangedAt": {
+              "genderChangedAt": {
                 "type": "string",
                 "nullable": true,
                 "format": "date-time"
@@ -100,8 +113,8 @@
               "birthMonth",
               "gender",
               "pond",
+              "home",
               "genderChangedAt",
-              "seeksChangedAt",
               "email",
               "foundThemAnswered",
               "emailConfirmedAt"
@@ -115,7 +128,7 @@
             "items": {
               "$ref": "#/components/schemas/StoredDealBreaker"
             },
-            "maxItems": 5
+            "maxItems": 7
           },
           "consents": {
             "type": "array",
@@ -201,6 +214,9 @@
                 "expiresAt": {
                   "type": "string",
                   "format": "date-time"
+                },
+                "push": {
+                  "$ref": "#/components/schemas/ExportedPush"
                 }
               },
               "required": [
@@ -209,7 +225,8 @@
                 "userAgent",
                 "createdAt",
                 "lastUsedAt",
-                "expiresAt"
+                "expiresAt",
+                "push"
               ]
             }
           },
@@ -275,9 +292,6 @@
           "research": {
             "$ref": "#/components/schemas/ResearchExport"
           },
-          "gate": {
-            "$ref": "#/components/schemas/ExportedGate"
-          },
           "exports": {
             "type": "array",
             "items": {
@@ -334,6 +348,9 @@
           "rounds": {
             "$ref": "#/components/schemas/ExportedRounds"
           },
+          "stars": {
+            "$ref": "#/components/schemas/ExportedStars"
+          },
           "invitations": {
             "$ref": "#/components/schemas/ExportedInvitations"
           }
@@ -353,7 +370,6 @@
           "cardsShown",
           "photoCheck",
           "research",
-          "gate",
           "exports",
           "feedback",
           "sanctions",
@@ -363,6 +379,7 @@
           "contacts",
           "notifications",
           "rounds",
+          "stars",
           "invitations"
         ]
       },
@@ -393,24 +410,12 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 80
-          },
-          "nameInessive": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 80
-          },
-          "parentId": {
-            "type": "string",
-            "nullable": true,
-            "format": "uuid"
           }
         },
         "required": [
           "id",
           "slug",
-          "name",
-          "nameInessive",
-          "parentId"
+          "name"
         ]
       },
       "PreferencesResponse": {
@@ -492,7 +497,9 @@
           "hasKids",
           "wantsKids",
           "smoking",
-          "languages"
+          "languages",
+          "height",
+          "distance"
         ]
       },
       "ConsentRecord": {
@@ -555,6 +562,39 @@
           "android"
         ]
       },
+      "ExportedPush": {
+        "type": "object",
+        "nullable": true,
+        "properties": {
+          "platform": {
+            "$ref": "#/components/schemas/PushPlatform"
+          },
+          "locale": {
+            "type": "string",
+            "enum": [
+              "en",
+              "fi",
+              "sv"
+            ]
+          },
+          "registeredAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "platform",
+          "locale",
+          "registeredAt"
+        ]
+      },
+      "PushPlatform": {
+        "type": "string",
+        "enum": [
+          "ios",
+          "android"
+        ]
+      },
       "ProfileDocument": {
         "type": "object",
         "nullable": true,
@@ -580,6 +620,14 @@
               "$ref": "#/components/schemas/PromptAnswer"
             },
             "maxItems": 3
+          },
+          "hiddenFields": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HiddenField"
+            },
+            "maxItems": 18,
+            "default": []
           },
           "specialCategoryConsent": {
             "type": "object",
@@ -733,11 +781,17 @@
                 "ja",
                 "se",
                 "ko",
+                "fse",
+                "fss",
+                "smn",
+                "sms",
+                "krl",
+                "rmf",
                 "other"
               ]
             },
             "minItems": 1,
-            "maxItems": 35
+            "maxItems": 41
           },
           "education": {
             "type": "string",
@@ -956,6 +1010,7 @@
               "hindu",
               "jewish",
               "spiritual",
+              "non_religious",
               "agnostic",
               "atheist",
               "other"
@@ -1015,6 +1070,29 @@
           "last_laugh",
           "three_things",
           "ask_me"
+        ]
+      },
+      "HiddenField": {
+        "type": "string",
+        "enum": [
+          "intent",
+          "identityLabel",
+          "monogamy",
+          "hasKids",
+          "wantsKids",
+          "smoking",
+          "nicotine",
+          "languages",
+          "hobbies",
+          "height",
+          "exercise",
+          "pets",
+          "field",
+          "occupation",
+          "occupationTitle",
+          "politics",
+          "religion",
+          "zodiac"
         ]
       },
       "ExportedPhoto": {
@@ -1418,48 +1496,6 @@
           "enrolled",
           "since",
           "consentVersion"
-        ]
-      },
-      "ExportedGate": {
-        "type": "object",
-        "nullable": true,
-        "properties": {
-          "pondId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "admittedAt": {
-            "type": "string",
-            "nullable": true,
-            "format": "date-time"
-          },
-          "placeSaid": {
-            "type": "integer",
-            "nullable": true,
-            "minimum": 1
-          },
-          "poolSaid": {
-            "type": "integer",
-            "minimum": 0
-          },
-          "openedAt": {
-            "type": "string",
-            "nullable": true,
-            "format": "date-time"
-          },
-          "countedAt": {
-            "type": "string",
-            "nullable": true,
-            "format": "date-time"
-          }
-        },
-        "required": [
-          "pondId",
-          "admittedAt",
-          "placeSaid",
-          "poolSaid",
-          "openedAt",
-          "countedAt"
         ]
       },
       "ExportedFeedback": {
@@ -1924,7 +1960,8 @@
           "phone",
           "whatsapp",
           "telegram",
-          "instagram"
+          "instagram",
+          "snapchat"
         ]
       },
       "ContactShareEnd": {
@@ -2018,17 +2055,19 @@
       "NotificationKind": {
         "type": "string",
         "enum": [
-          "round",
           "message",
           "match",
-          "moderation"
+          "moderation",
+          "announcement"
         ]
       },
       "NoticeKind": {
         "type": "string",
         "enum": [
           "warning",
-          "invitation_counted"
+          "invitation_counted",
+          "invitation_friend",
+          "announcement"
         ]
       },
       "ExportedRounds": {
@@ -2077,14 +2116,14 @@
             "items": {
               "$ref": "#/components/schemas/ExportedRelaxation"
             },
-            "maxItems": 5
+            "maxItems": 7
           },
           "entries": {
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/ExportedRoundEntry"
             },
-            "maxItems": 50
+            "maxItems": 32767
           }
         },
         "required": [
@@ -2137,7 +2176,7 @@
           "position": {
             "type": "integer",
             "minimum": 1,
-            "maximum": 50
+            "maximum": 32767
           },
           "reason": {
             "$ref": "#/components/schemas/RoundReason"
@@ -2175,6 +2214,16 @@
             "type": "string",
             "nullable": true,
             "format": "date-time"
+          },
+          "secondPass": {
+            "type": "boolean"
+          },
+          "distance": {
+            "$ref": "#/components/schemas/DistanceBand"
+          },
+          "distanceInWords": {
+            "type": "string",
+            "nullable": true
           }
         },
         "required": [
@@ -2186,7 +2235,10 @@
           "seenAt",
           "decision",
           "decisionInWords",
-          "decidedAt"
+          "decidedAt",
+          "secondPass",
+          "distance",
+          "distanceInWords"
         ]
       },
       "RoundReason": {
@@ -2206,7 +2258,48 @@
           "like",
           "pass",
           "fish",
+          "skip",
           null
+        ]
+      },
+      "DistanceBand": {
+        "type": "string",
+        "nullable": true,
+        "enum": [
+          "nearby",
+          "close",
+          "around",
+          "far",
+          null
+        ]
+      },
+      "ExportedStars": {
+        "type": "object",
+        "properties": {
+          "about": {
+            "type": "string",
+            "description": "What this part is, in the request's language."
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "at": {
+                  "type": "string",
+                  "format": "date-time"
+                }
+              },
+              "required": [
+                "at"
+              ]
+            },
+            "maxItems": 100
+          }
+        },
+        "required": [
+          "about",
+          "items"
         ]
       },
       "ExportedInvitations": {
@@ -2301,7 +2394,6 @@
       "RewardKind": {
         "type": "string",
         "enum": [
-          "like",
           "fish"
         ]
       },
@@ -2351,6 +2443,25 @@
               "pending"
             ],
             "description": "Committed migrations compared with the ones applied to this database."
+          },
+          "trustedProxy": {
+            "type": "string",
+            "enum": [
+              "none",
+              "traefik",
+              "cloudfront"
+            ],
+            "description": "Whose word the rate limiter takes for the client address, as the process read it at boot (ADR-008 §5)."
+          },
+          "originProof": {
+            "type": "string",
+            "enum": [
+              "valid",
+              "missing",
+              "wrong",
+              "unset"
+            ],
+            "description": "Whether this request carried the proof of Kuutti's own CloudFront distribution (ADR-066): unset when the process has no secret to check it against."
           }
         },
         "required": [
@@ -2415,13 +2526,13 @@
           },
           "refreshToken": {
             "type": "string",
-            "pattern": "^[A-Za-z0-9_-]{43}$",
-            "description": "Single use: /auth/refresh answers with a new pair and retires this one."
+            "pattern": "^[A-Za-z0-9_-]{43}\\.[A-Za-z0-9_-]{43}$",
+            "description": "Single use: /auth/refresh answers with a new pair and retires this one. Any retired token of the session presented again ends the session (ADR-059)."
           },
           "refreshExpiresAt": {
             "type": "string",
             "format": "date-time",
-            "description": "After this the device logs in through the bank again."
+            "description": "After this the device logs in through the bank again. Each refresh moves it to ninety days on, never past a year from the bank login (ADR-058)."
           },
           "outcome": {
             "type": "string",
@@ -2481,13 +2592,13 @@
           },
           "refreshToken": {
             "type": "string",
-            "pattern": "^[A-Za-z0-9_-]{43}$",
-            "description": "Single use: /auth/refresh answers with a new pair and retires this one."
+            "pattern": "^[A-Za-z0-9_-]{43}\\.[A-Za-z0-9_-]{43}$",
+            "description": "Single use: /auth/refresh answers with a new pair and retires this one. Any retired token of the session presented again ends the session (ADR-059)."
           },
           "refreshExpiresAt": {
             "type": "string",
             "format": "date-time",
-            "description": "After this the device logs in through the bank again."
+            "description": "After this the device logs in through the bank again. Each refresh moves it to ninety days on, never past a year from the bank login (ADR-058)."
           }
         },
         "required": [
@@ -2503,7 +2614,7 @@
         "properties": {
           "refreshToken": {
             "type": "string",
-            "pattern": "^[A-Za-z0-9_-]{43}$"
+            "pattern": "^[A-Za-z0-9_-]{43}\\.[A-Za-z0-9_-]{43}$"
           }
         },
         "required": [
@@ -3201,6 +3312,25 @@
               "reason"
             ],
             "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "decision": {
+                "type": "string",
+                "enum": [
+                  "take_down"
+                ]
+              },
+              "reason": {
+                "$ref": "#/components/schemas/ModeratorRejectionReason"
+              }
+            },
+            "required": [
+              "decision",
+              "reason"
+            ],
+            "additionalProperties": false
           }
         ]
       },
@@ -3224,11 +3354,15 @@
           },
           "completeness": {
             "$ref": "#/components/schemas/Completeness"
+          },
+          "home": {
+            "$ref": "#/components/schemas/HomeSummary"
           }
         },
         "required": [
           "profile",
-          "completeness"
+          "completeness",
+          "home"
         ]
       },
       "Completeness": {
@@ -3260,6 +3394,52 @@
           "age_window"
         ]
       },
+      "HomeSummary": {
+        "type": "object",
+        "nullable": true,
+        "properties": {
+          "town": {
+            "$ref": "#/components/schemas/PlaceName"
+          },
+          "area": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PlaceName"
+              },
+              {
+                "nullable": true
+              }
+            ]
+          },
+          "showArea": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "town",
+          "area",
+          "showArea"
+        ]
+      },
+      "PlaceName": {
+        "type": "object",
+        "properties": {
+          "fi": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "sv": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          }
+        },
+        "required": [
+          "fi",
+          "sv"
+        ]
+      },
       "ProfileUpdate": {
         "type": "object",
         "properties": {
@@ -3286,6 +3466,13 @@
               "$ref": "#/components/schemas/PromptAnswer"
             },
             "maxItems": 3
+          },
+          "hiddenFields": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HiddenField"
+            },
+            "maxItems": 18
           }
         },
         "required": [
@@ -3347,8 +3534,15 @@
           "gender": {
             "$ref": "#/components/schemas/Gender"
           },
-          "pond": {
-            "$ref": "#/components/schemas/PondSummary"
+          "place": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PlaceName"
+              },
+              {
+                "nullable": true
+              }
+            ]
           },
           "photos": {
             "type": "array",
@@ -3392,7 +3586,7 @@
                   "type": "string",
                   "maxLength": 40
                 },
-                "maxItems": 35
+                "maxItems": 41
               }
             },
             "required": [
@@ -3406,7 +3600,7 @@
           "displayName",
           "age",
           "gender",
-          "pond",
+          "place",
           "photos",
           "fields",
           "bio",
@@ -3473,8 +3667,8 @@
           "gender": {
             "$ref": "#/components/schemas/Gender"
           },
-          "pond": {
-            "$ref": "#/components/schemas/PondSummary"
+          "home": {
+            "$ref": "#/components/schemas/HomeSummary"
           },
           "preferences": {
             "$ref": "#/components/schemas/PreferencesResponse"
@@ -3533,16 +3727,10 @@
                 "type": "string",
                 "nullable": true,
                 "format": "date-time"
-              },
-              "seeks": {
-                "type": "string",
-                "nullable": true,
-                "format": "date-time"
               }
             },
             "required": [
-              "gender",
-              "seeks"
+              "gender"
             ]
           },
           "missing": {
@@ -3560,7 +3748,7 @@
           "state",
           "age",
           "gender",
-          "pond",
+          "home",
           "preferences",
           "consents",
           "currentVersions",
@@ -3607,9 +3795,9 @@
           "seeks",
           "intent",
           "age_window",
+          "home",
           "photos",
-          "prompts_or_bio",
-          "pond"
+          "prompts_or_bio"
         ]
       },
       "GenderUpdate": {
@@ -3831,6 +4019,11 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 500
+          },
+          "photoId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The one photo of the card the report is about (#476). Kept only for a photo of that person the reporter was shown; any other is left out, and the answer is the same."
           }
         },
         "required": [
@@ -3849,6 +4042,12 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 500
+          },
+          "seq": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2147483647,
+            "description": "The line of the one photo the report is about (#476). Kept only for a photo the other person sent that the reporter could read; any other line is left out, and the answer is the same."
           }
         },
         "required": [
@@ -3905,13 +4104,21 @@
           },
           {
             "$ref": "#/components/schemas/InvitationCountedNotice"
+          },
+          {
+            "$ref": "#/components/schemas/InvitationFriendNotice"
+          },
+          {
+            "$ref": "#/components/schemas/AnnouncementNotice"
           }
         ],
         "discriminator": {
           "propertyName": "kind",
           "mapping": {
             "warning": "#/components/schemas/WarningNotice",
-            "invitation_counted": "#/components/schemas/InvitationCountedNotice"
+            "invitation_counted": "#/components/schemas/InvitationCountedNotice",
+            "invitation_friend": "#/components/schemas/InvitationFriendNotice",
+            "announcement": "#/components/schemas/AnnouncementNotice"
           }
         }
       },
@@ -3989,45 +4196,132 @@
           "fish": {
             "type": "integer",
             "minimum": 0
-          },
-          "likes": {
-            "type": "integer",
-            "minimum": 0
           }
         },
         "required": [
-          "fish",
-          "likes"
+          "fish"
         ]
+      },
+      "InvitationFriendNotice": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "readAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "invitation_friend"
+            ]
+          },
+          "reward": {
+            "$ref": "#/components/schemas/RewardUnits"
+          }
+        },
+        "required": [
+          "id",
+          "at",
+          "readAt",
+          "kind",
+          "reward"
+        ]
+      },
+      "AnnouncementNotice": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "readAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "announcement"
+            ]
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 80
+          },
+          "body": {
+            "type": "string",
+            "maxLength": 1000
+          }
+        },
+        "required": [
+          "id",
+          "at",
+          "readAt",
+          "kind",
+          "title",
+          "body"
+        ]
+      },
+      "PushTokenRequest": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string",
+            "maxLength": 200,
+            "pattern": "^Expo(nent)?PushToken\\[[A-Za-z0-9_-]{1,160}\\]$"
+          },
+          "platform": {
+            "$ref": "#/components/schemas/PushPlatform"
+          }
+        },
+        "required": [
+          "token",
+          "platform"
+        ],
+        "additionalProperties": false
       },
       "Invitations": {
         "type": "object",
         "properties": {
           "canInvite": {
             "type": "boolean",
-            "description": "True once the person's profile has passed the pond gate's test."
+            "description": "True while the person's profile and onboarding are complete."
           },
           "redeemable": {
             "type": "boolean",
-            "description": "True while the person may still type a code: before their profile first passed the gate's test, with the current consents, no code used, and an identity never erased."
+            "description": "True while the person may type a code: their profile is not complete, with the current consents, no code used, and an identity never erased."
           },
           "reward": {
             "type": "object",
             "properties": {
-              "fish": {
+              "inviterFish": {
                 "type": "integer",
                 "minimum": 0,
                 "maximum": 10
               },
-              "likes": {
+              "friendFish": {
                 "type": "integer",
                 "minimum": 0,
-                "maximum": 50
+                "maximum": 10
               }
             },
             "required": [
-              "fish",
-              "likes"
+              "inviterFish",
+              "friendFish"
             ],
             "additionalProperties": false,
             "description": "What an invitation earns today (matching_config invitation_reward), for the app's words."
@@ -4049,17 +4343,12 @@
               "fish": {
                 "type": "integer",
                 "minimum": 0
-              },
-              "likes": {
-                "type": "integer",
-                "minimum": 0
               }
             },
             "required": [
-              "fish",
-              "likes"
+              "fish"
             ],
-            "description": "What the person's invitations earned that is not used yet."
+            "description": "What invitations earned the person that is not used yet, theirs and the one they used."
           }
         },
         "required": [
@@ -4141,11 +4430,15 @@
               "$ref": "#/components/schemas/ConversationSummary"
             },
             "maxItems": 1000
+          },
+          "yourTurn": {
+            "$ref": "#/components/schemas/YourTurnCount"
           }
         },
         "required": [
           "open",
-          "archived"
+          "archived",
+          "yourTurn"
         ]
       },
       "ConversationSummary": {
@@ -4170,6 +4463,9 @@
           "unread": {
             "type": "integer",
             "minimum": 0
+          },
+          "yourTurn": {
+            "type": "boolean"
           }
         },
         "required": [
@@ -4178,7 +4474,8 @@
           "closedHow",
           "counterpart",
           "lastMessage",
-          "unread"
+          "unread",
+          "yourTurn"
         ]
       },
       "Counterpart": {
@@ -4303,6 +4600,29 @@
           "theirs"
         ]
       },
+      "YourTurnCount": {
+        "type": "object",
+        "properties": {
+          "waiting": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "warning": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "waiting",
+          "limit",
+          "warning"
+        ],
+        "additionalProperties": false
+      },
       "ConversationDetail": {
         "type": "object",
         "properties": {
@@ -4325,6 +4645,9 @@
           "unread": {
             "type": "integer",
             "minimum": 0
+          },
+          "yourTurn": {
+            "type": "boolean"
           },
           "limits": {
             "type": "object",
@@ -4356,6 +4679,7 @@
           "counterpart",
           "lastMessage",
           "unread",
+          "yourTurn",
           "limits",
           "counterpartReadUpTo",
           "contacts",
@@ -4387,7 +4711,7 @@
                 "shared"
               ]
             },
-            "maxItems": 4
+            "maxItems": 5
           },
           "theirs": {
             "type": "array",
@@ -4407,7 +4731,7 @@
                 "value"
               ]
             },
-            "maxItems": 4
+            "maxItems": 5
           }
         },
         "required": [
@@ -4582,7 +4906,7 @@
             "items": {
               "$ref": "#/components/schemas/StoredContact"
             },
-            "maxItems": 4
+            "maxItems": 5
           }
         },
         "required": [
@@ -5502,6 +5826,16 @@
             },
             "maxItems": 1000000
           },
+          "lineSeq": {
+            "type": "integer",
+            "nullable": true,
+            "minimum": 1,
+            "maximum": 2147483647,
+            "default": null
+          },
+          "pointedPhoto": {
+            "$ref": "#/components/schemas/ReportPointedPhoto"
+          },
           "actable": {
             "type": "array",
             "items": {
@@ -5568,6 +5902,55 @@
           "reporter",
           "reported"
         ]
+      },
+      "ReportPointedPhoto": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "removed": {
+                "type": "boolean",
+                "enum": [
+                  true
+                ]
+              }
+            },
+            "required": [
+              "removed"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "removed": {
+                "type": "boolean",
+                "enum": [
+                  false
+                ]
+              },
+              "id": {
+                "$ref": "#/components/schemas/PhotoId"
+              },
+              "state": {
+                "$ref": "#/components/schemas/PhotoState"
+              },
+              "approvedPhotos": {
+                "type": "integer",
+                "minimum": 0
+              }
+            },
+            "required": [
+              "removed",
+              "id",
+              "state",
+              "approvedPhotos"
+            ]
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null
       },
       "ReportActable": {
         "type": "object",
@@ -5736,11 +6119,6 @@
             "nullable": true,
             "maxLength": 40
           },
-          "pond": {
-            "type": "string",
-            "nullable": true,
-            "maxLength": 80
-          },
           "profile": {
             "type": "object",
             "nullable": true,
@@ -5830,7 +6208,6 @@
           "suspensionEndsAt",
           "age",
           "gender",
-          "pond",
           "profile",
           "photos",
           "feedback",
@@ -6067,32 +6444,196 @@
           "lastSignInAt"
         ]
       },
+      "AdminPondList": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminPond"
+            },
+            "maxItems": 200
+          }
+        },
+        "required": [
+          "items"
+        ]
+      },
+      "AdminPond": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "slug": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 60
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "matchingOpen": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "slug",
+          "name",
+          "matchingOpen"
+        ]
+      },
+      "PondMatchingChange": {
+        "type": "object",
+        "properties": {
+          "open": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "open"
+        ],
+        "additionalProperties": false
+      },
+      "AdminAnnouncementList": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminAnnouncement"
+            },
+            "maxItems": 50
+          },
+          "reach": {
+            "$ref": "#/components/schemas/AnnouncementReach"
+          }
+        },
+        "required": [
+          "items",
+          "reach"
+        ]
+      },
+      "AdminAnnouncement": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "en": {
+            "$ref": "#/components/schemas/AnnouncementText"
+          },
+          "fi": {
+            "$ref": "#/components/schemas/AnnouncementText"
+          },
+          "sv": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AnnouncementText"
+              },
+              {
+                "nullable": true
+              }
+            ]
+          },
+          "writtenAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "approvedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "yours": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "en",
+          "fi",
+          "sv",
+          "writtenAt",
+          "approvedAt",
+          "yours"
+        ]
+      },
+      "AnnouncementText": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "body": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000
+          }
+        },
+        "required": [
+          "title",
+          "body"
+        ],
+        "additionalProperties": false
+      },
+      "AnnouncementReach": {
+        "type": "object",
+        "properties": {
+          "accounts": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "phones": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "addresses": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "accounts",
+          "phones",
+          "addresses"
+        ]
+      },
+      "AnnouncementDraft": {
+        "type": "object",
+        "properties": {
+          "en": {
+            "$ref": "#/components/schemas/AnnouncementText"
+          },
+          "fi": {
+            "$ref": "#/components/schemas/AnnouncementText"
+          },
+          "sv": {
+            "$ref": "#/components/schemas/AnnouncementText"
+          }
+        },
+        "required": [
+          "en",
+          "fi"
+        ],
+        "additionalProperties": false
+      },
       "GateResponse": {
         "type": "object",
         "properties": {
           "state": {
             "$ref": "#/components/schemas/GateState"
-          },
-          "within": {
-            "type": "integer",
-            "nullable": true,
-            "minimum": 1
-          },
-          "needed": {
-            "type": "integer",
-            "nullable": true,
-            "minimum": 1
-          },
-          "step": {
-            "type": "integer",
-            "minimum": 10
           }
         },
         "required": [
-          "state",
-          "within",
-          "needed",
-          "step"
+          "state"
         ],
         "additionalProperties": false
       },
@@ -6100,13 +6641,11 @@
         "type": "string",
         "enum": [
           "incomplete",
-          "pending",
-          "waiting",
           "closed",
           "open"
         ]
       },
-      "WaitlistResponse": {
+      "PondCounterResponse": {
         "type": "object",
         "properties": {
           "k": {
@@ -6116,7 +6655,7 @@
           "ponds": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/WaitlistPond"
+              "$ref": "#/components/schemas/PondCounterPond"
             },
             "maxItems": 500
           }
@@ -6127,7 +6666,7 @@
         ],
         "additionalProperties": false
       },
-      "WaitlistPond": {
+      "PondCounterPond": {
         "type": "object",
         "properties": {
           "pond": {
@@ -6138,84 +6677,62 @@
             "nullable": true,
             "format": "date"
           },
-          "verified": {
+          "finished": {
             "type": "integer",
             "nullable": true,
             "minimum": 10
           },
-          "split": {
-            "$ref": "#/components/schemas/WaitlistSplit"
-          },
-          "finishing": {
-            "type": "integer",
-            "nullable": true,
-            "minimum": 0,
-            "not": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 9
-            }
+          "seeks": {
+            "$ref": "#/components/schemas/PondSeeks"
           }
         },
         "required": [
           "pond",
           "day",
-          "verified",
-          "split",
-          "finishing"
+          "finished",
+          "seeks"
         ],
         "additionalProperties": false
       },
-      "WaitlistSplit": {
+      "PondSeeks": {
         "type": "object",
         "nullable": true,
         "properties": {
-          "woman": {
+          "men": {
             "type": "integer",
-            "minimum": 10
+            "minimum": 5,
+            "maximum": 100
           },
-          "man": {
+          "everyone": {
             "type": "integer",
-            "minimum": 10
+            "minimum": 5,
+            "maximum": 100
           },
-          "nonBinary": {
+          "women": {
             "type": "integer",
-            "minimum": 10
+            "minimum": 5,
+            "maximum": 100
           }
         },
         "required": [
-          "woman",
-          "man",
-          "nonBinary"
+          "men",
+          "everyone",
+          "women"
         ],
         "additionalProperties": false
       },
-      "PondList": {
+      "HomeUpdate": {
         "type": "object",
         "properties": {
-          "ponds": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/PondSummary"
-            },
-            "maxItems": 200
-          }
-        },
-        "required": [
-          "ponds"
-        ]
-      },
-      "PondChoice": {
-        "type": "object",
-        "properties": {
-          "pondId": {
+          "postalCode": {
             "type": "string",
-            "format": "uuid"
+            "pattern": "^\\d{5}$",
+            "description": "Five digits, checked against the list of postal areas."
+          },
+          "showArea": {
+            "type": "boolean"
           }
         },
-        "required": [
-          "pondId"
-        ],
         "additionalProperties": false
       },
       "RoundResponse": {
@@ -6231,12 +6748,26 @@
             "items": {
               "$ref": "#/components/schemas/RoundEntry"
             },
-            "maxItems": 50
+            "maxItems": 10
+          },
+          "fishToSend": {
+            "type": "boolean"
+          },
+          "likesLeft": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "yourTurn": {
+            "type": "integer",
+            "minimum": 0
           }
         },
         "required": [
           "day",
-          "entries"
+          "entries",
+          "fishToSend",
+          "likesLeft",
+          "yourTurn"
         ]
       },
       "RoundEntry": {
@@ -6245,7 +6776,7 @@
           "position": {
             "type": "integer",
             "minimum": 1,
-            "maximum": 50
+            "maximum": 32767
           },
           "reason": {
             "$ref": "#/components/schemas/RoundReason"
@@ -6256,6 +6787,14 @@
           "card": {
             "$ref": "#/components/schemas/ProfileCard"
           },
+          "distance": {
+            "$ref": "#/components/schemas/DistanceBand"
+          },
+          "star": {
+            "type": "string",
+            "nullable": true,
+            "format": "uuid"
+          },
           "relaxedField": {
             "$ref": "#/components/schemas/DealBreakerField"
           },
@@ -6264,14 +6803,16 @@
             "items": {
               "$ref": "#/components/schemas/DealBreakerField"
             },
-            "maxItems": 5
+            "maxItems": 7
           }
         },
         "required": [
           "position",
           "reason",
           "decision",
-          "card"
+          "card",
+          "distance",
+          "star"
         ]
       },
       "RoundDecisionAnswer": {
@@ -6290,10 +6831,24 @@
               "conversationId"
             ],
             "additionalProperties": false
+          },
+          "fishToSend": {
+            "type": "boolean"
+          },
+          "likesLeft": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "yourTurn": {
+            "type": "integer",
+            "minimum": 0
           }
         },
         "required": [
-          "match"
+          "match",
+          "fishToSend",
+          "likesLeft",
+          "yourTurn"
         ],
         "additionalProperties": false
       },
@@ -6320,14 +6875,14 @@
             "items": {
               "$ref": "#/components/schemas/RelaxationOffer"
             },
-            "maxItems": 10
+            "maxItems": 14
           },
           "relaxed": {
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/Relaxation"
             },
-            "maxItems": 5
+            "maxItems": 7
           }
         },
         "required": [
@@ -6382,7 +6937,7 @@
             "items": {
               "$ref": "#/components/schemas/RoundEntry"
             },
-            "maxItems": 50
+            "maxItems": 10
           }
         },
         "required": [
@@ -6398,13 +6953,90 @@
             "items": {
               "type": "integer",
               "minimum": 1,
-              "maximum": 50
+              "maximum": 32767
             },
-            "maxItems": 50
+            "maxItems": 32767
           }
         },
         "required": [
           "removed"
+        ],
+        "additionalProperties": false
+      },
+      "StarList": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StarredPerson"
+            },
+            "maxItems": 100
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "additionalProperties": false
+      },
+      "StarredPerson": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "age": {
+            "type": "integer",
+            "minimum": 18,
+            "maximum": 130
+          },
+          "photo": {
+            "type": "object",
+            "nullable": true,
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "blurhash": {
+                "type": "string",
+                "maxLength": 100
+              }
+            },
+            "required": [
+              "id",
+              "blurhash"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "age",
+          "photo"
+        ],
+        "additionalProperties": false
+      },
+      "StarAnswer": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "first": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "first"
         ],
         "additionalProperties": false
       },
@@ -6416,12 +7048,12 @@
             "items": {
               "$ref": "#/components/schemas/StoredDealBreaker"
             },
-            "maxItems": 5
+            "maxItems": 7
           },
           "max": {
             "type": "integer",
             "minimum": 0,
-            "maximum": 5
+            "maximum": 7
           }
         },
         "required": [
@@ -6437,7 +7069,7 @@
             "items": {
               "$ref": "#/components/schemas/DealBreaker"
             },
-            "maxItems": 5
+            "maxItems": 7
           }
         },
         "required": [
@@ -6496,7 +7128,7 @@
     "/health": {
       "get": {
         "summary": "Liveness and readiness in one answer",
-        "description": "200 when the database answers and committed migrations are applied; 503 with the same body when either fails.",
+        "description": "200 when the database answers and committed migrations are applied; 503 with the same body when either fails. One check of the database answers every request within its second.",
         "responses": {
           "200": {
             "description": "Every dependency answers.",
@@ -7451,7 +8083,7 @@
     "/account/pause": {
       "post": {
         "summary": "Take a break: pause this account",
-        "description": "The account goes to paused (#170, ADR-022): the profile leaves every pool, counter and round, and every session of the account ends, this one included. Nothing is erased: the profile, the photos, the preferences, the consents and the place at the gate stay as they are, and the next bank login brings the account back as it was. The body confirms; the screen asks first.",
+        "description": "The account goes to paused (#170, ADR-022): the profile leaves every pool, counter and round, and every session of the account ends, this one included. Nothing is erased: the profile, the photos, the preferences and the consents stay as they are, and the next bank login brings the account back as it was. The body confirms; the screen asks first.",
         "security": [
           {
             "session": []
@@ -7970,7 +8602,7 @@
     "/photos/{id}/{variant}": {
       "get": {
         "summary": "A signed URL for one variant",
-        "description": "Valid for fifteen minutes. Every issuance is logged against the caller and counted against the day's budget for the variant (matching_config.photo_fetches_per_day; the day rolls at midnight in Finland). The app caches by photo id and variant, never by this URL, and asks for full only from the zoom screen. Another account's photo is served only from a card the caller was shown.",
+        "description": "Valid for fifteen minutes. Every issuance is logged against the caller and counted against the day's budget for the variant (matching_config.photo_fetches_per_day; the day rolls at midnight in Finland). The app caches by photo id and variant, never by this URL, and asks for full only from the zoom screen of one's own photos. Another account's photo is served only from a card the caller was shown, and never in the full size (ADR-056).",
         "security": [
           {
             "session": []
@@ -8027,7 +8659,7 @@
             }
           },
           "404": {
-            "description": "Not a photo this account may see: not its own, and not on a card it was shown.",
+            "description": "Not a photo this account may see: not its own, and not on a card it was shown, or another account's in the full size.",
             "content": {
               "application/json": {
                 "schema": {
@@ -8210,8 +8842,8 @@
     },
     "/admin/photos/{id}/decision": {
       "post": {
-        "summary": "Approve or reject a photo",
-        "description": "approve makes the photo visible to others; reject hides it and tells the owner the reason in words. Only a queued photo takes a decision, once. Only a person rejects. Written to audit_log.",
+        "summary": "Approve or reject a queued photo, or take an approved one down",
+        "description": "approve makes a queued photo visible to others; reject hides it and tells the owner the reason in words. take_down rejects an approved profile photo (#477): nobody else is given it, and the owner is told the reason, with no appeal. Each decision is taken once, on the state it is for. Nothing is deleted. Written to audit_log.",
         "security": [
           {
             "session": []
@@ -8289,7 +8921,7 @@
             }
           },
           "409": {
-            "description": "photo_not_queued: the photo is not waiting for a decision (already decided, or still being checked).",
+            "description": "photo_not_queued: approve or reject on a photo not waiting for a decision (already decided, or still being checked). photo_not_approved: take_down on a photo that is not approved (taken down already, or never approved).",
             "content": {
               "application/json": {
                 "schema": {
@@ -8304,7 +8936,7 @@
     "/profile": {
       "get": {
         "summary": "The caller's profile and what it still needs",
-        "description": "The profile as saved (null before the first save) and the completeness rule's verdict (what is missing before the profile can enter a round).",
+        "description": "The profile as saved (null before the first save), the completeness rule's verdict (what is missing before the profile can enter a round), and the home in names, which PUT /account/home writes and this document never does.",
         "security": [
           {
             "session": []
@@ -8441,7 +9073,7 @@
     "/onboarding": {
       "get": {
         "summary": "What the caller has answered and which steps of onboarding are still open",
-        "description": "The steps of the field sheet in the order the app asks them, the answers so far, the consents given for the current wordings and the current versions. An account without a pond is put in the default pond here. When the four answers matching needs and the two consents are there and the account is still registered, it becomes active here; the profile steps keep `complete` false until they are done.",
+        "description": "The steps of the field sheet in the order the app asks them, the answers so far, the consents given for the current wordings and the current versions. When the four answers matching needs and the two consents are there and the account is still registered, it becomes active here; the profile steps keep `complete` false until they are done.",
         "security": [
           {
             "session": []
@@ -8474,7 +9106,7 @@
     "/account/gender": {
       "put": {
         "summary": "Declare the caller's gender",
-        "description": "Self-declared, one of a closed list (rule 3); nothing from the bank informs it.",
+        "description": "Self-declared, one of a closed list (rule 3); nothing from the bank informs it. The first answer and the same answer again are free; a change is possible once in `change_cadence_days`. A change away from non-binary clears the identity label.",
         "security": [
           {
             "session": []
@@ -8516,6 +9148,16 @@
           },
           "404": {
             "description": "No live account (erased meanwhile).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "change_too_soon: the gender was changed within the cadence, and GET /onboarding's nextChange says from when.",
             "content": {
               "application/json": {
                 "schema": {
@@ -8978,7 +9620,7 @@
     "/reports": {
       "post": {
         "summary": "Report the person of a card one was shown, and block them",
-        "description": "A reason from the closed list and, if the person likes, a few lines for the moderators, who read it in the panel. The report blocks both ways in the same transaction. The reported person learns nothing. At most matching_config reports_per_day a day per account, the Finnish calendar day; one open report per pair.",
+        "description": "A reason from the closed list and, if the person likes, a few lines for the moderators, who read it in the panel, and the one photo of the card it is about (#476). The report blocks both ways in the same transaction. The reported person learns nothing. At most matching_config reports_per_day a day per account, the Finnish calendar day; one open report per pair.",
         "security": [
           {
             "session": []
@@ -8996,10 +9638,10 @@
         },
         "responses": {
           "204": {
-            "description": "Filed and blocked; or a report of the same person is still open, and nothing more is written."
+            "description": "Filed and blocked; or a report of the same person is still open, and nothing more is written. A photo that is not one of the card the person was shown is left out, and the answer is the same."
           },
           "400": {
-            "description": "Validation failed: a missing or unknown reason, a note blank or over 500 characters, a malformed account id, an unknown key.",
+            "description": "Validation failed: a missing or unknown reason, a note blank or over 500 characters, a malformed account or photo id, an unknown key.",
             "content": {
               "application/json": {
                 "schema": {
@@ -9101,7 +9743,7 @@
     "/conversations/{id}/report": {
       "post": {
         "summary": "Report the other person of a conversation, with a copy of it, and block them",
-        "description": "The card's reason and note (#351, ADR-030 §12). In one transaction: the report naming the conversation, a frozen copy of every message it holds now, both people's, for the moderators, who read it in the panel, the block both ways and the conversation's close. Taken while the conversation is open or archived, and for matching_config report_after_close_days after it closed, so a person blocked can still report what was said. At most matching_config reports_per_day a day, one open report per pair, as from a card. The reported person learns nothing.",
+        "description": "The card's reason and note (#351, ADR-030 §12), and the line of the one photo it is about (#476). In one transaction: the report naming the conversation, a frozen copy of every message it holds now, both people's, for the moderators, who read it in the panel, the block both ways and the conversation's close. Taken while the conversation is open or archived, and for matching_config report_after_close_days after it closed, so a person blocked can still report what was said. At most matching_config reports_per_day a day, one open report per pair, as from a card. The reported person learns nothing.",
         "security": [
           {
             "session": []
@@ -9130,10 +9772,10 @@
         },
         "responses": {
           "204": {
-            "description": "Filed, copied, blocked and closed; or a report of the same person is still open, and nothing more is written."
+            "description": "Filed, copied, blocked and closed; or a report of the same person is still open, and nothing more is written. A line that is not a photo the other person sent, as the reporter could read it, is left out, and the answer is the same."
           },
           "400": {
-            "description": "Validation failed: a missing or unknown reason, a note blank or over 500 characters, an unknown key, an id that is not a uuid.",
+            "description": "Validation failed: a missing or unknown reason, a note blank or over 500 characters, a line that is not a whole number from 1, an unknown key, an id that is not a uuid.",
             "content": {
               "application/json": {
                 "schema": {
@@ -9188,7 +9830,7 @@
     "/account/notifications": {
       "get": {
         "summary": "What the caller may be notified of",
-        "description": "Every kind (a new round, a message, a match, a moderator's decision), in that order, each on unless the person switched it off. The senders read it when they exist (#102 the message).",
+        "description": "Every kind (a message, a match, a moderator's decision), in that order, each on unless the person switched it off. The push reads it for a message and a match; nothing is sent for a moderator's decision yet.",
         "security": [
           {
             "session": []
@@ -9293,7 +9935,7 @@
     "/notices": {
       "get": {
         "summary": "The caller's notices in the app",
-        "description": "What must reach the person even without a push, newest first, at most 20: a moderator's warning, with its reason, until it is lifted, and an invitation of the person's that counted, with what it earned and never who was invited. A notice holds no text of its own; the app says it.",
+        "description": "What must reach the person even without a push, newest first, at most 20: a moderator's warning, with its reason, until it is lifted; an invitation of the person's that counted, with what it earned and never who was invited; and an announcement to everybody (#573, ADR-068), with its title and body in the request's language, Swedish falling back to English and Stadi reading Finnish. Every other notice holds no text of its own; the app says it.",
         "security": [
           {
             "session": []
@@ -9379,10 +10021,56 @@
         }
       }
     },
+    "/push-token": {
+      "put": {
+        "summary": "Register this device's push token",
+        "description": "The caller's session's Expo push token, which its pushes go to (ADR-055): one per session, replacing the session's earlier one, and taken from any other session it was registered to. The pushes are worded in the request's language. It goes when the session ends. A session revoked meanwhile writes nothing.",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PushTokenRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Registered, or nothing to register for a session that ended."
+          },
+          "400": {
+            "description": "validation_failed: not an Expo push token, an unknown platform, an unknown key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "unauthenticated, session_expired or session_revoked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/invitations": {
       "get": {
         "summary": "The caller's invitations",
-        "description": "Whether the caller may invite (their profile has passed the pond gate's test) and may still type a code, what an invitation earns today (matching_config invitation_reward), their open invitations newest first, how many of theirs have counted, and what those earned that is not used yet. Never a code, and nothing of anybody invited.",
+        "description": "Whether the caller may invite (their profile is complete) and may still type a code, what an invitation earns today (matching_config invitation_reward), their open invitations newest first, how many of theirs have counted, and what invitations earned them that is not used yet. Never a code, and nothing of anybody invited.",
         "security": [
           {
             "session": []
@@ -9423,7 +10111,7 @@
       },
       "post": {
         "summary": "Make an invitation",
-        "description": "A code for one friend, in two groups of five, shown here once: Kuutti keeps only its hash. For a caller whose profile has passed the pond gate's test; at most matching_config invitations_open open at once. The night the friend's profile first passes the same test, the invitation counts and the caller earns matching_config invitation_reward.",
+        "description": "A code for one friend, in two groups of five, shown here once: Kuutti keeps only its hash. For a caller whose profile is complete; at most matching_config invitations_open open at once. The night the friend's profile first passes the same test, the invitation counts and the two earn matching_config invitation_reward.",
         "security": [
           {
             "session": []
@@ -9461,7 +10149,7 @@
             }
           },
           "409": {
-            "description": "invitation_not_yet: the caller's profile has not passed the pond gate's test; invitations_full: as many invitations open as matching_config invitations_open allows. Nothing was written.",
+            "description": "invitation_not_yet: the caller's profile is not complete; invitations_full: as many invitations open as matching_config invitations_open allows. Nothing was written.",
             "content": {
               "application/json": {
                 "schema": {
@@ -9532,7 +10220,7 @@
     "/invitations/redeem": {
       "post": {
         "summary": "Use an invitation code",
-        "description": "A code typed by the caller, before their profile first passes the pond gate's test: case, spaces and hyphens do not matter. The caller is checked before the code is looked up. At most matching_config invitation_tries_per_day tries a Finnish day, whatever their answer.",
+        "description": "A code typed by the caller, before their profile is complete: case, spaces and hyphens do not matter. The caller is checked before the code is looked up. At most matching_config invitation_tries_per_day tries a Finnish day, whatever their answer.",
         "security": [
           {
             "session": []
@@ -9583,7 +10271,7 @@
             }
           },
           "409": {
-            "description": "invitation_not_for_you: the caller cannot use a code: their profile has passed the test, they used one already, the current terms and privacy consents are not given, or their identity had an account erased before.",
+            "description": "invitation_not_for_you: the caller cannot use a code: their profile is complete, they used one already, the current terms and privacy consents are not given, or their identity had an account erased before.",
             "content": {
               "application/json": {
                 "schema": {
@@ -9666,7 +10354,7 @@
     "/conversations/{id}": {
       "get": {
         "summary": "One conversation",
-        "description": "The summary, the longest message the composer may send, the highest sequence the counterpart has read, and the contacts (#103): the caller's stored pieces, each shared here or not, and the counterpart's pieces shared with the caller now. In a closed conversation nothing is shared either way.",
+        "description": "The summary, the longest message the composer may send, how far the counterpart has read as the caller may see it (a shadow ban of the counterpart's holds it where the ban began, #470), and the contacts (#103): the caller's stored pieces, each shared here or not, and the counterpart's pieces shared with the caller now. In a closed conversation nothing is shared either way.",
         "security": [
           {
             "session": []
@@ -9730,7 +10418,7 @@
     "/conversations/{id}/messages": {
       "get": {
         "summary": "A page of messages",
-        "description": "With before, the messages under that sequence, newest first; with after, the ones above it, oldest first (what is new since the last one the phone holds); with neither, the newest. At most limit, 50 by default, 100 at most. A counterpart's message sent during a shadow ban still open is not among them.",
+        "description": "With before, the messages under that sequence, newest first; with after, the ones above it, oldest first (what is new since the last one the phone holds); with neither, the newest. At most limit, 50 by default, 100 at most. A counterpart's message sent during a shadow ban that is still open, or that was lifted only after the conversation ended, is not among them.",
         "security": [
           {
             "session": []
@@ -10073,7 +10761,7 @@
     "/contacts": {
       "get": {
         "summary": "The caller's stored contacts",
-        "description": "Up to one phone number, WhatsApp number, Telegram and Instagram username, in that order, each in its stored form. Nobody else sees them until the caller shares one in a conversation.",
+        "description": "Up to one phone number, WhatsApp number, Telegram, Instagram and Snapchat username, in that order, each in its stored form. Nobody else sees them until the caller shares one in a conversation.",
         "security": [
           {
             "session": []
@@ -10106,7 +10794,7 @@
     "/contacts/{kind}": {
       "put": {
         "summary": "Keep a contact",
-        "description": "Stores the piece of that kind in its one form (normaliseContact: a number in E.164, a Finnish one from 0 to +358; a username without its @, Instagram's in lower case), replacing the one kept before. A shared piece that changes shows its new value in the conversations where it is shared, at once. Counts against matching_config messages_per_minute.",
+        "description": "Stores the piece of that kind in its one form (normaliseContact: a number in E.164, a Finnish one from 0 to +358; a username without its @, Instagram's and Snapchat's in lower case), replacing the one kept before. A shared piece that changes shows its new value in the conversations where it is shared, at once. Counts against matching_config messages_per_minute.",
         "security": [
           {
             "session": []
@@ -11531,7 +12219,7 @@
     "/admin/reports/{id}": {
       "get": {
         "summary": "One report, with the reporter's note and the frozen conversation",
-        "description": "The queue's item, the reporter's note, the decision, the frozen copy of the conversation for a report made from one (null for a card's), and the sanctions that may close it while it waits. Written first to audit_log, about the report: conversation.view for a conversation's report, report.view for a card's; a look whose row cannot be written answers nothing of it. Moderators and admins.",
+        "description": "The queue's item, the reporter's note, the decision, the frozen copy of the conversation for a report made from one (null for a card's), the photo the report points at (#476: the copy's line, or a card's photo with its id and state, or removed since), and the sanctions that may close it while it waits. Written first to audit_log, about the report: conversation.view for a conversation's report, report.view for a card's; a look whose row cannot be written answers nothing of it. Moderators and admins.",
         "security": [
           {
             "session": []
@@ -11675,6 +12363,90 @@
           },
           "404": {
             "description": "not_found: no such report, a party's, or no photo at that line, answered alike.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "media_unavailable: no object storage is configured here.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/reports/{id}/photo": {
+      "get": {
+        "summary": "A signed URL for the photo a card's report points at",
+        "description": "The card variant of the one photo of the card the reporter pointed at (#476), for fifteen minutes. Every issuance is a photo.view row about the report, written before the URL is signed. Moderators and admins.",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The signed URL.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PhotoUrlResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "unauthenticated, session_expired or session_revoked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "admin_forbidden: the role does not allow this.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "not_found: no such report, a party's, one that points at no photo, or a photo removed since, answered alike.",
             "content": {
               "application/json": {
                 "schema": {
@@ -12029,10 +12801,10 @@
         }
       }
     },
-    "/gate": {
+    "/admin/ponds": {
       "get": {
-        "summary": "Where the caller stands at the pond gate",
-        "description": "Between a finished profile and the first round (TD-10): on the pond's waitlist with a place, let in and waiting for enough people who match (how many more, in steps of `step`), or open. Counted nightly, and once when a person with a finished profile first asks.",
+        "summary": "Every pond with its switch",
+        "description": "Each pond and whether matching is open in it. Admins only.",
         "security": [
           {
             "session": []
@@ -12040,7 +12812,399 @@
         ],
         "responses": {
           "200": {
-            "description": "The caller's gate.",
+            "description": "The ponds.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminPondList"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "unauthenticated, session_expired or session_revoked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "admin_forbidden: the role does not allow this.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/ponds/{id}/matching": {
+      "post": {
+        "summary": "Open or close matching in a pond",
+        "description": "Sets the pond's switch. Open, its complete people are told so, and the night and the day's first read build their rounds (not in production yet: ADR-035 Open 1); closed, they build none, and rounds already built and conversations stay. Nothing else turns it. A press that finds the switch as it asks changes nothing and writes nothing. Admins only; written to audit_log.",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PondMatchingChange"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The pond as it now stands.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminPond"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "unauthenticated, session_expired or session_revoked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "admin_forbidden: the role does not allow this.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such pond.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/announcements": {
+      "get": {
+        "summary": "The newest announcements, and how many one would reach",
+        "description": "The newest 50, drafts and sent alike, each in its languages and whether the caller wrote it, which is who may not approve it; never who wrote or approved it, which the audit log says. With them how many an announcement approved now reaches: every account that is not erased gets its notice, the people with the announcements switch on and a live device its push, and the confirmed addresses with the switch on its email. Admins only.",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The announcements.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminAnnouncementList"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "unauthenticated, session_expired or session_revoked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "admin_forbidden: the role does not allow this.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Write an announcement",
+        "description": "A draft in English and Finnish, and in Swedish or not at all: each a title of at most 80 characters and a body of at most 1,000, trimmed, never empty, and with no address, link, phone number or handle (the plain-text rule). Nothing is sent until another admin approves it. Admins only; written to audit_log with no words.",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AnnouncementDraft"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The draft.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminAnnouncement"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "validation_failed, or text_contact_details naming the language and what was found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "unauthenticated, session_expired or session_revoked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "admin_forbidden: the role does not allow this.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/announcements/{id}": {
+      "delete": {
+        "summary": "Delete a draft",
+        "description": "Any admin may delete an announcement that has not been approved; one that went to everybody stays. Admins only; written to audit_log.",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted."
+          },
+          "400": {
+            "description": "Validation failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "unauthenticated, session_expired or session_revoked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "admin_forbidden: the role does not allow this.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such announcement.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "announcement_sent: it went to everybody already.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/announcements/{id}/approve": {
+      "post": {
+        "summary": "Approve an announcement, which sends it to everybody",
+        "description": "The second admin's approval: never the one who wrote it, and once. In the same transaction every account that is not erased gets the announcement as a notice in the app; after the answer, the confirmed addresses whose switch is on get it by email, and the people whose notice is still unread and whose switch is on get a push in the app's own words, or once the quiet hours end. Nothing takes it back. Admins only; written to audit_log with how many notices it wrote.",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The announcement, sent.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminAnnouncement"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "unauthenticated, session_expired or session_revoked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "admin_forbidden: the role does not allow this.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such announcement.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "own_announcement: the caller wrote it; announcement_sent: it went to everybody already.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/gate": {
+      "get": {
+        "summary": "Whether matching is open for the caller",
+        "description": "Between a finished profile and the first round: incomplete while the profile or onboarding lacks something, closed once it is finished and matching has not opened in the caller's pond yet, open once it has. An admin opens a pond; nothing here counts anybody.",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "What stands for the caller.",
             "content": {
               "application/json": {
                 "schema": {
@@ -12062,46 +13226,29 @@
         }
       }
     },
-    "/waitlist": {
+    "/ponds/counter": {
       "get": {
-        "summary": "The waitlist counter",
-        "description": "Per pond: bank-verified people waiting, their split by self-declared gender, and how many are finishing their profile. A number is published only where at least k people stand behind it (k is in the answer), the split only when every cell is at least k, and a pond's numbers move only once at least k people have come or gone since they were last said. Counted once a day. No session needed.",
-        "responses": {
-          "200": {
-            "description": "Every pond with what may be said of it.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/WaitlistResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/ponds": {
-      "get": {
-        "summary": "The ponds a person can choose",
-        "description": "Every pond with both Finnish case forms (TD-17), parents first. Where matching happens (TD-10); the choice is one per account.",
+        "summary": "The pond counter",
+        "description": "Per pond: how many bank-verified people with the pond as theirs have completed their profiles. The number is published only where at least k people stand behind it (k is in the answer), and it moves only once at least k people have come or gone since it was last said. Counted once a day. No session needed. With one, the answer is the caller's and is not cached, and the caller's own pond also says whom its people seek: percentages in steps of five of three bands of finished profiles, those who seek men, those who seek both women and men, and those who seek women, null until every band holds at least k people.",
         "security": [
+          {},
           {
             "session": []
           }
         ],
         "responses": {
           "200": {
-            "description": "The ponds.",
+            "description": "Every pond with what may be said of it.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/PondList"
+                  "$ref": "#/components/schemas/PondCounterResponse"
                 }
               }
             }
           },
           "401": {
-            "description": "unauthenticated, session_expired or session_revoked.",
+            "description": "A session was offered and does not stand: unauthenticated, session_expired or session_revoked. No session at all is the public answer.",
             "content": {
               "application/json": {
                 "schema": {
@@ -12113,9 +13260,10 @@
         }
       }
     },
-    "/account/pond": {
+    "/account/home": {
       "put": {
-        "summary": "Choose the caller's pond",
+        "summary": "Set the caller's home, or what their card shows of it",
+        "description": "A postal code of five digits, whether the card shows the area instead of the town, or both. What is kept is a place of at least matching_config home_min_inhabitants people: the postal area, else its municipality, else the nearest municipality that has them. A new postal code starts from the town again unless the same request says otherwise, and showArea stays false where no area is kept. The home changes whenever the person likes. The write sets the account's pond if it has none. The answer names places and never carries digits.",
         "security": [
           {
             "session": []
@@ -12126,17 +13274,24 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/PondChoice"
+                "$ref": "#/components/schemas/HomeUpdate"
               }
             }
           }
         },
         "responses": {
-          "204": {
-            "description": "Chosen."
+          "200": {
+            "description": "Saved; the home as its owner reads it.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HomeSummary"
+                }
+              }
+            }
           },
           "400": {
-            "description": "Validation failed, or pond_unknown.",
+            "description": "validation_failed, or postal_code_unknown: five digits the list lacks. Both constant, repeating nothing that was sent.",
             "content": {
               "application/json": {
                 "schema": {
@@ -12170,8 +13325,8 @@
     },
     "/rounds/today": {
       "get": {
-        "summary": "Today's round",
-        "description": "The Finnish day and its cards in order, each with why it is there and the caller's own decision. The first read of a day builds the caller's round once their matching has opened; entries null while they have none, an empty list for a round with nobody to show. A card that cannot be shown now is left out. Serving a card writes the shown record and counts against matching_config exposure_cards_per_day (ADR-008).",
+        "summary": "The next cards of the queue",
+        "description": "The Finnish day and the next cards to go through, at most ten, in order: likes waiting, then new people, then people coming back. Each says why it is there and how far its person lives as it stood when the entry was written. With nothing left to go through a read adds the next people; entries null while the caller's matching has not opened, an empty list at the queue's end. A card that cannot be shown now, a filter of either side included, is left out. fishToSend says whether the fish's budget lets the caller send one today, one of matching_config fish_budget in the calendar week (fish_window_days counted from a Monday) or an earned one, never how many. likesLeft says how many of the day's likes the caller has left, from matching_config like_budget_balanced down to zero, by the count that refuses a like. yourTurn says how many conversations wait on the caller's answer. Serving a card writes the shown record and counts against matching_config exposure_cards_per_day, where that is not 0 (ADR-008, ADR-062).",
         "security": [
           {
             "session": []
@@ -12179,7 +13334,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Today's round.",
+            "description": "The next cards.",
             "content": {
               "application/json": {
                 "schema": {
@@ -12234,7 +13389,7 @@
             "schema": {
               "type": "integer",
               "minimum": 1,
-              "maximum": 50
+              "maximum": 32767
             },
             "required": true,
             "name": "position",
@@ -12266,7 +13421,7 @@
             }
           },
           "404": {
-            "description": "not_found: no round today, no card at that place, a card that can no longer be shown, or a day not begun.",
+            "description": "not_found: no round today, no card at that place, a card that can no longer be shown (a block, a sanction, or for a like a filter of either side), or a day not begun.",
             "content": {
               "application/json": {
                 "schema": {
@@ -12290,8 +13445,8 @@
     },
     "/rounds/{day}/entries/{position}/decision": {
       "put": {
-        "summary": "Like or pass a card",
-        "description": "Recorded, or replacing the day's earlier decision on the card; the same decision again writes nothing. A day that has ended answers round_expired. A like counts against the day's matching_config like_budget_balanced, except one on a liked_you or fish card; a pass never does. A like of somebody whose like of the caller stands is a match: the answer names its conversation, and that like is final. A fish is a like with a mark, matching_config fish_budget of them in any fish_window_days; on a liked_you or fish card it is a like. Past either budget, a like or a fish the caller's invitations earned is used by itself, left out of the counts after, and given back when the decision changes the same day.",
+        "summary": "Like, pass or skip a card",
+        "description": "Recorded, or replacing the day's earlier decision on the card; the same decision again writes nothing. A day that has ended answers round_expired. A skip moves on, spends nothing and answers no like; the card returns another day. A like counts against the day's matching_config like_budget_balanced, a like back on a liked_you or fish card too; a pass or a skip never does. A new like or fish answers your_turn_limit with matching_config your_turn_limit conversations waiting on the caller, and not_found where either side's filters no longer let the two meet. A like of somebody whose like of the caller stands is a match: the answer names its conversation, and that like is final. A fish is a like with a mark, matching_config fish_budget of them in each fish_window_days counted from a Monday, the calendar week; on a liked_you or fish card it is a like. Past the fish's budget, a fish invitations earned the caller is used by itself, left out of the count after, and given back when the decision changes the same day. The answer's fishToSend, likesLeft and yourTurn are the queue's after this decision.",
         "security": [
           {
             "session": []
@@ -12311,7 +13466,7 @@
             "schema": {
               "type": "integer",
               "minimum": 1,
-              "maximum": 50
+              "maximum": 32767
             },
             "required": true,
             "name": "position",
@@ -12330,7 +13485,7 @@
         },
         "responses": {
           "200": {
-            "description": "Recorded, with the conversation the card's like is part of, or null for a pass and a like that made no match.",
+            "description": "Recorded, with the conversation the card's like is part of, or null for a pass, a skip and a like that made no match.",
             "content": {
               "application/json": {
                 "schema": {
@@ -12360,7 +13515,7 @@
             }
           },
           "404": {
-            "description": "not_found: no round today, no card at that place, a card that can no longer be shown, or a day not begun.",
+            "description": "not_found: no round today, no card at that place, a card that can no longer be shown (a block, a sanction, or for a like a filter of either side), or a day not begun.",
             "content": {
               "application/json": {
                 "schema": {
@@ -12370,7 +13525,7 @@
             }
           },
           "409": {
-            "description": "round_expired: the day named has ended; match_made: the card's like made a match and stays. Nothing was written.",
+            "description": "round_expired: the day named has ended; match_made: the card's like made a match and stays; your_turn_limit: too many conversations wait on the caller's answer. Nothing was written.",
             "content": {
               "application/json": {
                 "schema": {
@@ -12380,7 +13535,7 @@
             }
           },
           "429": {
-            "description": "like_budget_exceeded: the day's likes are used up and no earned like is left, Retry-After the wait until the day rolls; fish_budget_exceeded: matching_config fish_budget fish were sent within fish_window_days and no earned fish is left, Retry-After the wait until the next can go. Nothing was written.",
+            "description": "like_budget_exceeded: the day's likes are used up, Retry-After the wait until the day rolls; fish_budget_exceeded: matching_config fish_budget fish were sent within the period and no earned fish is left, Retry-After the wait until the midnight that begins the next period, a Monday's. Nothing was written.",
             "content": {
               "application/json": {
                 "schema": {
@@ -12395,7 +13550,7 @@
     "/rounds/{day}/relaxations": {
       "get": {
         "summary": "What today's round may relax, and what is relaxed",
-        "description": "For a short round (fewer ordered places than matching_config round_size, the liked-you and fish places aside), every deal-breaker of the caller's that is not paused and not relaxed today, each way it can be relaxed for the day: unanswered (let through those who did not answer its field) and aside (set it aside), each listed only when it would add somebody today, with more: how much it widens the caller's pool, rounded down to a step of matching_config waitlist_k. Counted on asking. Also the relaxations in force today. Never another filter (ADR-042).",
+        "description": "Once no new person is left in the queue, every deal-breaker of the caller's that is not paused and not relaxed today, each way it can be relaxed for the day: unanswered (let through those who did not answer its field) and aside (set it aside), each listed only when it would add somebody today, with more: how much it widens the caller's pool, rounded down to a step of matching_config pond_counter_k. Counted on asking. Also the relaxations in force today. Never another filter (ADR-042).",
         "security": [
           {
             "session": []
@@ -12467,7 +13622,7 @@
       },
       "post": {
         "summary": "Relax a deal-breaker for today",
-        "description": "One of the caller's own deal-breakers loosened for the day only: the people it lets in today are added after the round's last place, as many as the room left (round_size less the ordered places), new people first, reason relaxed with the field. Tomorrow's round is built from the filters as stored. The answer is the cards added, served as the round's read serves them (ADR-008).",
+        "description": "One of the caller's own deal-breakers loosened for the day only: the people it lets in today join the queue, new people first, reason relaxed with the field. Tomorrow's queue reads the filters as stored. The answer is the first cards added, at most ten, served as a read serves them (ADR-008); the next read goes on to the rest.",
         "security": [
           {
             "session": []
@@ -12640,10 +13795,258 @@
         }
       }
     },
+    "/stars": {
+      "get": {
+        "summary": "The people the caller starred",
+        "description": "Those who may be shown now, the latest star first and in no other order: both people's filters, the accounts' state and the inbox stop are asked on every read, and whoever does not pass is left out with no word why. Each with a name, an age and the main one of the photos the caller was shown, whose thumb is asked for as any photo's. It serves no card and signs no photo.",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The list, perhaps empty.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StarList"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "unauthenticated, session_expired or session_revoked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/rounds/{day}/entries/{position}/star": {
+      "put": {
+        "summary": "Put a star on a card",
+        "description": "Marks the card's person for later: it spends nothing and decides nothing, and the same star again answers the one that stands. It reaches nobody. A card holding a like or a pass takes none. first says this is the only star the list shows.",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "date"
+            },
+            "required": true,
+            "name": "day",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 32767
+            },
+            "required": true,
+            "name": "position",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The star, and whether it is the first.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StarAnswer"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "unauthenticated, session_expired or session_revoked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "not_found: no such card in today's round, one that can no longer be shown, or one holding a like or a pass.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "round_expired: the day named has ended; stars_full: the list shows matching_config stars_max people. Nothing was written.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/stars/{id}": {
+      "delete": {
+        "summary": "Take a star off",
+        "description": "The person comes back to the queue where it would have them. Nobody is told, and nothing else changes.",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Taken off."
+          },
+          "400": {
+            "description": "Validation failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "unauthenticated, session_expired or session_revoked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "not_found: no such star of the caller's.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/stars/{id}/open": {
+      "post": {
+        "summary": "Open a starred person's card",
+        "description": "The card comes into today's log, or as it stands there, so it is reported seen and decided by its day and place as any card is, spending what those spend anywhere else. Answered as a read of the queue is, with that one card, served as a read serves one (ADR-008, ADR-041).",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The card.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoundResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "unauthenticated, session_expired or session_revoked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "not_found: no such star of the caller's, or somebody the list leaves out now.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "card_budget_exceeded: the day's cards are used up; Retry-After is the wait until the day rolls.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/preferences/deal-breakers": {
       "get": {
         "summary": "The caller's deal-breakers",
-        "description": "Each with whether it is paused: a deal-breaker waits while the person's own answer on its field is missing (#149, the disclose-to-filter rule). `max` is how many a person may have.",
+        "description": "Each with whether it is paused: a deal-breaker waits while the person's own answer on its field is missing (#149, the disclose-to-filter rule). One on distance has no field and is never paused. `max` is how many a person may have.",
         "security": [
           {
             "session": []
@@ -12674,7 +14077,7 @@
       },
       "put": {
         "summary": "Set the caller's deal-breakers",
-        "description": "The whole set, at most `max`, each on a distinct whitelisted field the person has answered themselves, accepting options the field has. Hard rows: #87 applies them in the pool, both ways.",
+        "description": "The whole set, at most `max`, each on a distinct whitelisted field the person has answered themselves, accepting options the field has. A person already past a lowered `max` may still remove or change what they hold; only a new field past it is refused. One on distance has no field: it accepts the bands up to nearby, close or around, and lets through those who did not answer whatever the request says, since nobody can leave it unanswered. Hard rows: #87 applies them in the pool, both ways.",
         "security": [
           {
             "session": []
@@ -12702,7 +14105,7 @@
             }
           },
           "400": {
-            "description": "Validation failed: more than allowed, a field twice, or an answer the field has not.",
+            "description": "Validation failed: a new field past what is allowed, a field twice, an answer the field has not, or bands that do not run up to one.",
             "content": {
               "application/json": {
                 "schema": {
@@ -12778,7 +14181,7 @@
       },
       "put": {
         "summary": "Set whom the caller seeks, the age window, or both",
-        "description": "Either or both, each replacing its row: a non-empty set of genders, an age window within 18 and 99 with min at most max. Onboarding saves each on its own screen (ADR-010 §13). Hard rows: the round builder never crosses them, in either direction.",
+        "description": "Either or both, each replacing its row: a non-empty set of genders, an age window within 18 and 99 with min at most max. Onboarding saves each on its own screen (ADR-010 §13). Hard rows: the round builder never crosses them, in either direction. The set of genders needs the sensitive-answers consent of the current wording (ADR-010 §16).",
         "security": [
           {
             "session": []
@@ -12825,8 +14228,8 @@
               }
             }
           },
-          "404": {
-            "description": "No live account (erased meanwhile).",
+          "403": {
+            "description": "consent_required: whom one seeks without the sensitive-answers consent of the current wording; nothing was saved, a window in the same request included.",
             "content": {
               "application/json": {
                 "schema": {
@@ -12835,8 +14238,8 @@
               }
             }
           },
-          "429": {
-            "description": "change_too_soon: whom one seeks was changed within matching_config change_cadence_days; nothing was saved, and GET /onboarding's nextChange.seeks says from when.",
+          "404": {
+            "description": "No live account (erased meanwhile).",
             "content": {
               "application/json": {
                 "schema": {

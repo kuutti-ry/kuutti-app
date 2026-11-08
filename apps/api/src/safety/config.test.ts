@@ -116,25 +116,25 @@ describe("features/safety/config.feature", () => {
   });
 
   test("A change is a new version with its reason and who", async ({ ctx, api }) => {
-    const before = await versionsOf(ctx, "gate_k");
+    const before = await versionsOf(ctx, "like_expiry_days");
     expect(before.map((r) => r.version)).toEqual([1]);
     const admin = await staffSession(ctx.client, "admin");
 
-    const response = await change(api, admin.headers, "gate_k", {
+    const response = await change(api, admin.headers, "like_expiry_days", {
       value: 25,
       reason: "Smaller ponds first",
     });
     expect(response.status).toBe(200);
     const answer = ConfigChange.parse(await response.json());
     expect(answer).toMatchObject({
-      key: "gate_k",
+      key: "like_expiry_days",
       value: 25,
       version: 2,
       createdBy: admin.identityId,
       reason: "Smaller ponds first",
     });
 
-    const after = await versionsOf(ctx, "gate_k");
+    const after = await versionsOf(ctx, "like_expiry_days");
     expect(after).toHaveLength(2);
     expect(after[0]).toEqual(before[0]);
     const written = after[1];
@@ -146,7 +146,7 @@ describe("features/safety/config.feature", () => {
     });
     expect(written?.valid_from.toISOString()).toBe(T.toISOString());
     // Every reader takes it from here on.
-    expect(await matchingConfigNumber(ctx.client, "gate_k")).toBe(25);
+    expect(await matchingConfigNumber(ctx.client, "like_expiry_days")).toBe(25);
 
     expect(await configAudit(ctx)).toEqual([
       {
@@ -154,14 +154,14 @@ describe("features/safety/config.feature", () => {
         action: "config.change",
         subject_type: "config",
         subject_id: written?.id,
-        detail: { key: "gate_k", version: 2 },
+        detail: { key: "like_expiry_days", version: 2 },
       },
     ]);
   });
 
   test("A change keeps the value's shape", async ({ ctx, api }) => {
     const before = await versionsOf(ctx, "photo_fetches_per_day");
-    expect(before.at(-1)?.value).toEqual({ thumb: 600, card: 300, full: 60 });
+    expect(before.at(-1)?.value).toEqual({ thumb: 600, card: 0, full: 60 });
     const admin = await staffSession(ctx.client, "admin");
     for (const value of [600, { thumb: 600, card: 300 }]) {
       const response = await change(api, admin.headers, "photo_fetches_per_day", {
@@ -281,7 +281,7 @@ describe("changeConfig against the key's declaration", () => {
     const admin = await staffSession(ctx.client, "admin");
     const change = (value: number) =>
       changeConfig(ctx.client, {
-        key: "majority_share_max",
+        key: "photo_tip_tight_crop_face_area_min",
         value,
         reason: "Trying it out",
         actor: admin.identityId,
@@ -309,34 +309,38 @@ describe("listConfig", () => {
   test("gives each key its latest value and version, and its versions newest first", async ({
     ctx,
   }) => {
-    const pond = (await listConfig(ctx.client)).find((i) => i.key === "default_pond");
-    expect(pond).toMatchObject({ key: "default_pond", value: "paakaupunkiseutu", version: 2 });
-    expect(pond?.versions.map((v) => [v.version, v.value, v.createdBy])).toEqual([
-      [2, "paakaupunkiseutu", "migration:0025"],
-      [1, "suomi", "migration:0020"],
+    const key = (await listConfig(ctx.client)).find((i) => i.key === "deal_breakers_max");
+    expect(key).toMatchObject({ key: "deal_breakers_max", value: 7, version: 1 });
+    expect(key?.versions.map((v) => [v.version, v.value, v.createdBy])).toEqual([
+      [1, 7, "migration:0001"],
     ]);
 
     const from = new Date("2026-10-15T06:30:00Z");
     await ctx.client.query(
       `INSERT INTO matching_config (version, key, value, valid_from, created_by, reason)
-       VALUES (3, 'default_pond', '"suomi"'::jsonb, $1, 'someone', 'Back to one pond')`,
+       VALUES (2, 'deal_breakers_max', '6'::jsonb, $1, 'before', NULL),
+              (3, 'deal_breakers_max', '5'::jsonb, $1, 'someone', 'Fewer at first')`,
       [from],
     );
-    const again = (await listConfig(ctx.client)).find((i) => i.key === "default_pond");
-    expect(again).toMatchObject({ value: "suomi", version: 3 });
-    expect(again?.versions.map((v) => v.version)).toEqual([3, 2, 1]);
+    const again = (await listConfig(ctx.client)).find((i) => i.key === "deal_breakers_max");
+    expect(again).toMatchObject({ value: 5, version: 3 });
+    expect(again?.versions.map((v) => [v.version, v.value, v.createdBy])).toEqual([
+      [3, 5, "someone"],
+      [2, 6, "before"],
+      [1, 7, "migration:0001"],
+    ]);
     expect(again?.versions[0]).toEqual({
       version: 3,
-      value: "suomi",
+      value: 5,
       validFrom: from.toISOString(),
       createdBy: "someone",
-      reason: "Back to one pond",
+      reason: "Fewer at first",
     });
-    const single = (await listConfig(ctx.client)).find((i) => i.key === "gate_k");
-    expect(single).toMatchObject({ value: 30, version: 1 });
+    const single = (await listConfig(ctx.client)).find((i) => i.key === "like_expiry_days");
+    expect(single).toMatchObject({ value: 14, version: 1 });
     expect(single?.versions).toHaveLength(1);
     const budget = (await listConfig(ctx.client)).find((i) => i.key === "photo_fetches_per_day");
-    expect(budget?.value).toEqual({ thumb: 600, card: 300, full: 60 });
+    expect(budget?.value).toEqual({ thumb: 600, card: 0, full: 60 });
   });
 
   test("a version the seed or a migration wrote has no reason", async ({ ctx }) => {
@@ -397,9 +401,9 @@ describe("changeConfig", () => {
   });
 
   test.for([
-    ["a string for gate_k's number", "gate_k", "25", "number"],
-    ["a number for default_pond's string", "default_pond", 1, "string"],
-    ["a boolean for gate_k's number", "gate_k", true, "number"],
+    ["a string for like_expiry_days's number", "like_expiry_days", "25", "number"],
+    ["a number for a string", "config_test_word", 1, "string"],
+    ["a boolean for like_expiry_days's number", "like_expiry_days", true, "number"],
     ["a number for the budget's object", "photo_fetches_per_day", 600, "object"],
     ["the budget without full", "photo_fetches_per_day", { thumb: 600, card: 300 }, "object"],
     [
@@ -412,7 +416,7 @@ describe("changeConfig", () => {
   ] as const)(
     "refuses %s with config_shape, expecting %s, and writes nothing",
     async ([, key, value, expected], { ctx }) => {
-      await withMatchingConfig(ctx.client, { config_test_flag: true });
+      await withMatchingConfig(ctx.client, { config_test_flag: true, config_test_word: "word" });
       const admin = await staffSession(ctx.client, "admin");
       const before = await versionsOf(ctx, key);
       const attempt = changeConfig(ctx.client, {
@@ -439,7 +443,7 @@ describe("changeConfig", () => {
     const admin = await staffSession(ctx.client, "admin");
     const at = new Date("2026-10-16T10:15:30.123Z");
     const answer = await changeConfig(ctx.client, {
-      key: "liked_you_cap",
+      key: "like_expiry_days",
       value: 8,
       reason: "Fewer at a time while we watch",
       actor: admin.identityId,
@@ -447,14 +451,14 @@ describe("changeConfig", () => {
     });
     // The answer is the row this change wrote (ConfigChange); the list has the history.
     expect(ConfigChange.parse(answer)).toEqual({
-      key: "liked_you_cap",
+      key: "like_expiry_days",
       version: 2,
       value: 8,
       validFrom: at.toISOString(),
       createdBy: admin.identityId,
       reason: "Fewer at a time while we watch",
     });
-    const listed = (await listConfig(ctx.client)).find((k) => k.key === "liked_you_cap");
+    const listed = (await listConfig(ctx.client)).find((k) => k.key === "like_expiry_days");
     expect(listed).toMatchObject({ value: 8, version: 2 });
     expect(listed?.versions).toEqual([
       {
@@ -466,14 +470,14 @@ describe("changeConfig", () => {
       },
       {
         version: 1,
-        value: 10,
+        value: 14,
         validFrom: expect.any(String),
-        createdBy: "migration:0007",
+        createdBy: "migration:0001",
         reason: null,
       },
     ]);
 
-    const rows = await versionsOf(ctx, "liked_you_cap");
+    const rows = await versionsOf(ctx, "like_expiry_days");
     const written = rows[1];
     expect(written).toMatchObject({
       version: 2,
@@ -488,7 +492,7 @@ describe("changeConfig", () => {
         action: "config.change",
         subject_type: "config",
         subject_id: written?.id,
-        detail: { key: "liked_you_cap", version: 2 },
+        detail: { key: "like_expiry_days", version: 2 },
       },
     ]);
   });
@@ -517,7 +521,7 @@ describe("changeConfig", () => {
     expect(listed?.versions.map((v) => [v.version, v.value, v.createdBy])).toEqual([
       [3, 12, second.identityId],
       [2, 10, first.identityId],
-      [1, 14, "migration:0007"],
+      [1, 14, "migration:0001"],
     ]);
     const rows = await versionsOf(ctx, "like_expiry_days");
     expect(
@@ -538,17 +542,17 @@ describe("changeConfig", () => {
     // and before it writes: both want version 2.
     const db = interleaved(ctx.client, LATEST_READ, async () => {
       theOther = await changeConfig(ctx.client, {
-        key: "shown_cooldown_days",
-        value: 21,
-        reason: "Three weeks",
+        key: "silent_match_archive_days",
+        value: 5,
+        reason: "Five days",
         actor: second.identityId,
         at: T,
       });
     });
     const attempt = changeConfig(db, {
-      key: "shown_cooldown_days",
-      value: 20,
-      reason: "Twenty days",
+      key: "silent_match_archive_days",
+      value: 6,
+      reason: "Six days",
       actor: first.identityId,
       at: T,
     });
@@ -557,10 +561,10 @@ describe("changeConfig", () => {
     expect(db.ran()).toBe(true);
     expect(theOther?.version).toBe(2);
 
-    const rows = await versionsOf(ctx, "shown_cooldown_days");
+    const rows = await versionsOf(ctx, "silent_match_archive_days");
     expect(rows.map((r) => [r.version, r.value, r.created_by, r.reason])).toEqual([
-      [1, 30, "migration:0007", null],
-      [2, 21, second.identityId, "Three weeks"],
+      [1, 7, "migration:0001", null],
+      [2, 5, second.identityId, "Five days"],
     ]);
     expect(await configAudit(ctx)).toEqual([
       {
@@ -568,7 +572,7 @@ describe("changeConfig", () => {
         action: "config.change",
         subject_type: "config",
         subject_id: rows[1]?.id,
-        detail: { key: "shown_cooldown_days", version: 2 },
+        detail: { key: "silent_match_archive_days", version: 2 },
       },
     ]);
   });

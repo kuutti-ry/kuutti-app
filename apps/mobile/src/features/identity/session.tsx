@@ -3,10 +3,13 @@ import * as React from "react";
 import { ApiError, api } from "@/lib/api";
 import {
   clearSession,
+  currentSession,
+  isCurrentSession,
   loadSession,
   onSessionChange,
   type StoredSession,
   saveSession,
+  sessionGeneration,
 } from "@/lib/session";
 
 /**
@@ -18,8 +21,6 @@ import {
  */
 type AuthOutcome = AuthExchangeResponse["outcome"];
 
-export type SignedOutNotice = "paused" | "lock";
-
 export type SessionState =
   | { status: "loading" }
   /**
@@ -27,7 +28,7 @@ export type SessionState =
    * break began on this device (#170), "lock" right after the app's lock
    * signed it out (#418).
    */
-  | { status: "signed-out"; notice?: SignedOutNotice }
+  | { status: "signed-out"; notice?: "paused" | "lock" }
   | { status: "signed-in"; sessionId: string; outcome?: AuthOutcome };
 
 /** The export as the API answers it (#237): a zip, named by the API, nothing about the person in the name. */
@@ -67,13 +68,40 @@ const SessionContext = React.createContext<SessionApi | null>(null);
 const fromStored = (session: StoredSession | null): SessionState =>
   session ? { status: "signed-in", sessionId: session.sessionId } : { status: "signed-out" };
 
-export function SessionProvider({ children }: { children: React.ReactNode }) {
+/** A completed action can end only the lifecycle that started it. */
+async function clearOwnedSession(owner: number): Promise<number | null> {
+  if (!isCurrentSession(owner)) {
+    // Its own refused refresh may already have ended it while the request
+    // was pending. Preserve the sign-out notice in that case.
+    return currentSession() === null && sessionGeneration() === owner + 1 ? owner + 1 : null;
+  }
+  const clearing = clearSession();
+  const cleared = sessionGeneration();
+  await clearing;
+  return cleared;
+}
+
+export function SessionProvider({
+  children,
+  onLogoutUnheard,
+}: {
+  children: React.ReactNode;
+  /**
+   * Called after a sign-out whose logout the API did not answer with a 2xx:
+   * the server's session lives on until it expires, and with it this phone's
+   * push token (#102). The notifications slice's, handed over by the root
+   * layout, so this slice never imports it. Reports its own failure and
+   * never rejects.
+   */
+  onLogoutUnheard?: () => Promise<void>;
+}) {
   const [state, setState] = React.useState<SessionState>({ status: "loading" });
+  const signInAttempt = React.useRef(0);
 
   React.useEffect(() => {
     let mounted = true;
-    void loadSession().then((session) => {
-      if (mounted) setState(fromStored(session));
+    void loadSession().then(() => {
+      if (mounted) setState(fromStored(currentSession()));
     });
     // Unsubscribed in the same cleanup that ends `mounted`: no call comes after it.
     const unsubscribe = onSessionChange((session) => {
@@ -86,6 +114,8 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const signIn = React.useCallback(async (code: string, verifier: string) => {
+    const owner = sessionGeneration();
+    const attempt = ++signInAttempt.current;
     const { data, error, response } = await api.POST("/auth/exchange", {
       body: { code, verifier },
     });
@@ -93,33 +123,54 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       throw new ApiError(`sign-in answered ${response.status}`, response.status, error?.error.code);
     }
     const { outcome, ...tokens } = AuthExchangeResponse.parse(data);
-    await saveSession(tokens);
+    if (!isCurrentSession(owner) || signInAttempt.current !== attempt) {
+      throw new ApiError("sign-in was superseded", 401, "session_revoked");
+    }
+    const saving = saveSession(tokens);
+    const saved = sessionGeneration();
+    await saving;
+    if (!isCurrentSession(saved) || signInAttempt.current !== attempt) {
+      throw new ApiError("sign-in was superseded", 401, "session_revoked");
+    }
     setState({ status: "signed-in", sessionId: tokens.sessionId, outcome });
     return outcome;
   }, []);
 
   // Ending the session locally waits for the API a few seconds at most: a
   // phone without network still signs out, and the row expires or is swept
-  // later. The lock's way out counts on it ending (ADR-045 §3, §6).
-  const signOut = React.useCallback(async (notice?: "lock") => {
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    await Promise.race([
-      api.POST("/auth/logout").catch(() => undefined),
-      new Promise<void>((done) => {
-        timer = setTimeout(done, LOGOUT_WAIT_MS);
-      }),
-    ]);
-    clearTimeout(timer);
-    await clearSession();
-    if (notice) setState({ status: "signed-out", notice });
-  }, []);
+  // later. The lock's way out counts on it ending (ADR-045 §3, §6). A logout
+  // the API did not take leaves the session's push token live, so the phone
+  // is then told to drop its device token (`onLogoutUnheard`), not waited
+  // for: the sign-out is done once the device's session is gone.
+  const signOut = React.useCallback(
+    async (notice?: "lock") => {
+      const owner = sessionGeneration();
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const heard = await Promise.race([
+        api.POST("/auth/logout").then(
+          ({ response }) => response.ok,
+          () => false,
+        ),
+        new Promise<boolean>((done) => {
+          timer = setTimeout(() => done(false), LOGOUT_WAIT_MS);
+        }),
+      ]);
+      clearTimeout(timer);
+      const cleared = await clearOwnedSession(owner);
+      if (cleared === null || !isCurrentSession(cleared)) return;
+      if (notice) setState({ status: "signed-out", notice });
+      if (!heard) void onLogoutUnheard?.();
+    },
+    [onLogoutUnheard],
+  );
 
   const signOutEverywhere = React.useCallback(async () => {
+    const owner = sessionGeneration();
     const { response } = await api.POST("/auth/logout-all");
     if (!response.ok && response.status !== 401) {
       throw new ApiError(`log out everywhere answered ${response.status}`, response.status);
     }
-    await clearSession();
+    await clearOwnedSession(owner);
   }, []);
 
   const exportData = React.useCallback(async (): Promise<ExportFile> => {
@@ -138,6 +189,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   // The API has already ended every token of the account when it answers 204;
   // the local store follows. A failure leaves the session in place.
   const deleteAccount = React.useCallback(async () => {
+    const owner = sessionGeneration();
     const { error, response } = await api.POST("/account/delete", { body: { confirm: true } });
     if (!response.ok) {
       throw new ApiError(
@@ -146,18 +198,21 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
         error?.error.code,
       );
     }
-    await clearSession();
+    await clearOwnedSession(owner);
   }, []);
 
   // Like the deletion, but nothing is gone: the sign-in screen says so, once,
   // from the notice; the store's own change arrives first and this state after it.
   const pauseAccount = React.useCallback(async () => {
+    const owner = sessionGeneration();
     const { error, response } = await api.POST("/account/pause", { body: { confirm: true } });
     if (!response.ok) {
       throw new ApiError(`break answered ${response.status}`, response.status, error?.error.code);
     }
-    await clearSession();
-    setState({ status: "signed-out", notice: "paused" });
+    const cleared = await clearOwnedSession(owner);
+    if (cleared !== null && isCurrentSession(cleared)) {
+      setState({ status: "signed-out", notice: "paused" });
+    }
   }, []);
 
   const value = React.useMemo<SessionApi>(

@@ -7,8 +7,10 @@ import {
   chatRoutes,
   chatSocketRoutes,
   conversationBetween,
+  conversationsOnTurn,
   createLive,
   type Live,
+  messageReaders,
   openConversation,
   PHOTO_MESSAGE_PATH,
 } from "./chat/index.ts";
@@ -17,6 +19,7 @@ import {
   accountRoutes,
   adminSessionStore,
   authRoutes,
+  currentConsent,
   type IdentityBroker,
   isSignInStart,
   onboardingRoutes,
@@ -24,8 +27,9 @@ import {
   sessionStore,
   wellKnownRoutes,
 } from "./identity/index.ts";
-import { gateOf } from "./jobs/pond-gate.ts";
-import { buildRoundOf, relaxationOffers, relaxedCandidates } from "./jobs/round-builder.ts";
+import { isComplete, matchingStatusOf } from "./jobs/pool.ts";
+import { fillQueue, fitsNow, relaxationOffers, relaxedCandidates } from "./jobs/round-builder.ts";
+import { starPlace, starredPeople, starsShown } from "./jobs/stars.ts";
 import { requireAdmin } from "./lib/admin-middleware.ts";
 import { requireSession } from "./lib/auth-middleware.ts";
 import type { Config } from "./lib/config.ts";
@@ -43,14 +47,20 @@ import { requestLocale, servedLocales } from "./lib/i18n.ts";
 import { type Logger, requestLogger } from "./lib/logger.ts";
 import type { Mailer } from "./lib/mail.ts";
 import { servedDocument } from "./lib/openapi.ts";
+import type { Pusher } from "./lib/push.ts";
 import { addressOf, limited, personOf, rateLimit } from "./lib/rate-limit.ts";
 import { serverRequestId } from "./lib/request-id.ts";
-import { preferencesRoutes, readPreferences, roundRoutes } from "./matching/index.ts";
+import { preferencesRoutes, readPreferences, roundRoutes, starRoutes } from "./matching/index.ts";
 import { type MediaDeps, photoAdminRoutes, photoRoutes, UPLOAD_ROUTE } from "./media/index.ts";
-import { notificationRoutes } from "./notifications/index.ts";
-import { pondRoutes } from "./pond/index.ts";
+import {
+  announcementAdminRoutes,
+  createPush,
+  notificationRoutes,
+  type Push,
+} from "./notifications/index.ts";
+import { pondAdminRoutes, pondRoutes } from "./pond/index.ts";
 import { buildCard, exportProfile, profileRoutes } from "./profile/index.ts";
-import { invitationRoutes } from "./rewards/index.ts";
+import { invitationLinkRoutes, invitationRoutes } from "./rewards/index.ts";
 import {
   accountAdminRoutes,
   auditAdminRoutes,
@@ -86,9 +96,23 @@ export type Deps = {
   live?: Live;
   /** Mail out (#385, ADR-043): SES or the development log; absent where MAIL is off, and a code answers 503. */
   mailer?: Mailer;
+  /** Push out (#102, ADR-055): Expo or the development log; absent where PUSH is off, and nothing is sent. */
+  pusher?: Pusher;
+  /** The pushes (#102): boot hands in the process's one, which its shutdown waits for; absent, the app makes its own over `pusher`. */
+  push?: Push;
 };
 
-const UNLIMITED_PATHS = new Set(["/health", "/openapi.json"]);
+/**
+ * The one path outside every window, the probes': Route 53's, the deploys'
+ * waits, and the container's own HEALTHCHECK, which asks from inside the
+ * container without the proof of Kuutti's distribution and so, in
+ * `cloudfront` mode, has no address (ADR-066). Counted, it would share the
+ * bucket of no address with a flood through anybody's distribution, and Swarm
+ * would replace a container that floods its own check out. Its database
+ * answer is kept for a second instead, so no number of asks begins more than
+ * one check a second (health/index.ts, ADR-026 History of 2026-11-06).
+ */
+const UNLIMITED_PATH = "/health";
 
 /**
  * The routes that end a session or the account (ADR-026 §2): outside the
@@ -110,13 +134,16 @@ export const PUBLIC_ROUTES = new Set([
   "GET /openapi.json",
   "GET /docs",
   // Aggregates per pond, once a day, nothing below k (#54, ADR-013).
-  "GET /waitlist",
+  "GET /ponds/counter",
   "GET /auth/start",
   "GET /auth/callback",
   "POST /auth/exchange",
   "POST /auth/refresh",
   "GET /.well-known/assetlinks.json",
   "GET /.well-known/apple-app-site-association",
+  // The one link (#574, ADR-044 §13): a redirect to a store, no page, no lookup.
+  "GET /i",
+  "GET /i/:code",
   "GET /admin/auth/start",
   "POST /admin/auth/exchange",
   // The chat's socket (#349): its first frame carries the session's token, checked
@@ -166,7 +193,7 @@ export function createApp(deps: Deps) {
     rateLimit({
       limit: deps.config.RATE_LIMIT_PER_MINUTE,
       windowMs: 60_000,
-      keyOf: addressOf(deps.config.TRUSTED_PROXY),
+      keyOf: addressOf(deps.config),
       // Given back only for a request the person's limiter counted: a guard
       // without it, or a session-ending route it skips, stays on the address.
       refund: (c) => c.get("personCounted") === true,
@@ -174,7 +201,7 @@ export function createApp(deps: Deps) {
         isSignInStart(c.req.path)
           ? refuseSignInStart(c, deps, "address")
           : limited(c, retryAfterSeconds),
-      skip: (path) => UNLIMITED_PATHS.has(path),
+      skip: (path) => path === UNLIMITED_PATH,
     }),
   );
 
@@ -224,6 +251,7 @@ export function createApp(deps: Deps) {
   app.route("/", authRoutes(deps, guard, anyStaff));
   app.route("/", accountRoutes(deps, guard));
   app.route("/", wellKnownRoutes(deps));
+  app.route("/", invitationLinkRoutes(deps));
   // A URL of somebody else's photo is checked by the velocity rule (#86,
   // ADR-041): the safety slice decides, the media slice only issues.
   app.route(
@@ -239,30 +267,58 @@ export function createApp(deps: Deps) {
   // What a person chose to be notified of, and the notices in the app (#176, ADR-032).
   app.route("/", notificationRoutes(deps, guard));
   // Invitations and the reward they earn (#107, ADR-044).
-  app.route("/", invitationRoutes(deps, guard));
-  // The conversations a match opens and their text messages (#348, ADR-031).
-  // A conversation's first message is checked by the automatic rules (#105,
-  // ADR-033): the safety slice decides, the chat only measures.
   app.route(
     "/",
-    chatRoutes(deps, guard, (accountId, conversationId) =>
-      checkFirstMessage(ruleDeps, { accountId, conversationId }),
+    invitationRoutes(deps, guard, (db, accountId) =>
+      isComplete(db, accountId, deps.now?.() ?? new Date()),
     ),
   );
-  // ...and what changes in them, live over one socket (#349, ADR-031 §5).
+  // The chat's live sockets (#349): who is in the app now, which the push asks too.
+  const live =
+    deps.live ??
+    createLive({
+      db: deps.db,
+      logger: deps.logger,
+      socketsPerAccount: deps.config.WS_SOCKETS_PER_ACCOUNT,
+    });
+  // The pushes (#102, ADR-055): the notifications slice decides whom to tell,
+  // the chat and the round's routes only say when.
+  const push =
+    deps.push ??
+    createPush({
+      db: deps.db,
+      logger: deps.logger,
+      now: deps.now ?? (() => new Date()),
+      ...(deps.pusher ? { pusher: deps.pusher } : {}),
+      ...(deps.mailer ? { mailer: deps.mailer } : {}),
+      online: (accountId) => live.online(accountId),
+    });
+  // The conversations a match opens and their text messages (#348, ADR-031).
+  // A conversation's first message is checked by the automatic rules (#105,
+  // ADR-033): the safety slice decides, the chat only measures. Every new
+  // message is handed to the push with whom the chat lets read it.
+  app.route(
+    "/",
+    chatRoutes(
+      deps,
+      guard,
+      (accountId, conversationId) => checkFirstMessage(ruleDeps, { accountId, conversationId }),
+      (accountId, conversationId, seq) =>
+        push.message({
+          conversationId,
+          readers: () =>
+            messageReaders(deps.db, { conversationId, seq, senderAccountId: accountId }),
+        }),
+    ),
+  );
+  // ...and what changes in them, live over one socket (#349, ADR-031 §9).
   app.route(
     "/",
     chatSocketRoutes({
       db: deps.db,
       logger: deps.logger,
       store: sessionStore,
-      live:
-        deps.live ??
-        createLive({
-          db: deps.db,
-          logger: deps.logger,
-          socketsPerAccount: deps.config.WS_SOCKETS_PER_ACCOUNT,
-        }),
+      live,
       now: deps.now ?? (() => new Date()),
       allowedOrigins: deps.config.corsAllowedOrigins,
       timing: {
@@ -279,11 +335,14 @@ export function createApp(deps: Deps) {
   app.route("/", accountAdminRoutes(deps, moderators));
   app.route("/", auditAdminRoutes(deps, admins));
   app.route("/", staffAdminRoutes(deps, admins));
-  // The gate's count reads across slices and lives with the jobs; the pond's route is handed it.
+  app.route("/", pondAdminRoutes(deps, admins));
+  // Announcements to everybody (#573, ADR-068): an admin writes, another approves.
+  app.route("/", announcementAdminRoutes(deps, admins, push));
+  // Completeness reads across slices and lives with the jobs; the pond's route is handed it.
   app.route(
     "/",
     pondRoutes(deps, guard, (accountId) =>
-      gateOf({ db: deps.db, logger: deps.logger, now: () => new Date() }, accountId),
+      matchingStatusOf({ db: deps.db, now: deps.now ?? (() => new Date()) }, accountId),
     ),
   );
   const builderDeps = () => ({
@@ -294,42 +353,47 @@ export function createApp(deps: Deps) {
   // The caller's own answers, which the deal-breakers' pause and the cards' "did not answer" read (#149, #99).
   const ownFieldsOf = async (accountId: string) =>
     (await exportProfile(deps.db, accountId))?.fields ?? {};
-  // Today's round (#96, ADR-034) serves its cards through the profile slice's
-  // builder, handed in here since profile already imports matching; a card
-  // the builder refuses (404) is a card the round leaves out, and its budget's
-  // 429 goes through. A day's first read with no round builds it through the
-  // round builder, which reads across slices and lives with the jobs (#95).
+  // The queue (#96, #502, ADR-034, ADR-062) serves its cards through the profile
+  // slice's builder, handed in here since profile already imports matching; a
+  // card the builder refuses (404) is a card the read leaves out, and its budget's
+  // 429 goes through. Who comes next, and whether two people fit now, are the
+  // queue's builder's, which reads across slices and lives with the jobs (#95).
   // A read is checked by the velocity rules after it (#86, ADR-041).
+  const cardOf = async (viewerAccountId: string, subjectAccountId: string) => {
+    try {
+      const built = await buildCard(
+        {
+          db: deps.db,
+          logger: deps.logger,
+          now: deps.now ?? (() => new Date()),
+          readPreferences,
+        },
+        { viewerAccountId, subjectAccountId },
+      );
+      return built.card;
+    } catch (error) {
+      if (error instanceof AppError && error.status === 404) return null;
+      throw error;
+    }
+  };
   app.route(
     "/",
     roundRoutes(
       deps,
       guard,
-      async (viewerAccountId, subjectAccountId) => {
-        try {
-          const built = await buildCard(
-            {
-              db: deps.db,
-              logger: deps.logger,
-              now: deps.now ?? (() => new Date()),
-              readPreferences,
-            },
-            { viewerAccountId, subjectAccountId },
-          );
-          return built.card;
-        } catch (error) {
-          if (error instanceof AppError && error.status === 404) return null;
-          throw error;
-        }
+      cardOf,
+      {
+        fill: (accountId) => fillQueue(builderDeps(), accountId),
+        fits: (db, accountId, candidateIds) => fitsNow(builderDeps(), db, accountId, candidateIds),
       },
-      // shortcut: nothing is built in production until the maintainer has set how long
-      // rounds are kept (ADR-034 Open 2, ADR-035 Open 1); his answer lifts this and boot.ts's twin.
-      deps.config.APP_ENV === "production"
-        ? async () => false
-        : (accountId) => buildRoundOf(builderDeps(), accountId),
       // A match is a conversation (#100, ADR-031): the chat slice's, handed in
       // here since the chat imports the profile, which imports matching.
-      { between: conversationBetween, open: openConversation },
+      {
+        between: conversationBetween,
+        open: openConversation,
+        yourTurn: conversationsOnTurn,
+        made: push.match,
+      },
       roundRead,
       // A short round's relaxations (#99, ADR-042) read the pond as the builder does.
       {
@@ -340,8 +404,36 @@ export function createApp(deps: Deps) {
       ownFieldsOf,
     ),
   );
+  // The stars (#575, ADR-064) serve a card as the queue does, and read across
+  // slices as its builder does, from the jobs.
+  app.route(
+    "/",
+    starRoutes(
+      deps,
+      guard,
+      cardOf,
+      {
+        shown: (db, accountId, candidateIds) =>
+          starsShown(builderDeps(), db, accountId, candidateIds),
+        place: (accountId, candidateId) => starPlace(builderDeps(), accountId, candidateId),
+        people: (accountId) => starredPeople(builderDeps(), accountId),
+      },
+      { yourTurn: conversationsOnTurn },
+      roundRead,
+      ownFieldsOf,
+    ),
+  );
   // The deal-breakers need the caller's own answers (#149): the profile slice reads them, handed in here.
-  app.route("/", preferencesRoutes(deps, guard, ownFieldsOf));
+  app.route(
+    "/",
+    preferencesRoutes(
+      deps,
+      guard,
+      ownFieldsOf,
+      // Whom one seeks waits for the identity slice's consent row (ADR-019 §4, ADR-010 §16).
+      async (tx, accountId) => (await currentConsent(tx, accountId, "special_category")) !== null,
+    ),
+  );
 
   // The bearer scheme the session routes declare (#35); the tokens themselves
   // are opaque, so the scheme is all the contract says about them.

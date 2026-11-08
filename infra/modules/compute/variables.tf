@@ -39,8 +39,18 @@ variable "backup_bucket" {
 }
 
 variable "dokploy_version" {
-  description = "Git tag of the Dokploy release whose install script runs at first boot. Pinned so a rebuilt box gets the same version as the last one."
+  description = "Git tag of the Dokploy release whose install script runs at first boot. Pinned so a rebuilt box gets the same version as the last one. A bump checks ADR-048's two points of Dokploy's code: no default router when dokploy.yml exists, and a router added when Dokploy's domain is assigned; and the Traefik tag that infra/scripts/dokploy-setup.sh pulls, which must be the new release's TRAEFIK_VERSION (ADR-053)."
   type        = string
+}
+
+variable "swap_mb" {
+  description = "Size of the box's /swapfile in MiB, 0 for none (#77, ADR-046). Set by each environment: swap may page the API's memory, a hetu in flight during a callback included, to the root volume, so production has none (rule 1, ADR-046)."
+  type        = number
+
+  validation {
+    condition     = var.swap_mb >= 0 && floor(var.swap_mb) == var.swap_mb
+    error_message = "swap_mb is a whole number of MiB, 0 for no swap file."
+  }
 }
 
 variable "root_volume_gb" {
@@ -60,6 +70,12 @@ variable "preview_databases" {
   default     = false
 }
 
+variable "demo_reset" {
+  description = "Staging only (#613, ADR-018 §8): declares the Run Command document that returns the demo personas to where they begin, inside the API's container, which demo-reset.yml sends through the plan role."
+  type        = bool
+  default     = false
+}
+
 variable "cpu_credits" {
   description = "t4g burst mode: standard caps the bill at baseline performance, unlimited keeps performance and bills surplus credits (TD-19). Staging standard, prod unlimited with its credit alarms."
   type        = string
@@ -72,7 +88,7 @@ variable "cpu_credits" {
 }
 
 variable "domain" {
-  description = "The project domain; the box pins dokploy.<environment>.<domain> to the control plane in Traefik, and the instance role sends mail as noreply@<domain> through its SES identity (#385, ADR-043 §5)."
+  description = "The project domain; the instance role sends mail as noreply@<domain> through its SES identity (#385, ADR-043 §5)."
   type        = string
   default     = "kuutti.app"
 }

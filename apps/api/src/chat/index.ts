@@ -5,8 +5,8 @@ export { archiveJob } from "./archive.ts";
 // The person's stored contacts for their export (#103, ADR-031 §11).
 export { exportContacts } from "./contacts.ts";
 // The ban's close, and the halves erasure and the export call (ADR-007 §4);
-// a block's close, and what a report from a conversation reads, and its copy
-// (#351, ADR-030 §12).
+// a block's close, and what a report from a conversation reads, its copy
+// (#351, ADR-030 §12) and the photo line it may point at (#476).
 // The match's conversation (#100): whether two people have one, and the
 // opening that the second like writes; app.ts hands both to the round's
 // routes, since matching imports no slice that imports it.
@@ -14,7 +14,9 @@ export {
   closeConversationsBetween,
   closeConversationsOf,
   conversationBetween,
+  conversationsOnTurn,
   copyConversation,
+  counterpartPhotoAt,
   eraseConversationsOf,
   exportConversations,
   lockReportedConversation,
@@ -28,6 +30,8 @@ export { firstMessageCounts } from "./first-messages.ts";
 export { startChatListener } from "./listen.ts";
 // The live half (#349): the registry and hub, the listener, the socket's route.
 export { createLive, type Live } from "./live.ts";
+// Who may read a new message: whom its push may tell (#102, ADR-055 §4).
+export { messageReaders } from "./messages.ts";
 // A photo in a message (#350): its path, which app.ts lets past the app-wide
 // body cap, and the send, which the demo's stories call as the route does.
 export { PHOTO_MESSAGE_PATH, sendPhoto } from "./photos.ts";

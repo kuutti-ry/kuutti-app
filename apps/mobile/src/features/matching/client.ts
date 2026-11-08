@@ -1,5 +1,6 @@
 import {
   type ApiComponents,
+  ConversationList,
   type DealBreakerField,
   ErrorResponse,
   type Relaxation,
@@ -10,38 +11,30 @@ import {
   RoundDecisionAnswer,
   type RoundEntry,
   RoundResponse,
+  StarAnswer,
+  StarList,
+  type StarredPerson,
 } from "@kuutti/schema";
 import { ApiError, api } from "@/lib/api";
 
-// Today's round as the app calls it (#379, ADR-034 §4), through the typed
-// client; the zod contracts guard the runtime (ADR-003). A refusal keeps the
-// envelope's code, which the screen says in words, and its wait.
+// The queue as the app calls it (#379, #502, ADR-034 §4, ADR-062), through the
+// typed client; the zod contracts guard the runtime (ADR-003). A refusal keeps
+// the envelope's code, which the screen says in words.
 
-/** A refusal of the round's routes, with the wait a budget's 429 names (Retry-After, in seconds). */
-export class RoundRefusal extends ApiError {
-  constructor(
-    message: string,
-    status: number,
-    code: string | undefined,
-    readonly retryAfter: number | null,
-  ) {
-    super(message, status, code);
-    this.name = "RoundRefusal";
-  }
-}
-
-function failed(response: Response, error: unknown, what: string): RoundRefusal {
+function failed(response: Response, error: unknown, what: string): ApiError {
   const parsed = ErrorResponse.safeParse(error);
-  const wait = Number(response.headers.get("retry-after") ?? Number.NaN);
-  return new RoundRefusal(
+  return new ApiError(
     `${what} answered ${response.status}`,
     response.status,
     parsed.success ? parsed.data.error.code : undefined,
-    Number.isFinite(wait) && wait >= 0 ? wait : null,
   );
 }
 
-/** The day and its cards in order; the first read of a day builds it once matching is open (ADR-035 §5). */
+/**
+ * The day and the next cards, undecided, in order, a page of them: a read with
+ * none left adds the next people. Null entries before matching opens, an empty
+ * list at the queue's end (ADR-062 §1).
+ */
 export async function fetchRound(): Promise<RoundResponse> {
   const { data, error, response } = await api.GET("/rounds/today");
   if (!data) throw failed(response, error, "round");
@@ -56,7 +49,25 @@ export async function reportSeen(day: string, position: number): Promise<void> {
   if (!response.ok) throw failed(response, error, "seen");
 }
 
-/** A like, a pass or a fish, replacing the day's earlier one; the answer names a match's conversation (#100). */
+/**
+ * How many conversations wait on the person's answer now (ADR-062 §5), for the
+ * refusal that carries no number: the list without thumbs, which signs and spends
+ * nothing, where a read of the queue would serve its cards again (ADR-008) and
+ * count towards its alarm (ADR-041).
+ */
+export async function fetchYourTurn(): Promise<number> {
+  const { data, error, response } = await api.GET("/conversations", {
+    params: { query: { thumbs: "false" } },
+  });
+  if (!data) throw failed(response, error, "conversations");
+  return ConversationList.parse(data).yourTurn.waiting;
+}
+
+/**
+ * A like, a pass, a fish or a skip, replacing the day's earlier one; the answer
+ * names a match's conversation (#100), and says whether a fish can still go
+ * today (#475), the likes left (#524) and the conversations waiting (ADR-062 §5).
+ */
 export async function decide(
   day: string,
   position: number,
@@ -70,7 +81,7 @@ export async function decide(
   return RoundDecisionAnswer.parse(data);
 }
 
-/** What a short round may relax today, and what is relaxed (#99, ADR-042 §4); counted when asked. */
+/** What a short queue may relax today, and what is relaxed (#99, ADR-042 §4); counted when asked. */
 export async function fetchRelaxations(day: string): Promise<RelaxationsResponse> {
   const { data, error, response } = await api.GET("/rounds/{day}/relaxations", {
     params: { path: { day } },
@@ -79,7 +90,7 @@ export async function fetchRelaxations(day: string): Promise<RelaxationsResponse
   return RelaxationsResponse.parse(data);
 }
 
-/** One deal-breaker relaxed for today: the cards it added, to append without reading the round again (§5). */
+/** One deal-breaker relaxed for today: the first cards it added, to append without a read (§5, ADR-062 §10). */
 export async function relaxToday(day: string, relaxation: Relaxation): Promise<RoundEntry[]> {
   const { data, error, response } = await api.POST("/rounds/{day}/relaxations", {
     params: { path: { day } },
@@ -97,4 +108,35 @@ export async function undoRelaxation(day: string, field: DealBreakerField): Prom
   });
   if (!data) throw failed(response, error, "undo relaxation");
   return RelaxationUndone.parse(data).removed;
+}
+
+/** The people the person starred who may be shown now, the latest star first (#575, ADR-064 §6). It serves no card and signs no photo. */
+export async function fetchStars(): Promise<StarredPerson[]> {
+  const { data, error, response } = await api.GET("/stars");
+  if (!data) throw failed(response, error, "stars");
+  return StarList.parse(data).items;
+}
+
+/** A star on today's card (§1): the star, and whether it is the first the list shows. */
+export async function putStar(day: string, position: number): Promise<StarAnswer> {
+  const { data, error, response } = await api.PUT("/rounds/{day}/entries/{position}/star", {
+    params: { path: { day, position } },
+  });
+  if (!data) throw failed(response, error, "star");
+  return StarAnswer.parse(data);
+}
+
+/** A star taken off, on a card or on the list. */
+export async function clearStar(id: string): Promise<void> {
+  const { error, response } = await api.DELETE("/stars/{id}", { params: { path: { id } } });
+  if (!response.ok) throw failed(response, error, "clear star");
+}
+
+/** A starred person's card, in today's log (§4): answered as a read of the queue is, with that one card. */
+export async function openStar(id: string): Promise<RoundResponse> {
+  const { data, error, response } = await api.POST("/stars/{id}/open", {
+    params: { path: { id } },
+  });
+  if (!data) throw failed(response, error, "open star");
+  return RoundResponse.parse(data);
 }

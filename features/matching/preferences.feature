@@ -2,13 +2,16 @@
 Feature: The hard preferences of onboarding
   Whom a person seeks and the age window are hard filters (rule 7, TD-11):
   rows of mode hard the round builder joins for both parties, never crossed
-  in either direction. Onboarding writes them (#46). The deal-breakers over
+  in either direction. Onboarding writes them (#46). Whom one seeks is an
+  article 9 answer: it is saved only with the sensitive-answers consent of
+  the current wording (ADR-019 §4, ADR-010 §16). The deal-breakers over
   profile fields (#149, TD-16) are hard rows of the same table on a whitelist
   of fields, at most deal_breakers_max of them, each only on a field the
   person answered themselves: a filter on what one will not say about
   oneself is the one-sidedness the design document targets. Taking the own
   answer back pauses the filter, which is read, never stored. #87 applies
-  them in the pool, both ways.
+  them in the pool, both ways. The seventh, distance (#514, ADR-061 §7), is on
+  no field: everybody has a home, so it waits for nobody's answer.
 
   Scenario Outline: The hard rows refuse what matching cannot use
     Given a signed-in account
@@ -33,15 +36,36 @@ Feature: The hard preferences of onboarding
     When it sets whom it seeks alone, then the age window alone
     Then each is stored when it is sent and the other stays as it was, and an update naming neither is refused
 
+  Scenario Outline: Whom one seeks needs the consent of the current wording
+    Given a signed-in account whose sensitive-answers consent is <consent>
+    When it sets whom it seeks and an age window
+    Then the answer is 403 consent_required and neither is stored
+
+    Examples:
+      | consent                    |
+      | never given                |
+      | given for an older wording |
+      | withdrawn                  |
+
+  Scenario: The age window needs no consent
+    Given a signed-in account without the sensitive-answers consent
+    When it sets an age window alone
+    Then the window is stored
+
+  Scenario: A save of whom one seeks that waited behind a withdrawal stores nothing
+    Given an account with the consent, whose withdrawal holds the account row
+    When a save of whom it seeks waits for that lock and then runs
+    Then it is refused and no answer is left with no consent on record
+
   Scenario: The preferences of another account are never served
     Given two accounts, one with preferences set
     When the other reads its preferences
     Then it sees nothing set
 
-  Scenario: A change of whom one seeks is possible once in the cadence
+  Scenario: Whom one seeks can be changed as often as one wishes
     Given a signed-in account that set seeks and an age window
-    When it changes whom it seeks, and again within the cadence
-    Then the first change is stored, the second is refused as change_too_soon, the same answer again and another window of ages pass, and the onboarding status says from when
+    When it changes whom it seeks, and again, and again
+    Then every change is stored, and no status says from when another is possible
 
   Scenario: A change of gender is possible once in the cadence
     Given a signed-in account that declared a gender
@@ -49,22 +73,57 @@ Feature: The hard preferences of onboarding
     Then the first change is stored, the second is refused as change_too_soon, the same gender again passes, and the onboarding status says from when
 
   Scenario Outline: A deal-breaker the rule refuses is not stored
-    Given a signed-in account that answered how it smokes and whether it has kids
+    Given a signed-in account that answered how it smokes, whether it has kids and its height
     When it sets <what>
     Then the answer is <status> and no deal-breaker is stored
 
     Examples:
       | what                                              | status |
-      | a third deal-breaker                              | 400    |
+      | one more deal-breaker than the config allows      | 400    |
       | a deal-breaker on a field outside the whitelist   | 400    |
       | a deal-breaker on a field it has not answered     | 409    |
       | a deal-breaker accepting an answer the field has not | 400 |
+      | a deal-breaker on languages accepting another language | 400 |
       | the same field twice                              | 400    |
+      | a deal-breaker on height accepting no relation of height | 400 |
+      | a deal-breaker on height accepting two relations  | 400    |
+      | a deal-breaker on distance accepting no band      | 400    |
+      | a deal-breaker on distance accepting far          | 400    |
+      | a deal-breaker on distance past what the config allows | 400 |
+
+  Scenario Outline: A person past a lowered number may remove or change what they hold, and take on nothing new
+    Given a signed-in account holding deal-breakers on smoking, kids and height, with the config lowered to one
+    When it <what>
+    Then the answer is <status> and it holds <held>
+
+    Examples:
+      | what                                   | status | held                            |
+      | removes kids, still one too many       | 200    | smoking and height              |
+      | changes what smoking accepts           | 200    | smoking, changed, kids and height |
+      | sends the set as it stands             | 200    | smoking, kids and height        |
+      | adds monogamy                          | 400    | smoking, kids and height        |
+      | swaps kids for monogamy                | 400    | smoking, kids and height        |
 
   Scenario: Deal-breakers are stored as hard rows beside onboarding's and paused while the own answer is missing
     Given a signed-in account with seeks, an age window and answers on smoking and kids
     When it sets a deal-breaker on each, takes its smoking answer back, and answers again
     Then the rows are hard and read back, the smoking one is paused in between and nothing is deleted, onboarding's rows stand, the export carries them, and no accepted answer reaches a log line
+
+  Scenario: A deal-breaker on height is stored as one relation to the person's own height
+    Given a signed-in account that answered its height
+    When it asks for somebody taller, then somebody shorter, then everyone
+    Then each relation is a hard row that reads back as saved, a second one replaces the first, and everyone leaves no row
+
+  Scenario: A deal-breaker on distance is stored as the bands it accepts, on no answer of one's own
+    Given a signed-in account that answered nothing on its profile
+    When it accepts nearby, then nearby and close, then everyone
+    Then each is a hard row that reads back as saved, a second one replaces the first, and everyone leaves no row
+    And it is never paused, and it lets through those who did not answer, whatever the request said
+
+  Scenario: A language deal-breaker saved with Another language reads back without it
+    Given one account's language deal-breaker saved accepting Finnish and Another language, and another's accepting Another language alone
+    When each reads its deal-breakers
+    Then the first accepts Finnish alone and the second has none, as the queue's builder reads them too
 
   Scenario: The deal-breakers of another account are never served
     Given two accounts, one with a deal-breaker set

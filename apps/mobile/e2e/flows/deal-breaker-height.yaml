@@ -1,0 +1,46 @@
+# Height as a deal-breaker (#508, #551, features/matching/preferences.feature):
+# one relation to the person's own height, or Everyone, which is having none.
+# Sanna answered her height and has no deal-breaker; the flow ends as it began.
+appId: fi.kuutti.app
+name: Height takes one relation of its four buttons, kept by going back, and Everyone takes it off
+---
+- runFlow: ../common/sign-in.yaml
+- openLink: kuutti://profile/deal-breakers/height
+- extendedWaitUntil:
+    visible: "✓ Everyone|✓ Kaikki|✓ Alla"
+    timeout: 15000
+- waitForAnimationToEnd
+- assertNotVisible: "Also people who did not answer|Myös ne, jotka eivät vastanneet|Även de som inte svarade"
+
+# One relation at a time: the second replaces the first, and those who did not
+# answer are let through until switched off.
+- tapOn: "Taller than me|Minua pidempi|Längre än jag"
+- assertVisible: "✓ Taller than me|✓ Minua pidempi|✓ Längre än jag"
+- tapOn: "My height or taller|Yhtä pitkä tai pidempi|Lika lång eller längre"
+- assertVisible: "✓ My height or taller|✓ Yhtä pitkä tai pidempi|✓ Lika lång eller längre"
+- assertVisible: "Taller than me|Minua pidempi|Längre än jag"
+- assertVisible: "Also people who did not answer|Myös ne, jotka eivät vastanneet|Även de som inte svarade"
+
+# Kept by going back: it is there when the screen opens again.
+- tapOn: "Back|Takaisin|Tillbaka"
+- extendedWaitUntil:
+    notVisible: "Also people who did not answer|Myös ne, jotka eivät vastanneet|Även de som inte svarade"
+    timeout: 15000
+- openLink: kuutti://profile/deal-breakers/height
+- extendedWaitUntil:
+    visible: "✓ My height or taller|✓ Yhtä pitkä tai pidempi|✓ Lika lång eller längre"
+    timeout: 15000
+- waitForAnimationToEnd
+
+# Everyone takes it off, and going back, she is back as she began.
+- tapOn: "Everyone|Kaikki|Alla"
+- assertVisible: "✓ Everyone|✓ Kaikki|✓ Alla"
+- assertNotVisible: "Also people who did not answer|Myös ne, jotka eivät vastanneet|Även de som inte svarade"
+- tapOn: "Back|Takaisin|Tillbaka"
+- extendedWaitUntil:
+    notVisible: "Taller than me|Minua pidempi|Längre än jag"
+    timeout: 15000
+- openLink: kuutti://profile/deal-breakers/height
+- extendedWaitUntil:
+    visible: "✓ Everyone|✓ Kaikki|✓ Alla"
+    timeout: 15000

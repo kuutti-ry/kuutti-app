@@ -1,11 +1,9 @@
+import { realLocale } from "@kuutti/i18n";
 import {
-  type ApiComponents,
   type ConsentKind,
   ConsentsResponse,
   ErrorResponse,
-  type Gender,
   OnboardingStatus,
-  type PreferencesUpdate,
   type WithdrawableConsentKind,
 } from "@kuutti/schema";
 import { ApiError, api } from "@/lib/api";
@@ -28,22 +26,8 @@ export async function fetchOnboarding(): Promise<OnboardingStatus> {
   return OnboardingStatus.parse(data);
 }
 
-export async function declareGender(gender: Gender): Promise<void> {
-  const { error, response } = await api.PUT("/account/gender", { body: { gender } });
-  if (!response.ok) throw failed(response, error, "gender");
-}
-
-export async function savePreferences(update: PreferencesUpdate): Promise<void> {
-  // The generated body type spells the strict object with an index signature the zod type has no room for (ADR-003).
-  const { error, response } = await api.PUT("/preferences", {
-    body: update as unknown as ApiComponents["schemas"]["PreferencesUpdate"],
-  });
-  if (!response.ok) throw failed(response, error, "preferences");
-}
-
-/** The consent texts exist in fi, sv and en; the pseudo-locale reads the English. */
-export const consentLocale = (locale: string): "fi" | "sv" | "en" =>
-  locale === "fi" || locale === "sv" ? locale : "en";
+/** The consent texts exist in fi, sv and en; Stadi reads the Finnish, the pseudo-locale the English. */
+export const consentLocale = realLocale;
 
 export async function fetchConsents(): Promise<ConsentsResponse> {
   const { data, error, response } = await api.GET("/consents");

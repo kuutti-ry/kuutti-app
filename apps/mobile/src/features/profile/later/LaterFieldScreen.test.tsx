@@ -1,10 +1,22 @@
-import { act, fireEvent, screen, waitFor } from "@testing-library/react-native";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react-native";
+import { useLocales } from "expo-localization";
 import type * as React from "react";
+import { StrictMode } from "react";
+import { AccessibilityInfo, Platform } from "react-native";
 import { saveSession } from "@/lib/session";
 import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
+import { FAILED_TO_LOAD } from "@/test/failed";
 import { expectPinnedHeader } from "@/test/layout";
-import { renderWithTheme } from "@/test/render";
-import { LaterFieldScreen, laterProgress, screenOpen } from "./LaterFieldScreen";
+import { renderWithTheme, underProviders } from "@/test/render";
+import { LaterFieldScreen, laterFieldsShown, laterProgress, screenOpen } from "./LaterFieldScreen";
+
+/** The names of the radio groups on the screen, each a plain view that a role query would leave out. */
+const radioGroups = () =>
+  screen.container
+    .queryAll(
+      (node) => typeof node.type === "string" && node.props.accessibilityRole === "radiogroup",
+    )
+    .map((node) => String(node.props.accessibilityLabel));
 
 const { __router: router, __navigation: navigation } = jest.requireMock("expo-router") as {
   __router: { push: jest.Mock; replace: jest.Mock; back: jest.Mock; dismissTo: jest.Mock };
@@ -66,6 +78,7 @@ function fakeApi(profile: Profile | null = null) {
         }
       : null,
     completeness: { complete: false, missing: ["photos"] },
+    home: null,
   });
   globalThis.fetch = jest.fn(async (input: Request | string, init?: RequestInit) => {
     const request = input instanceof Request ? input : new Request(input, init);
@@ -95,6 +108,13 @@ const checkA11y = () => {
   expect(found.flatMap((node) => a11yProblems(node))).toEqual([]);
 };
 
+/** An answer that is a whole-width row by its word, chosen or not: the chosen one's name carries its mark. */
+const answer = (name: string) =>
+  screen.getByRole(/^(radio|checkbox)$/, { name: new RegExp(`^(✓ )?${name}$`) });
+const checked = (name: string) => answer(name).props.accessibilityState?.checked;
+
+const INTRO = "Every answer is on your card only when you give it.";
+
 beforeEach(async () => {
   router.push.mockReset();
   router.replace.mockReset();
@@ -102,7 +122,7 @@ beforeEach(async () => {
     sessionId: "6f1c1c4e-9a8e-4a0b-9c3a-0c8d1e2f3a4b",
     accessToken: token("access"),
     accessExpiresAt: "2030-01-01T00:15:00.000Z",
-    refreshToken: token("refresh"),
+    refreshToken: `${token("family")}.${token("refresh")}`,
     refreshExpiresAt: "2030-04-01T00:00:00.000Z",
   });
 });
@@ -122,19 +142,44 @@ describe("screenOpen", () => {
   });
 });
 
+describe("laterFieldsShown", () => {
+  it("draws only the half still open where both halves count and one is answered (#616)", () => {
+    expect(laterFieldsShown({}, "smoking", false)).toEqual(["smoking", "nicotine"]);
+    expect(laterFieldsShown({ smoking: "never" }, "smoking", false)).toEqual(["nicotine"]);
+    expect(laterFieldsShown({ nicotine: ["snus"] }, "smoking", false)).toEqual(["smoking"]);
+    expect(laterFieldsShown({ smoking: "never", nicotine: ["none"] }, "smoking", false)).toEqual([
+      "smoking",
+      "nicotine",
+    ]);
+  });
+
+  it("draws both halves on a screen opened for its one answer, and a setting or a free text with its field", () => {
+    expect(laterFieldsShown({ smoking: "never" }, "smoking", true)).toEqual([
+      "smoking",
+      "nicotine",
+    ]);
+    expect(laterFieldsShown({ hideFromField: true }, "field", false)).toEqual([
+      "field",
+      "hideFromField",
+    ]);
+    expect(laterFieldsShown({}, "occupation", false)).toEqual(["occupation", "occupationTitle"]);
+    expect(laterFieldsShown({ smoking: "never" }, "hasKids", false)).toEqual(["hasKids"]);
+  });
+});
+
 describe("LaterFieldScreen", () => {
   it("asks the first field with the progress, skips without writing, and saves before moving on", async () => {
     const { puts } = fakeApi(named({}));
     await show(<LaterFieldScreen field="hasKids" />);
-    await waitFor(() => expect(screen.getByText("While you wait")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("When you have a moment")).toBeTruthy());
     expect(screen.getByText("0 of 16 answered")).toBeTruthy();
-    expect(screen.getByText(/One question at a time/)).toBeTruthy();
-    expect(screen.getByText("No kids")).toBeTruthy();
+    expect(screen.getByText(INTRO)).toBeTruthy();
+    expect(answer("No kids")).toBeTruthy();
     checkA11y();
     await press(screen.getByRole("button", { name: "Ask me later" }));
     expect(router.push).toHaveBeenCalledWith("/profile/later/wantsKids");
     expect(puts).toEqual([]);
-    await press(screen.getByRole("button", { name: "Yes, living with me" }));
+    await press(answer("Yes, living with me"));
     await press(screen.getByRole("button", { name: "Save and continue" }));
     await waitFor(() => expect(puts).toHaveLength(1));
     expect(puts[0]).toMatchObject({ displayName: "Aino", fields: { hasKids: "yes_with_me" } });
@@ -147,9 +192,9 @@ describe("LaterFieldScreen", () => {
     router.back.mockClear();
     router.dismissTo.mockClear();
     await show(<LaterFieldScreen field="hasKids" />);
-    await waitFor(() => expect(screen.getByText("While you wait")).toBeTruthy());
-    expectPinnedHeader("While you wait", "Back to your profile");
-    await press(screen.getByRole("button", { name: "Yes, living with me" }));
+    await waitFor(() => expect(screen.getByText("When you have a moment")).toBeTruthy());
+    expectPinnedHeader("When you have a moment", "Back to your profile");
+    await press(answer("Yes, living with me"));
     await press(screen.getByRole("button", { name: "Back to your profile" }));
     expect(router.dismissTo).toHaveBeenCalledWith("/profile");
     expect(router.back).not.toHaveBeenCalled();
@@ -161,13 +206,13 @@ describe("LaterFieldScreen", () => {
     const { puts } = fakeApi(named({}));
     navigation.dispatch.mockClear();
     await show(<LaterFieldScreen field="hasKids" />);
-    await waitFor(() => expect(screen.getByText("While you wait")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("When you have a moment")).toBeTruthy());
     expect((await leave()).preventDefault).not.toHaveBeenCalled();
-    await press(screen.getByRole("button", { name: "Yes, living with me" }));
+    await press(answer("Yes, living with me"));
     expect(navigation.setOptions.mock.lastCall?.[0]).toEqual({ gestureEnabled: false });
 
     expect((await leave()).preventDefault).toHaveBeenCalled();
-    expect(screen.getByText("Your changes are not saved yet.")).toBeTruthy();
+    expect(screen.getByText("Leave without saving?")).toBeTruthy();
     await press(screen.getByRole("button", { name: "Keep editing" }));
     expect(navigation.dispatch).not.toHaveBeenCalled();
 
@@ -176,26 +221,37 @@ describe("LaterFieldScreen", () => {
     expect(navigation.dispatch).toHaveBeenCalledWith({ type: "POP_TO" });
     expect(puts).toEqual([]);
     // Dropped: back to what is saved, so a screen a link left mounted holds nothing.
-    expect(
-      screen.getByRole("button", { name: "Yes, living with me" }).props.accessibilityState
-        ?.selected,
-    ).toBe(false);
+    expect(checked("Yes, living with me")).toBe(false);
   });
 
   it("puts an answer back on Ask me later, so a question passed over holds nothing to ask about", async () => {
     const { puts } = fakeApi(named({}));
     await show(<LaterFieldScreen field="hasKids" />);
-    await waitFor(() => expect(screen.getByText("While you wait")).toBeTruthy());
-    await press(screen.getByRole("button", { name: "Yes, living with me" }));
+    await waitFor(() => expect(screen.getByText("When you have a moment")).toBeTruthy());
+    await press(answer("Yes, living with me"));
     await press(screen.getByRole("button", { name: "Ask me later" }));
     expect(router.push).toHaveBeenCalledWith("/profile/later/wantsKids");
-    expect(
-      screen.getByRole("button", { name: "Yes, living with me" }).props.accessibilityState
-        ?.selected,
-    ).toBe(false);
+    expect(checked("Yes, living with me")).toBe(false);
     expect(navigation.setOptions.mock.lastCall?.[0]).toEqual({ gestureEnabled: true });
     expect((await leave()).preventDefault).not.toHaveBeenCalled();
     expect(puts).toEqual([]);
+  });
+
+  it("saves a Hide with the answer on Save and continue, and drops it on Ask me later (#515)", async () => {
+    const { puts } = fakeApi(named({}));
+    await show(<LaterFieldScreen field="hasKids" />);
+    await waitFor(() => expect(screen.getByText("When you have a moment")).toBeTruthy());
+    await press(answer("Yes, living with me"));
+    await press(screen.getByRole("button", { name: "Hide from your card: Kids" }));
+    await press(screen.getByRole("button", { name: "Ask me later" }));
+    expect(puts).toEqual([]);
+    expect(screen.queryByRole("button", { name: "Show on your card: Kids" })).toBeNull();
+
+    await press(answer("Yes, living with me"));
+    await press(screen.getByRole("button", { name: "Hide from your card: Kids" }));
+    await press(screen.getByRole("button", { name: "Save and continue" }));
+    expect(puts).toMatchObject([{ fields: { hasKids: "yes_with_me" }, hiddenFields: ["hasKids"] }]);
+    checkA11y();
   });
 
   it("lands on the first unanswered field when the first one is answered already", async () => {
@@ -227,9 +283,77 @@ describe("LaterFieldScreen", () => {
   it("keeps the intro line on the first unanswered field while it is being answered", async () => {
     fakeApi(named({ hasKids: "no" }));
     await show(<LaterFieldScreen field="wantsKids" />);
-    await waitFor(() => expect(screen.getByText(/One question at a time/)).toBeTruthy());
-    await press(screen.getByRole("button", { name: "Want kids" }));
-    expect(screen.getByText(/One question at a time/)).toBeTruthy();
+    await waitFor(() => expect(screen.getByText(INTRO)).toBeTruthy());
+    await press(answer("Want kids"));
+    expect(screen.getByText(INTRO)).toBeTruthy();
+  });
+
+  it("has only the intro's one line left of what it said, and none over a later question (#581)", async () => {
+    fakeApi(named({}));
+    await show(<LaterFieldScreen field="hasKids" />);
+    await waitFor(() => expect(screen.getByText(INTRO)).toBeTruthy());
+    expect(screen.queryByText(/One question at a time/)).toBeNull();
+    expect(screen.queryByText(/Skip what you like/)).toBeNull();
+    fakeApi(named({}));
+    await show(<LaterFieldScreen field="smoking" />);
+    await waitFor(() => expect(answer("Never")).toBeTruthy());
+    expect(screen.queryByText(INTRO)).toBeNull();
+  });
+
+  it.each([
+    ["fi-FI", "Jokainen vastaus näkyy kortillasi vain, jos annat sen."],
+    ["sv-FI", "Varje svar syns på ditt kort bara om du ger det."],
+  ])("says the intro's line in %s", async (tag, line) => {
+    (useLocales as jest.Mock).mockReturnValue([{ languageTag: tag }]);
+    try {
+      fakeApi(named({}));
+      await show(<LaterFieldScreen field="hasKids" />);
+      await waitFor(() => expect(screen.getByText(line)).toBeTruthy());
+    } finally {
+      (useLocales as jest.Mock).mockReturnValue([{ languageTag: "en-US" }]);
+    }
+  });
+
+  describe("what it draws the answers as (#581)", () => {
+    it("one answer of a short list as whole-width radios, in a group the question names", async () => {
+      fakeApi(named({}));
+      await show(<LaterFieldScreen field="exercise" />);
+      await waitFor(() => expect(answer("Weekly")).toBeTruthy());
+      expect(screen.getByLabelText("Exercise").props.accessibilityRole).toBe("radiogroup");
+      expect(screen.getAllByRole("radio")).toHaveLength(4);
+      expect(screen.queryByRole("button", { name: "Weekly" })).toBeNull();
+      checkA11y();
+    });
+
+    it("several answers of a short list as whole-width checkboxes", async () => {
+      fakeApi(named({}));
+      await show(<LaterFieldScreen field="pets" />);
+      await waitFor(() => expect(answer("Dog")).toBeTruthy());
+      expect(screen.getAllByRole("checkbox")).toHaveLength(5);
+      expect(radioGroups()).toEqual([]);
+      checkA11y();
+    });
+
+    it("a companion on the same screen as rows too, each by its own kind", async () => {
+      fakeApi(named({}));
+      await show(<LaterFieldScreen field="smoking" />);
+      await waitFor(() => expect(answer("Never")).toBeTruthy());
+      expect(screen.getAllByRole("radio")).toHaveLength(5);
+      expect(screen.getAllByRole("checkbox")).toHaveLength(3);
+    });
+
+    it.each([
+      ["the parties", "politics", "Greens"],
+      ["the star signs", "zodiac", "Corgi"],
+      ["the languages", "languages", "Finnish"],
+      ["the hobbies", "hobbies", "Yoga"],
+    ])("a long list as chips, %s", async (_what, field, word) => {
+      fakeApi(named({}));
+      await show(<LaterFieldScreen field={field} />);
+      await waitFor(() => expect(screen.getByRole("button", { name: word })).toBeTruthy());
+      expect(screen.queryByRole("radio")).toBeNull();
+      expect(screen.queryByRole("checkbox")).toBeNull();
+    });
   });
 
   it("adapts the wants-kids texts to the kids answer", async () => {
@@ -284,13 +408,40 @@ describe("LaterFieldScreen", () => {
     unmount();
   });
 
+  it("asks only other nicotine of someone whose smoking was answered before it existed, and keeps the smoking answer (#616)", async () => {
+    const { puts } = fakeApi(named({ smoking: "never" }));
+    await show(<LaterFieldScreen field="smoking" />);
+    await waitFor(() => expect(screen.getByText("Other nicotine")).toBeTruthy());
+    // Smoking's answers are radios, other nicotine's checkboxes (#581): none of smoking's is drawn.
+    expect(screen.queryAllByRole("radio")).toHaveLength(0);
+    expect(screen.getAllByRole("checkbox")).toHaveLength(3);
+    checkA11y();
+    await press(answer("Snus"));
+    // Answered on the screen, nothing comes back or goes: the screen reads the stored document.
+    expect(answer("Snus")).toBeTruthy();
+    expect(screen.queryAllByRole("radio")).toHaveLength(0);
+    await press(screen.getByRole("button", { name: "Save and continue" }));
+    await waitFor(() => expect(puts).toHaveLength(1));
+    expect(puts[0]).toMatchObject({ fields: { smoking: "never", nicotine: ["snus"] } });
+  });
+
+  it("asks only smoking of someone who answered other nicotine alone (#616)", async () => {
+    fakeApi(named({ nicotine: ["pouches"] }));
+    await show(<LaterFieldScreen field="smoking" />);
+    await waitFor(() => expect(answer("Never")).toBeTruthy());
+    expect(screen.getAllByRole("radio")).toHaveLength(5);
+    expect(screen.queryAllByRole("checkbox")).toHaveLength(0);
+  });
+
   it("asks other nicotine on the smoking screen, and saves both with one press (#239)", async () => {
     const { puts } = fakeApi(named({}));
     await show(<LaterFieldScreen field="smoking" />);
     await waitFor(() => expect(screen.getByText("Other nicotine")).toBeTruthy());
     checkA11y();
-    await press(screen.getByRole("button", { name: "Vaping" }));
-    await press(screen.getByRole("button", { name: "Snus" }));
+    await press(answer("Vaping"));
+    // Smoking answered on the screen stays there beside other nicotine (#616).
+    expect(screen.getAllByRole("radio")).toHaveLength(5);
+    await press(answer("Snus"));
     await press(screen.getByRole("button", { name: "Save and continue" }));
     await waitFor(() => expect(puts).toHaveLength(1));
     expect(puts[0]).toMatchObject({ fields: { smoking: "vaping", nicotine: ["snus"] } });
@@ -363,15 +514,15 @@ describe("LaterFieldScreen", () => {
     globalThis.fetch = jest.fn(async () =>
       failing
         ? json({ error: { code: "internal_error", message: "x", requestId: "r" } }, 500)
-        : json({ profile: null, completeness: { complete: false, missing: [] } }),
+        : json({ profile: null, completeness: { complete: false, missing: [] }, home: null }),
     ) as unknown as typeof fetch;
     await show(<LaterFieldScreen field="smoking" />);
-    expect(screen.getByText("Your profile could not be loaded.")).toBeTruthy();
+    expect(screen.getByText(FAILED_TO_LOAD)).toBeTruthy();
     // Why, in words: the API answered 500.
     expect(screen.getByText("Kuutti's server had a problem. Try again in a moment.")).toBeTruthy();
     failing = false;
     await press(screen.getByRole("button", { name: "Try again" }));
-    await waitFor(() => expect(screen.getByText("While you wait")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("When you have a moment")).toBeTruthy());
   });
 
   /** The profile read as usual; a save waits for the test, or is refused with a code. */
@@ -403,20 +554,66 @@ describe("LaterFieldScreen", () => {
   it("gives any other refusal the generic line", async () => {
     refusingSaves("validation_failed");
     await show(<LaterFieldScreen field="smoking" />);
-    await waitFor(() => expect(screen.getByText("While you wait")).toBeTruthy());
-    await press(screen.getByRole("button", { name: "Never" }));
+    await waitFor(() => expect(screen.getByText("When you have a moment")).toBeTruthy());
+    await press(answer("Never"));
     await press(screen.getByRole("button", { name: "Save and continue" }));
     expect(screen.getByText("Saving did not work. Check the fields and try again.")).toBeTruthy();
     expect(router.push).not.toHaveBeenCalled();
   });
 
-  it("says it is saving and holds both buttons meanwhile", async () => {
+  describe("what it says as it saves (#581)", () => {
+    afterEach(() => jest.restoreAllMocks());
+
+    it.each([
+      ["ios", "announceForAccessibilityWithOptions", [["Saving…", { queue: true }]]],
+      ["android", "announceForAccessibility", [["Saving…"]]],
+    ] as const)(
+      "says it is saving aloud on %s, with no line that pushes the buttons down, once for a press",
+      async (os, call, heard) => {
+        jest.replaceProperty(Platform, "OS", os);
+        const said = jest.spyOn(AccessibilityInfo, call).mockClear();
+        const server = refusingSaves(null);
+        await show(<LaterFieldScreen field="smoking" />);
+        await waitFor(() => expect(answer("Never")).toBeTruthy());
+        await press(answer("Never"));
+        expect(said).not.toHaveBeenCalled();
+        await press(screen.getByRole("button", { name: "Save and continue" }));
+        expect(said.mock.calls).toEqual(heard);
+        expect(screen.queryByText("Saving…")).toBeNull();
+        // Answered, as the next test's read waits for a save on its way.
+        await act(async () => {
+          server.answer(
+            json({
+              profile: {
+                ...named({ smoking: "never" }),
+                specialCategoryConsent: null,
+                updatedAt: "2026-10-08T10:00:00.000Z",
+              },
+              completeness: { complete: false, missing: ["photos"] },
+              home: null,
+            }),
+          );
+          await settle();
+        });
+      },
+    );
+
+    it("says nothing on Ask me later, which saves nothing", async () => {
+      const said = jest.spyOn(AccessibilityInfo, "announceForAccessibilityWithOptions").mockClear();
+      fakeApi(named({}));
+      await show(<LaterFieldScreen field="smoking" />);
+      await waitFor(() => expect(answer("Never")).toBeTruthy());
+      await press(screen.getByRole("button", { name: "Ask me later" }));
+      expect(said).not.toHaveBeenCalled();
+    });
+  });
+
+  it("holds both buttons while it saves", async () => {
     const server = refusingSaves(null);
     await show(<LaterFieldScreen field="smoking" />);
-    await waitFor(() => expect(screen.getByText("While you wait")).toBeTruthy());
-    await press(screen.getByRole("button", { name: "Never" }));
+    await waitFor(() => expect(screen.getByText("When you have a moment")).toBeTruthy());
+    await press(answer("Never"));
     await press(screen.getByRole("button", { name: "Save and continue" }));
-    expect(screen.getByText("Saving…")).toBeTruthy();
     for (const name of ["Save and continue", "Ask me later"]) {
       expect(screen.getByRole("button", { name }).props.accessibilityState?.disabled).toBe(true);
     }
@@ -429,10 +626,223 @@ describe("LaterFieldScreen", () => {
             updatedAt: "2026-10-08T10:00:00.000Z",
           },
           completeness: { complete: false, missing: ["photos"] },
+          home: null,
         }),
       );
       await settle();
     });
     expect(router.push).toHaveBeenCalledWith("/profile/later/languages");
+  });
+
+  /**
+   * Save and continue, then away by the arrow with the save on its way (#542):
+   * the stack takes the screen at once, and the save lands after it.
+   */
+  async function leftWhileSaving(ui: React.ReactElement, arrow: string) {
+    const server = refusingSaves(null);
+    const { unmount } = await act(async () => {
+      const rendered = renderWithTheme(ui);
+      await settle();
+      return rendered;
+    });
+    await waitFor(() => expect(screen.getByText("When you have a moment")).toBeTruthy());
+    await press(screen.getByRole("button", { name: "Save and continue" }));
+    await press(screen.getByRole("button", { name: arrow }));
+    await act(async () => {
+      unmount();
+      await settle();
+    });
+    await act(async () => {
+      server.answer(
+        json({
+          profile: {
+            ...named({}),
+            specialCategoryConsent: null,
+            updatedAt: "2026-10-08T10:00:00.000Z",
+          },
+          completeness: { complete: false, missing: ["photos"] },
+          home: null,
+        }),
+      );
+      await settle();
+    });
+  }
+
+  it("moves on to no next question when it was left while its save was on the way", async () => {
+    router.dismissTo.mockClear();
+    await leftWhileSaving(<LaterFieldScreen field="smoking" />, "Back to your profile");
+    expect(router.dismissTo).toHaveBeenCalledTimes(1);
+    expect(router.push).not.toHaveBeenCalled();
+  });
+
+  // The second run of the effects comes after their cleanup, which marked the screen left.
+  it("still moves on after a save once StrictMode has run the effects twice", async () => {
+    const { puts } = fakeApi(named({}));
+    // Around the root: below the providers, the effects run once.
+    await act(async () => {
+      render(underProviders(<LaterFieldScreen field="hasKids" />), { wrapper: StrictMode });
+      await settle();
+    });
+    await waitFor(() => expect(screen.getByText("When you have a moment")).toBeTruthy());
+    await press(answer("No kids"));
+    await press(screen.getByRole("button", { name: "Save and continue" }));
+    await waitFor(() => expect(puts).toHaveLength(1));
+    await waitFor(() => expect(router.push).toHaveBeenCalledWith("/profile/later/wantsKids"));
+  });
+
+  describe("opened for its one answer (#542)", () => {
+    const SAVE = "Save and continue";
+    const SKIP = "Ask me later";
+    const ARROW = "Back to your deal-breakers";
+    const ASKED = "Leave without saving?";
+    const button = (name: string) => screen.getByRole("button", { name });
+    /** An answer, by its word: a row of a short list, a chip of a long one (the star signs). */
+    const either = (name: string) =>
+      screen.getByRole(/^(radio|checkbox|button)$/, { name: new RegExp(`^(✓ )?${name}$`) });
+
+    /**
+     * The stack as `router.back` drives it: `beforeRemove` in the same tick, ahead
+     * of any render, so a screen that still thinks itself unsaved is caught at it.
+     * `popped` is each leaving, with how many saves had landed by then.
+     */
+    function popping(puts: Profile[] = []) {
+      const popped: { saved: number; preventDefault: jest.Mock }[] = [];
+      router.back.mockImplementation(() => {
+        const event = {
+          saved: puts.length,
+          preventDefault: jest.fn(),
+          data: { action: { type: "GO_BACK" } },
+        };
+        popped.push(event);
+        navigation.emit("beforeRemove", event);
+      });
+      return popped;
+    }
+
+    beforeEach(() => {
+      router.dismissTo.mockClear();
+    });
+    afterEach(() => {
+      router.back.mockReset();
+    });
+
+    it("goes back to what opened it from the arrow, never out to the profile, saving nothing", async () => {
+      const { puts } = fakeApi(named({}));
+      const popped = popping(puts);
+      await show(<LaterFieldScreen field="hasKids" once />);
+      await waitFor(() => expect(screen.getByText("When you have a moment")).toBeTruthy());
+      await press(button(ARROW));
+      expect(popped).toHaveLength(1);
+      expect(popped[0]?.preventDefault).not.toHaveBeenCalled();
+      expect(router.dismissTo).not.toHaveBeenCalled();
+      expect(router.push).not.toHaveBeenCalled();
+      expect(puts).toEqual([]);
+    });
+
+    it("draws smoking beside other nicotine, the reason it was opened (#616)", async () => {
+      fakeApi(named({ smoking: "never" }));
+      await show(<LaterFieldScreen field="smoking" once />);
+      await waitFor(() => expect(screen.getByText("Other nicotine")).toBeTruthy());
+      expect(screen.getAllByRole("radio")).toHaveLength(5);
+      expect(screen.getAllByRole("checkbox")).toHaveLength(3);
+    });
+
+    it("still asks before the arrow leaves an answer not saved", async () => {
+      const { puts } = fakeApi(named({}));
+      const popped = popping(puts);
+      await show(<LaterFieldScreen field="hasKids" once />);
+      await waitFor(() => expect(screen.getByText("When you have a moment")).toBeTruthy());
+      await press(answer("Yes, living with me"));
+      await press(button(ARROW));
+      expect(popped[0]?.preventDefault).toHaveBeenCalled();
+      expect(screen.getByText(ASKED)).toBeTruthy();
+      expect(puts).toEqual([]);
+    });
+
+    it.each([
+      ["the first question", "hasKids", "No kids", { hasKids: "no" }],
+      ["a question with a companion", "smoking", "Vaping", { smoking: "vaping" }],
+      ["the last question", "zodiac", "Corgi", { zodiac: "corgi" }],
+    ])(
+      "saves %s, then goes back with nothing asked, on to no other screen",
+      async (_what, field, word, fields) => {
+        const { puts } = fakeApi(named({}));
+        const popped = popping(puts);
+        await show(<LaterFieldScreen field={field} once />);
+        await waitFor(() => expect(either(word)).toBeTruthy());
+        await press(either(word));
+        await press(button(SAVE));
+        await waitFor(() => expect(popped).toHaveLength(1));
+        expect(puts).toEqual([expect.objectContaining({ fields })]);
+        // The save first: back on the deal-breakers, the row reads what was stored.
+        expect(popped[0]?.saved).toBe(1);
+        expect(popped[0]?.preventDefault).not.toHaveBeenCalled();
+        expect(screen.queryByText(ASKED)).toBeNull();
+        expect(router.push).not.toHaveBeenCalled();
+        expect(router.replace).not.toHaveBeenCalled();
+        expect(router.dismissTo).not.toHaveBeenCalled();
+      },
+    );
+
+    it("pops once when it was left while its save was on the way: a second pop would take what opened it", async () => {
+      const popped = popping();
+      await leftWhileSaving(<LaterFieldScreen field="smoking" once />, ARROW);
+      expect(popped).toHaveLength(1);
+      expect(popped[0]?.preventDefault).not.toHaveBeenCalled();
+      expect(router.push).not.toHaveBeenCalled();
+    });
+
+    it("stays on a refused save, with the reason and the answer, and still asks before it is left", async () => {
+      refusingSaves("validation_failed");
+      const popped = popping();
+      await show(<LaterFieldScreen field="smoking" once />);
+      await waitFor(() => expect(screen.getByText("When you have a moment")).toBeTruthy());
+      await press(answer("Never"));
+      await press(button(SAVE));
+      expect(screen.getByText("Saving did not work. Check the fields and try again.")).toBeTruthy();
+      expect(popped).toEqual([]);
+      expect(router.push).not.toHaveBeenCalled();
+      expect(checked("Never")).toBe(true);
+      expect((await leave()).preventDefault).toHaveBeenCalled();
+      expect(screen.getByText(ASKED)).toBeTruthy();
+    });
+
+    it.each([
+      ["with nothing changed", []],
+      ["even after a change", ["Yes, living with me"]],
+    ])(
+      "writes nothing on Ask me later and goes back with nothing asked, %s",
+      async (_what, taps) => {
+        const { puts } = fakeApi(named({}));
+        const popped = popping(puts);
+        await show(<LaterFieldScreen field="hasKids" once />);
+        await waitFor(() => expect(screen.getByText("When you have a moment")).toBeTruthy());
+        for (const name of taps) await press(answer(name));
+        await press(button(SKIP));
+        expect(popped).toHaveLength(1);
+        expect(popped[0]?.preventDefault).not.toHaveBeenCalled();
+        expect(screen.queryByText(ASKED)).toBeNull();
+        expect(puts).toEqual([]);
+        expect(router.push).not.toHaveBeenCalled();
+      },
+    );
+
+    it("stays on the first field when it is answered already: the person came for this one", async () => {
+      fakeApi(named({ hasKids: "no" }));
+      await show(<LaterFieldScreen field="hasKids" once />);
+      await waitFor(() => expect(screen.getByText("When you have a moment")).toBeTruthy());
+      await waitFor(() => expect(checked("No kids")).toBe(true));
+      expect(router.replace).not.toHaveBeenCalled();
+    });
+
+    it("goes back from the last field with every other answered too, never to the e-mail", async () => {
+      const { puts } = fakeApi(named(ALL_ANSWERED));
+      const popped = popping(puts);
+      await show(<LaterFieldScreen field="zodiac" once />);
+      await waitFor(() => expect(screen.getByText("16 of 16 answered")).toBeTruthy());
+      await press(button(SKIP));
+      expect(popped).toHaveLength(1);
+      expect(router.push).not.toHaveBeenCalled();
+    });
   });
 });

@@ -16,7 +16,7 @@ const tokens = (seed = "a", sessionId = SESSION_ID) => ({
   sessionId,
   accessToken: token(`access${seed}`),
   accessExpiresAt: "2030-01-01T00:15:00.000Z",
-  refreshToken: token(`refresh${seed}`),
+  refreshToken: `${token("family")}.${token(`refresh${seed}`)}`,
   refreshExpiresAt: "2030-04-01T00:00:00.000Z",
 });
 
@@ -27,7 +27,7 @@ const refusal = (code: string, status: number) =>
 
 type Seen = { method: string; path: string; body: unknown };
 /** Answers by "METHOD /path"; a missing route is a network failure. */
-function serve(routes: Record<string, () => Response>) {
+function serve(routes: Record<string, () => Response | Promise<Response>>) {
   const seen: Seen[] = [];
   globalThis.fetch = jest.fn(async (input: Request | string, init?: RequestInit) => {
     const request = input instanceof Request ? input : new Request(input, init);
@@ -41,8 +41,21 @@ function serve(routes: Record<string, () => Response>) {
   return seen;
 }
 
-async function session() {
-  const view = await renderHook(() => useSession(), { wrapper: SessionProvider });
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((done) => {
+    resolve = done;
+  });
+  return { promise, resolve };
+}
+
+/** The provider as the root layout gives it, with what a logout the API did not take calls. */
+async function session(onLogoutUnheard?: () => Promise<void>) {
+  const view = await renderHook(() => useSession(), {
+    wrapper: ({ children }) => (
+      <SessionProvider onLogoutUnheard={onLogoutUnheard}>{children}</SessionProvider>
+    ),
+  });
   await waitFor(() => expect(view.result.current.status).not.toBe("loading"));
   return view;
 }
@@ -144,6 +157,119 @@ describe("SessionProvider: signing in", () => {
     expect(result.current.status).toBe("signed-out");
     expect(currentSession()).toBeNull();
   });
+
+  it("keeps the newer sign-in's tokens and outcome when an earlier exchange finishes last", async () => {
+    const first = deferred<Response>();
+    const started = deferred<void>();
+    const replacement = tokens("new", "7f1c1c4e-9a8e-4a0b-9c3a-0c8d1e2f3a4b");
+    let exchanges = 0;
+    serve({
+      "POST /auth/exchange": () => {
+        exchanges += 1;
+        if (exchanges === 1) {
+          started.resolve();
+          return first.promise;
+        }
+        return json({ ...replacement, outcome: "resumed" });
+      },
+    });
+    const { result } = await session();
+    let earlier!: Promise<unknown>;
+    await act(async () => {
+      earlier = result.current.signIn(token("old-code"), VERIFIER).catch(() => undefined);
+      await started.promise;
+    });
+    await act(async () => {
+      await result.current.signIn(token("new-code"), VERIFIER);
+    });
+    await act(async () => {
+      first.resolve(json({ ...tokens("old"), outcome: "created" }));
+      await earlier;
+    });
+    expect(currentSession()).toEqual(replacement);
+    expect(result.current).toMatchObject({
+      status: "signed-in",
+      sessionId: replacement.sessionId,
+      outcome: "resumed",
+    });
+    expect(result.current).not.toHaveProperty("notice");
+  });
+});
+
+describe("SessionProvider: an operation's session", () => {
+  it.each([
+    { action: "signOut", path: "/auth/logout", clearFirst: false },
+    { action: "signOutEverywhere", path: "/auth/logout-all", clearFirst: true },
+    { action: "deleteAccount", path: "/account/delete", clearFirst: false },
+    { action: "pauseAccount", path: "/account/pause", clearFirst: true },
+  ] as const)(
+    "keeps the replacement session signed in without a stale notice when an earlier $action finishes",
+    async ({ action, path, clearFirst }) => {
+      await saveSession(tokens());
+      const response = deferred<Response>();
+      const started = deferred<void>();
+      serve({
+        [`POST ${path}`]: () => {
+          started.resolve();
+          return response.promise;
+        },
+      });
+      const unheard = jest.fn(async () => undefined);
+      const { result } = await session(unheard);
+      let earlier!: Promise<unknown>;
+      await act(async () => {
+        const operation =
+          action === "signOut" ? result.current.signOut("lock") : result.current[action]();
+        earlier = operation.catch(() => undefined);
+        await started.promise;
+      });
+      // Clearing makes a new lifecycle even if the next sign-in reuses its id.
+      const replacement = tokens(
+        "new",
+        clearFirst ? SESSION_ID : "7f1c1c4e-9a8e-4a0b-9c3a-0c8d1e2f3a4b",
+      );
+      await act(async () => {
+        if (clearFirst) await clearSession();
+        await saveSession(replacement);
+      });
+      await act(async () => {
+        response.resolve(new Response(null, { status: action === "signOut" ? 503 : 204 }));
+        await earlier;
+      });
+      expect(currentSession()).toEqual(replacement);
+      expect(result.current).toMatchObject({
+        status: "signed-in",
+        sessionId: replacement.sessionId,
+      });
+      expect(result.current).not.toHaveProperty("notice");
+      expect(unheard).not.toHaveBeenCalled();
+    },
+  );
+
+  it("still completes a pause after the same session's tokens rotate", async () => {
+    await saveSession(tokens());
+    const response = deferred<Response>();
+    const started = deferred<void>();
+    serve({
+      "POST /account/pause": () => {
+        started.resolve();
+        return response.promise;
+      },
+    });
+    const { result } = await session();
+    let pause!: Promise<void>;
+    await act(async () => {
+      pause = result.current.pauseAccount();
+      await started.promise;
+    });
+    await act(async () => saveSession(tokens("rotated")));
+    await act(async () => {
+      response.resolve(new Response(null, { status: 204 }));
+      await pause;
+    });
+    expect(currentSession()).toBeNull();
+    expect(result.current).toMatchObject({ status: "signed-out", notice: "paused" });
+  });
 });
 
 describe("SessionProvider: signing out", () => {
@@ -210,6 +336,61 @@ describe("SessionProvider: signing out", () => {
       expect(done).toBe(true);
       expect(result.current).toMatchObject({ status: "signed-out", notice: "lock" });
       expect(currentSession()).toBeNull();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it("leaves the phone's push alone after a logout the API took", async () => {
+    await saveSession(tokens());
+    serve({ "POST /auth/logout": () => new Response(null, { status: 204 }) });
+    const unheard = jest.fn(async () => undefined);
+    const { result } = await session(unheard);
+    await act(async () => result.current.signOut());
+    expect(result.current.status).toBe("signed-out");
+    expect(unheard).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["could not reach the API", {}],
+    ["was refused", { "POST /auth/logout": () => refusal("internal_error", 500) }],
+  ])(
+    "has the phone drop its push once signed out, when the logout %s (#102)",
+    async (_, routes) => {
+      await saveSession(tokens());
+      serve(routes);
+      // Whether the device's session was gone by the time it was called.
+      const signedIn: boolean[] = [];
+      const unheard = jest.fn(async () => {
+        signedIn.push(currentSession() !== null);
+      });
+      const { result } = await session(unheard);
+      await act(async () => result.current.signOut("lock"));
+      expect(result.current).toMatchObject({ status: "signed-out", notice: "lock" });
+      expect(unheard).toHaveBeenCalledTimes(1);
+      expect(signedIn).toEqual([false]);
+    },
+  );
+
+  it("has the phone drop its push when the API never answers the logout (#102)", async () => {
+    await saveSession(tokens());
+    const unheard = jest.fn(async () => undefined);
+    const { result } = await session(unheard);
+    jest.useFakeTimers();
+    try {
+      globalThis.fetch = jest.fn(() => new Promise<Response>(() => {})) as unknown as typeof fetch;
+      await act(async () => {
+        void result.current.signOut();
+      });
+      await act(async () => {
+        jest.advanceTimersByTime(4_999);
+      });
+      expect(unheard).not.toHaveBeenCalled();
+      await act(async () => {
+        jest.advanceTimersByTime(1);
+      });
+      expect(result.current.status).toBe("signed-out");
+      expect(unheard).toHaveBeenCalledTimes(1);
     } finally {
       jest.useRealTimers();
     }

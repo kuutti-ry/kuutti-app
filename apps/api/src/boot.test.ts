@@ -23,7 +23,7 @@ import { captureLogger, type LogLine, TEST_DATABASE_URL, testConfig } from "./te
 import { testSigningKeys } from "./test/media.ts";
 
 // The boot sequence (index.ts is only the process around it) against a
-// database of its own: a boot migrates, counts the waitlist and, for a
+// database of its own: a boot migrates, counts the counter and, for a
 // preview, creates and seeds a database, all of which commits. The shared
 // test database stays as the transactional tests expect it. Nothing goes to
 // the network: discovery is a stub or the Telia double, Sentry is a fake.
@@ -60,7 +60,7 @@ const MOCK_ISSUER = "http://127.0.0.1:8080/ftn";
 const WARN = 40;
 const ERROR = 50;
 
-/** The messages of the boot's own steps, in the order the boot logged them; the waitlist count has a test of its own. */
+/** The messages of the boot's own steps, in the order the boot logged them; the pond counter has a test of its own. */
 const STEPS = new Set([
   "error reporting",
   "bank identification",
@@ -203,6 +203,30 @@ describe("boot", () => {
     expect(await health.json()).toMatchObject({ db: "ok", migrations: "current" });
   });
 
+  it("pushes as PUSH says, saying whether with an access token and never the token (#102)", async () => {
+    for (const [overrides, said] of [
+      [{}, { push: "log", authenticated: false }],
+      [{ PUSH: "off" }, { push: "off", authenticated: false }],
+      [
+        { PUSH: "expo", EXPO_ACCESS_TOKEN: "boot-test-expo-access" },
+        { push: "expo", authenticated: true },
+      ],
+    ] as const) {
+      const { lines, push } = await booted(overrides);
+      expect(line(lines, "push")).toMatchObject(said);
+      expect(JSON.stringify(lines())).not.toContain("boot-test-expo-access");
+      // A message's push returns at once; settled waits for it. Nobody has a device here.
+      expect(
+        push.message({
+          conversationId: "00000000-0000-4000-8000-000000000000",
+          readers: async () => ["00000000-0000-4000-8000-000000000001"],
+        }),
+      ).toBeUndefined();
+      await push.settled();
+      expect(lines().filter((l) => /^push (failed|not sent)/.test(l.msg ?? ""))).toEqual([]);
+    }
+  });
+
   // Without an object store there is no research copy either (#194).
   it("arms the thirteen nightly jobs, each of which runs against the database it was given", async () => {
     const { jobs } = await booted();
@@ -212,10 +236,9 @@ describe("boot", () => {
       "research-events-partitions",
       "research-anonymity",
       "end-suspensions",
-      "waitlist-snapshot",
-      "pond-gate",
+      "pond-counter",
       "invitation-count",
-      "round-builder",
+      "prune-rounds",
       "reject-unreviewed-photos",
       "prune-photo-check-notes",
       "prune-reports",
@@ -235,7 +258,11 @@ describe("boot", () => {
       S3_FORCE_PATH_STYLE: "true",
     });
     expect(line(lines, "media")).toMatchObject({ mode: "presigned", moderation: "queue" });
-    expect(jobs.map((j) => j.name).at(-1)).toBe("moderate-pending-photos");
+    // The look, and last the sweep of the objects no row names (#636), both only with a store.
+    expect(jobs.map((j) => j.name).slice(-2)).toEqual([
+      "moderate-pending-photos",
+      "sweep-orphaned-objects",
+    ]);
     // And the research copy, to the same bucket, right before the prune that checks it (#194).
     expect(jobs.map((j) => j.name).slice(2, 4)).toEqual([
       "research-export",
@@ -246,8 +273,10 @@ describe("boot", () => {
     const partitions = jobs.find((j) => j.name === "research-events-partitions");
     expect(await partitions?.run()).toMatchObject({ dropped: 0, uncopied: 0 });
     // Nothing is pending in this database: the look finds nothing and asks the store nothing.
-    const sweep = jobs.at(-1);
-    expect(await sweep?.run()).toEqual({ rechecked: 0, failed: 0 });
+    // The sweep is not run here: the stand-in's bucket is shared with the developer's own
+    // stack, whose rows are in another database, so it would take their photos for orphans.
+    const look = jobs.at(-2);
+    expect(await look?.run()).toEqual({ rechecked: 0, failed: 0 });
     // The reports' prune is handed the store, for the objects of the photos it lets go (#351).
     const prune = jobs.find((j) => j.name === "prune-reports");
     expect(await prune?.run()).toEqual({ pruned: 0, photos: 0, objects: 0 });
@@ -286,38 +315,36 @@ describe("boot", () => {
     expect((await pool.query("SELECT 1 AS one")).rows).toEqual([{ one: 1 }]);
   });
 
-  it("counts the waitlist of a database with no figures yet, last, and does not count it again", async () => {
+  it("counts the ponds of a database with no figures yet, last, and does not count it again", async () => {
     const admin = createPool({ connectionString: databaseUrl, max: 1 });
     try {
-      await admin.query("DELETE FROM waitlist_snapshot");
+      await admin.query("DELETE FROM pond_counter");
       const first = await booted();
       const messages = first.lines().map((l) => l.msg);
-      expect(line(first.lines, "waitlist snapshot")).toMatchObject({ counted: true });
-      expect(messages.indexOf("waitlist snapshot")).toBeGreaterThan(messages.indexOf("media"));
-      const { rows } = await admin.query<{ n: string }>(
-        "SELECT count(*) AS n FROM waitlist_snapshot",
-      );
+      expect(line(first.lines, "pond counter")).toMatchObject({ counted: true });
+      expect(messages.indexOf("pond counter")).toBeGreaterThan(messages.indexOf("media"));
+      const { rows } = await admin.query<{ n: string }>("SELECT count(*) AS n FROM pond_counter");
       expect(Number(rows[0]?.n)).toBeGreaterThan(0);
 
       const second = await booted();
-      expect(second.lines().filter((l) => /^waitlist snapshot/.test(l.msg ?? ""))).toEqual([]);
+      expect(second.lines().filter((l) => /^pond counter/.test(l.msg ?? ""))).toEqual([]);
     } finally {
       await admin.end();
     }
   });
 
-  it("logs a first waitlist count that fails and boots all the same", async () => {
+  it("logs a first count that fails and boots all the same", async () => {
     const admin = createPool({ connectionString: databaseUrl, max: 1 });
     // The counter's table gone for the length of one boot: the count fails as a broken database would.
-    await admin.query("ALTER TABLE waitlist_snapshot RENAME TO waitlist_snapshot_away");
+    await admin.query("ALTER TABLE pond_counter RENAME TO pond_counter_away");
     try {
       const { app, lines } = await booted();
-      const failed = line(lines, "first waitlist snapshot failed");
-      expect(failed).toMatchObject({ level: ERROR, job: "waitlist-snapshot" });
+      const failed = line(lines, "first pond counter failed");
+      expect(failed).toMatchObject({ level: ERROR, job: "pond-counter" });
       expect(JSON.stringify(failed?.err)).toContain("42P01");
       expect((await app.request("/health")).status).toBe(200);
     } finally {
-      await admin.query("ALTER TABLE waitlist_snapshot_away RENAME TO waitlist_snapshot");
+      await admin.query("ALTER TABLE pond_counter_away RENAME TO pond_counter");
       await admin.end();
     }
   });
@@ -650,7 +677,7 @@ describe("boot: a deployed box", () => {
     },
   );
 
-  it("with its photos on CloudFront, staging writes the research copy and builds rounds, and production does neither", async () => {
+  it("with its photos on CloudFront, staging writes the research copy and production does not, and both prune the rounds", async () => {
     const media = {
       S3_BUCKET: "kuutti-media-test",
       MEDIA_URL_BASE: "https://api.test",
@@ -670,9 +697,9 @@ describe("boot: a deployed box", () => {
     });
     expect(line(production.lines, "media")).toMatchObject({ mode: "cloudfront" });
     expect(production.jobs.map((j) => j.name)).not.toContain("research-export");
-    // Nor the rounds, before the maintainer has set how long they are kept (ADR-035, Open 1).
-    expect(staging.jobs.map((j) => j.name)).toContain("round-builder");
-    expect(production.jobs.map((j) => j.name)).not.toContain("round-builder");
+    // Rounds are kept a year, so production keeps them as staging does (ADR-062 §13).
+    expect(staging.jobs.map((j) => j.name)).toContain("prune-rounds");
+    expect(production.jobs.map((j) => j.name)).toContain("prune-rounds");
     const partitions = production.jobs.find((j) => j.name === "research-events-partitions");
     expect(await partitions?.run()).not.toHaveProperty("uncopied");
   });

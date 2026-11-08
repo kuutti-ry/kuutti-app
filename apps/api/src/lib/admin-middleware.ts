@@ -67,6 +67,8 @@ export function requireAdmin(deps: {
     c.set("adminRole", found.currentRole);
     c.set("adminSessionId", found.sessionId);
     c.set("adminExpiresAt", found.expiresAt.toISOString());
+    // Never kept by a browser or anybody in between: the panel reads people's answers (ADR-010 §16).
+    c.header("Cache-Control", "no-store");
     // A request the limiter refuses writes nothing, not even the touch.
     const admitted = async () => {
       await deps.store.touch(deps.db, found.sessionId, at);

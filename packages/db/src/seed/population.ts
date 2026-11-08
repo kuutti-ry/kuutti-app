@@ -3,6 +3,7 @@ import {
   AGE_MIN,
   BIO_PRESETS,
   type BioPreset,
+  bioOrPromptsComplete,
   GENDERS,
   type Gender,
   HOBBIES,
@@ -12,7 +13,10 @@ import {
   PROMPTS_MAX,
   type ProfileFields,
   type PromptAnswer,
+  type SeeksBands,
+  seeksBand,
 } from "@kuutti/schema";
+import { POSTAL_CODE_LENGTH } from "@kuutti/schema/postal-areas";
 import { ageFromYearMonth } from "@kuutti-ry/tunnistus-oidc/hetu";
 import { createRandom, type Random } from "./rng.ts";
 import { BIOS, type Language, NAMES, OCCUPATION_TITLES, PROMPT_ANSWERS } from "./words.ts";
@@ -24,10 +28,10 @@ import { BIOS, type Language, NAMES, OCCUPATION_TITLES, PROMPT_ANSWERS } from ".
  * anybody: the generator and its word lists are all there is.
  *
  * It is made to cross the product's thresholds, not only to fill screens:
- * the one pond is over the gate, over the majority share and, from enough
- * people up, shows the counter's split. The shares are exact counts, not
- * draws, so the thresholds are crossed by construction and not by luck; what
- * is drawn is who gets which age, name and words.
+ * from enough people up, the one pond shows the counter's number and its bar
+ * (`BAR_PEOPLE`), by construction and not by luck. The gender shares are exact
+ * counts, not draws; what is drawn is who gets which age, name and words, and,
+ * from the list the API holds, where they live.
  *
  * Pure: no clock, no database. Every date derives from the epoch.
  */
@@ -55,20 +59,18 @@ export type PondPlan = {
 
 /**
  * Who lives where, and why: the data dictionary of docs/demo/population.md in
- * code. One pond for now, the capital region (#146, ADR-010 §11): it has to show everything at
- * once, so it is over the gate, has men over the majority share (the line the
- * admission rule draws) and, from enough people up, every counter cell at k.
+ * code. One pond, the whole country (ADR-061 §8).
  */
 export const POND_PLANS: readonly PondPlan[] = [
   {
-    slug: "paakaupunkiseutu",
+    slug: "suomi",
     people: { share: 1 },
     genders: { woman: 0.32, man: 0.62, non_binary: 0.06 },
-    why: "over gate_k (30); men are 62 %, over majority_share_max (0.6), so the admission rule holds them back; from 174 people up every gender cell is at ten or more, so the counter shows the split",
+    why: "the whole country, so everybody who onboarded is here",
   },
 ];
 
-/** Registered at the bank and gone before the first onboarding step: no gender, no pond. */
+/** Registered at the bank and gone before the first onboarding step: no gender, no pond, no home. */
 export const NEVER_ONBOARDED_SHARE = 0.08;
 
 /** How old people are, in years at the epoch: a young pond with a long tail. */
@@ -108,7 +110,12 @@ type SyntheticConsent = {
   kind: "terms" | "privacy" | "special_category";
   localeShown: Language;
   givenAt: Date;
+  /** Given to a wording that has since changed: it reads as none, as a person's would. */
+  olderWording?: boolean;
 };
+
+/** A home as `account` holds it (ADR-061 §2, §3): the kept place's key, written as it is, and what the card shows. */
+export type SyntheticHome = { place: string; showsArea: boolean };
 
 export type SyntheticProfile = {
   displayName: string;
@@ -129,13 +136,30 @@ export type SyntheticPerson = {
   registeredAt: Date;
   /** Null for somebody who never onboarded. */
   pond: string | null;
+  /** Null with the pond, and for everybody where no list was handed in (`HomePlaces`). */
+  home: SyntheticHome | null;
   gender: Gender | null;
   preferences: { seeks: Gender[]; ageWindow: { min: number; max: number } } | null;
   consents: SyntheticConsent[];
   profile: SyntheticProfile | null;
+  /** One of `BAR_PEOPLE`: a finished profile, there for the counter's bar alone. */
+  fillsTheBar?: boolean;
 };
 
-export type PopulationOptions = { size?: number; seed?: number; epoch?: Date };
+/**
+ * The places a home can be kept in, by key, each with the people behind it.
+ * Handed in, as the consents' versions are: the list and `keptPlace` are the
+ * API's, and neither has a second copy here (ADR-061 §2, §4).
+ */
+export type HomePlaces = Readonly<Record<string, number>>;
+
+export type PopulationOptions = {
+  size?: number;
+  seed?: number;
+  epoch?: Date;
+  /** Without it nobody has a home: people to read, whom the writer refuses. */
+  homes?: HomePlaces;
+};
 
 /** Whole numbers in the proportions of the shares, summing to `total` (largest remainder). */
 export function apportion<K extends string>(total: number, shares: Readonly<Record<K, number>>) {
@@ -321,6 +345,7 @@ function onboarded(
     birthMonth: born.month,
     registeredAt,
     pond,
+    home: null,
     gender,
     preferences: { seeks, ageWindow },
     consents,
@@ -328,11 +353,74 @@ function onboarded(
   };
 }
 
+/**
+ * How many people fill each band of the home card's bar (#507). The bar counts
+ * finished profiles, and without a release of faces the population has none,
+ * so these get two photos that have no picture (`PLACEHOLDER_PHOTO_PREFIX`).
+ * They have not accepted the terms' latest wording, a state real people are in,
+ * so the night's counter sees a finished profile, and no round or card ever
+ * sees them. Nobody is added: they are people the generator drew anyway, picked
+ * by what they drew, which leaves everybody else as they were.
+ */
+export const BAR_PEOPLE: Readonly<Record<keyof SeeksBands, number>> = {
+  seeksMen: 18,
+  seeksEveryone: 12,
+  seeksWomen: 20,
+};
+
+/** How many of these people fill each band: `BAR_PEOPLE`, unless the population is too small to hold them. */
+export function barOf(people: readonly SyntheticPerson[]): Record<keyof SeeksBands, number> {
+  const bar = { seeksMen: 0, seeksEveryone: 0, seeksWomen: 0 };
+  for (const person of people) {
+    const band = seeksBand(person.preferences?.seeks ?? null);
+    if (band && person.fillsTheBar) bar[band] += 1;
+  }
+  return bar;
+}
+
+function fillTheBar(people: readonly SyntheticPerson[]): void {
+  const left = { ...BAR_PEOPLE };
+  for (const person of people) {
+    const band = seeksBand(person.preferences?.seeks ?? null);
+    const words = person.profile && {
+      ...person.profile,
+      answeredPrompts: person.profile.prompts.length,
+    };
+    if (band === null || left[band] === 0 || !words || !bioOrPromptsComplete(words)) continue;
+    left[band] -= 1;
+    person.fillsTheBar = true;
+    for (const consent of person.consents) {
+      if (consent.kind === "terms") consent.olderWording = true;
+    }
+  }
+}
+
+/** Of those whose area is kept, how many show its name on the card; a home starts from the town (ADR-061 §3). */
+const SHOWS_AREA_SHARE = 0.2;
+
+/**
+ * A home for everybody who onboarded, drawn by the people behind each place,
+ * so that the population is spread as Finland is. A stream of its own, as the
+ * faces have (photos.ts), and last: nothing here moves any other draw, so the
+ * people are who they are with or without a list, on any list. A key of five
+ * digits is an area, the one thing the card's switch can show.
+ */
+function giveHomes(people: readonly SyntheticPerson[], homes: HomePlaces, seed: number): void {
+  const random = createRandom((seed ^ 0x85ebca6b) >>> 0);
+  for (const person of people) {
+    if (person.pond === null) continue;
+    const place = random.weighted(homes);
+    const area = place.length === POSTAL_CODE_LENGTH;
+    person.home = { place, showsArea: area && random.chance(SHOWS_AREA_SHARE) };
+  }
+}
+
 /** The same people for the same size, seed and epoch, on every machine. */
 export function generatePopulation(options: PopulationOptions = {}): SyntheticPerson[] {
   const size = options.size ?? DEMO_SIZE;
   const epoch = options.epoch ?? DEMO_EPOCH;
-  const random = createRandom(options.seed ?? DEMO_SEED);
+  const seed = options.seed ?? DEMO_SEED;
+  const random = createRandom(seed);
   const sizes = planSizes(size);
   const width = String(DEMO_SIZE_MAX).length;
   const people: SyntheticPerson[] = [];
@@ -360,16 +448,19 @@ export function generatePopulation(options: PopulationOptions = {}): SyntheticPe
           random.int(0, 1439) * 60_000,
       ),
       pond: null,
+      home: null,
       gender: null,
       preferences: null,
       consents: [],
       profile: null,
     });
   }
+  fillTheBar(people);
+  if (options.homes) giveHomes(people, options.homes, seed);
   return people;
 }
 
-export type PondSummary = Record<Gender, number> & { people: number; largestShare: number };
+export type PondSummary = Record<Gender, number> & { people: number };
 
 /** The same counts as `summarise(generatePopulation({ size }))`, without drawing anybody. */
 export function plannedPonds(size: number): Record<string, PondSummary> {
@@ -378,37 +469,12 @@ export function plannedPonds(size: number): Record<string, PondSummary> {
   for (const plan of POND_PLANS) {
     const people = sizes.ponds[plan.slug] ?? 0;
     if (people === 0) continue;
-    const counts = apportion(people, plan.genders);
-    ponds[plan.slug] = {
-      ...counts,
-      people,
-      largestShare: Math.max(counts.woman, counts.man, counts.non_binary) / people,
-    };
+    ponds[plan.slug] = { ...apportion(people, plan.genders), people };
   }
   return ponds;
 }
 
-export type Thresholds = { gateK: number; majorityShareMax: number; counterK: number };
-
-/**
- * What a population of this size does not show, in words; empty when it shows
- * everything it is there for. The shares cross the thresholds by construction
- * only when the pond is large enough, which it is from 174 people up.
- */
-export function uncrossed(ponds: Record<string, PondSummary>, t: Thresholds): string[] {
-  const missing: string[] = [];
-  const pond = ponds.paakaupunkiseutu;
-  if (!pond || pond.people < t.gateK) missing.push("the pond is under the gate");
-  if (!pond || pond.largestShare <= t.majorityShareMax) {
-    missing.push("the pond is not over the majority share");
-  }
-  if (!pond || [pond.woman, pond.man, pond.non_binary].some((n) => n < t.counterK)) {
-    missing.push("the pond has a cell under the counter's k, so it shows no split");
-  }
-  return missing;
-}
-
-/** People per pond and gender: what the thresholds are checked against. */
+/** People per pond and gender. */
 export function summarise(people: readonly SyntheticPerson[]): Record<string, PondSummary> {
   const ponds: Record<string, PondSummary> = {};
   for (const person of people) {
@@ -418,14 +484,10 @@ export function summarise(people: readonly SyntheticPerson[]): Record<string, Po
       man: 0,
       non_binary: 0,
       people: 0,
-      largestShare: 0,
     };
     ponds[person.pond] = pond;
     pond[person.gender] += 1;
     pond.people += 1;
-  }
-  for (const pond of Object.values(ponds)) {
-    pond.largestShare = Math.max(pond.woman, pond.man, pond.non_binary) / pond.people;
   }
   return ponds;
 }

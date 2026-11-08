@@ -2,7 +2,7 @@ import type { Gender, ProfileUpdate } from "@kuutti/schema";
 import { DEMO_PERSONAS, type DemoPersona } from "./personas.ts";
 
 /**
- * What the eighteen personas "with a history" have done before the demo begins
+ * What the nineteen personas "with a history" have done before the demo begins
  * (#73, ADR-014 §12). The ages follow the codes of Telia's test persons
  * (#140), and each age window holds its persona's own age (a test says so).
  * Data only: `pnpm demo:reset` gives a persona its history by logging it in
@@ -23,8 +23,8 @@ export type PersonaHistory = {
     gender: Gender;
     seeks: Gender[];
     ageWindow: { min: number; max: number };
-    /** The one pond for now (#146): named here as the API would assign it, so the story reads as the person's. */
-    pond: string;
+    /** The postal code the persona types (ADR-061 §1): what is kept of it is the API's to say, as for anybody. */
+    home: string;
   } | null;
   profile: ProfileUpdate | null;
   /** How many of the persona's own pictures the loader uploads and approves (#142): the release has that many of them. */
@@ -46,8 +46,9 @@ export const PERSONA_HISTORIES: readonly PersonaHistory[] = [
     onboarding: {
       gender: "woman",
       seeks: ["man"],
-      ageWindow: { min: 42, max: 56 },
-      pond: "paakaupunkiseutu",
+      // Ten years either way, for Sanna, Noa and Kerttu (#560), so that the cast's ages vary.
+      ageWindow: { min: 39, max: 59 },
+      home: "02100",
     },
     profile: {
       displayName: "Sanna",
@@ -83,8 +84,8 @@ export const PERSONA_HISTORIES: readonly PersonaHistory[] = [
     onboarding: {
       gender: "non_binary",
       seeks: ["woman", "man", "non_binary"],
-      ageWindow: { min: 35, max: 50 },
-      pond: "paakaupunkiseutu",
+      ageWindow: { min: 33, max: 53 },
+      home: "02150",
     },
     profile: {
       displayName: "Noa",
@@ -105,7 +106,7 @@ export const PERSONA_HISTORIES: readonly PersonaHistory[] = [
     },
     photos: 2,
     // The second face waits for a moderator: one approved photo is short of
-    // the two a profile needs (#56), so the gate and the profile wait.
+    // the two a profile needs (#56), so the home card and the profile wait.
     facesInReview: 1,
     // Four more pictures for the check (#142): no face, text and several
     // people are not accepted and Noa is told why, with no moderator asked;
@@ -121,8 +122,8 @@ export const PERSONA_HISTORIES: readonly PersonaHistory[] = [
     onboarding: {
       gender: "woman",
       seeks: ["woman", "man"],
-      ageWindow: { min: 40, max: 55 },
-      pond: "paakaupunkiseutu",
+      ageWindow: { min: 36, max: 56 },
+      home: "10210",
     },
     profile: {
       displayName: "Kerttu",
@@ -150,7 +151,7 @@ export const PERSONA_HISTORIES: readonly PersonaHistory[] = [
       gender: "man",
       seeks: ["woman"],
       ageWindow: { min: 45, max: 60 },
-      pond: "paakaupunkiseutu",
+      home: "33100",
     },
     profile: null,
     photos: 0,
@@ -163,7 +164,7 @@ export const PERSONA_HISTORIES: readonly PersonaHistory[] = [
       gender: "woman",
       seeks: ["man"],
       ageWindow: { min: 48, max: 64 },
-      pond: "paakaupunkiseutu",
+      home: "00550",
     },
     profile: {
       displayName: "Ilona",
@@ -177,6 +178,9 @@ export const PERSONA_HISTORIES: readonly PersonaHistory[] = [
   },
   // The break's flow (#170, ADR-022): onboarded and active, no photos, so the
   // flow finds her signed in and leaves her so; nothing another flow reads.
+  // Her municipality, Pukkila, is too small to keep, so the nearest large
+  // enough is kept; Kerttu's area is too small and her municipality is not.
+  // With these two a persona shows every way a home is kept (ADR-061 §2).
   {
     key: "helmi",
     locale: "fi",
@@ -184,7 +188,7 @@ export const PERSONA_HISTORIES: readonly PersonaHistory[] = [
       gender: "woman",
       seeks: ["man"],
       ageWindow: { min: 80, max: 99 },
-      pond: "paakaupunkiseutu",
+      home: "07560",
     },
     profile: {
       displayName: "Helmi",
@@ -206,7 +210,7 @@ export const PERSONA_HISTORIES: readonly PersonaHistory[] = [
       gender: "man",
       seeks: ["woman", "man"],
       ageWindow: { min: 40, max: 55 },
-      pond: "paakaupunkiseutu",
+      home: "01300",
     },
     profile: {
       displayName: "Antti",
@@ -229,7 +233,7 @@ export const PERSONA_HISTORIES: readonly PersonaHistory[] = [
       gender: "man",
       seeks: ["man"],
       ageWindow: { min: 44, max: 56 },
-      pond: "paakaupunkiseutu",
+      home: "00200",
     },
     profile: {
       displayName: "Ville",
@@ -256,7 +260,7 @@ export const PERSONA_HISTORIES: readonly PersonaHistory[] = [
       gender: "woman",
       seeks: ["man"],
       ageWindow: { min: 35, max: 48 },
-      pond: "paakaupunkiseutu",
+      home: "33200",
     },
     profile: {
       displayName: "Elina",
@@ -279,7 +283,7 @@ export const PERSONA_HISTORIES: readonly PersonaHistory[] = [
       gender: "man",
       seeks: ["woman"],
       ageWindow: { min: 33, max: 45 },
-      pond: "paakaupunkiseutu",
+      home: "33720",
     },
     profile: {
       displayName: "Jussi",
@@ -306,7 +310,7 @@ export const PERSONA_HISTORIES: readonly PersonaHistory[] = [
       gender: "woman",
       seeks: ["woman"],
       ageWindow: { min: 26, max: 35 },
-      pond: "paakaupunkiseutu",
+      home: "90130",
     },
     profile: {
       displayName: "Laura",
@@ -329,7 +333,7 @@ export const PERSONA_HISTORIES: readonly PersonaHistory[] = [
       gender: "woman",
       seeks: ["woman"],
       ageWindow: { min: 27, max: 35 },
-      pond: "paakaupunkiseutu",
+      home: "90500",
     },
     profile: {
       displayName: "Emmi",
@@ -350,7 +354,9 @@ export const PERSONA_HISTORIES: readonly PersonaHistory[] = [
   // each other's pool both ways and in no other persona's (a test says so):
   // 36 and 37, above the report's pair's windows and below Kerttu.
   // Iida's round holds the other four, Henna first, who liked her yesterday
-  // (rounds.ts). Complete profiles: the release's faces of them (#142).
+  // (rounds.ts). Complete profiles: the release's faces of them (#142). Each
+  // of the four is in a band of her own from Iida's home, nearest first
+  // (ADR-061 §5, §6; a test holds them to the list).
   {
     key: "iida",
     locale: "fi",
@@ -358,7 +364,7 @@ export const PERSONA_HISTORIES: readonly PersonaHistory[] = [
       gender: "woman",
       seeks: ["woman"],
       ageWindow: { min: 34, max: 44 },
-      pond: "paakaupunkiseutu",
+      home: "00530",
     },
     profile: {
       displayName: "Iida",
@@ -381,7 +387,7 @@ export const PERSONA_HISTORIES: readonly PersonaHistory[] = [
       gender: "woman",
       seeks: ["woman"],
       ageWindow: { min: 34, max: 44 },
-      pond: "paakaupunkiseutu",
+      home: "00150",
     },
     profile: {
       displayName: "Henna",
@@ -404,7 +410,7 @@ export const PERSONA_HISTORIES: readonly PersonaHistory[] = [
       gender: "woman",
       seeks: ["woman"],
       ageWindow: { min: 34, max: 45 },
-      pond: "paakaupunkiseutu",
+      home: "02600",
     },
     profile: {
       displayName: "Katja",
@@ -427,7 +433,7 @@ export const PERSONA_HISTORIES: readonly PersonaHistory[] = [
       gender: "woman",
       seeks: ["woman"],
       ageWindow: { min: 34, max: 42 },
-      pond: "paakaupunkiseutu",
+      home: "04200",
     },
     profile: {
       displayName: "Minna",
@@ -450,7 +456,7 @@ export const PERSONA_HISTORIES: readonly PersonaHistory[] = [
       gender: "woman",
       seeks: ["woman"],
       ageWindow: { min: 35, max: 45 },
-      pond: "paakaupunkiseutu",
+      home: "20100",
     },
     profile: {
       displayName: "Riikka",
@@ -464,6 +470,32 @@ export const PERSONA_HISTORIES: readonly PersonaHistory[] = [
       prompts: [],
     },
     photos: 2,
+    afterwards: "nothing",
+  },
+  // What you seek's (#542): in no other persona's pool, by her age and her
+  // window, so the flow that changes what she seeks changes nothing another
+  // reads. No photos: the release has no face of her.
+  {
+    key: "ritva",
+    locale: "fi",
+    onboarding: {
+      gender: "woman",
+      seeks: ["man"],
+      ageWindow: { min: 60, max: 72 },
+      home: "40100",
+    },
+    profile: {
+      displayName: "Ritva",
+      bio: "Eläkkeellä oleva kirjastonhoitaja, joka lukee kaiken minkä ehtii ja hoitaa palstaa Jyväskylässä. Etsin seuraa kävelyille ja konsertteihin.",
+      bioPreset: null,
+      fields: {
+        languages: ["fi", "en"],
+        intent: "long_term",
+        hobbies: ["reading", "gardening"],
+      },
+      prompts: [],
+    },
+    photos: 0,
     afterwards: "nothing",
   },
 ];

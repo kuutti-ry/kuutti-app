@@ -1,9 +1,9 @@
 import { z } from "zod";
 
 // Invitations and the reward ledger they earn into (#107, ADR-044; TD-15): a
-// code a person whose profile passed the gate's test gives a friend, single
-// use, and what it earns its inviter the night the friend's profile first
-// passes it. Nothing here names, counts or dates anybody but the caller.
+// code a person whose profile is complete gives a friend, single use, and what
+// it earns the two of them the first night the friend's profile is complete.
+// Nothing here names, counts or dates anybody but the caller.
 
 /**
  * The code's format (ADR-044 §2), not a tunable: ten characters of
@@ -41,32 +41,28 @@ export function groupInvitationCode(code: string): string {
 }
 
 /** What one unit of the reward ledger is. Mirrors the database's reward_kind. */
-export const RewardKind = z.enum(["like", "fish"]).meta({ id: "RewardKind" });
+export const RewardKind = z.enum(["fish"]).meta({ id: "RewardKind" });
 export type RewardKind = z.infer<typeof RewardKind>;
 
-/** The contract's ceilings on one invitation's reward; the amounts are the tunable. */
+/** The contract's ceiling on one side of an invitation's reward; the amounts are the tunable. */
 export const INVITATION_REWARD_FISH_MAX = 10;
-export const INVITATION_REWARD_LIKES_MAX = 50;
 
 /**
- * The shape of matching_config invitation_reward (ADR-044 §4): what an
- * invitation that counted earns its inviter, in units of each kind, 0
- * switching a kind off. One fish and no likes, the maintainer's default of
- * 22/10/2026.
+ * The shape of matching_config invitation_reward (ADR-044 §4, #503): the fish
+ * an invitation that counted earns its inviter and the friend who used it, 0
+ * switching a side off. One each, the maintainer's of 29/10/2026.
  */
 export const InvitationReward = z
   .object({
-    fish: z.int().min(0).max(INVITATION_REWARD_FISH_MAX),
-    likes: z.int().min(0).max(INVITATION_REWARD_LIKES_MAX),
+    inviterFish: z.int().min(0).max(INVITATION_REWARD_FISH_MAX),
+    friendFish: z.int().min(0).max(INVITATION_REWARD_FISH_MAX),
   })
   .strict()
   .meta({ id: "InvitationReward" });
 export type InvitationReward = z.infer<typeof InvitationReward>;
 
-/** Units of each kind, counted: what is earned and not yet used, or what one invitation earned. */
-export const RewardUnits = z
-  .object({ fish: z.int().min(0), likes: z.int().min(0) })
-  .meta({ id: "RewardUnits" });
+/** Units counted: what is earned and not yet used, or what one invitation earned the person. */
+export const RewardUnits = z.object({ fish: z.int().min(0) }).meta({ id: "RewardUnits" });
 export type RewardUnits = z.infer<typeof RewardUnits>;
 
 /** The contract's ceiling on open invitations; the rule is the tunable (matching_config invitations_open, 5 at launch). */
@@ -87,11 +83,11 @@ export type OpenInvitation = z.infer<typeof OpenInvitation>;
 export const Invitations = z
   .object({
     canInvite: z.boolean().meta({
-      description: "True once the person's profile has passed the pond gate's test.",
+      description: "True while the person's profile and onboarding are complete.",
     }),
     redeemable: z.boolean().meta({
       description:
-        "True while the person may still type a code: before their profile first passed the gate's test, with the current consents, no code used, and an identity never erased.",
+        "True while the person may type a code: their profile is not complete, with the current consents, no code used, and an identity never erased.",
     }),
     reward: InvitationReward.meta({
       description:
@@ -102,7 +98,8 @@ export const Invitations = z
     /** How many of the person's invitations have counted, ever. */
     counted: z.int().min(0),
     earned: RewardUnits.meta({
-      description: "What the person's invitations earned that is not used yet.",
+      description:
+        "What invitations earned the person that is not used yet, theirs and the one they used.",
     }),
   })
   .meta({ id: "Invitations" });
@@ -151,7 +148,7 @@ export type InvitationState = z.infer<typeof InvitationState>;
 
 /**
  * The invitations in the export (#107, ADR-044, ADR-007): those the person
- * made, the one they used, and the units theirs earned. Never a code, and
+ * made, the one they used, and the units these earned them. Never a code, and
  * never the other person or when they joined.
  */
 export const ExportedInvitations = z
@@ -171,13 +168,13 @@ export const ExportedInvitations = z
     used: z
       .object({ redeemedAt: z.iso.datetime(), countedAt: z.iso.datetime().nullable() })
       .nullable(),
-    /** What the person's invitations earned, one unit a row, newest first, at most 1000. */
+    /** What invitations earned the person, theirs and the one they used, one unit a row, newest first, at most 1000. */
     rewards: z
       .array(
         z.object({
           kind: RewardKind,
           earnedAt: z.iso.datetime(),
-          /** When a like or a fish past the budget used it; null while it waits. */
+          /** When a fish past the budget used it; null while it waits. */
           spentAt: z.iso.datetime().nullable(),
         }),
       )

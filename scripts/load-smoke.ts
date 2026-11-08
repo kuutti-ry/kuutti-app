@@ -10,10 +10,11 @@
  *                                              runs against a stand-in on this computer
  *
  * A visit is an assumption about a bad hour (capacity.md): a person opening the app (the onboarding
- * status, then the home's gate) and looking at their profile (the profile and the photo list); on
+ * status, then the home's gate), reading the queue once (ADR-062: a read that finds nothing left
+ * walks the pool, the new cost) and looking at their profile (the profile and the photo list); on
  * one visit in N they also open the photos screen, which reads the list again and asks a signed
  * URL for each thumbnail (ADR-008), N spread so an account's URLs last the run. The public part
- * goes out at the visit's start: every second visit asks for the waitlist counter (cacheable for an
+ * goes out at the visit's start: every second visit asks for the pond counter (cacheable for an
  * hour), and every fourth sends the sign-in's last step, the exchange, with a code nobody holds:
  * its shape without the bank. Without sessions a visit is that public part alone. A stage offers
  * visits at a fixed rate, an open model: a visit that finds every request slot busy is counted as
@@ -38,15 +39,19 @@
  * - The target is this computer or staging. Production by name, the previews (which share
  *   staging's box), any other host, APP_ENV=production and an APP_ENV that disagrees with the
  *   target are refused. Before any load the server is asked: /health must be ours and ready, and
- *   /openapi.json must be served, which production never does (app.ts).
- * - Staging needs --confirm-staging: it is the demo, and its address limit counts the CloudFront
- *   edge the team's phones share (ADR-008 History).
+ *   /openapi.json must be served, which production never does (app.ts); it is counted in the
+ *   address's window, so a spent window refuses it with 429 and its wait.
+ * - Staging needs --confirm-staging: it is the demo, where the team tries the app while the run
+ *   spends the API's time (its address limit counts each viewer since ADR-066).
  * - The sessions file is refused inside any git work tree, readable by others, with a token twice,
  *   or naming another API than the target: an unknown token and a revoked one get the same 401.
  * - Hard caps no flag passes: 20 visits a second, 8 stages, 10 minutes, 64 requests in flight,
  *   50 sessions, 60 thumbnail URLs per account (a tenth of the day's budget), 10 s a request,
  *   200 sockets and 4 an account (the API holds 5 and closes the oldest for a sixth, which must
  *   never be a persona's own phone).
+ * - The alarm on the queue's reads (auto_shadow_ban_round_reads, ADR-041): the plan takes at most
+ *   40 % of it per account, a rate past that reading the queue on one visit in Q, spread as the
+ *   photos screen is, so a run never shadow-bans its own test persons.
  * - ADR-026's budgets: never a sign-in start (the doors). The plan takes at most 40 % of the
  *   address's window and of each person's (from the RateLimit-Limit the API reports), a socket's
  *   upgrade counted on the address, which never gives it back (no guard admits it); as it goes,
@@ -61,13 +66,19 @@
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import {
   chmodSync,
+  closeSync,
   existsSync,
+  linkSync,
+  lstatSync,
   mkdirSync,
   mkdtempSync,
+  openSync,
+  readdirSync,
   readFileSync,
   renameSync,
   rmSync,
   statSync,
+  symlinkSync,
   writeFileSync,
 } from "node:fs";
 import { createServer } from "node:http";
@@ -121,6 +132,8 @@ const REST_SHARE = 0.5;
 const WINDOW_MS = 60_000;
 /** Thumbnail URLs per account in one run: a tenth of the day's 600 (photo_fetches_per_day, ADR-008 §1). */
 const URLS_PER_ACCOUNT = 60;
+/** Reads of the queue a minute at which an account is shadow-banned: matching_config auto_shadow_ban_round_reads (ADR-041 §3). */
+const QUEUE_READS_ALARM = 30;
 /**
  * The 5xx alarm fires at five in five minutes (infra/modules/observability); the run stops sending
  * at three, and what is in flight then still finishes.
@@ -128,11 +141,10 @@ const URLS_PER_ACCOUNT = 60;
 const SERVER_ERRORS_MAX = 3;
 /** The share of errors, dropped visits or held-back parts past which a stage is not one that held. */
 const BEND_SHARE = 0.01;
-const WAITLIST_EVERY = 2;
 // A launch evening's share of first sign-ins: an assumption, and the visit's cheapest request.
 const EXCHANGE_EVERY = 4;
-/** The signed-in requests of every visit: onboarding, gate, profile, photo list. */
-const SIGNED_IN_PER_VISIT = 4;
+/** The signed-in requests of every visit, the queue's read aside: onboarding, gate, counter, profile, photo list. */
+const SIGNED_IN_PER_VISIT = 5;
 /**
  * The chat's sockets an account may hold in a run: one under the API's WS_SOCKETS_PER_ACCOUNT (5),
  * which closes an account's oldest for a sixth, so a persona's own phone is never the one closed.
@@ -175,9 +187,10 @@ const ROUTES = {
     expect: 401,
     code: "auth_code_used",
   },
-  waitlist: { name: "GET /waitlist", method: "GET", signedIn: false, expect: 200 },
+  counter: { name: "GET /ponds/counter", method: "GET", signedIn: true, expect: 200 },
   onboarding: { name: "GET /onboarding", method: "GET", signedIn: true, expect: 200 },
   gate: { name: "GET /gate", method: "GET", signedIn: true, expect: 200 },
+  queue: { name: "GET /rounds/today", method: "GET", signedIn: true, expect: 200 },
   profile: { name: "GET /profile", method: "GET", signedIn: true, expect: 200 },
   photos: { name: "GET /photos", method: "GET", signedIn: true, expect: 200 },
   thumb: { name: "GET /photos/{id}/thumb", method: "GET", signedIn: true, expect: 200 },
@@ -203,6 +216,7 @@ type Run = {
   accounts: Account[];
   sockets: Sockets;
   thumbEvery: number;
+  queueEvery: number;
   slots: ReturnType<typeof slots>;
   anonymousRestUntil: number;
   samples: Sample[];
@@ -398,24 +412,31 @@ function percentile(values: readonly number[], p: number): number | null {
  * address's counts the public requests and holds a signed-in one until it is answered, so the
  * requests in flight count against it too; each account's counts its signed-in requests, the
  * visits going round its accounts. The photos screen comes on one visit in thumbEvery, spread so
- * an account's URLs last the whole run: ADR-008's budget, not the app, sets how often. A socket's
- * upgrade counts on the address and is never given back (the socket signs in by its first frame,
- * so no guard admits it); they go out before the first stage and fall in one window or two, and
- * the plan counts them in every one, on the safe side.
+ * an account's URLs last the whole run: ADR-008's budget, not the app, sets how often. The queue is
+ * read on every visit until the top rate would take an account past PLAN_SHARE of its alarm, and
+ * on one visit in queueEvery then: the alarm sets that too, or a run would ban its own test
+ * persons. A socket's upgrade counts on the address and is never given back (the socket signs in
+ * by its first frame, so no guard admits it); they go out before the first stage and fall in one
+ * window or two, and the plan counts them in every one, on the safe side.
  */
 function planOf(
   options: Pick<Options, "rates" | "stageSeconds" | "concurrency" | "sockets">,
   budgets: { addressLimit: number; personLimit: number; accounts: number; photosMax: number },
-): { thumbEvery: number; ceiling: number; neededLimit: number } {
+): { thumbEvery: number; queueEvery: number; ceiling: number; neededLimit: number } {
   const { accounts, photosMax } = budgets;
   const visits = options.rates.reduce((sum, rate) => sum + rate * options.stageSeconds, 0);
+  const top = Math.max(...options.rates);
   const thumbEvery =
     accounts === 0 || photosMax === 0
       ? 1
       : Math.max(1, Math.ceil(((visits / accounts) * photosMax) / URLS_PER_ACCOUNT));
-  const publicPerVisit = 1 / WAITLIST_EVERY + 1 / EXCHANGE_EVERY;
-  // The photos screen reads the list again, then a URL a photo.
-  const personPerVisit = SIGNED_IN_PER_VISIT + (1 + photosMax) / thumbEvery;
+  const queueEvery =
+    accounts === 0
+      ? 1
+      : Math.max(1, Math.ceil(((top / accounts) * 60) / (PLAN_SHARE * QUEUE_READS_ALARM)));
+  const publicPerVisit = 1 / EXCHANGE_EVERY;
+  // The queue's read, then the photos screen, which reads the list again and asks a URL a photo.
+  const personPerVisit = SIGNED_IN_PER_VISIT + 1 / queueEvery + (1 + photosMax) / thumbEvery;
   // What the address's window holds besides the public requests: the signed-in requests in
   // flight, and the sockets' upgrades.
   const held = (accounts > 0 ? options.concurrency : 0) + options.sockets;
@@ -424,14 +445,18 @@ function planOf(
     accounts > 0
       ? (accounts * PLAN_SHARE * budgets.personLimit) / (personPerVisit * 60)
       : Number.POSITIVE_INFINITY;
-  const top = Math.max(...options.rates);
   const neededLimit = Math.ceil(
     Math.max(
       (top * publicPerVisit * 60 + held) / PLAN_SHARE,
       accounts > 0 ? ((top / accounts) * personPerVisit * 60) / PLAN_SHARE : 0,
     ),
   );
-  return { thumbEvery, ceiling: Math.max(0, Math.min(byAddress, byPerson)), neededLimit };
+  return {
+    thumbEvery,
+    queueEvery,
+    ceiling: Math.max(0, Math.min(byAddress, byPerson)),
+    neededLimit,
+  };
 }
 
 /** What an answer means for the run; the expected refusal of nobody's code is a success. */
@@ -650,9 +675,10 @@ function countServerError(run: Run): void {
 }
 
 /**
- * A person opening the app and looking at their profile (useOnboardingGate and HomeScreen, then
- * ProfileScreen); the photos screen on one visit in thumbEvery. The public part goes out at the
- * start, where the app asks the waitlist alongside the gate: one request's place in a visit.
+ * A person opening the app, reading the queue and looking at their profile (useOnboardingGate and
+ * HomeScreen, then the people screen, then ProfileScreen); the photos screen on one visit in
+ * thumbEvery. The public part, a sign-in's last step, goes out at the start: one request's place
+ * in a visit.
  */
 async function visit(run: Run, n: number): Promise<void> {
   const jobs: Promise<unknown>[] = [];
@@ -664,7 +690,6 @@ async function visit(run: Run, n: number): Promise<void> {
   const publicly = (route: Route, path: string, body?: unknown) =>
     offer(performance.now() < run.anonymousRestUntil, () => call(run, route, path, { body }));
   if (n % EXCHANGE_EVERY === 0) publicly(ROUTES.exchange, "/auth/exchange", nobodysCode());
-  if (n % WAITLIST_EVERY === 0) publicly(ROUTES.waitlist, "/waitlist");
   const account = run.accounts[n % run.accounts.length];
   if (account) offer(performance.now() < account.restUntil, () => signedIn(run, account));
   await Promise.all(jobs);
@@ -673,10 +698,13 @@ async function visit(run: Run, n: number): Promise<void> {
 async function signedIn(run: Run, account: Account): Promise<void> {
   const token = account.access[account.visits % account.access.length];
   const thumbs = account.visits % run.thumbEvery === 0;
+  const queue = account.visits % run.queueEvery === 0;
   account.visits += 1;
   const get = (route: Route, path: string) => call(run, route, path, { token, account });
   await get(ROUTES.onboarding, "/onboarding");
-  await get(ROUTES.gate, "/gate");
+  // The home's two reads, the counter asked with the session for the pond's bar (ADR-013 §18).
+  await Promise.all([get(ROUTES.gate, "/gate"), get(ROUTES.counter, "/ponds/counter")]);
+  if (queue) await get(ROUTES.queue, "/rounds/today");
   await Promise.all([get(ROUTES.profile, "/profile"), get(ROUTES.photos, "/photos")]);
   if (!thumbs) return;
   // The photos screen reads the list itself (usePhotos), then a URL for each thumbnail.
@@ -915,11 +943,14 @@ function readSessions(file: string, target: URL): Sessions | string {
     if (!AuthRefreshRequest.shape.refreshToken.safeParse(token).success) {
       return `line ${line + 1} of ${file} is not a refresh token`;
     }
-    const first = seen.get(token);
+    // Keyed by the session's secret, the part before the dot: any two tokens of one session
+    // presented end it (reuse, ADR-059), the same token twice among them.
+    const family = token.slice(0, token.indexOf("."));
+    const first = seen.get(family);
     if (first !== undefined) {
-      return `line ${line + 1} of ${file} repeats line ${first + 1}: a refresh token presented twice ends its session (reuse, #35)`;
+      return `line ${line + 1} of ${file} holds a token of the session of line ${first + 1}: two refresh tokens of one session presented end it (reuse, ADR-059)`;
     }
-    seen.set(token, line);
+    seen.set(family, line);
     tokens.push({ line, token });
   }
   // An API answers another's token as it answers an ended one (session_revoked): read against
@@ -940,9 +971,21 @@ function readSessions(file: string, target: URL): Sessions | string {
 /** Written whole and renamed into place, so a crash leaves the old file or the new one. */
 function writeSessions(file: string, lines: string[]): void {
   const path = resolve(file);
-  const next = `${path}.${process.pid}.tmp`;
-  writeFileSync(next, lines.join("\n"), { mode: 0o600 });
-  renameSync(next, path);
+  // A short, random sibling stays on the same filesystem. Exclusive creation
+  // gives this call its own private inode; write through that descriptor.
+  const next = join(dirname(path), `.kuutti-sessions-${randomUUID()}.tmp`);
+  const descriptor = openSync(next, "wx", 0o600);
+  try {
+    writeFileSync(descriptor, lines.join("\n"));
+    renameSync(next, path);
+  } finally {
+    try {
+      closeSync(descriptor);
+    } finally {
+      // Remove at most this leaf: never traverse a substituted directory.
+      rmSync(next, { force: true });
+    }
+  }
 }
 
 /**
@@ -1046,6 +1089,12 @@ async function execute(options: Options, io: Io, now: Date = new Date()): Promis
     );
   }
   const contract = await ask(base, "/openapi.json");
+  // The contract is counted in this address's window like any other path (#630).
+  if (typeof contract !== "string" && contract.status === 429) {
+    return refuse(
+      `the API at ${host} refused /openapi.json, this address's window spent: ask again in ${contract.headers.get("retry-after") ?? "?"} s; nothing was sent`,
+    );
+  }
   if (typeof contract === "string" || contract.status !== 200) {
     return refuse(
       `the API at ${host} does not serve /openapi.json, which production alone withholds (app.ts): nothing was sent`,
@@ -1073,13 +1122,14 @@ async function execute(options: Options, io: Io, now: Date = new Date()): Promis
     );
   }
 
-  const waitlist = await ask(base, "/waitlist");
-  if (typeof waitlist === "string") return refuse(`/waitlist: ${waitlist}`);
-  const address = budgetOf(waitlist.headers);
-  if (waitlist.status !== 200) {
-    return refuse(`/waitlist answered ${waitlist.status} ${codeOf(waitlist.json)}`);
+  const counter = await ask(base, "/ponds/counter");
+  if (typeof counter === "string") return refuse(`/ponds/counter: ${counter}`);
+  const address = budgetOf(counter.headers);
+  if (counter.status !== 200) {
+    return refuse(`/ponds/counter answered ${counter.status} ${codeOf(counter.json)}`);
   }
-  if (!address) return refuse("/waitlist sent no RateLimit-Limit: a budget unseen cannot be kept");
+  if (!address)
+    return refuse("/ponds/counter sent no RateLimit-Limit: a budget unseen cannot be kept");
   const accounts = people.accounts.length;
   const plan = planOf(options, {
     addressLimit: address.limit,
@@ -1099,6 +1149,7 @@ async function execute(options: Options, io: Io, now: Date = new Date()): Promis
     accounts: people.accounts,
     sockets: { asked: options.sockets, open: 0, outside: 0, all: [], closing: false },
     thumbEvery: plan.thumbEvery,
+    queueEvery: plan.queueEvery,
     slots: slots(options.concurrency),
     anonymousRestUntil: 0,
     samples: [],
@@ -1112,7 +1163,7 @@ async function execute(options: Options, io: Io, now: Date = new Date()): Promis
   const urlsPerVisit = (people.photosMax / plan.thumbEvery).toFixed(2);
   const grid = accounts > 0 ? `1 in ${plan.thumbEvery} · ${urlsPerVisit}` : "-";
   io.log(
-    `load-smoke: ${options.rates.length} stage${options.rates.length === 1 ? "" : "s"} of ${options.stageSeconds} s; the budgets allow ${plan.ceiling.toFixed(2)} visits a second${accounts > 0 ? `; the photos screen on ${plan.thumbEvery === 1 ? "every visit" : `one visit in ${plan.thumbEvery}`}, ${urlsPerVisit} signed URLs a visit` : ""}`,
+    `load-smoke: ${options.rates.length} stage${options.rates.length === 1 ? "" : "s"} of ${options.stageSeconds} s; the budgets allow ${plan.ceiling.toFixed(2)} visits a second${accounts > 0 ? `; the queue read on ${plan.queueEvery === 1 ? "every visit" : `one visit in ${plan.queueEvery}`}, under its alarm; the photos screen on ${plan.thumbEvery === 1 ? "every visit" : `one visit in ${plan.thumbEvery}`}, ${urlsPerVisit} signed URLs a visit` : ""}`,
   );
   const socketNote = () =>
     options.sockets > 0
@@ -1380,10 +1431,11 @@ async function selfTest(): Promise<never> {
 
   const shape = (plan: ReturnType<typeof planOf>) => [
     plan.thumbEvery,
+    plan.queueEvery,
     plan.ceiling.toFixed(3),
     plan.neededLimit,
   ];
-  // Public only: 0.75 public requests a visit, 40 % of 120 a minute: 48 / 45.
+  // Public only: 0.25 public requests a visit, 40 % of 120 a minute: 48 / 15.
   expect(
     "plan without sessions",
     shape(
@@ -1392,11 +1444,13 @@ async function selfTest(): Promise<never> {
         { addressLimit: 120, personLimit: 0, accounts: 0, photosMax: 0 },
       ),
     ),
-    [1, "1.067", 57],
+    [1, 1, "3.200", 19],
   );
-  // Seven accounts of six photos over 90 visits: the photos screen every second visit, 7.5
-  // signed-in requests a visit; the address holds sixteen in flight and binds, (48 - 16) / 45
-  // against 7 * 48 / 450; one visit a second needs 64.3 a minute of each person, / 0.4.
+  // Seven accounts of six photos over 90 visits: the photos screen every second visit, the queue
+  // on every one (8.6 reads a minute of each person against 40 % of the alarm's 30), 9.5
+  // signed-in requests a visit; the accounts bind, 7 * 48 / 570 against (48 - 16) / 15 with the
+  // sixteen in flight the address holds; one visit a second needs 81.4 a minute of each person,
+  // / 0.4.
   expect(
     "plan with seven accounts",
     shape(
@@ -1405,10 +1459,12 @@ async function selfTest(): Promise<never> {
         { addressLimit: 120, personLimit: 120, accounts: 7, photosMax: 6 },
       ),
     ),
-    [2, "0.711", 161],
+    [2, 1, "0.589", 204],
   );
-  // The limit raised to 1000 for the run: 720 visits, the photos screen on every eleventh; the
-  // address binds, (400 - 32) / 45, and six visits a second need (270 + 32) / 0.4.
+  // The limit raised to 1000 for the run: 720 visits, the photos screen on every eleventh, the
+  // queue on every fifth, since six visits a second would be 51.4 reads a minute of each person,
+  // 5.84 signed-in requests a visit; the accounts bind, 7 * 400 / 350.2, and six visits a second
+  // need 300.1 a minute of each person, / 0.4.
   expect(
     "plan with a raised limit",
     shape(
@@ -1417,10 +1473,10 @@ async function selfTest(): Promise<never> {
         { addressLimit: 1000, personLimit: 1000, accounts: 7, photosMax: 6 },
       ),
     ),
-    [11, "8.178", 755],
+    [11, 5, "7.996", 751],
   );
   // The same with four sockets for each of the seven accounts: their 28 upgrades stay on the
-  // address, (400 - 32 - 28) / 45, and six visits a second need (270 + 60) / 0.4.
+  // address, (400 - 32 - 28) / 15, which still does not bind.
   expect(
     "plan with a raised limit and sockets",
     shape(
@@ -1429,10 +1485,10 @@ async function selfTest(): Promise<never> {
         { addressLimit: 1000, personLimit: 1000, accounts: 7, photosMax: 6 },
       ),
     ),
-    [11, "7.556", 825],
+    [11, 5, "7.996", 751],
   );
   // Under the default limit the 28 upgrades take nearly all the address's share, (48 - 16 - 28) /
-  // 45; one visit a second needs (45 + 44) / 0.4.
+  // 15; one visit a second needs 81.4 a minute of each person, / 0.4.
   expect(
     "plan with sockets under the default limit",
     shape(
@@ -1441,10 +1497,10 @@ async function selfTest(): Promise<never> {
         { addressLimit: 120, personLimit: 120, accounts: 7, photosMax: 6 },
       ),
     ),
-    [2, "0.089", 223],
+    [2, 1, "0.267", 204],
   );
   // Forty take more than all of it: nothing is allowed, and half a visit a second needs
-  // (22.5 + 56) / 0.4.
+  // (7.5 + 56) / 0.4.
   expect(
     "plan with more sockets than the address's share",
     shape(
@@ -1453,10 +1509,10 @@ async function selfTest(): Promise<never> {
         { addressLimit: 120, personLimit: 120, accounts: 10, photosMax: 6 },
       ),
     ),
-    [1, "0.000", 197],
+    [1, 1, "0.000", 159],
   );
-  // One account without photos: five requests a visit (the photos screen's list on each) against
-  // its 40 % of 120, 48 / 300.
+  // One account without photos: the queue on every fifth visit, 6.2 requests a visit (the photos
+  // screen's list on each) against its 40 % of 120, 48 / 372.
   expect(
     "plan of an account without photos",
     shape(
@@ -1465,7 +1521,7 @@ async function selfTest(): Promise<never> {
         { addressLimit: 120, personLimit: 120, accounts: 1, photosMax: 0 },
       ),
     ),
-    [1, "0.160", 750],
+    [1, 5, "0.129", 930],
   );
 
   const outcomes: Array<[Route, number, string, Outcome]> = [
@@ -1474,8 +1530,8 @@ async function selfTest(): Promise<never> {
     [ROUTES.exchange, 200, "", "unexpected"],
     [ROUTES.gate, 200, "", "ok"],
     [ROUTES.gate, 401, "session_expired", "signed-out"],
-    [ROUTES.waitlist, 401, "unauthenticated", "unexpected"],
-    [ROUTES.waitlist, 429, "rate_limited", "limited"],
+    [ROUTES.counter, 401, "unauthenticated", "signed-out"],
+    [ROUTES.counter, 429, "rate_limited", "limited"],
     [ROUTES.thumb, 429, "photo_budget_exceeded", "limited"],
     [ROUTES.gate, 503, "unreadable", "server"],
     [ROUTES.thumb, 404, "not_found", "unexpected"],
@@ -1589,6 +1645,7 @@ async function selfTest(): Promise<never> {
   ];
   for (const [a, b, want] of apis) expect(`sameApi ${a} ${b}`, sameApi(api(a), api(b)), want);
 
+  sessionFileChecks(expect);
   const runs = await standInRuns(expect);
   for (const failure of failures) console.error(`✖ self-test: ${failure}`);
   if (failures.length > 0) process.exit(1);
@@ -1596,6 +1653,100 @@ async function selfTest(): Promise<never> {
     `✔ load-smoke self-test: ${checks} checks, ${lines.length} of them command lines, ${runs} runs against a stand-in`,
   );
   process.exit(0);
+}
+
+/** The atomic writer keeps unrelated entries intact and removes its own staging files. */
+function sessionFileChecks(expect: (what: string, got: unknown, want: unknown) => void): void {
+  const dir = mkdtempSync(join(tmpdir(), "kuutti-session-files-"));
+  try {
+    const ordinary = join(dir, "ordinary");
+    for (const lines of [
+      ["# dummy header", "dummy first", ""],
+      ["dummy second", "# comment"],
+    ]) {
+      writeSessions(ordinary, lines);
+      expect(
+        "session replacement preserves exact bytes",
+        readFileSync(ordinary, "utf8"),
+        lines.join("\n"),
+      );
+      expect("session replacement is owner-only", statSync(ordinary).mode & 0o777, 0o600);
+      expect("session replacement leaves no staging entry", readdirSync(dir), ["ordinary"]);
+    }
+    for (const kind of ["regular", "symlink", "hardlink"] as const) {
+      const caseDir = join(dir, kind);
+      mkdirSync(caseDir);
+      const file = join(caseDir, "sessions");
+      const legacy = `${file}.${process.pid}.tmp`;
+      const sentinel = join(caseDir, "sentinel");
+      writeFileSync(sentinel, "dummy unrelated bytes");
+      chmodSync(sentinel, 0o666);
+      if (kind === "symlink") symlinkSync(sentinel, legacy);
+      else if (kind === "hardlink") linkSync(sentinel, legacy);
+      else {
+        writeFileSync(legacy, "dummy unrelated bytes");
+        chmodSync(legacy, 0o666);
+      }
+      writeSessions(file, ["dummy replacement"]);
+      expect(
+        `${kind}: unrelated content survives`,
+        readFileSync(sentinel, "utf8"),
+        "dummy unrelated bytes",
+      );
+      expect(`${kind}: old temporary entry survives`, existsSync(legacy), true);
+      if (existsSync(legacy)) {
+        expect(
+          `${kind}: old temporary bytes survive`,
+          readFileSync(legacy, "utf8"),
+          "dummy unrelated bytes",
+        );
+      }
+      expect(`${kind}: destination is a regular file`, lstatSync(file).isFile(), true);
+      expect(`${kind}: destination is owner-only`, statSync(file).mode & 0o777, 0o600);
+      expect(`${kind}: exact replacement bytes`, readFileSync(file, "utf8"), "dummy replacement");
+    }
+    const longName = join(dir, "s".repeat(246));
+    writeSessions(longName, ["dummy long-name replacement"]);
+    expect(
+      "a long destination basename still works",
+      readFileSync(longName, "utf8"),
+      "dummy long-name replacement",
+    );
+    const previousUmask = process.umask(0);
+    try {
+      writeSessions(ordinary, ["dummy permissive-umask replacement"]);
+      expect("a permissive umask keeps owner-only mode", statSync(ordinary).mode & 0o777, 0o600);
+    } finally {
+      process.umask(previousUmask);
+    }
+    const blocked = join(dir, "nonempty-directory");
+    mkdirSync(blocked);
+    writeFileSync(join(blocked, "sentinel"), "dummy preserved bytes");
+    const entries = readdirSync(dir).sort();
+    let failed = false;
+    try {
+      writeSessions(blocked, ["dummy replacement"]);
+    } catch {
+      failed = true;
+    }
+    expect("rename failure propagates", failed, true);
+    expect(
+      "rename failure preserves the destination",
+      readFileSync(join(blocked, "sentinel"), "utf8"),
+      "dummy preserved bytes",
+    );
+    expect("rename failure removes its staging entry", readdirSync(dir).sort(), entries);
+    failed = false;
+    try {
+      writeSessions(join(dir, "missing-parent", "sessions"), ["dummy replacement"]);
+    } catch {
+      failed = true;
+    }
+    expect("creation failure propagates", failed, true);
+    expect("creation failure leaves no staging entry", readdirSync(dir).sort(), entries);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 }
 
 /**
@@ -1608,7 +1759,9 @@ async function standInRuns(
 ): Promise<number> {
   const dir = mkdtempSync(join(tmpdir(), "kuutti-load-smoke-"));
   let runs = 0;
-  const token = () => randomBytes(32).toString("base64url");
+  const part = () => randomBytes(32).toString("base64url");
+  /** A refresh token's shape (ADR-059): the session's secret, a dot, the part a refresh replaces. */
+  const token = () => `${part()}.${part()}`;
   const sessionsFile = (name: string, text: string, mode = 0o600) => {
     const path = join(dir, name);
     writeFileSync(path, text);
@@ -1685,8 +1838,9 @@ async function standInRuns(
       "GET /openapi.json",
       "GET /photos",
       "GET /photos/{id}/thumb",
+      "GET /ponds/counter",
       "GET /profile",
-      "GET /waitlist",
+      "GET /rounds/today",
       "POST /auth/exchange",
       "POST /auth/refresh",
     ]);
@@ -1696,6 +1850,18 @@ async function standInRuns(
       "the photo lists and URLs of a whole run",
       [times(a.seen, "GET /photos"), times(a.seen, "GET /photos/{id}/thumb")],
       [9, 8],
+    );
+    // One account at four visits a second would read the queue 240 times a minute, past its alarm:
+    // on one visit in twenty, so once in these four.
+    expect(
+      "the queue's reads of a whole run",
+      [
+        times(a.seen, "GET /rounds/today"),
+        runA.out.some((line) =>
+          line.includes("the queue read on one visit in 20, under its alarm"),
+        ),
+      ],
+      [1, true],
     );
     expect(
       "the row of a whole run",
@@ -1715,6 +1881,27 @@ async function standInRuns(
     await b.close();
     expect("what production was asked", b.seen, ["GET /health", "GET /openapi.json"]);
     expect("the file production left", readFileSync(fileB, "utf8"), ours(b.url, kept));
+
+    // The address's window spent on the contract (#630): refused with its wait, not as production.
+    const w = await standIn([], {
+      twist: (route) =>
+        route === "GET /openapi.json"
+          ? { status: 429, code: "rate_limited", retryAfter: 42, remaining: 0 }
+          : undefined,
+    });
+    const runW = await drive(w.url, undefined);
+    await w.close();
+    expect(
+      "a spent window's refusal",
+      [runW.status, w.seen, runW.out],
+      [
+        1,
+        ["GET /health", "GET /openapi.json"],
+        [
+          `load-smoke: the API at ${w.url.host} refused /openapi.json, this address's window spent: ask again in 42 s; nothing was sent`,
+        ],
+      ],
+    );
 
     // What answers is not Kuutti's API: refused after the one question.
     const n = await standIn([], {
@@ -1741,7 +1928,7 @@ async function standInRuns(
       "POST /auth/refresh",
       "GET /auth/session",
       "GET /photos",
-      "GET /waitlist",
+      "GET /ponds/counter",
     ]);
     expect(
       "an over-budget run's refusal",
@@ -1818,8 +2005,7 @@ async function standInRuns(
     // The address's budget under half on a public answer rests the public parts for a window:
     // the stage sent less than its rate, and is no measurement.
     const h = await standIn([], {
-      twist: (route, nth) =>
-        route === "GET /waitlist" && nth >= 1 ? { remaining: 10 } : undefined,
+      twist: (route) => (route === "POST /auth/exchange" ? { remaining: 10 } : undefined),
     });
     const runH = await drive(h.url, undefined, { rates: [8] });
     await h.close();
@@ -1827,7 +2013,7 @@ async function standInRuns(
       "a run whose address rests",
       [
         runH.status,
-        times(h.seen, "GET /waitlist"),
+        times(h.seen, "GET /ponds/counter"),
         times(h.seen, "POST /auth/exchange"),
         runH.out.some((line) =>
           /^load-smoke: held at no stage; the stage at 8 is no measurement: \d+ of \d+ parts of its visits were held back/.test(
@@ -1835,7 +2021,7 @@ async function standInRuns(
           ),
         ),
       ],
-      [0, 2, 1, true],
+      [0, 1, 1, true],
     );
 
     // A person's budget under half rests that account: the same, and the row says so.
@@ -2020,11 +2206,21 @@ async function standInRuns(
       [
         "a token twice",
         sessionsFile("j", ours(idle.url, one, one)),
-        "repeats line 2: a refresh token presented twice ends its session (reuse, #35)",
+        "holds a token of the session of line 2: two refresh tokens of one session presented end it (reuse, ADR-059)",
+      ],
+      [
+        "two tokens of one session",
+        sessionsFile("j2", ours(idle.url, one, `${one.slice(0, 43)}.${part()}`)),
+        "holds a token of the session of line 2: two refresh tokens of one session presented end it (reuse, ADR-059)",
       ],
       [
         "a line that is no token",
         sessionsFile("k", ours(idle.url, "not-a-token")),
+        "is not a refresh token",
+      ],
+      [
+        "a token of the shape before ADR-059, one part",
+        sessionsFile("k2", ours(idle.url, part())),
         "is not a refresh token",
       ],
       [
@@ -2066,7 +2262,14 @@ async function standInRuns(
   }
 }
 
-type Twist = { status?: number; code?: string; json?: unknown; limit?: number; remaining?: number };
+type Twist = {
+  status?: number;
+  code?: string;
+  json?: unknown;
+  limit?: number;
+  remaining?: number;
+  retryAfter?: number;
+};
 /**
  * How the stand-in's socket misbehaves: it refuses the upgrade (as the address's limiter would),
  * refuses the auth, drops every connection at the first visit's signed-in part, or says two
@@ -2124,6 +2327,7 @@ async function standIn(
         "content-type": "application/json",
         "ratelimit-limit": String(twist?.limit ?? 60_000),
         "ratelimit-remaining": String(twist?.remaining ?? 59_990),
+        ...(twist?.retryAfter === undefined ? {} : { "retry-after": String(twist.retryAfter) }),
       });
       res.end(JSON.stringify(json));
     };
@@ -2149,14 +2353,15 @@ async function standIn(
     if (route === "GET /openapi.json") {
       return behaviour.production ? refused(404, "not_found") : answer(200, { openapi: "3.1.0" });
     }
-    if (route === "GET /waitlist") return answer(200, {});
+    if (route === "GET /ponds/counter") return answer(200, {});
     if (route === "POST /auth/exchange") return refused(401, "auth_code_used");
     if (route === "POST /auth/refresh") {
       const presented = (JSON.parse(body) as { refreshToken?: string }).refreshToken ?? "";
       if (!refresh.delete(presented)) return refused(401, "session_revoked");
+      const family = presented.split(".")[0] ?? "";
       const next = {
         access: randomBytes(32).toString("base64url"),
-        refresh: randomBytes(32).toString("base64url"),
+        refresh: `${family}.${randomBytes(32).toString("base64url")}`,
       };
       refresh.add(next.refresh);
       access.add(next.access);
@@ -2187,7 +2392,9 @@ async function standIn(
         expiresAt: later,
       });
     }
-    if (["GET /onboarding", "GET /gate", "GET /profile"].includes(route)) return answer(200, {});
+    if (["GET /onboarding", "GET /gate", "GET /profile", "GET /rounds/today"].includes(route)) {
+      return answer(200, {});
+    }
     return refused(404, "not_found");
   });
   server.on("upgrade", (req, socket: Duplex) => {

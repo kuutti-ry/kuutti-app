@@ -1,7 +1,9 @@
 # Who the bank login lets in, and who not (TD-7, the age rule of #33; the cast
 # of personas.ts): a banned identity, an account deleted inside its waiting
 # time and those under 18 are refused at the callback, each in its own words;
-# the youngest who gets in and the oldest reach the welcome screen. Age is
+# the youngest who gets in and the oldest reach onboarding: the welcome step, a
+# friend's invitation code or, in a later run, a numbered step, which of them
+# depends on the phone and on how far they have come (#418, #581). Age is
 # counted from the end of the birth month, so Venla, who turns 18 this month,
 # is refused on every day but its last.
 appId: fi.kuutti.app
@@ -40,7 +42,7 @@ name: The bank login refuses the banned, the recently deleted and those under 18
     when:
       true: ${new Date(Date.now() + 86400000).getDate() !== 1}
     commands:
-      # "Try again" clears the previous refusal, so the one shown after the bank is Venla's.
+      # The button clears the previous refusal, so the one shown after the bank is Venla's.
       - runFlow:
           file: ../common/bank-login.yaml
           env:
@@ -54,7 +56,7 @@ name: The bank login refuses the banned, the recently deleted and those under 18
     env:
       PERSONA: Eetu Laine
 - extendedWaitUntil:
-    visible: "Welcome to Kuutti|Tervetuloa Kuuttiin|Välkommen till Kuutti"
+    visible: "How we do things here|Näin täällä toimitaan|Så här gör vi här|Did a friend invite you\\?|Kutsuiko ystävä sinut\\?|Bjöd en vän in dig\\?|Step \\d+ of \\d+|Vaihe \\d+ / \\d+|Steg \\d+ av \\d+"
     timeout: 30000
 
 - runFlow: ../common/sign-out.yaml
@@ -63,5 +65,5 @@ name: The bank login refuses the banned, the recently deleted and those under 18
     env:
       PERSONA: Siiri Koskinen
 - extendedWaitUntil:
-    visible: "Welcome to Kuutti|Tervetuloa Kuuttiin|Välkommen till Kuutti"
+    visible: "How we do things here|Näin täällä toimitaan|Så här gör vi här|Did a friend invite you\\?|Kutsuiko ystävä sinut\\?|Bjöd en vän in dig\\?|Step \\d+ of \\d+|Vaihe \\d+ / \\d+|Steg \\d+ av \\d+"
     timeout: 30000

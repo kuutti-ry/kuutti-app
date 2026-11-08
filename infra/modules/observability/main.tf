@@ -8,11 +8,15 @@
 # confirmed by hand from the mailbox, like the billing one.
 #
 # Cost: standard alarms at 0.10 USD and custom metrics at 0.30 USD each (the
-# 5xx and Rekognition metrics, the exposure-budget one of #52 and the
-# nightly-failure one of #194), so about 2.00 USD a month per environment;
-# query definitions and the topic are free. The probe from outside the box,
-# which is what catches a stopped container, is probe.tf (#29): a Route 53
-# health check with its alarm and topic in us-east-1.
+# 5xx and Rekognition metrics, the exposure-budget one of #52, the
+# nightly-failure one of #194, the box's free memory of #77, the bank
+# identifications of #471 and the API's refusals of #41), plus the box's
+# PutMetricData once a minute, about 44,000 calls a month at 0.01 USD a
+# thousand: about 3.70 USD a month per environment at list price, the edge's
+# alarm included; query definitions and the topic are free. The probe from
+# outside the box, which is what catches a stopped container, is probe.tf
+# (#29): a Route 53 health check with its alarm and topic in us-east-1. The
+# edge's alarm, edge.tf, mails through that topic too (#41, ADR-067).
 # ---------------------------------------------------------------------------
 
 data "aws_caller_identity" "current" {}
@@ -98,6 +102,32 @@ resource "aws_cloudwatch_metric_alarm" "instance_credits" {
   ok_actions          = [aws_sns_topic.alerts.arn]
 }
 
+# The box's free memory (#77, ADR-046). Twice the box ran out of it with
+# nothing measuring it (2026-09-27, 2026-10-08) while EC2's status check saw a
+# healthy instance. The box pushes MemAvailable once a minute (modules/compute,
+# the headroom script) into a namespace of its own, which the box may write
+# and the log filters' metrics are not in. Missing data counts as breaching
+# once no real datapoint is left in the range CloudWatch evaluates: a box
+# that never ran the script (after the apply that brings this alarm, until
+# the headroom document has run; after a rebuild, until first boot has) is in
+# ALARM within a minute or two, one that stops pushing a few minutes after
+# its last good datapoint. A single missed push between good ones counts for
+# nothing.
+resource "aws_cloudwatch_metric_alarm" "memory_low" {
+  alarm_name          = "${local.name}-memory-low"
+  alarm_description   = "The API box has had under ${var.memory_available_mb} MB available for five minutes, or has stopped saying how much (#77). First steps: docs/runbooks/alerts.md."
+  namespace           = "${local.namespace}/box"
+  metric_name         = "MemAvailable"
+  statistic           = "Minimum"
+  period              = 60
+  evaluation_periods  = 5
+  threshold           = var.memory_available_mb
+  comparison_operator = "LessThanThreshold"
+  treat_missing_data  = "breaching"
+  alarm_actions       = [aws_sns_topic.alerts.arn]
+  ok_actions          = [aws_sns_topic.alerts.arn]
+}
+
 # --- The database ---------------------------------------------------------
 
 resource "aws_cloudwatch_metric_alarm" "db_storage" {
@@ -178,6 +208,40 @@ resource "aws_cloudwatch_log_metric_filter" "rekognition_calls" {
   }
 }
 
+# Every identification the bank passes on is one line, written once the
+# broker's answer is verified and fresh and before anything is decided
+# ({"msg":"identified at the bank","platform":"ios",...}, #471, ADR-016 §3): in
+# production Telia bills each one, refused or not, and the AWS budget does not
+# see it. A day far above the usual is a loop in a build or somebody signing in
+# again and again; the mail comes the same day rather than with the invoice.
+resource "aws_cloudwatch_log_metric_filter" "bank_identifications" {
+  name           = "${local.name}-bank-identifications"
+  log_group_name = var.log_group_name
+  pattern        = "{ $.msg = \"identified at the bank\" }"
+
+  metric_transformation {
+    name          = "BankIdentifications"
+    namespace     = local.namespace
+    value         = "1"
+    default_value = "0"
+  }
+}
+
+resource "aws_cloudwatch_metric_alarm" "bank_identifications" {
+  alarm_name          = "${local.name}-bank-identifications"
+  alarm_description   = "The bank passed on ${var.bank_identifications_per_day} or more identifications within a day (#471), each billed by Telia in production. First steps: docs/runbooks/alerts.md."
+  namespace           = local.namespace
+  metric_name         = "BankIdentifications"
+  statistic           = "Sum"
+  period              = 86400
+  evaluation_periods  = 1
+  threshold           = var.bank_identifications_per_day
+  comparison_operator = "GreaterThanOrEqualToThreshold"
+  treat_missing_data  = "notBreaching" # a quiet day logs none
+  alarm_actions       = [aws_sns_topic.alerts.arn]
+  ok_actions          = [aws_sns_topic.alerts.arn]
+}
+
 # Saved Logs Insights queries: the first three things to run when an alarm
 # fires. pino levels: 50 error, 60 fatal.
 resource "aws_cloudwatch_query_definition" "errors_by_route" {
@@ -212,6 +276,17 @@ resource "aws_cloudwatch_query_definition" "boot" {
   EOT
 }
 
+# The bank-identifications alarm's day, split by platform (ios, android, admin).
+resource "aws_cloudwatch_query_definition" "bank_identifications" {
+  name            = "${local.name}/bank-identifications-by-platform"
+  log_group_names = [var.log_group_name]
+  query_string    = <<-EOT
+    filter msg = "identified at the bank"
+    | stats count() as identifications by platform
+    | sort identifications desc
+  EOT
+}
+
 # A photo URL the API refused for the day's exposure budget is one warn line
 # ({"msg":"photo refused","reason":"budget",...}, #52, TD-6, ADR-008). A few a
 # day are people who scrolled a lot; a hundred is somebody's script, or a
@@ -242,6 +317,56 @@ resource "aws_cloudwatch_metric_alarm" "photo_budget_refusals" {
   treat_missing_data  = "notBreaching" # no refusals is the normal day
   alarm_actions       = [aws_sns_topic.alerts.arn]
   ok_actions          = [aws_sns_topic.alerts.arn]
+}
+
+# The API's own limits refusing (#41, ADR-026 §7): a 429 on the request line,
+# or, for a sign-in start, which answers 302 to the app or the panel, a warn
+# line of its own ({"msg":"sign-in refused","detail":{"limiter":"address"},...};
+# "cap", or "evicted" when the table of attempts is full). The day's budgets
+# of the product answer 429 too (likes, cards, messages, photos): a person
+# meets each a few times a day, so a hundred refusals in five minutes is a
+# script, a loop in a build or a limit set too low, whichever limit it was.
+# The saved query below says which. A preview logs to the same group.
+resource "aws_cloudwatch_log_metric_filter" "refusals" {
+  name           = "${local.name}-api-refusals"
+  log_group_name = var.log_group_name
+  pattern        = "{ ($.msg = \"request\" && $.status = 429) || ($.msg = \"sign-in refused\") }"
+
+  metric_transformation {
+    name          = "ApiRefusals"
+    namespace     = local.namespace
+    value         = "1"
+    default_value = "0"
+  }
+}
+
+resource "aws_cloudwatch_metric_alarm" "refusals" {
+  alarm_name          = "${local.name}-api-refusals"
+  alarm_description   = "The API refused ${var.refusals_per_five_minutes} or more requests for its limits or budgets within five minutes (#41): a flood, a loop in a build, or a limit set too low. First steps: docs/runbooks/abuse.md."
+  namespace           = local.namespace
+  metric_name         = "ApiRefusals"
+  statistic           = "Sum"
+  period              = 300
+  evaluation_periods  = 1
+  threshold           = var.refusals_per_five_minutes
+  comparison_operator = "GreaterThanOrEqualToThreshold"
+  treat_missing_data  = "notBreaching" # no refusals is the normal five minutes
+  alarm_actions       = [aws_sns_topic.alerts.arn]
+  ok_actions          = [aws_sns_topic.alerts.arn]
+}
+
+# The refusals alarm's five minutes, split by what refused: a 429 without an
+# account is the address's window, one with an account the person's window or
+# a day's budget (the route tells which), a sign-in line its limiter.
+resource "aws_cloudwatch_query_definition" "refusals" {
+  name            = "${local.name}/refusals-by-route"
+  log_group_names = [var.log_group_name]
+  query_string    = <<-EOT
+    filter (msg = "request" and status = 429) or msg = "sign-in refused"
+    | fields ispresent(accountId) or ispresent(staffIdentityId) as signedIn
+    | stats count() as refusals by msg, route, signedIn, detail.limiter
+    | sort refusals desc
+  EOT
 }
 
 # Every nightly job ends in one line (apps/api/src/jobs/nightly.ts), and a

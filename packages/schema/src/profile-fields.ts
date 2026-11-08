@@ -97,11 +97,16 @@ const text = (maxLength: number, r: Roles) => ({
   schema: z.string().trim().min(1).max(maxLength),
 });
 
-/** A whole number inside a closed range; the unit is in the text. */
-const integer = (min: number, max: number, r: Roles) => ({
+/**
+ * A whole number inside a closed range; the unit is in the text. `relations`
+ * are what a deal-breaker on it may accept (#508): how the other person's
+ * number stands to the holder's own, where a list field has its options.
+ */
+const integer = (min: number, max: number, relations: Options, r: Roles) => ({
   kind: "number" as const,
   min,
   max,
+  relations,
   ...roles(r),
   schema: z.int().min(min).max(max),
 });
@@ -115,8 +120,13 @@ const flag = (r: Roles) => ({ kind: "flag" as const, ...roles(r), schema: z.bool
  * language is not a country and no flag stands for one. In the order of use
  * (#239): the two national languages, English, then by the people of 20 to 64
  * who speak each as their registered language (Statistics Finland, StatFin
- * 11rl, 31.12.2025). The first LANGUAGES_SHOWN_FIRST lead the picker, the
- * rest is found by search, and "other" stays last.
+ * 11rl, 31.12.2025). After them Finland's own languages, which that count
+ * does not order: the two sign languages, Inari and Skolt Sami, Karelian and
+ * Romani, by their ISO 639-3 codes, since none has one of two letters (the
+ * maintainer, 07/11/2026, #616; a sign language is no word on hearing, since
+ * hearing people sign too, and the field can be hidden from the card). The
+ * first LANGUAGES_SHOWN_FIRST lead the picker, the rest is found by search,
+ * and "other" stays last, shown only once a search finds nothing else (#616).
  */
 const LANGUAGES = [
   "fi",
@@ -153,6 +163,12 @@ const LANGUAGES = [
   "ja",
   "se",
   "ko",
+  "fse",
+  "fss",
+  "smn",
+  "sms",
+  "krl",
+  "rmf",
   "other",
 ] as const;
 export const LANGUAGES_SHOWN_FIRST = 10;
@@ -278,8 +294,7 @@ const HEIGHT_MAX_CM = 260;
  * before the name (#213, ADR-019 §3); the list is refreshed after the
  * election of April 2027. "None of them" is an answer of its own, after the
  * parties and without a logo, and it stands alone (#239). The coffee party
- * left the list on the maintainer's word (#239); migration 0037 took it out
- * of stored answers.
+ * left the list on the maintainer's word (#239).
  */
 export const POLITICS_OPTIONS = [
   "kesk",
@@ -304,7 +319,7 @@ export const PROFILE_FIELDS = {
     preferenceAbout: "hard",
     research: true,
   }),
-  /** Offered after a non-binary gender only, by the screen (#146); display only, never matching. */
+  /** Offered after a non-binary gender only, by the screen (#146), and cleared by a change away from it (#552); display only, never matching. */
   identityLabel: single(
     [
       "agender",
@@ -361,8 +376,11 @@ export const PROFILE_FIELDS = {
     preferenceAbout: "soft",
   }),
   hobbies: multi(HOBBIES, { role: "info", preferenceAbout: "none" }),
-  /** Centimetres; display only, never filterable. */
-  height: integer(HEIGHT_MIN_CM, HEIGHT_MAX_CM, { role: "info", preferenceAbout: "none" }),
+  /** Centimetres. A deal-breaker on it is one relation to the holder's own height (#508); everyone is having none. */
+  height: integer(HEIGHT_MIN_CM, HEIGHT_MAX_CM, ["taller", "at_least_mine", "shorter"], {
+    role: "info",
+    preferenceAbout: "deal_breaker",
+  }),
   exercise: single(["never", "sometimes", "weekly", "daily"], {
     role: "info",
     preferenceAbout: "none",
@@ -436,6 +454,7 @@ export const PROFILE_FIELDS = {
       "hindu",
       "jewish",
       "spiritual",
+      "non_religious",
       "agnostic",
       "atheist",
       "other",
@@ -481,7 +500,19 @@ export const CARD_FIELD_KEYS = PROFILE_FIELD_KEYS.filter((key) => {
 });
 
 /**
- * The optional fields as the screens after the gate ask them, one per
+ * A field a person may keep off their card (#515, ADR-019 §2): every field a
+ * card carries. Hidden, an answer is still an answer: the pool, both sides'
+ * deal-breakers and the soft order read it as before, and only the card
+ * leaves it out. The name, the age, the photos and the gender are no fields
+ * here, since a card needs them; the soft fields never reach a card at all.
+ */
+export const HiddenField = z
+  .enum(CARD_FIELD_KEYS as unknown as [ProfileFieldKey, ...ProfileFieldKey[]])
+  .meta({ id: "HiddenField" });
+export type HiddenField = z.infer<typeof HiddenField>;
+
+/**
+ * The optional fields as the screens after onboarding ask them, one per
  * screen with "Ask me later", in the field sheet's order (#148, TD-16).
  * Intent and the identity label are onboarding's; a companion field shares
  * its screen with the one it belongs to.

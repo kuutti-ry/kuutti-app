@@ -4,8 +4,8 @@ import { DEMO_SEED, DEMO_SIZE, DEMO_SIZE_MAX } from "./population.ts";
 /**
  * What `pnpm demo:population` may do and where (#73, ADR-014 §10). Three
  * hundred accounts that look bank-verified, in a database real people use,
- * would enter the public counter, count toward the gate and appear on
- * people's cards. So the command is stricter than the seed:
+ * would enter the public counter and appear on people's cards. So the
+ * command is stricter than the seed:
  *
  * - it goes ahead only in an environment that is named and allowed, never in
  *   one that merely is not called "production";

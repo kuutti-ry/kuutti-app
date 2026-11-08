@@ -3,8 +3,8 @@ import type { Queryable } from "@kuutti/db";
 // The audit log (TD-5, security checklist "Moderator actions, disclosure
 // requests, and photo views by staff write to the immutable audit table").
 // One row per thing a member of staff did or saw, keyed by their identity
-// (never an account); the table refuses UPDATE and DELETE by trigger
-// (migration 0006), so a row written here is a row kept for five years
+// (never an account); the table refuses UPDATE and DELETE by trigger,
+// so a row written here is a row kept for five years
 // (rules/db.md). `detail` is a small closed structure, never text a person
 // typed.
 
@@ -25,6 +25,14 @@ const AUDIT_ACTIONS = [
   "report.view",
   "conversation.view",
   "report.decide",
+  // A pond's switch turned in the panel (#500, ADR-060 §2): `detail` says which way.
+  "pond.matching",
+  // An announcement to everybody (#573, ADR-068 §2): written, approved by a
+  // second admin (`detail` says how many notices it wrote), or deleted as a
+  // draft. Never its words.
+  "announcement.write",
+  "announcement.approve",
+  "announcement.delete",
 ] as const;
 type AuditAction = (typeof AUDIT_ACTIONS)[number];
 
@@ -33,7 +41,15 @@ export type AuditEntry = {
   actorIdentityId: string | null;
   action: AuditAction;
   /** "any": an audit read narrowed to a subject id of no named type (#309). */
-  subjectType: "photo" | "feedback" | "account" | "config" | "report" | "any";
+  subjectType:
+    | "photo"
+    | "feedback"
+    | "account"
+    | "config"
+    | "report"
+    | "pond"
+    | "announcement"
+    | "any";
   subjectId: string;
   detail?: Record<string, string | number | boolean | null>;
 };

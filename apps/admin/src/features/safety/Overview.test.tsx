@@ -108,8 +108,8 @@ describe("the front page", () => {
       (req) => (isOverview(req) ? new Promise<Response>((r) => (release = r)) : null),
     ]);
     show();
-    expect(screen.getByRole("heading", { level: 2, name: "What waits" })).toBeInTheDocument();
-    expect(screen.getByText("Loading what waits…")).toHaveAttribute("aria-busy", "true");
+    expect(screen.getByRole("heading", { level: 2, name: "Overview" })).toBeInTheDocument();
+    expect(screen.getByText("Loading…")).toHaveAttribute("aria-busy", "true");
     expect(screen.queryByRole("list")).toBeNull();
 
     // The request is out before it is answered.
@@ -123,12 +123,11 @@ describe("the front page", () => {
       ),
     );
     const lines = await screen.findAllByRole("listitem");
-    expect(screen.queryByText("Loading what waits…")).toBeNull();
+    expect(screen.queryByText("Loading…")).toBeNull();
     expect(lines.map((line) => line.textContent)).toEqual([
       "Feedback 1 waits. Oldest: 2 hours",
-      "Photo review queue 3 wait. Oldest: 5 hours",
+      "Photos 3 wait. Oldest: 5 hours",
     ]);
-    expect(screen.queryByText("Nothing waits in any queue.")).toBeNull();
     expect(calls).toHaveLength(1);
     expect(calls[0]?.headers.get("authorization")).toBe(`Bearer ${"t".repeat(43)}`);
   });
@@ -136,7 +135,7 @@ describe("the front page", () => {
   it.each([
     ["Reports", "/reports", "the report screen"],
     ["Automatic shadow bans", "/automatic-bans", "the automatic bans screen"],
-    ["Photo review queue", "/photos", "the photo screen"],
+    ["Photos", "/photos", "the photo screen"],
     ["Feedback", "/feedback", "the feedback screen"],
   ])("links %s to its screen at %s", async (name, href, screenText) => {
     fetchMock([
@@ -154,7 +153,7 @@ describe("the front page", () => {
     expect(link).toHaveAttribute("href", href);
     fireEvent.click(link);
     expect(await screen.findByText(screenText)).toBeInTheDocument();
-    expect(screen.queryByRole("heading", { name: "What waits" })).toBeNull();
+    expect(screen.queryByRole("heading", { name: "Overview" })).toBeNull();
   });
 
   it("makes every link a 44 pt target the keyboard reaches, an empty queue's too", async () => {
@@ -166,7 +165,7 @@ describe("the front page", () => {
     show();
     await screen.findAllByRole("listitem");
     const links = screen.getAllByRole("link");
-    expect(links.map((link) => link.textContent)).toEqual(["Photo review queue", "Feedback"]);
+    expect(links.map((link) => link.textContent)).toEqual(["Photos", "Feedback"]);
     for (const link of links) {
       expect(link).toHaveClass("target");
       expect(link.tabIndex).toBe(0);
@@ -182,32 +181,31 @@ describe("the front page", () => {
       ),
     ]);
     show();
-    expect(await lineOf("Photo review queue")).toHaveTextContent(
-      /^Photo review queue nothing waits\.$/,
-    );
+    expect(await lineOf("Photos")).toHaveTextContent(/^Photos nothing waits\.$/);
     expect(await lineOf("Feedback")).toHaveTextContent(/^Feedback 2 wait\. Oldest: 1 hour$/);
-    expect(screen.queryByText("Nothing waits in any queue.")).toBeNull();
     expect(screen.queryByText(/Late/)).toBeNull();
   });
 
-  it("says nothing waits in any queue when every queue is empty, each line still linking to it", async () => {
+  it("says nothing waits once per line when every queue is empty, each line still linking to it, and not again above them (#581)", async () => {
     fetchMock([answer(overview([empty("photos"), empty("feedback")]))]);
     show();
-    expect(await screen.findByText("Nothing waits in any queue.")).toBeInTheDocument();
-    expect(screen.getAllByRole("listitem").map((line) => line.textContent)).toEqual([
-      "Photo review queue nothing waits.",
+    const lines = await screen.findAllByRole("listitem");
+    expect(lines.map((line) => line.textContent)).toEqual([
+      "Photos nothing waits.",
       "Feedback nothing waits.",
     ]);
+    expect(screen.getAllByText(/nothing waits/i)).toHaveLength(2);
     expect(screen.getAllByRole("link")).toHaveLength(2);
     expect(screen.queryByText(/Late/)).toBeNull();
   });
 
-  it("says nothing waits in any queue when the API names no queue at all", async () => {
+  it("shows no line, no link and no failure when the API names no queue at all", async () => {
     fetchMock([answer(overview([]))]);
     show();
-    expect(await screen.findByText("Nothing waits in any queue.")).toBeInTheDocument();
+    await screen.findByRole("table", { name: "Told Kuutti they found someone" });
     expect(screen.queryAllByRole("listitem")).toHaveLength(0);
     expect(screen.queryByRole("link")).toBeNull();
+    expect(screen.queryByRole("alert")).toBeNull();
   });
 
   describe("measures the oldest's age by the API's clock, in the coarsest unit that says it", () => {
@@ -230,8 +228,8 @@ describe("the front page", () => {
         answer(overview([{ queue: "photos", waiting: 1, oldestSince: before(ms) }], 10_000)),
       ]);
       show();
-      expect(await lineOf("Photo review queue")).toHaveTextContent(
-        new RegExp(`^Photo review queue 1 waits\\. Oldest: ${age}$`),
+      expect(await lineOf("Photos")).toHaveTextContent(
+        new RegExp(`^Photos 1 waits\\. Oldest: ${age}$`),
       );
     });
 
@@ -263,7 +261,7 @@ describe("the front page", () => {
         ),
       ]);
       show();
-      expect(await lineOf("Photo review queue")).toHaveTextContent(/Oldest: 23 hours$/);
+      expect(await lineOf("Photos")).toHaveTextContent(/Oldest: 23 hours$/);
       expect(await lineOf("Feedback")).toHaveTextContent(/Oldest: 24 hours$/);
       expect(screen.queryByText(/Late/)).toBeNull();
       expect(document.querySelector("strong")).toBeNull();
@@ -279,9 +277,9 @@ describe("the front page", () => {
         ),
       ]);
       show();
-      const photos = await lineOf("Photo review queue");
+      const photos = await lineOf("Photos");
       expect(photos).toHaveTextContent(
-        /^Photo review queue 2 wait\. Oldest: 24 hours Late \(response time: 24 h\)$/,
+        /^Photos 2 wait\. Oldest: 24 hours Late \(response time: 24 h\)$/,
       );
       const late = within(photos).getByText("Late (response time: 24 h)");
       expect(late.tagName).toBe("STRONG");
@@ -303,7 +301,7 @@ describe("the front page", () => {
       ]);
       show();
       // Thirty-six hours is not late against a thirty-six hour line.
-      expect(await lineOf("Photo review queue")).toHaveTextContent(/Oldest: 36 hours$/);
+      expect(await lineOf("Photos")).toHaveTextContent(/Oldest: 36 hours$/);
       const feedback = await lineOf("Feedback");
       expect(feedback).toHaveTextContent(/Oldest: 9 days Late \(response time: 36 h\)$/);
       expect(within(feedback).getByText("Late (response time: 36 h)").tagName).toBe("STRONG");
@@ -354,13 +352,13 @@ describe("the front page", () => {
         /^Automatic shadow bans 1 waits\. Oldest: 12 hours Late \(response time: 12 h\)$/,
       );
       expect(within(bans).getByText("Late (response time: 12 h)").tagName).toBe("STRONG");
-      expect(await lineOf("Photo review queue")).not.toHaveTextContent(/Late/);
+      expect(await lineOf("Photos")).not.toHaveTextContent(/Late/);
     });
 
     it("is never late for an empty queue, even with no response time to spare", async () => {
       fetchMock([answer(overview([empty("photos"), empty("feedback")], 0))]);
       show();
-      expect(await screen.findByText("Nothing waits in any queue.")).toBeInTheDocument();
+      expect(await lineOf("Photos")).toHaveTextContent(/^Photos nothing waits\.$/);
       expect(screen.queryByText(/Late/)).toBeNull();
     });
   });
@@ -377,10 +375,12 @@ describe("the front page", () => {
     ]);
     show();
     const table = await screen.findByRole("table", { name: "Told Kuutti they found someone" });
-    // A section of the page, under its title.
-    expect(
-      screen.getByRole("heading", { level: 3, name: "Told Kuutti they found someone" }),
-    ).toBeInTheDocument();
+    // A section of the page, under its title, which with the columns says what is counted: no note beside it (#581).
+    const title = screen.getByRole("heading", {
+      level: 3,
+      name: "Told Kuutti they found someone",
+    });
+    expect(title.parentElement?.textContent).toBe("Told Kuutti they found someone");
     expect(within(table).getByRole("columnheader", { name: "Last 30 days" })).toBeTruthy();
     const rows = within(table).getAllByRole("row");
     expect(rows.map((row) => row.textContent)).toEqual([
@@ -389,19 +389,14 @@ describe("the front page", () => {
       "Elsewhere14",
       "Another reason02",
     ]);
-    expect(
-      screen.getByText(
-        "Counted by day and reason, with nobody's name: the count stays when an account is deleted.",
-      ),
-    ).toBeTruthy();
   });
 
   it("says the page could not be loaded when the API fails", async () => {
     fetchMock([answer({ error: { code: "internal_error", message: "x", requestId: "r" } }, 500)]);
     show();
-    expect(await screen.findByRole("alert")).toHaveTextContent("What waits could not be loaded.");
+    expect(await screen.findByRole("alert")).toHaveTextContent(/^Could not be loaded\.$/);
     expect(screen.queryByRole("list")).toBeNull();
-    expect(screen.queryByText("Loading what waits…")).toBeNull();
+    expect(screen.queryByText("Loading…")).toBeNull();
   });
 
   it("says the page could not be loaded when the answer is not the contract, and logs why", async () => {
@@ -415,7 +410,7 @@ describe("the front page", () => {
       }),
     ]);
     show();
-    expect(await screen.findByRole("alert")).toHaveTextContent("What waits could not be loaded.");
+    expect(await screen.findByRole("alert")).toHaveTextContent(/^Could not be loaded\.$/);
     expect(log).toHaveBeenCalledWith("overview load failed", expect.anything());
     expect(screen.queryByRole("list")).toBeNull();
   });
@@ -429,7 +424,7 @@ describe("the front page", () => {
       },
     ]);
     show();
-    expect(await screen.findByRole("alert")).toHaveTextContent("What waits could not be loaded.");
+    expect(await screen.findByRole("alert")).toHaveTextContent(/^Could not be loaded\.$/);
     expect(log).toHaveBeenCalledWith("overview load failed", expect.any(TypeError));
   });
 
@@ -439,13 +434,11 @@ describe("the front page", () => {
     fetchMock([answer({ error: { code: "admin_forbidden", message: "x", requestId: "r" } }, 403)]);
     show();
     await waitFor(() => expect(role).toHaveBeenCalledWith(false));
-    await waitFor(() => expect(screen.queryByText("Loading what waits…")).toBeNull());
+    await waitFor(() => expect(screen.queryByText("Loading…")).toBeNull());
     expect(screen.queryByRole("alert")).toBeNull();
-    expect(screen.queryByText("What waits could not be loaded.")).toBeNull();
     expect(screen.queryByRole("list")).toBeNull();
-    expect(screen.queryByText("Nothing waits in any queue.")).toBeNull();
     // The heading and the refresh stay, for when the role is given back.
-    expect(screen.getByRole("heading", { level: 2, name: "What waits" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 2, name: "Overview" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Refresh" })).toBeEnabled();
   });
 
@@ -470,20 +463,19 @@ describe("the front page", () => {
       },
     ]);
     show();
-    expect(await screen.findByText("Nothing waits in any queue.")).toBeInTheDocument();
+    expect(await lineOf("Photos")).toHaveTextContent(/^Photos nothing waits\.$/);
 
     fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
-    expect(await lineOf("Photo review queue")).toHaveTextContent(
-      /^Photo review queue 5 wait\. Oldest: 30 hours Late \(response time: 24 h\)$/,
+    expect(await lineOf("Photos")).toHaveTextContent(
+      /^Photos 5 wait\. Oldest: 30 hours Late \(response time: 24 h\)$/,
     );
-    expect(screen.queryByText("Nothing waits in any queue.")).toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
-    expect(await screen.findByText("Loading what waits…")).toBeInTheDocument();
+    expect(await screen.findByText("Loading…")).toBeInTheDocument();
     expect(screen.queryByRole("list")).toBeNull();
     await waitFor(() => expect(calls.filter(isOverview)).toHaveLength(3));
     pending(json(overview([empty("photos"), empty("feedback")])));
-    expect(await screen.findByText("Nothing waits in any queue.")).toBeInTheDocument();
+    expect(await lineOf("Photos")).toHaveTextContent(/^Photos nothing waits\.$/);
   });
 
   it("recovers on refresh after a failure", async () => {
@@ -497,10 +489,10 @@ describe("the front page", () => {
           : null,
     ]);
     show();
-    expect(await screen.findByRole("alert")).toHaveTextContent("What waits could not be loaded.");
+    expect(await screen.findByRole("alert")).toHaveTextContent(/^Could not be loaded\.$/);
     fail = false;
     fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
-    expect(await screen.findByText("Nothing waits in any queue.")).toBeInTheDocument();
+    expect(await lineOf("Photos")).toHaveTextContent(/^Photos nothing waits\.$/);
     expect(screen.queryByRole("alert")).toBeNull();
   });
 });

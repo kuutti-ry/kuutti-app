@@ -9,17 +9,17 @@ import {
   type ConsentsResponse,
   type ConsentVersions,
   type Gender,
+  type HomeSummary,
   ONBOARDING_STEPS,
   type OnboardingStatus,
   type OnboardingStep,
   PHOTOS_FOR_COMPLETENESS,
-  type PondSummary,
   type PreferencesResponse,
   type WithdrawableConsentKind,
 } from "@kuutti/schema";
 import { AppError } from "../lib/errors.ts";
 import type { Logger } from "../lib/logger.ts";
-import { matchingConfigNumber, readMatchingConfig } from "../lib/matching-config.ts";
+import { matchingConfigNumber } from "../lib/matching-config.ts";
 import {
   CHANGE_CADENCE_KEY,
   deleteSeeksOfAccount,
@@ -28,13 +28,11 @@ import {
 } from "../matching/index.ts";
 import { listPhotos } from "../media/index.ts";
 import {
-  admissionAnew,
-  findPondBySlug,
-  findPondOfAccount,
-  listPonds,
-  setPondOfAccount,
-} from "../pond/index.ts";
-import { ageInYears, readProfile, withdrawSpecialCategoryAnswers } from "../profile/index.ts";
+  ageInYears,
+  clearIdentityLabel,
+  readProfile,
+  withdrawSpecialCategoryAnswers,
+} from "../profile/index.ts";
 import { enrolResearchSubject, removeResearchSubject, track } from "../research/index.ts";
 import * as repo from "./repo.ts";
 import { visibleState } from "./standing.ts";
@@ -48,9 +46,6 @@ import { visibleState } from "./standing.ts";
 // every status read, never a flag a route sets.
 
 export type OnboardingDeps = { db: Queryable; logger: Logger; now: () => Date };
-
-/** The matching_config key naming the pond every account is put in while there is one (ADR-010 §10). */
-const DEFAULT_POND_KEY = "default_pond";
 
 function currentVersions(): ConsentVersions {
   const out: Partial<Record<ConsentKind, string>> = {};
@@ -69,7 +64,8 @@ export const CURRENT_CONSENT_VERSIONS: ConsentVersions = currentVersions();
 export type OnboardingAnswers = {
   gender: Gender | null;
   preferences: PreferencesResponse;
-  pond: PondSummary | null;
+  /** A home the list knows: one that left it reads as none, which opens the step again (ADR-061 §2). */
+  home: HomeSummary | null;
   terms: string | null;
   privacy: string | null;
   /** The special-category consent's version when it is the current one: the seek answer counts only with it (ADR-019 §4). */
@@ -88,9 +84,9 @@ export function missingSteps(input: OnboardingAnswers): OnboardingStep[] {
     seeks: input.preferences.seeks !== null && input.specialCategory !== null,
     intent: input.profile.intent,
     age_window: input.preferences.ageWindow !== null,
+    home: input.home !== null,
     photos: input.profile.photos,
     prompts_or_bio: input.profile.promptsOrBio,
-    pond: input.pond !== null,
   };
   return ONBOARDING_STEPS.filter((step) => !done[step]);
 }
@@ -132,30 +128,6 @@ export async function currentConsent(
   return row ? { version: row.version, givenAt: row.givenAt } : null;
 }
 
-/**
- * One pond for now (#146, ADR-010 §10 and §11): an account with none is
- * put in the pond matching_config names, on its first status read, so no
- * pond step exists. Where the key names no live pond (several ponds later,
- * or a test database without the seed) the step stays and PUT /account/pond
- * is the way, as before.
- */
-async function assignDefaultPond(
-  deps: OnboardingDeps,
-  accountId: string,
-): Promise<PondSummary | null> {
-  const slug = await readMatchingConfig(deps.db, DEFAULT_POND_KEY);
-  if (typeof slug !== "string" || slug.length === 0) return null;
-  // With more than one pond to choose from the choice is the person's (#174,
-  // ADR-010 §12): the step stays open and the app asks; a child pond is no choice yet.
-  const topLevel = (await listPonds(deps.db)).filter((pond) => pond.parentId === null);
-  if (topLevel.length > 1) return null;
-  const pond = await findPondBySlug(deps.db, slug);
-  if (!pond) return null;
-  if ((await setPondOfAccount(deps.db, accountId, pond.id)) !== "set") return null;
-  deps.logger.info({ accountId, pondId: pond.id }, "pond assigned");
-  return pond;
-}
-
 export async function onboardingStatus(
   deps: OnboardingDeps,
   accountId: string,
@@ -178,8 +150,7 @@ export async function onboardingStatus(
     matchingConfigNumber(deps.db, CHANGE_CADENCE_KEY),
   ]);
   const now = deps.now();
-  const pond =
-    (await findPondOfAccount(deps.db, accountId)) ?? (await assignDefaultPond(deps, accountId));
+  const { home } = profile;
   const terms = acceptedCurrent(consents, "terms")?.version ?? null;
   const privacy = acceptedCurrent(consents, "privacy")?.version ?? null;
   const specialCategory = acceptedCurrent(consents, "special_category")?.version ?? null;
@@ -187,7 +158,7 @@ export async function onboardingStatus(
   const missing = missingSteps({
     gender: account.gender,
     preferences,
-    pond,
+    home,
     terms,
     privacy,
     specialCategory,
@@ -215,7 +186,7 @@ export async function onboardingStatus(
     state: visibleState(state),
     age: ageInYears(account.birthYear, account.birthMonth, now),
     gender: account.gender,
-    pond,
+    home,
     preferences,
     consents: {
       terms,
@@ -228,7 +199,6 @@ export async function onboardingStatus(
     currentVersions: CURRENT_CONSENT_VERSIONS,
     nextChange: {
       gender: nextChangeFrom(account.genderChangedAt, cadence, now)?.toISOString() ?? null,
-      seeks: nextChangeFrom(account.seeksChangedAt, cadence, now)?.toISOString() ?? null,
     },
     missing,
     complete: missing.length === 0,
@@ -328,7 +298,7 @@ export async function withdrawConsentOf(
       await removeResearchSubject(tx, accountId);
     } else if (withdrawn.withdrawn > 0) {
       // Only a consent that was there takes the answers with it: a request
-      // without one changes nothing, and is no way round the cadence (#147).
+      // without one changes nothing.
       await deleteSeeksOfAccount(tx, accountId);
       await withdrawSpecialCategoryAnswers(
         { db: tx, logger: deps.logger, now: deps.now },
@@ -352,7 +322,10 @@ export async function declareGender(
     const before = await repo.lockGender(tx, accountId);
     if (before === undefined) return false;
     // A change from an earlier answer is possible once in the cadence (#147,
-    // ADR-015 §9), said without a wall: the date, never a reason.
+    // ADR-060 §9), said without a wall: the date, never a reason. A brake, not
+    // a lock: reading a pool again after a change of one's own gender says who
+    // seeks that gender, so the route needs a limit however it is reached,
+    // until #502 looks at the class.
     const change = before.gender !== null && before.gender !== gender;
     if (change) {
       const cadence = await matchingConfigNumber(tx, CHANGE_CADENCE_KEY);
@@ -363,12 +336,13 @@ export async function declareGender(
         });
       }
     }
-    if (!(await repo.setGender(tx, accountId, gender, change ? at : null))) return false;
-    // The gender decides for whom one competes at the pond gate (#94, ADR-015
-    // §9): joining a contest is decided anew by the next count.
-    const { seeks } = await readPreferences(tx, accountId);
-    await admissionAnew(tx, accountId, { gender: before.gender, seeks }, { gender, seeks });
-    return true;
+    // In this transaction, so that no card says the new gender with the old
+    // word (#552). No log line of its own: it would say what was left.
+    // shortcut: a save from a second phone that read the profile before this
+    // commit and lands after it brings the word back, since saveProfile does
+    // not ask the gender; asking it there, under the same lock, would lift it.
+    if (change && before.gender === "non_binary") await clearIdentityLabel(tx, accountId, at);
+    return repo.setGender(tx, accountId, gender, change ? at : null);
   });
   if (!declared) throw new AppError(404, "not_found", "No live account");
   // The value stays out of the log: self-declared, and nobody's business there.

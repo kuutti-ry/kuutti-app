@@ -1,6 +1,6 @@
 # features/chat/live.feature
 Feature: The chat's live socket
-  One WebSocket per signed-in app in front (#349, ADR-031 §5) tells the phone
+  One WebSocket per signed-in app in front (#349, ADR-031 §9) tells the phone
   what changed in its conversations: a message, a read mark, the other's
   presence, a conversation archived, back or closed. Writing stays on the
   HTTP routes; Postgres is the store and the socket the notifier, so what is
@@ -77,6 +77,13 @@ Feature: The chat's live socket
     Given "A" is shadow-banned and both are on the socket
     When "A" writes to "B"
     Then A's phone gets the message and B's gets nothing of it, and B never hears A online
+
+  Scenario: A shadow-banned reader's mark reaches no counterpart until the lift
+    Given "A" is shadow-banned and "B"'s phone is on the socket
+    When "B" writes and "A" reads it
+    Then B's phone hears no read mark, and B's other phone resumes with the mark from before the ban
+    When the ban is lifted and "A" reads "B"'s next line
+    Then B's phone gets that mark
 
   Scenario: A shadow ban put on while the socket is open hides the person at the next ping
     Given "A" and "B" are on the socket in their conversation, and B hears A online

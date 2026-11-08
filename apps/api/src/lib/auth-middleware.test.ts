@@ -64,7 +64,7 @@ async function guarded(
     return { status: res.status, body };
   };
   const code = (body: unknown) => ErrorResponse.parse(body).error.code;
-  return { call, code, asked, touched, events };
+  return { app, call, code, asked, touched, events };
 }
 
 describe("requireSession", () => {
@@ -78,6 +78,13 @@ describe("requireSession", () => {
     expect(asked).toEqual([hashToken(TOKEN)]);
     expect(asked[0]).not.toContain(TOKEN);
     expect(touched).toEqual([{ sessionId: "ses-1", at: NOW }]);
+  });
+
+  it("tells nobody in between to keep what a session reads", async () => {
+    const { app } = await guarded(live, { now: () => NOW });
+    const res = await app.request("/me", { headers: { authorization: `Bearer ${TOKEN}` } });
+    expect(res.status).toBe(200);
+    expect(res.headers.get("cache-control")).toBe("no-store");
   });
 
   it("tolerates spaces around the token, not another scheme or spelling", async () => {
@@ -213,6 +220,14 @@ describe("requireSession and the person's limiter (ADR-026)", () => {
     expect(seen).toEqual([{ accountId: "acc-1", sessionId: "ses-1" }]);
     expect(events).toEqual(["limit"]);
     expect(touched).toEqual([]);
+  });
+
+  it("says the same on the limiter's refusal as on an answer", async () => {
+    const { limit } = personLimiter("refuse");
+    const { app } = await guarded(live, { now: () => NOW, limit });
+    const res = await app.request("/me", { headers: { authorization: `Bearer ${TOKEN}` } });
+    expect(res.status).toBe(429);
+    expect(res.headers.get("cache-control")).toBe("no-store");
   });
 
   // A token that opens no session stays on the address's count (ADR-026 §2):

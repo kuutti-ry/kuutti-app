@@ -15,3 +15,16 @@ export function useHapticTap(): () => void {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   }, [reduced]);
 }
+
+/**
+ * A warning felt as a refusal or a failure is said (#511): a contact the app
+ * cannot read, a save that did not go through. Gated as the tap is; a save
+ * that went through is said in words and felt as nothing.
+ */
+export function useHapticWarning(): () => void {
+  const reduced = useReducedMotion();
+  return useCallback(() => {
+    if (reduced || Platform.OS === "web") return;
+    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+  }, [reduced]);
+}

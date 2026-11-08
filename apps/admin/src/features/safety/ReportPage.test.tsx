@@ -53,6 +53,9 @@ const detail = (extra: Record<string, unknown> = {}) => ({
     { seq: 3, side: "reported", kind: "photo", body: null, photo: true, createdAt: SAID(3) },
     { seq: 4, side: "reporter", kind: "photo", body: null, photo: false, createdAt: SAID(4) },
   ],
+  // Pointing at nothing (#476).
+  lineSeq: null,
+  pointedPhoto: null,
   actable: [],
   ...extra,
 });
@@ -184,7 +187,11 @@ function termValue(term: string): string | null | undefined {
 const loaded = () => screen.findByRole("heading", { level: 3, name: "Decision" });
 const ACT = "Act on the reported person";
 const actions = () => screen.findByRole("group", { name: ACT });
-const status = () => screen.getByRole("status");
+/** The decision's status line; a card's pointed photo has its own (#476). */
+const status = () =>
+  within(
+    screen.getByRole("heading", { level: 3, name: "Decision" }).parentElement as HTMLElement,
+  ).getByRole("status");
 
 /** Presses a button as a keyboard does, so it has the focus a dialog gives back. */
 function press(button: HTMLElement) {
@@ -219,10 +226,10 @@ describe("opening a report", () => {
     const calls = fetchMock([on("GET", REPORT, answer.answer)]);
     show({ strict: true });
     expect(screen.getByRole("heading", { level: 2, name: "Report 0b1c1c4e" })).toBeInTheDocument();
-    expect(screen.getByText("Loading the report…")).toHaveAttribute("aria-busy", "true");
+    expect(screen.getByText("Loading…")).toHaveAttribute("aria-busy", "true");
     answer.release(json(detail()));
     expect(await loaded()).toBeInTheDocument();
-    expect(screen.queryByText("Loading the report…")).toBeNull();
+    expect(screen.queryByText("Loading…")).toBeNull();
     expect(asked(calls)).toEqual([`GET ${REPORT}`]);
     expect(calls[0]?.headers.get("authorization")).toBe(`Bearer ${"t".repeat(43)}`);
   });
@@ -329,7 +336,7 @@ describe("opening a report", () => {
     const calls = fetchMock([on("GET", REPORT, () => failure(403, "admin_forbidden"))]);
     show();
     await waitFor(() => expect(answers).toEqual([false]));
-    await waitFor(() => expect(screen.queryByText("Loading the report…")).toBeNull());
+    await waitFor(() => expect(screen.queryByText("Loading…")).toBeNull());
     expect(screen.queryByRole("alert")).toBeNull();
     expect(screen.queryByText("No such report.")).toBeNull();
     expect(screen.queryByRole("heading", { level: 3 })).toBeNull();
@@ -345,7 +352,7 @@ describe("opening a report", () => {
     vi.spyOn(console, "error").mockImplementation(() => undefined);
     fetchMock([on("GET", REPORT, answer)]);
     show();
-    expect(await screen.findByRole("alert")).toHaveTextContent("The report could not be loaded.");
+    expect(await screen.findByRole("alert")).toHaveTextContent(/^Could not be loaded\.$/);
     expect(screen.queryByRole("heading", { level: 3 })).toBeNull();
   });
 
@@ -380,7 +387,6 @@ describe("opening a report", () => {
     expect(termValue("State")).toBe(state);
     expect(screen.queryByRole("group", { name: ACT })).toBeNull();
     expect(screen.queryByRole("button", { name: "Dismiss" })).toBeNull();
-    expect(screen.queryByText(/Reported for/)).toBeNull();
     expect(status()).toBeEmptyDOMElement();
   });
 
@@ -416,7 +422,8 @@ describe("a photo of the conversation", () => {
       name: `Photo sent by the reported person. Sent: ${when(SAID(3))}`,
     });
     expect(image).toHaveAttribute("src", photoUrl(3));
-    expect(image).toHaveClass("full");
+    // Held to the page's width, whatever its aspect.
+    expect(image).toHaveClass("max-w-full");
     await waitFor(() => expect(image).toHaveFocus());
     expect(asked(calls)).toEqual([`GET ${REPORT}`, `GET ${photoOf(3)}`]);
     expect(screen.queryByRole("button", { name: "Show photo" })).toBeNull();
@@ -496,18 +503,26 @@ describe("a photo of the conversation", () => {
 
 describe("acting on the reported person", () => {
   it.each<[ModeratorRole, string[]]>([
-    ["moderator", ["Warn", "Hide from others (shadow ban)", "Suspend until a day"]],
-    ["admin", ["Warn", "Hide from others (shadow ban)", "Suspend until a day", "Ban"]],
-  ])("offers a %s these actions, beside the report's reason", async (role, buttons) => {
-    fetchMock([theReport()]);
-    show({ role });
-    expect(
-      within(await actions())
-        .getAllByRole("button")
-        .map((button) => button.textContent),
-    ).toEqual(buttons);
-    expect(screen.getByText("Reported for: Harassment")).toBeInTheDocument();
-  });
+    ["moderator", ["Warn", "Shadow ban", "Suspend"]],
+    ["admin", ["Warn", "Shadow ban", "Suspend", "Ban"]],
+  ])(
+    "offers a %s these actions, under a drawn name that says on whom (#581)",
+    async (role, buttons) => {
+      fetchMock([theReport()]);
+      show({ role });
+      const group = await actions();
+      expect(
+        within(group)
+          .getAllByRole("button")
+          .map((button) => button.textContent),
+      ).toEqual(buttons);
+      // The page shows two people: this is what says on which of them the buttons act.
+      expect(within(group).getByText(ACT)).not.toHaveClass("sr-only");
+      // The report's reason is said once, at the page's top, and not again beside the actions.
+      expect(termValue("Reason")).toBe("Harassment");
+      expect(screen.queryByText(/Reported for/)).toBeNull();
+    },
+  );
 
   it("applies the sanction, then closes the report naming it, and says so where the focus goes, reading nothing again", async () => {
     const calls = fetchMock([
@@ -517,9 +532,7 @@ describe("acting on the reported person", () => {
     ]);
     show({ strict: true });
     const { dialog, send } = await warn();
-    expect(dialog).toHaveTextContent(
-      "Applying one also closes this report as acted on; the reporter's export will say it was acted on, never which action.",
-    );
+    expect(dialog).toHaveTextContent("Applying one also closes this report as acted on.");
     fireEvent.click(send);
     await waitFor(() =>
       expect(status()).toHaveTextContent("Applied: Warning. The report is closed as acted on."),
@@ -555,17 +568,13 @@ describe("acting on the reported person", () => {
     fireEvent.click(send);
     await waitFor(() =>
       expect(status()).toHaveTextContent(
-        "Applied: Warning, and it stands. Another member of staff decided this report meanwhile. The reported person's page, where it can be lifted",
+        /^Applied: Warning, and it stands\. Another member of staff decided this report meanwhile\. The reported person's page$/,
       ),
     );
     await waitFor(() => expect(status()).toHaveFocus());
     expect(asked(calls)).toEqual([`GET ${REPORT}`, `POST ${SANCTIONS}`, `POST ${DECISION}`]);
     expect(screen.queryByRole("heading", { level: 4 })).toBeNull();
-    fireEvent.click(
-      within(status()).getByRole("link", {
-        name: "The reported person's page, where it can be lifted",
-      }),
-    );
+    fireEvent.click(within(status()).getByRole("link", { name: "The reported person's page" }));
     expect(await screen.findByText(`the page of ${REPORTED}`)).toBeInTheDocument();
   });
 
@@ -634,7 +643,7 @@ describe("acting on the reported person", () => {
       expect(within(status()).queryByRole("link")).toBeNull();
       const list = screen.getByRole("heading", {
         level: 4,
-        name: "Close as acted on with a sanction applied since the report",
+        name: "Applied since the report",
       }).nextElementSibling as HTMLElement;
       expect(
         within(list)
@@ -735,7 +744,7 @@ describe("closing the report with a sanction applied since", () => {
       within(dialog).getByRole("heading", { name: "Close the report as acted on" }),
     ).toBeInTheDocument();
     expect(dialog).toHaveTextContent(
-      `The report closes as acted on, naming this sanction: Suspension, applied ${when(APPLIED)}. Nothing more happens to the reported person; the reporter's export will say it was acted on, never which action.`,
+      `The report closes as acted on, naming this sanction: Suspension, applied ${when(APPLIED)}. Nothing more happens to the reported person.`,
     );
     fireEvent.click(within(dialog).getByRole("button", { name: "Close report" }));
     await waitFor(() => expect(status()).toHaveTextContent("Report closed as acted on."));
@@ -819,13 +828,12 @@ describe("dismissing the report", () => {
       show();
       await loaded();
       const button = screen.getByRole("button", { name: "Dismiss" });
-      expect(button).toHaveClass("apart");
       const dialog = press(button);
       expect(
         within(dialog).getByRole("heading", { name: "Dismiss the report" }),
       ).toBeInTheDocument();
       expect(dialog).toHaveTextContent(
-        "The report closes with no action on the reported person. The block between the two stays. The reporter's export will say it was dismissed.",
+        "The report closes with no action on the reported person. The block between the two stays.",
       );
       if (how === "Cancel") fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
       else fireEvent.keyDown(document.activeElement as Element, { key: "Escape" });
@@ -848,7 +856,6 @@ describe("dismissing the report", () => {
     expect(termValue("State")).toBe(`Dismissed · ${when(DECIDED)} · Who: a1b2c3d4`);
     expect(screen.queryByRole("group", { name: ACT })).toBeNull();
     expect(screen.queryByRole("button", { name: "Dismiss" })).toBeNull();
-    expect(screen.queryByText(/Reported for/)).toBeNull();
   });
 
   it("sends a dismissal pressed twice before its answer once", async () => {
@@ -865,5 +872,207 @@ describe("dismissing the report", () => {
     answer.release(json(decision("dismissed")));
     await waitFor(() => expect(status()).toHaveTextContent("Report dismissed."));
     expect(posted(calls, DECISION)).toHaveLength(1);
+  });
+});
+
+// The photo a report points at (#476): a conversation's line, marked in words
+// and listed first, still hidden until asked; a card's photo through the
+// report's own route, removed since, and taken down beside it while approved
+// (#477), the page updated from the answer and never read again.
+describe("the photo a conversation's report points at", () => {
+  const MARK = "The reporter pointed at this photo";
+
+  it("marks the line in words and lists it first under the copy's heading, its photo still hidden", async () => {
+    const calls = fetchMock([theReport(detail({ lineSeq: 3 }))]);
+    show();
+    const heading = await screen.findByRole("heading", {
+      level: 3,
+      name: /as it was when reported/,
+    });
+    const first = heading.nextElementSibling as HTMLElement;
+    expect(first.tagName).toBe("UL");
+    expect(within(first).getAllByRole("listitem")).toHaveLength(1);
+    expect(first).toHaveTextContent(`Reported person · ${when(SAID(3))} · ${MARK}Show photo`);
+    // In its place too, the conversation's order kept, marked there as well.
+    const order = first.nextElementSibling as HTMLElement;
+    expect(order.tagName).toBe("OL");
+    expect(within(order).getAllByRole("listitem")).toHaveLength(4);
+    expect(within(order).getAllByRole("listitem")[2]).toHaveTextContent(MARK);
+    expect(screen.getAllByText(MARK)).toHaveLength(2);
+    const shows = screen.getAllByRole("button", { name: "Show photo" });
+    expect(shows).toHaveLength(2);
+    expect(shows[0]).toHaveAccessibleDescription(`Reported person · ${when(SAID(3))} · ${MARK}`);
+    expect(screen.queryByRole("img")).toBeNull();
+    expect(asked(calls)).toEqual([`GET ${REPORT}`]);
+  });
+
+  it("shows the line's photo only when pressed, through the copy's own route", async () => {
+    const calls = fetchMock([theReport(detail({ lineSeq: 3 })), on("GET", photoOf(3), full(3))]);
+    show();
+    await loaded();
+    const [first] = screen.getAllByRole("button", { name: "Show photo" });
+    fireEvent.click(first as HTMLElement);
+    const image = await screen.findByRole("img", { name: /^Photo sent by the reported person/ });
+    expect(image).toHaveAttribute("src", photoUrl(3));
+    expect(asked(calls)).toEqual([`GET ${REPORT}`, `GET ${photoOf(3)}`]);
+  });
+
+  it("marks nothing when the report points at no line", async () => {
+    fetchMock([theReport()]);
+    show();
+    await loaded();
+    expect(screen.queryByText(MARK)).toBeNull();
+    expect(screen.getAllByRole("button", { name: "Show photo" })).toHaveLength(1);
+  });
+});
+
+describe("the photo a card's report points at", () => {
+  const PHOTO = "0b1c1c4e-9a8e-4a0b-9c3a-0c8d1e2f3aff";
+  const POINTED = `${REPORT}/photo`;
+  const TAKE_DOWN = `/admin/photos/${PHOTO}/decision`;
+  const TITLE = "The photo the reporter pointed at";
+  const DONE = "Taken down.";
+  const cardUrl = "https://media.test/media/k/p/card.webp?Signature=s";
+  const card = () => json({ url: cardUrl, variant: "card", expiresAt: "2030-01-01T00:00:00.000Z" });
+  const pointed = (extra: Record<string, unknown> = {}) => ({
+    removed: false,
+    id: PHOTO,
+    state: "approved",
+    approvedPhotos: 3,
+    ...extra,
+  });
+  const cardReport = (pointedPhoto: unknown = pointed()) =>
+    detail({ source: "card", copy: null, pointedPhoto });
+  const photoCard = () =>
+    screen.getByRole("heading", { level: 3, name: TITLE }).parentElement as HTMLElement;
+  const reasonOf = (dialog: HTMLElement, value: string) =>
+    fireEvent.change(within(dialog).getByRole("combobox", { name: "Reason the person is told" }), {
+      target: { value },
+    });
+
+  it("is asked for only when pressed, through the report's own route, and the picture takes the focus", async () => {
+    const calls = fetchMock([theReport(cardReport()), on("GET", POINTED, card)]);
+    show();
+    await loaded();
+    expect(
+      screen.getAllByRole("heading", { level: 3 }).map((heading) => heading.textContent),
+    ).toEqual(["The report", "The two people", "The reporter's words", TITLE, "Decision"]);
+    expect(asked(calls)).toEqual([`GET ${REPORT}`]);
+    const button = within(photoCard()).getByRole("button", { name: "Show photo" });
+    expect(button).toHaveAccessibleDescription("approved");
+    fireEvent.click(button);
+    const image = await screen.findByRole("img", {
+      name: "The photo the reporter pointed at: approved",
+    });
+    expect(image).toHaveAttribute("src", cardUrl);
+    await waitFor(() => expect(image).toHaveFocus());
+    expect(asked(calls)).toEqual([`GET ${REPORT}`, `GET ${POINTED}`]);
+  });
+
+  it("says Photo removed for a photo deleted since, and offers neither Show photo nor Take down", async () => {
+    fetchMock([theReport(cardReport({ removed: true }))]);
+    show();
+    await loaded();
+    expect(photoCard()).toHaveTextContent(`${TITLE}Photo removed`);
+    expect(within(photoCard()).queryByRole("button")).toBeNull();
+  });
+
+  it("has no photo card when the report points at no photo", async () => {
+    fetchMock([theReport(cardReport(null))]);
+    show();
+    await loaded();
+    expect(screen.queryByRole("heading", { level: 3, name: TITLE })).toBeNull();
+  });
+
+  it.each([
+    ["refused", () => failure(404, "not_found")],
+    ["outside the contract", () => json({ url: "not a url" })],
+    ["unreachable", unreachable],
+  ])(
+    "says the photo could not be shown and keeps its button when the answer is %s",
+    async (_, answer) => {
+      fetchMock([theReport(cardReport()), on("GET", POINTED, answer)]);
+      show();
+      await loaded();
+      fireEvent.click(within(photoCard()).getByRole("button", { name: "Show photo" }));
+      expect(await within(photoCard()).findByRole("alert")).toHaveTextContent(
+        "The photo could not be shown.",
+      );
+      expect(within(photoCard()).getByRole("button", { name: "Show photo" })).toBeInTheDocument();
+      expect(screen.queryByRole("img")).toBeNull();
+    },
+  );
+
+  it("offers Take down beside an approved photo, described by its state, and none beside another", async () => {
+    fetchMock([theReport(cardReport(pointed({ state: "rejected" })))]);
+    show();
+    await loaded();
+    expect(within(photoCard()).queryByRole("button", { name: "Take down…" })).toBeNull();
+    cleanup();
+    fetchMock([theReport(cardReport())]);
+    show();
+    await loaded();
+    expect(
+      within(photoCard()).getByRole("button", { name: "Take down…" }),
+    ).toHaveAccessibleDescription("approved");
+  });
+
+  it.each([
+    [1, true],
+    [2, true],
+    [3, false],
+  ])(
+    "with %i approved photos, the step says the person drops out of every round: %s",
+    async (n, says) => {
+      fetchMock([theReport(cardReport(pointed({ approvedPhotos: n })))]);
+      show();
+      await loaded();
+      const dialog = press(within(photoCard()).getByRole("button", { name: "Take down…" }));
+      if (says) expect(dialog).toHaveTextContent("fewer than 2 approved photos");
+      else expect(dialog).not.toHaveTextContent("fewer than");
+    },
+  );
+
+  it("takes the photo down through its confirm step, says so in the photo's own line, and never reads the report again", async () => {
+    const calls = fetchMock([
+      theReport(cardReport()),
+      on("POST", TAKE_DOWN, () =>
+        json({ photoId: PHOTO, state: "rejected", rejectionReason: "other" }),
+      ),
+    ]);
+    show();
+    await loaded();
+    const dialog = press(within(photoCard()).getByRole("button", { name: "Take down…" }));
+    reasonOf(dialog, "other");
+    fireEvent.click(within(dialog).getByRole("button", { name: "Take down" }));
+    const line = await within(photoCard()).findByText(DONE);
+    await waitFor(() => expect(line).toHaveFocus());
+    expect(within(photoCard()).queryByRole("button", { name: "Take down…" })).toBeNull();
+    expect(photoCard()).toHaveTextContent("rejected");
+    expect(await bodyOf(posted(calls, TAKE_DOWN)[0])).toEqual({
+      decision: "take_down",
+      reason: "other",
+    });
+    expect(asked(calls)).toEqual([`GET ${REPORT}`, `POST ${TAKE_DOWN}`]);
+    // Not a decision on the report: it still waits, and the decision's line says nothing.
+    expect(await actions()).toBeInTheDocument();
+    expect(status()).toBeEmptyDOMElement();
+  });
+
+  it("says a refused take-down in its step and changes nothing on the page", async () => {
+    fetchMock([
+      theReport(cardReport()),
+      on("POST", TAKE_DOWN, () => failure(409, "photo_not_approved")),
+    ]);
+    show();
+    await loaded();
+    const dialog = press(within(photoCard()).getByRole("button", { name: "Take down…" }));
+    reasonOf(dialog, "nudity");
+    fireEvent.click(within(dialog).getByRole("button", { name: "Take down" }));
+    expect(await within(dialog).findByRole("alert")).toHaveTextContent(
+      "The photo is no longer approved: it was taken down meanwhile.",
+    );
+    expect(screen.queryByText(DONE)).toBeNull();
+    expect(within(photoCard()).getByRole("button", { name: "Take down…" })).toBeInTheDocument();
   });
 });

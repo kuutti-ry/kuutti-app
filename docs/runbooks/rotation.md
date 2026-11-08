@@ -4,7 +4,7 @@ How each key, password and token the service uses is replaced, who may do it, ho
 
 Every step here is the maintainer's, or an organisation owner's where it says so. An agent working in this repository runs none of them: signing in is the maintainer's (CLAUDE.md, Commands; `infra/README.md`, Tools).
 
-There is no rotation calendar. Rotate when a value may have been seen by someone who should not have it, when a person who could read it leaves (below), and at the yearly custody review if the maintainer wants a rehearsal. `<env>` is `staging` or `prod`; production exists from #25, and until then every `prod` line is for later.
+There is no rotation calendar. Rotate when a value may have been seen by someone who should not have it, when a person who could read it leaves (below), and at the yearly custody review if the maintainer wants a rehearsal. `<env>` is `staging` or `prod`; production exists since 2026-10-24 (ADR-049), without bank identification and photos, so its Telia, HMAC and CloudFront lines are for later.
 
 ## Before any rotation
 
@@ -34,11 +34,15 @@ There is no rotation calendar. Rotate when a value may have been seen by someone
 | Telia's own signing keys | Telia's JWKS | the API, from discovery | Telia | 5 |
 | `/kuutti/<env>/hetu-hmac-key` | SSM SecureString; the offline medium; production also on paper in the sealed envelope | the API at boot | **nobody: never rotated** | 6 |
 | `/kuutti/<env>/cloudfront-signing-key` | SSM SecureString; the offline medium; the public half in `infra/envs/<env>/` | the API at boot | maintainer | 7 |
+| `/kuutti/<env>/origin-secret`, and the key `origin-secret` of the store `kuutti-<env>-origin-proof` | SSM SecureString; a CloudFront key value store; the offline medium | the API at boot; the distribution's CloudFront Function on every request | maintainer | 17 |
 | session and admin-session tokens, sign-in codes | hashes in the database | the API | nothing to rotate | 8 |
 | `DOKPLOY_TOKEN` (two keys), the Dokploy admin login | GitHub environments; Dokploy | `deploy.yml`, `preview.yml`, `preview-cleanup.yml` | the Dokploy admin and a repository admin | 9 |
 | `EXPO_TOKEN` | GitHub environments `staging`, `prod`, `preview`, `preview-cleanup` | `deploy.yml`, `eas-build.yml`, `preview.yml`, `preview-cleanup.yml` | an Expo owner or Admin and a repository admin | 10 |
 | `SENTRY_AUTH_TOKEN`; the two DSNs | GitHub environments `staging`, `prod`; EAS environments `preview`, `production`; SSM `sentry-dsn` (String) | `deploy.yml`, EAS builds; the API and the app | the Sentry owner and a repository admin | 11 |
 | GitHub variables, AWS access from CI | repository and environment variables; OIDC roles | the workflows | an owner | 12 |
+| `FONTS_TOKEN`, read-only on `kuutti-ry/kuutti-app-fonts` alone | EAS environments `preview`, `production`, visibility secret. Never GitHub. The website's Amplify app holds a token of its own, rotated in `kuutti-app-site` (its decision 18) | EAS builds, `eas-build-pre-install` (`scripts/fonts.ts`, ADR-052) | the maintainer | 13 |
+| the Google Play service account's JSON key; Play's upload key, EAS's keystore of `fi.kuutti.app` | EAS's credentials of `fi.kuutti.app`, no other copy. Never GitHub | EAS Submit and EAS builds, for any holder of `EXPO_TOKEN`; the `staging` profile's `--auto-submit` (ADR-057) | the maintainer (Google Cloud, expo.dev, Play Console) | 14 |
+| the App Store Connect API key of the association's Apple team; its APNs key | EAS's credentials of the team and of `fi.kuutti.app`, no other copy. Never GitHub | EAS Submit, for any holder of `EXPO_TOKEN`, through the `staging` profile's `--auto-submit` (ADR-063); Expo's push service (ADR-055) | the maintainer, as the team's Account Holder (App Store Connect, the developer site, expo.dev) | 15 |
 
 ## 1. Database application password
 
@@ -197,7 +201,7 @@ The private half signs every photo URL. A profile photo's lives fifteen minutes 
 
 ## 8. Session tokens and sign-in codes: nothing to rotate
 
-There is no session secret. Access and refresh tokens, admin tokens and one-time sign-in codes are random 256-bit values; the database keeps only their SHA-256 hashes (`apps/api/src/identity/sessions.ts`, `admin-session.ts`, `codes.ts`). A refresh rotates both tokens with reuse detection. Admin sessions last eight hours.
+There is no session secret on the server. Access tokens, admin tokens and one-time sign-in codes are random 256-bit values, and a refresh token is two of them, its session's own secret and the part each refresh replaces (ADR-059); the database keeps only their SHA-256 hashes (`apps/api/src/identity/sessions.ts`, `admin-session.ts`, `codes.ts`). A refresh rotates both tokens with reuse detection. Admin sessions last eight hours.
 
 To end every session at once (after a database leak, say), as `kuutti_app` through the tunnel of section 1:
 
@@ -249,7 +253,7 @@ Then revoke the old token on expo.dev.
 
 **What breaks meanwhile:** the EAS steps of `deploy.yml` (after the API is already deployed), `eas-build.yml`, the preview lanes and the sweep's EAS removals fail until the new token is set. The sweep retries.
 
-**If it leaked:** revoke first, before setting the new one. Then look at what was published to the `staging` and `production` channels since the leak (the project's updates on expo.dev). Roll a bad one back as ADR-004 says: republish the previous commit, or `eas update:republish`. Channel edits stay the maintainer's.
+**If it leaked:** revoke first, before setting the new one. Then look at what was published to the `staging` and `production` channels since the leak (the project's updates on expo.dev). Roll a bad one back as ADR-004 says: republish the previous commit, or `eas update:republish`. Channel edits stay the maintainer's. The token also reached Google Play through EAS, which uses the Play key for any holder and hands the upload key to every cloud build (ADR-057 §3): in Play Console, read each testing track's history; halt on a closed or open track what nobody started, and replace an internal release, which cannot be halted, with a staging build from a known-good `main`. Then replace the Play key and reset the upload key (section 14). It also reached App Store Connect through EAS (ADR-063 §3): read the app's TestFlight builds, expire any nobody started, and replace the App Store Connect key (section 15). Every cloud build is also handed the team's distribution certificate, so replace that too (section 16).
 
 ## 11. Sentry DSNs and the source-map token
 
@@ -262,7 +266,7 @@ Then revoke the old token on expo.dev.
 3. The EAS environments `preview` and `production`, visibility secret: replace the value as for the DSN above.
 4. Revoke the old token in Sentry.
 
-**Check.** The next deploy's step "Upload the update's source maps to Sentry" passes, and the next EAS build uploads its maps (`devices.md`: a build without readable stack traces fails).
+**Check.** The next deploy's step "Upload the update's source maps to Sentry" passes, and the next EAS build uploads its maps. A `production` build without them fails, but a `preview` environment build goes on (`devices.md`), so read its log for a `warning: sentry-cli` line: a dead token shows nowhere else.
 
 **What breaks meanwhile:** revoke the old token before the new one is in place and the upload step fails the deploy job (the update is already out), and EAS builds fail. Set first, revoke last.
 
@@ -270,28 +274,113 @@ Personal Sentry tokens made for settings work are revoked when the work is done 
 
 ## 12. GitHub: secrets, variables, AWS access
 
-- **Environment secrets** are the three above: `DOKPLOY_TOKEN`, `EXPO_TOKEN`, `SENTRY_AUTH_TOKEN`. The workflows read no other secret and none at repository or organisation level. Setting one needs admin rights on the repository (the organisation's owners).
+- **Environment secrets** are the three above: `DOKPLOY_TOKEN`, `EXPO_TOKEN`, `SENTRY_AUTH_TOKEN`. `FONTS_TOKEN` is EAS's alone (13). The workflows read no other secret and none at repository or organisation level. Setting one needs admin rights on the repository (the organisation's owners).
 - **Variables** are not secrets: role ARNs, the state bucket, URLs, ids and switches (`AWS_REGION`, `TF_STATE_BUCKET`, `AWS_PLAN_ROLE_ARN`, `AWS_APPLY_ROLE_ARN`, `AWS_PERMISSIONS_BOUNDARY_ARN`, `AWS_EXPORT_ROLE_ARN`, `ALERT_EMAIL`, `STAGING_ENABLED`, `PREVIEWS_ENABLED`, `EAS_ENABLED`, `EAS_PLATFORMS`, `EAS_BUILDS_ISSUE`, `DOKPLOY_URL`, `DOKPLOY_APPLICATION_ID`, `DOKPLOY_ENVIRONMENT_ID`, `API_URL`, `PREVIEW_API_DOMAIN`, `EAS_HOSTING_SUBDOMAIN`, `ADMIN_URL`, `ADMIN_BUCKET`, `ADMIN_DISTRIBUTION_ID`, `ADMIN_API_URL`). Nothing to rotate; a wrong one is set again with `gh variable set` from the commands in `infra/README.md`.
 - **AWS access from CI** is OIDC only: the roles trust this repository's numeric ids and an environment or branch, and no AWS key exists anywhere in GitHub (`infra/README.md`, After bootstrap). Nothing to rotate. `GITHUB_TOKEN` lives for one run.
 - **Owners' own tokens and second factors** follow `SECURITY.md`, Maintainer accounts.
 
-## 13. Nothing to rotate
+## 13. The fonts token
+
+`FONTS_TOKEN` lets a build read Saiga, Kuutti's typeface, from the association's private repository `kuutti-app-fonts` (ADR-052): a fine-grained token with Contents read on that repository alone, or a GitHub App's, the maintainer's choice. It lives in exactly these places, and in no GitHub secret, since no workflow ever has the typeface (`check-workflow-permissions.py` refuses one that names it):
+
+1. GitHub, Settings, Developer settings, fine-grained tokens: a new one, resource owner `kuutti-ry`, repository `kuutti-app-fonts` only, Contents read-only; the organisation approves it.
+2. The EAS environments `preview` and `production`, visibility secret: `eas env:create --name FONTS_TOKEN --environment preview --visibility secret` (and `production`), or `eas env:update` for a new value. A member's laptop needs none: `pnpm fonts` uses the member's own `gh` login.
+3. Revoke the old token on GitHub. The website's token is another one, in its Amplify app; this does not touch it.
+
+**Check.** The next EAS build's log shows `Saiga: …, verified` for each file in its install phase, and the build draws in Saiga.
+
+**What breaks meanwhile:** nothing fails. A build without the token, or with a dead one, says so in its log and is drawn in the system font (`scripts/fonts.ts --soft`). Do not let one reach the store that way.
+
+**If it leaked:** revoke it; the token reads the font files and nothing else. Whether Spoke is told is the maintainer's call (ADR-052).
+
+## 14. Google Play: the service account key and the upload key
+
+**The service account key** lets EAS upload a bundle to Google Play and release it on the app's testing tracks, never to production (ADR-057 §3). It lives in one place, EAS's credentials of `fi.kuutti.app` (Service credentials, the Google service account key for EAS Submit), and no copy is kept, on a laptop or in GitHub.
+
+1. Lift the organisation's ban on keys for the project as in `docs/vendors/google-play.md`, step 4 (`gcloud org-policies set-policy`, both constraints), and make a new key outside the checkout: `gcloud iam service-accounts keys create ~/eas-submit.json --iam-account=eas-submit@<project>.iam.gserviceaccount.com`.
+2. On expo.dev, the project's Credentials, Android, `fi.kuutti.app`: upload the new key in place of the old, or with `eas credentials -p android`, Google Service Account. Then `rm ~/eas-submit.json`.
+3. Delete the old key (`gcloud iam service-accounts keys list --iam-account=…` gives its id, then `gcloud iam service-accounts keys delete <id> --iam-account=…`) and put the policy back (`gcloud org-policies delete <constraint> --project=<project>`, both).
+
+**Check.** The next `staging` build's submission ends finished on expo.dev, and its release is on the internal testing track.
+
+**What breaks meanwhile:** a submission between the old key's deletion and the new one's upload fails, and its bundle reaches nobody until `eas submit --platform android --profile staging --id <build id>`. Upload first, delete last.
+
+**If it leaked:** delete the key in Google Cloud first. On a track it releases only bundles with the upload key's signature, but it can release those on any testing track and halt them on a closed or open one, and it can upload a bundle signed with any key to internal app sharing, which reaches the e-mail list of `docs/vendors/google-play.md`, step 3, and shows in no track's history. Read the tracks' release history in Play Console, and treat what internal app sharing handed out since the leak as unknown.
+
+**The upload key** is EAS's keystore of `fi.kuutti.app`, which also signs the development and preview APKs; EAS holds it and nobody rotates it on a schedule. When it is lost or out: make a new keystore for the app on EAS (`eas credentials -p android`), and in Play Console, Manage Play app signing, request an upload key reset with the new key's certificate as a PEM file (`keytool -export -rfc` on the keystore, which `eas credentials` can download), then delete the downloaded keystore and its passwords from the disk. No bundle can be uploaded until Google has made the change. Then register the new key under Android developer verification (`docs/vendors/google-play.md`, step 7) and put its fingerprint in place of the old one in `/kuutti/<env>/android-cert-fingerprints` (`devices.md`, Verified links). A phone with an expo.dev APK signed with the old key cannot update to one signed with the new: it uninstalls first.
+
+## 15. Apple: the App Store Connect API key and the APNs key
+
+**The App Store Connect API key** lets EAS upload a build of `fi.kuutti.app` to App Store Connect, from where it reaches TestFlight's internal group (ADR-063 §3). It is a team key of the association's Apple team, with the App Manager role by ADR-063 §3 (the one in use reads Admin on EAS, ADR-063, Open 6). A team key reaches every app of the team, and its role cannot be changed afterwards. It lives in one place, EAS's credentials of the team, assigned to the app's submissions, and no copy is kept, on a laptop or in GitHub. Apple offers its private half once, when it is made.
+
+1. Let EAS make the new one, as the Account Holder: in `apps/mobile`, `eas credentials -p ios`, the profile `staging`, App Store Connect: Manage your API Key, a new key, the role App Manager, assigned to the app's submissions. Or make it in App Store Connect (Users and Access, Integrations, Team Keys; the Account Holder or an Admin), with the role App Manager, download the `.p8` outside the checkout, upload it the same way with its key id and issuer id, and delete the file.
+2. Revoke the old key in App Store Connect (the same page). A revoked key cannot be brought back, and stays listed for 30 days.
+
+**Check.** The next `staging` build's iOS submission ends finished on expo.dev, and the build shows in TestFlight.
+
+**What breaks meanwhile:** a submission between the old key's revocation and the new one's assignment fails, and its build reaches nobody until `eas submit --platform ios --profile staging --id <build id>`. Assign first, revoke last.
+
+**If it leaked:** revoke it in App Store Connect first. With App Manager it can create versions of every app of the team and submit them for Apple's review, change their listings and prices, and manage TestFlight's groups and testers; only Apple's review stands between a version and the App Store. With Admin, which the one in use reads on EAS, it can also manage the team's users and keys and remove apps. Read the app's versions, its TestFlight builds and groups, and Users and Access for anything nobody started.
+
+**The maintainer's own App Store Connect key**, for the `asc` command-line tool, is in the maintainer's Keychain and not at EAS. Nothing depends on it but that tool: make a new one in App Store Connect (Users and Access, Integrations) if it is still wanted, and revoke the old one. Its role has not been read (ADR-063, Open 7).
+
+**The APNs key** lets Expo's push service wake iPhones for `fi.kuutti.app` (ADR-055). It lives in EAS's credentials of the app, with no copy. Make a new one at developer.apple.com (Certificates, Identifiers & Profiles, Keys, Apple Push Notifications service), or let `eas credentials -p ios`, Push Notifications, make it; upload it there, then revoke the old one at Apple. A push between the revocation and the upload fails, and its receipt says so (`docs/vendors/expo.md`). Apple caps how many keys a team holds, so an unused one is revoked rather than kept. **If it leaked:** with a phone's device token it can send that phone a notification that reads as Kuutti's, so upload the new key and revoke the old one at once.
+
+The distribution certificate and the provisioning profiles are section 16's.
+
+## 16. Nothing to rotate
 
 - **S3.** Deployed environments have no S3 keys: the API writes through its instance role. `S3_ACCESS_KEY` and `S3_SECRET_KEY` exist for the local stand-in only (`apps/api/src/lib/config.ts`).
 - **The instance role's credentials** are short-lived and issued by AWS to the box. A box that may be compromised is rebuilt and every secret under its prefix is rotated (`incident.md`).
 - **Encryption keys of SSM, S3 and RDS** are AWS-managed (`aws/ssm`, SSE-S3, RDS storage encryption). Their rotation is AWS's.
 - **TLS certificates** renew themselves: ACM for CloudFront, Let's Encrypt through Traefik on the box.
-- **Store signing credentials** (the Android keystore, the iOS distribution certificate and profiles) are held by EAS (`apps/mobile/README.md`, Setting up EAS). This page does not rotate them. A new Android keystore would change the fingerprint in `/kuutti/<env>/android-cert-fingerprints` (`devices.md`, Verified links).
+- **Store signing credentials** (the Android keystore, the iOS distribution certificate and profiles) are held by EAS (`apps/mobile/README.md`, Setting up EAS). This page does not rotate them on a schedule; a lost or leaked Android keystore is section 14's upload key. Play's own signing keys are Google's (`docs/vendors/google-play.md`). A leaked iOS distribution certificate is revoked at developer.apple.com and EAS makes a new one at the next interactive run (`eas credentials -p ios`); the profiles made with it are made again.
 - **Developer keys** for maintainer tools are not service secrets: the Claude API key of `pnpm i18n:translate` (`packages/i18n/README.md`) and the image-model key of the demo pictures (`docs/demo/photo-prompts.md`) live in the developer's own environment and are revoked at their provider.
 - **Human logins** (the mailbox, AWS root and Identity Center, GitHub, Expo, Dokploy, Sentry) are `custody.md`'s; a lost device is `SECURITY.md`'s.
+
+## 17. The origin secret (ADR-066)
+
+The value Kuutti's distribution sends to the box as `x-kuutti-origin`, which the API compares with its own copy before it believes CloudFront's viewer address. It lives in two places that must agree: the key `origin-secret` of the CloudFront key value store `kuutti-<env>-origin-proof`, and the SecureString `/kuutti/<env>/origin-secret`. Neither is a resource, so the value is in no state (ADR-001). CI's plan role may not read the store (the bootstrap's `ci_plan_deny_data`), so that deny must be applied before a value is first written. The value needs no other copy: a lost one is replaced, by these same steps, never restored. So it is made in the shell and never written to a file.
+
+**Steps.** Let the API take both the old and the new value, move the store, then let the API drop the old one:
+
+```sh
+new=$(openssl rand -base64 32 | tr '+/' '-_' | tr -d '=\n')
+old=$(aws ssm get-parameter --name /kuutti/<env>/origin-secret --with-decryption --query Parameter.Value --output text | awk '{print $NF}')
+aws ssm put-parameter --name /kuutti/<env>/origin-secret --type SecureString --overwrite --value "$old $new"
+# Redeploy the API (step "Restart" above), and on staging every open preview, as section 2 does;
+# /health still says "originProof":"valid" with the old value.
+arn=$(aws cloudfront describe-key-value-store --name kuutti-<env>-origin-proof --query KeyValueStore.ARN --output text)
+etag=$(aws cloudfront-keyvaluestore describe-key-value-store --kvs-arn "$arn" --query ETag --output text)
+aws cloudfront-keyvaluestore put-key --kvs-arn "$arn" --key origin-secret --value "$new" --if-match "$etag"
+# Within a minute or so every edge sends the new value. Then:
+aws ssm put-parameter --name /kuutti/<env>/origin-secret --type SecureString --overwrite --value "$new"
+# Redeploy the API again, and on staging the open previews again.
+unset new old
+```
+
+The first time, there is no old value. One command writes both, and prints `1` and `1`, never the value (as on staging on 2026-11-06):
+
+```sh
+V=$(openssl rand -base64 32 | tr '+/' '-_' | tr -d '=\n') && aws ssm put-parameter --name /kuutti/<env>/origin-secret --type SecureString --value "$V" --query Version && ARN=$(aws cloudfront describe-key-value-store --name kuutti-<env>-origin-proof --query KeyValueStore.ARN --output text) && aws cloudfront-keyvaluestore put-key --kvs-arn "$ARN" --key origin-secret --value "$V" --if-match "$(aws cloudfront-keyvaluestore describe-key-value-store --kvs-arn "$ARN" --query ETag --output text)" --query ItemCount; unset V
+```
+
+Then redeploy. Should SSM take the value and the store refuse it, do not run it again (SSM refuses a second first write): put SSM's value into the store with the `put-key` above, its `--value` read by `aws ssm get-parameter --name /kuutti/<env>/origin-secret --with-decryption --query Parameter.Value --output text`.
+
+**Check.** `curl -s https://api.<env>.kuutti.app/health` (production `https://api.kuutti.app/health`) says `"originProof":"valid"` after each step. `wrong` means the store and SSM disagree. `missing` means the function sent nothing: the store has no key, the function is not attached, or its read failed. A preview answers for itself at its own address.
+
+**What breaks meanwhile:** nothing, if the steps keep their order. If the API is left in `cloudfront` mode with a value the store no longer sends, every request has no address, and they share one bucket until the two agree again.
+
+**If it leaked:** anyone holding it can forge a viewer address through a CloudFront distribution of their own. Rotate at once. In `traefik` mode the value proves nothing to the limiter, so a leak has no effect where that mode holds, production before its cutover among them. On staging the previews can read it (preview code holds the instance role), which is ADR-004 §3's trust.
 
 ## When someone with write access leaves
 
 Write access is staging-level trust: a pull request's preview runs its code on the staging box with the staging instance role and the `preview` environment's tokens (`infra/README.md`, Previews, Trust; ADR-004 §3). When a person with write leaves the team, after their access is removed:
 
 - `EXPO_TOKEN` in all four environments (section 10);
+- `FONTS_TOKEN` in the EAS environments `preview` and `production` (section 13): anyone with write access could start a build that holds it;
 - the `ci-preview` Dokploy key (section 9);
-- on staging, what the role could read: `db-app-password` (1), `db-preview-password` (2), the Telia keys (4), the CloudFront key (7). The staging HMAC key is section 6's staging paragraph.
+- on staging, what the role could read: `db-app-password` (1), `db-preview-password` (2), the Telia keys (4), the CloudFront key (7), the origin secret (17). The staging HMAC key is section 6's staging paragraph.
 
 An organisation owner who leaves also had admin rights: add the deploy key (9) and the Sentry token (11).
 

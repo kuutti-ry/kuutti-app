@@ -2,7 +2,11 @@
 Feature: Device-bound sessions
   Bank ID is the account (TD-1): there is no password to reset. A device holds
   a short-lived access token and a single-use refresh token; losing a phone is
-  answered by one new bank login and "log out everywhere".
+  answered by one new bank login and "log out everywhere". A phone in use stays
+  signed in: each refresh moves the session's end ninety days on, never past a
+  year from the bank login (ADR-058). Every refresh token of a session carries
+  its secret, so any retired one presented again ends the session, however
+  often it was refreshed since (ADR-059).
 
   Scenario: An exchanged code yields a session that answers as the account
     Given "A" has completed a bank login and holds the one-time code
@@ -22,11 +26,34 @@ Feature: Device-bound sessions
     Then the answer is session_revoked
     And the pair from the first refresh no longer answers either
 
+  Scenario: A refresh token two refreshes old ends the session for both holders
+    Given someone copied a device's refresh token and has refreshed with it twice
+    When the device presents the refresh token it holds
+    Then the answer is session_revoked
+    And the copier's latest pair no longer answers either
+
   Scenario: An expired access token asks for a refresh
     Given a device's access token has passed its fifteen minutes
     When it calls a protected route
     Then the answer is session_expired
     And a refresh still succeeds
+
+  Scenario: A refresh moves the session's end to ninety days on
+    Given a device signed in through the bank eighty-nine days ago
+    When it refreshes
+    Then it receives a new pair
+    And its session ends ninety days after the refresh
+
+  Scenario: A phone left for ninety days signs in through the bank again
+    Given a device last refreshed ninety days ago
+    When it refreshes
+    Then the answer is session_revoked
+
+  Scenario: A year after the bank login even a phone in use signs in again
+    Given a device has refreshed every eighty days since its bank login
+    When it refreshes a year after the bank login
+    Then the answer is session_revoked
+    And the refresh before it ended the session at the year, not ninety days on
 
   Scenario: Logging out this device leaves the other devices signed in
     Given "A" is signed in on two devices

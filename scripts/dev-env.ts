@@ -439,6 +439,9 @@ function startService(service: Service): void {
       PATH: `${cwd}/node_modules/.bin:${ROOT}/node_modules/.bin:${process.env.PATH ?? ""}`,
       FORCE_COLOR: "1",
       DATABASE_URL,
+      // The API reads PORT, and an inherited one (a launcher's own) would beat
+      // .env and move it off the port this script waits on (#468).
+      PORT: String(service.port),
       ...service.env,
     },
     stdio: ["ignore", "pipe", "pipe"],

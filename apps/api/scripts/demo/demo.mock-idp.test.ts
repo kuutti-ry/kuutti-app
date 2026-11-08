@@ -13,6 +13,7 @@ import {
   ConversationList,
   Gender,
   OnboardingStatus,
+  PostalCode,
   PreferencesUpdate,
   ProfileResponse,
   ProfileUpdate,
@@ -81,11 +82,6 @@ const lastDayOfMonth = (at: Date) =>
 
 async function world(ctx: TestContext, overrides: Record<string, string> = {}) {
   const { logger, lines } = await captureLogger();
-  // The pond the histories name, and the default pond (#146): the test database has no seed.
-  await ctx.client.query(
-    `INSERT INTO ponds (slug, name_nominative, name_inessive) VALUES ('paakaupunkiseutu', 'Pääkaupunkiseutu', 'Pääkaupunkiseudulla')
-     ON CONFLICT (slug) DO NOTHING`,
-  );
   const config = testConfig({
     HETU_HMAC_KEY: randomBytes(32).toString("hex"),
     OIDC_ISSUER: ISSUER,
@@ -127,6 +123,7 @@ describe("the histories are what a person's own answers would be", () => {
           }).success,
           history.key,
         ).toBe(true);
+        expect(PostalCode.safeParse(history.onboarding.home).success, history.key).toBe(true);
       }
       if (history.profile) {
         expect(ProfileUpdate.safeParse(history.profile).success, history.key).toBe(true);
@@ -748,7 +745,7 @@ describe.skipIf(!reachable)("the personas, through the mock bank", () => {
     expect(sanna.profile.profile?.displayName).toBe("Sanna");
     expect(sanna.profile.completeness.missing).toEqual(["photos"]);
 
-    // Registered and gone: nothing answered. With two ponds to choose from, the pond is asked too (ADR-010 §12).
+    // Registered and gone: nothing answered, the home among it (ADR-061 §1).
     expect((await as("onni")).onboarding.missing).toEqual([
       "terms",
       "privacy",
@@ -757,9 +754,9 @@ describe.skipIf(!reachable)("the personas, through the mock bank", () => {
       "seeks",
       "intent",
       "age_window",
+      "home",
       "photos",
       "prompts_or_bio",
-      "pond",
     ]);
     expect((await as("noa")).onboarding.gender).toBe("non_binary");
 
@@ -771,9 +768,9 @@ describe.skipIf(!reachable)("the personas, through the mock bank", () => {
         await call(bank, login.accessToken, "GET", "/conversations?thumbs=false"),
       );
     };
-    const named = (list: ConversationList) =>
+    const named = ({ open, archived }: ConversationList) =>
       Object.fromEntries(
-        Object.entries(list).map(([group, rows]) => [
+        Object.entries({ open, archived }).map(([group, rows]) => [
           group,
           rows.map((c) => ({
             name: c.counterpart && !c.counterpart.deleted ? c.counterpart.name : null,
@@ -882,15 +879,15 @@ describe.skipIf(!reachable)("the personas, through the mock bank", () => {
     const count = async (sql: string) =>
       Number((await ctx.client.query<{ n: string }>(sql)).rows[0]?.n);
     const personas = `broker_subject = ANY(ARRAY[${DEMO_PERSONAS.map((p) => `'${p.key}'`).join(",")}])`;
-    // The eighteen with a history, Aino, and Aino's name at the other bank.
-    expect(await count(`SELECT count(*) AS n FROM identity WHERE ${personas}`)).toBe(20);
+    // The nineteen with a history, Aino, and Aino's name at the other bank.
+    expect(await count(`SELECT count(*) AS n FROM identity WHERE ${personas}`)).toBe(21);
     // Tapio's ban, which his erasure keeps on the identity (ADR-024 §8).
     expect(await count("SELECT count(*) AS n FROM sanction")).toBe(1);
 
     const result = await resetPersonas({ db: ctx.client, logger, now });
-    // Nineteen identities of the mock bank; eighteen accounts were live (Ilona's was a tombstone
+    // Twenty identities of the mock bank; nineteen accounts were live (Ilona's was a tombstone
     // already, Tapio's was banned and is taken as it is).
-    expect(result).toEqual({ identities: 19, erased: 18, objects: 0, spared: [] });
+    expect(result).toEqual({ identities: 20, erased: 19, objects: 0, spared: [] });
     expect(await count(`SELECT count(*) AS n FROM identity WHERE ${personas}`)).toBe(1);
     expect(
       await count(

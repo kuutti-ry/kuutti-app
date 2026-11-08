@@ -1,18 +1,15 @@
 import type { ProfileFieldKey } from "@kuutti/schema";
-import { Image } from "expo-image";
-import { cssInterop } from "nativewind";
-import { Platform } from "react-native";
+import { Ink } from "@/components/ui/ink";
 import { cn } from "@/lib/utils";
-import { DECORATIVE } from "@/theme/a11y";
 
 /**
  * A glyph before an option's name (#213, ADR-019 §3): a party's mark, a
  * religion's symbol, a star sign. Every glyph is black and white (the
  * maintainer, 10/10/2026: no colours, the parties' included): ink on
- * transparency, tinted with the text colour the way the home screen's mark
- * is. The name stays the text and the glyph is decorative, hidden from screen
- * readers, so no meaning rests on it (CLAUDE.md Accessibility). Sources,
- * terms and the edits made: assets/glyphs/NOTICE.md.
+ * transparency, tinted with the text colour (Ink). The name stays the text
+ * and the glyph is decorative, hidden from screen readers, so no meaning
+ * rests on it (CLAUDE.md Accessibility). Sources, terms and the edits made:
+ * assets/glyphs/NOTICE.md.
  */
 const ink = (source: number): number => source;
 
@@ -67,12 +64,6 @@ export function optionGlyph(field: ProfileFieldKey, option: string): number | nu
   return glyphs[option] ?? null;
 }
 
-// The text colour class is handed over as tintColor, native only (the home
-// screen's mark explains); on the web target the ink is inverted under dark.
-const Tinted = cssInterop(Image, {
-  className: { target: "style", nativeStyleToProp: { color: "tintColor" } },
-});
-
 /**
  * The glyph of one option, or nothing. `className` names the text colour the
  * ink takes: the chip's own when the chip is selected.
@@ -88,12 +79,5 @@ export function OptionGlyph({
 }) {
   const source = optionGlyph(field, option);
   if (source === null) return null;
-  return (
-    <Tinted
-      source={source}
-      contentFit="contain"
-      className={cn("h-5 w-5", className, Platform.select({ web: "dark:invert" }))}
-      {...DECORATIVE}
-    />
-  );
+  return <Ink source={source} className={cn("h-5 w-5", className)} />;
 }

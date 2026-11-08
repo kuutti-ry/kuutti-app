@@ -26,7 +26,7 @@ By hand, one piece at a time (this is what `env:up` does for you), each in its o
 ```bash
 docker compose up -d --wait                              # Postgres, S3 stand-in, mock bank login
 pnpm --filter @kuutti/db migrate                         # apply the migrations
-pnpm --filter @kuutti/db seed --env development          # ponds and matching_config
+pnpm --filter @kuutti/db seed --env development          # the pond and matching_config
 pnpm dev                                                 # API on 3000, restarts on change
 pnpm dev:mobile                                          # Metro on 8081; press w for the browser
 pnpm dev:admin                                           # moderation panel on 5173
@@ -38,9 +38,11 @@ AGPL-3.0 with App Store exception.
 
 The code is licensed under the GNU Affero General Public License, version 3, see [LICENSE](LICENSE), with an additional permission under section 7 that allows distribution through app stores whose terms conflict with the AGPL, see [LICENSE-EXCEPTION](LICENSE-EXCEPTION).
 
-The licence covers the code, not the name or the look: a fork needs its own name and emblem, see [TRADEMARKS.md](TRADEMARKS.md). Whoever runs the code as a service offers its source to the users of that service (AGPL section 13): the API names it in `GET /health` (`source`, with the running `commit`), and the app and the moderation panel show both. A modified deployment sets `SOURCE_URL` to its own repository.
+The licence covers the code, not the name or the look: a fork needs its own name and emblem, see [TRADEMARKS.md](TRADEMARKS.md). Saiga, the typeface the app and the panel are set in, is Spoke Type's, licensed to Kuutti ry for Kuutti alone; it is not in this repository and not under its licence, and a build without it, a fork's, is in the system font (ADR-052). Whoever runs the code as a service offers its source to the users of that service (AGPL section 13): the API names it in `GET /health` (`source`, with the running `commit`), and the app and the moderation panel show both. A modified deployment sets `SOURCE_URL` to its own repository.
 
 The Telia Tunnistus relying-party kit is a repository of its own, [kuutti-ry/tunnistus-oidc](https://github.com/kuutti-ry/tunnistus-oidc), MIT, published as `@kuutti-ry/tunnistus-oidc` (ADR-017 §6), so that any Finnish relying party can take it; this repository takes it from npm.
+
+The postal list, `packages/schema/src/postal-areas.generated.ts` and `apps/api/src/pond/places.generated.ts`, is Statistics Finland's open data under CC BY 4.0 and not under this repository's licence; [its notice](packages/schema/src/postal-areas.NOTICE.md) gives the source and what Kuutti changed (ADR-061 §4).
 
 Dependencies stay within the licences listed in [scripts/license-policy.json](scripts/license-policy.json), so that nothing copyleft without an equivalent store permission ends up in the app (`pnpm check:licenses`).
 

@@ -1,6 +1,9 @@
+import { readFileSync } from "node:fs";
+import { ErrorResponse } from "@kuutti/schema";
 import { Hono, type MiddlewareHandler } from "hono";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { AppEnv } from "./env.ts";
+import { ORIGIN_PROOF_HEADER } from "./origin-proof.ts";
 import {
   addressOf,
   personOf,
@@ -11,6 +14,14 @@ import {
 } from "./rate-limit.ts";
 import { serverRequestId } from "./request-id.ts";
 
+// The secret Kuutti's distribution sends (ADR-066), and the header that carries it.
+const SECRET = "origin-proof-of-the-test-4711-4711-4711";
+const PROOF = { [ORIGIN_PROOF_HEADER]: SECRET };
+const sourceOf = (trusted: TrustedProxy, originSecrets: readonly string[] = [SECRET]) => ({
+  TRUSTED_PROXY: trusted,
+  originSecrets,
+});
+
 function limitedApp(now?: () => number, trustedProxy: TrustedProxy = "traefik") {
   const app = new Hono<AppEnv>();
   app.use("*", serverRequestId());
@@ -19,7 +30,7 @@ function limitedApp(now?: () => number, trustedProxy: TrustedProxy = "traefik") 
     rateLimit({
       limit: 2,
       windowMs: 1_000,
-      keyOf: addressOf(trustedProxy),
+      keyOf: addressOf(sourceOf(trustedProxy)),
       skip: (p) => p === "/free",
       now,
     }),
@@ -94,19 +105,79 @@ describe("rate limit", () => {
   it("behind CloudFront, keys on the viewer address CloudFront adds, port dropped, forwarded hops ignored", async () => {
     const app = limitedApp(() => 1_000, "cloudfront");
     const viewer = (port: number, forged: string) =>
-      from({ "cloudfront-viewer-address": `198.51.100.7:${port}`, "x-forwarded-for": forged });
+      from({
+        ...PROOF,
+        "cloudfront-viewer-address": `198.51.100.7:${port}`,
+        "x-forwarded-for": forged,
+      });
     await app.request("/", viewer(4711, "10.0.0.1"));
     await app.request("/", viewer(4712, "10.0.0.2"));
     expect((await app.request("/", viewer(4713, "10.0.0.3"))).status).toBe(429);
-    const ipv6 = from({ "cloudfront-viewer-address": "2001:db8::1:40000" });
+    const ipv6 = from({ ...PROOF, "cloudfront-viewer-address": "2001:db8::1:40000" });
     expect((await app.request("/", ipv6)).status).toBe(200);
   });
 
   it("behind CloudFront, a missing or malformed viewer header shares the one bucket, forwarded hops notwithstanding", async () => {
     const app = limitedApp(() => 1_000, "cloudfront");
-    await app.request("/", from({ "x-forwarded-for": "1.1.1.1, 198.51.100.7, 130.176.0.1" }));
-    await app.request("/", from({ "cloudfront-viewer-address": "not an address" }));
-    expect((await app.request("/", from({ "x-forwarded-for": "2.2.2.2" }))).status).toBe(429);
+    await app.request(
+      "/",
+      from({ ...PROOF, "x-forwarded-for": "1.1.1.1, 198.51.100.7, 130.176.0.1" }),
+    );
+    await app.request("/", from({ ...PROOF, "cloudfront-viewer-address": "not an address" }));
+    expect((await app.request("/", from({ ...PROOF, "x-forwarded-for": "2.2.2.2" }))).status).toBe(
+      429,
+    );
+  });
+
+  // ADR-066: the box admits every CloudFront distribution's servers, and anybody's
+  // may send CloudFront-Viewer-Address with a value of its own.
+  it("behind CloudFront, a viewer address without Kuutti's proof is no address, whatever it says", async () => {
+    const app = limitedApp(() => 1_000, "cloudfront");
+    const forged = (viewer: string) => from({ "cloudfront-viewer-address": `${viewer}:4711` });
+    await app.request("/", forged("198.51.100.1"));
+    await app.request("/", forged("198.51.100.2"));
+    // A third invented address joins the same bucket of no address and is refused.
+    expect((await app.request("/", forged("198.51.100.3"))).status).toBe(429);
+    // A viewer of Kuutti's distribution is counted on its own all the while.
+    const proven = from({ ...PROOF, "cloudfront-viewer-address": "198.51.100.1:4711" });
+    expect((await app.request("/", proven)).status).toBe(200);
+  });
+
+  it("behind CloudFront, a wrong proof counts as none", async () => {
+    const app = limitedApp(() => 1_000, "cloudfront");
+    const wrong = (viewer: string) =>
+      from({ [ORIGIN_PROOF_HEADER]: `${SECRET}x`, "cloudfront-viewer-address": `${viewer}:4711` });
+    await app.request("/", wrong("198.51.100.1"));
+    await app.request("/", wrong("198.51.100.2"));
+    expect((await app.request("/", wrong("198.51.100.3"))).status).toBe(429);
+  });
+
+  it("while a secret replaces another, a request carrying either is counted by its viewer", async () => {
+    const next = "the-next-origin-proof-4711-4711-4711";
+    const app = new Hono<AppEnv>();
+    app.get("/", (c) => c.json({ key: addressOf(sourceOf("cloudfront", [SECRET, next]))(c) }));
+    const keyWith = async (proof: string) =>
+      (
+        (await (
+          await app.request(
+            "/",
+            from({
+              [ORIGIN_PROOF_HEADER]: proof,
+              "cloudfront-viewer-address": "198.51.100.7:4711",
+            }),
+          )
+        ).json()) as { key: string | null }
+      ).key;
+    expect(await keyWith(SECRET)).toBe("198.51.100.7");
+    expect(await keyWith(next)).toBe("198.51.100.7");
+    expect(await keyWith("neither-of-the-two-secrets-4711-4711")).toBeNull();
+  });
+
+  it("behind Traefik or on the socket, the proof changes nothing", async () => {
+    const app = new Hono<AppEnv>();
+    app.get("/", (c) => c.json({ key: addressOf(sourceOf("traefik", []))(c) }));
+    const res = await app.request("/", from({ "x-forwarded-for": "198.51.100.9" }));
+    expect(((await res.json()) as { key: string | null }).key).toBe("198.51.100.9");
   });
 
   it("reads only the shapes CloudFront sends", () => {
@@ -168,7 +239,7 @@ async function keyOf(
   options: { ipv6Prefix?: number } = {},
 ): Promise<string | null> {
   const app = new Hono<AppEnv>();
-  app.get("/", (c) => c.json({ key: addressOf(trusted, options)(c) }));
+  app.get("/", (c) => c.json({ key: addressOf(sourceOf(trusted), options)(c) }));
   const res =
     trusted === "none"
       ? await app.request("/", {}, socket(address))
@@ -177,7 +248,7 @@ async function keyOf(
           from(
             trusted === "traefik"
               ? { "x-forwarded-for": address }
-              : { "cloudfront-viewer-address": `${address}:4711` },
+              : { ...PROOF, "cloudfront-viewer-address": `${address}:4711` },
           ),
         );
   return ((await res.json()) as { key: string | null }).key;
@@ -247,7 +318,7 @@ describe("the address a request is counted by (ADR-026 §1)", () => {
               from(
                 trusted === "traefik"
                   ? { "x-forwarded-for": address }
-                  : { "cloudfront-viewer-address": `${address}:443` },
+                  : { ...PROOF, "cloudfront-viewer-address": `${address}:443` },
               ),
             );
       expect((await carrying("2001:db8:4711::1")).status).toBe(200);
@@ -299,7 +370,7 @@ describe("the address counted by a wider IPv6 prefix", () => {
       rateLimit({
         limit: 256,
         windowMs: 1_000,
-        keyOf: addressOf("traefik", AT_56),
+        keyOf: addressOf(sourceOf("traefik"), AT_56),
         now: () => 0,
       }),
     );
@@ -340,7 +411,7 @@ describe("rate limit bookkeeping", () => {
           return limit;
         },
         windowMs: 1_000,
-        keyOf: addressOf("traefik"),
+        keyOf: addressOf(sourceOf("traefik")),
         now: () => 0,
       }),
     );
@@ -375,7 +446,12 @@ describe("rate limit bookkeeping", () => {
     const app = new Hono<AppEnv>();
     app.use(
       "*",
-      rateLimit({ limit: 1, windowMs: 60_000, keyOf: addressOf("traefik"), now: () => 0 }),
+      rateLimit({
+        limit: 1,
+        windowMs: 60_000,
+        keyOf: addressOf(sourceOf("traefik")),
+        now: () => 0,
+      }),
     );
     app.get("/", (c) => c.text("ok"));
     const client = from({ "x-forwarded-for": "203.0.113.7" });
@@ -709,5 +785,25 @@ describe("the address given back only for what the person's limiter counted (ADR
     expect((await app.request("/ends-session")).status).toBe(200);
     expect((await app.request("/ends-session")).status).toBe(429);
     expect(counts).toEqual([]);
+  });
+});
+
+// The edge's refusal (ADR-067 §3): AWS WAF answers an address past the edge's
+// limit with this body in the API's place (infra/modules/media/edge.tf reads
+// edge.json), so the app and the load smoke must read it as the limiter's own 429.
+describe("the edge's refusal", () => {
+  const { refusal: edge } = JSON.parse(
+    readFileSync(new URL("../../../../infra/modules/media/edge.json", import.meta.url), "utf8"),
+  ) as { refusal: unknown };
+
+  it("is the limiter's own envelope and code, with nothing else in it", async () => {
+    const app = limitedApp();
+    const client = from({ "x-forwarded-for": "203.0.113.9" });
+    await app.request("/", client);
+    await app.request("/", client);
+    const own = ErrorResponse.parse(await (await app.request("/", client)).json());
+    // zod leaves out a key the envelope does not have, so a stray one fails the comparison.
+    expect(ErrorResponse.parse(edge)).toEqual(edge);
+    expect(ErrorResponse.parse(edge).error.code).toBe(own.error.code);
   });
 });

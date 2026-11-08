@@ -15,9 +15,9 @@ import { isLegalTextKind, legalPageUrl } from "./legal.ts";
  * revert the text.
  */
 const GOLDEN: Record<string, { version: string; hash: string }> = {
-  privacy: { version: "2026-09-draft-1", hash: "7197e6c3209d4b4a" },
+  privacy: { version: "2026-10-draft-3", hash: "7197e6c3209d4b4a" },
   research: { version: "2026-09-draft-1", hash: "b55ab7542a8d4bb2" },
-  special_category: { version: "2026-10-draft-2", hash: "507c62005dcc9d0d" },
+  special_category: { version: "2026-11-draft-3", hash: "575a40e24df60b7d" },
   terms: { version: "2026-09-draft-1", hash: "a947eb54ce1338cd" },
 };
 

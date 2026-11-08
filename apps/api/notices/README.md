@@ -30,6 +30,34 @@ It reads over HTTPS (and tags with `git ls-remote`), never running anything it f
 
 Each text goes under the key `textKey` from `@kuutti/notices` gives it, split with `splitNotice` (libpng's licence whole: its title would pass for a copyright line).
 
+## The copy of what could vanish (#425)
+
+The notices point at each source where its project keeps it, and the image's publisher stays obliged to keep that source reachable while the image is offered (GPL-3.0 6(d), through LGPL-3.0). Most of it sits where releases are kept: download.gnome.org, cairographics.org, static.crates.io, storage.googleapis.com, gitlab. What could change or vanish is copied, once per sharp-libvips version, into a release of this repository, `sources-sharp-libvips-<version>`, which the notices name beside the upstream addresses: every patch (gists, a pull request's diff, a commit's patch), and the release of each library used under the LGPL that its project hosts on GitHub, where the project could delete it. For 1.3.4 that is nine files, 29 MB. The release is never deleted while an image built from that libvips is still offered.
+
+After gathering a new version, and before its image is built, make its release (a release tag is not `v*`, so no workflow starts):
+
+```
+v=$(jq -r .version apps/api/notices/libvips.json)
+dir=$(mktemp -d)
+jq -r '.libraries[] | (.license | test("LGPL")) as $lgpl | .name as $lib | .source[]
+  | select(test("\\.patch$|//gist\\.") or ($lgpl and test("^https://github\\.com/[^/]+/[^/]+/(releases/download|archive)/")))
+  | "\($lib)\t\(.)"' apps/api/notices/libvips.json | sort -u -t$'\t' -k2,2 |
+while IFS=$'\t' read -r lib url; do
+  base=${url##*/}
+  case "$url" in
+    */pull/*.patch) name="$lib-pull-$base" ;;
+    *) [[ $base =~ ^[0-9a-f]{40}\.patch$ ]] && name="$lib-$base" || name=$base ;;
+  esac
+  curl -fsSL -o "$dir/$name" "$url" && printf '%s\t%s\n' "$name" "$url"
+done
+(cd "$dir" && shasum -a 256 * > SHA256SUMS)
+gh release create "sources-sharp-libvips-$v" --target main --latest=false \
+  --title "Sources of sharp-libvips $v (libvips $(jq -r .versions.vips apps/api/notices/libvips.json))" \
+  --notes "A copy of what could change or vanish of the API image's libvips sources (apps/api/notices/README.md, #425). Not a release of Kuutti." "$dir"/*
+```
+
+The loop prints each file with the address it came from; put that table into the release's notes. A patch from a pull request still open may change after the build fetched it: say in the notes when it was merged, or that it was open.
+
 ## When it fails
 
 - **A library the build gains, or a row it no longer needs.** Add or remove its row in `LIBRARIES` (`scripts/notices/libvips.ts`), read from the library's own repository at its tag: what it is used under (sharp-libvips' table names it), its repository and tag, its licence files.

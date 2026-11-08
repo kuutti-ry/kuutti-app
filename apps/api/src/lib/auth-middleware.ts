@@ -85,6 +85,9 @@ export function requireSession(deps: {
     const found = await authenticate(deps, token, at);
     c.set("accountId", found.accountId);
     c.set("sessionId", found.sessionId);
+    // Never kept by anybody in between, the phone's own HTTP cache included: what
+    // a session reads is that person's, whom they seek among it (ADR-010 §16).
+    c.header("Cache-Control", "no-store");
     // A request the limiter refuses writes nothing, not even the touch.
     const admitted = async () => {
       await deps.store.touch(deps.db, found.sessionId, at);

@@ -4,7 +4,9 @@ import { ApiError, api } from "@/lib/api";
 // The block and report routes as the app calls them (#84, ADR-030), from a
 // card and from a conversation (#351), through the typed client; the zod
 // contracts guard the runtime (ADR-003). Each answers 204 whatever stood
-// before, so the app learns nothing about the other person.
+// before, so the app learns nothing about the other person: a report's
+// pointer at one photo (#476, ADR-030 §13) that does not hold is left out
+// with the same answer.
 
 function failed(response: Response, error: unknown, what: string): ApiError {
   const parsed = ErrorResponse.safeParse(error);
@@ -21,7 +23,7 @@ export async function blockPerson(accountId: string): Promise<void> {
   if (!response.ok) throw failed(response, error, "block");
 }
 
-/** Reports the person of a card the caller was shown, which blocks them too. */
+/** Reports the person of a card the caller was shown, which blocks them too; `photoId` names one of the card's photos (#476). */
 export async function reportPerson(body: ReportRequest): Promise<void> {
   const { error, response } = await api.POST("/reports", { body });
   if (!response.ok) throw failed(response, error, "report");
@@ -35,7 +37,7 @@ export async function blockConversation(id: string): Promise<void> {
   if (!response.ok) throw failed(response, error, "block");
 }
 
-/** Reports the other person of a conversation with a copy of it, which blocks them too (#351). */
+/** Reports the other person of a conversation with a copy of it, which blocks them too (#351); `seq` names the line of one photo they sent (#476). */
 export async function reportConversation(
   id: string,
   body: ConversationReportRequest,

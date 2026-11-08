@@ -1,5 +1,9 @@
+import type { PlainMessageKey } from "@kuutti/i18n";
+import * as Sentry from "@sentry/react-native";
 import { useEffect, useState } from "react";
-import { AccessibilityInfo, Platform, View } from "react-native";
+import { AccessibilityInfo, AppState, Keyboard, Linking, Platform, View } from "react-native";
+import { Choice } from "@/components/Choice";
+import { sayAloud } from "@/components/Notice";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -7,12 +11,17 @@ import { Text } from "@/components/ui/text";
 import { GRACE_MINUTES, PasscodeField, useLock } from "@/features/identity";
 import { useT } from "@/lib/locale";
 import { useHapticTap } from "@/theme/haptics";
-import { Choice } from "./Choice";
 
 /** Said aloud on iOS; Android's live region below says it already. */
 function announce(words: string) {
   if (Platform.OS === "ios") AccessibilityInfo.announceForAccessibility(words);
 }
+
+/** Why the face or fingerprint was not turned on: not confirmed, or paused by the phone (#464). */
+const REFUSED: Record<"failed" | "lockout", PlainMessageKey> = {
+  failed: "lock.settings.biometricsFailed",
+  lockout: "lock.settings.biometricsLockout",
+};
 
 /**
  * A new passcode, typed twice (#418): the sixth digit of the first moves on
@@ -29,6 +38,12 @@ function PasscodeSetup({
   const [first, setFirst] = useState<string | null>(null);
   const [typed, setTyped] = useState("");
   const [mismatch, setMismatch] = useState(false);
+  // The field goes with this step. Android can leave its keyboard up with nothing
+  // to type into, over what comes next, unless it is closed while the field stands.
+  const leave = (then: () => void) => {
+    Keyboard.dismiss();
+    then();
+  };
   return (
     <View className="gap-4">
       <PasscodeField
@@ -44,7 +59,7 @@ function PasscodeSetup({
             setFirst(code);
             setMismatch(false);
           } else if (code === first) {
-            onDone(code);
+            leave(() => onDone(code));
           } else {
             setFirst(null);
             setMismatch(true);
@@ -53,7 +68,7 @@ function PasscodeSetup({
         }}
       />
       {mismatch && <Text accessibilityLiveRegion="assertive">{t("lock.passcode.mismatch")}</Text>}
-      <Button variant="outline" onPress={onCancel}>
+      <Button variant="outline" onPress={() => leave(onCancel)}>
         {t("lock.passcode.cancel")}
       </Button>
     </View>
@@ -73,23 +88,42 @@ export function LockControls() {
   const lock = useLock();
   const [choosing, setChoosing] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [refused, setRefused] = useState(false);
+  const [refused, setRefused] = useState<"failed" | "lockout" | null>(null);
   const biometricsOn = lock.settings?.biometrics ?? false;
-  // What the phone has now: a face or finger may have been set up or removed since the app started.
+  const canOffer =
+    lock.biometrics !== undefined && lock.biometrics !== null && lock.biometrics !== "denied";
+  // What the phone has now: a face or finger may have been set up or removed
+  // since the app started, or in the phone's settings while this row
+  // waited, which the lock asks about on return only while it is on (#464).
+  // Back from the background only: iOS's Face ID prompt and its question
+  // whether Kuutti may use Face ID pass through "inactive" alone, and what
+  // they answer is the ask's to say.
   const { recheck } = lock;
   useEffect(() => {
     void recheck();
+    let away = false;
+    const subscription = AppState.addEventListener("change", (next) => {
+      if (next === "background") away = true;
+      if (next === "active" && away) {
+        away = false;
+        void recheck();
+      }
+    });
+    return () => subscription.remove();
   }, [recheck]);
 
   const toggleBiometrics = async (wanted: boolean) => {
     tap();
     setBusy(true);
-    setRefused(false);
+    setRefused(null);
     try {
       const answer = await lock.setBiometrics(wanted);
-      if (answer === "failed") {
-        setRefused(true);
-        announce(t("lock.settings.biometricsFailed"));
+      if (answer === "denied") {
+        // The line above takes the switch's place, and says it from here on.
+        announce(t("lock.settings.biometricsDenied"));
+      } else if (answer !== "ok") {
+        setRefused(answer);
+        announce(t(REFUSED[answer]));
       }
     } finally {
       setBusy(false);
@@ -102,8 +136,23 @@ export function LockControls() {
       {lock.biometrics === null && (
         <Text variant="muted">{t("lock.settings.biometricsMissing")}</Text>
       )}
+      {lock.biometrics === "denied" && (
+        <View className="gap-2">
+          <Text>{t("lock.settings.biometricsDenied")}</Text>
+          <Button
+            variant="outline"
+            onPress={() => {
+              tap();
+              // A phone whose settings cannot be opened is reported, the error alone.
+              Linking.openSettings().catch((error: unknown) => Sentry.captureException(error));
+            }}
+          >
+            {t("notifications.phone.openSettings")}
+          </Button>
+        </View>
+      )}
       {/* Also while the phone no longer has any, if the lock still says so: it can then be turned off. */}
-      {((lock.biometrics !== null && lock.biometrics !== undefined) || biometricsOn) && (
+      {(canOffer || biometricsOn) && (
         <View className="gap-2">
           <View className="flex-row items-center justify-between gap-4">
             <Label
@@ -120,8 +169,8 @@ export function LockControls() {
               onCheckedChange={(wanted) => void toggleBiometrics(wanted)}
             />
           </View>
-          {refused && (
-            <Text accessibilityLiveRegion="assertive">{t("lock.settings.biometricsFailed")}</Text>
+          {refused !== null && (
+            <Text accessibilityLiveRegion="assertive">{t(REFUSED[refused])}</Text>
           )}
         </View>
       )}
@@ -134,13 +183,13 @@ export function LockControls() {
           onDone={(code) => {
             void lock.setPasscode(code).then(() => {
               setChoosing(false);
-              announce(t("lock.settings.passcodeSet"));
+              // Change and Remove say it to the eye (#581).
+              sayAloud(t("lock.settings.passcodeSet"));
             });
           }}
         />
       ) : lock.settings?.passcode ? (
         <View className="gap-2">
-          <Text accessibilityLiveRegion="polite">{t("lock.settings.passcodeSet")}</Text>
           <Button
             variant="outline"
             onPress={() => {
@@ -191,7 +240,6 @@ export function LockControls() {
               />
             ))}
           </View>
-          <Text variant="muted">{t("lock.settings.always")}</Text>
         </View>
       )}
     </View>

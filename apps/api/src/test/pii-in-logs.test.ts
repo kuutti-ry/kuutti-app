@@ -4,7 +4,7 @@ import { generateHetu } from "@kuutti-ry/tunnistus-oidc/hetu";
 import type { QueryResultRow } from "pg";
 import { afterAll, describe, expect, it } from "vitest";
 import { createApp } from "../app.ts";
-import type { IdentityBroker } from "../identity/index.ts";
+import { CURRENT_CONSENT_VERSIONS, type IdentityBroker } from "../identity/index.ts";
 import { type Mailer, type MailMessage, sesMailer } from "../lib/mail.ts";
 import { addressOf, TRUSTED_PROXIES, type TrustedProxy } from "../lib/rate-limit.ts";
 import { signedInAccount, staffSession, withMatchingConfig } from "./account.ts";
@@ -46,6 +46,8 @@ const FIXTURES = {
   verifier: VERIFIER_PROBE,
   // Its SHA-256, which the start carries in the query.
   challenge: createHash("sha256").update(VERIFIER_PROBE).digest("hex"),
+  // The proof of Kuutti's distribution (ADR-066): a secret, so never in a line either.
+  originSecret: "pii-origin-proof-4711-4711-4711-4711",
 } as const;
 
 /**
@@ -102,6 +104,8 @@ function requestFor(
     "x-probe": FIXTURES.email,
     "x-forwarded-for": client.forwardedFor,
     "cloudfront-viewer-address": client.viewer,
+    // As through Kuutti's distribution, so the cloudfront mode reads the viewer address.
+    "x-kuutti-origin": FIXTURES.originSecret,
   };
   const withBody = method !== "GET" && method !== "HEAD";
   if (withBody) headers["content-type"] = "application/json";
@@ -413,7 +417,7 @@ describe("PII in logs", () => {
     );
     await ctx.client.query(
       `INSERT INTO photo_access (account_id, photo_id, variant, at)
-       SELECT $1, $2, 'card', $3::timestamptz - g * interval '1 second' FROM generate_series(1, 119) g`,
+       SELECT $1, $2, 'card', $3::timestamptz - g * interval '1 second' FROM generate_series(1, 1499) g`,
       [a.accountId, photo, new Date(tick)],
     );
     const probe = `?${new URLSearchParams({ hetu: FIXTURES.hetu, email: FIXTURES.email, text: FIXTURES.message })}`;
@@ -428,7 +432,7 @@ describe("PII in logs", () => {
     }
     const banned = lines().filter((line) => line.msg === "automatic shadow ban");
     expect(banned.map(({ rule, count }) => ({ rule, count }))).toEqual([
-      { rule: "photo_fetches", count: 120 },
+      { rule: "photo_fetches", count: 1500 },
       { rule: "round_reads", count: 30 },
     ]);
     for (const line of banned) {
@@ -527,7 +531,7 @@ describe("PII in logs", () => {
       const { logger, lines } = await captureLogger();
       // Built with media, so the photo routes run their own code and not the 503 of a bare app (#49).
       const app = createApp({
-        config: testConfig({ TRUSTED_PROXY: mode }),
+        config: testConfig({ TRUSTED_PROXY: mode, ORIGIN_SECRET: FIXTURES.originSecret }),
         logger,
         db: testPool(),
         media: testMediaDeps().deps,
@@ -551,7 +555,11 @@ describe("PII in logs", () => {
       const { logger, lines } = await captureLogger();
       const build = (overrides: Record<string, string>) =>
         createApp({
-          config: testConfig({ TRUSTED_PROXY: mode, ...overrides }),
+          config: testConfig({
+            TRUSTED_PROXY: mode,
+            ORIGIN_SECRET: FIXTURES.originSecret,
+            ...overrides,
+          }),
           logger,
           db: ctx.client,
         });
@@ -565,13 +573,13 @@ describe("PII in logs", () => {
       // The address's limit, on a route nobody signs in for, and on the two
       // starts it then sends back with a code.
       const byAddress = build({ RATE_LIMIT_PER_MINUTE: "1" });
-      const waitlist = { method: "GET", path: "/waitlist" };
+      const docs = { method: "GET", path: "/docs" };
       const starts = [
         { method: "GET", path: "/auth/start" },
         { method: "GET", path: "/admin/auth/start" },
       ];
       for (const client of [CLIENTS.ipv4, CLIENTS.ipv6]) {
-        expect(await twice(byAddress, waitlist, client)).toEqual([200, 429]);
+        expect(await twice(byAddress, docs, client)).toEqual([200, 429]);
         expect(await exercise(byAddress, starts, client)).toEqual([302, 302]);
       }
 
@@ -689,13 +697,105 @@ describe("PII in logs", () => {
     const tokens = (await own.json()) as { accessToken: string; refreshToken: string };
     expect((await exchange(code, FIXTURES.verifier)).status).toBe(401);
 
-    // The login left its line, so the absence below is not for want of lines.
+    // The login left its lines, so the absence below is not for want of lines:
+    // the decision's, and the identification the alarm counts (#471).
     expect(lines().some((l) => l.msg === "bank login")).toBe(true);
+    expect(lines().some((l) => l.msg === "identified at the bank")).toBe(true);
     expect(leakedFixtures(lines())).toEqual([]);
     const out = JSON.stringify(lines());
     for (const secret of [hetu, code, tokens.accessToken, tokens.refreshToken]) {
       expect(out).not.toContain(secret);
     }
+  });
+
+  // The sweep's fake session never reaches the home's handler (#514, ADR-061
+  // §9): a code kept, one too small to keep, one the list lacks, something
+  // that is no code, what the card shows, and the write interrupted by a fault.
+  test("A home reaches no log line, no error and no event", async ({ ctx }) => {
+    const reports: unknown[] = [];
+    const { logger, lines } = await captureLogger();
+    let armed = false;
+    const db: Queryable = {
+      async query<R extends QueryResultRow = QueryResultRow>(text: string, values?: unknown[]) {
+        if (armed && /UPDATE account\s+SET home_place/.test(text)) {
+          armed = false;
+          throw new Error("Connection terminated unexpectedly");
+        }
+        return ctx.client.query<R>(text, values);
+      },
+    };
+    const app = createApp({
+      config: testConfig(),
+      logger,
+      db,
+      report: (error, context) => reports.push({ error: String(error), context }),
+    });
+    const a = await signedInAccount(ctx.client);
+    const json = { ...a.headers, "content-type": "application/json" };
+    const consent = await app.request("/consents", {
+      method: "POST",
+      headers: json,
+      body: JSON.stringify({
+        kind: "research",
+        version: CURRENT_CONSENT_VERSIONS.research,
+        locale: "fi",
+      }),
+    });
+    expect(consent.status).toBe(200);
+    const put = (body: unknown) =>
+      app.request("/account/home", { method: "PUT", headers: json, body: JSON.stringify(body) });
+
+    expect((await put({ postalCode: "00530" })).status).toBe(200);
+    expect((await put({ showArea: true })).status).toBe(200);
+    expect((await put({ postalCode: "83960" })).status).toBe(200);
+    const refused = await put({ postalCode: "99999" });
+    expect(refused.status).toBe(400);
+    // What an answer says, without its request id: random, it may hold any digits.
+    const said = async (answer: Response) => {
+      const { requestId: _random, ...words } = (await answer.json()).error;
+      return JSON.stringify(words);
+    };
+    expect(await said(refused)).not.toContain("99999");
+    const malformed = await put({ postalCode: "0053A" });
+    expect(malformed.status).toBe(400);
+    expect(await said(malformed)).not.toContain("0053A");
+    armed = true;
+    expect((await put({ postalCode: "33100" })).status).toBe(500);
+
+    // The write's line names the account alone.
+    const written = lines().filter((l) => l.msg === "home set");
+    expect(written).toHaveLength(3);
+    for (const {
+      level: _level,
+      time: _time,
+      pid: _pid,
+      hostname: _host,
+      msg,
+      ...rest
+    } of written) {
+      expect(msg).toBe("home set");
+      expect(rest).toEqual({ accountId: a.accountId });
+    }
+    // Each path left its line, so the absence below is not for want of lines.
+    expect(lines().some((l) => l.code === "postal_code_unknown")).toBe(true);
+    expect(lines().some((l) => l.msg === "request validation failed")).toBe(true);
+    expect(lines().some((l) => l.msg === "unhandled error")).toBe(true);
+    expect(reports).toHaveLength(1);
+
+    const { rows: events } = await ctx.client.query(
+      `SELECT e.name, e.props, e.snapshot, e.pond FROM events e
+         JOIN research_subject s ON s.research_id = e.research_id
+        WHERE s.account_id = $1`,
+      [a.accountId],
+    );
+    expect(events.length).toBeGreaterThan(0);
+    const everything = JSON.stringify([lines(), reports, events]);
+    for (const digits of ["00530", "83960", "99999", "0053A", "33100", "422"]) {
+      // A quoted match, or one after a word: five digits can occur by chance in an id or a time.
+      expect(everything).not.toContain(`"${digits}"`);
+      expect(everything).not.toContain(` ${digits}`);
+    }
+    expect(everything).not.toMatch(/Kallio|Berghäll|Helsinki|Helsingfors|Lieksa|Joensuu|Tampere/);
   });
 
   // The sweep's fake session never reaches the e-mail's handlers (#385,
@@ -770,7 +870,10 @@ describe("PII in logs", () => {
     const app = createApp({ config: testConfig(), logger, db: testPool() });
     const keyed =
       (mode: TrustedProxy) => async (c: Parameters<ReturnType<typeof addressOf>>[0]) => {
-        logger.info({ key: addressOf(mode)(c) }, "debug");
+        logger.info(
+          { key: addressOf({ TRUSTED_PROXY: mode, originSecrets: [FIXTURES.originSecret] })(c) },
+          "debug",
+        );
         return c.json({ ok: true });
       };
     app.get("/leak/forwarded", (c) => {

@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { PHOTOS_FOR_COMPLETENESS } from "@kuutti/schema";
 import type { Queryable } from "../pool.ts";
 import { transaction } from "../pool.ts";
 import { DEMO_LABEL_PREFIX, type SyntheticPerson } from "./population.ts";
@@ -35,6 +36,14 @@ export const demoHetuHmac = (label: string): string =>
 /** The versions the rows name: the two consents of onboarding and the special-category wording of the profile (ADR-019 §4). */
 export type ConsentVersions = Readonly<Record<"terms" | "privacy" | "special_category", string>>;
 
+/** The key of a photo with no picture behind it (`BAR_PEOPLE`): its row makes a profile finished, and nobody is ever shown it. */
+export const PLACEHOLDER_PHOTO_PREFIX = "demo-placeholder-";
+
+const PLACEHOLDER_BLURHASH = "LEHV6nWB2yk8pyo0adR*.7kCMdnj";
+
+/** What a consent of `olderWording` names: no wording there has ever been, so it reads as none. */
+const OLDER_WORDING = "demo-older-wording";
+
 /** `spared`: identities that carry the mark and are not synthetic; never touched. */
 export type RemoveResult = { removed: number; spared: number };
 
@@ -42,7 +51,6 @@ export type WriteResult = RemoveResult & { written: number; ponds: Record<string
 
 /** The tables that hold rows of an account, in an order in which they can be emptied. */
 const ACCOUNT_TABLES = [
-  "gate",
   "photo_access",
   "card_shown",
   // The photo check writes these on staging too, where the population's photos go through it (#253).
@@ -66,25 +74,94 @@ const ACCOUNT_TABLES = [
   "auth_request",
 ] as const;
 
+/**
+ * The synthetic identities, and how many carry the mark without being one.
+ * Synthetic is who carries the mark, the hash of the label behind the mark,
+ * and no time of authentication. The hash is computed by the server from the
+ * row's own subject, the way demoHetuHmac computes it.
+ */
+async function syntheticIdentities(db: Queryable): Promise<{ ids: string[]; spared: number }> {
+  const { rows } = await db.query<{ id: string; synthetic: boolean }>(
+    `SELECT id,
+            (authenticated_at IS NULL
+             AND hetu_hmac = encode(sha256(convert_to(
+                   'kuutti demo identity: ' || substr(broker_subject, length($2) + 1), 'UTF8')), 'hex')
+            ) AS synthetic
+     FROM identity WHERE broker_subject LIKE $1`,
+    [`${DEMO_SUBJECT_PREFIX}%`, DEMO_SUBJECT_PREFIX],
+  );
+  const ids = rows.filter((r) => r.synthetic).map((r) => r.id);
+  return { ids, spared: rows.length - ids.length };
+}
+
 /** Removes every synthetic identity with everything of its accounts. */
 export async function removePopulation(db: Queryable): Promise<RemoveResult> {
   return transaction(db, async (tx) => {
-    // Synthetic is who carries the mark, the hash of the label behind the
-    // mark, and no time of authentication. The hash is computed by the server
-    // from the row's own subject, the way demoHetuHmac computes it.
-    const { rows } = await tx.query<{ id: string; synthetic: boolean }>(
-      `SELECT id,
-              (authenticated_at IS NULL
-               AND hetu_hmac = encode(sha256(convert_to(
-                     'kuutti demo identity: ' || substr(broker_subject, length($2) + 1), 'UTF8')), 'hex')
-              ) AS synthetic
-       FROM identity WHERE broker_subject LIKE $1`,
-      [`${DEMO_SUBJECT_PREFIX}%`, DEMO_SUBJECT_PREFIX],
+    const { ids, spared } = await syntheticIdentities(tx);
+    await deleteIdentities(tx, ids);
+    return { removed: ids.length, spared };
+  });
+}
+
+/** The kinds the population consents to: never research (population.ts says why). */
+const POPULATION_CONSENTS = [
+  "terms",
+  "privacy",
+  "special_category",
+] as const satisfies readonly (keyof ConsentVersions)[];
+
+/** How many consent rows of the wording in force a renewal gave, by kind. */
+export type RenewResult = Record<keyof ConsentVersions, number>;
+
+/**
+ * Brings the population's consents to the wordings in force (#560). A
+ * consent of a wording that has changed since reads as none (ADR-010 §6),
+ * and nobody is in a pool without terms, privacy and the special-category
+ * consent of the current wording, nor in a band of the seek bar without the
+ * last: after a new version every synthetic person would be on nobody's card
+ * until the population was written again, its pictures through the photo
+ * check again. So each live consent of a synthetic person that names a
+ * wording since changed gets a row of the current one beside it, in the
+ * language the last was shown in, given at `at`, as accepting the new wording
+ * gives a person one (`recordConsent` in the identity slice); the old row
+ * stays, as a person's does. A consent of an older wording on purpose (the
+ * people who fill the seek bar and are nobody's card, `olderWording`) stays
+ * as it is, and so does a withdrawn one. Run again, it gives nothing.
+ */
+export async function renewPopulationConsents(
+  db: Queryable,
+  consentVersions: ConsentVersions,
+  at: Date,
+): Promise<RenewResult> {
+  return transaction(db, async (tx) => {
+    const { ids } = await syntheticIdentities(tx);
+    // One row per account and kind, from its newest live row: the language it was shown in.
+    const { rows } = await tx.query<{ kind: keyof ConsentVersions }>(
+      `INSERT INTO consent (account_id, kind, version, locale_shown, given_at)
+       SELECT DISTINCT ON (c.account_id, c.kind)
+              c.account_id, c.kind, v.version, c.locale_shown, $4::timestamptz
+       FROM consent c
+       JOIN account a ON a.id = c.account_id
+       JOIN unnest($2::consent_kind[], $3::text[]) AS v(kind, version) ON v.kind = c.kind
+       WHERE a.identity_id = ANY($1::uuid[])
+         AND c.withdrawn_at IS NULL
+         AND c.version <> $5
+         AND NOT EXISTS (SELECT 1 FROM consent n
+                         WHERE n.account_id = c.account_id AND n.kind = c.kind
+                           AND n.version = v.version AND n.withdrawn_at IS NULL)
+       ORDER BY c.account_id, c.kind, c.given_at DESC
+       RETURNING kind`,
+      [
+        ids,
+        POPULATION_CONSENTS,
+        POPULATION_CONSENTS.map((kind) => consentVersions[kind]),
+        at,
+        OLDER_WORDING,
+      ],
     );
-    const identities = rows.filter((r) => r.synthetic).map((r) => r.id);
-    const spared = rows.length - identities.length;
-    await deleteIdentities(tx, identities);
-    return { removed: identities.length, spared };
+    const renewed = Object.fromEntries(POPULATION_CONSENTS.map((kind) => [kind, 0])) as RenewResult;
+    for (const row of rows) renewed[row.kind] += 1;
+    return renewed;
   });
 }
 
@@ -128,6 +205,10 @@ export async function deleteIdentities(
   // The entries in which the accounts are somebody's card (#96); their own
   // rounds go with ACCOUNT_TABLES, their entries by the cascade.
   await tx.query("DELETE FROM round_entries WHERE candidate_id = ANY($1)", [accounts]);
+  // The stars the accounts put, and those put on them (#575).
+  await tx.query("DELETE FROM star WHERE account_id = ANY($1) OR candidate_id = ANY($1)", [
+    accounts,
+  ]);
   // Invitations on either side (#107): those the accounts made, and the one
   // each redeemed, whoever made it, with the units and notices they hold.
   await tx.query(
@@ -151,6 +232,10 @@ export async function writePopulation(
     if (!person.label.startsWith(DEMO_LABEL_PREFIX)) {
       throw new Error(`not a synthetic person: ${person.label}`);
     }
+    // In nobody's pool, with nothing to say so (ADR-061 §1): refused, not written.
+    if (person.pond !== null && person.home === null) {
+      throw new Error(`${person.label} has no home: generatePopulation needs the places`);
+    }
   }
   return transaction(db, async (tx) => {
     const { removed, spared } = await removePopulation(tx);
@@ -163,7 +248,7 @@ export async function writePopulation(
     const ponds: Record<string, number> = {};
     for (const person of people) {
       const pondId = person.pond === null ? null : pondIds.get(person.pond);
-      if (pondId === undefined) throw new Error(`no pond ${person.pond}: run the seed first`);
+      if (pondId === undefined) throw new Error(`no pond ${person.pond} in this database`);
       if (person.pond !== null) ponds[person.pond] = (ponds[person.pond] ?? 0) + 1;
 
       const identity = await tx.query<{ id: string }>(
@@ -173,8 +258,9 @@ export async function writePopulation(
       );
       const account = await tx.query<{ id: string }>(
         `INSERT INTO account
-           (identity_id, state, state_changed_at, birth_year, birth_month, gender, pond_id, registered_at)
-         VALUES ($1, $2::account_state, $3, $4, $5, $6::gender, $7, $8) RETURNING id`,
+           (identity_id, state, state_changed_at, birth_year, birth_month, gender, pond_id,
+            home_place, home_shows_area, registered_at)
+         VALUES ($1, $2::account_state, $3, $4, $5, $6::gender, $7, $8, $9, $10) RETURNING id`,
         [
           identity.rows[0]?.id,
           person.state,
@@ -183,6 +269,8 @@ export async function writePopulation(
           person.birthMonth,
           person.gender,
           pondId,
+          person.home?.place ?? null,
+          person.home?.showsArea ?? false,
           person.registeredAt,
         ],
       );
@@ -196,7 +284,7 @@ export async function writePopulation(
           [
             accountId,
             consent.kind,
-            consentVersions[consent.kind],
+            consent.olderWording ? OLDER_WORDING : consentVersions[consent.kind],
             consent.localeShown,
             consent.givenAt,
           ],
@@ -229,6 +317,20 @@ export async function writePopulation(
             JSON.stringify(person.profile.fields),
             JSON.stringify(person.profile.prompts),
             person.registeredAt,
+          ],
+        );
+      }
+      if (person.fillsTheBar) {
+        await tx.query(
+          `INSERT INTO photo (account_id, key, blurhash, width, height, state, position, created_at)
+           SELECT $1, $2 || n, $3, 800, 1067, 'approved', n, $4
+           FROM generate_series(0, $5::int - 1) n`,
+          [
+            accountId,
+            PLACEHOLDER_PHOTO_PREFIX,
+            PLACEHOLDER_BLURHASH,
+            person.registeredAt,
+            PHOTOS_FOR_COMPLETENESS,
           ],
         );
       }

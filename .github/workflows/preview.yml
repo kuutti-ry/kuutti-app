@@ -8,7 +8,7 @@ name: Preview
 #           that API, at https://<EAS_HOSTING_SUBDOMAIN>--pr-<n>.expo.app
 #   native  when native code, auth, push, camera or the fingerprint changed
 #           against main: an EAS Update on branch pr-<n> for the dev client
-#           (#10), with a QR code; dormant until expo-updates is configured
+#           (#10), with a QR code
 #   admin   the moderation panel of the same commit, built under /pr-<n>/
 #           against the staging API, since a preview API has no bank
 #           (ADR-014 §1), and written to pr-<n>/ of the staging panel's
@@ -211,8 +211,9 @@ jobs:
       - uses: ./.github/actions/pnpm
 
       # EXPO_PUBLIC_* is inlined at export time: this bundle can only ever talk
-      # to this pull request's API. The web target runs against seed data and
-      # the mock IdP only (rules/mobile.md); it is not a product surface.
+      # to this pull request's API and its seed data. A preview never uses the
+      # real broker and no mock bank runs beside it, and the web target offers
+      # no bank login (rules/mobile.md); it is not a product surface.
       - name: Export the web target against the preview API
         working-directory: apps/mobile
         env:
@@ -350,7 +351,7 @@ jobs:
           VITE_API_URL: ${{ vars.ADMIN_API_URL }}
         run: pnpm --filter @kuutti/admin exec vite build --base "/pr-$PR_NUMBER/"
 
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: steps.ready.outputs.ready == 'true'
         with:
           name: admin-preview
@@ -406,7 +407,7 @@ jobs:
       - if: steps.open.outputs.open == 'true'
         run: .github/scripts/aws-oidc.sh
 
-      # As main's build is written (build.yml): the assets, then the
+      # As main's build is written (admin-deploy.yml): the assets, then the
       # licences and index.html, uncached under their fixed names, then the
       # assets of the push before go. The trailing slash keeps pr-1/ from
       # reaching pr-12/.

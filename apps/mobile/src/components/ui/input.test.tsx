@@ -1,5 +1,5 @@
 import { fireEvent, screen } from "@testing-library/react-native";
-import { renderWithTheme } from "@/test/render";
+import { renderWithTheme, underProviders } from "@/test/render";
 import { Input } from "./input";
 
 // The text field (#12): its label is required (a placeholder is not one), it
@@ -12,15 +12,37 @@ describe("Input", () => {
     const input = screen.getByLabelText("Your name");
     expect(input.props.maxFontSizeMultiplier).toBe(2);
     expect(input.props.className).toMatch(/\bmin-h-touch\b/);
+    // What people type is read: the phone's font at body size (#408).
+    expect(input.props.className.split(" ")).toEqual(
+      expect.arrayContaining(["font-system", "text-body"]),
+    );
     expect(input.props.className).not.toMatch(/opacity-50/);
+    expect(input.props.className).not.toMatch(/\bborder-dashed\b/);
     await fireEvent.changeText(input, "Aino");
     expect(typed).toHaveBeenCalledWith("Aino");
   });
 
-  it("is dimmed when it cannot be edited", async () => {
+  it("looks read-only when it cannot be edited", async () => {
     await renderWithTheme(<Input accessibilityLabel="Locked" editable={false} />);
     const input = screen.getByLabelText("Locked");
     expect(input.props.editable).toBe(false);
-    expect(input.props.className).toMatch(/\bopacity-50\b/);
+    // Drawn, not faded (#467): a dashed outline and the text muted.
+    expect(input.props.className).not.toMatch(/opacity-/);
+    expect(input.props.className).toMatch(/\bborder-dashed\b/);
+    expect(input.props.className).not.toMatch(/\bborder-solid\b/);
+    // Not the placeholder's own placeholder:text-muted-foreground.
+    expect(input.props.className).toMatch(/(^| )text-muted-foreground( |$)/);
+    expect(input.props.className).not.toMatch(/\btext-foreground\b/);
+  });
+
+  // Android keeps a border's dash when its style goes away (#548).
+  it("says solid when it can be edited again, so Android drops the dash", async () => {
+    const { rerender } = await renderWithTheme(
+      <Input accessibilityLabel="Locked" editable={false} />,
+    );
+    await rerender(underProviders(<Input accessibilityLabel="Locked" editable />));
+    const input = screen.getByLabelText("Locked");
+    expect(input.props.className).toMatch(/\bborder-solid\b/);
+    expect(input.props.className).not.toMatch(/\bborder-dashed\b/);
   });
 });

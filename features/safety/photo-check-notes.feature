@@ -6,7 +6,7 @@ Feature: A closer look after repeated hard rejections
   thirty days: every hard group rejects from 75 instead of its usual line.
   Nothing else follows; a ban stays a person's decision. The notes keep
   twelve months, go with the account, and only the person reads them, in
-  their export (#253, ADR-006 §2, migration 0035 sets the numbers).
+  their export (#253, ADR-006 §2; matching_config holds the numbers).
 
   Scenario: A photo the check is sure of leaves a note of its kind
     Given the check finds a hard label at or above its group's reject line

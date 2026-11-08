@@ -11,7 +11,7 @@ export interface paths {
         };
         /**
          * Liveness and readiness in one answer
-         * @description 200 when the database answers and committed migrations are applied; 503 with the same body when either fails.
+         * @description 200 when the database answers and committed migrations are applied; 503 with the same body when either fails. One check of the database answers every request within its second.
          */
         get: {
             parameters: {
@@ -1151,7 +1151,7 @@ export interface paths {
         put?: never;
         /**
          * Take a break: pause this account
-         * @description The account goes to paused (#170, ADR-022): the profile leaves every pool, counter and round, and every session of the account ends, this one included. Nothing is erased: the profile, the photos, the preferences, the consents and the place at the gate stay as they are, and the next bank login brings the account back as it was. The body confirms; the screen asks first.
+         * @description The account goes to paused (#170, ADR-022): the profile leaves every pool, counter and round, and every session of the account ends, this one included. Nothing is erased: the profile, the photos, the preferences and the consents stay as they are, and the next bank login brings the account back as it was. The body confirms; the screen asks first.
          */
         post: {
             parameters: {
@@ -1712,7 +1712,7 @@ export interface paths {
         };
         /**
          * A signed URL for one variant
-         * @description Valid for fifteen minutes. Every issuance is logged against the caller and counted against the day's budget for the variant (matching_config.photo_fetches_per_day; the day rolls at midnight in Finland). The app caches by photo id and variant, never by this URL, and asks for full only from the zoom screen. Another account's photo is served only from a card the caller was shown.
+         * @description Valid for fifteen minutes. Every issuance is logged against the caller and counted against the day's budget for the variant (matching_config.photo_fetches_per_day; the day rolls at midnight in Finland). The app caches by photo id and variant, never by this URL, and asks for full only from the zoom screen of one's own photos. Another account's photo is served only from a card the caller was shown, and never in the full size (ADR-056).
          */
         get: {
             parameters: {
@@ -1754,7 +1754,7 @@ export interface paths {
                         "application/json": components["schemas"]["ErrorResponse"];
                     };
                 };
-                /** @description Not a photo this account may see: not its own, and not on a card it was shown. */
+                /** @description Not a photo this account may see: not its own, and not on a card it was shown, or another account's in the full size. */
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -1955,8 +1955,8 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Approve or reject a photo
-         * @description approve makes the photo visible to others; reject hides it and tells the owner the reason in words. Only a queued photo takes a decision, once. Only a person rejects. Written to audit_log.
+         * Approve or reject a queued photo, or take an approved one down
+         * @description approve makes a queued photo visible to others; reject hides it and tells the owner the reason in words. take_down rejects an approved profile photo (#477): nobody else is given it, and the owner is told the reason, with no appeal. Each decision is taken once, on the state it is for. Nothing is deleted. Written to audit_log.
          */
         post: {
             parameters: {
@@ -2018,7 +2018,7 @@ export interface paths {
                         "application/json": components["schemas"]["ErrorResponse"];
                     };
                 };
-                /** @description photo_not_queued: the photo is not waiting for a decision (already decided, or still being checked). */
+                /** @description photo_not_queued: approve or reject on a photo not waiting for a decision (already decided, or still being checked). photo_not_approved: take_down on a photo that is not approved (taken down already, or never approved). */
                 409: {
                     headers: {
                         [name: string]: unknown;
@@ -2044,7 +2044,7 @@ export interface paths {
         };
         /**
          * The caller's profile and what it still needs
-         * @description The profile as saved (null before the first save) and the completeness rule's verdict (what is missing before the profile can enter a round).
+         * @description The profile as saved (null before the first save), the completeness rule's verdict (what is missing before the profile can enter a round), and the home in names, which PUT /account/home writes and this document never does.
          */
         get: {
             parameters: {
@@ -2203,7 +2203,7 @@ export interface paths {
         };
         /**
          * What the caller has answered and which steps of onboarding are still open
-         * @description The steps of the field sheet in the order the app asks them, the answers so far, the consents given for the current wordings and the current versions. An account without a pond is put in the default pond here. When the four answers matching needs and the two consents are there and the account is still registered, it becomes active here; the profile steps keep `complete` false until they are done.
+         * @description The steps of the field sheet in the order the app asks them, the answers so far, the consents given for the current wordings and the current versions. When the four answers matching needs and the two consents are there and the account is still registered, it becomes active here; the profile steps keep `complete` false until they are done.
          */
         get: {
             parameters: {
@@ -2252,7 +2252,7 @@ export interface paths {
         get?: never;
         /**
          * Declare the caller's gender
-         * @description Self-declared, one of a closed list (rule 3); nothing from the bank informs it.
+         * @description Self-declared, one of a closed list (rule 3); nothing from the bank informs it. The first answer and the same answer again are free; a change is possible once in `change_cadence_days`. A change away from non-binary clears the identity label.
          */
         put: {
             parameters: {
@@ -2294,6 +2294,15 @@ export interface paths {
                 };
                 /** @description No live account (erased meanwhile). */
                 404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description change_too_soon: the gender was changed within the cadence, and GET /onboarding's nextChange says from when. */
+                429: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -2805,7 +2814,7 @@ export interface paths {
         put?: never;
         /**
          * Report the person of a card one was shown, and block them
-         * @description A reason from the closed list and, if the person likes, a few lines for the moderators, who read it in the panel. The report blocks both ways in the same transaction. The reported person learns nothing. At most matching_config reports_per_day a day per account, the Finnish calendar day; one open report per pair.
+         * @description A reason from the closed list and, if the person likes, a few lines for the moderators, who read it in the panel, and the one photo of the card it is about (#476). The report blocks both ways in the same transaction. The reported person learns nothing. At most matching_config reports_per_day a day per account, the Finnish calendar day; one open report per pair.
          */
         post: {
             parameters: {
@@ -2820,14 +2829,14 @@ export interface paths {
                 };
             };
             responses: {
-                /** @description Filed and blocked; or a report of the same person is still open, and nothing more is written. */
+                /** @description Filed and blocked; or a report of the same person is still open, and nothing more is written. A photo that is not one of the card the person was shown is left out, and the answer is the same. */
                 204: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content?: never;
                 };
-                /** @description Validation failed: a missing or unknown reason, a note blank or over 500 characters, a malformed account id, an unknown key. */
+                /** @description Validation failed: a missing or unknown reason, a note blank or over 500 characters, a malformed account or photo id, an unknown key. */
                 400: {
                     headers: {
                         [name: string]: unknown;
@@ -2948,7 +2957,7 @@ export interface paths {
         put?: never;
         /**
          * Report the other person of a conversation, with a copy of it, and block them
-         * @description The card's reason and note (#351, ADR-030 §12). In one transaction: the report naming the conversation, a frozen copy of every message it holds now, both people's, for the moderators, who read it in the panel, the block both ways and the conversation's close. Taken while the conversation is open or archived, and for matching_config report_after_close_days after it closed, so a person blocked can still report what was said. At most matching_config reports_per_day a day, one open report per pair, as from a card. The reported person learns nothing.
+         * @description The card's reason and note (#351, ADR-030 §12), and the line of the one photo it is about (#476). In one transaction: the report naming the conversation, a frozen copy of every message it holds now, both people's, for the moderators, who read it in the panel, the block both ways and the conversation's close. Taken while the conversation is open or archived, and for matching_config report_after_close_days after it closed, so a person blocked can still report what was said. At most matching_config reports_per_day a day, one open report per pair, as from a card. The reported person learns nothing.
          */
         post: {
             parameters: {
@@ -2965,14 +2974,14 @@ export interface paths {
                 };
             };
             responses: {
-                /** @description Filed, copied, blocked and closed; or a report of the same person is still open, and nothing more is written. */
+                /** @description Filed, copied, blocked and closed; or a report of the same person is still open, and nothing more is written. A line that is not a photo the other person sent, as the reporter could read it, is left out, and the answer is the same. */
                 204: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content?: never;
                 };
-                /** @description Validation failed: a missing or unknown reason, a note blank or over 500 characters, an unknown key, an id that is not a uuid. */
+                /** @description Validation failed: a missing or unknown reason, a note blank or over 500 characters, a line that is not a whole number from 1, an unknown key, an id that is not a uuid. */
                 400: {
                     headers: {
                         [name: string]: unknown;
@@ -3034,7 +3043,7 @@ export interface paths {
         };
         /**
          * What the caller may be notified of
-         * @description Every kind (a new round, a message, a match, a moderator's decision), in that order, each on unless the person switched it off. The senders read it when they exist (#102 the message).
+         * @description Every kind (a message, a match, a moderator's decision), in that order, each on unless the person switched it off. The push reads it for a message and a match; nothing is sent for a moderator's decision yet.
          */
         get: {
             parameters: {
@@ -3151,7 +3160,7 @@ export interface paths {
         };
         /**
          * The caller's notices in the app
-         * @description What must reach the person even without a push, newest first, at most 20: a moderator's warning, with its reason, until it is lifted, and an invitation of the person's that counted, with what it earned and never who was invited. A notice holds no text of its own; the app says it.
+         * @description What must reach the person even without a push, newest first, at most 20: a moderator's warning, with its reason, until it is lifted; an invitation of the person's that counted, with what it earned and never who was invited; and an announcement to everybody (#573, ADR-068), with its title and body in the request's language, Swedish falling back to English and Stadi reading Finnish. Every other notice holds no text of its own; the app says it.
          */
         get: {
             parameters: {
@@ -3253,6 +3262,65 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/push-token": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Register this device's push token
+         * @description The caller's session's Expo push token, which its pushes go to (ADR-055): one per session, replacing the session's earlier one, and taken from any other session it was registered to. The pushes are worded in the request's language. It goes when the session ends. A session revoked meanwhile writes nothing.
+         */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["PushTokenRequest"];
+                };
+            };
+            responses: {
+                /** @description Registered, or nothing to register for a session that ended. */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description validation_failed: not an Expo push token, an unknown platform, an unknown key. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description unauthenticated, session_expired or session_revoked. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/invitations": {
         parameters: {
             query?: never;
@@ -3262,7 +3330,7 @@ export interface paths {
         };
         /**
          * The caller's invitations
-         * @description Whether the caller may invite (their profile has passed the pond gate's test) and may still type a code, what an invitation earns today (matching_config invitation_reward), their open invitations newest first, how many of theirs have counted, and what those earned that is not used yet. Never a code, and nothing of anybody invited.
+         * @description Whether the caller may invite (their profile is complete) and may still type a code, what an invitation earns today (matching_config invitation_reward), their open invitations newest first, how many of theirs have counted, and what invitations earned them that is not used yet. Never a code, and nothing of anybody invited.
          */
         get: {
             parameters: {
@@ -3305,7 +3373,7 @@ export interface paths {
         put?: never;
         /**
          * Make an invitation
-         * @description A code for one friend, in two groups of five, shown here once: Kuutti keeps only its hash. For a caller whose profile has passed the pond gate's test; at most matching_config invitations_open open at once. The night the friend's profile first passes the same test, the invitation counts and the caller earns matching_config invitation_reward.
+         * @description A code for one friend, in two groups of five, shown here once: Kuutti keeps only its hash. For a caller whose profile is complete; at most matching_config invitations_open open at once. The night the friend's profile first passes the same test, the invitation counts and the two earn matching_config invitation_reward.
          */
         post: {
             parameters: {
@@ -3343,7 +3411,7 @@ export interface paths {
                         "application/json": components["schemas"]["ErrorResponse"];
                     };
                 };
-                /** @description invitation_not_yet: the caller's profile has not passed the pond gate's test; invitations_full: as many invitations open as matching_config invitations_open allows. Nothing was written. */
+                /** @description invitation_not_yet: the caller's profile is not complete; invitations_full: as many invitations open as matching_config invitations_open allows. Nothing was written. */
                 409: {
                     headers: {
                         [name: string]: unknown;
@@ -3434,7 +3502,7 @@ export interface paths {
         put?: never;
         /**
          * Use an invitation code
-         * @description A code typed by the caller, before their profile first passes the pond gate's test: case, spaces and hyphens do not matter. The caller is checked before the code is looked up. At most matching_config invitation_tries_per_day tries a Finnish day, whatever their answer.
+         * @description A code typed by the caller, before their profile is complete: case, spaces and hyphens do not matter. The caller is checked before the code is looked up. At most matching_config invitation_tries_per_day tries a Finnish day, whatever their answer.
          */
         post: {
             parameters: {
@@ -3483,7 +3551,7 @@ export interface paths {
                         "application/json": components["schemas"]["ErrorResponse"];
                     };
                 };
-                /** @description invitation_not_for_you: the caller cannot use a code: their profile has passed the test, they used one already, the current terms and privacy consents are not given, or their identity had an account erased before. */
+                /** @description invitation_not_for_you: the caller cannot use a code: their profile is complete, they used one already, the current terms and privacy consents are not given, or their identity had an account erased before. */
                 409: {
                     headers: {
                         [name: string]: unknown;
@@ -3577,7 +3645,7 @@ export interface paths {
         };
         /**
          * One conversation
-         * @description The summary, the longest message the composer may send, the highest sequence the counterpart has read, and the contacts (#103): the caller's stored pieces, each shared here or not, and the counterpart's pieces shared with the caller now. In a closed conversation nothing is shared either way.
+         * @description The summary, the longest message the composer may send, how far the counterpart has read as the caller may see it (a shadow ban of the counterpart's holds it where the ban began, #470), and the contacts (#103): the caller's stored pieces, each shared here or not, and the counterpart's pieces shared with the caller now. In a closed conversation nothing is shared either way.
          */
         get: {
             parameters: {
@@ -3645,7 +3713,7 @@ export interface paths {
         };
         /**
          * A page of messages
-         * @description With before, the messages under that sequence, newest first; with after, the ones above it, oldest first (what is new since the last one the phone holds); with neither, the newest. At most limit, 50 by default, 100 at most. A counterpart's message sent during a shadow ban still open is not among them.
+         * @description With before, the messages under that sequence, newest first; with after, the ones above it, oldest first (what is new since the last one the phone holds); with neither, the newest. At most limit, 50 by default, 100 at most. A counterpart's message sent during a shadow ban that is still open, or that was lifted only after the conversation ended, is not among them.
          */
         get: {
             parameters: {
@@ -3935,7 +4003,7 @@ export interface paths {
         };
         /**
          * The caller's stored contacts
-         * @description Up to one phone number, WhatsApp number, Telegram and Instagram username, in that order, each in its stored form. Nobody else sees them until the caller shares one in a conversation.
+         * @description Up to one phone number, WhatsApp number, Telegram, Instagram and Snapchat username, in that order, each in its stored form. Nobody else sees them until the caller shares one in a conversation.
          */
         get: {
             parameters: {
@@ -3984,7 +4052,7 @@ export interface paths {
         get?: never;
         /**
          * Keep a contact
-         * @description Stores the piece of that kind in its one form (normaliseContact: a number in E.164, a Finnish one from 0 to +358; a username without its @, Instagram's in lower case), replacing the one kept before. A shared piece that changes shows its new value in the conversations where it is shared, at once. Counts against matching_config messages_per_minute.
+         * @description Stores the piece of that kind in its one form (normaliseContact: a number in E.164, a Finnish one from 0 to +358; a username without its @, Instagram's and Snapchat's in lower case), replacing the one kept before. A shared piece that changes shows its new value in the conversations where it is shared, at once. Counts against matching_config messages_per_minute.
          */
         put: {
             parameters: {
@@ -5399,7 +5467,7 @@ export interface paths {
         };
         /**
          * One report, with the reporter's note and the frozen conversation
-         * @description The queue's item, the reporter's note, the decision, the frozen copy of the conversation for a report made from one (null for a card's), and the sanctions that may close it while it waits. Written first to audit_log, about the report: conversation.view for a conversation's report, report.view for a card's; a look whose row cannot be written answers nothing of it. Moderators and admins.
+         * @description The queue's item, the reporter's note, the decision, the frozen copy of the conversation for a report made from one (null for a card's), the photo the report points at (#476: the copy's line, or a card's photo with its id and state, or removed since), and the sanctions that may close it while it waits. Written first to audit_log, about the report: conversation.view for a conversation's report, report.view for a card's; a look whose row cannot be written answers nothing of it. Moderators and admins.
          */
         get: {
             parameters: {
@@ -5527,6 +5595,92 @@ export interface paths {
                     };
                 };
                 /** @description not_found: no such report, a party's, or no photo at that line, answered alike. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description media_unavailable: no object storage is configured here. */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/reports/{id}/photo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * A signed URL for the photo a card's report points at
+         * @description The card variant of the one photo of the card the reporter pointed at (#476), for fifteen minutes. Every issuance is a photo.view row about the report, written before the URL is signed. Moderators and admins.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The signed URL. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["PhotoUrlResponse"];
+                    };
+                };
+                /** @description Validation failed. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description unauthenticated, session_expired or session_revoked. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description admin_forbidden: the role does not allow this. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description not_found: no such report, a party's, one that points at no photo, or a photo removed since, answered alike. */
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -5852,7 +6006,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/gate": {
+    "/admin/ponds": {
         parameters: {
             query?: never;
             header?: never;
@@ -5860,8 +6014,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Where the caller stands at the pond gate
-         * @description Between a finished profile and the first round (TD-10): on the pond's waitlist with a place, let in and waiting for enough people who match (how many more, in steps of `step`), or open. Counted nightly, and once when a person with a finished profile first asks.
+         * Every pond with its switch
+         * @description Each pond and whether matching is open in it. Admins only.
          */
         get: {
             parameters: {
@@ -5872,7 +6026,426 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                /** @description The caller's gate. */
+                /** @description The ponds. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AdminPondList"];
+                    };
+                };
+                /** @description unauthenticated, session_expired or session_revoked. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description admin_forbidden: the role does not allow this. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/ponds/{id}/matching": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Open or close matching in a pond
+         * @description Sets the pond's switch. Open, its complete people are told so, and the night and the day's first read build their rounds (not in production yet: ADR-035 Open 1); closed, they build none, and rounds already built and conversations stay. Nothing else turns it. A press that finds the switch as it asks changes nothing and writes nothing. Admins only; written to audit_log.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["PondMatchingChange"];
+                };
+            };
+            responses: {
+                /** @description The pond as it now stands. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AdminPond"];
+                    };
+                };
+                /** @description Validation failed. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description unauthenticated, session_expired or session_revoked. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description admin_forbidden: the role does not allow this. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description No such pond. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/announcements": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The newest announcements, and how many one would reach
+         * @description The newest 50, drafts and sent alike, each in its languages and whether the caller wrote it, which is who may not approve it; never who wrote or approved it, which the audit log says. With them how many an announcement approved now reaches: every account that is not erased gets its notice, the people with the announcements switch on and a live device its push, and the confirmed addresses with the switch on its email. Admins only.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The announcements. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AdminAnnouncementList"];
+                    };
+                };
+                /** @description unauthenticated, session_expired or session_revoked. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description admin_forbidden: the role does not allow this. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        /**
+         * Write an announcement
+         * @description A draft in English and Finnish, and in Swedish or not at all: each a title of at most 80 characters and a body of at most 1,000, trimmed, never empty, and with no address, link, phone number or handle (the plain-text rule). Nothing is sent until another admin approves it. Admins only; written to audit_log with no words.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["AnnouncementDraft"];
+                };
+            };
+            responses: {
+                /** @description The draft. */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AdminAnnouncement"];
+                    };
+                };
+                /** @description validation_failed, or text_contact_details naming the language and what was found. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description unauthenticated, session_expired or session_revoked. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description admin_forbidden: the role does not allow this. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/announcements/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete a draft
+         * @description Any admin may delete an announcement that has not been approved; one that went to everybody stays. Admins only; written to audit_log.
+         */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Deleted. */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Validation failed. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description unauthenticated, session_expired or session_revoked. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description admin_forbidden: the role does not allow this. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description No such announcement. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description announcement_sent: it went to everybody already. */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/announcements/{id}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Approve an announcement, which sends it to everybody
+         * @description The second admin's approval: never the one who wrote it, and once. In the same transaction every account that is not erased gets the announcement as a notice in the app; after the answer, the confirmed addresses whose switch is on get it by email, and the people whose notice is still unread and whose switch is on get a push in the app's own words, or once the quiet hours end. Nothing takes it back. Admins only; written to audit_log with how many notices it wrote.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The announcement, sent. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AdminAnnouncement"];
+                    };
+                };
+                /** @description Validation failed. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description unauthenticated, session_expired or session_revoked. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description admin_forbidden: the role does not allow this. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description No such announcement. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description own_announcement: the caller wrote it; announcement_sent: it went to everybody already. */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/gate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Whether matching is open for the caller
+         * @description Between a finished profile and the first round: incomplete while the profile or onboarding lacks something, closed once it is finished and matching has not opened in the caller's pond yet, open once it has. An admin opens a pond; nothing here counts anybody.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description What stands for the caller. */
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -5900,7 +6473,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/waitlist": {
+    "/ponds/counter": {
         parameters: {
             query?: never;
             header?: never;
@@ -5908,8 +6481,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * The waitlist counter
-         * @description Per pond: bank-verified people waiting, their split by self-declared gender, and how many are finishing their profile. A number is published only where at least k people stand behind it (k is in the answer), the split only when every cell is at least k, and a pond's numbers move only once at least k people have come or gone since they were last said. Counted once a day. No session needed.
+         * The pond counter
+         * @description Per pond: how many bank-verified people with the pond as theirs have completed their profiles. The number is published only where at least k people stand behind it (k is in the answer), and it moves only once at least k people have come or gone since it was last said. Counted once a day. No session needed. With one, the answer is the caller's and is not cached, and the caller's own pond also says whom its people seek: percentages in steps of five of three bands of finished profiles, those who seek men, those who seek both women and men, and those who seek women, null until every band holds at least k people.
          */
         get: {
             parameters: {
@@ -5926,49 +6499,10 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["WaitlistResponse"];
+                        "application/json": components["schemas"]["PondCounterResponse"];
                     };
                 };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/ponds": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * The ponds a person can choose
-         * @description Every pond with both Finnish case forms (TD-17), parents first. Where matching happens (TD-10); the choice is one per account.
-         */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description The ponds. */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["PondList"];
-                    };
-                };
-                /** @description unauthenticated, session_expired or session_revoked. */
+                /** @description A session was offered and does not stand: unauthenticated, session_expired or session_revoked. No session at all is the public answer. */
                 401: {
                     headers: {
                         [name: string]: unknown;
@@ -5987,7 +6521,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/account/pond": {
+    "/account/home": {
         parameters: {
             query?: never;
             header?: never;
@@ -5995,7 +6529,10 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** Choose the caller's pond */
+        /**
+         * Set the caller's home, or what their card shows of it
+         * @description A postal code of five digits, whether the card shows the area instead of the town, or both. What is kept is a place of at least matching_config home_min_inhabitants people: the postal area, else its municipality, else the nearest municipality that has them. A new postal code starts from the town again unless the same request says otherwise, and showArea stays false where no area is kept. The home changes whenever the person likes. The write sets the account's pond if it has none. The answer names places and never carries digits.
+         */
         put: {
             parameters: {
                 query?: never;
@@ -6005,18 +6542,20 @@ export interface paths {
             };
             requestBody: {
                 content: {
-                    "application/json": components["schemas"]["PondChoice"];
+                    "application/json": components["schemas"]["HomeUpdate"];
                 };
             };
             responses: {
-                /** @description Chosen. */
-                204: {
+                /** @description Saved; the home as its owner reads it. */
+                200: {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": components["schemas"]["HomeSummary"];
+                    };
                 };
-                /** @description Validation failed, or pond_unknown. */
+                /** @description validation_failed, or postal_code_unknown: five digits the list lacks. Both constant, repeating nothing that was sent. */
                 400: {
                     headers: {
                         [name: string]: unknown;
@@ -6060,8 +6599,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Today's round
-         * @description The Finnish day and its cards in order, each with why it is there and the caller's own decision. The first read of a day builds the caller's round once their matching has opened; entries null while they have none, an empty list for a round with nobody to show. A card that cannot be shown now is left out. Serving a card writes the shown record and counts against matching_config exposure_cards_per_day (ADR-008).
+         * The next cards of the queue
+         * @description The Finnish day and the next cards to go through, at most ten, in order: likes waiting, then new people, then people coming back. Each says why it is there and how far its person lives as it stood when the entry was written. With nothing left to go through a read adds the next people; entries null while the caller's matching has not opened, an empty list at the queue's end. A card that cannot be shown now, a filter of either side included, is left out. fishToSend says whether the fish's budget lets the caller send one today, one of matching_config fish_budget in the calendar week (fish_window_days counted from a Monday) or an earned one, never how many. likesLeft says how many of the day's likes the caller has left, from matching_config like_budget_balanced down to zero, by the count that refuses a like. yourTurn says how many conversations wait on the caller's answer. Serving a card writes the shown record and counts against matching_config exposure_cards_per_day, where that is not 0 (ADR-008, ADR-062).
          */
         get: {
             parameters: {
@@ -6072,7 +6611,7 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                /** @description Today's round. */
+                /** @description The next cards. */
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -6159,7 +6698,7 @@ export interface paths {
                         "application/json": components["schemas"]["ErrorResponse"];
                     };
                 };
-                /** @description not_found: no round today, no card at that place, a card that can no longer be shown, or a day not begun. */
+                /** @description not_found: no round today, no card at that place, a card that can no longer be shown (a block, a sanction, or for a like a filter of either side), or a day not begun. */
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -6194,8 +6733,8 @@ export interface paths {
         };
         get?: never;
         /**
-         * Like or pass a card
-         * @description Recorded, or replacing the day's earlier decision on the card; the same decision again writes nothing. A day that has ended answers round_expired. A like counts against the day's matching_config like_budget_balanced, except one on a liked_you or fish card; a pass never does. A like of somebody whose like of the caller stands is a match: the answer names its conversation, and that like is final. A fish is a like with a mark, matching_config fish_budget of them in any fish_window_days; on a liked_you or fish card it is a like. Past either budget, a like or a fish the caller's invitations earned is used by itself, left out of the counts after, and given back when the decision changes the same day.
+         * Like, pass or skip a card
+         * @description Recorded, or replacing the day's earlier decision on the card; the same decision again writes nothing. A day that has ended answers round_expired. A skip moves on, spends nothing and answers no like; the card returns another day. A like counts against the day's matching_config like_budget_balanced, a like back on a liked_you or fish card too; a pass or a skip never does. A new like or fish answers your_turn_limit with matching_config your_turn_limit conversations waiting on the caller, and not_found where either side's filters no longer let the two meet. A like of somebody whose like of the caller stands is a match: the answer names its conversation, and that like is final. A fish is a like with a mark, matching_config fish_budget of them in each fish_window_days counted from a Monday, the calendar week; on a liked_you or fish card it is a like. Past the fish's budget, a fish invitations earned the caller is used by itself, left out of the count after, and given back when the decision changes the same day. The answer's fishToSend, likesLeft and yourTurn are the queue's after this decision.
          */
         put: {
             parameters: {
@@ -6213,7 +6752,7 @@ export interface paths {
                 };
             };
             responses: {
-                /** @description Recorded, with the conversation the card's like is part of, or null for a pass and a like that made no match. */
+                /** @description Recorded, with the conversation the card's like is part of, or null for a pass, a skip and a like that made no match. */
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -6240,7 +6779,7 @@ export interface paths {
                         "application/json": components["schemas"]["ErrorResponse"];
                     };
                 };
-                /** @description not_found: no round today, no card at that place, a card that can no longer be shown, or a day not begun. */
+                /** @description not_found: no round today, no card at that place, a card that can no longer be shown (a block, a sanction, or for a like a filter of either side), or a day not begun. */
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -6249,7 +6788,7 @@ export interface paths {
                         "application/json": components["schemas"]["ErrorResponse"];
                     };
                 };
-                /** @description round_expired: the day named has ended; match_made: the card's like made a match and stays. Nothing was written. */
+                /** @description round_expired: the day named has ended; match_made: the card's like made a match and stays; your_turn_limit: too many conversations wait on the caller's answer. Nothing was written. */
                 409: {
                     headers: {
                         [name: string]: unknown;
@@ -6258,7 +6797,7 @@ export interface paths {
                         "application/json": components["schemas"]["ErrorResponse"];
                     };
                 };
-                /** @description like_budget_exceeded: the day's likes are used up and no earned like is left, Retry-After the wait until the day rolls; fish_budget_exceeded: matching_config fish_budget fish were sent within fish_window_days and no earned fish is left, Retry-After the wait until the next can go. Nothing was written. */
+                /** @description like_budget_exceeded: the day's likes are used up, Retry-After the wait until the day rolls; fish_budget_exceeded: matching_config fish_budget fish were sent within the period and no earned fish is left, Retry-After the wait until the midnight that begins the next period, a Monday's. Nothing was written. */
                 429: {
                     headers: {
                         [name: string]: unknown;
@@ -6285,7 +6824,7 @@ export interface paths {
         };
         /**
          * What today's round may relax, and what is relaxed
-         * @description For a short round (fewer ordered places than matching_config round_size, the liked-you and fish places aside), every deal-breaker of the caller's that is not paused and not relaxed today, each way it can be relaxed for the day: unanswered (let through those who did not answer its field) and aside (set it aside), each listed only when it would add somebody today, with more: how much it widens the caller's pool, rounded down to a step of matching_config waitlist_k. Counted on asking. Also the relaxations in force today. Never another filter (ADR-042).
+         * @description Once no new person is left in the queue, every deal-breaker of the caller's that is not paused and not relaxed today, each way it can be relaxed for the day: unanswered (let through those who did not answer its field) and aside (set it aside), each listed only when it would add somebody today, with more: how much it widens the caller's pool, rounded down to a step of matching_config pond_counter_k. Counted on asking. Also the relaxations in force today. Never another filter (ADR-042).
          */
         get: {
             parameters: {
@@ -6348,7 +6887,7 @@ export interface paths {
         put?: never;
         /**
          * Relax a deal-breaker for today
-         * @description One of the caller's own deal-breakers loosened for the day only: the people it lets in today are added after the round's last place, as many as the room left (round_size less the ordered places), new people first, reason relaxed with the field. Tomorrow's round is built from the filters as stored. The answer is the cards added, served as the round's read serves them (ADR-008).
+         * @description One of the caller's own deal-breakers loosened for the day only: the people it lets in today join the queue, new people first, reason relaxed with the field. Tomorrow's queue reads the filters as stored. The answer is the first cards added, at most ten, served as a read serves them (ADR-008); the next read goes on to the rest.
          */
         post: {
             parameters: {
@@ -6505,6 +7044,275 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/stars": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The people the caller starred
+         * @description Those who may be shown now, the latest star first and in no other order: both people's filters, the accounts' state and the inbox stop are asked on every read, and whoever does not pass is left out with no word why. Each with a name, an age and the main one of the photos the caller was shown, whose thumb is asked for as any photo's. It serves no card and signs no photo.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The list, perhaps empty. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["StarList"];
+                    };
+                };
+                /** @description unauthenticated, session_expired or session_revoked. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/rounds/{day}/entries/{position}/star": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Put a star on a card
+         * @description Marks the card's person for later: it spends nothing and decides nothing, and the same star again answers the one that stands. It reaches nobody. A card holding a like or a pass takes none. first says this is the only star the list shows.
+         */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    day: string;
+                    position: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The star, and whether it is the first. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["StarAnswer"];
+                    };
+                };
+                /** @description Validation failed. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description unauthenticated, session_expired or session_revoked. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description not_found: no such card in today's round, one that can no longer be shown, or one holding a like or a pass. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description round_expired: the day named has ended; stars_full: the list shows matching_config stars_max people. Nothing was written. */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/stars/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Take a star off
+         * @description The person comes back to the queue where it would have them. Nobody is told, and nothing else changes.
+         */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Taken off. */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Validation failed. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description unauthenticated, session_expired or session_revoked. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description not_found: no such star of the caller's. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/stars/{id}/open": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Open a starred person's card
+         * @description The card comes into today's log, or as it stands there, so it is reported seen and decided by its day and place as any card is, spending what those spend anywhere else. Answered as a read of the queue is, with that one card, served as a read serves one (ADR-008, ADR-041).
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The card. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["RoundResponse"];
+                    };
+                };
+                /** @description Validation failed. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description unauthenticated, session_expired or session_revoked. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description not_found: no such star of the caller's, or somebody the list leaves out now. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description card_budget_exceeded: the day's cards are used up; Retry-After is the wait until the day rolls. */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/preferences/deal-breakers": {
         parameters: {
             query?: never;
@@ -6514,7 +7322,7 @@ export interface paths {
         };
         /**
          * The caller's deal-breakers
-         * @description Each with whether it is paused: a deal-breaker waits while the person's own answer on its field is missing (#149, the disclose-to-filter rule). `max` is how many a person may have.
+         * @description Each with whether it is paused: a deal-breaker waits while the person's own answer on its field is missing (#149, the disclose-to-filter rule). One on distance has no field and is never paused. `max` is how many a person may have.
          */
         get: {
             parameters: {
@@ -6547,7 +7355,7 @@ export interface paths {
         };
         /**
          * Set the caller's deal-breakers
-         * @description The whole set, at most `max`, each on a distinct whitelisted field the person has answered themselves, accepting options the field has. Hard rows: #87 applies them in the pool, both ways.
+         * @description The whole set, at most `max`, each on a distinct whitelisted field the person has answered themselves, accepting options the field has. A person already past a lowered `max` may still remove or change what they hold; only a new field past it is refused. One on distance has no field: it accepts the bands up to nearby, close or around, and lets through those who did not answer whatever the request says, since nobody can leave it unanswered. Hard rows: #87 applies them in the pool, both ways.
          */
         put: {
             parameters: {
@@ -6571,7 +7379,7 @@ export interface paths {
                         "application/json": components["schemas"]["DealBreakersResponse"];
                     };
                 };
-                /** @description Validation failed: more than allowed, a field twice, or an answer the field has not. */
+                /** @description Validation failed: a new field past what is allowed, a field twice, an answer the field has not, or bands that do not run up to one. */
                 400: {
                     headers: {
                         [name: string]: unknown;
@@ -6658,7 +7466,7 @@ export interface paths {
         };
         /**
          * Set whom the caller seeks, the age window, or both
-         * @description Either or both, each replacing its row: a non-empty set of genders, an age window within 18 and 99 with min at most max. Onboarding saves each on its own screen (ADR-010 §13). Hard rows: the round builder never crosses them, in either direction.
+         * @description Either or both, each replacing its row: a non-empty set of genders, an age window within 18 and 99 with min at most max. Onboarding saves each on its own screen (ADR-010 §13). Hard rows: the round builder never crosses them, in either direction. The set of genders needs the sensitive-answers consent of the current wording (ADR-010 §16).
          */
         put: {
             parameters: {
@@ -6700,8 +7508,8 @@ export interface paths {
                         "application/json": components["schemas"]["ErrorResponse"];
                     };
                 };
-                /** @description No live account (erased meanwhile). */
-                404: {
+                /** @description consent_required: whom one seeks without the sensitive-answers consent of the current wording; nothing was saved, a window in the same request included. */
+                403: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -6709,8 +7517,8 @@ export interface paths {
                         "application/json": components["schemas"]["ErrorResponse"];
                     };
                 };
-                /** @description change_too_soon: whom one seeks was changed within matching_config change_cadence_days; nothing was saved, and GET /onboarding's nextChange.seeks says from when. */
-                429: {
+                /** @description No live account (erased meanwhile). */
+                404: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -6748,10 +7556,12 @@ export interface components {
                 birthMonth: number | null;
                 gender: components["schemas"]["Gender"];
                 pond: components["schemas"]["PondSummary"];
+                home: {
+                    place: string;
+                    shownOnCard: string;
+                } | null;
                 /** Format: date-time */
                 genderChangedAt: string | null;
-                /** Format: date-time */
-                seeksChangedAt: string | null;
                 email: string | null;
                 foundThemAnswered: boolean;
                 /** Format: date-time */
@@ -6785,6 +7595,7 @@ export interface components {
                 lastUsedAt: string;
                 /** Format: date-time */
                 expiresAt: string;
+                push: components["schemas"]["ExportedPush"];
             }[];
             profile: components["schemas"]["ProfileDocument"];
             photos: components["schemas"]["ExportedPhoto"][];
@@ -6803,7 +7614,6 @@ export interface components {
             }[];
             photoCheck: components["schemas"]["ExportedPhotoCheck"];
             research: components["schemas"]["ResearchExport"];
-            gate: components["schemas"]["ExportedGate"];
             exports: {
                 /** Format: date-time */
                 at: string;
@@ -6816,6 +7626,7 @@ export interface components {
             contacts: components["schemas"]["StoredContact"][];
             notifications: components["schemas"]["ExportedNotifications"];
             rounds: components["schemas"]["ExportedRounds"];
+            stars: components["schemas"]["ExportedStars"];
             invitations: components["schemas"]["ExportedInvitations"];
         };
         /** @enum {string|null} */
@@ -6825,9 +7636,6 @@ export interface components {
             id: string;
             slug: string;
             name: string;
-            nameInessive: string;
-            /** Format: uuid */
-            parentId: string | null;
         } | null;
         PreferencesResponse: {
             seeks: components["schemas"]["Gender"][] | null;
@@ -6844,7 +7652,7 @@ export interface components {
             paused: boolean;
         };
         /** @enum {string} */
-        DealBreakerField: "monogamy" | "hasKids" | "wantsKids" | "smoking" | "languages";
+        DealBreakerField: "monogamy" | "hasKids" | "wantsKids" | "smoking" | "languages" | "height" | "distance";
         ConsentRecord: {
             kind: components["schemas"]["ConsentKind"];
             version: string;
@@ -6861,12 +7669,23 @@ export interface components {
         IdentityStanding: "ok" | "suspended" | "banned";
         /** @enum {string} */
         AuthPlatform: "ios" | "android";
+        ExportedPush: {
+            platform: components["schemas"]["PushPlatform"];
+            /** @enum {string} */
+            locale: "en" | "fi" | "sv";
+            /** Format: date-time */
+            registeredAt: string;
+        } | null;
+        /** @enum {string} */
+        PushPlatform: "ios" | "android";
         ProfileDocument: {
             displayName: string;
             bio: string | null;
             bioPreset: components["schemas"]["BioPreset"];
             fields: components["schemas"]["ProfileFields"];
             prompts: components["schemas"]["PromptAnswer"][];
+            /** @default [] */
+            hiddenFields: components["schemas"]["HiddenField"][];
             specialCategoryConsent: {
                 version: string;
                 /** Format: date-time */
@@ -6891,7 +7710,7 @@ export interface components {
             /** @enum {string} */
             smoking?: "never" | "sometimes" | "regularly" | "quitting" | "vaping";
             nicotine?: ("snus" | "pouches" | "none")[];
-            languages?: ("fi" | "sv" | "en" | "ru" | "et" | "uk" | "ar" | "fa" | "zh" | "so" | "vi" | "sq" | "ku" | "tl" | "th" | "bn" | "tr" | "ne" | "es" | "ur" | "de" | "ro" | "pl" | "fr" | "hi" | "pt" | "it" | "lv" | "hu" | "nl" | "lt" | "ja" | "se" | "ko" | "other")[];
+            languages?: ("fi" | "sv" | "en" | "ru" | "et" | "uk" | "ar" | "fa" | "zh" | "so" | "vi" | "sq" | "ku" | "tl" | "th" | "bn" | "tr" | "ne" | "es" | "ur" | "de" | "ro" | "pl" | "fr" | "hi" | "pt" | "it" | "lv" | "hu" | "nl" | "lt" | "ja" | "se" | "ko" | "fse" | "fss" | "smn" | "sms" | "krl" | "rmf" | "other")[];
             /** @enum {string} */
             education?: "peruskoulu" | "toinen_aste" | "amk" | "kandi" | "maisteri" | "tohtori";
             /** @enum {string} */
@@ -6909,7 +7728,7 @@ export interface components {
             occupationTitle?: string;
             politics?: ("kesk" | "kok" | "kd" | "liik" | "ps" | "pp" | "rkp" | "sdp" | "vas" | "vihr" | "none_of_them")[];
             /** @enum {string} */
-            religion?: "lutheran" | "orthodox" | "other_christian" | "muslim" | "buddhist" | "hindu" | "jewish" | "spiritual" | "agnostic" | "atheist" | "other";
+            religion?: "lutheran" | "orthodox" | "other_christian" | "muslim" | "buddhist" | "hindu" | "jewish" | "spiritual" | "non_religious" | "agnostic" | "atheist" | "other";
             /** @enum {string} */
             zodiac?: "aries" | "taurus" | "gemini" | "cancer" | "leo" | "virgo" | "corgi" | "libra" | "scorpio" | "sagittarius" | "capricorn" | "aquarius" | "pisces";
         };
@@ -6919,6 +7738,8 @@ export interface components {
         };
         /** @enum {string} */
         PromptKey: "sunday" | "proud_of" | "argue_about" | "unpopular_opinion" | "teach_me" | "first_date" | "never_again" | "overrated" | "hidden_talent" | "last_laugh" | "three_things" | "ask_me";
+        /** @enum {string} */
+        HiddenField: "intent" | "identityLabel" | "monogamy" | "hasKids" | "wantsKids" | "smoking" | "nicotine" | "languages" | "hobbies" | "height" | "exercise" | "pets" | "field" | "occupation" | "occupationTitle" | "politics" | "religion" | "zodiac";
         ExportedPhoto: {
             id: components["schemas"]["PhotoId"];
             /** @description Placeholder the app paints before the thumb arrives (computed from the thumb). */
@@ -7021,18 +7842,6 @@ export interface components {
             since: string | null;
             consentVersion: string | null;
         };
-        ExportedGate: {
-            /** Format: uuid */
-            pondId: string;
-            /** Format: date-time */
-            admittedAt: string | null;
-            placeSaid: number | null;
-            poolSaid: number;
-            /** Format: date-time */
-            openedAt: string | null;
-            /** Format: date-time */
-            countedAt: string | null;
-        } | null;
         ExportedFeedback: {
             /** Format: date-time */
             at: string;
@@ -7155,7 +7964,7 @@ export interface components {
             endedHow: components["schemas"]["ContactShareEnd"];
         };
         /** @enum {string} */
-        ContactKind: "phone" | "whatsapp" | "telegram" | "instagram";
+        ContactKind: "phone" | "whatsapp" | "telegram" | "instagram" | "snapchat";
         /** @enum {string|null} */
         ContactShareEnd: "stopped" | "removed" | "closed" | null;
         StoredContact: {
@@ -7179,9 +7988,9 @@ export interface components {
             enabled: boolean;
         };
         /** @enum {string} */
-        NotificationKind: "round" | "message" | "match" | "moderation";
+        NotificationKind: "message" | "match" | "moderation" | "announcement";
         /** @enum {string} */
-        NoticeKind: "warning" | "invitation_counted";
+        NoticeKind: "warning" | "invitation_counted" | "invitation_friend" | "announcement";
         ExportedRounds: {
             /** @description What this part is, in the request's language. */
             about: string;
@@ -7221,11 +8030,24 @@ export interface components {
             decisionInWords: string | null;
             /** Format: date-time */
             decidedAt: string | null;
+            secondPass: boolean;
+            distance: components["schemas"]["DistanceBand"];
+            distanceInWords: string | null;
         };
         /** @enum {string} */
         RoundReason: "matches_filters" | "liked_you" | "seen_before" | "relaxed" | "fish";
         /** @enum {string|null} */
-        RoundChoice: "like" | "pass" | "fish" | null;
+        RoundChoice: "like" | "pass" | "fish" | "skip" | null;
+        /** @enum {string|null} */
+        DistanceBand: "nearby" | "close" | "around" | "far" | null;
+        ExportedStars: {
+            /** @description What this part is, in the request's language. */
+            about: string;
+            items: {
+                /** Format: date-time */
+                at: string;
+            }[];
+        };
         ExportedInvitations: {
             made: {
                 /** Format: date-time */
@@ -7251,7 +8073,7 @@ export interface components {
         /** @enum {string} */
         InvitationState: "open" | "redeemed" | "counted";
         /** @enum {string} */
-        RewardKind: "like" | "fish";
+        RewardKind: "fish";
         HealthResponse: {
             /**
              * @description ok when the database answers and migrations are current; degraded otherwise.
@@ -7279,6 +8101,16 @@ export interface components {
              * @enum {string}
              */
             migrations: "current" | "pending";
+            /**
+             * @description Whose word the rate limiter takes for the client address, as the process read it at boot (ADR-008 §5).
+             * @enum {string}
+             */
+            trustedProxy?: "none" | "traefik" | "cloudfront";
+            /**
+             * @description Whether this request carried the proof of Kuutti's own CloudFront distribution (ADR-066): unset when the process has no secret to check it against.
+             * @enum {string}
+             */
+            originProof?: "valid" | "missing" | "wrong" | "unset";
         };
         ErrorResponse: {
             error: {
@@ -7300,11 +8132,11 @@ export interface components {
             accessToken: string;
             /** Format: date-time */
             accessExpiresAt: string;
-            /** @description Single use: /auth/refresh answers with a new pair and retires this one. */
+            /** @description Single use: /auth/refresh answers with a new pair and retires this one. Any retired token of the session presented again ends the session (ADR-059). */
             refreshToken: string;
             /**
              * Format: date-time
-             * @description After this the device logs in through the bank again.
+             * @description After this the device logs in through the bank again. Each refresh moves it to ninety days on, never past a year from the bank login (ADR-058).
              */
             refreshExpiresAt: string;
             /**
@@ -7329,11 +8161,11 @@ export interface components {
             accessToken: string;
             /** Format: date-time */
             accessExpiresAt: string;
-            /** @description Single use: /auth/refresh answers with a new pair and retires this one. */
+            /** @description Single use: /auth/refresh answers with a new pair and retires this one. Any retired token of the session presented again ends the session (ADR-059). */
             refreshToken: string;
             /**
              * Format: date-time
-             * @description After this the device logs in through the bank again.
+             * @description After this the device logs in through the bank again. Each refresh moves it to ninety days on, never past a year from the bank login (ADR-058).
              */
             refreshExpiresAt: string;
         };
@@ -7531,12 +8363,17 @@ export interface components {
             /** @enum {string} */
             decision: "reject";
             reason: components["schemas"]["ModeratorRejectionReason"];
+        } | {
+            /** @enum {string} */
+            decision: "take_down";
+            reason: components["schemas"]["ModeratorRejectionReason"];
         };
         /** @enum {string} */
         ModeratorRejectionReason: "nudity" | "no_person" | "several_people" | "minor" | "violence" | "contact_details" | "other";
         ProfileResponse: {
             profile: components["schemas"]["ProfileDocument"];
             completeness: components["schemas"]["Completeness"];
+            home: components["schemas"]["HomeSummary"];
         };
         Completeness: {
             complete: boolean;
@@ -7544,12 +8381,22 @@ export interface components {
         };
         /** @enum {string} */
         CompletenessItem: "display_name" | "photos" | "bio_or_prompts" | "seeks" | "age_window";
+        HomeSummary: {
+            town: components["schemas"]["PlaceName"];
+            area: components["schemas"]["PlaceName"] & unknown;
+            showArea: boolean;
+        } | null;
+        PlaceName: {
+            fi: string;
+            sv: string;
+        };
         ProfileUpdate: {
             displayName: string;
             bio: string | null;
             bioPreset: components["schemas"]["BioPreset"];
             fields: components["schemas"]["ProfileFields"];
             prompts: components["schemas"]["PromptAnswer"][];
+            hiddenFields?: components["schemas"]["HiddenField"][];
         };
         CardPreviewResponse: {
             card: components["schemas"]["ProfileCard"];
@@ -7565,7 +8412,7 @@ export interface components {
                 verifiedByBank: true;
             };
             gender: components["schemas"]["Gender"];
-            pond: components["schemas"]["PondSummary"];
+            place: components["schemas"]["PlaceName"] & unknown;
             photos: components["schemas"]["CardPhoto"][];
             fields: components["schemas"]["ProfileFields"];
             bio: string | null;
@@ -7589,7 +8436,7 @@ export interface components {
             state: "registered" | "active" | "paused" | "shadow_banned" | "suspended" | "banned" | "deleted";
             age: number;
             gender: components["schemas"]["Gender"];
-            pond: components["schemas"]["PondSummary"];
+            home: components["schemas"]["HomeSummary"];
             preferences: components["schemas"]["PreferencesResponse"];
             consents: {
                 terms: string | null;
@@ -7605,8 +8452,6 @@ export interface components {
             nextChange: {
                 /** Format: date-time */
                 gender: string | null;
-                /** Format: date-time */
-                seeks: string | null;
             };
             missing: components["schemas"]["OnboardingStep"][];
             complete: boolean;
@@ -7619,7 +8464,7 @@ export interface components {
             special_category: string;
         };
         /** @enum {string} */
-        OnboardingStep: "terms" | "privacy" | "name" | "gender" | "seeks" | "intent" | "age_window" | "photos" | "prompts_or_bio" | "pond";
+        OnboardingStep: "terms" | "privacy" | "name" | "gender" | "seeks" | "intent" | "age_window" | "home" | "photos" | "prompts_or_bio";
         GenderUpdate: {
             gender: components["schemas"]["Gender"];
         };
@@ -7682,10 +8527,17 @@ export interface components {
             accountId: string;
             reason: components["schemas"]["SanctionReason"];
             note?: string;
+            /**
+             * Format: uuid
+             * @description The one photo of the card the report is about (#476). Kept only for a photo of that person the reporter was shown; any other is left out, and the answer is the same.
+             */
+            photoId?: string;
         };
         ConversationReportRequest: {
             reason: components["schemas"]["SanctionReason"];
             note?: string;
+            /** @description The line of the one photo the report is about (#476). Kept only for a photo the other person sent that the reporter could read; any other line is left out, and the answer is the same. */
+            seq?: number;
         };
         NotificationChoices: {
             choices: components["schemas"]["NotificationChoice"][];
@@ -7696,7 +8548,7 @@ export interface components {
         Notices: {
             notices: components["schemas"]["Notice"][];
         };
-        Notice: components["schemas"]["WarningNotice"] | components["schemas"]["InvitationCountedNotice"];
+        Notice: components["schemas"]["WarningNotice"] | components["schemas"]["InvitationCountedNotice"] | components["schemas"]["InvitationFriendNotice"] | components["schemas"]["AnnouncementNotice"];
         WarningNotice: {
             /** Format: uuid */
             id: string;
@@ -7727,24 +8579,55 @@ export interface components {
         };
         RewardUnits: {
             fish: number;
-            likes: number;
+        };
+        InvitationFriendNotice: {
+            /** Format: uuid */
+            id: string;
+            /** Format: date-time */
+            at: string;
+            /** Format: date-time */
+            readAt: string | null;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "invitation_friend";
+            reward: components["schemas"]["RewardUnits"];
+        };
+        AnnouncementNotice: {
+            /** Format: uuid */
+            id: string;
+            /** Format: date-time */
+            at: string;
+            /** Format: date-time */
+            readAt: string | null;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "announcement";
+            title: string;
+            body: string;
+        };
+        PushTokenRequest: {
+            token: string;
+            platform: components["schemas"]["PushPlatform"];
         };
         Invitations: {
-            /** @description True once the person's profile has passed the pond gate's test. */
+            /** @description True while the person's profile and onboarding are complete. */
             canInvite: boolean;
-            /** @description True while the person may still type a code: before their profile first passed the gate's test, with the current consents, no code used, and an identity never erased. */
+            /** @description True while the person may type a code: their profile is not complete, with the current consents, no code used, and an identity never erased. */
             redeemable: boolean;
             /** @description What an invitation earns today (matching_config invitation_reward), for the app's words. */
             reward: {
-                fish: number;
-                likes: number;
+                inviterFish: number;
+                friendFish: number;
             };
             open: components["schemas"]["OpenInvitation"][];
             counted: number;
-            /** @description What the person's invitations earned that is not used yet. */
+            /** @description What invitations earned the person that is not used yet, theirs and the one they used. */
             earned: {
                 fish: number;
-                likes: number;
             };
         };
         OpenInvitation: {
@@ -7768,6 +8651,7 @@ export interface components {
         ConversationList: {
             open: components["schemas"]["ConversationSummary"][];
             archived: components["schemas"]["ConversationSummary"][];
+            yourTurn: components["schemas"]["YourTurnCount"];
         };
         ConversationSummary: {
             /** Format: uuid */
@@ -7777,6 +8661,7 @@ export interface components {
             counterpart: components["schemas"]["Counterpart"];
             lastMessage: components["schemas"]["LastMessage"];
             unread: number;
+            yourTurn: boolean;
         };
         Counterpart: components["schemas"]["CounterpartPerson"] | components["schemas"]["CounterpartDeleted"] | null;
         CounterpartPerson: {
@@ -7809,6 +8694,11 @@ export interface components {
         } | null;
         /** @enum {string} */
         MessageSide: "mine" | "theirs";
+        YourTurnCount: {
+            waiting: number;
+            limit: number;
+            warning: number;
+        };
         ConversationDetail: {
             /** Format: uuid */
             id: string;
@@ -7817,6 +8707,7 @@ export interface components {
             counterpart: components["schemas"]["Counterpart"];
             lastMessage: components["schemas"]["LastMessage"];
             unread: number;
+            yourTurn: boolean;
             limits: {
                 maxLength: number;
             };
@@ -8111,6 +9002,9 @@ export interface components {
             /** Format: uuid */
             sanctionId: string | null;
             copy: components["schemas"]["ReportCopyLine"][] | null;
+            /** @default null */
+            lineSeq: number | null;
+            pointedPhoto?: components["schemas"]["ReportPointedPhoto"];
             actable: components["schemas"]["ReportActable"][];
         };
         ReportCopyLine: {
@@ -8124,6 +9018,17 @@ export interface components {
         };
         /** @enum {string} */
         ReportMessageSide: "reporter" | "reported";
+        /** @default null */
+        ReportPointedPhoto: {
+            /** @enum {boolean} */
+            removed: true;
+        } | {
+            /** @enum {boolean} */
+            removed: false;
+            id: components["schemas"]["PhotoId"];
+            state: components["schemas"]["PhotoState"];
+            approvedPhotos: number;
+        } | null;
         ReportActable: {
             /** Format: uuid */
             id: string;
@@ -8173,7 +9078,6 @@ export interface components {
             suspensionEndsAt: string | null;
             age: number | null;
             gender: string | null;
-            pond: string | null;
             profile: {
                 displayName: string;
                 bio: string | null;
@@ -8248,48 +9152,91 @@ export interface components {
             /** Format: date-time */
             lastSignInAt: string | null;
         };
+        AdminPondList: {
+            items: components["schemas"]["AdminPond"][];
+        };
+        AdminPond: {
+            /** Format: uuid */
+            id: string;
+            slug: string;
+            name: string;
+            matchingOpen: boolean;
+        };
+        PondMatchingChange: {
+            open: boolean;
+        };
+        AdminAnnouncementList: {
+            items: components["schemas"]["AdminAnnouncement"][];
+            reach: components["schemas"]["AnnouncementReach"];
+        };
+        AdminAnnouncement: {
+            /** Format: uuid */
+            id: string;
+            en: components["schemas"]["AnnouncementText"];
+            fi: components["schemas"]["AnnouncementText"];
+            sv: components["schemas"]["AnnouncementText"] & unknown;
+            /** Format: date-time */
+            writtenAt: string;
+            /** Format: date-time */
+            approvedAt: string | null;
+            yours: boolean;
+        };
+        AnnouncementText: {
+            title: string;
+            body: string;
+        };
+        AnnouncementReach: {
+            accounts: number;
+            phones: number;
+            addresses: number;
+        };
+        AnnouncementDraft: {
+            en: components["schemas"]["AnnouncementText"];
+            fi: components["schemas"]["AnnouncementText"];
+            sv?: components["schemas"]["AnnouncementText"];
+        };
         GateResponse: {
             state: components["schemas"]["GateState"];
-            within: number | null;
-            needed: number | null;
-            step: number;
         };
         /** @enum {string} */
-        GateState: "incomplete" | "pending" | "waiting" | "closed" | "open";
-        WaitlistResponse: {
+        GateState: "incomplete" | "closed" | "open";
+        PondCounterResponse: {
             k: number;
-            ponds: components["schemas"]["WaitlistPond"][];
+            ponds: components["schemas"]["PondCounterPond"][];
         };
-        WaitlistPond: {
+        PondCounterPond: {
             pond: components["schemas"]["PondSummary"];
             /** Format: date */
             day: string | null;
-            verified: number | null;
-            split: components["schemas"]["WaitlistSplit"];
-            finishing: number | null;
+            finished: number | null;
+            seeks: components["schemas"]["PondSeeks"];
         };
-        WaitlistSplit: {
-            woman: number;
-            man: number;
-            nonBinary: number;
+        PondSeeks: {
+            men: number;
+            everyone: number;
+            women: number;
         } | null;
-        PondList: {
-            ponds: components["schemas"]["PondSummary"][];
-        };
-        PondChoice: {
-            /** Format: uuid */
-            pondId: string;
+        HomeUpdate: {
+            /** @description Five digits, checked against the list of postal areas. */
+            postalCode?: string;
+            showArea?: boolean;
         };
         RoundResponse: {
             /** Format: date */
             day: string;
             entries: components["schemas"]["RoundEntry"][] | null;
+            fishToSend: boolean;
+            likesLeft: number;
+            yourTurn: number;
         };
         RoundEntry: {
             position: number;
             reason: components["schemas"]["RoundReason"];
             decision: components["schemas"]["RoundChoice"];
             card: components["schemas"]["ProfileCard"];
+            distance: components["schemas"]["DistanceBand"];
+            /** Format: uuid */
+            star: string | null;
             relaxedField?: components["schemas"]["DealBreakerField"];
             notAnswered?: components["schemas"]["DealBreakerField"][];
         };
@@ -8298,6 +9245,9 @@ export interface components {
                 /** Format: uuid */
                 conversationId: string;
             } | null;
+            fishToSend: boolean;
+            likesLeft: number;
+            yourTurn: number;
         };
         RoundDecisionUpdate: {
             decision: components["schemas"]["RoundChoice"];
@@ -8321,6 +9271,25 @@ export interface components {
         };
         RelaxationUndone: {
             removed: number[];
+        };
+        StarList: {
+            items: components["schemas"]["StarredPerson"][];
+        };
+        StarredPerson: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            age: number;
+            photo: {
+                /** Format: uuid */
+                id: string;
+                blurhash: string;
+            } | null;
+        };
+        StarAnswer: {
+            /** Format: uuid */
+            id: string;
+            first: boolean;
         };
         DealBreakersResponse: {
             dealBreakers: components["schemas"]["StoredDealBreaker"][];

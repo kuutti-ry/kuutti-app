@@ -180,7 +180,8 @@ async function processUnderLimit(deps: PhotoServiceDeps, bytes: Uint8Array) {
 // shortcut: erasure's `deleteOrphanedObjects` window is here too: a send of
 // the same picture that stored its objects and has not committed its row
 // yet loses them to a refused one's cleanup. A per-content-key ownership
-// protocol lifts it, noted for the M4 orphan sweep.
+// protocol lifts it; meanwhile the night's `sweepOrphanedObjects` (#636) takes
+// what it leaves behind once a day old.
 async function dropOrphansOf(deps: PhotoServiceDeps, key: string, accountId: string) {
   try {
     if ((await repo.countRowsForKey(deps.db, key)) === 0) {
@@ -446,9 +447,9 @@ export async function reorderPhotos(
 
 /**
  * A signed URL for one variant of a photo the caller may see: their own, or
- * another account's approved photo on a card they were shown (#52, the
- * shown-record rule; the card route of #47 writes the record). Visibility is
- * the query's WHERE clause (rule 6). Every issuance is a photo_access row,
+ * another account's approved photo on a card they were shown, in the thumb
+ * and card sizes (#52, the shown-record rule; the card route of #47 writes
+ * the record; ADR-056 §3). Visibility is the query's WHERE clause (rule 6). Every issuance is a photo_access row,
  * written by the statement that counts the day's fetches of the variant
  * against matching_config.photo_fetches_per_day (TD-6, ADR-008): over the
  * budget there is no row and no URL, a 429 with Retry-After until the Finnish
@@ -476,7 +477,7 @@ export async function issuePhotoUrl(
     );
     return new AppError(404, "not_found", "No such photo for this account");
   };
-  const row = await repo.findVisiblePhoto(deps.db, input.accountId, input.photoId);
+  const row = await repo.findVisiblePhoto(deps.db, input.accountId, input.photoId, input.variant);
   if (!row) throw notVisible();
   const at = deps.now();
   const expiresAt = new Date(at.getTime() + URL_TTL_MS);

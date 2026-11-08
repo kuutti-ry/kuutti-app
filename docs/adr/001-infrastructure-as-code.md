@@ -1,6 +1,6 @@
 # ADR-001: Infrastructure as code with OpenTofu
 
-- Status: proposed (built in `infra/` and applied to staging; production waits for the first release, `infra/README.md`; accepting it is the maintainer's), amended 2026-09-13 (#6: admin access through IAM Identity Center), 2026-09-17 and 2026-09-18 (the domain; the placeholder page), 2026-09-28 (the site moved to a repository of its own) and 2026-10-03 (#110: the organisation renamed)
+- Status: proposed (built in `infra/` and applied to staging, and to production on 2026-10-24, ADR-049; accepting it is the maintainer's), amended 2026-09-13 (#6: admin access through IAM Identity Center), 2026-09-17 and 2026-09-18 (the domain; the placeholder page), 2026-09-28 (the site moved to a repository of its own) and 2026-10-03 (#110: the organisation renamed)
 - Date: 2026-09-12
 - Follows: TD-4 (single-vendor AWS, eu-central-1), TD-19 (RDS, SSM, instance role)
 
@@ -29,7 +29,7 @@ infra/
     data/           RDS instance, parameter group, backups
     compute/        EC2, EBS, Elastic IP, instance profile and role, user_data
     media/          S3 buckets, CloudFront, OAC, cache and origin request policies, ACM
-    email/          SES identity, DKIM, configuration set, SNS topic
+    email/          not built: the SES identity is the domain's, bootstrap/mail.tf (ADR-043 §5)
     observability/  log groups, alarms
   envs/
     staging/ prod/
@@ -40,7 +40,7 @@ State: one S3 bucket, one key per environment, versioned and encrypted, `use_loc
 
 CI: GitHub Actions assumes an AWS role by OIDC. `tofu plan` runs on every pull request and posts the plan. Apply to staging happens on merge to `main`; apply to production requires approval through a GitHub environment protection rule.
 
-Two roles. The plan role has `ReadOnlyAccess` minus data: it is explicitly denied `kms:Decrypt` (so it cannot read SecureString parameters under the default key), Secrets Manager reads, CloudWatch log reads, and `s3:GetObject` outside the state bucket, because it is assumable from any pull request. The apply role has `PowerUserAccess` plus scoped IAM, and can only create or modify roles that carry a permissions boundary shaped like `PowerUserAccess`, so it cannot mint a role more powerful than itself.
+Two roles. The plan role has `ReadOnlyAccess` minus data: it is explicitly denied `kms:Decrypt` (so it cannot read SecureString parameters under the default key), Secrets Manager reads, CloudWatch log reads, `s3:GetObject` outside the state bucket and, since ADR-066, the values of the CloudFront key value stores, because it is assumable from any pull request. The apply role has `PowerUserAccess` plus scoped IAM, and can only create or modify roles that carry a permissions boundary shaped like `PowerUserAccess`, so it cannot mint a role more powerful than itself.
 
 ### Out of scope, deliberately
 
@@ -88,3 +88,7 @@ Added 2026-10-03. The organisation was renamed from `kuutti-fi` to `kuutti-ry` o
 **CloudFormation directly.** Its historical advantages (day-one support for new services, StackSets, Service Catalog) do not apply to a single-account stack of long-established services. Its changesets are also a weaker review artefact than a plan.
 
 **No IaC, console plus a runbook.** Cheapest today and the usual choice at this size. Rejected for the four reasons in the context section, of which transfer to the association and reviewability of security-relevant resources are the ones that do not go away.
+
+## History
+
+- 2026-10-24 (#397): the layout's `email/` module was never built. Mail's SES identity belongs to the domain, so it went to `bootstrap/mail.tf` with #385 (ADR-043 §5). The modules that came later, `admin` (ADR-025) and `research` (ADR-029), and the deployment they make are in `infra/README.md`'s layout and in `docs/architecture/`.

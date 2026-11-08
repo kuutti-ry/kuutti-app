@@ -48,8 +48,9 @@ const accountFrom = (r: Row): Account => ({
   birthMonth: (r.birth_month as number | null) ?? null,
   gender: (r.gender as Account["gender"]) ?? null,
   pondId: (r.pond_id as string | null) ?? null,
+  homePlace: (r.home_place as string | null) ?? null,
+  homeShowsArea: r.home_shows_area === true,
   genderChangedAt: (r.gender_changed_at as Date | null) ?? null,
-  seeksChangedAt: (r.seeks_changed_at as Date | null) ?? null,
   email: (r.email as string | null) ?? null,
   foundThemAnswered: r.found_them_answered === true,
   emailConfirmedAt: (r.email_confirmed_at as Date | null) ?? null,
@@ -338,20 +339,27 @@ export async function countRefusedAttempt(db: Queryable, identityId: string): Pr
 }
 
 /**
- * Null when the identity has a live account already: two logins of the same
- * person can both decide to create one (two devices), and the loser must go
- * through the decision again, where it resumes the winner's, rather than
- * surface the unique violation of `account_one_live_per_identity_idx`.
+ * Null when the identity has a live account already, or a cooldown at `now`.
+ * Two logins of the same person can both decide to create one (two devices),
+ * and the loser must go through the decision again, where it resumes the
+ * winner's, rather than surface the unique violation of
+ * `account_one_live_per_identity_idx`. The cooldown is the statement's own
+ * check and not the decision's alone: an erasure can commit between the
+ * login's read of the identity and its read of the live account, so the
+ * decision held an identity without a cooldown and found no account to
+ * resume (TD-7; the audit of #609, run 1, record 1). Refused here, the
+ * caller decides again and reads the cooldown.
  */
 export async function insertAccount(
   db: Queryable,
-  input: { identityId: string; birthYear: number; birthMonth: number },
+  input: { identityId: string; birthYear: number; birthMonth: number; now: Date },
 ): Promise<Account | null> {
   const { rows } = await db.query<Row>(
     `INSERT INTO account (identity_id, state, birth_year, birth_month)
-     VALUES ($1, 'registered', $2, $3)
+     SELECT i.id, 'registered', $2, $3 FROM identity i
+     WHERE i.id = $1 AND (i.reregister_after IS NULL OR i.reregister_after <= $4)
      ON CONFLICT (identity_id) WHERE state <> 'deleted' DO NOTHING RETURNING *`,
-    [input.identityId, input.birthYear, input.birthMonth],
+    [input.identityId, input.birthYear, input.birthMonth, input.now],
   );
   const row = rows[0];
   return row ? accountFrom(row) : null;
@@ -398,13 +406,14 @@ export async function insertSession(
     accessHash: string;
     accessExpiresAt: Date;
     refreshHash: string;
+    familyHash: string;
     expiresAt: Date;
     at: Date;
   },
 ): Promise<SessionRow | null> {
   const { rows } = await db.query<Row>(
-    `INSERT INTO session (account_id, platform, user_agent, access_hash, access_expires_at, refresh_hash, expires_at, created_at, last_used_at)
-     SELECT $1, $2, $3, $4, $5, $6, $7, $8, $8
+    `INSERT INTO session (account_id, platform, user_agent, access_hash, access_expires_at, refresh_hash, family_hash, expires_at, created_at, last_used_at)
+     SELECT $1, $2, $3, $4, $5, $6, $7, $8, $9, $9
      WHERE EXISTS (
        SELECT 1 FROM account a JOIN identity i ON i.id = a.identity_id
        WHERE a.id = $1 AND i.standing = 'ok'
@@ -418,6 +427,7 @@ export async function insertSession(
       input.accessHash,
       input.accessExpiresAt,
       input.refreshHash,
+      input.familyHash,
       input.expiresAt,
       input.at,
     ],
@@ -507,9 +517,12 @@ export async function touchSession(db: Queryable, sessionId: string, at: Date): 
 
 /**
  * Rotates in place when the presented hash is the live one; null when it is
- * not. Only the hash retired by the last rotation is kept: a token two
- * rotations old reads as unknown, which is narrower than the reuse rule but
- * costs nothing, since nobody could have used that token in between.
+ * not, and then `findSessionByFamilyHash` tells a retired token of the session
+ * from an unknown one (ADR-059).
+ *
+ * The end moves to `nextExpiresAt`, never past `ceilingMs` after the row's
+ * creation, the bank login (ADR-058); once it is reached, the next refresh
+ * finds the end passed.
  */
 export async function rotateSession(
   db: Queryable,
@@ -518,12 +531,15 @@ export async function rotateSession(
     nextAccessHash: string;
     nextAccessExpiresAt: Date;
     nextRefreshHash: string;
+    nextExpiresAt: Date;
+    ceilingMs: number;
     at: Date;
   },
 ): Promise<SessionRow | null> {
   const { rows } = await db.query<Row>(
     `UPDATE session
-     SET refresh_hash = $2, retired_refresh_hash = $1, access_hash = $3, access_expires_at = $4, last_used_at = $5
+     SET refresh_hash = $2, access_hash = $3, access_expires_at = $4, last_used_at = $5,
+       expires_at = LEAST($6::timestamptz, created_at + $7::double precision * interval '1 millisecond')
      WHERE refresh_hash = $1 AND revoked_at IS NULL AND expires_at > $5 AND ${SESSION_ALIVE}
      RETURNING ${SESSION_COLUMNS}`,
     [
@@ -532,20 +548,29 @@ export async function rotateSession(
       input.nextAccessHash,
       input.nextAccessExpiresAt,
       input.at,
+      input.nextExpiresAt,
+      input.ceilingMs,
     ],
   );
   return rows[0] ? sessionFrom(rows[0]) : null;
 }
 
-export async function findSessionByRetiredRefreshHash(
+/**
+ * The session a refresh token belongs to, by the hash of its family part, the
+ * secret the session keeps for its life (ADR-059); `live` when the presented
+ * token is the session's live one, so a session that ended by itself is told
+ * from a retired token coming back.
+ */
+export async function findSessionByFamilyHash(
   db: Queryable,
-  retiredRefreshHash: string,
-): Promise<SessionRow | null> {
+  input: { familyHash: string; refreshHash: string },
+): Promise<(SessionRow & { live: boolean }) | null> {
   const { rows } = await db.query<Row>(
-    `SELECT ${SESSION_COLUMNS} FROM session WHERE retired_refresh_hash = $1`,
-    [retiredRefreshHash],
+    `SELECT ${SESSION_COLUMNS}, refresh_hash = $2 AS live FROM session WHERE family_hash = $1`,
+    [input.familyHash, input.refreshHash],
   );
-  return rows[0] ? sessionFrom(rows[0]) : null;
+  const row = rows[0];
+  return row ? { ...sessionFrom(row), live: row.live as boolean } : null;
 }
 
 export async function findSessionForAccount(
@@ -579,7 +604,14 @@ export async function revokeAccountSessions(
   reason: string,
 ): Promise<number> {
   const result = await db.query(
-    "UPDATE session SET revoked_at = $2, revoked_reason = $3 WHERE account_id = $1 AND revoked_at IS NULL",
+    // Bulk lifecycle writers and push submission take session locks in the
+    // same order, before any revocation trigger takes a token lock.
+    `WITH locked AS MATERIALIZED (
+       SELECT id FROM session WHERE account_id = $1 AND revoked_at IS NULL
+       ORDER BY id FOR UPDATE
+     )
+     UPDATE session SET revoked_at = $2, revoked_reason = $3
+      WHERE id IN (SELECT id FROM locked)`,
     [accountId, at, reason],
   );
   return result.rowCount ?? 0;
@@ -592,8 +624,13 @@ export async function deleteDeadSessions(
   now: Date,
 ): Promise<number> {
   const result = await db.query(
-    `DELETE FROM session WHERE (revoked_at IS NOT NULL AND revoked_at < $1) OR expires_at < $2
-       OR account_id IN (SELECT id FROM account WHERE state = 'deleted')`,
+    `WITH locked AS MATERIALIZED (
+       SELECT id FROM session
+        WHERE (revoked_at IS NOT NULL AND revoked_at < $1) OR expires_at < $2
+          OR account_id IN (SELECT id FROM account WHERE state = 'deleted')
+       ORDER BY id FOR UPDATE
+     )
+     DELETE FROM session WHERE id IN (SELECT id FROM locked)`,
     [endedBefore, now],
   );
   return result.rowCount ?? 0;
@@ -788,7 +825,13 @@ export async function listSessionsForAccount(
 
 /** Every session of the account, gone (not revoked and kept: erasure). */
 export async function deleteAccountSessions(db: Queryable, accountId: string): Promise<number> {
-  const result = await db.query("DELETE FROM session WHERE account_id = $1", [accountId]);
+  const result = await db.query(
+    `WITH locked AS MATERIALIZED (
+       SELECT id FROM session WHERE account_id = $1 ORDER BY id FOR UPDATE
+     )
+     DELETE FROM session WHERE id IN (SELECT id FROM locked)`,
+    [accountId],
+  );
   return result.rowCount ?? 0;
 }
 
@@ -813,8 +856,8 @@ export async function tombstoneAccount(
   const result = await db.query(
     `UPDATE account SET state = 'deleted', state_changed_at = $2, deleted_at = $2,
        birth_year = NULL, birth_month = NULL, gender = NULL, pond_id = NULL,
-       gender_changed_at = NULL, seeks_changed_at = NULL, email = NULL, email_confirmed_at = NULL,
-       sanctioned_from = NULL, found_them_answered = false
+       home_place = NULL, home_shows_area = false, gender_changed_at = NULL, email = NULL, email_confirmed_at = NULL,
+       paused_from = NULL, sanctioned_from = NULL, found_them_answered = false
      WHERE id = $1 AND state <> 'deleted'`,
     [accountId, at],
   );
@@ -1171,7 +1214,8 @@ export async function recordExport(
       `account_export:${input.accountId}`,
     ]);
     const { rows } = await tx.query<{ live: boolean; used: number; id: string | null }>(
-      `WITH live AS (SELECT 1 FROM account WHERE id = $1 AND state <> 'deleted'),
+      // Share erasure's account lock before writing its child row (TD-7).
+      `WITH live AS (SELECT 1 FROM account WHERE id = $1 AND state <> 'deleted' FOR SHARE),
           used AS (SELECT count(*)::int AS n FROM account_export WHERE account_id = $1 AND at >= $3),
           ins AS (INSERT INTO account_export (account_id, at)
                   SELECT $1, $2 FROM live, used WHERE used.n < $4

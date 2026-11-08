@@ -5,4 +5,4 @@ export { ChatsButton } from "./ChatsButton";
 export { ConversationScreen } from "./ConversationScreen";
 export { ConversationsScreen } from "./ConversationsScreen";
 export { ChatLiveProvider } from "./store";
-export { YourContacts } from "./YourContacts";
+export { useContactsSummary, YourContacts } from "./YourContacts";

@@ -17,10 +17,10 @@ const failure = () =>
 const invitations = (counted: number) => ({
   canInvite: true,
   redeemable: false,
-  reward: { fish: 1, likes: 0 },
+  reward: { inviterFish: 1, friendFish: 1 },
   open: [],
   counted,
-  earned: { fish: 0, likes: 0 },
+  earned: { fish: 0 },
 });
 
 /** Each read waits for the test to answer it. */
@@ -56,7 +56,7 @@ beforeEach(async () => {
     sessionId: "6f1c1c4e-9a8e-4a0b-9c3a-0c8d1e2f3a4b",
     accessToken: token("access"),
     accessExpiresAt: "2030-01-01T00:15:00.000Z",
-    refreshToken: token("refresh"),
+    refreshToken: `${token("family")}.${token("refresh")}`,
     refreshExpiresAt: "2030-04-01T00:00:00.000Z",
   });
 });

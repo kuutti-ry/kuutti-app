@@ -1,8 +1,10 @@
 import { act, fireEvent, screen, waitFor } from "@testing-library/react-native";
+import { useLocales } from "expo-localization";
 import { PixelRatio } from "react-native";
 import { saveSession } from "@/lib/session";
 import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
-import { expectPinnedHeader } from "@/test/layout";
+import { FAILED_TO_LOAD } from "@/test/failed";
+import { expectPinnedHeader, hasCutText } from "@/test/layout";
 import { renderWithTheme } from "@/test/render";
 import { MAX_FONT_SCALE } from "@/theme/a11y";
 import { CardPreviewScreen } from "./CardPreviewScreen";
@@ -23,13 +25,7 @@ const card = {
   displayName: "Aino",
   age: { years: 36, verifiedByBank: true },
   gender: "non_binary",
-  pond: {
-    id: "5f1c1c4e-9a8e-4a0b-9c3a-0c8d1e2f3a00",
-    slug: "espoo",
-    name: "Espoo",
-    nameInessive: "Espoossa",
-    parentId: null,
-  },
+  place: { fi: "Espoo", sv: "Esbo" },
   photos: [
     { id: PHOTO_A, blurhash: "LEHV6nWB2yk8pyo0adR*.7kCMdnj", width: 1200, height: 1600 },
     { id: PHOTO_B, blurhash: "LEHV6nWB2yk8pyo0adR*.7kCMdnj", width: 1200, height: 1600 },
@@ -95,7 +91,7 @@ beforeEach(async () => {
     sessionId: "6f1c1c4e-9a8e-4a0b-9c3a-0c8d1e2f3a4b",
     accessToken: token("access"),
     accessExpiresAt: "2030-01-01T00:15:00.000Z",
-    refreshToken: token("refresh"),
+    refreshToken: `${token("family")}.${token("refresh")}`,
     refreshExpiresAt: "2030-04-01T00:00:00.000Z",
   });
 });
@@ -114,28 +110,50 @@ describe("CardPreviewScreen", () => {
     expect(screen.getByText("Non-binary")).toBeTruthy();
     expect(screen.getByText("Genderfluid")).toBeTruthy();
     expect(screen.getByText("Espoo")).toBeTruthy();
-    // Languages in the reader's language, as every option (ADR-019 §3, #238); what both answered said in words.
-    expect(screen.getByText("Finnish, English (you too)")).toBeTruthy();
-    expect(screen.getByText("Yoga (you too), Hiking")).toBeTruthy();
+    // The owner's preview says where, and never how far (ADR-061 §5): only a round's entry has a band.
+    expect(screen.queryByText(/^(Nearby|Close|Around|Far)$/)).toBeNull();
+    // Languages in the reader's language, as every option (ADR-019 §3, #238); what both
+    // answered is filled, in bold and heard as shared (#644).
+    expect(screen.getByLabelText("Languages: Finnish")).toBeTruthy();
+    expect(screen.getByLabelText("English, shared")).toBeTruthy();
     expect(screen.getByText("Something long-term")).toBeTruthy();
-    expect(screen.getByText("Architect")).toBeTruthy();
     expect(screen.getByText("171 cm")).toBeTruthy();
-    expect(screen.getByText("The photos say it. The rest over coffee.")).toBeTruthy();
     expect(screen.getByText("A long breakfast.")).toBeTruthy();
+    expect(screen.getByText("Whom you are looking for")).toBeTruthy();
+    // The owner sees the same two depths as others (#644): the rest waits for the whole card.
+    expect(screen.queryByText("Architect")).toBeNull();
+    expect(screen.queryByText("I can whistle with my mouth full.")).toBeNull();
+    await act(async () => {
+      fireEvent.press(screen.getByRole("button", { name: "Show the whole card" }));
+      await settle();
+    });
+    expect(screen.getByText("Architect")).toBeTruthy();
+    expect(screen.getByLabelText("Hobbies: Yoga, shared")).toBeTruthy();
+    expect(screen.getByText("Hiking")).toBeTruthy();
+    expect(screen.getByText("The photos say it. The rest over coffee.")).toBeTruthy();
     expect(screen.getByText("I can whistle with my mouth full.")).toBeTruthy();
-    expect(screen.getByText("Whom you are looking for (set in onboarding)")).toBeTruthy();
     // The identity label stands in the header, not among the fields.
     expect(screen.queryByText("Identity")).toBeNull();
-    // The card leads with the photo and one answer in the person's words; the rest follows (#150).
+    // The card leads with the photo and one answer in the person's words; the whole card
+    // follows with the other words, then the answers under their sections (#150, #644).
     const order = textsOf(screen.toJSON());
     expect(order.indexOf("Non-binary")).toBeLessThan(order.indexOf("Genderfluid"));
-    expect(order.indexOf("A long breakfast.")).toBeLessThan(order.indexOf("Hobbies"));
-    expect(order.indexOf("Hobbies")).toBeLessThan(
+    expect(order.indexOf("A long breakfast.")).toBeLessThan(order.indexOf("Show less"));
+    expect(order.indexOf("Show less")).toBeLessThan(
       order.indexOf("I can whistle with my mouth full."),
     );
+    expect(order.indexOf("I can whistle with my mouth full.")).toBeLessThan(
+      order.indexOf("Hobbies"),
+    );
     await waitFor(() => expect(calls).toContain(`/photos/${PHOTO_A}/card`));
-    expect(calls).toContain(`/photos/${PHOTO_B}/thumb`);
-    expect(calls.filter((p) => p.endsWith("/full"))).toEqual([]);
+    // The next photo only once it comes to the front (#513), in the card size as well.
+    expect(calls.filter((p) => p.includes(PHOTO_B))).toEqual([]);
+    await act(async () => {
+      fireEvent.press(screen.getByRole("button", { name: "Next photo" }));
+      await settle();
+    });
+    expect(calls).toContain(`/photos/${PHOTO_B}/card`);
+    expect(calls.filter((p) => p.endsWith("/full") || p.endsWith("/thumb"))).toEqual([]);
     const found = pressables(screen.toJSON() as HostNode);
     expect(found.flatMap((node) => a11yProblems(node))).toEqual([]);
     await act(async () => {
@@ -157,31 +175,19 @@ describe("CardPreviewScreen", () => {
     serveCard({ complete: true, missing: [] });
     await show();
     await waitFor(() => expect(screen.getByText("Aino, 36")).toBeTruthy());
-    expect(screen.getByText("Yoga (you too), Hiking")).toBeTruthy();
+    await act(async () => {
+      fireEvent.press(screen.getByRole("button", { name: "Show the whole card" }));
+      await settle();
+    });
+    expect(screen.getByLabelText("Hobbies: Yoga, shared")).toBeTruthy();
     expect(screen.getByText("I can whistle with my mouth full.")).toBeTruthy();
     // No fixed-height text container anywhere on the card (CLAUDE.md Accessibility).
-    const fixed = (node: unknown): boolean => {
-      if (Array.isArray(node)) return node.some(fixed);
-      if (!node || typeof node !== "object") return false;
-      const { type, props, children } = node as {
-        type?: string;
-        props?: { style?: unknown; numberOfLines?: number };
-        children?: unknown;
-      };
-      if (type === "Text") {
-        const style = ([] as unknown[]).concat(props?.style ?? []) as { height?: unknown }[];
-        if (props?.numberOfLines !== undefined || style.some((s) => s?.height !== undefined)) {
-          return true;
-        }
-      }
-      return fixed(children);
-    };
-    expect(fixed(screen.toJSON())).toBe(false);
+    expect(hasCutText(screen.toJSON() as HostNode)).toBe(false);
     const found = pressables(screen.toJSON() as HostNode);
     expect(found.flatMap((node) => a11yProblems(node))).toEqual([]);
   });
 
-  it("asks for the profile first when there is no card yet", async () => {
+  it("says only what the card still needs when there is no card yet: nobody saves a profile here (#581)", async () => {
     globalThis.fetch = jest.fn(async () =>
       json({
         card: null,
@@ -189,7 +195,99 @@ describe("CardPreviewScreen", () => {
       }),
     ) as unknown as typeof fetch;
     await show();
-    await waitFor(() => expect(screen.getByText(/Save your profile first/)).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("A name on the card")).toBeTruthy());
+    expect(textsOf(screen.toJSON())).toEqual([
+      "Your card",
+      "Before your card can be shown",
+      "A name on the card",
+    ]);
+  });
+
+  describe("what others see, and what the card still needs (#581)", () => {
+    const EXPLAIN = "This is what others see.";
+
+    it("puts what the card still needs above the card, and does not call it what others see", async () => {
+      serveCard({ complete: false, missing: ["photos", "bio_or_prompts"] });
+      await show();
+      await waitFor(() => expect(screen.getByText("Aino, 36")).toBeTruthy());
+      const order = textsOf(screen.toJSON());
+      expect(order.slice(0, 4)).toEqual([
+        "Your card",
+        "Before your card can be shown",
+        "At least 2 approved photos",
+        "A bio of 50 characters, a ready line, or two answered questions",
+      ]);
+      expect(
+        order.indexOf("A bio of 50 characters, a ready line, or two answered questions"),
+      ).toBeLessThan(order.indexOf("Aino, 36"));
+      expect(screen.queryByText(EXPLAIN)).toBeNull();
+    });
+
+    it("says it of a complete card, over the card, with no list", async () => {
+      serveCard({ complete: true, missing: [] });
+      await show();
+      await waitFor(() => expect(screen.getByText("Aino, 36")).toBeTruthy());
+      const order = textsOf(screen.toJSON());
+      expect(order.slice(0, 2)).toEqual(["Your card", EXPLAIN]);
+      expect(order.indexOf(EXPLAIN)).toBeLessThan(order.indexOf("Aino, 36"));
+    });
+
+    it("says nothing of it with no card to show", async () => {
+      globalThis.fetch = jest.fn(async () =>
+        json({ card: null, completeness: { complete: true, missing: [] } }),
+      ) as unknown as typeof fetch;
+      await show();
+      await waitFor(() => expect(screen.queryByText("Loading…")).toBeNull());
+      expect(textsOf(screen.toJSON())).toEqual(["Your card"]);
+    });
+
+    it("says nothing of it while the card loads, nor when it could not be", async () => {
+      let answer: ((response: Response) => void) | undefined;
+      globalThis.fetch = jest.fn(
+        () =>
+          new Promise<Response>((resolve) => {
+            answer = resolve;
+          }),
+      ) as unknown as typeof fetch;
+      await show();
+      expect(screen.getByText("Loading…")).toBeTruthy();
+      expect(screen.queryByText(EXPLAIN)).toBeNull();
+      await act(async () => {
+        answer?.(json({ error: { code: "internal_error", message: "x", requestId: "r" } }, 500));
+        await settle();
+      });
+      expect(screen.getByText(FAILED_TO_LOAD)).toBeTruthy();
+      expect(screen.queryByText(EXPLAIN)).toBeNull();
+    });
+
+    it.each([
+      ["fi-FI", "Tämän muut näkevät."],
+      ["sv-FI", "Det här ser andra."],
+    ])("says it in %s", async (tag, words) => {
+      (useLocales as jest.Mock).mockReturnValue([{ languageTag: tag }]);
+      try {
+        serveCard({ complete: true, missing: [] });
+        await show();
+        await waitFor(() => expect(screen.getByText(words)).toBeTruthy());
+      } finally {
+        (useLocales as jest.Mock).mockReturnValue([{ languageTag: "en-US" }]);
+      }
+    });
+
+    it.each([
+      ["fi-FI", "Ketä etsit", "Ikähaarukkasi"],
+      ["sv-FI", "Vem du söker", "Ditt åldersspann"],
+    ])("lists whom and the ages in %s with no word of onboarding", async (tag, whom, ages) => {
+      (useLocales as jest.Mock).mockReturnValue([{ languageTag: tag }]);
+      try {
+        serveCard();
+        await show();
+        await waitFor(() => expect(screen.getByText(whom)).toBeTruthy());
+        expect(screen.getByText(ages)).toBeTruthy();
+      } finally {
+        (useLocales as jest.Mock).mockReturnValue([{ languageTag: "en-US" }]);
+      }
+    });
   });
 
   it("says it is loading, and then that the card could not be loaded", async () => {
@@ -201,13 +299,33 @@ describe("CardPreviewScreen", () => {
         }),
     ) as unknown as typeof fetch;
     await show();
-    expect(screen.getByText("Loading your card…")).toBeTruthy();
+    expect(screen.getByText("Loading…")).toBeTruthy();
     await act(async () => {
       answer?.(json({ error: { code: "internal_error", message: "x", requestId: "r" } }, 500));
       await settle();
     });
-    expect(screen.getByText("Your card could not be loaded.")).toBeTruthy();
-    expect(screen.queryByText("Loading your card…")).toBeNull();
+    expect(screen.getByText(FAILED_TO_LOAD)).toBeTruthy();
+    expect(screen.queryByText("Loading…")).toBeNull();
+  });
+
+  it("tries again on request when the card could not be loaded, and shows it then", async () => {
+    let failing = true;
+    serveCard({ complete: true, missing: [] });
+    const answers = globalThis.fetch;
+    globalThis.fetch = jest.fn(async (input: Request | string, init?: RequestInit) =>
+      failing
+        ? json({ error: { code: "internal_error", message: "x", requestId: "r" } }, 500)
+        : answers(input, init),
+    ) as unknown as typeof fetch;
+    await show();
+    await waitFor(() => expect(screen.getByText(FAILED_TO_LOAD)).toBeTruthy());
+    failing = false;
+    await act(async () => {
+      fireEvent.press(screen.getByRole("button", { name: "Try again" }));
+      await settle();
+    });
+    await waitFor(() => expect(screen.getByText("Aino, 36")).toBeTruthy());
+    expect(screen.queryByText(FAILED_TO_LOAD)).toBeNull();
   });
 
   it("shows no checklist for a complete card", async () => {

@@ -2,6 +2,10 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Queryable } from "@kuutti/db";
 import {
+  CAST_CONVERSATIONS,
+  CAST_LIKES,
+  type ConversationsResult,
+  castAccounts,
   type DemoPersona,
   MOCK_BANK_AMR,
   OLDER_TERMS_VERSION,
@@ -10,21 +14,23 @@ import {
   type PersonaHistory,
   personaOf,
   type RoundsResult,
+  removeCastLeftovers,
   writeConversations,
   writeRounds,
+  writeWaitingLikes,
 } from "@kuutti/db/demo";
 import type { AuthExchangeResponse } from "@kuutti/schema";
 import {
   ConsentsResponse,
   type Gender,
   OnboardingStatus,
-  PondList,
   type PreferencesUpdate,
   type ProfileUpdate,
   SessionResponse,
 } from "@kuutti/schema";
 import { sendPhoto } from "../../src/chat/index.ts";
-import { type BuilderDeps, buildRoundOf } from "../../src/jobs/round-builder.ts";
+import { type BuilderDeps, fillQueue } from "../../src/jobs/round-builder.ts";
+import { finnishDay } from "../../src/lib/finnish-day.ts";
 import type { Logger } from "../../src/lib/logger.ts";
 import type { MediaDeps } from "../../src/media/index.ts";
 import { applySanction } from "../../src/safety/index.ts";
@@ -65,7 +71,8 @@ export type HistoryWriter = {
   ): Promise<void>;
   gender(accountId: string, gender: Gender): Promise<void>;
   preferences(accountId: string, update: PreferencesUpdate): Promise<void>;
-  pond(accountId: string, slug: string): Promise<void>;
+  /** The code as a person types it: the API keeps what it keeps of it, and writing it sets the pond (ADR-061 §2, §8). */
+  home(accountId: string, postalCode: string): Promise<void>;
   profile(accountId: string, update: ProfileUpdate): Promise<void>;
   /** The pictures through the upload pipeline (rule 4), as anybody's; the ids, in order. */
   photos(accountId: string, pictures: readonly Uint8Array[]): Promise<string[]>;
@@ -134,11 +141,8 @@ export function viaRoutes(context: HistoryContext): HistoryWriter {
     async preferences(accountId, update) {
       await as(accountId, "PUT", "/preferences", update);
     },
-    async pond(accountId, slug) {
-      const { ponds } = PondList.parse(await as(accountId, "GET", "/ponds"));
-      const pond = ponds.find((p) => p.slug === slug);
-      if (!pond) throw new DemoError(`no pond ${slug}: run the seed first`);
-      await as(accountId, "PUT", "/account/pond", { pondId: pond.id });
+    async home(accountId, postalCode) {
+      await as(accountId, "PUT", "/account/home", { postalCode });
     },
     async profile(accountId, update) {
       await as(accountId, "PUT", "/profile", update);
@@ -224,7 +228,7 @@ export async function giveHistory(
       seeks: history.onboarding.seeks,
       ageWindow: history.onboarding.ageWindow,
     });
-    await writer.pond(accountId, history.onboarding.pond);
+    await writer.home(accountId, history.onboarding.home);
   }
   if (history.profile) await writer.profile(accountId, history.profile);
   // The pictures (#142), through the pipeline like anybody's: the faces of the
@@ -327,11 +331,12 @@ function accountsOf(results: readonly HistoryResult[]): Map<string, string> {
 }
 
 /**
- * The round of the stories (#379), after the gates are counted: Iida's gate
- * opened and Henna's like of the day before (rows, `writeRounds`), then
- * Iida's round for the day through the round builder (#95), as the night
- * builds it, Henna first as liked you (ADR-037). `standing`: stories whose
- * round for the day stands now, built here or before (the builder's answer).
+ * The round of the stories (#379), once the ponds are open: Henna's like of
+ * the day before (rows, `writeRounds`), then Iida's day through the queue's
+ * builder (#502), as the day's first read would open it, Henna first as liked
+ * you (ADR-037). A day already opened is left as it stands, since a fill beside
+ * it would add the next people. `standing`: stories whose day stands now, opened
+ * here or before.
  */
 export async function giveRounds(
   deps: BuilderDeps,
@@ -339,12 +344,45 @@ export async function giveRounds(
 ): Promise<RoundsResult & { standing: number }> {
   const accounts = accountsOf(results);
   const written = await writeRounds(deps.db, accounts, deps.now());
+  const day = finnishDay(deps.now());
   let standing = 0;
   for (const story of PERSONA_ROUNDS) {
     const of = accounts.get(story.of);
-    if (of && (await buildRoundOf(deps, of))) standing += 1;
+    if (!of) continue;
+    const opened = await deps.db.query("SELECT 1 FROM rounds WHERE account_id = $1 AND day = $2", [
+      of,
+      day,
+    ]);
+    if (opened.rows.length > 0 || (await fillQueue(deps, of))) standing += 1;
   }
   return { ...written, standing };
+}
+
+/**
+ * What the cast gives the members of the stories (#560): a fish and likes waiting,
+ * so that a like back makes a match, and chats with something unread. Nothing where
+ * no cast has been written (`pnpm demo:population -- --photos`), as in the e2e jobs.
+ * Told before, it stays. What an erased member left with them goes first.
+ */
+export async function giveCastStories(
+  db: Queryable,
+  results: readonly HistoryResult[],
+  at: Date,
+): Promise<{
+  cast: number;
+  leftovers?: number;
+  likes?: RoundsResult;
+  conversations?: ConversationsResult;
+}> {
+  const cast = await castAccounts(db);
+  if (cast.size === 0) return { cast: 0 };
+  const accounts = new Map([...accountsOf(results), ...cast]);
+  return {
+    cast: cast.size,
+    leftovers: await removeCastLeftovers(db, cast),
+    likes: await writeWaitingLikes(db, CAST_LIKES, accounts, at),
+    conversations: await writeConversations(db, accounts, at, CAST_CONVERSATIONS),
+  };
 }
 
 const HOUR_MS = 60 * 60 * 1000;

@@ -20,7 +20,7 @@ const settle = () => act(() => new Promise<void>((resolve) => setTimeout(resolve
 const noProblems = () =>
   expect(pressables(screen.toJSON() as HostNode).flatMap((node) => a11yProblems(node))).toEqual([]);
 
-const DONE = "The code is in. Your friend's invitation counts once your profile is complete.";
+const DONE = "The code is in.";
 const field = () => screen.getByLabelText("Invitation code");
 const button = () => screen.getByRole("button", { name: "Use the code" });
 const dimmed = () => button().props.accessibilityState?.disabled === true;
@@ -49,7 +49,7 @@ beforeEach(async () => {
     sessionId: "6f1c1c4e-9a8e-4a0b-9c3a-0c8d1e2f3a4b",
     accessToken: token("access"),
     accessExpiresAt: "2030-01-01T00:15:00.000Z",
-    refreshToken: token("refresh"),
+    refreshToken: `${token("family")}.${token("refresh")}`,
     refreshExpiresAt: "2030-04-01T00:00:00.000Z",
   });
 });
@@ -106,9 +106,9 @@ describe("RedeemInvitation", () => {
     [
       "invitation_tries_exceeded",
       429,
-      "You have tried enough codes for today. You can try again after midnight.",
+      "That is enough for today. You can try again after midnight.",
     ],
-    ["internal_error", 500, "The code could not be checked. Try again."],
+    ["internal_error", 500, "That did not go through. Try again."],
   ])(
     "says the refusal %s in words, aloud on iOS, and keeps the field",
     async (code, status, words) => {
@@ -146,7 +146,7 @@ describe("RedeemInvitation", () => {
     await renderWithTheme(<RedeemInvitation onRedeemed={jest.fn()} />);
     await type("ABCDE-FGHJK");
     await send();
-    expect(screen.getByText("The code could not be checked. Try again.")).toBeTruthy();
+    expect(screen.getByText("That did not go through. Try again.")).toBeTruthy();
   });
 
   it("is dimmed while a code is on its way", async () => {

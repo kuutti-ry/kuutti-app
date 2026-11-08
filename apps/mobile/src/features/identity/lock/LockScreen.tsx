@@ -15,6 +15,23 @@ const UNLOCK_WITH: Record<Biometrics, PlainMessageKey> = {
   either: "lock.unlock.biometrics",
 };
 
+/**
+ * A refusal in the kind the button names, as whole sentences, since Finnish
+ * agrees with it (#464): a failure, or the phone's pause after too many tries.
+ */
+const REFUSED: Record<"failed" | "lockout", Record<Biometrics, PlainMessageKey>> = {
+  failed: {
+    face: "lock.failed.face",
+    fingerprint: "lock.failed.fingerprint",
+    either: "lock.failed.biometrics",
+  },
+  lockout: {
+    face: "lock.lockout.face",
+    fingerprint: "lock.lockout.fingerprint",
+    either: "lock.lockout.biometrics",
+  },
+};
+
 /** What a passcode try answered: in, or how many tries are left. */
 export type PasscodeAnswer = { ok: true } | { ok: false; left: number };
 
@@ -28,6 +45,7 @@ export type PasscodeAnswer = { ok: true } | { ok: false; left: number };
  */
 export function LockScreen({
   biometrics,
+  denied,
   passcode,
   onBiometrics,
   onPasscode,
@@ -35,6 +53,8 @@ export function LockScreen({
 }: {
   /** The phone's kind when the person chose it and the phone still has it; null otherwise. */
   biometrics: Biometrics | null;
+  /** The person chose the face, and this iPhone is not letting Kuutti use it (#505). */
+  denied: boolean;
   passcode: boolean;
   onBiometrics: () => Promise<BiometricAnswer>;
   onPasscode: (code: string) => Promise<PasscodeAnswer>;
@@ -54,11 +74,14 @@ export function LockScreen({
     if (words !== null && Platform.OS === "ios") AccessibilityInfo.announceForAccessibility(words);
   };
 
-  const askBiometrics = async () => {
+  /** Asks the phone, and says a refusal in the words of the kind that was asked. */
+  const askBiometrics = async (kind: Biometrics) => {
     setBusy(true);
     try {
       const answer = await onBiometrics();
-      say(answer === "failed" ? t("lock.biometrics.failed") : null);
+      say(answer === "failed" || answer === "lockout" ? t(REFUSED[answer][kind]) : null);
+      // Its line comes with `denied`, and goes with it; only an iPhone answers this.
+      if (answer === "denied") AccessibilityInfo.announceForAccessibility(t("lock.denied"));
     } finally {
       setBusy(false);
     }
@@ -69,7 +92,7 @@ export function LockScreen({
   useEffect(() => {
     if (biometrics === null || asked.current) return;
     asked.current = true;
-    void askBiometrics();
+    void askBiometrics(biometrics);
   });
 
   // One try at a time. The field stays editable, so the number pad stays up
@@ -112,12 +135,13 @@ export function LockScreen({
                 disabled={busy}
                 onPress={() => {
                   tap();
-                  void askBiometrics();
+                  void askBiometrics(biometrics);
                 }}
               >
                 {t(UNLOCK_WITH[biometrics])}
               </Button>
             )}
+            {denied && <Text>{t("lock.denied")}</Text>}
             {passcode && (
               <PasscodeField
                 label={t("lock.passcode.label")}

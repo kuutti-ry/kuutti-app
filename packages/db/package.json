@@ -22,8 +22,8 @@
   },
   "dependencies": {
     "@kuutti/schema": "workspace:*",
-    "@kuutti-ry/tunnistus-oidc": "^0.1.0",
-    "drizzle-orm": "^0.45.3",
+    "@kuutti-ry/tunnistus-oidc": "^0.1.2",
+    "drizzle-orm": "^0.45.4",
     "pg": "^8.23.1"
   },
   "devDependencies": {

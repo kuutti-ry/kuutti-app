@@ -13,16 +13,22 @@ import {
 } from "./identity/index.ts";
 import { invitationCountJob } from "./jobs/invitation-count.ts";
 import type { NightlyJob } from "./jobs/nightly.ts";
-import { gateJob } from "./jobs/pond-gate.ts";
-import { roundsJob } from "./jobs/round-builder.ts";
-import { ensureFirstSnapshot, waitlistJob } from "./jobs/waitlist-snapshot.ts";
+import { ensureFirstSnapshot, pondCounterJob } from "./jobs/pond-counter.ts";
 import type { Config } from "./lib/config.ts";
 import type { Logger } from "./lib/logger.ts";
 import { mailerFor } from "./lib/mail.ts";
 import { ensurePreviewDatabase } from "./lib/preview-database.ts";
+import { pusherFor } from "./lib/push.ts";
 import { createS3Client } from "./lib/s3.ts";
 import { initSentry, sentryReporter } from "./lib/sentry.ts";
-import { createMediaDeps, rejectUnreviewedPhotos, sweepPendingPhotos } from "./media/index.ts";
+import { pruneRounds } from "./matching/index.ts";
+import {
+  createMediaDeps,
+  rejectUnreviewedPhotos,
+  sweepOrphanedObjects,
+  sweepPendingPhotos,
+} from "./media/index.ts";
+import { createPush, type Push } from "./notifications/index.ts";
 import {
   copiedBeforeDrop,
   ensureEventPartitions,
@@ -47,7 +53,14 @@ export type BootOptions = {
   createBroker?: (options: Parameters<typeof OidcBroker.create>[0]) => Promise<IdentityBroker>;
 };
 
-export type Booted = { app: App; pool: Pool; jobs: NightlyJob[]; live: Live };
+export type Booted = {
+  app: App;
+  pool: Pool;
+  jobs: NightlyJob[];
+  live: Live;
+  /** The pushes in flight, which index.ts's shutdown waits for (#102). */
+  push: Push;
+};
 
 /**
  * Everything between a validated configuration and a server that may listen:
@@ -208,8 +221,23 @@ export async function boot({
   // Mail (#385, ADR-043): SES on AWS, the log locally, none where MAIL is off.
   const mailer = mailerFor(config, logger);
   logger.info({ mail: config.MAIL }, "mail");
+  // Push (#102, ADR-055 §8): Expo, the log locally, none where PUSH is off.
+  const pusher = pusherFor(config, logger);
+  logger.info({ push: config.PUSH, authenticated: Boolean(config.EXPO_ACCESS_TOKEN) }, "push");
+  // The process's one push (#102, ADR-055): the app's message and match
+  // pushes and the round's, asking the same live registry who is in the app.
+  const push = createPush({
+    db: pool,
+    logger,
+    now: () => new Date(),
+    ...(pusher ? { pusher } : {}),
+    // An announcement's email goes with its push (ADR-068 §5).
+    ...(mailer ? { mailer } : {}),
+    online: (accountId) => live.online(accountId),
+  });
   const app = createApp({
     live,
+    push,
     config,
     logger,
     db: pool,
@@ -217,6 +245,7 @@ export async function boot({
     ...(broker ? { broker } : {}),
     ...(media.deps ? { media: media.deps } : {}),
     ...(mailer ? { mailer } : {}),
+    ...(pusher ? { pusher } : {}),
   });
   // Nightly housekeeping inside the process (rules/api.md): ended sessions and
   // stale login attempts (#35).
@@ -232,6 +261,7 @@ export async function boot({
     media.setup.mode === "off" || config.APP_ENV === "production"
       ? undefined
       : { db: pool, now, store: s3CopyStore(createS3Client(config), config.S3_BUCKET) };
+  const counter = { db: pool, logger, now };
   const jobs: NightlyJob[] = [
     { name: "sweep-sessions", run: () => sweepSessions({ db: pool, now }) },
     { name: "sweep-admin-sessions", run: () => sweepAdminSessions({ db: pool, now }) },
@@ -246,19 +276,15 @@ export async function boot({
     }),
     // The census of the research block: a cell under k is a warning (ADR-011 §9).
     researchAnonymityJob({ db: pool, logger }),
-    // Suspensions past their day end (#307, ADR-024 §5), before the counter
-    // and the gate, so a person let back in is counted the same night.
+    // Suspensions past their day end (#307, ADR-024 §5), before the counter,
+    // so a person let back in is counted the same night.
     { name: "end-suspensions", run: async () => ({ ended: await endSuspensions(pool, now()) }) },
-    // The day's waitlist figures (#54): taken once a day, served all day.
-    waitlistJob({ db: pool, logger, now }),
-    // Who is let into each pond, and for whom matching opens (#94).
-    gateJob({ db: pool, logger, now }),
-    // The invitations whose redeemer's profile the gate's count has seen tonight (#107, ADR-044 §7).
+    // The day's figures (#54): taken once a day, served all day.
+    pondCounterJob(counter),
+    // The invitations whose redeemer's profile is complete tonight (#107, ADR-044 §7).
     invitationCountJob({ db: pool, logger, now }),
-    // The day's round for everybody whose matching is open, after the gate (#95, ADR-035).
-    // shortcut: none in production until the maintainer has set how long rounds
-    // are kept (ADR-034 Open 2, ADR-035 Open 1); his answer lifts this and app.ts's twin.
-    ...(config.APP_ENV === "production" ? [] : [roundsJob({ db: pool, logger, now })]),
+    // Rounds keep a year (#502, ADR-062 §13), their entries and relaxations with them.
+    { name: "prune-rounds", run: async () => ({ pruned: await pruneRounds(pool, now()) }) },
     // A photo nobody decided in photo_queue_reject_days is rejected as not reviewed (#376),
     // wherever there is a queue, Rekognition or none.
     { name: "reject-unreviewed-photos", run: () => rejectUnreviewedPhotos({ db: pool, now }) },
@@ -289,11 +315,19 @@ export async function boot({
       run: () => sweepPendingPhotos({ db: pool, logger, now, moderator, store: mediaDeps.store }),
     });
   }
+  // Last, the objects under media/ a day old or more that no photo row names (#636,
+  // ADR-007): what a failed delete or a crash between an upload's puts and its row left.
+  if (mediaDeps) {
+    jobs.push({
+      name: "sweep-orphaned-objects",
+      run: () => sweepOrphanedObjects({ db: pool, store: mediaDeps.store, logger }, now()),
+    });
+  }
   // A database with no figures yet gets its first ones now, so the public route has a day to serve.
   // Logged, never thrown, like a nightly job: the counter is not worth a boot, and the night tries again.
-  await ensureFirstSnapshot({ db: pool, logger, now }).catch((err: unknown) =>
-    logger.error({ job: "waitlist-snapshot", err }, "first waitlist snapshot failed"),
+  await ensureFirstSnapshot(counter).catch((err: unknown) =>
+    logger.error({ job: "pond-counter", err }, "first pond counter failed"),
   );
 
-  return { app, pool, jobs, live };
+  return { app, pool, jobs, live, push };
 }

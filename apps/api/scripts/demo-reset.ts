@@ -1,12 +1,12 @@
 /**
- * Returns the twenty-four personas to where they begin (#73, ADR-014 §12; on
+ * Returns the twenty-five personas to where they begin (#73, ADR-014 §12; on
  * staging #141, ADR-018): everybody erased through the erasure path and
- * forgotten, then the eighteen with a history given it anew, with their
- * conversations (#348) and, once the gates are counted, Iida's round for the
- * day (#379).
+ * forgotten, then the nineteen with a history given it anew, with their
+ * conversations (#348) and, once the ponds are open, Iida's round for the day
+ * (#379).
  *
  *   pnpm demo:reset                  reset, then the histories
- *   pnpm demo:reset -- --bare        reset only: all twenty-four are newcomers
+ *   pnpm demo:reset -- --bare        reset only: all twenty-five are newcomers
  *   pnpm demo:reset -- --api http://localhost:3000
  *   pnpm demo:reset -- --objects-lost   although the store does not hold the photos
  *   node dist/demo-reset.js --env staging   inside the API's container on staging
@@ -37,16 +37,18 @@ import {
   assertStagingProcess,
   DemoCommandError,
   describeTarget,
+  openPonds,
   PERSONA_HISTORIES,
+  renewPopulationConsents,
 } from "@kuutti/db/demo";
-import { hmacKeyFromHex } from "../src/identity/index.ts";
-import { countGates } from "../src/jobs/pond-gate.ts";
-import { takeSnapshot } from "../src/jobs/waitlist-snapshot.ts";
+import { CURRENT_CONSENT_VERSIONS, hmacKeyFromHex } from "../src/identity/index.ts";
+import { takeSnapshot } from "../src/jobs/pond-counter.ts";
 import { loadConfig, parseConfig } from "../src/lib/config.ts";
 import { createLogger, type Logger } from "../src/lib/logger.ts";
 import { createMediaDeps } from "../src/media/index.ts";
 import { DemoError, lookAtApi, onThisComputer, whyNotTheLocalStore } from "./demo/bank.ts";
 import {
+  giveCastStories,
   giveConversations,
   giveHistory,
   givePhotoMessages,
@@ -99,9 +101,9 @@ if (envArg !== undefined && process.env.APP_ENV !== undefined && envArg !== proc
 }
 
 /**
- * The counter and the gates after the people changed, then the round of the
- * stories, which needs the gates counted (#379): the same steps locally and
- * on staging.
+ * The population's consents to the wordings in force, the counter after the
+ * people changed, the ponds opened, then the round of the stories, which needs
+ * its pond open (#379): the same steps locally and on staging.
  */
 async function recount(
   pool: ReturnType<typeof createPool>,
@@ -109,17 +111,25 @@ async function recount(
   now: () => Date,
   results: readonly HistoryResult[],
 ) {
+  // First, since the counter's bands and everybody's pool read only consents
+  // of the current wording: after a new version the synthetic people, the
+  // cast among them, would be nobody's card until the population was written
+  // again (#560).
+  const renewed = await renewPopulationConsents(pool, CURRENT_CONSENT_VERSIONS, now());
+  console.log(JSON.stringify({ msg: "demo reset: consents renewed", ...renewed }));
   // The ponds have other people in them now: the counter of #54 is counted
   // anew, as after a write of the population (demo-population.ts says why).
-  await pool.query("DELETE FROM waitlist_snapshot");
+  await pool.query("DELETE FROM pond_counter");
   const counted = await takeSnapshot({ db: pool, logger, now });
   console.log(JSON.stringify({ msg: "demo reset: counter recounted", ...counted }));
-  // And the gates (#94): who is let into each pond, and for whom matching is open.
-  const gates = await countGates({ db: pool, logger, now });
-  console.log(JSON.stringify({ msg: "demo reset: gates counted", ...gates }));
+  // And the ponds open, so that the personas have rounds (ADR-060 Open 1).
+  const opened = await openPonds(pool);
+  console.log(JSON.stringify({ msg: "demo reset: ponds opened", opened }));
   if (results.length === 0) return;
   const rounds = await giveRounds({ db: pool, logger, now }, results);
   console.log(JSON.stringify({ msg: "demo reset: rounds", ...rounds }));
+  const cast = await giveCastStories(pool, results, now());
+  console.log(JSON.stringify({ msg: "demo reset: the cast's stories", ...cast }));
 }
 
 function sparedOrThrow(reset: ResetResult): void {

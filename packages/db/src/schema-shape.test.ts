@@ -2,6 +2,7 @@ import {
   AccountState,
   CONSENT_KINDS,
   ConversationCloseKind,
+  DISTANCE_BANDS,
   FoundReason,
   GENDERS,
   MessageKind,
@@ -12,6 +13,7 @@ import {
   PhotoPurpose,
   PhotoRejectionReason,
   PhotoState,
+  PushPlatform,
   RelaxationKind,
   ReportMessageSide,
   ReportOutcome,
@@ -46,6 +48,8 @@ describe("the tables", () => {
       "account",
       "account_export",
       "admin_session",
+      // What Kuutti told everybody, kept for good (#573, ADR-068).
+      "announcement",
       "audit_log",
       "auth_request",
       "block",
@@ -61,9 +65,8 @@ describe("the tables", () => {
       "feedback",
       // "Löysin hänet": a count by day and reason, naming nobody (#83, ADR-040).
       "found_them_count",
-      "gate",
       "identity",
-      // An invitation, and the units it earned its inviter (#107, ADR-044).
+      // An invitation, and the units it earned its two (#107, #503, ADR-044).
       "invitation",
       "matching_config",
       "message",
@@ -74,9 +77,12 @@ describe("the tables", () => {
       "photo_access",
       "photo_check_note",
       "photo_review",
+      "pond_counter",
       "ponds",
       "preferences",
       "profile",
+      // A signed-in device's push token (#102, ADR-055).
+      "push_token",
       "report",
       "report_message",
       "research_subject",
@@ -87,7 +93,8 @@ describe("the tables", () => {
       "rounds",
       "sanction",
       "session",
-      "waitlist_snapshot",
+      // One person's private mark on another (#575, ADR-064).
+      "star",
     ]);
   });
 
@@ -130,6 +137,58 @@ describe("the tables", () => {
   });
 });
 
+describe("the pond counter (#581, ADR-013)", () => {
+  it("holds one number and the bands: no total, nobody's gender, nobody finishing", () => {
+    const columns = byName.get("pond_counter")?.columns ?? [];
+    expect(columns.map((column) => column.name).sort()).toEqual([
+      "day",
+      "finished",
+      "pond_id",
+      "seeks_everyone",
+      "seeks_men",
+      "seeks_women",
+      "taken_at",
+    ]);
+    const finished = columns.find((column) => column.name === "finished");
+    expect(finished?.getSQLType()).toBe("integer");
+    expect(finished?.notNull).toBe(true);
+    expect(finished?.default).toBe(0);
+  });
+});
+
+describe("a person's home (ADR-061)", () => {
+  const column = (table: string, name: string) =>
+    byName.get(table)?.columns.find((candidate) => candidate.name === name);
+  const named = (table: string, words: RegExp) =>
+    byName
+      .get(table)
+      ?.columns.map((candidate) => candidate.name)
+      .filter((name) => words.test(name));
+
+  it("is one place kept and the card's choice, on the account, and no time of a move (§1, §2, ADR-062 §8)", () => {
+    expect(column("account", "home_place")?.getSQLType()).toBe("text");
+    expect(column("account", "home_place")?.notNull).toBe(false);
+    expect(column("account", "home_shows_area")?.getSQLType()).toBe("boolean");
+    expect(column("account", "home_shows_area")?.notNull).toBe(true);
+    expect(column("account", "home_shows_area")?.default).toBe(false);
+    expect(named("account", /home|postal|place|location/)).toEqual([
+      "home_place",
+      "home_shows_area",
+    ]);
+  });
+
+  it("gives a round's entry a frozen band, null on an entry from before it (§5)", () => {
+    expect(column("round_entries", "distance")?.getSQLType()).toBe("distance_band");
+    expect(column("round_entries", "distance")?.notNull).toBe(false);
+  });
+
+  it("marks a second pass on its entry, off unless the pass is one (ADR-062 §6)", () => {
+    expect(column("round_entries", "second_pass")?.getSQLType()).toBe("boolean");
+    expect(column("round_entries", "second_pass")?.notNull).toBe(true);
+    expect(column("round_entries", "second_pass")?.default).toBe(false);
+  });
+});
+
 describe("the foreign keys", () => {
   const references = tables.flatMap((table) =>
     table.foreignKeys.map((key) => {
@@ -139,7 +198,7 @@ describe("the foreign keys", () => {
     }),
   );
 
-  it("cascade only from a photo to what describes it, from a conversation to its people and messages, from a report to its copy, from a sanction or an invitation to its notice, and from an invitation to what it earned; identity and account rows are never deleted from under anything (TD-7)", () => {
+  it("cascade only from a photo to what describes it, from a conversation to its people and messages, from a report to its copy, from a sanction, an invitation or an announcement to its notice, from an invitation to what it earned, and from a session to its push token; identity and account rows are never deleted from under anything (TD-7)", () => {
     expect(references.filter((reference) => reference.endsWith(" cascade")).sort()).toEqual([
       "card_shown.photo_id -> photo.id cascade",
       // A conversation goes only once nobody is left to keep it for (#348, ADR-031 §5),
@@ -147,11 +206,15 @@ describe("the foreign keys", () => {
       "contact_share.conversation_id -> conversation.id cascade",
       "conversation_participant.conversation_id -> conversation.id cascade",
       "message.conversation_id -> conversation.id cascade",
-      // A counted invitation's notice goes with its invitation (#107).
+      // An announcement's notices go with it: a draft, deleted, has none (#573, ADR-068 §8).
+      "notice.announcement_id -> announcement.id cascade",
+      // A counted invitation's notice, either side's, goes with its invitation (#107, #503).
       "notice.invitation_id -> invitation.id cascade",
       // A warning's notice goes with its warning (#176).
       "notice.sanction_id -> sanction.id cascade",
       "photo_review.photo_id -> photo.id cascade",
+      // A device's push token goes with its session, whatever deletes it (#102, ADR-055 §3).
+      "push_token.session_id -> session.id cascade",
       // A report's frozen copy goes with the report, twelve months from filing (#351).
       "report_message.report_id -> report.id cascade",
       // The units an invitation earned go with it (#107, ADR-044).
@@ -179,7 +242,6 @@ describe("the foreign keys", () => {
       "email_code",
       "email_send",
       "feedback",
-      "gate",
       // The inviter and the redeemer of an invitation (#107): at either's
       // erasure the row goes, or that side's link is cut to null.
       "invitation",
@@ -192,6 +254,8 @@ describe("the foreign keys", () => {
       "photo_check_note",
       "preferences",
       "profile",
+      // A device's push token (#102), deleted at erasure before its session.
+      "push_token",
       "report",
       "report",
       "research_subject",
@@ -202,6 +266,9 @@ describe("the foreign keys", () => {
       "rounds",
       "sanction",
       "session",
+      // Who put a star and on whom (#575): gone at the erasure of either.
+      "star",
+      "star",
     ]);
     const toIdentity = references
       .filter((reference) => reference.includes(" -> identity.id"))
@@ -209,6 +276,9 @@ describe("the foreign keys", () => {
     expect(toIdentity.sort()).toEqual([
       "account.identity_id",
       "admin_session.identity_id",
+      // The two admins of an announcement (#573, ADR-068 §2): staff's work, kept for good.
+      "announcement.approved_by",
+      "announcement.written_by",
       "audit_log.actor_identity_id",
       "auth_request.identity_id",
       "block.blocked_identity_id",
@@ -261,6 +331,8 @@ describe("the foreign keys", () => {
     expect(references.filter((reference) => reference.startsWith("report.")).sort()).toEqual([
       "report.conversation_id -> conversation.id set null",
       "report.decided_by -> identity.id no action",
+      // The photo a card's report points at goes null with the photo (#476).
+      "report.photo_id -> photo.id set null",
       "report.reported_account_id -> account.id no action",
       "report.reporter_account_id -> account.id no action",
       "report.sanction_id -> sanction.id set null",
@@ -294,8 +366,13 @@ describe("the foreign keys", () => {
     ]);
   });
 
-  it("make the ponds a tree", () => {
-    expect(references).toContain("ponds.parent_id -> ponds.id no action");
+  it("name the one pond from the account and the counter, and no pond from a pond", () => {
+    expect(
+      references.filter((reference) => reference.endsWith("-> ponds.id no action")).sort(),
+    ).toEqual([
+      "account.pond_id -> ponds.id no action",
+      "pond_counter.pond_id -> ponds.id no action",
+    ]);
   });
 });
 
@@ -322,6 +399,8 @@ describe("the indexes", () => {
     ["notification_preference", "notification_preference_kind_idx", ["account_id", "kind"]],
     ["found_them_count", "found_them_count_day_reason_idx", ["day", "reason"]],
     ["round_relaxation", "round_relaxation_round_field_idx", ["round_id", "field"]],
+    // Starred or not, with no degrees (#575).
+    ["star", "star_account_candidate_idx", ["account_id", "candidate_id"]],
     // One invitation per code, and one redeemed per person (#107).
     ["invitation", "invitation_code_hash_idx", ["code_hash"]],
     ["invitation", "invitation_redeemed_by_idx", ["redeemed_by_account_id"]],
@@ -336,16 +415,21 @@ describe("the indexes", () => {
     ["feedback", "feedback_account_created_idx", ["account_id", "created_at"]],
     ["feedback", "feedback_handled_created_idx", ["handled_at", "created_at"]],
     ["card_shown", "card_shown_photo_idx", ["photo_id"]],
-    ["session", "session_retired_refresh_hash_idx", ["retired_refresh_hash"]],
     ["auth_request", "auth_request_expires_at_idx", ["expires_at"]],
     ["photo_review", "photo_review_decision_idx", ["decision", "checked_at"]],
     ["photo_check_note", "photo_check_note_account_at_idx", ["account_id", "at"]],
     ["sanction", "sanction_account_created_idx", ["account_id", "created_at"]],
     ["sanction", "sanction_identity_open_idx", ["identity_id"]],
     ["report", "report_reporter_created_idx", ["reporter_account_id", "created_at"]],
+    // The erasure of the person starred finds the stars on them (#575).
+    ["star", "star_candidate_idx", ["candidate_id"]],
     ["photo", "photo_message_day_idx", ["account_id", "created_at"]],
     ["report_message", "report_message_photo_idx", ["photo_id"]],
+    // The SET NULL of a deleted photo finds the reports pointing at it (#476).
+    ["report", "report_photo_idx", ["photo_id"]],
     ["notice", "notice_account_created_idx", ["account_id", "created_at"]],
+    // The push's read of an account's devices (#102).
+    ["push_token", "push_token_account_idx", ["account_id"]],
     ["invitation", "invitation_inviter_created_idx", ["inviter_account_id", "created_at"]],
     ["reward", "reward_account_kind_idx", ["account_id", "kind"]],
     ["reward", "reward_invitation_idx", ["invitation_id"]],
@@ -372,6 +456,10 @@ describe("the indexes", () => {
   it("hold one open report per pair, and a block once per direction (#84)", () => {
     expect(index("report", "report_open_pair_idx")?.where).toBeDefined();
     expect(index("block", "block_pair_idx")?.where).toBeUndefined();
+  });
+
+  it("index only the reports that point at a photo (#476)", () => {
+    expect(index("report", "report_photo_idx")?.where).toBeDefined();
   });
 });
 
@@ -402,8 +490,11 @@ describe("the checks", () => {
     expect(checks("report")).toEqual([
       "report_conversation_check",
       "report_decision_check",
+      // A conversation's report points at a line, a card's at a photo (#476).
+      "report_line_seq_check",
       "report_not_self_check",
       "report_note_check",
+      "report_photo_check",
     ]);
   });
 
@@ -459,7 +550,19 @@ describe("the checks of invitations and their notices (#107, ADR-044)", () => {
   });
 
   it("hold a warning to its sanction and a counted invitation's notice to its invitation", () => {
-    expect(checks("notice")).toEqual(["notice_invitation_check", "notice_warning_check"]);
+    expect(checks("notice")).toEqual([
+      "notice_announcement_check",
+      "notice_invitation_check",
+      "notice_warning_check",
+    ]);
+  });
+
+  it("hold an announcement's Swedish whole or absent, and its approval to a second admin (#573, ADR-068)", () => {
+    expect(checks("announcement")).toEqual([
+      "announcement_approval_check",
+      "announcement_second_admin_check",
+      "announcement_swedish_check",
+    ]);
   });
 });
 
@@ -484,6 +587,8 @@ describe("the enums", () => {
     // Why a card is in a round, and what was decided about it (#96).
     expect(enums.round_reason).toEqual(RoundReason.options);
     expect(enums.round_decision).toEqual(RoundDecision.options);
+    // How far a card's person lives, in the only words there are for it (ADR-061 §5).
+    expect(enums.distance_band).toEqual([...DISTANCE_BANDS]);
     // How a deal-breaker is relaxed for the day (#99).
     expect(enums.relaxation_kind).toEqual(RelaxationKind.options);
     expect(enums.report_outcome).toEqual(ReportOutcome.options);
@@ -494,6 +599,8 @@ describe("the enums", () => {
     // What a person may be notified of, and what a notice is about (#176).
     expect(enums.notification_kind).toEqual(NotificationKind.options);
     expect(enums.notice_kind).toEqual(NoticeKind.options);
+    // The platforms a push reaches (#102).
+    expect(enums.push_platform).toEqual(PushPlatform.options);
     // What one unit of the reward ledger is (#107).
     expect(enums.reward_kind).toEqual(RewardKind.options);
     expect(enums.conversation_close).toEqual(ConversationCloseKind.options);
@@ -512,5 +619,31 @@ describe("the enums", () => {
       ),
     );
     expect([...used].sort()).toEqual(Object.keys(enums).sort());
+  });
+});
+
+describe("a device's session (#35, ADR-059)", () => {
+  it("finds a token by its hash, and a refresh token's family by the hash of its secret, one row each", () => {
+    const columns = byName.get("session")?.columns ?? [];
+    expect(
+      columns
+        .filter((column) => column.isUnique)
+        .map((column) => column.name)
+        .sort(),
+    ).toEqual(["access_hash", "family_hash", "refresh_hash"]);
+    expect(columns.find((column) => column.name === "family_hash")?.notNull).toBe(true);
+    expect(columns.map((column) => column.name)).not.toContain("retired_refresh_hash");
+  });
+});
+
+describe("a device's push token (#102, ADR-055 §2)", () => {
+  it("is one per session, and a token is in one session", () => {
+    const columns = byName.get("push_token")?.columns ?? [];
+    expect(
+      columns
+        .filter((column) => column.isUnique)
+        .map((column) => column.name)
+        .sort(),
+    ).toEqual(["session_id", "token"]);
   });
 });

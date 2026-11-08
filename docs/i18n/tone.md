@@ -9,6 +9,7 @@ For everyone who writes or reviews `packages/i18n/messages.yaml`, and sent with 
 - Calm, not urgent. Nothing in the app hurries anyone: no "don't miss out", no countdowns in words, no streak or score language (CLAUDE.md, Product constraints).
 - Say what happened and what the person can do next. Never blame ("you entered an invalid…"); describe ("that date is not valid").
 - Rejection-adjacent moments (a pass, no match, the end of a round) are neutral and kind. They never judge the reader or the other person.
+- A screen does not explain itself in words. No tagline, helper line or secondary label where the layout could say it (#581). A fact that protects a person keeps its words.
 
 ## Finnish and Swedish
 
@@ -21,11 +22,11 @@ For everyone who writes or reviews `packages/i18n/messages.yaml`, and sent with 
 
 - Dates are d.M.yyyy in every language: 19.9.2026. Never ISO (2026-09-19), never month first (9/19/2026), never a month name on a screen. `formatDate` in `packages/i18n`.
 - Times are 24-hour with the language's own separator (14.14); a date with its time is `formatDateTime`, a time alone `formatTime`.
-- A height is centimetres with the unit, `formatHeight` (171 cm); an age is a number of whole years and stands beside the name (`{name}, {years}`, #239); every account is bank-verified, so no text says so; distances will be bands, never metres, when there is a second pond.
+- A height is centimetres with the unit, `formatHeight` (171 cm); an age is a number of whole years and stands beside the name (`{name}, {years}`, #239); every account is bank-verified, so no text says so; a distance is a band (nearby, close, around, far), never kilometres, and a place's name stands alone in the nominative, with no sentence built around it (ADR-061 §3, §5).
 - A date or a number is never built from strings in a client; `pnpm lint` refuses `toLocaleDateString` and `Intl.DateTimeFormat` outside `packages/i18n`.
 
 ## Hard rules (checked by `pnpm i18n:check`)
 
-- A dynamic value (`{pond}`, `{name}`) stands only where it needs no inflection: after a colon, as a subject, in a list. Never "in {pond}", never `{pond}ssa`. If the sentence needs a case form, the form comes from the database (`formatPond`), not from the message.
+- A dynamic value (`{name}`) stands only where it needs no inflection: after a colon, as a subject, in a list. Never "in {name}", never `{name}ssa`. A sentence that would need a case form is written so that it does not.
 - ICU arguments are kept exactly as in the English source: same names, same plural and select structure, every plural category the language needs.
 - Legal texts (`legal.*`: privacy, consent, terms, the police-traceability line) are never machine-translated. The Finnish text is binding and is written by people.

@@ -1,11 +1,18 @@
 import type { PlainMessageKey } from "@kuutti/i18n";
-import type { Photo, PhotoRejectionReason, PhotoState } from "@kuutti/schema";
+import {
+  PHOTOS_FOR_COMPLETENESS,
+  type Photo,
+  type PhotoRejectionReason,
+  type PhotoState,
+} from "@kuutti/schema";
 import { useRouter } from "expo-router";
 import Hourglass from "lucide-react-native/icons/hourglass";
 import Trash from "lucide-react-native/icons/trash";
-import { useState } from "react";
-import { Animated, Pressable, ScrollView, View } from "react-native";
+import { useEffect, useRef, useState } from "react";
+import { Animated, Pressable, ScrollView, useWindowDimensions, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { sayAloud } from "@/components/Notice";
+import { ScreenHeader } from "@/components/ScreenHeader";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/card";
 import {
@@ -31,13 +38,6 @@ import { PhotoTip } from "./tips";
 import { useDragOrder } from "./useDragOrder";
 import { type PhotosNotice, usePhotos } from "./usePhotos";
 
-const STATE_TEXT: Record<PhotoState, PlainMessageKey> = {
-  pending: "photos.state.pending",
-  queued: "photos.state.queued",
-  approved: "photos.state.approved",
-  rejected: "photos.state.rejected",
-};
-
 /** A rejected photo says why, in words from a list (#49): a moderator's choice, the check's (#206), or the night's (#376); never a label name. */
 const REJECTED_TEXT: Record<PhotoRejectionReason, PlainMessageKey> = {
   nudity: "photos.rejected.nudity",
@@ -50,15 +50,12 @@ const REJECTED_TEXT: Record<PhotoRejectionReason, PlainMessageKey> = {
   not_reviewed: "photos.rejected.not_reviewed",
 };
 
-/** Waiting for the check or a person (#376): the tile is dimmed under an hourglass, and its words say which. */
+/** Waiting for the check or a person (#376): the tile is dimmed under an hourglass, and the same words say so for both (#581). */
 const inReview = (state: PhotoState) => state === "pending" || state === "queued";
 
-function stateText(photo: Photo, t: ReturnType<typeof useT>["t"]): string {
-  if (photo.state === "rejected" && photo.rejectionReason) {
-    return t(REJECTED_TEXT[photo.rejectionReason]);
-  }
-  return t(STATE_TEXT[photo.state]);
-}
+/** A refused photo says why where it can; one that is through says nothing, the silence being the word for it (#581). */
+const refusalText = (photo: Photo, t: ReturnType<typeof useT>["t"]): string =>
+  t(photo.rejectionReason ? REJECTED_TEXT[photo.rejectionReason] : "photos.state.rejected");
 
 /**
  * The API's refusals the screen has its own words for; a Map so a code like
@@ -80,8 +77,8 @@ const ERROR_TEXT: ReadonlyMap<string, PlainMessageKey> = new Map([
 function noticeText(notice: PhotosNotice, t: ReturnType<typeof useT>["t"]): string {
   if (notice.kind === "refused_local") return t("photos.refused.local");
   if (notice.kind === "permission") return t("photos.error.permission");
-  if (notice.kind === "caption_failed") return t("photos.caption.failed");
-  return t(ERROR_TEXT.get(notice.code ?? "") ?? "photos.error.generic");
+  if (notice.kind === "caption_failed") return t("load.failed.press");
+  return t(ERROR_TEXT.get(notice.code ?? "") ?? "load.failed.press");
 }
 
 /**
@@ -96,17 +93,35 @@ const TILE_ACTIONS: ReadonlyArray<{ name: string; key: PlainMessageKey }> = [
   { name: "makeMain", key: "photos.makeMain" },
 ];
 
+/** From here half a phone's width breaks a caption's longest word in the middle ("kuvateksti", at 390 pt and less). */
+const ONE_COLUMN_FONT_SCALE = 1.3;
+
 /**
  * The person's photos (#48, rules/mobile.md Images): a grid of thumbs,
  * reordered by holding a tile and dragging it, the first slot the main photo
  * (#179), the same moves as accessibility actions on every tile; each has a
  * button to remove it after a confirmation. Tapping a photo opens the zoom
  * screen, the one place the full variant is requested. A new photo goes
- * through the on-device check and the pre-resize before the upload, with its
- * progress in words. Opened from onboarding, it says that step's "Step x of
- * n" as every other step does (#146).
+ * through the on-device check and the pre-resize before the upload, whose
+ * progress is in words. The count is drawn only at the limit, where Add a photo
+ * stops and needs a reason; below it the grid shows the count, and each change
+ * of it is said to a screen reader, the one word that a photo landed (#581).
+ * Opened from the profile, it has the arrow back at the top that other screens
+ * have, and Done at the end (#616): the route has no back gesture, which the
+ * grid's drag would start. It is onboarding's photos step too (#146, #581):
+ * under that step's number, heading and line, with no arrow and the step's
+ * Continue in place of Done, the step's only end.
  */
-export function PhotosScreen({ progress }: { progress?: { step: number; total: number } }) {
+export function PhotosScreen({
+  step,
+}: {
+  /**
+   * Onboarding's step, when this is it: where it stands, whether the status its
+   * Continue asked for is still being read, and that Continue, the way on once
+   * two photos count as the API counts them.
+   */
+  step?: { position: number; total: number; reading: boolean; onContinue: () => void };
+}) {
   const { t } = useT();
   const router = useRouter();
   const tap = useHapticTap();
@@ -127,8 +142,20 @@ export function PhotosScreen({ progress }: { progress?: { step: number; total: n
   // owner's order, as the card and the tips read it (ADR-009 §4). The first
   // tile while it is still in review is not it (#239).
   const mainId = list?.photos.find((photo) => photo.state === "approved")?.id;
+  const { fontScale } = useWindowDimensions();
   const busy = photos.busy.kind !== "idle";
   const atMax = list !== null && total >= list.maxPhotos;
+  // The API's rule for the step: a refused photo does not count, one in review does.
+  const enough =
+    (list?.photos.filter((photo) => photo.state !== "rejected").length ?? 0) >=
+    PHOTOS_FOR_COMPLETENESS;
+  const count = list && t("photos.count", { photos: total, max: list.maxPhotos });
+  const countSaid = useRef<string | null>(null);
+  useEffect(() => {
+    if (count === null) return;
+    if (countSaid.current !== null) sayAloud(count);
+    countSaid.current = count;
+  }, [count]);
 
   const drag = useDragOrder({
     count: total,
@@ -144,34 +171,35 @@ export function PhotosScreen({ progress }: { progress?: { step: number; total: n
   };
 
   const busyText =
-    photos.busy.kind === "picking"
-      ? t("photos.picking")
-      : photos.busy.kind === "preparing"
-        ? t("photos.preparing")
-        : photos.busy.kind === "uploading"
-          ? t("photos.uploading", { percent: photos.busy.percent })
-          : null;
+    photos.busy.kind === "uploading"
+      ? t("photos.uploading", { percent: photos.busy.percent })
+      : null;
 
   return (
     <SafeAreaView className="flex-1 bg-background">
+      {!step && (
+        <ScreenHeader
+          title={t("photos.title")}
+          backLabel={t("photos.back")}
+          onBack={() => router.back()}
+        />
+      )}
       <ScrollView
         contentContainerClassName="flex-grow gap-4 p-6"
         scrollEnabled={drag.active === null}
       >
-        <Text variant="h1" accessibilityRole="header">
-          {t("photos.title")}
-        </Text>
-        {progress && (
-          <Text variant="muted" accessibilityLiveRegion="polite">
-            {t("onboarding.progress", progress)}
-          </Text>
+        {step && (
+          <>
+            <Text variant="muted" accessibilityLiveRegion="polite">
+              {t("onboarding.progress", { step: step.position, total: step.total })}
+            </Text>
+            <Text variant="h1" accessibilityRole="header">
+              {t("onboarding.photos.title")}
+            </Text>
+            <Text>{t("onboarding.photos.explain")}</Text>
+          </>
         )}
-        {list && <Text>{t("photos.explain", { max: list.maxPhotos })}</Text>}
-        {list && (
-          <Text variant="muted" accessibilityLiveRegion="polite">
-            {t("photos.count", { photos: total, max: list.maxPhotos })}
-          </Text>
-        )}
+        {list && <Text>{t("photos.explain")}</Text>}
 
         {photos.notice && (
           <Card>
@@ -194,8 +222,6 @@ export function PhotosScreen({ progress }: { progress?: { step: number; total: n
           <PhotoTip tips={list.tips} fishSpecies={list.fishSpecies} mainId={mainId ?? null} />
         )}
 
-        {list && total === 0 && <Text variant="muted">{t("photos.empty")}</Text>}
-
         <View className="flex-row flex-wrap gap-3">
           {list?.photos.map((photo, index) => {
             const tile = drag.tile(index);
@@ -206,7 +232,7 @@ export function PhotosScreen({ progress }: { progress?: { step: number; total: n
               // a screen reader to land on; the tile inside is the control.
               <View
                 key={photo.id}
-                className="w-[47%]"
+                className={fontScale >= ONE_COLUMN_FONT_SCALE ? "w-full" : "w-[47%]"}
                 style={{ zIndex: tile.zIndex }}
                 onLayout={tile.onLayout}
                 accessible={false}
@@ -281,21 +307,24 @@ export function PhotosScreen({ progress }: { progress?: { step: number; total: n
                         </View>
                       )}
                     </Pressable>
-                    <View className="gap-0.5">
-                      {photo.id === mainId && <Text variant="small">{t("photos.main")}</Text>}
-                      {inReview(photo.state) ? (
-                        <View className="flex-row items-center gap-1">
-                          <Icon as={Hourglass} size={16} />
-                          {/* Wraps beside the icon at the largest text sizes, never clipped. */}
-                          <Text variant="small" className="shrink">
-                            {stateText(photo, t)}
-                          </Text>
-                        </View>
-                      ) : (
-                        <Text variant="muted">{stateText(photo, t)}</Text>
-                      )}
-                      {words && <PhotoDescriptionText text={words} />}
-                    </View>
+                    {(photo.id === mainId || photo.state !== "approved" || words !== null) && (
+                      <View className="gap-0.5">
+                        {photo.id === mainId && <Text variant="small">{t("photos.main")}</Text>}
+                        {inReview(photo.state) && (
+                          <View className="flex-row items-center gap-1">
+                            <Icon as={Hourglass} size={16} />
+                            {/* Wraps beside the icon at the largest text sizes, never clipped. */}
+                            <Text variant="small" className="shrink">
+                              {t("photos.state.pending")}
+                            </Text>
+                          </View>
+                        )}
+                        {photo.state === "rejected" && (
+                          <Text variant="muted">{refusalText(photo, t)}</Text>
+                        )}
+                        {words && <PhotoDescriptionText text={words} />}
+                      </View>
+                    )}
                     {/* The owner's line under the photo (#296): the button says the line, or asks for one. */}
                     <Button
                       variant="outline"
@@ -351,6 +380,8 @@ export function PhotosScreen({ progress }: { progress?: { step: number; total: n
           </Card>
         )}
 
+        {/* Why Add a photo stops, beside it. */}
+        {atMax && <Text variant="muted">{count}</Text>}
         <Button
           accessibilityLabel={t("photos.add")}
           disabled={busy || atMax || photos.status !== "ready"}
@@ -361,16 +392,32 @@ export function PhotosScreen({ progress }: { progress?: { step: number; total: n
         >
           <Text>{t("photos.add")}</Text>
         </Button>
-        {/* Headers are hidden app-wide; from onboarding this is the way on to the next step. */}
-        <Button
-          variant="outline"
-          onPress={() => {
-            tap();
-            router.back();
-          }}
-        >
-          {t("photos.done")}
-        </Button>
+        {step ? (
+          <Button
+            // A failed read shows the upload's fallback above, and this reads the list again.
+            disabled={busy || step.reading || (photos.status !== "error" && !enough)}
+            onPress={() => {
+              tap();
+              // A photo refused since the list was read keeps the step here: the tile says why.
+              photos.dismissNotice();
+              void photos.reload();
+              step.onContinue();
+            }}
+          >
+            {t("onboarding.continue")}
+          </Button>
+        ) : (
+          // The end of the scroll's way back, beside the arrow at the top (#616).
+          <Button
+            variant="outline"
+            onPress={() => {
+              tap();
+              router.back();
+            }}
+          >
+            {t("photos.done")}
+          </Button>
+        )}
       </ScrollView>
 
       <CaptionDialog

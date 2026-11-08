@@ -15,7 +15,7 @@ variable "environment" {
 }
 
 variable "vpc_cidr" {
-  description = "One /16 per environment; the four subnets are carved from it."
+  description = "One /16 per environment; the three subnets are carved from it."
   type        = string
 }
 
@@ -26,7 +26,7 @@ variable "ssh_cidrs" {
 }
 
 variable "cloudfront_only_ingress" {
-  description = "When true, port 443 admits only CloudFront's origin-facing prefix list (ADR-005), so the box is reachable through the distribution alone. Off until Dokploy's control plane (deploy.yml) and the pull-request previews are served through the distribution too: today they reach the box on 443 directly. Port 80 stays open for the ACME challenge and the redirect either way."
+  description = "When true, port 443 admits only CloudFront's origin-facing prefix list (ADR-005), so the box is reachable through CloudFront alone, though through anybody's distribution, not Kuutti's alone (#198). Turned on once everything the box serves on 443 goes through the distribution: Dokploy's control plane (deploy.yml) and, on staging, the pull-request previews are its extra aliases (#198). Port 80 stays open for the ACME challenge and the redirect either way."
   type        = bool
   default     = false
 }

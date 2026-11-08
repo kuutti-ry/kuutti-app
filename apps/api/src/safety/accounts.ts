@@ -2,7 +2,6 @@ import type { Queryable } from "@kuutti/db";
 import type { AdminAccount, AdminAuditRow } from "@kuutti/schema";
 import { accountForStaff } from "../identity/index.ts";
 import { listPhotos } from "../media/index.ts";
-import { findPondOfAccount } from "../pond/index.ts";
 import { ageInYears, exportProfile, fieldsOnCard } from "../profile/index.ts";
 import { listFeedbackOfAccount } from "./feedback.ts";
 
@@ -44,16 +43,12 @@ async function auditAbout(db: Queryable, accountId: string): Promise<AdminAuditR
   }));
 }
 
-type Sections = Pick<
-  AdminAccount,
-  "age" | "gender" | "pond" | "profile" | "photos" | "feedback" | "audit"
->;
+type Sections = Pick<AdminAccount, "age" | "gender" | "profile" | "photos" | "feedback" | "audit">;
 
 /** Every section empty: an erased account's page, and the base of every other. */
 const empty = (): Sections => ({
   age: null,
   gender: null,
-  pond: null,
   profile: null,
   photos: [],
   feedback: [],
@@ -101,7 +96,6 @@ export async function accountPage(
   // One after another: the caller's transaction is one connection.
   const profile = await exportProfile(db, accountId);
   const photos = await listPhotos(db, accountId);
-  const pond = await findPondOfAccount(db, accountId);
   const feedback = await listFeedbackOfAccount(db, accountId, 100);
   const audit = await auditAbout(db, accountId);
   return {
@@ -111,7 +105,6 @@ export async function accountPage(
         ? ageInYears(account.birthYear, account.birthMonth, now)
         : null,
     gender: account.gender,
-    pond: pond?.name ?? null,
     // As the card shows it (ADR-009), by the card's own presenter: what other
     // people see, no more (a field of study the person hides stays hidden, #150).
     profile: profile
@@ -120,7 +113,7 @@ export async function accountPage(
           bio: profile.bio,
           bioPreset: profile.bioPreset,
           prompts: profile.prompts,
-          fields: fieldsOnCard(profile.fields),
+          fields: fieldsOnCard(profile),
         }
       : null,
     photos: photos.slice(0, 50).map((p) => ({

@@ -6,6 +6,13 @@
 # is the API on the box. TLS terminates at CloudFront with an ACM certificate
 # from us-east-1; the hop to the box is HTTPS to origin.api.<env>.<domain>,
 # whose certificate Traefik holds.
+#
+# The same distribution fronts the rest of what the box serves on 443, under
+# extra_aliases: Dokploy's control plane and, on staging, the previews
+# (ADR-005 §7, #198), so that the box can admit CloudFront alone. Traefik routes
+# them by the forwarded Host, as it routes the API. Let's Encrypt's HTTP-01
+# challenge for a name behind the distribution reaches Traefik over plain HTTP,
+# through a third origin (below).
 
 data "aws_caller_identity" "current" {}
 data "aws_region" "current" {}
@@ -237,6 +244,46 @@ data "aws_cloudfront_origin_request_policy" "all_viewer" {
   name = "Managed-AllViewerAndCloudFrontHeaders-2022-06"
 }
 
+# The proof of Kuutti's own distribution (ADR-066): the box admits every
+# CloudFront distribution's servers (ADR-008, History), so a viewer-request
+# function puts the store's secret in x-kuutti-origin on every request of
+# the default behaviour, after removing the viewer's own. The code holds the
+# store's id, never the value. The bucket's and the ACME behaviours carry no
+# function: neither the bucket nor Traefik's challenge handler asks for it.
+resource "aws_cloudfront_function" "origin_proof" {
+  name                         = "${local.name}-origin-proof"
+  runtime                      = "cloudfront-js-2.0"
+  comment                      = "x-kuutti-origin from the store on the default behaviour (ADR-066)"
+  publish                      = true
+  key_value_store_associations = [var.origin_proof_store_arn]
+  code = templatefile("${path.module}/origin-proof.js", {
+    store_id = element(split("/", var.origin_proof_store_arn), 1)
+  })
+}
+
+# The ACME behaviour's hop goes over plain HTTP, so it carries the path and
+# the Host and nothing else: no cookie, no other viewer header, no query
+# string. Traefik's challenge handler finds a token by those two. A signed-in
+# browser sent to the path by a link would otherwise put Dokploy's session on
+# the wire. CloudFront still adds X-Forwarded-For, the requester's address.
+resource "aws_cloudfront_origin_request_policy" "acme" {
+  name    = "${local.name}-acme"
+  comment = "Let's Encrypt's HTTP-01 challenge over plain HTTP: the Host alone"
+
+  cookies_config {
+    cookie_behavior = "none"
+  }
+  headers_config {
+    header_behavior = "whitelist"
+    headers {
+      items = ["Host"]
+    }
+  }
+  query_strings_config {
+    query_string_behavior = "none"
+  }
+}
+
 # ---------------------------------------------------------------------------
 # The certificate for the alias, in us-east-1 as CloudFront requires, validated
 # by a record in the project zone.
@@ -245,8 +292,9 @@ data "aws_cloudfront_origin_request_policy" "all_viewer" {
 resource "aws_acm_certificate" "api" {
   provider = aws.us_east_1
 
-  domain_name       = var.api_fqdn
-  validation_method = "DNS"
+  domain_name               = var.api_fqdn
+  subject_alternative_names = var.extra_aliases
+  validation_method         = "DNS"
 
   lifecycle {
     create_before_destroy = true
@@ -291,7 +339,9 @@ resource "aws_cloudfront_distribution" "this" {
   # Europe and North America: Finland is served from Europe, and the rest of
   # the classes add edges nobody here reaches.
   price_class = "PriceClass_100"
-  aliases     = [var.api_fqdn]
+  aliases     = concat([var.api_fqdn], var.extra_aliases)
+  # The edge's rate rule (edge.tf, #41, ADR-067).
+  web_acl_id = aws_wafv2_web_acl.edge.arn
 
   origin {
     origin_id                = "media"
@@ -313,6 +363,30 @@ resource "aws_cloudfront_distribution" "this" {
     }
   }
 
+  # Let's Encrypt's HTTP-01 challenge for a name whose address is this
+  # distribution (api_fqdn and the extra aliases): Traefik on the box holds a
+  # certificate for each and renews it by that challenge, which it answers on
+  # port 80 alone. Under the default behaviour the challenge would be
+  # redirected to HTTPS and reach the API, a 404, so this path goes to the
+  # box's port 80, where Traefik's challenge router outranks every other and
+  # answers only a token it is waiting for. The renewals matter: CloudFront
+  # accepts the box's certificate if it names the origin or the forwarded Host,
+  # and AWS does not say which of the two it asks the box for.
+  origin {
+    origin_id   = "acme"
+    domain_name = var.origin_fqdn
+
+    custom_origin_config {
+      http_port              = 80
+      https_port             = 443
+      origin_protocol_policy = "http-only"
+      origin_ssl_protocols   = ["TLSv1.2"]
+    }
+  }
+
+  # Nothing may be cached here: the API, Dokploy and the previews share this
+  # behaviour, and a cache key without the Host would hand one host's answer
+  # to another, a preview's to the API's callers among them.
   default_cache_behavior {
     target_origin_id         = "api"
     viewer_protocol_policy   = "redirect-to-https"
@@ -321,6 +395,11 @@ resource "aws_cloudfront_distribution" "this" {
     cache_policy_id          = data.aws_cloudfront_cache_policy.caching_disabled.id
     origin_request_policy_id = data.aws_cloudfront_origin_request_policy.all_viewer.id
     compress                 = false
+
+    function_association {
+      event_type   = "viewer-request"
+      function_arn = aws_cloudfront_function.origin_proof.arn
+    }
   }
 
   ordered_cache_behavior {
@@ -332,6 +411,17 @@ resource "aws_cloudfront_distribution" "this" {
     cache_policy_id        = aws_cloudfront_cache_policy.media.id
     trusted_key_groups     = [aws_cloudfront_key_group.signing.id]
     compress               = false
+  }
+
+  ordered_cache_behavior {
+    path_pattern             = "/.well-known/acme-challenge/*"
+    target_origin_id         = "acme"
+    viewer_protocol_policy   = "allow-all"
+    allowed_methods          = ["GET", "HEAD"]
+    cached_methods           = ["GET", "HEAD"]
+    cache_policy_id          = data.aws_cloudfront_cache_policy.caching_disabled.id
+    origin_request_policy_id = aws_cloudfront_origin_request_policy.acme.id
+    compress                 = false
   }
 
   restrictions {
@@ -378,7 +468,8 @@ resource "aws_s3_bucket_policy" "media" {
 }
 
 # api.<env>.<domain> is the distribution from here on; the environment's
-# dns.tf points origin.api.<env>.<domain> at the box instead.
+# dns.tf points origin.api.<env>.<domain> at the box instead, and the extra
+# aliases at the distribution.
 resource "aws_route53_record" "api" {
   for_each = toset(["A", "AAAA"])
 

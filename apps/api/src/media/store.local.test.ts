@@ -49,6 +49,30 @@ describe.skipIf(!endpoint)("media store (compose stand-in)", () => {
     }
   });
 
+  it("lists the objects under a prefix with when they were written, and nothing of another prefix", async () => {
+    const client = createS3Client(config);
+    const store = s3MediaStore(client, config.S3_BUCKET);
+    const key = `test-list-${randomBytes(6).toString("hex")}`;
+    const before = Date.now();
+    try {
+      await store.put(objectKey(key, "thumb"), new Uint8Array([1]), "image/webp");
+      await store.put(objectKey(key, "card"), new Uint8Array([2]), "image/webp");
+      const listed = await store.list(`media/${key}/`);
+      expect(listed.map((o) => o.key).sort()).toEqual([
+        objectKey(key, "card"),
+        objectKey(key, "thumb"),
+      ]);
+      for (const object of listed) {
+        // The stand-in's clock is this machine's; a minute of slack either way.
+        expect(Math.abs(object.lastModified.getTime() - before)).toBeLessThan(60_000);
+      }
+      expect(await store.list(`media/${key}-other/`)).toEqual([]);
+    } finally {
+      await store.delete([objectKey(key, "thumb"), objectKey(key, "card")]);
+      client.destroy();
+    }
+  });
+
   it("a failure other than a missing object is thrown, never read as a missing object", async () => {
     const client = createS3Client(config);
     try {
@@ -57,6 +81,26 @@ describe.skipIf(!endpoint)("media store (compose stand-in)", () => {
         name: "NoSuchBucket",
       });
     } finally {
+      client.destroy();
+    }
+  });
+
+  it("deletes objects in both batches when more than 1000 keys are supplied", async () => {
+    const client = createS3Client(config);
+    const store = s3MediaStore(client, config.S3_BUCKET);
+    const prefix = `test-bulk-${randomBytes(6).toString("hex")}`;
+    const keys = Array.from({ length: 1002 }, (_, i) => objectKey(`${prefix}-${i}`, "thumb"));
+    const first = keys[0] as string;
+    const second = keys[1000] as string;
+    try {
+      // Two tiny dummy objects suffice; missing keys are valid delete inputs.
+      await store.put(first, new Uint8Array([1]), "application/octet-stream");
+      await store.put(second, new Uint8Array([2]), "application/octet-stream");
+      await store.delete(keys);
+      expect(await store.get(first)).toBeNull();
+      expect(await store.get(second)).toBeNull();
+    } finally {
+      await store.delete([first, second]);
       client.destroy();
     }
   });

@@ -3,6 +3,7 @@ import type * as React from "react";
 import { Platform } from "react-native";
 import { cn } from "@/lib/utils";
 import { hitSlopFor } from "@/theme/a11y";
+import { useLook } from "@/theme/ThemeProvider";
 
 // Drawn size in points; hitSlop extends the touch target to 44 pt (#12).
 const TRACK_WIDTH = 52;
@@ -10,13 +11,19 @@ const TRACK_HEIGHT = 32;
 
 // From React Native Reusables (#12), adapted. On and off differ by the thumb's
 // position, not only by colour, and the label is required: a switch has no
-// text of its own.
+// text of its own. Disabled is drawn as a disabled Button is (#467): no fill,
+// a dashed track and a --muted-foreground thumb, still on its side; faded, it
+// fell below the high-contrast sets' contrast, and a dashed edge on the on
+// track's fill would vanish there (black on navy, white on light blue). Solid is
+// said for the same reason as there (#548): on Android the dash outlives its class.
 type SwitchProps = Omit<
   React.ComponentProps<typeof SwitchPrimitives.Root>,
   "accessibilityLabel" | "aria-label"
 > & { accessibilityLabel: string };
 
 function Switch({ className, accessibilityLabel, ...props }: SwitchProps) {
+  // Today's --input edge, or the neubrutalism try's ink.
+  const neubrutalist = useLook() === "neubrutalism";
   return (
     <SwitchPrimitives.Root
       accessibilityRole="switch"
@@ -26,12 +33,13 @@ function Switch({ className, accessibilityLabel, ...props }: SwitchProps) {
       hitSlop={hitSlopFor(TRACK_WIDTH, TRACK_HEIGHT)}
       style={{ width: TRACK_WIDTH, height: TRACK_HEIGHT }}
       className={cn(
-        "shrink-0 flex-row items-center rounded-full border-2 border-input px-0.5",
+        "shrink-0 flex-row items-center rounded-full border-2 border-solid px-0.5",
+        neubrutalist ? "border-stroke" : "border-input",
         Platform.select({
           web: "outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed",
         }),
         props.checked ? "justify-end bg-primary" : "justify-start bg-background",
-        props.disabled && "opacity-50",
+        props.disabled && "border-dashed border-input bg-transparent",
         className,
       )}
       {...props}
@@ -40,6 +48,7 @@ function Switch({ className, accessibilityLabel, ...props }: SwitchProps) {
         className={cn(
           "size-6 rounded-full",
           props.checked ? "bg-primary-foreground" : "bg-input",
+          props.disabled && "bg-muted-foreground",
           Platform.select({ web: "pointer-events-none block" }),
         )}
       />

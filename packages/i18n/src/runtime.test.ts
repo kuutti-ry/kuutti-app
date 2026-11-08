@@ -6,11 +6,12 @@ import {
   formatDateTime,
   formatHeight,
   formatNumber,
-  formatPond,
   formatTime,
   LOCALE_NAMES,
   LOCALES,
   parseAcceptLanguage,
+  RELEASED_LOCALES,
+  realLocale,
   resolveLocale,
   typedT,
 } from "./index.ts";
@@ -24,19 +25,38 @@ const tIn = (locale: (typeof LOCALES)[number]) => typedT(createI18n({ locale }))
 
 describe("plurals in every language", () => {
   it.each([
-    ["en", 0, "Everyone has finished their profile."],
-    ["en", 1, "1 person is still finishing their profile."],
-    ["en", 2, "2 people are still finishing their profile."],
-    ["en", 1000, `1${nbsp}000 people are still finishing their profile.`],
-    ["fi", 0, "Kaikki ovat saaneet profiilinsa valmiiksi."],
-    ["fi", 1, "1 ihminen viimeistelee vielä profiiliaan."],
-    ["fi", 10, "10 ihmistä viimeistelee vielä profiiliaan."],
-    ["fi", 12345, `12${nbsp}345 ihmistä viimeistelee vielä profiiliaan.`],
-    ["sv", 0, "Alla har gjort klart sin profil."],
-    ["sv", 1, "1 person håller fortfarande på med sin profil."],
-    ["sv", 11, "11 personer håller fortfarande på med sin profil."],
+    ["en", 1, "1 person has completed their profile."],
+    ["en", 2, "2 people have completed their profiles."],
+    ["en", 1000, `1${nbsp}000 people have completed their profiles.`],
+    ["fi", 1, "1 ihminen on saanut profiilinsa valmiiksi."],
+    ["fi", 10, "10 ihmistä on saanut profiilinsa valmiiksi."],
+    ["fi", 12345, `12${nbsp}345 ihmistä on saanut profiilinsa valmiiksi.`],
+    ["sv", 1, "1 person har gjort klart sin profil."],
+    ["sv", 11, "11 personer har gjort klart sina profiler."],
   ] as const)("say %s for %i: %s", (locale, people, text) => {
-    expect(tIn(locale)("pond.waitlist.finishing", { people })).toBe(text);
+    expect(tIn(locale)("pond.counter.finished", { people })).toBe(text);
+  });
+
+  it.each([
+    ["en", 1, "1 person has completed their profile and is looking for:"],
+    ["en", 477, "477 people have completed their profiles and are looking for:"],
+    ["fi", 1, "1 ihminen on saanut profiilinsa valmiiksi ja etsii:"],
+    ["fi", 477, "477 ihmistä on saanut profiilinsa valmiiksi ja etsii:"],
+    ["sv", 1, "1 person har gjort klart sin profil och söker:"],
+    ["sv", 477, "477 personer har gjort klart sina profiler och söker:"],
+  ] as const)("lead into the bar of a pond in %s for %i: %s", (locale, people, text) => {
+    expect(tIn(locale)("pond.counter.seeks.finished", { people })).toBe(text);
+  });
+
+  it.each([
+    ["en", 0, "Conversations, nothing unread"],
+    ["en", 1, "Conversations, 1 unread message"],
+    ["fi", 0, "Keskustelut, ei lukemattomia"],
+    ["fi", 2, "Keskustelut, 2 lukematonta viestiä"],
+    ["sv", 0, "Samtal, inget oläst"],
+    ["sv", 2, "Samtal, 2 olästa meddelanden"],
+  ] as const)("take an exact zero for its own words in %s: %i", (locale, unread, text) => {
+    expect(tIn(locale)("home.chats.label", { unread })).toBe(text);
   });
 
   it.each([
@@ -49,10 +69,27 @@ describe("plurals in every language", () => {
     expect(tIn(locale)("errors.rate_limited", { seconds })).toContain(phrase);
   });
 
+  it.each([
+    [
+      "en",
+      "Of the people with a finished profile who are looking for men or women, 30 percent are looking for men. 20 percent are looking for everyone. 50 percent are looking for women.",
+    ],
+    [
+      "fi",
+      "Valmiin profiilin tehneistä miehiä tai naisia etsivistä 30 prosenttia etsii miehiä. 20 prosenttia etsii kaikkia. 50 prosenttia etsii naisia.",
+    ],
+    [
+      "sv",
+      "Av personerna med färdig profil som söker män eller kvinnor söker 30 procent män. 20 procent söker alla. 50 procent söker kvinnor.",
+    ],
+  ] as const)("say the bar of a pond in three sentences in %s", (locale, text) => {
+    const shares = { men: 30, everyone: 20, women: 50 };
+    expect(tIn(locale)("pond.counter.seeks.label", shares)).toBe(text);
+  });
+
   it("format the numbers of a message with the language's grouping and a decimal comma", () => {
-    expect(tIn("en")("pond.waitlist.split", { women: 1200, men: 10, nonBinary: 10.5 })).toBe(
-      `1${nbsp}200 women, 10 men, 10,5 non-binary`,
-    );
+    expect(tIn("en")("pond.counter.seeks.men", { share: 1200 })).toBe(`1${nbsp}200 % men`);
+    expect(tIn("en")("pond.counter.seeks.men", { share: 10.5 })).toBe("10,5 % men");
     expect(tIn("sv")("photos.count", { photos: 1, max: 6 })).toBe("1 foto, högst 6");
   });
 });
@@ -71,7 +108,7 @@ describe("selects and fallbacks", () => {
     "fall back from %s to the English of an English-only key",
     (locale) => {
       expect(tIn(locale)("admin.queue.total", { total: 0 })).toBe("Nothing waiting");
-      expect(tIn(locale)("admin.queue.total", { total: 3 })).toBe("3 photos waiting");
+      expect(tIn(locale)("admin.queue.total", { total: 3 })).toBe("3 waiting");
     },
   );
 
@@ -82,7 +119,7 @@ describe("selects and fallbacks", () => {
 
   it("serve English for a language without a catalogue", () => {
     const t = typedT(createI18n({ locale: "de" as "en" }));
-    expect(t("onboarding.retry")).toBe("Try again");
+    expect(t("load.retry")).toBe("Try again");
   });
 });
 
@@ -101,7 +138,7 @@ describe("dates and times at the edges of a day", () => {
     [Date.UTC(2026, 0, 1, 23, 59), "23.59"],
     [Date.UTC(2026, 0, 1, 12, 5), "12.05"],
   ])("write %i as %s in every language, 24 hours and two digits", (at, text) => {
-    for (const locale of ["en", "fi", "sv", "en-XA"] as const) {
+    for (const locale of ["en", "fi", "sv", "fi-x-stadi", "en-XA"] as const) {
       expect(formatTime(locale, at, { timeZone: "UTC" }), locale).toBe(text);
     }
   });
@@ -118,7 +155,7 @@ describe("numbers", () => {
     [1_000_000, `1${nbsp}000${nbsp}000`],
     [0.125, "0,125"],
   ])("write %d in Finland's convention in every language", (value, text) => {
-    for (const locale of ["en", "fi", "sv", "en-XA"] as const) {
+    for (const locale of ["en", "fi", "sv", "fi-x-stadi", "en-XA"] as const) {
       expect(formatNumber(locale, value), locale).toBe(text);
     }
   });
@@ -144,27 +181,14 @@ describe("numbers", () => {
   });
 
   it("map each catalogue to Finland's Intl locale, and leave any other tag as it is", () => {
-    expect(["en", "fi", "sv", "en-XA", "de-DE"].map(intlLocale)).toEqual([
+    expect(["en", "fi", "sv", "fi-x-stadi", "en-XA", "de-DE"].map(intlLocale)).toEqual([
       "en-FI",
       "fi",
       "sv-FI",
+      "fi-FI",
       "en-FI",
       "de-DE",
     ]);
-  });
-});
-
-describe("a pond's name", () => {
-  it.each([
-    ["fi", "inessive", "Helsingissä"],
-    ["fi", "nominative", "Helsinki"],
-    ["sv", "inessive", "Helsinki"],
-    ["en", "nominative", "Helsinki"],
-    ["en-XA", "inessive", "Helsinki"],
-  ] as const)("in %s, %s, is %s", (locale, grammaticalCase, name) => {
-    expect(
-      formatPond({ name: "Helsinki", nameInessive: "Helsingissä" }, grammaticalCase, locale),
-    ).toBe(name);
   });
 });
 
@@ -181,6 +205,12 @@ describe("the language a request gets", () => {
 
   it("is the first allowed one when English is not allowed", () => {
     expect(resolveLocale(["de"], ["sv", "fi"])).toBe("sv");
+  });
+
+  it("is never Stadi, here or in a release: a request naming it is Finnish, like a Finnish phone", () => {
+    expect(resolveLocale(["fi-x-stadi"])).toBe("fi");
+    expect(resolveLocale(["fi-x-stadi"], RELEASED_LOCALES)).toBe("fi");
+    expect(resolveLocale(["fi-FI"])).toBe("fi");
   });
 
   it.each([
@@ -204,6 +234,68 @@ describe("the language a request gets", () => {
 
 describe("the language picker", () => {
   it("lists every language under its own name", () => {
-    expect(LOCALES.map((locale) => LOCALE_NAMES[locale])).toEqual(["English", "Suomi", "Svenska"]);
+    expect(LOCALES.map((locale) => LOCALE_NAMES[locale])).toEqual([
+      "English",
+      "Suomi",
+      "Svenska",
+      "Stadi",
+    ]);
+  });
+});
+
+// Stadin slangi (#521): a made-up language over Finnish.
+describe("Stadi", () => {
+  const stadi = tIn("fi-x-stadi");
+
+  it("speaks slang where a key has a slangi text", () => {
+    expect(stadi("round.like")).toBe("Digaan");
+    expect(tIn("fi")("round.like")).toBe("Tykkää");
+  });
+
+  it.each([["load.retry"], ["legal.terms.title"], ["push.match"]] as const)(
+    "is the Finnish text where a key has none: %s",
+    (key) => {
+      expect(stadi(key)).toBe(tIn("fi")(key));
+      expect(stadi(key)).not.toBe(tIn("en")(key));
+    },
+  );
+
+  it("keeps Finnish plurals in a Finnish text", () => {
+    expect(stadi("errors.rate_limited", { seconds: 1 })).toBe(
+      tIn("fi")("errors.rate_limited", { seconds: 1 }),
+    );
+    expect(stadi("errors.rate_limited", { seconds: 30 })).toBe(
+      tIn("fi")("errors.rate_limited", { seconds: 30 }),
+    );
+  });
+
+  it("falls back to Finnish and nowhere else, and leaves Finnish's own fallback as it was", () => {
+    expect(createI18n({ locale: "fi-x-stadi" }).languages).toEqual(["fi-x-stadi", "fi"]);
+    expect(createI18n({ locale: "fi" }).languages).toEqual(["fi", "en"]);
+    expect(createI18n({ locale: "sv" }).languages).toEqual(["sv", "en"]);
+    // English only, so a key in no language it falls back to stays a key.
+    expect(stadi("admin.title")).toBe("admin.title");
+  });
+
+  it("is the same for a t fixed to it on an instance in another language (the API's)", () => {
+    const fixed = typedT(createI18n({ locale: "en" }), "fi-x-stadi");
+    expect(fixed("round.like")).toBe("Digaan");
+    expect(fixed("load.retry")).toBe("Yritä uudelleen");
+  });
+
+  it("stays out of a release", () => {
+    expect(RELEASED_LOCALES).not.toContain("fi-x-stadi");
+  });
+
+  it.each([
+    ["fi-x-stadi", "fi"],
+    ["fi", "fi"],
+    ["sv", "sv"],
+    ["en", "en"],
+    ["en-XA", "en"],
+    ["de", "en"],
+    ["", "en"],
+  ])("reads as a real language where one is needed: %j is %s", (locale, real) => {
+    expect(realLocale(locale)).toBe(real);
   });
 });

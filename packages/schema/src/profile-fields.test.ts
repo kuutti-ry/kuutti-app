@@ -3,6 +3,7 @@ import {
   CARD_FIELD_KEYS,
   cardFields,
   DEAL_BREAKER_FIELDS,
+  HiddenField,
   HOBBIES,
   HOBBY_GROUP_KEYS,
   HOBBY_GROUPS,
@@ -45,6 +46,7 @@ describe("the profile field registry (ADR-019)", () => {
       "wantsKids",
       "smoking",
       "languages",
+      "height",
     ]);
     expect(PROFILE_FIELDS.intent).toMatchObject({ role: "hard", preferenceAbout: "hard" });
   });
@@ -59,6 +61,16 @@ describe("the profile field registry (ADR-019)", () => {
     expect(
       cardFields({ intent: "casual", education: "amk", hideFromField: true, height: 178 }),
     ).toEqual({ intent: "casual", height: 178 });
+  });
+
+  it("lets a person hide every field a card carries, and nothing else (#515)", () => {
+    for (const key of PROFILE_FIELD_KEYS) {
+      expect(HiddenField.safeParse(key).success, key).toBe(CARD_FIELD_KEYS.includes(key));
+    }
+    // What a card needs is no field of the registry, so there is no hiding it.
+    for (const key of ["displayName", "age", "photos", "gender", "bio", "prompts"]) {
+      expect(HiddenField.safeParse(key).success, key).toBe(false);
+    }
   });
 
   it("parses the sheet's answers and refuses what it does not list", () => {
@@ -178,6 +190,9 @@ describe("the profile field registry (ADR-019)", () => {
     ]);
     expect(options.at(-1)).toBe("other");
     expect(new Set(options).size).toBe(options.length);
+    // Finland's own languages, which the count leaves out, after the counted ones (#616).
+    expect(options.slice(-7, -1)).toEqual(["fse", "fss", "smn", "sms", "krl", "rmf"]);
+    expect(options).toHaveLength(41);
     for (const key of PROFILE_FIELD_KEYS) {
       const spec = PROFILE_FIELDS[key];
       if (spec.kind === "multi" && key !== "languages")

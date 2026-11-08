@@ -4,8 +4,9 @@ variable "vpc_cidr" {
 }
 
 variable "instance_type" {
-  type    = string
-  default = "t4g.small"
+  description = "4 GB, so that production can go without swap (ADR-046); staging's 1.8 GB leans on 2 GB of it."
+  type        = string
+  default     = "t4g.medium"
 }
 
 variable "db_instance_class" {
@@ -49,7 +50,7 @@ variable "admin_app_url" {
 }
 
 variable "cors_allowed_origins" {
-  description = "Browser origins the API answers (rule 8: the admin panel and the waitlist site only), comma separated: /kuutti/prod/cors-allowed-origins. The panel's origin must be here or its preflight fails."
+  description = "Browser origins the API answers (rule 8: the admin panel and the public site only), comma separated: /kuutti/prod/cors-allowed-origins. The panel's origin must be here or its preflight fails."
   type        = string
   default     = "https://admin.kuutti.app"
 }
@@ -67,13 +68,13 @@ variable "media_enabled" {
 }
 
 variable "cloudfront_only_ingress" {
-  description = "Passed to the network module: HTTPS from CloudFront's prefix list only. Off until Dokploy and the previews are behind the distribution too (ADR-005)."
+  description = "Passed to the network module: HTTPS from CloudFront's prefix list only. Dokploy is behind the distribution from the cutover on (#198, ADR-005 §7), so the cutover commit can set this with media_enabled and trusted_proxy = cloudfront, once the box can tell Kuutti's distribution from anybody's (#198, ADR-008 History)."
   type        = bool
   default     = false
 }
 
 variable "trusted_proxy" {
-  description = "Whose word the API takes for the client address behind its rate limiter (#52, audit F19, ADR-008): /kuutti/prod/trusted-proxy. traefik while the box answers 443 directly (the last X-Forwarded-For hop, the one Traefik appends); cloudfront once cloudfront_only_ingress is on (CloudFront's viewer address), and never before, since until then anyone reaching the origin could send that header."
+  description = "Whose word the API takes for the client address behind its rate limiter (#52, audit F19, ADR-008): /kuutti/prod/trusted-proxy. traefik reads the last X-Forwarded-For hop, the one Traefik appends: behind CloudFront, the CloudFront server that forwarded the request, which nobody chooses. cloudfront reads CloudFront's viewer address, which only a request through Kuutti's own distribution can be trusted to carry: the box's prefix list admits every CloudFront distribution, and any of them may send that header with a value of its own. So it stays traefik until the proof of ADR-066 is in place: the bootstrap's deny applied, origin-secret written to SSM and to the store, and /health answering \"originProof\":\"valid\" through the distribution. The API refuses to boot in cloudfront mode without origin-secret. The API reads it at boot: turning it on takes that proof first, then the parameter and a deploy; turning it off takes the parameter and a deploy before 443 opens again."
   type        = string
   default     = "traefik"
 

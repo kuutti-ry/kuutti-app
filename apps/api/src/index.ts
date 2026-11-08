@@ -30,7 +30,7 @@ async function main(): Promise<void> {
 
   // Everything from the configuration to the app, the pool and the jobs is
   // boot.ts, where the tests run it; this file is the process around it.
-  const { app, pool, jobs, live } = await boot({ config, logger });
+  const { app, pool, jobs, live, push } = await boot({ config, logger });
   scheduleNightly(jobs, logger);
   // The chat's sockets (#349): upgrades on the same server, a frame bounded
   // before it is parsed, and the committed changes from Postgres's channel.
@@ -85,8 +85,10 @@ async function main(): Promise<void> {
       for (const client of wss.clients) client.terminate();
     }, 1_000).unref();
     server.close(() => {
-      listener
-        .stop()
+      // The pushes the last requests started (#102), at most five seconds of Expo's each, before the pool goes.
+      push
+        .settled()
+        .then(() => listener.stop())
         .then(() => pool.end())
         .finally(() => process.exit(0));
     });

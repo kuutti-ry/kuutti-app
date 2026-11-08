@@ -1,3 +1,4 @@
+import { MATCHING_CONFIG_V1 } from "@kuutti/db";
 import {
   PERSONA_CONVERSATIONS,
   PERSONA_HISTORIES,
@@ -7,7 +8,8 @@ import {
   personaOf,
 } from "@kuutti/db/demo";
 import { describe, expect, it } from "vitest";
-import { inEachOthersPool, type PoolPerson } from "../../src/matching/index.ts";
+import { bandBetween, inEachOthersPool, type PoolPerson } from "../../src/matching/index.ts";
+import { keptPlace, pointOf } from "../../src/pond/index.ts";
 import { ageInYears, contactDetailsIn } from "../../src/profile/index.ts";
 
 // The stories' conversations (#348) are matches the product's own rules
@@ -30,6 +32,22 @@ const historyOf = (key: string): PersonaHistory => {
   return found;
 };
 
+/** Where the pool reads the persona's home: the centre of what is kept of the code they type (ADR-061 §2, §5). */
+function homeOf(key: string): PoolPerson["home"] {
+  const code = historyOf(key).onboarding?.home ?? "";
+  const kept = keptPlace(code, MATCHING_CONFIG_V1.home_min_inhabitants);
+  const point = kept === null ? null : pointOf(kept);
+  if (!point) throw new Error(`${key} has no home`);
+  return {
+    ...point,
+    edges: {
+      nearby: MATCHING_CONFIG_V1.distance_nearby_km,
+      close: MATCHING_CONFIG_V1.distance_close_km,
+      around: MATCHING_CONFIG_V1.distance_around_km,
+    },
+  };
+}
+
 /** The persona as the pool sees it on the day: the answers of the story, the age the card says. */
 function poolPerson(key: string, at: Date): PoolPerson {
   const history = historyOf(key);
@@ -43,6 +61,7 @@ function poolPerson(key: string, at: Date): PoolPerson {
     ageWindow: onboarding.ageWindow,
     age: ageInYears(born.year, born.month, at),
     intent,
+    home: homeOf(key),
     identityId: key,
     blocks: new Set(),
     fields: profile.fields,
@@ -100,6 +119,21 @@ describe("the stories' conversations", () => {
 });
 
 describe("the round of the stories (#379)", () => {
+  it("shows every band, a card to each, from where its owner lives (ADR-061 §5)", () => {
+    for (const story of PERSONA_ROUNDS) {
+      const cards = PERSONA_HISTORIES.filter((h) => personaOf(h).group === "cards").map((h) => [
+        h.key,
+        bandBetween(homeOf(story.of), homeOf(h.key)),
+      ]);
+      expect(Object.fromEntries(cards)).toEqual({
+        henna: "nearby",
+        katja: "close",
+        minna: "around",
+        riikka: "far",
+      });
+    }
+  });
+
   it("holds people in each other's pool, both ways, and in no other persona's, on every day of the demo", () => {
     for (const story of PERSONA_ROUNDS) {
       // The round's owner and everybody of her cast, who are each other's people only.

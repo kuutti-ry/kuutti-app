@@ -16,7 +16,7 @@ import type { Logger } from "../lib/logger.ts";
 import type { Live } from "./live.ts";
 import type { LiveSocket } from "./presence.ts";
 
-// The chat's socket (#349, ADR-031 §5): GET /ws, one per signed-in app in
+// The chat's socket (#349, ADR-031 §9): GET /ws, one per signed-in app in
 // front. It authenticates by its first frame, `auth { token }`, so the token
 // never sits in a URL and the web preview, which cannot set headers on a
 // WebSocket, runs the same code. Every frame both ways is the contract's
@@ -113,6 +113,11 @@ export function socketEvents(deps: SocketDeps, requestId: string): WSEvents {
   const gone = () => closing || phase === "closed";
 
   const send = (frame: ServerFrame) => {
+    // Registration lets revocation find the socket while its final check is
+    // pending. Only a completed admission may receive the hub's frames.
+    if (frame.type !== "error" && (gone() || (phase !== "ready" && phase !== "resumed"))) {
+      return;
+    }
     if (ws && ws.readyState === 1) ws.send(JSON.stringify(frame));
   };
   /** Says why, then closes; the reason is the code, never more. */
@@ -203,7 +208,6 @@ export function socketEvents(deps: SocketDeps, requestId: string): WSEvents {
     // listener lost meanwhile has already closed every socket it knew.
     if (gone()) return;
     if (!live.listening) return refuse(RESTARTING, "restarting");
-    phase = "ready";
     socket = {
       accountId: found.accountId,
       sessionId: found.sessionId,
@@ -221,6 +225,7 @@ export function socketEvents(deps: SocketDeps, requestId: string): WSEvents {
     if (standing !== "live") {
       return refuse(POLICY, standing === "expired" ? "session_expired" : "session_revoked");
     }
+    phase = "ready";
     logger.info({ requestId, accountId: found.accountId }, "chat socket opened");
     send({ type: "ready" });
     ping();

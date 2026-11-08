@@ -46,6 +46,24 @@ jobs:
       # on the runner, never an environment (#200).
       - name: load:smoke refuses production and keeps its budgets
         run: node scripts/load-smoke.ts --self-test
+      # The list of postal areas from a fixture, never the network: what it writes, and that
+      # nothing fetched can become code in a generated file (#514, ADR-061 §4).
+      - name: places writes the lists and refuses what it should
+        run: node scripts/places.ts --self-test
+      # What the hooks hold an agent to, over stand-ins of a session's transcript
+      # and of GitHub (#525).
+      - name: The pull request duties refuse what they should
+        run: node .claude/hooks/skill-gates.ts --self-test
+      # The panel's flows run under the headers infra/modules/admin/main.tf ships, read from the
+      # file, and write to a database of their own on this computer only (#106, ADR-051).
+      - name: e2e:admin reads the host's headers and keeps to its own database
+        run: node apps/admin/e2e/run.ts --self-test
+      # Saiga's fetch and the font guard, each against stand-ins: no runner
+      # ever has the typeface or its token (ADR-052).
+      - name: The font fetch verifies and the font guard refuses
+        run: |
+          node scripts/fonts.ts --self-test
+          node scripts/check-fonts.ts --self-test
       # Every PEM stays out of git; .gitignore un-ignores exactly one public
       # certificate bundle. TruffleHog filters unverifiable keys, so this is
       # the backstop.
@@ -179,6 +197,9 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          # The pull request's own commits, whose messages may say a drawing
+          # is still true (ADR-047).
+          fetch-depth: 0
       # The checkers have no dependencies, so there is nothing to install.
       - uses: ./.github/actions/pnpm
         with:
@@ -187,6 +208,16 @@ jobs:
         run: pnpm check:scenarios --list
       - name: Every ADR is in docs/adr/README.md with its status (#203)
         run: pnpm check:adr-index --self-test
+      - name: Every matching_config key has a row in docs/decisions.md (#396)
+        run: pnpm check:decisions --self-test
+      # A pull request is compared with its base as merged, the merge commit's
+      # first parent; on main the blocks alone are checked. Dependabot cannot
+      # write a Still-true line, and its pins change nothing a view draws.
+      - name: A drawing whose files changed is redrawn or still true (ADR-047)
+        if: github.actor != 'dependabot[bot]'
+        env:
+          BASE: ${{ github.event_name == 'pull_request' && 'HEAD^1' || 'HEAD' }}
+        run: pnpm check:docs --self-test --base "$BASE"
 
   schema-drift:
     name: schema-drift
@@ -300,7 +331,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: "3.13"
       - name: zizmor and the permission invariants
@@ -310,3 +341,5 @@ jobs:
           python .github/scripts/check-workflow-permissions.py
       - name: what the sweep withdraws, and what it leaves
         run: .github/scripts/withdraw-waiting-runs.test.sh
+      - name: what the plan role's probes decide, against a stand-in aws
+        run: .github/scripts/plan-role-denies.test.sh

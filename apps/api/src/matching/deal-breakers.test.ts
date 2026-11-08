@@ -1,11 +1,13 @@
 import { DealBreakersResponse, type ProfileUpdate } from "@kuutti/schema";
 import { describe, expect } from "vitest";
-import { signedInAccount, withMatchingConfig } from "../test/account.ts";
+import { consentedAccount, signedInAccount, withMatchingConfig } from "../test/account.ts";
 import { exportOf } from "../test/export.ts";
 import { type TestContext, test } from "../test/harness.ts";
+import { dealBreakersFrom } from "./deal-breakers.ts";
 
 // features/matching/preferences.feature (#149): the deal-breakers under the
-// disclose-to-filter rule. Hard rows beside the two of onboarding; #87 applies them.
+// disclose-to-filter rule. Hard rows beside the two of onboarding; #87 applies
+// them. The one on distance has no field and waits for nobody (#514, ADR-061 §7).
 
 type App = TestContext["app"];
 type Headers = Record<string, string>;
@@ -45,11 +47,13 @@ const storedRows = async (ctx: TestContext, accountId: string) =>
 
 const smoking = { field: "smoking", accept: ["never"], includeUnknown: false };
 const kids = { field: "hasKids", accept: ["no"], includeUnknown: true };
+const taller = { field: "height", accept: ["taller"], includeUnknown: true };
+const nearby = { field: "distance", accept: ["nearby"], includeUnknown: true };
 
 describe("A deal-breaker the rule refuses is not stored", () => {
   test.for([
     [
-      "a third deal-breaker",
+      "one more deal-breaker than the config allows",
       [smoking, kids, { field: "monogamy", accept: ["monogamous"], includeUnknown: false }],
       400,
     ],
@@ -68,7 +72,26 @@ describe("A deal-breaker the rule refuses is not stored", () => {
       [{ ...smoking, accept: ["cigars"] }],
       400,
     ],
+    [
+      // Two who chose Another language may speak none in common (#616).
+      "a deal-breaker on languages accepting another language",
+      [{ field: "languages", accept: ["fi", "other"], includeUnknown: false }],
+      400,
+    ],
     ["the same field twice", [smoking, { ...smoking, accept: ["quitting"] }], 400],
+    [
+      "a deal-breaker on height accepting no relation of height",
+      [{ ...taller, accept: ["180"] }],
+      400,
+    ],
+    [
+      "a deal-breaker on height accepting two relations",
+      [{ ...taller, accept: ["taller", "shorter"] }],
+      400,
+    ],
+    ["a deal-breaker on distance accepting no band", [{ ...nearby, accept: [] }], 400],
+    ["a deal-breaker on distance accepting far", [{ ...nearby, accept: ["far"] }], 400],
+    ["a deal-breaker on distance past what the config allows", [smoking, kids, nearby], 400],
   ] as const)("%s", async ([, dealBreakers, status], { ctx }) => {
     await withMatchingConfig(ctx.client, { deal_breakers_max: 2 });
     const a = await signedInAccount(ctx.client);
@@ -77,6 +100,7 @@ describe("A deal-breaker the rule refuses is not stored", () => {
       smoking: "never",
       hasKids: "no",
       monogamy: "monogamous",
+      height: 170,
     });
     expect(own.status).toBe(200);
     const response = await putDealBreakers(ctx.app, a.headers, { dealBreakers });
@@ -90,12 +114,71 @@ describe("A deal-breaker the rule refuses is not stored", () => {
   });
 });
 
+describe("A person past a lowered number may remove or change what they hold, and take on nothing new", () => {
+  const quitting = { ...smoking, accept: ["never", "quitting"] };
+  const monogamy = { field: "monogamy", accept: ["monogamous"], includeUnknown: false };
+  const held = [smoking, kids, taller];
+
+  test.for([
+    ["removes kids, still one too many", [smoking, taller], 200, [smoking, taller]],
+    ["changes what smoking accepts", [quitting, kids, taller], 200, [quitting, kids, taller]],
+    ["sends the set as it stands", held, 200, held],
+    ["adds monogamy", [...held, monogamy], 400, held],
+    ["swaps kids for monogamy", [smoking, monogamy, taller], 400, held],
+  ] as const)("%s", async ([, dealBreakers, status, after], { ctx }) => {
+    await withMatchingConfig(ctx.client, { deal_breakers_max: 3 });
+    const a = await signedInAccount(ctx.client);
+    const own = await answer(ctx.app, a.headers, {
+      smoking: "never",
+      hasKids: "no",
+      monogamy: "monogamous",
+      height: 170,
+    });
+    expect(own.status).toBe(200);
+    expect((await putDealBreakers(ctx.app, a.headers, { dealBreakers: held })).status).toBe(200);
+    await withMatchingConfig(ctx.client, { deal_breakers_max: 1 });
+
+    const response = await putDealBreakers(ctx.app, a.headers, { dealBreakers });
+
+    expect(response.status).toBe(status);
+    const read = await readDealBreakers(ctx.app, a.headers);
+    expect(read.max).toBe(1);
+    const byField = (a: { field: string }, b: { field: string }) => a.field.localeCompare(b.field);
+    expect(read.dealBreakers.toSorted(byField)).toEqual(
+      after.map((d) => ({ ...d, paused: false })).toSorted(byField),
+    );
+  });
+
+  test("a set at the number takes a new field only in place of one it gives up", async ({
+    ctx,
+  }) => {
+    await withMatchingConfig(ctx.client, { deal_breakers_max: 2 });
+    const a = await signedInAccount(ctx.client);
+    const own = await answer(ctx.app, a.headers, {
+      smoking: "never",
+      hasKids: "no",
+      height: 170,
+    });
+    expect(own.status).toBe(200);
+    const two = await putDealBreakers(ctx.app, a.headers, { dealBreakers: [smoking, kids] });
+    expect(two.status).toBe(200);
+
+    const swapped = await putDealBreakers(ctx.app, a.headers, { dealBreakers: [smoking, taller] });
+
+    expect(swapped.status).toBe(200);
+    expect((await storedRows(ctx, a.accountId)).map((row) => row.field)).toEqual([
+      "height",
+      "smoking",
+    ]);
+  });
+});
+
 describe("deal-breakers", () => {
   test("Deal-breakers are stored as hard rows beside onboarding's and paused while the own answer is missing", async ({
     ctx,
   }) => {
     await withMatchingConfig(ctx.client, { deal_breakers_max: 2 });
-    const a = await signedInAccount(ctx.client);
+    const a = await consentedAccount(ctx.client);
     const onboarding = await ctx.app.request("/preferences", {
       method: "PUT",
       headers: jsonHeaders(a.headers),
@@ -155,6 +238,193 @@ describe("deal-breakers", () => {
     ).toEqual([2, 1]);
   });
 
+  test("A deal-breaker on height is stored as one relation to the person's own height", async ({
+    ctx,
+  }) => {
+    await withMatchingConfig(ctx.client, { deal_breakers_max: 2 });
+    const a = await signedInAccount(ctx.client);
+    expect((await answer(ctx.app, a.headers, { height: 170 })).status).toBe(200);
+
+    expect((await putDealBreakers(ctx.app, a.headers, { dealBreakers: [taller] })).status).toBe(
+      200,
+    );
+    expect(await readDealBreakers(ctx.app, a.headers)).toEqual({
+      dealBreakers: [{ ...taller, paused: false }],
+      max: 2,
+    });
+    expect(await storedRows(ctx, a.accountId)).toEqual([{ field: "height", mode: "hard" }]);
+
+    // Another relation replaces the first, with the switch for those who did not answer.
+    const shorter = { field: "height", accept: ["shorter"], includeUnknown: false };
+    expect((await putDealBreakers(ctx.app, a.headers, { dealBreakers: [shorter] })).status).toBe(
+      200,
+    );
+    expect((await readDealBreakers(ctx.app, a.headers)).dealBreakers).toEqual([
+      { ...shorter, paused: false },
+    ]);
+    expect(await storedRows(ctx, a.accountId)).toEqual([{ field: "height", mode: "hard" }]);
+    expect((await exportOf(ctx.app, a.headers)).dealBreakers).toEqual([
+      { ...shorter, paused: false },
+    ]);
+
+    // Everyone is having none: the set without it.
+    expect((await putDealBreakers(ctx.app, a.headers, { dealBreakers: [] })).status).toBe(200);
+    expect(await storedRows(ctx, a.accountId)).toEqual([]);
+
+    expect(JSON.stringify(ctx.logs())).not.toMatch(/shorter|taller/);
+  });
+
+  test("A deal-breaker on distance is stored as the bands it accepts, on no answer of one's own", async ({
+    ctx,
+  }) => {
+    await withMatchingConfig(ctx.client, { deal_breakers_max: 2 });
+    const a = await signedInAccount(ctx.client);
+    const value = async () =>
+      (
+        await ctx.client.query<{ value: string[]; include_unknown: boolean; mode: string }>(
+          "SELECT value, include_unknown, mode FROM preferences WHERE account_id = $1",
+          [a.accountId],
+        )
+      ).rows;
+
+    // Nothing answered on the profile, and the request says to keep those who did not answer out.
+    const first = await putDealBreakers(ctx.app, a.headers, {
+      dealBreakers: [{ ...nearby, includeUnknown: false }],
+    });
+    expect(first.status).toBe(200);
+    expect(DealBreakersResponse.parse(await first.json())).toEqual({
+      dealBreakers: [{ ...nearby, paused: false }],
+      max: 2,
+    });
+    expect(await value()).toEqual([{ value: ["nearby"], include_unknown: true, mode: "hard" }]);
+
+    // A second replaces the first.
+    const wider = { ...nearby, accept: ["nearby", "close"] };
+    expect((await putDealBreakers(ctx.app, a.headers, { dealBreakers: [wider] })).status).toBe(200);
+    expect(await readDealBreakers(ctx.app, a.headers)).toEqual({
+      dealBreakers: [{ ...wider, paused: false }],
+      max: 2,
+    });
+    expect(await value()).toEqual([
+      { value: ["nearby", "close"], include_unknown: true, mode: "hard" },
+    ]);
+    expect((await exportOf(ctx.app, a.headers)).dealBreakers).toEqual([
+      { ...wider, paused: false },
+    ]);
+
+    // Everyone is having none: the set without it.
+    expect((await putDealBreakers(ctx.app, a.headers, { dealBreakers: [] })).status).toBe(200);
+    expect(await value()).toEqual([]);
+    expect(JSON.stringify(ctx.logs())).not.toMatch(/nearby|close/);
+  });
+
+  test.for([
+    ["the middle band alone", ["close"]],
+    ["the last band alone", ["around"]],
+    ["a band skipped", ["nearby", "around"]],
+    ["a band twice", ["nearby", "nearby"]],
+    ["every band and one twice", ["nearby", "close", "around", "around"]],
+  ] as const)("a deal-breaker on distance with %s is refused", async ([, accept], { ctx }) => {
+    const a = await signedInAccount(ctx.client);
+    const refused = await putDealBreakers(ctx.app, a.headers, {
+      dealBreakers: [{ ...nearby, accept }],
+    });
+    expect(refused.status).toBe(400);
+    expect(await refused.json()).toMatchObject({ error: { code: "validation_failed" } });
+    expect(await storedRows(ctx, a.accountId)).toEqual([]);
+  });
+
+  test("a deal-breaker on distance is up to a band in whatever order it comes", async ({ ctx }) => {
+    const a = await signedInAccount(ctx.client);
+    const accept = ["around", "nearby", "close"];
+    expect(
+      (await putDealBreakers(ctx.app, a.headers, { dealBreakers: [{ ...nearby, accept }] })).status,
+    ).toBe(200);
+    expect((await readDealBreakers(ctx.app, a.headers)).dealBreakers).toEqual([
+      { ...nearby, accept, paused: false },
+    ]);
+  });
+
+  test("a row on distance reads as letting everybody through, and a band that left it goes", async ({
+    ctx,
+  }) => {
+    const a = await signedInAccount(ctx.client);
+    await ctx.client.query(
+      `INSERT INTO preferences (account_id, field, value, mode, include_unknown)
+       VALUES ($1, 'distance', '["nearby", "far"]', 'hard', false)`,
+      [a.accountId],
+    );
+    expect((await readDealBreakers(ctx.app, a.headers)).dealBreakers).toEqual([
+      { ...nearby, paused: false },
+    ]);
+  });
+
+  test("a deal-breaker on height waits for the person's own height, and keeps its relation", async ({
+    ctx,
+  }) => {
+    await withMatchingConfig(ctx.client, { deal_breakers_max: 2 });
+    const a = await signedInAccount(ctx.client);
+
+    const refused = await putDealBreakers(ctx.app, a.headers, { dealBreakers: [taller] });
+    expect(refused.status).toBe(409);
+    expect(await refused.json()).toMatchObject({ error: { code: "filter_unanswered" } });
+
+    expect((await answer(ctx.app, a.headers, { height: 170 })).status).toBe(200);
+    expect((await putDealBreakers(ctx.app, a.headers, { dealBreakers: [taller] })).status).toBe(
+      200,
+    );
+    // The height taken back: paused, and nothing is deleted.
+    expect((await answer(ctx.app, a.headers, {})).status).toBe(200);
+    expect((await readDealBreakers(ctx.app, a.headers)).dealBreakers).toEqual([
+      { ...taller, paused: true },
+    ]);
+    // Paused, another relation waits for the answer too.
+    const changed = await putDealBreakers(ctx.app, a.headers, {
+      dealBreakers: [{ ...taller, accept: ["shorter"] }],
+    });
+    expect(changed.status).toBe(409);
+  });
+
+  test("how many a person may hold is the config's, up to one per field and the distance (#508)", async ({
+    ctx,
+  }) => {
+    const a = await signedInAccount(ctx.client);
+    // As the migrations write it: one on every field, and the distance.
+    expect((await readDealBreakers(ctx.app, a.headers)).max).toBe(7);
+    expect(
+      (
+        await answer(ctx.app, a.headers, {
+          monogamy: "monogamous",
+          hasKids: "no",
+          wantsKids: "want",
+          smoking: "never",
+          languages: ["fi"],
+          height: 170,
+        })
+      ).status,
+    ).toBe(200);
+    const all = [
+      smoking,
+      kids,
+      taller,
+      { field: "monogamy", accept: ["monogamous"], includeUnknown: false },
+      { field: "wantsKids", accept: ["want"], includeUnknown: false },
+      { field: "languages", accept: ["fi"], includeUnknown: false },
+      nearby,
+    ];
+
+    await withMatchingConfig(ctx.client, { deal_breakers_max: 6 });
+    const over = await putDealBreakers(ctx.app, a.headers, { dealBreakers: all });
+    expect(over.status).toBe(400);
+    expect(await storedRows(ctx, a.accountId)).toEqual([]);
+
+    await withMatchingConfig(ctx.client, { deal_breakers_max: 7 });
+    expect((await putDealBreakers(ctx.app, a.headers, { dealBreakers: all })).status).toBe(200);
+    const read = await readDealBreakers(ctx.app, a.headers);
+    expect(read.max).toBe(7);
+    expect(read.dealBreakers.map((d) => d.field).sort()).toEqual(all.map((d) => d.field).sort());
+  });
+
   test("a paused deal-breaker sent back as it stands is kept, and the others save around it", async ({
     ctx,
   }) => {
@@ -209,6 +479,40 @@ describe("deal-breakers", () => {
     },
   );
 
+  test("A language deal-breaker saved with Another language reads back without it", async ({
+    ctx,
+  }) => {
+    await withMatchingConfig(ctx.client, { deal_breakers_max: 2 });
+    const a = await signedInAccount(ctx.client);
+    const b = await signedInAccount(ctx.client);
+    // Rows as a save before #616 could leave them: Another language beside Finnish, and alone.
+    const rows = [
+      { account: a, value: ["fi", "other"] },
+      { account: b, value: ["other"] },
+    ];
+    for (const { account, value } of rows) {
+      expect((await answer(ctx.app, account.headers, { languages: ["fi", "other"] })).status).toBe(
+        200,
+      );
+      await ctx.client.query(
+        `INSERT INTO preferences (account_id, field, value, mode, include_unknown)
+         VALUES ($1, 'languages', $2::jsonb, 'hard', false)`,
+        [account.accountId, JSON.stringify(value)],
+      );
+    }
+    expect(await readDealBreakers(ctx.app, a.headers)).toEqual({
+      dealBreakers: [{ field: "languages", accept: ["fi"], includeUnknown: false, paused: false }],
+      max: 2,
+    });
+    expect(await readDealBreakers(ctx.app, b.headers)).toEqual({ dealBreakers: [], max: 2 });
+    // The queue's builder reads the rows through the same function (jobs/pool.ts).
+    expect(
+      rows.map(({ value }) =>
+        dealBreakersFrom([{ field: "languages", value, include_unknown: false }]),
+      ),
+    ).toEqual([[{ field: "languages", accept: ["fi"], includeUnknown: false }], []]);
+  });
+
   test("The deal-breakers of another account are never served", async ({ ctx }) => {
     await withMatchingConfig(ctx.client, { deal_breakers_max: 2 });
     const a = await signedInAccount(ctx.client);
@@ -241,7 +545,7 @@ describe("deal-breakers", () => {
     }
     expect(await readDealBreakers(ctx.app, a.headers)).toEqual({
       dealBreakers: [{ ...smoking, paused: false }],
-      max: 5,
+      max: 7,
     });
     // The next save sends the set as read: the row with nothing left goes with it.
     expect((await putDealBreakers(ctx.app, a.headers, { dealBreakers: [smoking] })).status).toBe(

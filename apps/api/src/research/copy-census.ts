@@ -19,7 +19,7 @@ import { type AgeBand, RESEARCH_FIELD_KEYS } from "@kuutti/schema";
  * Under k, the cascade of ADR-011 §9: the research fields are withheld, then
  * the age band goes to its fixed neighbour pair, then the pond is withheld;
  * a row still under k is dropped and counted. Withheld is `*`, never null:
- * null already says "not chosen" or "not answered".
+ * null already says "no home yet" or "not answered".
  */
 export const WITHHELD = "*";
 
@@ -34,7 +34,7 @@ export const COARSE_AGE_BAND: Record<AgeBand, string> = {
 };
 
 export type Cell = {
-  /** The pond's slug; null before the person chose one; WITHHELD when generalised. */
+  /** The pond's slug; null before the person has a home; WITHHELD when generalised. */
   pond: string | null;
   /** One of AGE_BANDS, or a COARSE_AGE_BAND value when generalised. */
   ageBand: string;

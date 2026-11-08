@@ -26,13 +26,15 @@ import {
   findReportSource,
   listReports,
   openReport,
+  pointedPhotoKeyOf,
 } from "./report-queue.ts";
 
 // The panel's report queue (#311, TD-5) and one report worked to a decision
 // (#312). Listing writes no audit row, as it shows neither the reporter's
 // words nor the conversation. Opening a report, each look at a photo of its
-// frozen copy and the decision are audit rows about the report, never about a
-// person, written before anything is shown or changed (ADR-030 §6, §12).
+// frozen copy or at the photo a card's report points at (#476), and the
+// decision are audit rows about the report, never about a person, written
+// before anything is shown or changed (ADR-030 §6, §12, §13).
 // To a member of staff who is a party, every route answers as for a report
 // that does not exist, and writes nothing. The words of the note and the copy
 // reach the answer and nothing else: no log line, error detail or event
@@ -72,7 +74,7 @@ const openRoute = createRoute({
   path: "/admin/reports/{id}",
   summary: "One report, with the reporter's note and the frozen conversation",
   description:
-    "The queue's item, the reporter's note, the decision, the frozen copy of the conversation for a report made from one (null for a card's), and the sanctions that may close it while it waits. Written first to audit_log, about the report: conversation.view for a conversation's report, report.view for a card's; a look whose row cannot be written answers nothing of it. Moderators and admins.",
+    "The queue's item, the reporter's note, the decision, the frozen copy of the conversation for a report made from one (null for a card's), the photo the report points at (#476: the copy's line, or a card's photo with its id and state, or removed since), and the sanctions that may close it while it waits. Written first to audit_log, about the report: conversation.view for a conversation's report, report.view for a card's; a look whose row cannot be written answers nothing of it. Moderators and admins.",
   ...bearer,
   request: { params: ReportParams },
   responses: {
@@ -97,6 +99,25 @@ const photoRoute = createRoute({
     ...staffErrors,
     404: errorContent(
       "not_found: no such report, a party's, or no photo at that line, answered alike.",
+    ),
+    503: errorContent("media_unavailable: no object storage is configured here."),
+  },
+});
+
+const pointedPhotoRoute = createRoute({
+  method: "get",
+  path: "/admin/reports/{id}/photo",
+  summary: "A signed URL for the photo a card's report points at",
+  description:
+    "The card variant of the one photo of the card the reporter pointed at (#476), for fifteen minutes. Every issuance is a photo.view row about the report, written before the URL is signed. Moderators and admins.",
+  ...bearer,
+  request: { params: ReportParams },
+  responses: {
+    200: { description: "The signed URL.", ...json(PhotoUrlResponse) },
+    400: errorContent("Validation failed."),
+    ...staffErrors,
+    404: errorContent(
+      "not_found: no such report, a party's, one that points at no photo, or a photo removed since, answered alike.",
     ),
     503: errorContent("media_unavailable: no object storage is configured here."),
   },
@@ -127,7 +148,7 @@ const decisionRoute = createRoute({
 export function reportAdminRoutes(deps: Deps, requireModerator: MiddlewareHandler<AppEnv>) {
   const app = new OpenAPIHono<AppEnv>();
   const now = () => (deps.now ?? (() => new Date()))();
-  for (const route of [listRoute, openRoute, photoRoute, decisionRoute]) {
+  for (const route of [listRoute, openRoute, photoRoute, pointedPhotoRoute, decisionRoute]) {
     app.use(route.getRoutingPath(), requireModerator);
   }
   const notFound = () => new AppError(404, "not_found", "No such report");
@@ -196,6 +217,38 @@ export function reportAdminRoutes(deps: Deps, requireModerator: MiddlewareHandle
         seq,
         photoId: held.photoId,
         variant: "full",
+        at,
+      },
+      "staff report photo view",
+    );
+    return c.json(answer, 200);
+  });
+
+  app.openapi(pointedPhotoRoute, async (c) => {
+    const staff = staffOf(c);
+    const { id } = c.req.valid("param");
+    // Asked before anything is read, so the answer is the same for everybody.
+    if (!deps.media) {
+      throw new AppError(503, "media_unavailable", "Object storage is not configured here");
+    }
+    const held = await pointedPhotoKeyOf(deps.db, staff.identityId, id);
+    if (!held) throw notFound();
+    const at = now();
+    // The audit row first, about the report as the copy's photos are (ADR-030 §9).
+    await recordAudit(deps.db, {
+      actorIdentityId: staff.identityId,
+      action: "photo.view",
+      subjectType: "report",
+      subjectId: id,
+      detail: { variant: "card" },
+    });
+    const answer = await staffPhotoUrl(deps.media.signer, held.key, "card", at);
+    deps.logger.info(
+      {
+        staffIdentityId: staff.identityId,
+        reportId: id,
+        photoId: held.photoId,
+        variant: "card",
         at,
       },
       "staff report photo view",

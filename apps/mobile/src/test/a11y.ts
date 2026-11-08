@@ -75,3 +75,38 @@ export function a11yProblems(node: HostNode): string[] {
   }
   return problems;
 }
+
+/** The nodes hidden from a screen reader: what a decorative icon, glyph or mark renders as. */
+export function hiddenNodes(tree: HostNode | HostNode[] | null): HostNode[] {
+  const found: HostNode[] = [];
+  for (const root of Array.isArray(tree) ? tree : tree ? [tree] : []) {
+    visit(root, (node) => {
+      if (node.props.accessibilityElementsHidden === true) found.push(node);
+    });
+  }
+  return found;
+}
+
+/**
+ * Whether a decorative node comes just before the text of these words, as a
+ * mark before a name (#474): false when the node before it is not hidden or
+ * there is none, null when no text node holds the words.
+ */
+export function markBefore(tree: HostNode | HostNode[] | null, words: string): boolean | null {
+  for (const root of Array.isArray(tree) ? tree : tree ? [tree] : []) {
+    let found: boolean | null = null;
+    visit(root, (node) => {
+      if (found !== null) return;
+      const kids = node.children ?? [];
+      const at = kids.findIndex(
+        (kid) => typeof kid !== "string" && kid.type === "Text" && textOf(kid) === words,
+      );
+      if (at < 0) return;
+      const before = kids[at - 1];
+      found =
+        before !== undefined && hiddenNodes(typeof before === "string" ? null : before).length > 0;
+    });
+    if (found !== null) return found;
+  }
+  return null;
+}

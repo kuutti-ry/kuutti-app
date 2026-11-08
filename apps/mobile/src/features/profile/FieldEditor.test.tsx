@@ -1,34 +1,74 @@
-import type { ProfileFieldKey, ProfileFields } from "@kuutti/schema";
+import {
+  type HiddenField,
+  PROFILE_FIELDS,
+  type ProfileFieldKey,
+  type ProfileFields,
+} from "@kuutti/schema";
 import { fireEvent, screen } from "@testing-library/react-native";
+import { useLocales } from "expo-localization";
 import { useState } from "react";
+import { AccessibilityInfo } from "react-native";
 import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
 import { renderWithTheme } from "@/test/render";
 import { FieldEditor, optionTextKey, toggled, visibleOptions } from "./FieldEditor";
 
 // One field of the registry as the person answers it (#47, #148, ADR-019):
-// a setting as a switch, choices as chips that say whether they are chosen,
-// a short text, a number as a stepper, and a search over a long list.
+// a setting as a switch, choices as chips that say whether they are chosen, or
+// as whole-width rows where it is what its screen asks (#581), a short text, a
+// number as a stepper, and a search over a long list.
 
-/** The draft the editor works on, as the screens hold it; `fields` is what it holds now. */
+/** The names of the radio groups on the screen, each a plain view that a role query would leave out. */
+const radioGroups = () =>
+  screen.container
+    .queryAll(
+      (node) => typeof node.type === "string" && node.props.accessibilityRole === "radiogroup",
+    )
+    .map((node) => String(node.props.accessibilityLabel));
+
+/** The draft the editor works on, as the screens hold it; `fields` is what it holds now, `patches` every update it asked for. */
 let fields: ProfileFields = {};
-function Harness({ field, initial }: { field: ProfileFieldKey; initial: ProfileFields }) {
-  const [draft, setDraft] = useState({ fields: initial });
+let hiddenFields: readonly HiddenField[] | undefined;
+let patches: unknown[] = [];
+function Harness({
+  field,
+  initial,
+  hidden,
+  alone,
+}: {
+  field: ProfileFieldKey;
+  initial: ProfileFields;
+  hidden?: HiddenField[];
+  alone?: boolean;
+}) {
+  const [draft, setDraft] = useState<{ fields: ProfileFields; hiddenFields?: HiddenField[] }>({
+    fields: initial,
+    hiddenFields: hidden,
+  });
   fields = draft.fields;
+  hiddenFields = draft.hiddenFields;
   return (
     <FieldEditor
       field={field}
       draft={draft}
-      update={(patch) => setDraft((previous) => ({ ...previous, ...patch }))}
+      alone={alone}
+      update={(patch) => {
+        patches.push(patch);
+        setDraft((previous) => ({ ...previous, ...patch }));
+      }}
     />
   );
 }
-const show = (field: ProfileFieldKey, initial: ProfileFields = {}) =>
-  renderWithTheme(<Harness field={field} initial={initial} />);
+const show = (field: ProfileFieldKey, initial: ProfileFields = {}, hidden?: HiddenField[]) =>
+  renderWithTheme(<Harness field={field} initial={initial} hidden={hidden} />);
+const showAlone = (field: ProfileFieldKey, initial: ProfileFields = {}, hidden?: HiddenField[]) =>
+  renderWithTheme(<Harness field={field} initial={initial} hidden={hidden} alone />);
 const chosen = (name: string) =>
   screen.getByRole("button", { name }).props.accessibilityState?.selected;
 
 beforeEach(() => {
   fields = {};
+  hiddenFields = undefined;
+  patches = [];
 });
 
 describe("FieldEditor: a setting", () => {
@@ -40,6 +80,132 @@ describe("FieldEditor: a setting", () => {
     expect(fields).toEqual({ hideFromField: true });
     await fireEvent.press(screen.getByRole("switch", { name: "Hide me from people in my field" }));
     expect(fields).toEqual({});
+  });
+});
+
+describe("FieldEditor: what the card shows (#515)", () => {
+  const HIDE_SMOKING = "Hide from your card: Smoking";
+  const SHOW_SMOKING = "Show on your card: Smoking";
+  const USED = "Hidden from your card. Still used for matching.";
+  const NOT_USED = "Hidden from your card.";
+
+  afterEach(() => jest.restoreAllMocks());
+
+  it("offers nothing on an unanswered field", async () => {
+    await show("smoking");
+    expect(screen.queryByRole("button", { name: HIDE_SMOKING })).toBeNull();
+    expect(screen.queryByText(USED)).toBeNull();
+  });
+
+  it("offers Hide once there is an answer, with no line under the title", async () => {
+    await show("smoking");
+    await fireEvent.press(screen.getByRole("button", { name: "Never" }));
+    expect(screen.getByRole("button", { name: HIDE_SMOKING })).toBeTruthy();
+    expect(screen.getByText("Hide")).toBeTruthy();
+    expect(screen.queryByText(USED)).toBeNull();
+  });
+
+  it("hides the answer and keeps it, says what that means, and turns into Show", async () => {
+    const said = jest.spyOn(AccessibilityInfo, "announceForAccessibility");
+    await show("smoking", { smoking: "never" });
+    await fireEvent.press(screen.getByRole("button", { name: HIDE_SMOKING }));
+    expect(hiddenFields).toEqual(["smoking"]);
+    expect(fields).toEqual({ smoking: "never" });
+    expect(screen.getByText(USED)).toBeTruthy();
+    expect(screen.getByText("Show")).toBeTruthy();
+    expect(chosen("Never")).toBe(true);
+    expect(said).toHaveBeenCalledWith(USED);
+  });
+
+  it("shows a hidden answer again, the rest of the set as it was", async () => {
+    const said = jest.spyOn(AccessibilityInfo, "announceForAccessibility");
+    await show("smoking", { smoking: "never" }, ["height", "smoking"]);
+    await fireEvent.press(screen.getByRole("button", { name: SHOW_SMOKING }));
+    expect(hiddenFields).toEqual(["height"]);
+    expect(screen.getByRole("button", { name: HIDE_SMOKING })).toBeTruthy();
+    expect(screen.queryByText(USED)).toBeNull();
+    expect(said).toHaveBeenCalledWith("Back on your card.");
+  });
+
+  it.each([
+    ["intent", { intent: "casual" }, USED],
+    ["languages", { languages: ["fi"] }, USED],
+    ["monogamy", { monogamy: "monogamous" }, USED],
+    ["hobbies", { hobbies: ["sauna"] }, NOT_USED],
+    ["height", { height: 171 }, USED],
+    ["politics", { politics: ["vas"] }, NOT_USED],
+    ["religion", { religion: "atheist" }, NOT_USED],
+    ["occupationTitle", { occupationTitle: "Nurse" }, NOT_USED],
+  ] satisfies [ProfileFieldKey, ProfileFields, string][])(
+    "says matching still reads a hidden %s only where it does",
+    async (field, initial, line) => {
+      await show(field, initial, [field]);
+      expect(screen.getByText(line)).toBeTruthy();
+      expect(screen.queryByText(line === USED ? NOT_USED : USED)).toBeNull();
+    },
+  );
+
+  it.each([
+    ["education", { education: "amk" }],
+    ["drinking", {}],
+    ["drugsAttitude", { drugsAttitude: "not_my_thing" }],
+  ] as const)(
+    "says %s is never on a card, answered or not, with nothing to hide",
+    async (field, initial) => {
+      await show(field, initial);
+      expect(screen.getByText("Never on your card. Only used for matching.")).toBeTruthy();
+      expect(screen.queryByText("Hide")).toBeNull();
+    },
+  );
+
+  it("leaves a setting as it was: no Hide and no line", async () => {
+    await show("hideFromField", { hideFromField: true });
+    expect(screen.queryByText("Hide")).toBeNull();
+    expect(screen.queryByText("Never on your card. Only used for matching.")).toBeNull();
+  });
+
+  it("says a field of study is hidden under the setting, with nothing to press", async () => {
+    await show("field", { field: ["tech"], hideFromField: true });
+    expect(screen.getByText(NOT_USED)).toBeTruthy();
+    expect(screen.queryByText("Hide")).toBeNull();
+    expect(screen.queryByText("Show")).toBeNull();
+  });
+
+  it("offers Hide on a field of study again without the setting", async () => {
+    await show("field", { field: ["tech"] });
+    expect(screen.getByText("Hide")).toBeTruthy();
+    expect(screen.queryByText(NOT_USED)).toBeNull();
+  });
+
+  it("keeps a cleared answer's place in the set: answered again, it is hidden again, and says so", async () => {
+    await show("smoking", { smoking: "never" }, ["smoking"]);
+    await fireEvent.press(screen.getByRole("button", { name: "Never" }));
+    expect(fields).toEqual({});
+    expect(hiddenFields).toEqual(["smoking"]);
+    expect(screen.queryByText(USED)).toBeNull();
+    expect(screen.queryByText("Show")).toBeNull();
+    await fireEvent.press(screen.getByRole("button", { name: "Sometimes" }));
+    expect(screen.getByText(USED)).toBeTruthy();
+    expect(screen.getByRole("button", { name: SHOW_SMOKING })).toBeTruthy();
+  });
+
+  it("starts the hidden set from nothing on a draft that has none", async () => {
+    await show("height", { height: 171 });
+    expect(hiddenFields).toBeUndefined();
+    await fireEvent.press(screen.getByRole("button", { name: "Hide from your card: Height" }));
+    expect(hiddenFields).toEqual(["height"]);
+  });
+
+  it("offers it on a short text too", async () => {
+    await show("occupationTitle", { occupationTitle: "Nurse" });
+    expect(screen.getByRole("button", { name: "Hide from your card: Job title" })).toBeTruthy();
+  });
+
+  it("is a labelled button with a 44 pt target, in both states", async () => {
+    await show("smoking", { smoking: "never" });
+    expect(pressables(screen.toJSON() as HostNode).flatMap((n) => a11yProblems(n))).toEqual([]);
+    await fireEvent.press(screen.getByRole("button", { name: HIDE_SMOKING }));
+    expect(pressables(screen.toJSON() as HostNode).flatMap((n) => a11yProblems(n))).toEqual([]);
   });
 });
 
@@ -56,6 +222,233 @@ describe("FieldEditor: one choice", () => {
     await fireEvent.press(screen.getByRole("button", { name: "Sometimes" }));
     expect(fields).toEqual({});
     expect(pressables(screen.toJSON() as HostNode).flatMap((n) => a11yProblems(n))).toEqual([]);
+  });
+
+  it.each([
+    ["an info answer", "monogamy", { monogamy: "monogamous" }, "Monogamous"],
+    ["a soft answer", "drinking", { drinking: "rarely" }, "Rarely"],
+  ] satisfies [string, ProfileFieldKey, ProfileFields, string][])(
+    "still clears %s when the chosen one is pressed again",
+    async (_what, field, initial, name) => {
+      await show(field, initial);
+      expect(chosen(name)).toBe(true);
+      await fireEvent.press(screen.getByRole("button", { name }));
+      expect(fields).toEqual({});
+      expect(chosen(name)).toBe(false);
+    },
+  );
+});
+
+describe("FieldEditor: what its screen asks, a short list (#581)", () => {
+  /** A row by its word, chosen or not: the chosen one's name carries its mark. */
+  const marked = (name: string) => new RegExp(`^(✓ )?${name}$`);
+  const radio = (name: string) => screen.getByRole("radio", { name: marked(name) });
+  const checkbox = (name: string) => screen.getByRole("checkbox", { name: marked(name) });
+  const checked = (row: ReturnType<typeof radio>) => row.props.accessibilityState?.checked;
+
+  it("draws one answer as whole-width radios, one after another, in a group the field names", async () => {
+    await showAlone("smoking", { smoking: "never" });
+    const group = screen.getByLabelText("Smoking");
+    expect(group.props.accessibilityRole).toBe("radiogroup");
+    expect(group.props.className).not.toMatch(/\bflex-row\b/);
+    expect(screen.getAllByRole("radio").map((row) => row.props.accessibilityLabel)).toEqual([
+      "✓ Never",
+      "Sometimes",
+      "Regularly",
+      "Quitting",
+      "Vaping",
+    ]);
+    expect(screen.getByText("✓ Never")).toBeTruthy();
+    // The answers are no chips beside it, and the title's Hide stays a button.
+    expect(screen.queryByRole("button", { name: /Never/ })).toBeNull();
+    expect(screen.getByRole("button", { name: "Hide from your card: Smoking" })).toBeTruthy();
+    expect(pressables(screen.toJSON() as HostNode).flatMap((n) => a11yProblems(n))).toEqual([]);
+  });
+
+  it("chooses an answer, changes it, and clears it when the chosen one is pressed again", async () => {
+    await showAlone("smoking");
+    await fireEvent.press(radio("Never"));
+    expect(fields).toEqual({ smoking: "never" });
+    expect(checked(radio("Never"))).toBe(true);
+    await fireEvent.press(radio("Sometimes"));
+    expect(fields).toEqual({ smoking: "sometimes" });
+    expect(checked(radio("Never"))).toBe(false);
+    expect(checked(radio("Sometimes"))).toBe(true);
+    await fireEvent.press(radio("Sometimes"));
+    expect(fields).toEqual({});
+    expect(checked(radio("Sometimes"))).toBe(false);
+  });
+
+  it("keeps a hard answer chosen when pressed again, asking for no update (#542)", async () => {
+    await showAlone("intent", { intent: "casual" });
+    await fireEvent.press(radio("Something casual"));
+    expect(checked(radio("Something casual"))).toBe(true);
+    expect(fields).toEqual({ intent: "casual" });
+    expect(patches).toEqual([]);
+    await fireEvent.press(radio("Something long-term"));
+    expect(fields).toEqual({ intent: "long_term" });
+  });
+
+  it("draws several answers as whole-width checkboxes, with no group that says one goes", async () => {
+    await showAlone("pets");
+    expect(screen.queryByRole("radio")).toBeNull();
+    expect(radioGroups()).toEqual([]);
+    expect(screen.getAllByRole("checkbox")).toHaveLength(5);
+    await fireEvent.press(checkbox("Dog"));
+    await fireEvent.press(checkbox("Cat"));
+    expect(fields).toEqual({ pets: ["dog", "cat"] });
+    expect(checked(checkbox("Dog"))).toBe(true);
+    expect(checked(checkbox("Cat"))).toBe(true);
+    await fireEvent.press(checkbox("Dog"));
+    await fireEvent.press(checkbox("Cat"));
+    expect(fields).toEqual({});
+    expect(pressables(screen.toJSON() as HostNode).flatMap((n) => a11yProblems(n))).toEqual([]);
+  });
+
+  it("lets an answer that stands alone replace the rest, and give way to any other (#239)", async () => {
+    await showAlone("nicotine", { nicotine: ["snus", "pouches"] } as ProfileFields);
+    await fireEvent.press(checkbox("No snus or pouches"));
+    expect(fields).toEqual({ nicotine: ["none"] });
+    expect(checked(checkbox("Snus"))).toBe(false);
+    await fireEvent.press(checkbox("Snus"));
+    expect(fields).toEqual({ nicotine: ["snus"] });
+    expect(checked(checkbox("No snus or pouches"))).toBe(false);
+  });
+
+  it("names the rows by the same adaptive words as the chips: more children once there are kids", async () => {
+    await showAlone("wantsKids", { hasKids: "yes_with_me" } as ProfileFields);
+    expect(radio("Want more")).toBeTruthy();
+    expect(screen.queryByRole("radio", { name: "Want kids" })).toBeNull();
+  });
+
+  it("takes a list as long as the identity label's as rows", async () => {
+    await showAlone("identityLabel");
+    expect(screen.getAllByRole("radio")).toHaveLength(7);
+  });
+
+  // No field has eight options or nine today: the rule is the maintainer's "up to 8", so it stands here.
+  describe("the limit, on a list of its own length", () => {
+    const listOf = (length: number) =>
+      jest.replaceProperty(
+        PROFILE_FIELDS.smoking,
+        "options",
+        Array.from({ length }, (_, i) => `option${i}`) as never,
+      );
+    afterEach(() => jest.restoreAllMocks());
+
+    it("draws eight as rows", async () => {
+      listOf(8);
+      await showAlone("smoking");
+      expect(screen.getAllByRole("radio")).toHaveLength(8);
+      expect(screen.queryAllByRole("button")).toEqual([]);
+    });
+
+    it("draws nine as chips", async () => {
+      listOf(9);
+      await showAlone("smoking");
+      expect(screen.queryAllByRole("radio")).toEqual([]);
+      expect(screen.getAllByRole("button")).toHaveLength(9);
+    });
+  });
+
+  it.each([
+    ["the parties", "politics", "Greens"],
+    ["the stances", "religion", "Agnostic"],
+    ["the star signs", "zodiac", "Corgi"],
+    ["the fields", "field", "Other"],
+  ] as const)(
+    "keeps chips over a longer list, %s: rows would not fit",
+    async (_what, key, word) => {
+      await showAlone(key);
+      expect(screen.queryByRole("radio")).toBeNull();
+      expect(screen.queryByRole("checkbox")).toBeNull();
+      expect(radioGroups()).toEqual([]);
+      expect(screen.getByRole("button", { name: word })).toBeTruthy();
+    },
+  );
+
+  it("keeps chips and the search over the languages and the hobbies", async () => {
+    await showAlone("languages");
+    expect(screen.getByLabelText("Search")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Finnish" })).toBeTruthy();
+    await showAlone("hobbies");
+    expect(screen.getByRole("button", { name: "Yoga" })).toBeTruthy();
+    expect(screen.queryByRole("checkbox")).toBeNull();
+  });
+
+  it("keeps chips for one field of a section's several, however short its list", async () => {
+    await show("smoking");
+    expect(screen.queryByRole("radio")).toBeNull();
+    expect(radioGroups()).toEqual([]);
+    expect(screen.getByRole("button", { name: "Never" })).toBeTruthy();
+  });
+
+  it("leaves a number, a short text and a setting as they are", async () => {
+    await showAlone("height", { height: 170 } as ProfileFields);
+    expect(screen.getByRole("button", { name: "One more" })).toBeTruthy();
+    await showAlone("occupationTitle");
+    expect(screen.getByLabelText("Job title")).toBeTruthy();
+    await showAlone("hideFromField");
+    expect(screen.getByRole("switch", { name: "Hide me from people in my field" })).toBeTruthy();
+    expect(screen.queryByRole("radio")).toBeNull();
+    expect(screen.queryByRole("checkbox")).toBeNull();
+  });
+
+  it.each([
+    ["fi-FI", "Tupakointi", "En koskaan"],
+    ["sv-FI", "Rökning", "Aldrig"],
+  ])("names the group and its rows in %s", async (tag, title, never) => {
+    (useLocales as jest.Mock).mockReturnValue([{ languageTag: tag }]);
+    try {
+      await showAlone("smoking");
+      expect(screen.getByLabelText(title).props.accessibilityRole).toBe("radiogroup");
+      expect(radio(never)).toBeTruthy();
+    } finally {
+      (useLocales as jest.Mock).mockReturnValue([{ languageTag: "en-US" }]);
+    }
+  });
+});
+
+describe("FieldEditor: one hard choice (#542)", () => {
+  const CASUAL = "Something casual";
+  const LONG_TERM = "Something long-term";
+
+  it("stays chosen when pressed again, asking for no update: without it the person is back in onboarding", async () => {
+    await show("intent", { intent: "casual" });
+    await fireEvent.press(screen.getByRole("button", { name: CASUAL }));
+    expect(chosen(CASUAL)).toBe(true);
+    expect(fields).toEqual({ intent: "casual" });
+    expect(patches).toEqual([]);
+  });
+
+  it("changes to another option, and that one stays in its turn", async () => {
+    await show("intent", { intent: "casual" });
+    await fireEvent.press(screen.getByRole("button", { name: LONG_TERM }));
+    expect(fields).toEqual({ intent: "long_term" });
+    expect(chosen(LONG_TERM)).toBe(true);
+    expect(chosen(CASUAL)).toBe(false);
+    await fireEvent.press(screen.getByRole("button", { name: LONG_TERM }));
+    expect(fields).toEqual({ intent: "long_term" });
+    expect(patches).toEqual([{ fields: { intent: "long_term" } }]);
+  });
+
+  it("takes a first answer as any choice does", async () => {
+    await show("intent");
+    await fireEvent.press(screen.getByRole("button", { name: CASUAL }));
+    expect(fields).toEqual({ intent: "casual" });
+    expect(chosen(CASUAL)).toBe(true);
+  });
+
+  it("still hides and shows, and a hidden answer stays chosen when pressed again", async () => {
+    await show("intent", { intent: "casual" });
+    await fireEvent.press(screen.getByRole("button", { name: "Hide from your card: Looking for" }));
+    expect(hiddenFields).toEqual(["intent"]);
+    await fireEvent.press(screen.getByRole("button", { name: CASUAL }));
+    expect(fields).toEqual({ intent: "casual" });
+    expect(hiddenFields).toEqual(["intent"]);
+    await fireEvent.press(screen.getByRole("button", { name: "Show on your card: Looking for" }));
+    expect(hiddenFields).toEqual([]);
+    expect(fields).toEqual({ intent: "casual" });
   });
 });
 
@@ -117,6 +510,18 @@ describe("FieldEditor: several choices", () => {
     expect(fields).toEqual({ smoking: "vaping" });
   });
 
+  it("offers non-religious among the stances, between spiritual and agnostic (#509)", async () => {
+    await show("religion");
+    const stances = screen.getAllByText(/^(Spiritual|Non-religious|Agnostic)$/);
+    expect(stances.map((chip) => chip.props.children)).toEqual([
+      "Spiritual",
+      "Non-religious",
+      "Agnostic",
+    ]);
+    await fireEvent.press(screen.getByRole("button", { name: "Non-religious" }));
+    expect(fields).toEqual({ religion: "non_religious" });
+  });
+
   it("no longer offers the coffee party (#239)", async () => {
     await show("politics");
     expect(screen.queryByRole("button", { name: "The Coffee Party" })).toBeNull();
@@ -172,17 +577,9 @@ describe("FieldEditor: a long list", () => {
     },
   );
 
-  it("leads the languages with ten, keeps the chosen and 'other' in view, and finds the rest by search (#239)", async () => {
+  it("leads the languages with ten and the chosen, and finds the rest by search (#239)", async () => {
     await show("languages", { languages: ["de"] } as ProfileFields);
-    for (const name of [
-      "Finnish",
-      "Swedish",
-      "English",
-      "Russian",
-      "Somali",
-      "German",
-      "Another language",
-    ]) {
+    for (const name of ["Finnish", "Swedish", "English", "Russian", "Somali", "German"]) {
       expect(screen.getByRole("button", { name })).toBeTruthy();
     }
     // Vietnamese is eleventh: found by search only.
@@ -195,6 +592,35 @@ describe("FieldEditor: a long list", () => {
     await fireEvent.changeText(screen.getByLabelText("Search"), "");
     expect(chosen("Vietnamese")).toBe(true);
     expect(screen.queryByRole("button", { name: "French" })).toBeNull();
+  });
+
+  it("offers Another language only once a search finds no language of the list, and keeps it in view once chosen (#616)", async () => {
+    await show("languages");
+    expect(screen.queryByRole("button", { name: "Another language" })).toBeNull();
+    // A search that finds a language of the list offers that one alone.
+    await fireEvent.changeText(screen.getByLabelText("Search"), "another");
+    expect(screen.getByRole("button", { name: "Another language" })).toBeTruthy();
+    await fireEvent.changeText(screen.getByLabelText("Search"), "germ");
+    expect(screen.getByRole("button", { name: "German" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Another language" })).toBeNull();
+    await fireEvent.changeText(screen.getByLabelText("Search"), "Icelandic");
+    await fireEvent.press(screen.getByRole("button", { name: "Another language" }));
+    expect(fields).toEqual({ languages: ["other"] });
+    await fireEvent.changeText(screen.getByLabelText("Search"), "");
+    expect(chosen("Another language")).toBe(true);
+  });
+
+  it.each([
+    ["sign language", ["Finnish Sign Language", "Finland-Swedish Sign Language"]],
+    ["sami", ["Northern Sami", "Inari Sami", "Skolt Sami"]],
+    ["karel", ["Karelian"]],
+    ["romani", ["Finnish Romani", "Romanian"]],
+  ] as const)("finds Finland's own languages by a search for %s (#616)", async (search, found) => {
+    await show("languages");
+    await fireEvent.changeText(screen.getByLabelText("Search"), search);
+    for (const name of found) expect(screen.getByRole("button", { name })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Finnish" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Another language" })).toBeNull();
   });
 
   it("keeps a language beyond the first ten in view once taken back, so it can be chosen again (#239)", async () => {
@@ -217,14 +643,29 @@ describe("visibleOptions", () => {
     expect(visibleOptions(["a", "b"], undefined, [], "nothing", text)).toEqual([]);
   });
 
-  it("shows the first ones, the chosen and 'other' of a list that names first ones", () => {
+  it("shows the first ones and the chosen of a list that names first ones", () => {
     expect(visibleOptions(["a", "b", "c", "d", "other"], 2, ["d"], "", text)).toEqual([
       "a",
       "b",
       "d",
+    ]);
+    expect(visibleOptions(["a", "b", "c", "other"], 2, ["other"], "", text)).toEqual([
+      "a",
+      "b",
       "other",
     ]);
     expect(visibleOptions(["a", "b", "c"], 0, [], " ", text)).toEqual([]);
+  });
+
+  it("keeps 'other' of a list that names first ones for a search that finds nothing else (#616)", () => {
+    const options = ["a", "b", "c", "other"];
+    expect(visibleOptions(options, 2, [], "of c", text)).toEqual(["c"]);
+    // Its own text found is no language of the list found.
+    expect(visibleOptions(options, 2, [], "of other", text)).toEqual(["other"]);
+    expect(visibleOptions(options, 2, [], "nothing", text)).toEqual(["other"]);
+    expect(visibleOptions(options, 2, ["other"], "of a", text)).toEqual(["a"]);
+    // A list without one finds nothing.
+    expect(visibleOptions(["a", "b", "c"], 2, [], "nothing", text)).toEqual([]);
   });
 });
 
@@ -247,15 +688,30 @@ describe("toggled", () => {
 });
 
 describe("FieldEditor: a short text", () => {
-  it("keeps what is typed, says the limit, and drops the field when emptied", async () => {
+  it("keeps what is typed, says what to leave out, stops at its length itself, and drops the field when emptied", async () => {
     await show("occupationTitle");
     const input = screen.getByLabelText("Job title");
     expect(input.props.value).toBe("");
-    expect(screen.getByText("Without the employer's name, and up to 40 characters.")).toBeTruthy();
+    // The maintainer's rule, which only these words carry; the field stops at 40 by itself (#581).
+    expect(screen.getByText("Without the employer's name")).toBeTruthy();
+    expect(input.props.maxLength).toBe(40);
     await fireEvent.changeText(input, "Architect");
     expect(fields).toEqual({ occupationTitle: "Architect" });
     await fireEvent.changeText(input, "");
     expect(fields).toEqual({});
+  });
+
+  it.each([
+    ["fi-FI", "Ilman työnantajan nimeä"],
+    ["sv-FI", "Utan arbetsgivarens namn"],
+  ])("says what to leave out in %s, with no length", async (tag, words) => {
+    (useLocales as jest.Mock).mockReturnValue([{ languageTag: tag }]);
+    try {
+      await show("occupationTitle");
+      expect(screen.getByText(words)).toBeTruthy();
+    } finally {
+      (useLocales as jest.Mock).mockReturnValue([{ languageTag: "en-US" }]);
+    }
   });
 
   it("shows an empty box for a stored value that is not text", async () => {
@@ -278,6 +734,13 @@ describe("FieldEditor: a number", () => {
     expect(screen.getByText("176 cm")).toBeTruthy();
     await fireEvent.press(screen.getByRole("button", { name: "Clear the answer" }));
     expect(fields).toEqual({});
+  });
+
+  it("has Clear the answer as an outlined button, only with an answer to clear (#581)", async () => {
+    await show("height", { height: 170 } as ProfileFields);
+    const clear = screen.getByRole("button", { name: "Clear the answer" });
+    expect(clear.props.className).toMatch(/\bborder-input\b/);
+    expect(pressables(screen.toJSON() as HostNode).flatMap((n) => a11yProblems(n))).toEqual([]);
   });
 
   it("names the field once: its own label, not the stepper's again (#238)", async () => {

@@ -5,7 +5,6 @@ import { useCallback, useRef, useState } from "react";
 import { AccessibilityInfo, Platform, View } from "react-native";
 import { Button } from "@/components/ui/button";
 import { Text } from "@/components/ui/text";
-import { rewardParams } from "@/features/rewards";
 import { useT } from "@/lib/locale";
 import { useHapticTap } from "@/theme/haptics";
 import { fetchNotices, markNoticeRead } from "./client";
@@ -20,18 +19,26 @@ const REASONS: Record<SanctionReason, PlainMessageKey> = {
   other: "account.export.sanction.reason.other",
 };
 
-/** A notice's title and its sentence, from its kind and what it points at. */
+/** A notice's title and its sentence, from its kind and what it points at; an announcement's are its own. */
 function wordsOf(notice: Notice, t: ReturnType<typeof useT>["t"]): { title: string; body: string } {
+  // Kuutti's words to everybody, already in the reader's language (#573, ADR-068 §3).
+  if (notice.kind === "announcement") return { title: notice.title, body: notice.body };
   if (notice.kind === "warning") {
     return {
       title: t("notices.warning.title"),
       body: t("notices.warning.body", { reason: t(REASONS[notice.reason]) }),
     };
   }
-  // What the counted invitation earned, never who was invited (ADR-044 §9).
+  // What the counted invitation earned the person, never who the other was (ADR-044 §9).
+  if (notice.kind === "invitation_friend") {
+    return {
+      title: t("notices.invitationFriend.title"),
+      body: t("notices.invitationFriend.body", { fish: notice.reward.fish }),
+    };
+  }
   return {
     title: t("notices.invitationCounted.title"),
-    body: t("notices.invitationCounted.body", rewardParams(notice.reward)),
+    body: t("notices.invitationCounted.body", { fish: notice.reward.fish }),
   };
 }
 
@@ -39,8 +46,9 @@ function wordsOf(notice: Notice, t: ReturnType<typeof useT>["t"]): { title: stri
  * The notices on the home screen (#176, ADR-032): what must reach the person
  * even without a push, the unread ones only, newest first, under a heading of
  * their own; nothing at all when there are none. Today that is a moderator's
- * warning with its reason (ADR-024 §7), and an invitation of the person's that
- * counted, with what it earned (#107). Each has Got it, a button, which marks
+ * warning with its reason (ADR-024 §7), an invitation of the person's that
+ * counted, with what it earned (#107), and an announcement to everybody in
+ * its own words (#573). Each has Got it, a button, which marks
  * it read and takes it off the screen; a failure says so and keeps it. Read
  * again whenever the home screen comes into focus. A notice that cannot be
  * read is left out quietly: the home screen does not fail for it.
@@ -74,8 +82,7 @@ export function Notices() {
     } catch {
       setFailed(notice.id);
       // Android's live region speaks it; iOS has none.
-      if (Platform.OS === "ios")
-        AccessibilityInfo.announceForAccessibility(t("notices.readFailed"));
+      if (Platform.OS === "ios") AccessibilityInfo.announceForAccessibility(t("load.failed.press"));
     }
   };
 
@@ -92,7 +99,7 @@ export function Notices() {
             <Text className="font-semibold">{words.title}</Text>
             <Text>{words.body}</Text>
             {failed === notice.id && (
-              <Text accessibilityLiveRegion="assertive">{t("notices.readFailed")}</Text>
+              <Text accessibilityLiveRegion="assertive">{t("load.failed.press")}</Text>
             )}
             <Button variant="outline" onPress={() => void read(notice)}>
               {t("notices.read")}

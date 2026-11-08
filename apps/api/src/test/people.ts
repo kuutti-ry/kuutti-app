@@ -3,6 +3,14 @@ import { CONSENT_VERSIONS } from "@kuutti/i18n";
 import type { ProfileFields } from "@kuutti/schema";
 
 /**
+ * Kept places of the list at known distances (ADR-061): `HOME`, Kallio, and from
+ * it, by the bands of 5, 15 and 50 km, Sörnäinen at 0.8 km, Vattuniemi at 5.1,
+ * Hiekkaharju at 15.0 and Rovaniemi at 714.
+ */
+export const HOME = "00530";
+export const HOMES = { nearby: "00500", close: "00210", around: "01350", far: "96100" } as const;
+
+/**
  * Many verified people at once, for figures that only mean something in
  * numbers (#54). Plain SQL like `signedInAccount`: a test of one slice may
  * not import another's internals. No sessions: nobody here signs in.
@@ -22,9 +30,11 @@ export type PeopleOptions = {
   intent?: NonNullable<ProfileFields["intent"]>;
   /** With `complete`: their other answers, beside the intent (default: none; #87). */
   fields?: ProfileFields;
+  /** Their kept place's key, as a home is stored (default: `HOME` with `complete`, else none; null for a complete person with none, #514). */
+  home?: string | null;
   /** Born in June of this year (default: 1990). */
   birthYear?: number;
-  /** Terms, privacy and the special-category consent in their current wording, as onboarding leaves them (#46, #146): what the pond gate asks for (#94). */
+  /** Terms, privacy and the special-category consent in their current wording, as onboarding leaves them (#46, #146): what completeness asks for (ADR-060 §3). */
   consented?: boolean;
   /** When they registered; people of one call are a second apart, in the order of the ids returned. */
   registeredAt?: Date;
@@ -34,12 +44,66 @@ let batch = 0;
 
 export async function pondNamed(db: Queryable, slug: string): Promise<string> {
   const { rows } = await db.query<{ id: string }>(
-    `INSERT INTO ponds (slug, name_nominative, name_inessive) VALUES ($1, $2, $3) RETURNING id`,
-    [slug, `Pond ${slug}`, `Pondissa ${slug}`],
+    "INSERT INTO ponds (slug, name_nominative) VALUES ($1, $2) RETURNING id",
+    [slug, `Pond ${slug}`],
   );
   const id = rows[0]?.id;
   if (!id) throw new Error("test pond not written");
   return id;
+}
+
+/** Opens a pond, as an admin's switch does (#500, ADR-060 §1). */
+export async function openPond(db: Queryable, pondId: string): Promise<void> {
+  await db.query("UPDATE ponds SET matching_open = true WHERE id = $1", [pondId]);
+}
+
+/** The three consents, in their current wording, for accounts that may hold some of them already. */
+export async function consentsOf(db: Queryable, ids: readonly string[]): Promise<void> {
+  await db.query(
+    `INSERT INTO consent (account_id, kind, version, locale_shown)
+     SELECT id, k.kind::consent_kind, k.version, 'fi'
+     FROM unnest($1::uuid[]) AS id,
+          (VALUES ('terms', $2), ('privacy', $3), ('special_category', $4)) AS k(kind, version)
+     ON CONFLICT DO NOTHING`,
+    [ids, CONSENT_VERSIONS.terms, CONSENT_VERSIONS.privacy, CONSENT_VERSIONS.special_category],
+  );
+}
+
+/** A profile, three approved photos and both hard rows for accounts that have none (`complete`). */
+export async function completeProfiles(
+  db: Queryable,
+  ids: readonly string[],
+  options: PeopleOptions = {},
+): Promise<void> {
+  await db.query(
+    `INSERT INTO profile (account_id, display_name, bio, bio_preset, fields, prompts)
+     SELECT id, 'Aino', $2, $3, $4::jsonb, '[]'::jsonb FROM unnest($1::uuid[]) AS id`,
+    [
+      ids,
+      (options.bio ?? "written") === "written"
+        ? "A bio that is long enough to count as one, by the rule of the profile."
+        : null,
+      options.bio === "ready_line" ? "photos_speak" : null,
+      JSON.stringify({ ...options.fields, intent: options.intent ?? "open_to_either" }),
+    ],
+  );
+  await db.query(
+    `INSERT INTO photo (account_id, key, blurhash, width, height, state, position)
+     SELECT id, md5(id::text || n::text), 'LEHV6nWB2yk8pyo0adR*.7kCMdnj', 800, 1067, 'approved', n
+     FROM unnest($1::uuid[]) AS id, generate_series(0, 2) n`,
+    [ids],
+  );
+  await db.query(
+    `INSERT INTO preferences (account_id, field, value, mode, include_unknown)
+     SELECT id, f.field, f.value::jsonb, 'hard', false
+     FROM unnest($1::uuid[]) AS id,
+          (VALUES ('seeks', $2), ('age_window', $3)) AS f(field, value)`,
+    [
+      ids,
+      JSON.stringify(options.seeks ?? ["man"]),
+      JSON.stringify(options.ageWindow ?? { min: 25, max: 40 }),
+    ],
+  );
 }
 
 export async function people(
@@ -58,8 +122,9 @@ export async function people(
        FROM generate_series(1, $3::int) g
        RETURNING id)
      , numbered AS (SELECT id, row_number() OVER () AS n FROM ids)
-     INSERT INTO account (identity_id, state, birth_year, birth_month, gender, pond_id, registered_at)
-     SELECT id, $4::account_state, $7, 6, $5::gender, $6,
+     INSERT INTO account (identity_id, state, birth_year, birth_month, gender, pond_id, home_place,
+                          registered_at)
+     SELECT id, $4::account_state, $7, 6, $5::gender, $6, $9,
             coalesce($8::timestamptz, now()) + n * interval '1 second'
      FROM numbered ORDER BY n
      RETURNING id, registered_at`,
@@ -72,6 +137,7 @@ export async function people(
       pondId,
       options.birthYear ?? 1990,
       options.registeredAt ?? null,
+      options.home === undefined ? (options.complete ? HOME : null) : options.home,
     ],
   );
   const ids = rows
@@ -81,45 +147,7 @@ export async function people(
         (b as unknown as { registered_at: Date }).registered_at.getTime(),
     )
     .map((r) => r.id);
-  if (options.consented) {
-    await db.query(
-      `INSERT INTO consent (account_id, kind, version, locale_shown)
-       SELECT id, k.kind::consent_kind, k.version, 'fi'
-       FROM unnest($1::uuid[]) AS id,
-            (VALUES ('terms', $2), ('privacy', $3), ('special_category', $4)) AS k(kind, version)`,
-      [ids, CONSENT_VERSIONS.terms, CONSENT_VERSIONS.privacy, CONSENT_VERSIONS.special_category],
-    );
-  }
-  if (options.complete) {
-    await db.query(
-      `INSERT INTO profile (account_id, display_name, bio, bio_preset, fields, prompts)
-       SELECT id, 'Aino', $2, $3, $4::jsonb, '[]'::jsonb FROM unnest($1::uuid[]) AS id`,
-      [
-        ids,
-        (options.bio ?? "written") === "written"
-          ? "A bio that is long enough to count as one, by the rule of the profile."
-          : null,
-        options.bio === "ready_line" ? "photos_speak" : null,
-        JSON.stringify({ ...options.fields, intent: options.intent ?? "open_to_either" }),
-      ],
-    );
-    await db.query(
-      `INSERT INTO photo (account_id, key, blurhash, width, height, state, position)
-       SELECT id, md5(id::text || n::text), 'LEHV6nWB2yk8pyo0adR*.7kCMdnj', 800, 1067, 'approved', n
-       FROM unnest($1::uuid[]) AS id, generate_series(0, 2) n`,
-      [ids],
-    );
-    await db.query(
-      `INSERT INTO preferences (account_id, field, value, mode, include_unknown)
-       SELECT id, f.field, f.value::jsonb, 'hard', false
-       FROM unnest($1::uuid[]) AS id,
-            (VALUES ('seeks', $2), ('age_window', $3)) AS f(field, value)`,
-      [
-        ids,
-        JSON.stringify(options.seeks ?? ["man"]),
-        JSON.stringify(options.ageWindow ?? { min: 25, max: 40 }),
-      ],
-    );
-  }
+  if (options.consented) await consentsOf(db, ids);
+  if (options.complete) await completeProfiles(db, ids, options);
   return ids;
 }

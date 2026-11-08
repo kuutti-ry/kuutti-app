@@ -8,6 +8,9 @@ export {
   exportInvitations,
   type RewardsDeps,
 } from "./invitations.ts";
-// The ledger as matching's decide spends it and gives it back (ADR-044 §8).
-export { entriesPaidBy, releaseEarned, spendEarned } from "./ledger.ts";
+// The ledger as matching's decide spends it and gives it back, and as the
+// round says whether a fish can go (ADR-044 §8, #475).
+export { earnedFishWaiting, entriesPaidBy, releaseEarned, spendEarned } from "./ledger.ts";
+// The one link that sends a phone to its store (#574).
+export { invitationLinkRoutes } from "./link.ts";
 export { invitationRoutes } from "./routes.ts";

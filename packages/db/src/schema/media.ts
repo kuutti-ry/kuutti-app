@@ -123,10 +123,8 @@ export const photoAccess = pgTable(
  * cannot enumerate photos it was never shown. One row per viewer and photo,
  * however often the card comes round: the rule reads set membership, and `at`
  * is the last day the card was served, so it counts against that day's
- * budget once. The row
- * goes with the photo (cascade) and with the viewer's erasure
- * (media/erasure.ts); M4's nightly sweep trims rows older than
- * shown_cooldown_days once the round logic has no use for them (ADR-008).
+ * budget once. The row goes with the photo (cascade) and with the viewer's
+ * erasure (media/erasure.ts).
  */
 export const cardShown = pgTable(
   "card_shown",

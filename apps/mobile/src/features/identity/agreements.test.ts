@@ -66,8 +66,8 @@ const networkDown = () => {
   throw new TypeError("Network request failed");
 };
 
-const yes: Agreements = { terms: TERMS, privacy: PRIVACY, research: RESEARCH, locale: "sv" };
-const no: Agreements = { ...yes, research: null, locale: "fi" };
+const answers: Agreements = { terms: TERMS, privacy: PRIVACY, locale: "sv" };
+const later: Agreements = { ...answers, locale: "fi" };
 
 beforeEach(() => {
   dropAgreements();
@@ -80,31 +80,22 @@ afterEach(() => {
 });
 
 describe("agreementsOf", () => {
-  it("names the versions this app carries, and the research wording's only on a yes", () => {
-    expect(agreementsOf("en", true)).toEqual({
-      terms: TERMS,
-      privacy: PRIVACY,
-      research: RESEARCH,
-      locale: "en",
-    });
-    expect(agreementsOf("en", false)).toEqual({
-      terms: TERMS,
-      privacy: PRIVACY,
-      research: null,
-      locale: "en",
-    });
+  it("names the versions this app carries of the terms and the privacy summary, and nothing of research", () => {
+    expect(agreementsOf("en")).toEqual({ terms: TERMS, privacy: PRIVACY, locale: "en" });
   });
 
   it.each([
     ["fi", "fi"],
     ["sv", "sv"],
     ["en", "en"],
+    // Stadi reads the Finnish texts.
+    ["fi-x-stadi", "fi"],
     // The pseudo-locale reads the English texts, and so does anything unknown.
     ["en-XA", "en"],
     ["de", "en"],
     ["", "en"],
   ])("names the texts shown in %j as %s", (locale, shown) => {
-    expect(agreementsOf(locale, true).locale).toBe(shown);
+    expect(agreementsOf(locale).locale).toBe(shown);
   });
 
   it("names a wording this build carries no version of as empty, which the API refuses", () => {
@@ -114,12 +105,7 @@ describe("agreementsOf", () => {
         CONSENT_VERSIONS: {},
       }));
       const bare = require("./agreements") as typeof import("./agreements");
-      expect(bare.agreementsOf("fi", true)).toEqual({
-        terms: "",
-        privacy: "",
-        research: "",
-        locale: "fi",
-      });
+      expect(bare.agreementsOf("fi")).toEqual({ terms: "", privacy: "", locale: "fi" });
     });
     jest.dontMock("@kuutti/i18n");
   });
@@ -136,37 +122,37 @@ describe("the held answers", () => {
   });
 
   it("are read as often as asked, and taken once by the attempt they were carried into", () => {
-    holdAgreements(yes);
-    expect(heldAgreements()).toEqual(yes);
-    expect(heldAgreements()).toEqual(yes);
+    holdAgreements(answers);
+    expect(heldAgreements()).toEqual(answers);
+    expect(heldAgreements()).toEqual(answers);
     expect(bindAgreements(A)).toBe(true);
-    expect(takeAgreements(A)).toEqual(yes);
+    expect(takeAgreements(A)).toEqual(answers);
     expect(takeAgreements(A)).toBeNull();
     expect(heldAgreements()).toBeNull();
   });
 
   it("are the last answers given when given twice", () => {
-    holdAgreements(yes);
-    holdAgreements(no);
+    holdAgreements(answers);
+    holdAgreements(later);
     bindAgreements(A);
-    expect(takeAgreements(A)).toEqual(no);
+    expect(takeAgreements(A)).toEqual(later);
   });
 
   it("go to no exchange before they were carried into an attempt, and are gone after it asks", () => {
-    holdAgreements(yes);
+    holdAgreements(answers);
     expect(takeAgreements(A)).toBeNull();
     expect(heldAgreements()).toBeNull();
   });
 
   it("go to no other attempt's exchange, and are gone after it asks", () => {
-    holdAgreements(yes);
+    holdAgreements(answers);
     bindAgreements(A);
     expect(takeAgreements(B)).toBeNull();
     expect(takeAgreements(A)).toBeNull();
   });
 
   it("stay with their attempt when it is opened again, and are dropped when another one starts", () => {
-    holdAgreements(yes);
+    holdAgreements(answers);
     expect(bindAgreements(A)).toBe(true);
     expect(bindAgreements(A)).toBe(true);
     expect(bindAgreements(B)).toBe(false);
@@ -174,42 +160,42 @@ describe("the held answers", () => {
   });
 
   it("are gone once a refusal drops them", () => {
-    holdAgreements(yes);
+    holdAgreements(answers);
     dropAgreements();
     expect(heldAgreements()).toBeNull();
   });
 
   it("are dropped when the app leaves before they were carried to the bank, and kept after", () => {
     expect(dropUnboundAgreements()).toBe(false);
-    holdAgreements(yes);
+    holdAgreements(answers);
     expect(dropUnboundAgreements()).toBe(true);
     expect(heldAgreements()).toBeNull();
-    holdAgreements(yes);
+    holdAgreements(answers);
     bindAgreements(A);
     expect(dropUnboundAgreements()).toBe(false);
-    expect(takeAgreements(A)).toEqual(yes);
+    expect(takeAgreements(A)).toEqual(answers);
   });
 
   it.each([
     ["ten minutes after", 10 * 60 * 1000, true],
     ["a moment past ten minutes", 10 * 60 * 1000 + 1, false],
     ["with the clock set back", -1, false],
-  ])("wait for their exchange %s: %p", (_when, later, kept) => {
+  ])("wait for their exchange %s: %p", (_when, after, kept) => {
     const now = jest.spyOn(Date, "now").mockReturnValue(5_000_000);
-    holdAgreements(yes);
+    holdAgreements(answers);
     expect(bindAgreements(A)).toBe(true);
-    now.mockReturnValue(5_000_000 + later);
-    expect(heldAgreements()).toEqual(kept ? yes : null);
-    expect(takeAgreements(A)).toEqual(kept ? yes : null);
+    now.mockReturnValue(5_000_000 + after);
+    expect(heldAgreements()).toEqual(kept ? answers : null);
+    expect(takeAgreements(A)).toEqual(kept ? answers : null);
     now.mockRestore();
   });
 
   it("count the ten minutes from the attempt, not from the answer", () => {
     const now = jest.spyOn(Date, "now").mockReturnValue(5_000_000);
-    holdAgreements(yes);
+    holdAgreements(answers);
     bindAgreements(A, 5_000_000 + 9 * 60 * 1000);
     now.mockReturnValue(5_000_000 + 18 * 60 * 1000);
-    expect(takeAgreements(A)).toEqual(yes);
+    expect(takeAgreements(A)).toEqual(answers);
     now.mockRestore();
   });
 });
@@ -255,59 +241,35 @@ describe("agreedOnThisPhone", () => {
 });
 
 describe("recordAgreements", () => {
-  it("posts the terms, then the privacy summary, then research on a yes, in the language shown", async () => {
+  it("posts the terms, then the privacy summary, in the language shown, and nothing about research", async () => {
     const posted = serve();
-    await recordAgreements(yes);
+    await recordAgreements(answers);
     expect(posted).toEqual([
       { kind: "terms", version: TERMS, locale: "sv" },
       { kind: "privacy", version: PRIVACY, locale: "sv" },
-      { kind: "research", version: RESEARCH, locale: "sv" },
     ]);
     expect(await agreedOnThisPhone()).toBe(true);
   });
 
-  it("posts nothing about research on a no, which withdraws nothing", async () => {
-    const posted = serve();
-    await recordAgreements(no);
-    expect(posted.map((p) => [p.kind, p.locale])).toEqual([
-      ["terms", "fi"],
-      ["privacy", "fi"],
-    ]);
-    expect(await agreedOnThisPhone()).toBe(true);
-  });
-
-  it("skips the privacy summary and the memory when the terms are refused, and still posts research", async () => {
+  it("skips the privacy summary and the memory when the terms are refused", async () => {
     const posted = serve({ terms: () => refusal("consent_version_outdated", 409) });
-    await expect(recordAgreements(yes)).resolves.toBeUndefined();
-    expect(posted.map((p) => p.kind)).toEqual(["terms", "research"]);
+    await expect(recordAgreements(answers)).resolves.toBeUndefined();
+    expect(posted.map((p) => p.kind)).toEqual(["terms"]);
     expect(store.has(AGREED)).toBe(false);
     expect(await agreedOnThisPhone()).toBe(false);
   });
 
   it("does not remember the phone when the privacy summary is refused after the terms", async () => {
     const posted = serve({ privacy: () => refusal("rate_limited", 429) });
-    await recordAgreements(no);
+    await recordAgreements(later);
     expect(posted.map((p) => p.kind)).toEqual(["terms", "privacy"]);
     expect(store.has(AGREED)).toBe(false);
   });
 
-  it("swallows a research yes that did not land, with the phone remembered", async () => {
-    const posted = serve({ research: () => refusal("internal_error", 500) });
-    await expect(recordAgreements(yes)).resolves.toBeUndefined();
-    expect(posted.map((p) => p.kind)).toEqual(["terms", "privacy", "research"]);
-    expect(await agreedOnThisPhone()).toBe(true);
-  });
-
-  it("swallows a phone without network for every post, and remembers nothing", async () => {
-    const posted = serve({ terms: networkDown, research: networkDown });
-    await expect(recordAgreements(yes)).resolves.toBeUndefined();
-    expect(posted.map((p) => p.kind)).toEqual(["terms", "research"]);
+  it("swallows a phone without network, and remembers nothing", async () => {
+    const posted = serve({ terms: networkDown });
+    await expect(recordAgreements(answers)).resolves.toBeUndefined();
+    expect(posted.map((p) => p.kind)).toEqual(["terms"]);
     expect(store.has(AGREED)).toBe(false);
-  });
-
-  it("swallows a research post that cannot reach the API", async () => {
-    serve({ research: networkDown });
-    await expect(recordAgreements(yes)).resolves.toBeUndefined();
-    expect(await agreedOnThisPhone()).toBe(true);
   });
 });

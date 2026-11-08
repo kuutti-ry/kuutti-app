@@ -17,19 +17,12 @@ const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
 const token = (seed: string) => (seed + "x".repeat(43)).slice(0, 43);
 
-const POND = {
-  id: "0b4f3a0e-7c2f-4e2b-9a9a-1a2b3c4d5e6f",
-  slug: "paakaupunkiseutu",
-  name: "Pääkaupunkiseutu",
-  nameInessive: "Pääkaupunkiseudulla",
-  parentId: null,
-};
 const VERSION = "2026-09-draft-1";
 const status = (missing: string[]) => ({
   state: "active",
   age: 56,
   gender: "man",
-  pond: POND,
+  home: null,
   preferences: {
     seeks: missing.includes("seeks") ? null : ["woman"],
     ageWindow: { min: 51, max: 61 },
@@ -46,7 +39,7 @@ const status = (missing: string[]) => ({
     research: VERSION,
     special_category: "2026-10-draft-2",
   },
-  nextChange: { gender: null, seeks: null },
+  nextChange: { gender: null },
   missing,
   complete: missing.length === 0,
 });
@@ -69,7 +62,7 @@ beforeEach(async () => {
     sessionId: "6f1c1c4e-9a8e-4a0b-9c3a-0c8d1e2f3a4b",
     accessToken: token("access"),
     accessExpiresAt: "2030-01-01T00:15:00.000Z",
-    refreshToken: token("refresh"),
+    refreshToken: `${token("family")}.${token("refresh")}`,
     refreshExpiresAt: "2030-04-01T00:00:00.000Z",
   });
   globalThis.fetch = jest.fn(async (input: Request | string) => {

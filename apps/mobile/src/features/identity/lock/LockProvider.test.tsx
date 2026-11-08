@@ -18,7 +18,8 @@ import type { LockSettings } from "./store";
 
 // The app's lock (#418, ADR-045): over the screens at a cold start and after
 // the chosen time away, a cover over the app switcher's snapshot, the
-// passcode's five tries, the bank as the way out, and gone with the session.
+// passcode's five tries, the bank as the way out, gone with the session, and
+// whether it holds the screens, which a push's tap waits for (#102).
 
 const store = jest.requireMock("expo-secure-store").__store as Map<string, string>;
 const secureStore = jest.requireMock("expo-secure-store") as {
@@ -44,7 +45,7 @@ const SESSION = {
   sessionId: "6f1c1c4e-9a8e-4a0b-9c3a-0c8d1e2f3a4b",
   accessToken: token("access"),
   accessExpiresAt: "2099-01-01T00:15:00.000Z",
-  refreshToken: token("refresh"),
+  refreshToken: `${token("family")}.${token("refresh")}`,
   refreshExpiresAt: "2099-04-01T00:00:00.000Z",
 };
 
@@ -137,7 +138,7 @@ beforeEach(async () => {
   jest.spyOn(Date, "now").mockImplementation(() => now);
   fetchMock = jest.fn(async () => new Response(null, { status: 204 }));
   globalThis.fetch = fetchMock as unknown as typeof fetch;
-  auth.hasHardwareAsync.mockResolvedValue(false);
+  auth.hasHardwareAsync.mockResolvedValue(true);
   auth.isEnrolledAsync.mockResolvedValue(false);
   auth.supportedAuthenticationTypesAsync.mockResolvedValue([]);
   auth.authenticateAsync.mockResolvedValue({ success: false, error: "not_available" });
@@ -343,6 +344,37 @@ describe("the lock's provider", () => {
     expect(screen.getByText(LOCKED)).toBeTruthy();
   });
 
+  it("says it holds the screens while it is read at a cold start, while it shows and under the cover, not once open (#102)", async () => {
+    const read = deferred<string | null>();
+    secureStore.getItemAsync.mockImplementation((key: string) =>
+      key === "kuutti.lock" ? read.promise : reading?.(key),
+    );
+    await start();
+    expect(lock.holding).toBe(true);
+    await act(async () => read.resolve(JSON.stringify(withPasscode({ graceMinutes: 5 }))));
+    expect(screen.getByText(LOCKED)).toBeTruthy();
+    expect(lock.holding).toBe(true);
+    await typeCode(CODE);
+    expect(lock.holding).toBe(false);
+    // Away, covered: the return may lock.
+    await toApp("background");
+    expect(lock.holding).toBe(true);
+    await toApp("active");
+    expect(lock.holding).toBe(false);
+  });
+
+  it("says it holds nothing while it is off, away or not", async () => {
+    await start();
+    expect(lock.holding).toBe(false);
+    await toApp("background");
+    expect(lock.holding).toBe(false);
+  });
+
+  it("says it holds nothing with no session, whatever lock is stored", async () => {
+    await start({ lock: withPasscode(), signedIn: false });
+    expect(lock.holding).toBe(false);
+  });
+
   it("The app switcher shows a cover while the lock is on", async () => {
     await start({ lock: withPasscode() });
     await typeCode(CODE);
@@ -528,6 +560,77 @@ describe("the phone's face or fingerprint on the lock", () => {
     expect(auth.authenticateAsync).not.toHaveBeenCalled();
   });
 
+  // iOS's biometryNotAvailable, which the module reads as no hardware (#505).
+  const DENIED = /^This iPhone does not let Kuutti use Face ID/;
+
+  it("The lock screen says why the face it was set with is gone", async () => {
+    jest.replaceProperty(Platform, "OS", "ios");
+    auth.hasHardwareAsync.mockResolvedValue(false);
+    await start({ lock: withPasscode({ biometrics: true }) });
+    expect(screen.getByText(LOCKED)).toBeTruthy();
+    expect(screen.getByText(DENIED)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /Unlock with/ })).toBeNull();
+    expect(screen.getByLabelText(FIELD)).toBeTruthy();
+    expect(screen.getByRole("button", { name: BANK })).toBeEnabled();
+    expect(auth.authenticateAsync).not.toHaveBeenCalled();
+  });
+
+  it("says nothing of Face ID to a lock set without it", async () => {
+    jest.replaceProperty(Platform, "OS", "ios");
+    auth.hasHardwareAsync.mockResolvedValue(false);
+    await start({ lock: withPasscode() });
+    expect(lock.biometrics).toBe("denied");
+    expect(screen.getByText(LOCKED)).toBeTruthy();
+    expect(screen.queryByText(DENIED)).toBeNull();
+  });
+
+  // A reinstall keeps the keychain's lock and forgets the phone's yes, so its
+  // first ask is iOS's question, on the lock screen.
+  it("takes the button away as soon as an ask meets it, and says why", async () => {
+    jest.replaceProperty(Platform, "OS", "ios");
+    enrol();
+    auth.authenticateAsync.mockResolvedValue({ success: false, error: "not_available" });
+    await start({ lock: withPasscode({ biometrics: true }) });
+    expect(auth.authenticateAsync).toHaveBeenCalledTimes(1);
+    expect(lock.biometrics).toBe("denied");
+    expect(screen.getByText(DENIED)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /Unlock with/ })).toBeNull();
+    expect(screen.queryByText(/did not unlock/)).toBeNull();
+  });
+
+  it("gives the button back, and asks, once the phone lets Kuutti use Face ID again", async () => {
+    jest.replaceProperty(Platform, "OS", "ios");
+    auth.hasHardwareAsync.mockResolvedValue(false);
+    await start({ lock: withPasscode({ biometrics: true, graceMinutes: 0 }) });
+    expect(screen.getByText(DENIED)).toBeTruthy();
+    enrol();
+    auth.authenticateAsync.mockResolvedValue({ success: false, error: "user_cancel" });
+    await toApp("background");
+    await toApp("active");
+    expect(screen.queryByText(DENIED)).toBeNull();
+    expect(screen.getByRole("button", { name: "Unlock with your face" })).toBeEnabled();
+    expect(auth.authenticateAsync).toHaveBeenCalledTimes(1);
+  });
+
+  it("reads no hardware as none on Android", async () => {
+    jest.replaceProperty(Platform, "OS", "android");
+    auth.hasHardwareAsync.mockResolvedValue(false);
+    await start({ lock: withPasscode({ biometrics: true }) });
+    expect(lock.biometrics).toBeNull();
+    expect(screen.queryByText(DENIED)).toBeNull();
+  });
+
+  it("keeps the button on Android when the sensor cannot run, and calls it a failure", async () => {
+    jest.replaceProperty(Platform, "OS", "android");
+    enrol();
+    auth.authenticateAsync.mockResolvedValue({ success: false, error: "not_available" });
+    await start({ lock: withPasscode({ biometrics: true }) });
+    expect(lock.biometrics).toBe("face");
+    expect(screen.queryByText(DENIED)).toBeNull();
+    expect(screen.getByRole("button", { name: "Unlock with your face" })).toBeEnabled();
+    expect(screen.getByText(/did not unlock/)).toBeTruthy();
+  });
+
   it("ignores what the prompt does to the app's state: no cover, no lock", async () => {
     enrol();
     const prompt = deferred<{ success: boolean; error?: string }>();
@@ -570,17 +673,135 @@ describe("the phone's face or fingerprint on the lock", () => {
     expect(store.has("kuutti.lock")).toBe(false);
   });
 
-  it("leaves biometrics off when the confirming prompt does not succeed", async () => {
+  it.each([
+    ["user_cancel", "failed"],
+    ["authentication_failed", "failed"],
+    ["lockout", "lockout"],
+    ["not_available", "denied"],
+  ])(
+    "leaves biometrics off when the confirming prompt ends with %s, answering %s",
+    async (error, expected) => {
+      enrol();
+      auth.authenticateAsync.mockResolvedValue({ success: false, error });
+      await start();
+      let answer: string | undefined;
+      await act(async () => {
+        answer = await lock.setBiometrics(true);
+      });
+      expect(answer).toBe(expected);
+      expect(lock.settings).toBeNull();
+      expect(store.has("kuutti.lock")).toBe(false);
+    },
+  );
+
+  it("A pause by the phone after too many tries is said as a pause, not as a failure", async () => {
     enrol();
+    auth.authenticateAsync.mockResolvedValue({ success: false, error: "lockout" });
+    await start({ lock: withPasscode({ biometrics: true }) });
+    expect(auth.authenticateAsync).toHaveBeenCalledTimes(1);
+    expect(screen.getByText(LOCKED)).toBeTruthy();
+    expect(
+      screen.getByText(
+        "The phone has paused face unlock after too many tries. Lock the phone and open it with its own code, then try again.",
+      ),
+    ).toBeTruthy();
+    expect(screen.queryByText(/did not unlock/)).toBeNull();
+    expect(screen.getByRole("button", { name: "Unlock with your face" })).toBeEnabled();
+    expect(screen.getByLabelText(FIELD)).toBeTruthy();
+    expect(screen.getByRole("button", { name: BANK })).toBeEnabled();
+    // The pause over, the button's next ask opens it.
+    auth.authenticateAsync.mockResolvedValue({ success: true });
+    await fireEvent.press(screen.getByRole("button", { name: "Unlock with your face" }));
+    await act(async () => undefined);
+    expect(screen.queryByText(LOCKED)).toBeNull();
+  });
+
+  // Android 16 answers a recheck during its pause with the pause's own code,
+  // which the module reads as nothing enrolled (#499).
+  const FACE = { name: "Unlock with your face" };
+  /** The lock on with the face and Straight away, its first ask answered by the phone's pause. */
+  async function pausedAtStart() {
+    enrol();
+    auth.authenticateAsync.mockResolvedValue({ success: false, error: "lockout" });
+    await start({ lock: withPasscode({ biometrics: true, graceMinutes: 0 }) });
+    expect(screen.getByRole("button", FACE)).toBeEnabled();
+  }
+  const awayAndBack = async () => {
+    await toApp("background");
+    await toApp("active");
+  };
+
+  it("A pause keeps the button when the phone says on return that it has none", async () => {
+    jest.replaceProperty(Platform, "OS", "android");
+    await pausedAtStart();
+    auth.isEnrolledAsync.mockResolvedValue(false);
+    await awayAndBack();
+    expect(screen.getByText(LOCKED)).toBeTruthy();
+    expect(screen.getByRole("button", FACE)).toBeEnabled();
+    // An answer other than the pause forgets it: none then means none.
+    auth.authenticateAsync.mockResolvedValue({ success: false, error: "not_available" });
+    await fireEvent.press(screen.getByRole("button", FACE));
+    await act(async () => undefined);
+    await awayAndBack();
+    expect(screen.queryByRole("button", FACE)).toBeNull();
+    expect(screen.getByRole("button", { name: BANK })).toBeEnabled();
+  });
+
+  it("forgets the pause after a cancel too", async () => {
+    jest.replaceProperty(Platform, "OS", "android");
+    await pausedAtStart();
+    auth.isEnrolledAsync.mockResolvedValue(false);
     auth.authenticateAsync.mockResolvedValue({ success: false, error: "user_cancel" });
-    await start();
-    let answer: string | undefined;
-    await act(async () => {
-      answer = await lock.setBiometrics(true);
-    });
-    expect(answer).toBe("failed");
-    expect(lock.settings).toBeNull();
-    expect(store.has("kuutti.lock")).toBe(false);
+    await fireEvent.press(screen.getByRole("button", FACE));
+    await act(async () => undefined);
+    await awayAndBack();
+    expect(screen.getByText(LOCKED)).toBeTruthy();
+    expect(screen.queryByRole("button", FACE)).toBeNull();
+  });
+
+  it("forgets the pause after a yes, so the lock that comes back offers no face the phone lacks", async () => {
+    jest.replaceProperty(Platform, "OS", "android");
+    await pausedAtStart();
+    auth.isEnrolledAsync.mockResolvedValue(false);
+    auth.authenticateAsync.mockResolvedValue({ success: true });
+    await fireEvent.press(screen.getByRole("button", FACE));
+    await act(async () => undefined);
+    expect(screen.queryByText(LOCKED)).toBeNull();
+    // Should the lock that comes back ask before the phone has answered, it is put away.
+    auth.authenticateAsync.mockResolvedValue({ success: false, error: "user_cancel" });
+    await awayAndBack();
+    expect(screen.getByText(LOCKED)).toBeTruthy();
+    expect(screen.queryByRole("button", FACE)).toBeNull();
+  });
+
+  it("forgets the pause once the phone says again what it has", async () => {
+    jest.replaceProperty(Platform, "OS", "android");
+    await pausedAtStart();
+    // The pause over, the phone names its face again.
+    await awayAndBack();
+    expect(screen.getByRole("button", FACE)).toBeEnabled();
+    // The face removed after that: none now means none.
+    auth.isEnrolledAsync.mockResolvedValue(false);
+    await awayAndBack();
+    expect(screen.queryByRole("button", FACE)).toBeNull();
+  });
+
+  it("forgets the pause with the session", async () => {
+    jest.replaceProperty(Platform, "OS", "android");
+    await pausedAtStart();
+    await act(async () => session.signOut());
+    auth.isEnrolledAsync.mockResolvedValue(false);
+    await act(async () => lock.recheck());
+    expect(lock.biometrics).toBeNull();
+  });
+
+  it("keeps nothing on iOS, whose module counts a pause as enrolled, so none there means none", async () => {
+    jest.replaceProperty(Platform, "OS", "ios");
+    await pausedAtStart();
+    auth.isEnrolledAsync.mockResolvedValue(false);
+    await awayAndBack();
+    expect(screen.getByText(LOCKED)).toBeTruthy();
+    expect(screen.queryByRole("button", FACE)).toBeNull();
   });
 });
 

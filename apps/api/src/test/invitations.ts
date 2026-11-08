@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import type { Queryable } from "@kuutti/db";
 import { CONSENT_VERSIONS } from "@kuutti/i18n";
-import { pondNamed } from "./people.ts";
+import { completeProfiles, consentsOf, HOME, pondNamed } from "./people.ts";
 
 /**
  * Invitations and the reward ledger as a test of any slice sets them up
@@ -10,11 +10,17 @@ import { pondNamed } from "./people.ts";
  * real code: the invitations written are known by their hash alone.
  */
 
-/** The person's profile has passed the gate's test: a gate row, in a pond of its own, the account in it. */
-export async function gated(db: Queryable, accountId: string): Promise<void> {
+/** The person's profile and onboarding are complete (ADR-060 §7), in a pond of their own; a registered account becomes active, as onboarding makes it. */
+export async function completed(db: Queryable, accountId: string): Promise<void> {
   const pondId = await pondNamed(db, `invite-${randomUUID().slice(0, 8)}`);
-  await db.query("UPDATE account SET pond_id = $2 WHERE id = $1", [accountId, pondId]);
-  await db.query("INSERT INTO gate (account_id, pond_id) VALUES ($1, $2)", [accountId, pondId]);
+  await db.query(
+    `UPDATE account SET pond_id = $2, gender = 'woman', home_place = $3,
+            state = CASE WHEN state = 'registered' THEN 'active' ELSE state END
+      WHERE id = $1`,
+    [accountId, pondId, HOME],
+  );
+  await consentsOf(db, [accountId]);
+  await completeProfiles(db, [accountId]);
 }
 
 /** The current terms and privacy consents, as onboarding leaves them after its welcome. */
@@ -52,14 +58,14 @@ export async function invitationOf(
 }
 
 /**
- * Units the person earned, as the night's count leaves them: an invitation of
+ * Fish the person earned, as the night's count leaves them: an invitation of
  * theirs redeemed by a person of its own and counted, with one row a unit.
  * The invitation's id.
  */
 export async function earnedUnits(
   db: Queryable,
   accountId: string,
-  units: { fish?: number; likes?: number },
+  units: { fish: number },
   at: Date = new Date(),
 ): Promise<string> {
   const identity = await db.query<{ id: string }>(
@@ -77,15 +83,13 @@ export async function earnedUnits(
   });
   await db.query(
     `INSERT INTO reward (account_id, kind, invitation_id, earned_at)
-     SELECT $1, k.kind::reward_kind, $2, $3
-       FROM (SELECT 'fish' AS kind FROM generate_series(1, $4::int)
-             UNION ALL SELECT 'like' FROM generate_series(1, $5::int)) AS k`,
-    [accountId, invitationId, at, units.fish ?? 0, units.likes ?? 0],
+     SELECT $1, 'fish', $2, $3 FROM generate_series(1, $4::int)`,
+    [accountId, invitationId, at, units.fish],
   );
   return invitationId;
 }
 
-/** The person's units as stored, oldest first, fish before likes of one time: what each is and whether, and on what, it was spent. */
+/** The person's units as stored, oldest first: what each is and whether, and on what, it was spent. */
 export async function unitsOf(
   db: Queryable,
   accountId: string,
@@ -96,7 +100,7 @@ export async function unitsOf(
     spent_entry_id: string | null;
   }>(
     `SELECT kind, spent_at, spent_entry_id FROM reward
-      WHERE account_id = $1 ORDER BY earned_at, kind::text, id`,
+      WHERE account_id = $1 ORDER BY earned_at, id`,
     [accountId],
   );
   return rows.map((row) => ({

@@ -24,7 +24,7 @@ const tokens = {
   sessionId: "6f1c1c4e-9a8e-4a0b-9c3a-0c8d1e2f3a4b",
   accessToken: token("access"),
   accessExpiresAt: "2030-01-01T00:15:00.000Z",
-  refreshToken: token("refresh"),
+  refreshToken: `${token("family")}.${token("refresh")}`,
   refreshExpiresAt: "2030-04-01T00:00:00.000Z",
 };
 const json = (body: unknown, status = 200) =>
@@ -80,7 +80,11 @@ describe("the found-them screen", () => {
     expect(screen.getByRole("heading", { name: "Which is it?" })).toBeTruthy();
     // The question names the group of choices for a screen reader too.
     expect(screen.getByLabelText("Which is it?").props.accessibilityRole).toBe("radiogroup");
-    expect(screen.getByText(/Nothing changes in the app/)).toBeTruthy();
+    // Who sees it and that nothing changes, in the fewest words (#581).
+    expect(
+      screen.getByText("Your answer is shown to nobody, and it is counted without your name."),
+    ).toBeTruthy();
+    expect(screen.getByText("Nothing changes in the app.")).toBeTruthy();
     noProblems();
     expect(tellButton().props.accessibilityState?.disabled).toBe(true);
 
@@ -101,7 +105,7 @@ describe("the found-them screen", () => {
     await renderWithTheme(<FoundThemScreen />);
     await thanked();
     expect(screen.queryByRole("radio")).toBeNull();
-    expect(screen.getByText(/Nothing changes in the app/)).toBeTruthy();
+    expect(screen.getByText("Nothing changes in the app.")).toBeTruthy();
     expect(sent).toEqual([]);
   });
 
@@ -125,9 +129,7 @@ describe("the found-them screen", () => {
     await renderWithTheme(<FoundThemScreen />);
     await press("Another reason", "radio");
     await press("Tell Kuutti");
-    const failed = await screen.findByText(
-      "That did not go through. Your choice is kept; try again.",
-    );
+    const failed = await screen.findByText("That did not go through. Try again.");
     // Said at once by a screen reader, wherever its focus is.
     expect(failed.props.accessibilityLiveRegion).toBe("assertive");
     expect(screen.getByRole("radio", { name: "✓ Another reason" })).toBeTruthy();

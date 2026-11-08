@@ -18,7 +18,7 @@ import { redeemInvitation } from "./client";
 const REFUSALS = new Map<string | undefined, PlainMessageKey>([
   ["invitation_unknown", "errors.invitation_unknown"],
   ["invitation_not_for_you", "errors.invitation_not_for_you"],
-  ["invitation_tries_exceeded", "errors.invitation_tries_exceeded"],
+  ["invitation_tries_exceeded", "errors.enough_today"],
 ]);
 
 /**
@@ -47,7 +47,7 @@ export function RedeemInvitation({ onRedeemed }: { onRedeemed: () => void }) {
       await redeemInvitation(typed);
     } catch (error) {
       const words =
-        REFUSALS.get(error instanceof ApiError ? error.code : undefined) ?? "invite.redeem.failed";
+        REFUSALS.get(error instanceof ApiError ? error.code : undefined) ?? "load.failed.press";
       setRefusal(words);
       setAnswers((n) => n + 1);
       setBusy(false);

@@ -15,7 +15,9 @@ import { FullWindowOverlay as RNFullWindowOverlay } from "react-native-screens";
 import { Icon } from "@/components/ui/icon";
 import { NativeOnlyAnimatedView } from "@/components/ui/native-only-animated-view";
 import { cn } from "@/lib/utils";
-import { MAX_FONT_SCALE, TOUCH_TARGET } from "@/theme/a11y";
+import { HEADING_FONT_SCALE, MAX_FONT_SCALE, TOUCH_TARGET } from "@/theme/a11y";
+import { HARD_SHADOW, useHardShadow } from "@/theme/shadow";
+import { useLook } from "@/theme/ThemeProvider";
 
 // From React Native Reusables (#12, TD-9), adapted: the close control is a
 // labelled 44 pt button (closeLabel is required), the scrim is a token,
@@ -26,7 +28,15 @@ const MINIMUM_TARGET = { minHeight: TOUCH_TARGET, minWidth: TOUCH_TARGET };
 
 // The dialog shrinks into the space it is given rather than overflow it; a
 // caller's own cap (a share of the window) holds while that space is larger.
-const SHRINK = { flexShrink: 1 };
+// It takes the whole width of that space, so every dialog is one width (the
+// maintainer, 04/11/2026): this wrapper, centred, hugged what it held, and a
+// dialog of a few words stood narrow. The web target draws no wrapper.
+const SPACE = { flexShrink: 1, width: "100%" } as const;
+
+// The close control lies over the corner, out of the flow, so a title would run
+// under it (#530). DialogContent alone draws it, so only a title inside one
+// gives up width. The text below, lower than the control reaches, gives up none.
+const HasClose = React.createContext(false);
 
 const Dialog = DialogPrimitive.Root;
 
@@ -69,7 +79,7 @@ function DialogOverlay({
     <NativeOnlyAnimatedView
       entering={FadeIn.delay(50).reduceMotion(ReduceMotion.System)}
       exiting={FadeOut.duration(150).reduceMotion(ReduceMotion.System)}
-      style={SHRINK}
+      style={SPACE}
     >
       {children}
     </NativeOnlyAnimatedView>
@@ -134,21 +144,25 @@ function DialogContent({
   /** Read by screen readers for the close control; an i18n string, never inline. */
   closeLabel: string;
 }) {
+  const neubrutalist = useLook() === "neubrutalism";
+  const shadow = useHardShadow(HARD_SHADOW.overlay);
   return (
     <DialogPortal hostName={portalHost}>
       <DialogOverlay>
         <DialogPrimitive.Content
           accessibilityViewIsModal
           className={cn(
-            "bg-background border-border z-50 mx-auto flex w-full max-w-[calc(100%-2rem)] shrink flex-col gap-4 rounded-lg border p-6 sm:max-w-lg",
+            "bg-background z-50 mx-auto flex w-full max-w-[calc(100%-2rem)] shrink flex-col gap-4 rounded-lg p-6 sm:max-w-lg",
+            neubrutalist ? "border-stroke border-2 border-solid" : "border-border border",
             Platform.select({
               web: "animate-in fade-in-0 zoom-in-95 duration-200",
             }),
             className,
           )}
           {...props}
+          style={[neubrutalist && shadow, props.style]}
         >
-          {children}
+          <HasClose.Provider value={true}>{children}</HasClose.Provider>
           <DialogPrimitive.Close
             accessibilityRole="button"
             accessibilityLabel={closeLabel}
@@ -185,10 +199,17 @@ function DialogFooter({ className, ...props }: ViewProps) {
 }
 
 function DialogTitle({ className, ...props }: React.ComponentProps<typeof DialogPrimitive.Title>) {
+  const hasClose = React.useContext(HasClose);
   return (
     <DialogPrimitive.Title
-      className={cn("text-foreground text-lg font-semibold", className)}
-      maxFontSizeMultiplier={MAX_FONT_SCALE}
+      // pr-8 ends the title where the close control starts: past the content's
+      // padding the control takes 26.5 pt on a phone (rem 14) and 24 on the web.
+      className={cn(
+        "font-sans text-foreground text-title font-normal",
+        hasClose && "pr-8",
+        className,
+      )}
+      maxFontSizeMultiplier={HEADING_FONT_SCALE.title}
       {...props}
     />
   );
@@ -200,7 +221,7 @@ function DialogDescription({
 }: React.ComponentProps<typeof DialogPrimitive.Description>) {
   return (
     <DialogPrimitive.Description
-      className={cn("text-muted-foreground text-sm", className)}
+      className={cn("font-system text-muted-foreground text-small", className)}
       maxFontSizeMultiplier={MAX_FONT_SCALE}
       {...props}
     />

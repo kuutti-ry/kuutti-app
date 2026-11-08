@@ -141,7 +141,7 @@ const auditRoute = createRoute({
 });
 
 /** The subject types an audit row names; a read narrowed by another, or by none, names "any". */
-const SUBJECT_TYPES = new Set(["photo", "feedback", "account", "config", "report"]);
+const SUBJECT_TYPES = new Set(["photo", "feedback", "account", "config", "report", "pond"]);
 
 export function auditAdminRoutes(deps: Deps, requireAdministrator: MiddlewareHandler<AppEnv>) {
   const app = new OpenAPIHono<AppEnv>();

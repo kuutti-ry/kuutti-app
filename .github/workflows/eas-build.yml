@@ -2,14 +2,20 @@ name: EAS build
 
 # Native builds on EAS (#10, TD-2). On a v* tag: the production profile for
 # both platforms, behind the prod environment (its reviewer approves the
-# release anyway). On main: the development and preview profiles, but only
-# when the project's fingerprint differs from the last finished development
-# build's, so a JS-only change never spends a build; those reach devices as
-# EAS Updates from deploy.yml. Never per pull request: the free tier is 15
-# builds per platform a month. Install links are on the project's builds page
+# release anyway). On main: the development profile alone, preview by hand,
+# and only when the project's fingerprint differs from the last finished
+# development build's, so a JS-only change never spends a build; those reach
+# devices as EAS Updates from deploy.yml. Never per pull request: the free
+# tier is 15 builds per platform a month. Install links are on the project's
+# builds page
 # (https://expo.dev/accounts/kuutti/projects/kuutti/builds); a repository
 # variable EAS_BUILDS_ISSUE, if set, mirrors them onto that issue as well.
-# EAS_ENABLED switches this on.
+# EAS_ENABLED switches this on. By hand only, the staging profile: the staging
+# app as an Android app bundle and an iOS archive, which EAS submits to Google
+# Play's internal testing track and to TestFlight's internal testing once they
+# are built (ADR-057, ADR-063, #193); EAS holds the Play service account's key
+# and the App Store Connect API key, so no GitHub environment holds a Google or
+# an Apple credential.
 
 on:
   push:
@@ -20,7 +26,7 @@ on:
       profile:
         description: Build profile from eas.json
         type: choice
-        options: [development, preview, production]
+        options: [development, preview, staging, production]
         default: development
       platform:
         type: choice
@@ -162,7 +168,11 @@ jobs:
                     pnpm exec eas build:cancel "$id" --non-interactive || echo "could not cancel $id (finished meanwhile)"
                   done
             done
-            pnpm exec eas build --profile "$profile" --platform "$PLATFORM" \
+            # EAS submits the staging bundle itself once it is built (eas.json's
+            # submit profile staging), so the job does not wait for the build.
+            submit=()
+            if [ "$profile" = staging ]; then submit=(--auto-submit); fi
+            pnpm exec eas build --profile "$profile" --platform "$PLATFORM" "${submit[@]}" \
               --message "${GITHUB_REF_NAME} ${GITHUB_SHA::7}" --no-wait --json --non-interactive \
               | jq -c --arg profile "$profile" '.[] | {profile: $profile, id, platform, status}' >> "$RUNNER_TEMP/builds.json"
           done
@@ -190,7 +200,7 @@ jobs:
               jq -r --arg profile "$profile" --arg project "$project" \
                 'select(.profile == $profile) | "| \(.platform | ascii_downcase) | https://expo.dev/projects/\($project)/builds/\(.id) |"' "$RUNNER_TEMP/builds.json"
               echo
-              echo "<sub>Android: install the APK from the build page. iOS: registered devices only (apps/mobile/README.md). Started by [this run]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID).</sub>"
+              echo "<sub>Android: install the APK from the build page. iOS: registered devices only (apps/mobile/README.md). The staging builds go to Play and TestFlight instead. Started by [this run]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID).</sub>"
             } > "$body"
             MARKER="eas-builds-$profile" BODY_FILE="$body" .github/scripts/sticky-comment.sh
           done

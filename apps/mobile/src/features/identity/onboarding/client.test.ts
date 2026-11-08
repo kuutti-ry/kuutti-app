@@ -2,11 +2,9 @@ import { ApiError } from "@/lib/api";
 import { saveSession } from "@/lib/session";
 import {
   consentLocale,
-  declareGender,
   fetchConsents,
   fetchOnboarding,
   giveConsent,
-  savePreferences,
   withdrawConsent,
 } from "./client";
 
@@ -23,11 +21,11 @@ const STATUS = {
   state: "active",
   age: 36,
   gender: "woman",
-  pond: null,
+  home: null,
   preferences: { seeks: ["man"], ageWindow: { min: 30, max: 40 } },
   consents: { terms: "v1", privacy: "v1", specialCategory: "s1", research: null },
   currentVersions: { terms: "v1", privacy: "v1", research: "v1", special_category: "s1" },
-  nextChange: { gender: null, seeks: null },
+  nextChange: { gender: null },
   missing: [],
   complete: true,
 };
@@ -66,7 +64,7 @@ beforeEach(async () => {
     sessionId: "6f1c1c4e-9a8e-4a0b-9c3a-0c8d1e2f3a4b",
     accessToken: token("access"),
     accessExpiresAt: "2030-01-01T00:15:00.000Z",
-    refreshToken: token("refresh"),
+    refreshToken: `${token("family")}.${token("refresh")}`,
     refreshExpiresAt: "2030-04-01T00:00:00.000Z",
   });
 });
@@ -93,39 +91,6 @@ describe("the onboarding client", () => {
     const error = await fetchOnboarding().catch((caught: unknown) => caught);
     expect(error).toBeInstanceOf(ApiError);
     expect(error).toMatchObject({ status: 502, code: undefined });
-  });
-
-  it("declares the gender, and says why the API refused one", async () => {
-    const seen = answering(({ body }) =>
-      (body as { gender: string }).gender === "man"
-        ? refusal("gender_change_too_soon", 429)
-        : new Response(null, { status: 204 }),
-    );
-    await expect(declareGender("woman")).resolves.toBeUndefined();
-    await expect(declareGender("man")).rejects.toMatchObject({
-      status: 429,
-      code: "gender_change_too_soon",
-    });
-    expect(seen.map((c) => [c.method, c.path, c.body])).toEqual([
-      ["PUT", "/account/gender", { gender: "woman" }],
-      ["PUT", "/account/gender", { gender: "man" }],
-    ]);
-  });
-
-  it("saves the preferences as given, and says why the API refused them", async () => {
-    let answer = new Response(null, { status: 204 });
-    const seen = answering(() => answer);
-    await savePreferences({ seeks: ["woman", "non_binary"] });
-    expect(seen[0]).toEqual({
-      method: "PUT",
-      path: "/preferences",
-      body: { seeks: ["woman", "non_binary"] },
-    });
-    answer = refusal("seeks_change_too_soon", 429);
-    await expect(savePreferences({ ageWindow: { min: 30, max: 40 } })).rejects.toMatchObject({
-      status: 429,
-      code: "seeks_change_too_soon",
-    });
   });
 
   it("reads the consents, and fails on a refusal", async () => {
@@ -171,5 +136,9 @@ describe("consentLocale", () => {
     expect(consentLocale("sv")).toBe("sv");
     expect(consentLocale("en")).toBe("en");
     expect(consentLocale("en-XA")).toBe("en");
+  });
+
+  it("reads Stadi as Finnish: the consent texts are not in slang", () => {
+    expect(consentLocale("fi-x-stadi")).toBe("fi");
   });
 });

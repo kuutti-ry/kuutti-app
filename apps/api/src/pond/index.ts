@@ -1,24 +1,16 @@
 // Public surface of the pond slice in apps/api (#46, #54, #94; TD-10). Other slices import from here only.
 
+// The switch in the panel (#500, ADR-060 §2).
+export { pondAdminRoutes } from "./admin-routes.ts";
+export { readPondCounterK, readStandingFigures } from "./counter.ts";
+// A person's one home (#514, ADR-061): the write, the reads, and what a kept place is.
+export { exportHome, readHome, saveHome } from "./home.ts";
 export {
-  type Applicant,
-  admissionAnew,
-  admit,
-  admitsAlone,
-  deleteGateOfAccount,
-  exportGate,
-  GATE_EMPTIED,
-  neededFrom,
-  placeAlone,
-  readGateRow,
-  saidInStep,
-  sayPlace,
-  sayPool,
-} from "./gate.ts";
-export { findPondBySlug, findPondOfAccount, listPonds, setPondOfAccount } from "./repo.ts";
+  homeRules,
+  homeSummary,
+  keptPlace,
+  pointOf,
+  shownPlace,
+} from "./places.ts";
+export { findPondOfAccount, listPonds } from "./repo.ts";
 export { pondRoutes } from "./routes.ts";
-export {
-  readStandingFigures,
-  readWaitlistK,
-  WAITLIST_K_KEY,
-} from "./waitlist.ts";

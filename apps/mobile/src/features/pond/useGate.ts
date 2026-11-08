@@ -11,10 +11,10 @@ export type GateView =
   | { status: "failed"; error: unknown };
 
 /**
- * Where the person stands at the pond gate (#94). Read when the screen comes
+ * Whether matching is open for the person (#500). Read when the screen comes
  * to the front and when the app comes back to the foreground: the home screen
  * stays where it is while the person adds their photos on another one, and
- * while the night's count runs with the app in a pocket. What is shown stays
+ * while an admin opens their pond with the app in a pocket. What is shown stays
  * until the new answer is there, so a look at the card never flickers and a
  * read that fails takes nothing away that was known.
  */
