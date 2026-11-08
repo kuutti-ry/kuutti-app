@@ -1,12 +1,17 @@
 import { formatHeight } from "@kuutti/i18n";
 import {
   CARD_FIELD_KEYS,
+  DEAL_BREAKER_FIELDS,
   type DistanceBand,
+  HOBBY_GROUPS,
+  type HobbyGroup,
   PROFILE_FIELDS,
   type ProfileCard,
   type ProfileFieldKey,
 } from "@kuutti/schema";
-import { useState } from "react";
+import ChevronDown from "lucide-react-native/icons/chevron-down";
+import ChevronUp from "lucide-react-native/icons/chevron-up";
+import { Fragment, useState } from "react";
 import {
   type AccessibilityActionEvent,
   AccessibilityInfo,
@@ -14,8 +19,10 @@ import {
   StyleSheet,
   View,
 } from "react-native";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Text } from "@/components/ui/text";
+import { Icon } from "@/components/ui/icon";
+import { Text, TextClassContext } from "@/components/ui/text";
 import { captionKey, type OnRefused, PhotoDescriptionText, PhotoImage } from "@/features/media";
 import { SafetyActions } from "@/features/safety";
 import { useT } from "@/lib/locale";
@@ -23,9 +30,10 @@ import { usePhotoDescriptionText } from "@/lib/photo-descriptions";
 import { cn } from "@/lib/utils";
 import { DECORATIVE, TOUCH_TARGET } from "@/theme/a11y";
 import { useHapticTap } from "@/theme/haptics";
-import { FieldLabel } from "./fieldIcons";
-import { hasGlyphs, OptionGlyph } from "./glyphs";
-import { genderKey, optionKey, placeName, presetKey, promptKey } from "./keys";
+import { FIELD_ICONS, HOBBY_GROUP_ICONS } from "./fieldIcons";
+import { OptionGlyph, optionGlyph } from "./glyphs";
+import { fieldLabelKey, genderKey, optionKey, placeName, presetKey, promptKey } from "./keys";
+import { PROFILE_SECTIONS, type SectionItem, sectionTitleKey } from "./sections";
 
 /** The card's own accessibility action, by name; its label is the heard one. */
 const SAFETY_ACTION = "blockOrReport";
@@ -40,15 +48,94 @@ const BEHIND = {
 type Gallery = { card: string; index: number; seen: readonly string[] };
 
 /**
- * A card as others see it (#47, #150): the photos in the card variant, one
- * at a time, the name and the age, the gender with the identity label
- * after it, the name of the home and, in a round, how far it is in words
- * (ADR-061 §3, §5): a name and a band, each on a line of its own, with no
- * digits, no kilometres, and no meaning in a colour. Then one answer in the
- * person's own words (the sheet's Hinge takeaway), the bio or its placeholder, the
- * info fields the API left on the card with what both answered marked in
- * words, and the rest of the prompts. The rounds of M4 render the same
- * component; the reason label of rules/mobile.md joins there.
+ * The answers the short card shows (#644, the maintainer's of 07/11/2026):
+ * what the person is here for and the six a deal-breaker can be set on,
+ * the answers people care enough about to filter on, in the registry's order.
+ */
+const KEY_FACTS: readonly ProfileFieldKey[] = CARD_FIELD_KEYS.filter(
+  (key) => key === "intent" || DEAL_BREAKER_FIELDS.includes(key),
+);
+
+const isCardField = (item: SectionItem): item is ProfileFieldKey =>
+  (CARD_FIELD_KEYS as readonly string[]).includes(item);
+
+/**
+ * The rest of a card's answers, on the whole card, under the profile's own
+ * sections and in their order (#644), the one the person fills them in: the
+ * key facts stand above, and the identity label in the header.
+ */
+const WHOLE_SECTIONS = PROFILE_SECTIONS.map((section) => ({
+  id: section.id,
+  fields: (section.items as readonly SectionItem[])
+    .filter(isCardField)
+    .filter((key) => !KEY_FACTS.includes(key) && key !== "identityLabel"),
+})).filter((section) => section.fields.length > 0);
+
+/** Each hobby's group, whose icon stands before the hobby on its chip. */
+const HOBBY_GROUP_OF: ReadonlyMap<string, HobbyGroup> = new Map(
+  (Object.entries(HOBBY_GROUPS) as [HobbyGroup, readonly string[]][]).flatMap(([group, hobbies]) =>
+    hobbies.map((hobby) => [hobby, group] as const),
+  ),
+);
+
+/**
+ * One answer as a chip (#644): the person's own words, as the field's own
+ * screen offered them, and how a screen reader hears it, which the icon
+ * before the words cannot say.
+ */
+type Chip = {
+  id: string;
+  field: ProfileFieldKey;
+  option: string | null;
+  text: string;
+  /** Both the viewer and the subject answered it (#150): filled and in bold, never a colour alone. */
+  shared: boolean;
+  /** A field that reads as the work beside it says both answers, with both icons. */
+  withWork: boolean;
+  heard: string;
+};
+type Unheard = Omit<Chip, "heard">;
+
+/**
+ * A field and a work that read the same are one chip with both icons (#644,
+ * the maintainer's of 07/11/2026): two chips of "Arts and culture" told the
+ * two answers apart by their icons alone. Matched by the words the reader
+ * sees, so a pair that differs in a language stays two there. The fields come
+ * before the work in their section, so the work's chip is taken as its field's
+ * twin is reached.
+ */
+function mergeFieldAndWork(chips: readonly Unheard[]): Unheard[] {
+  const taken = new Set<string>();
+  return chips.flatMap((chip) => {
+    if (taken.has(chip.id)) return [];
+    if (chip.field !== "field") return [chip];
+    const work = chips.find(
+      (other) => other.field === "occupation" && other.text === chip.text && !taken.has(other.id),
+    );
+    if (!work) return [chip];
+    taken.add(work.id);
+    return [{ ...chip, withWork: true }];
+  });
+}
+
+/**
+ * A card as others see it (#47, #150), in two depths (#644, the maintainer's
+ * of 07/11/2026). The short card: the name with the age, then the gender
+ * with the identity label after it, the name of the home and, in a round, how
+ * far it is in words (ADR-061 §3, §5), on one line with no digits, no
+ * kilometres and no meaning in a colour; the photos; the key facts as chips;
+ * one answer in the person's own words, the first prompt or the bio when
+ * there is none (the field sheet's Hinge takeaway, ADR-009 §7); and "Show the
+ * whole card" while there is more. The whole card opens in place under it:
+ * the bio, the other prompts and the rest of the answers under the profile's
+ * own section titles. A new card starts short, as it starts at its main photo.
+ *
+ * A chip is an answer in the person's own words with the field's icon before
+ * it, or the option's own glyph (#213), Hinge's way ("<cigarette> Never"),
+ * the maintainer's call: the icon is decorative, so a field's first chip is
+ * heard with its question ("Smoking: Never"). An answer both people gave is
+ * filled and in bold, heard as shared, never a count or a score (ADR-009 §7);
+ * the words "you too" went for reading like "me too".
  *
  * The photos are a gallery in the main photo's place (#513), as the big
  * dating apps have it: a tap on the right half shows the next, on the left
@@ -84,6 +171,9 @@ export function ProfileCardView({
   const { t, locale } = useT();
   const tap = useHapticTap();
   const [safetyOpen, setSafetyOpen] = useState(false);
+  /** The person whose whole card is open: another person's card starts short. */
+  const [opened, setOpened] = useState<string | null>(null);
+  const whole = opened === card.accountId;
   const described = usePhotoDescriptionText();
   const [firstPrompt, ...morePrompts] = card.prompts;
   const total = card.photos.length;
@@ -120,34 +210,120 @@ export function ProfileCardView({
   };
   const fields = card.fields as Record<string, unknown>;
   const identityLabel = typeof fields.identityLabel === "string" ? fields.identityLabel : null;
+  /** The header's one line (#644): each word its own text, heard on its own. */
+  const line = [
+    card.gender ? t(genderKey(card.gender)) : null,
+    identityLabel ? t(optionKey("identityLabel", identityLabel)) : null,
+    card.place ? placeName(card.place, locale) : null,
+    distance ? t(optionKey("distance", distance)) : null,
+  ].filter((word): word is string => word !== null);
 
-  /** A field's value in words; null for what the card never shows (a setting). */
-  const shownOf = (key: ProfileFieldKey, value: unknown): string | null => {
+  /** A field's answers as chips, one an option; none for what the card never shows (a setting). */
+  const chipsOf = (key: ProfileFieldKey): Unheard[] => {
+    const value = fields[key];
     const spec = PROFILE_FIELDS[key];
-    if (spec.kind === "flag") return null;
-    if (spec.kind === "text") return String(value);
-    if (spec.kind === "number") return formatHeight(locale, Number(value));
+    if (value === undefined || spec.kind === "flag") return [];
+    const answers: { option: string | null; text: string }[] =
+      spec.kind === "text"
+        ? [{ option: null, text: String(value) }]
+        : spec.kind === "number"
+          ? [{ option: null, text: formatHeight(locale, Number(value)) }]
+          : (Array.isArray(value) ? value : [value]).map((option) => ({
+              option: String(option),
+              text: t(optionKey(key, String(option))),
+            }));
     const shared: readonly string[] =
       key === "hobbies" ? card.shared.hobbies : key === "languages" ? card.shared.languages : [];
-    return (Array.isArray(value) ? value : [value])
-      .map((option) => {
-        const text = t(optionKey(key, String(option)));
-        // What both answered is said, never a colour alone (CLAUDE.md Accessibility).
-        return shared.includes(String(option))
-          ? t("profile.card.sharedOption", { option: text })
-          : text;
-      })
-      .join(", ");
+    return answers.map((answer) => ({
+      ...answer,
+      id: `${key}.${answer.option ?? "value"}`,
+      field: key,
+      shared: answer.option !== null && shared.includes(answer.option),
+      withWork: false,
+    }));
   };
+  /**
+   * How each chip is heard: a field's first chip of its own names its question,
+   * which the icon says only to the eye, and a field read as the work names both.
+   */
+  const heardAll = (chips: readonly Unheard[]): Chip[] => {
+    const asked = new Set<ProfileFieldKey>();
+    return chips.map((chip) => {
+      const answer = chip.shared ? t("profile.card.shared", { option: chip.text }) : chip.text;
+      if (chip.withWork) return { ...chip, heard: t("profile.card.fieldAndWork", { answer }) };
+      const first = !asked.has(chip.field);
+      asked.add(chip.field);
+      return {
+        ...chip,
+        heard: first
+          ? t("profile.card.fact", { question: t(fieldLabelKey(chip.field)), answer })
+          : answer,
+      };
+    });
+  };
+  const keyChips = heardAll(KEY_FACTS.flatMap(chipsOf));
+  const sections = WHOLE_SECTIONS.map((section) => ({
+    id: section.id,
+    chips: heardAll(mergeFieldAndWork(section.fields.flatMap(chipsOf))),
+  })).filter((section) => section.chips.length > 0);
+  // What the person wrote wins over a ready line, an empty bio being none.
+  const bio = card.bio || (card.bioPreset ? t(presetKey(card.bioPreset)) : null);
   const prompt = (answer: ProfileCard["prompts"][number]) => (
     <View key={answer.key} className="gap-0.5">
       <Text variant="small">{t(promptKey(answer.key))}</Text>
       <Text>{answer.answer}</Text>
     </View>
   );
+  // With no prompt, the bio is the short card's words and the whole card has none left.
+  const moreWords = firstPrompt
+    ? [...(bio ? [<Text key="bio">{bio}</Text>] : []), ...morePrompts.map(prompt)]
+    : [];
+  const more = moreWords.length > 0 || sections.length > 0;
+  const content = keyChips.length > 0 || firstPrompt !== undefined || bio !== null || more;
+  const toggleText = t(whole ? "profile.card.showLess" : "profile.card.showWhole");
 
   return (
     <Card>
+      <CardHeader>
+        {/* The name and the line under it in one column, Block or report beside both,
+            so its 44 pt target puts no gap between them (#644). */}
+        <View className="flex-row items-start gap-2">
+          <View className="flex-1 gap-1.5">
+            {/* The age in the title, as visible as the name: every account is bank-verified,
+                so the card does not say so (#239). */}
+            <CardTitle
+              {...(onGone && {
+                // A screen reader reaches block or report from the name too.
+                accessibilityActions: [{ name: SAFETY_ACTION, label: t("safety.actions.title") }],
+                onAccessibilityAction: (event: AccessibilityActionEvent) => {
+                  if (event.nativeEvent.actionName === SAFETY_ACTION) setSafetyOpen(true);
+                },
+              })}
+            >
+              {t("profile.card.nameAge", { name: card.displayName, years: card.age.years })}
+            </CardTitle>
+            {line.length > 0 && <HeaderLine words={line} />}
+          </View>
+          {onGone && (
+            <SafetyActions
+              accountId={card.accountId}
+              // The report may name one of these (#476): named as here, in the variant
+              // painted here, so the phone's cache has each the card showed and nothing
+              // is signed again; one never shown is its blurhash.
+              photos={card.photos.map((photo, at) => ({
+                id: photo.id,
+                variant: "card",
+                blurhash: photo.blurhash,
+                label: photoLabel(photo, at + 1),
+                text: photoText(photo, at + 1),
+              }))}
+              open={safetyOpen}
+              onOpenChange={setSafetyOpen}
+              onGone={onGone}
+            />
+          )}
+        </View>
+      </CardHeader>
       {front && (
         <View style={{ width: "100%", aspectRatio: 3 / 4 }}>
           {card.photos.map((photo, at) =>
@@ -212,87 +388,129 @@ export function ProfileCardView({
           )}
         </View>
       )}
-      <CardHeader>
-        {front?.caption && <Caption text={t(captionKey(front.caption))} />}
-        {frontWords && <PhotoDescriptionText text={frontWords} />}
-        <View className="flex-row items-start gap-2">
-          {/* The age in the title, as visible as the name: every account is bank-verified,
-              so the card does not say so (#239). */}
-          <CardTitle
-            className="flex-1"
-            {...(onGone && {
-              // A screen reader reaches block or report from the name too.
-              accessibilityActions: [{ name: SAFETY_ACTION, label: t("safety.actions.title") }],
-              onAccessibilityAction: (event: AccessibilityActionEvent) => {
-                if (event.nativeEvent.actionName === SAFETY_ACTION) setSafetyOpen(true);
-              },
-            })}
-          >
-            {t("profile.card.nameAge", { name: card.displayName, years: card.age.years })}
-          </CardTitle>
-          {onGone && (
-            <SafetyActions
-              accountId={card.accountId}
-              // The report may name one of these (#476): named as here, in the variant
-              // painted here, so the phone's cache has each the card showed and nothing
-              // is signed again; one never shown is its blurhash.
-              photos={card.photos.map((photo, at) => ({
-                id: photo.id,
-                variant: "card",
-                blurhash: photo.blurhash,
-                label: photoLabel(photo, at + 1),
-                text: photoText(photo, at + 1),
-              }))}
-              open={safetyOpen}
-              onOpenChange={setSafetyOpen}
-              onGone={onGone}
+      {(front?.caption || frontWords) && (
+        <View className="gap-1.5 px-6">
+          {front?.caption ? <Caption text={t(captionKey(front.caption))} /> : null}
+          {frontWords ? <PhotoDescriptionText text={frontWords} /> : null}
+        </View>
+      )}
+      {content && (
+        <CardContent className="gap-4">
+          {keyChips.length > 0 && <Chips chips={keyChips} />}
+          {firstPrompt ? prompt(firstPrompt) : bio ? <Text>{bio}</Text> : null}
+          {more && (
+            <Button
+              variant="outline"
+              accessibilityLabel={toggleText}
+              accessibilityState={{ expanded: whole }}
+              onPress={() => {
+                tap();
+                setOpened(whole ? null : card.accountId);
+              }}
+            >
+              <Text>{toggleText}</Text>
+              <Icon as={whole ? ChevronUp : ChevronDown} size={18} />
+            </Button>
+          )}
+          {whole && moreWords}
+          {whole &&
+            sections.map((section) => (
+              <View key={section.id} className="gap-2">
+                <Text variant="small" role="heading">
+                  {t(sectionTitleKey(section.id))}
+                </Text>
+                <Chips chips={section.chips} />
+              </View>
+            ))}
+        </CardContent>
+      )}
+    </Card>
+  );
+}
+
+/**
+ * The header's words on one line (#644), apart by a drawn dot that is no
+ * text: the gender, the identity label, the home, the band. Each stays a
+ * text of its own and no sentence is built around the place's name (TD-17).
+ */
+function HeaderLine({ words }: { words: readonly string[] }) {
+  return (
+    <View testID="card-line" className="flex-row flex-wrap items-center gap-x-2">
+      {words.map((word, at) => (
+        <Fragment key={word}>
+          {at > 0 && (
+            <View
+              testID="card-line-dot"
+              className="h-1 w-1 rounded-full bg-muted-foreground"
+              {...DECORATIVE}
             />
           )}
-        </View>
-        {card.gender && <Text variant="muted">{t(genderKey(card.gender))}</Text>}
-        {identityLabel && (
-          <Text variant="muted">{t(optionKey("identityLabel", identityLabel))}</Text>
-        )}
-        {card.place && <Text variant="muted">{placeName(card.place, locale)}</Text>}
-        {distance && <Text variant="muted">{t(optionKey("distance", distance))}</Text>}
-      </CardHeader>
-      <CardContent className="gap-4">
-        {firstPrompt && prompt(firstPrompt)}
-        {card.bio && <Text>{card.bio}</Text>}
-        {!card.bio && card.bioPreset && <Text>{t(presetKey(card.bioPreset))}</Text>}
-        {CARD_FIELD_KEYS.map((key) => {
-          const value = fields[key];
-          // The identity label stands in the header, after the gender.
-          if (value === undefined || key === "identityLabel") return null;
-          if (hasGlyphs(key)) {
-            // A party, a religion, a star sign: the glyph before each name (#213).
-            const options = (Array.isArray(value) ? value : [value]).map(String);
-            return (
-              <View key={key} className="gap-0.5">
-                <FieldLabel field={key} />
-                <View className="flex-row flex-wrap items-center gap-x-3 gap-y-1">
-                  {options.map((option) => (
-                    <View key={option} className="flex-row items-center gap-1">
-                      <OptionGlyph field={key} option={option} />
-                      <Text>{t(optionKey(key, option))}</Text>
-                    </View>
-                  ))}
-                </View>
-              </View>
-            );
-          }
-          const shown = shownOf(key, value);
-          if (shown === null) return null;
-          return (
-            <View key={key} className="gap-0.5">
-              <FieldLabel field={key} />
-              <Text>{shown}</Text>
-            </View>
-          );
-        })}
-        {morePrompts.map(prompt)}
-      </CardContent>
-    </Card>
+          <Text variant="muted">{word}</Text>
+        </Fragment>
+      ))}
+    </View>
+  );
+}
+
+/** Chips that wrap onto as many lines as they need, never a sideways scroll (#644). */
+function Chips({ chips }: { chips: readonly Chip[] }) {
+  return (
+    <View className="flex-row flex-wrap gap-2">
+      {chips.map((chip) => (
+        <FactChip key={chip.id} chip={chip} />
+      ))}
+    </View>
+  );
+}
+
+/**
+ * One answer: the option's glyph where it has one (#213), a hobby's group
+ * icon, else the field's, then the words. A shared answer is filled and in
+ * bold, so the meaning never rests on the colour (CLAUDE.md Accessibility),
+ * and the chip is heard as one element.
+ */
+function FactChip({ chip }: { chip: Chip }) {
+  const group =
+    chip.field === "hobbies" && chip.option ? HOBBY_GROUP_OF.get(chip.option) : undefined;
+  const inner = (
+    <>
+      {chip.option !== null && optionGlyph(chip.field, chip.option) !== null ? (
+        // Only hobbies and languages are ever shared, and neither has a glyph.
+        <OptionGlyph field={chip.field} option={chip.option} className="h-4 w-4 text-foreground" />
+      ) : (
+        <Icon
+          as={group ? HOBBY_GROUP_ICONS[group] : FIELD_ICONS[chip.field]}
+          size={16}
+          testID={group ? `hobby-group-icon-${group}` : `field-icon-${chip.field}`}
+        />
+      )}
+      {chip.withWork && (
+        <Icon as={FIELD_ICONS.occupation} size={16} testID="field-icon-occupation" />
+      )}
+      <Text className="shrink">{chip.text}</Text>
+    </>
+  );
+  return (
+    <View
+      accessible
+      accessibilityLabel={chip.heard}
+      testID={`chip-${chip.id}`}
+      className={cn(
+        "max-w-full flex-row items-center gap-1.5 rounded-full border px-3 py-1",
+        // The outline stays on a shared chip: the high-contrast sets' fill is their
+        // background, and there the bold alone tells it, still a chip.
+        "border-border",
+        chip.shared && "bg-secondary",
+      )}
+    >
+      {chip.shared ? (
+        <TextClassContext.Provider value="font-semibold text-secondary-foreground">
+          {inner}
+        </TextClassContext.Provider>
+      ) : (
+        inner
+      )}
+    </View>
   );
 }
 

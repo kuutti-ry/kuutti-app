@@ -43,6 +43,13 @@ name: A phone number in the bio is refused on leaving with the reason, and the s
 - extendedWaitUntil:
     visible: "Your card|Korttisi|Ditt kort"
     timeout: 15000
+# Her first prompt leads the short card, so her bio is on the whole card (#644).
+- scrollUntilVisible:
+    element: "Show the whole card|Näytä koko kortti|Visa hela kortet"
+    direction: DOWN
+    centerElement: true
+    timeout: 60000
+- tapOn: "Show the whole card|Näytä koko kortti|Visa hela kortet"
 - scrollUntilVisible:
     element: "Arkkitehti, joka piirtää.*"
     direction: DOWN

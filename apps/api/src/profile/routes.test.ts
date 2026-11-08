@@ -652,7 +652,7 @@ describe("profile routes", () => {
     ).rejects.toMatchObject({ status: 404 });
   });
 
-  test('another viewer\'s card leaves out a hidden answer, and "you too" does not tell it (#515)', async ({
+  test("another viewer's card leaves out a hidden answer, and the shared marks do not tell it (#515)", async ({
     ctx,
   }) => {
     const { app, logger } = await appWith(ctx);
