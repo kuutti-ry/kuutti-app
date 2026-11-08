@@ -1,6 +1,6 @@
 # ADR-066: The box knows Kuutti's distribution by a secret header
 
-- Status: accepted 2026-11-08 (#203, the maintainer's word of that day; #198, his choice of 2026-11-06 among the three options of ADR-008's History of that day: the secret header; built as written here and at work on staging since 2026-11-06, see History; production's turn is §6's order at its cutover)
+- Status: proposed (#198, the maintainer's choice of 2026-11-06 among the three options of ADR-008's History of that day: the secret header; built as written here; the bootstrap's apply, the secret written by hand and the switch of §6 put it to work; accepting it is the maintainer's)
 - Date: 2026-11-06
 - Follows: TD-2 (CloudFront fronts the API), TD-19 (the parameter store and the instance role), ADR-008 §5 (whose word the API takes for the client address), ADR-005 §7 (CloudFront-only ingress), ADR-001 (a secret value never enters OpenTofu's state), ADR-004 §3 (write access is staging-level trust); issues #198, #25
 

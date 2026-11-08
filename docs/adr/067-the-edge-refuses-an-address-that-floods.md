@@ -1,6 +1,6 @@
 # ADR-067: The edge refuses an address that floods
 
-- Status: accepted 2026-11-08 (#203, the maintainer's word of that day; #41, his choices of 2026-11-06: a web ACL on each environment's distribution, 2,000 requests in five minutes, no managed core rule set, an allow list written by hand for the load smoke; built as written here and proven on staging by the burst test of that day, see History)
+- Status: proposed (#41, the maintainer's choices of 2026-11-06: a web ACL on each environment's distribution, 2,000 requests in five minutes, no managed core rule set, an allow list written by hand for the load smoke; built as written here; the bootstrap's apply and the burst test on staging put it to work; accepting it is the maintainer's)
 - Date: 2026-11-06
 - Follows: TD-3 (one box, limits in process), TD-6 (abuse), TD-2 (CloudFront fronts the API), TD-4 (AWS, and the budget), ADR-026 (the API's windows, whose Consequences leave volume to the edge), ADR-005 §7 (everything the box serves on 443 behind the distribution), ADR-001 (declared in code), ADR-049 §3 (the budget); issues #41, #198, #25, #200
 

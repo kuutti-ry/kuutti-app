@@ -1,6 +1,6 @@
 # ADR-054: The box writes its Dokploy backup and never reads it back
 
-- Status: accepted 2026-11-08 (#203, the maintainer's word of that day; built as written here at his word of 2026-10-25, "fix it"; the apply of each environment switches it on)
+- Status: proposed (built as written here at the maintainer's word of 2026-10-25, "fix it"; the apply of each environment switches it on; accepting it is the maintainer's)
 - Date: 2026-10-25
 - Follows: ADR-001 (Dokploy's configuration is the one manual island, backed up nightly from `/etc/dokploy`), ADR-004 §3 (write access to the repository is a preview's trust, and staging-level trust), ADR-048 (a restore brings the owner back before Dokploy serves), ADR-053 (the previews' wildcard key sits in `acme.json`), TD-19 (one staging box with the previews on it); issues #7, #448
 

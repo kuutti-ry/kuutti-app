@@ -1,6 +1,6 @@
 # ADR-051: The moderation panel's flows in a browser, with Playwright
 
-- Status: accepted 2026-11-08 (#203, the maintainer's word of that day; built as written here; when CI runs it, §8, stays his to settle)
+- Status: proposed (built as written here; when CI runs it, §8, is the maintainer's to settle, and so is accepting it)
 - Date: 2026-10-24
 - Follows: TD-2 (the stack: its test runners), TD-17 (the panel is English), ADR-020 (end-to-end flows; its "left for later: the admin panel with Playwright"), ADR-025 §3 (the panel's content security policy), ADR-050 §6 (the CSP checked by hand in a browser), ADR-006 §5 (staff roles granted with the maintainer's command line), ADR-014 (the personas live at the mock bank), ADR-021 (tests at every level), CLAUDE.md (a new dependency; testing); issue #106
 

@@ -12,7 +12,7 @@ paths:
 
 # Decision records and the TD numbers
 
-The reasoning behind Kuutti's rules lives in two places. The technical decisions log, TD-1 to TD-19, is in the maintainers' private planning documents, which the repository cannot show; where a record and the log disagree, the log wins. The architecture decision records in `docs/adr/` are public. `docs/adr/README.md` is the bridge between them (#203): every record with its status, its date and the TD numbers it cites, and every TD number with the records and the docs that cite it, so that a reader of "TD-6" in CLAUDE.md finds what to read. `pnpm check:adr-index` (CI's `scenarios` job) holds that page to the records and to the docs; this rule says what the check cannot.
+The reasoning behind Kuutti's rules lives in two places. The technical decisions log, TD-1 to TD-19, is in the maintainers' private planning documents, which the repository cannot show; where a record and the log disagree, the log wins. The architecture decision records in `docs/adr/` are public. `docs/adr/README.md` is the bridge between them (#203): every record with its status, its date and the TD numbers it cites, and every TD number with the records and the docs that cite it, so that a reader of a TD number in CLAUDE.md finds what to read. `pnpm check:adr-index` (CI's `scenarios` job) holds that page to the records and to the docs; this rule says what the check cannot.
 
 ## A record
 
@@ -23,7 +23,7 @@ The reasoning behind Kuutti's rules lives in two places. The technical decisions
 ## A change to a decision
 
 - A later change is made in the record itself, as a numbered amendment or a History line, and its status line says so: `amended <date> (§n: what, #issue; see History)`. A new record that changes another says "amends ADR-NNN" and the other's status line names it back. A History line that only records how the decision was carried out (a cut-over, a check that now runs) changes no point and leaves the status line as it is.
-- The statuses are the README's: proposed, accepted, amended, superseded. Accepting is the maintainer's. The agent writes a record as `proposed`, with a parenthesis saying how far it is built and what waits on him, and turns it `accepted` only on his word in chat, naming the day and where he gave it, as #203's second pass did on 2026-11-08. A superseded record is kept for its reasoning.
+- The statuses are the README's: proposed, accepted, amended, superseded. Accepting is the maintainer's. The agent writes a record as `proposed`, with a parenthesis saying how far it is built and what waits on him, and turns it `accepted` only on his word in chat, naming the day and where he gave it; "do the issue", a pass over the lines or a tidy-up is not that word (#203, 2026-11-08). A superseded record is kept for its reasoning.
 - A changed status line is copied into the record's row in the same pull request; the check refuses a row that differs by a character.
 
 ## A TD cited in a doc

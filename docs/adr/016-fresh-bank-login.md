@@ -1,6 +1,6 @@
 # ADR-016: The bank, every time: `prompt=login` and an `auth_time` no older than the attempt
 
-- Status: accepted 2026-11-08 (#203, the maintainer's word of that day; built as written here, and the first login on Telia's bed on 2026-10-08 showed `prompt=login` at work; his planning handoff of 2026-10-07 names it as a Kuutti requirement, and this record is the ADR that CLAUDE.md asks for when the identity flow changes), amended by ADR-058 on 2026-10-28 (§3: a session ends ninety days after its last use and a year after its bank login, #472; see History)
+- Status: proposed (built as written here; the maintainer's planning handoff of 2026-10-07 names `prompt=login` as a Kuutti requirement, and this record is the ADR that CLAUDE.md asks for when the identity flow changes), amended by ADR-058 on 2026-10-28 (§3: a session ends ninety days after its last use and a year after its bank login, #472; see History)
 - Date: 2026-10-07
 - Follows: TD-1 (one identity per person, verified at the bank), TD-7 (standing and re-registration decided at the callback), CLAUDE.md rules 1 and 6, `docs/vendors/telia.md` (guide 2.4.3: `prompt`, `max_age`; 2.6.4: `auth_time`), `.claude/rules/api.md` Identity and auth; issues #32, #33
 

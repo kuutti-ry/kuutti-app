@@ -1,6 +1,6 @@
 # ADR-046: Headroom on the one box: swap, and its free memory watched
 
-- Status: accepted 2026-11-08 (#203, the maintainer's word of that day; #77, built as written here and on staging since 2026-10-24, the alarm in OK; the alarm test of `infra/README.md`, The box's headroom, is his), amended 2026-10-24 (§2: no memory limit on Dokploy's service, which crashed in a loop under one; see History) and 2026-10-31 (§1: no swap in production, which is a t4g.medium; see History)
+- Status: proposed (#77, built as written here and on staging since 2026-10-24, the alarm in OK; #77's alarm test is the maintainer's, `infra/README.md`, The box's headroom), amended 2026-10-24 (§2: no memory limit on Dokploy's service, which crashed in a loop under one; see History) and 2026-10-31 (§1: no swap in production, which is a t4g.medium; see History)
 - Date: 2026-10-24
 - Follows: TD-19 (one staging box with the previews on it), TD-2 (three previews), TD-4 (one vendor, AWS), ADR-001 (`user_data` installs Dokploy and never reaches a running box), ADR-012 (whose Consequences left this open), ADR-018 (staging's people are Telia's test persons), CLAUDE.md rule 1 (the hetu is never persisted), rules/infra.md (the alarms CloudWatch carries), the maintainer's word that staging stays a t4g.small (2026-09-19); issues #77, #200, #191, #25; the outages of 2026-09-27 and 2026-10-08
 

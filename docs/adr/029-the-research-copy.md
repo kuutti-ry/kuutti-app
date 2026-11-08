@@ -1,6 +1,6 @@
 # ADR-029: The research copy: Parquet on S3, the copy's census, and the researcher's read-only role
 
-- Status: proposed (the app half, §1 to §7 and §12, is built as written here and writes staging's copy nightly, production's none; the infra half, §8 to §11, and the points under "Open, the maintainer's" wait for the meeting with the researchers, #194 closed as not planned on 2026-11-08 until then, and the status changes when they are answered; left proposed in #203's second pass of that day)
+- Status: proposed (the app half, §1 to §7 and §12, is built as written here and writes staging's copy nightly, production's none; the infra half, §8 to §11, and the points under "Open, the maintainer's" wait for the meeting with the researchers, #194 closed as not planned on 2026-11-08 until then, and the status changes when they are answered)
 - Date: 2026-10-17
 - Follows: TD-5 (research use of events, never text), TD-4 (AWS in eu-central-1), CLAUDE.md rules 5 and 6, ADR-011 §6, §8 and §9 (the retention, nothing streams anywhere, what makes the block anonymous), ADR-005 (the media bucket), ADR-001 (Identity Center), ADR-004 §3 (what a preview is trusted with), ADR-018 (staging holds invented people), ADR-021 (tests at every level), `.claude/rules/api.md` (nightly jobs: events to Parquet, retention pruning), `.claude/rules/infra.md` (S3 lifecycle, access logging on the research prefix); issue #194
 
@@ -84,4 +84,4 @@ Three things in the code shaped the decision. The prune was already built (ADR-0
 ## History
 
 - 2026-11-01 (#500, ADR-061 §8): §2 says null before the person has a home, in the table and under it, since nobody chooses a pond: there is one, and the write of a home sets it.
-- 2026-11-08 (#194, #203): #194 was closed as not planned on the maintainer's word of that day, until the meeting with the researchers; what they need decides what comes next. The infra half and the points under "Open, the maintainer's" wait for it, so this record stays proposed in #203's second pass, which accepted the other records then proposed. Staging writes the copy nightly as built; production writes none.
+- 2026-11-08 (#194, #203): #194 was closed as not planned on the maintainer's word of that day, until the meeting with the researchers; what they need decides what comes next. The infra half and the points under "Open, the maintainer's" wait for it, and the status line says so since #203's pass over the lines of 2026-11-08. Staging writes the copy nightly as built; production writes none.
