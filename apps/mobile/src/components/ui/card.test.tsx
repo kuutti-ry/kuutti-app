@@ -1,4 +1,5 @@
-import { screen } from "@testing-library/react-native";
+import { screen, waitFor } from "@testing-library/react-native";
+import * as SecureStore from "expo-secure-store";
 import { StyleSheet } from "react-native";
 import { renderWithTheme } from "@/test/render";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "./card";
@@ -11,6 +12,8 @@ jest.mock("nativewind", () => ({
   useUnstableNativeVariable: (name: string) =>
     name === "--stroke" ? [222, "40%", "14%"] : undefined,
 }));
+
+const store = (SecureStore as unknown as { __store: Map<string, string> }).__store;
 
 // The card (#12, TD-9): a surface whose text takes the card's foreground, a
 // title a screen reader announces as a heading, and its sections in order.
@@ -46,24 +49,6 @@ describe("Card", () => {
     expect(screen.getByText("Footer").props.className).toMatch(/text-card-foreground/);
   });
 
-  // The neubrutalism try: outlined in the ink, on a container's hard shadow,
-  // a caller's own style kept beside it.
-  it("is outlined in the ink and lies on a container's hard shadow", async () => {
-    await renderWithTheme(
-      <Card testID="card" style={{ marginTop: 4 }}>
-        <Text>Body</Text>
-      </Card>,
-    );
-    const card = screen.getByTestId("card");
-    expect(String(card.props.className).split(" ")).toEqual(
-      expect.arrayContaining(["border-2", "border-stroke", "rounded-lg"]),
-    );
-    expect(StyleSheet.flatten(card.props.style)).toMatchObject({
-      boxShadow: "3px 3px 0px 0px hsl(222, 40%, 14%)",
-      marginTop: 4,
-    });
-  });
-
   it("lets a caller add to a section's classes", async () => {
     await renderWithTheme(
       <Card className="mt-2" testID="card">
@@ -74,5 +59,45 @@ describe("Card", () => {
     );
     expect(screen.getByTestId("card").props.className).toMatch(/\bbg-card\b.*\bmt-2\b/);
     expect(screen.getByTestId("footer").props.className).toMatch(/flex-row.*justify-end/);
+  });
+});
+
+// The designers' try, outside production: outlined in the ink, on a
+// container's hard shadow, a caller's own style kept beside it. Today's look
+// keeps its hairline and soft shadow.
+describe("Card's look", () => {
+  const card = async () => {
+    await renderWithTheme(
+      <Card testID="card" style={{ marginTop: 4 }}>
+        <Text>Body</Text>
+      </Card>,
+    );
+    return () => screen.getByTestId("card");
+  };
+
+  it("is today's hairline with no hard shadow by default", async () => {
+    const shown = await card();
+    expect(String(shown().props.className).split(" ")).toEqual(
+      expect.arrayContaining(["border", "border-border", "rounded-xl"]),
+    );
+    expect(StyleSheet.flatten(shown().props.style)).toEqual({ marginTop: 4 });
+  });
+
+  it("is outlined in the ink and lies on a container's hard shadow in the neubrutalism try", async () => {
+    store.set("kuutti.preference.look", "neubrutalism");
+    try {
+      const shown = await card();
+      await waitFor(() =>
+        expect(String(shown().props.className).split(" ")).toEqual(
+          expect.arrayContaining(["border-2", "border-stroke", "rounded-lg"]),
+        ),
+      );
+      expect(StyleSheet.flatten(shown().props.style)).toMatchObject({
+        boxShadow: "3px 3px 0px 0px hsl(222, 40%, 14%)",
+        marginTop: 4,
+      });
+    } finally {
+      store.delete("kuutti.preference.look");
+    }
   });
 });

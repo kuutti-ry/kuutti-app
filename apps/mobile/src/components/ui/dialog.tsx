@@ -17,6 +17,7 @@ import { NativeOnlyAnimatedView } from "@/components/ui/native-only-animated-vie
 import { cn } from "@/lib/utils";
 import { HEADING_FONT_SCALE, MAX_FONT_SCALE, TOUCH_TARGET } from "@/theme/a11y";
 import { HARD_SHADOW, useHardShadow } from "@/theme/shadow";
+import { useLook } from "@/theme/ThemeProvider";
 
 // From React Native Reusables (#12, TD-9), adapted: the close control is a
 // labelled 44 pt button (closeLabel is required), the scrim is a token,
@@ -143,6 +144,7 @@ function DialogContent({
   /** Read by screen readers for the close control; an i18n string, never inline. */
   closeLabel: string;
 }) {
+  const neubrutalist = useLook() === "neubrutalism";
   const shadow = useHardShadow(HARD_SHADOW.overlay);
   return (
     <DialogPortal hostName={portalHost}>
@@ -150,14 +152,15 @@ function DialogContent({
         <DialogPrimitive.Content
           accessibilityViewIsModal
           className={cn(
-            "bg-background border-stroke z-50 mx-auto flex w-full max-w-[calc(100%-2rem)] shrink flex-col gap-4 rounded-lg border-2 border-solid p-6 sm:max-w-lg",
+            "bg-background z-50 mx-auto flex w-full max-w-[calc(100%-2rem)] shrink flex-col gap-4 rounded-lg p-6 sm:max-w-lg",
+            neubrutalist ? "border-stroke border-2 border-solid" : "border-border border",
             Platform.select({
               web: "animate-in fade-in-0 zoom-in-95 duration-200",
             }),
             className,
           )}
           {...props}
-          style={[shadow, props.style]}
+          style={[neubrutalist && shadow, props.style]}
         >
           <HasClose.Provider value={true}>{children}</HasClose.Provider>
           <DialogPrimitive.Close

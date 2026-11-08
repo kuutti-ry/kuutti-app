@@ -33,6 +33,8 @@ describe("contrast", () => {
       ".dark:root",
       ".high-contrast",
       ".high-contrast-dark",
+      ".palette-ice",
+      ".palette-ice-dark",
       ".palette-dusk",
       ".palette-dusk-dark",
       ".palette-birch",

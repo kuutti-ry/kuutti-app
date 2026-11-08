@@ -17,12 +17,19 @@ const isScheme = (value: string | null): value is SchemePreference =>
   value === "system" || value === "light" || value === "dark";
 
 /**
- * The palettes of the neubrutalism try (tokens.css): Ice is the base sets,
- * Dusk and Birch classes on the root view. Chosen on the tech screen, which
- * production has not, so a released app is always in Ice.
+ * The designers' try of neubrutalism, chosen on the tech screen, which
+ * production has not, so a released app always looks as today: the style,
+ * today's or neubrutalism's outlines and hard shadows, and apart from it the
+ * palette, today's colours (the base sets of tokens.css) or one of the try's
+ * three, a class on the root view.
  */
-export const PALETTES = ["ice", "dusk", "birch"] as const;
+export const LOOKS = ["today", "neubrutalism"] as const;
+export type Look = (typeof LOOKS)[number];
+export const PALETTES = ["today", "ice", "dusk", "birch"] as const;
 export type Palette = (typeof PALETTES)[number];
+
+const isLook = (value: string | null): value is Look =>
+  (LOOKS as readonly (string | null)[]).includes(value);
 
 const isPalette = (value: string | null): value is Palette =>
   (PALETTES as readonly (string | null)[]).includes(value);
@@ -30,7 +37,8 @@ const isPalette = (value: string | null): value is Palette =>
 // Whole class names, never built from parts: Tailwind keeps a rule of
 // tokens.css only for a class it finds written out in the source.
 const PALETTE_CLASS: Record<Palette, { light?: string; dark?: string }> = {
-  ice: {},
+  today: {},
+  ice: { light: "palette-ice", dark: "palette-ice-dark" },
   dusk: { light: "palette-dusk", dark: "palette-dusk-dark" },
   birch: { light: "palette-birch", dark: "palette-birch-dark" },
 };
@@ -43,6 +51,8 @@ type Theme = {
   setPreference: (preference: SchemePreference) => void;
   highContrast: boolean;
   setHighContrast: (on: boolean) => void;
+  look: Look;
+  setLook: (look: Look) => void;
   palette: Palette;
   setPalette: (palette: Palette) => void;
 };
@@ -87,7 +97,8 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [preference, setPreferenceState] = React.useState<SchemePreference>("system");
   const systemHighContrast = useSystemHighContrast();
   const [chosenHighContrast, setChosenHighContrast] = React.useState<boolean | null>(null);
-  const [palette, setPaletteState] = React.useState<Palette>("ice");
+  const [look, setLookState] = React.useState<Look>("today");
+  const [palette, setPaletteState] = React.useState<Palette>("today");
   const highContrast = chosenHighContrast ?? systemHighContrast;
   const scheme = colorScheme === "dark" ? "dark" : "light";
 
@@ -117,9 +128,13 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     setChosenHighContrast(on);
     void writePreference("highContrast", on ? "true" : "false");
   }, []);
+  const setLook = React.useCallback((next: Look) => {
+    setLookState(next);
+    void writePreference("look", next === "today" ? null : next);
+  }, []);
   const setPalette = React.useCallback((next: Palette) => {
     setPaletteState(next);
-    void writePreference("palette", next === "ice" ? null : next);
+    void writePreference("palette", next === "today" ? null : next);
   }, []);
 
   // What was chosen last time, read once; nothing stored is the OS's setting.
@@ -130,6 +145,9 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     });
     void readPreference("highContrast").then((stored) => {
       if (mounted && stored !== null) setChosenHighContrast(stored === "true");
+    });
+    void readPreference("look").then((stored) => {
+      if (mounted && isLook(stored)) setLookState(stored);
     });
     void readPreference("palette").then((stored) => {
       if (mounted && isPalette(stored)) setPaletteState(stored);
@@ -158,7 +176,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
   const duration = useMotionDuration(THEME_FADE_MS);
   const opacity = React.useRef(new Animated.Value(1)).current;
-  const appearance = `${scheme}:${highContrast}:${palette}`;
+  const appearance = `${scheme}:${highContrast}:${look}:${palette}`;
   const shown = React.useRef(appearance);
   React.useEffect(() => {
     if (shown.current === appearance) return;
@@ -178,10 +196,22 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       setPreference,
       highContrast,
       setHighContrast,
+      look,
+      setLook,
       palette,
       setPalette,
     }),
-    [scheme, preference, setPreference, highContrast, setHighContrast, palette, setPalette],
+    [
+      scheme,
+      preference,
+      setPreference,
+      highContrast,
+      setHighContrast,
+      look,
+      setLook,
+      palette,
+      setPalette,
+    ],
   );
 
   return (
@@ -195,6 +225,14 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       </Animated.View>
     </ThemeContext.Provider>
   );
+}
+
+/**
+ * The style the primitives draw in: today's, or the try's neubrutalism.
+ * Today's where no provider is above, as in a test rendered without one.
+ */
+export function useLook(): Look {
+  return React.useContext(ThemeContext)?.look ?? "today";
 }
 
 export function useTheme(): Theme {

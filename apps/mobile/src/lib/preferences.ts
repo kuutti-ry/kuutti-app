@@ -12,7 +12,7 @@ import { Platform } from "react-native";
  * recorded after a bank login and whether the app's lock was offered here
  * (#418), whether the home screen's offer of notifications was answered
  * here (#102, ADR-055 §9), which of Settings' rows were left open (#511),
- * and the palette tried on the tech screen outside production. expo-secure-store is already in the binary, so no storage module
+ * and the style and palette tried on the tech screen outside production. expo-secure-store is already in the binary, so no storage module
  * is added for a few strings; the web preview uses localStorage. Session
  * tokens and the lock itself do not go through here (rules/mobile.md).
  */
@@ -28,6 +28,7 @@ export type PreferenceKey =
   | "lockOffered"
   | "pushAsked"
   | "settingsOpen"
+  | "look"
   | "palette";
 
 const storageKey = (key: PreferenceKey): string => `kuutti.preference.${key}`;

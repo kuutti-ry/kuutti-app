@@ -40,24 +40,31 @@ describe("the tech config screen", () => {
   });
   afterEach(() => jest.restoreAllMocks());
 
-  // The neubrutalism try's palettes, on this screen alone, which production has not.
-  it("offers the try's three palettes as radios, and says and keeps the one chosen", async () => {
-    const store = (SecureStore as unknown as { __store: Map<string, string> }).__store;
-    store.clear();
-    await renderWithTheme(<TechConfigScreen />);
-    await waitFor(() => expect(screen.getByText("git commit abc1234")).toBeTruthy());
-    const group = screen.getByLabelText("Colours to try");
-    expect(group.props.accessibilityRole).toBe("radiogroup");
-    const labels = () =>
-      within(group)
-        .getAllByRole("radio")
-        .map((radio) => radio.props.accessibilityLabel);
-    expect(labels()).toEqual(["✓ Ice", "Dusk", "Birch"]);
-    await fireEvent.press(within(group).getByRole("radio", { name: "Dusk" }));
-    expect(labels()).toEqual(["Ice", "✓ Dusk", "Birch"]);
-    await waitFor(() => expect(store.get("kuutti.preference.palette")).toBe("dusk"));
-    expect(pressables(screen.toJSON() as HostNode).flatMap((n) => a11yProblems(n))).toEqual([]);
-  });
+  // The designers' try, on this screen alone, which production has not: a
+  // style and a palette, each a group of radios that says and keeps its choice.
+  it.each([
+    ["Style to try", ["Today's", "Neubrutalism"], "Neubrutalism", "look", "neubrutalism"],
+    ["Colours to try", ["Today's", "Ice", "Dusk", "Birch"], "Dusk", "palette", "dusk"],
+  ] as const)(
+    "offers the try's %s as radios, today's first, and keeps the one chosen",
+    async (title, options, pick, key, stored) => {
+      const store = (SecureStore as unknown as { __store: Map<string, string> }).__store;
+      store.clear();
+      await renderWithTheme(<TechConfigScreen />);
+      await waitFor(() => expect(screen.getByText("git commit abc1234")).toBeTruthy());
+      const group = screen.getByLabelText(title);
+      expect(group.props.accessibilityRole).toBe("radiogroup");
+      const labels = () =>
+        within(group)
+          .getAllByRole("radio")
+          .map((radio) => radio.props.accessibilityLabel);
+      expect(labels()).toEqual(options.map((option, at) => (at === 0 ? `✓ ${option}` : option)));
+      await fireEvent.press(within(group).getByRole("radio", { name: pick }));
+      expect(labels()).toEqual(options.map((option) => (option === pick ? `✓ ${option}` : option)));
+      await waitFor(() => expect(store.get(`kuutti.preference.${key}`)).toBe(stored));
+      expect(pressables(screen.toJSON() as HostNode).flatMap((n) => a11yProblems(n))).toEqual([]);
+    },
+  );
 
   it("keeps the title and the way back pinned above the details", async () => {
     await renderWithTheme(<TechConfigScreen />);

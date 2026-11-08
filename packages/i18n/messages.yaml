@@ -8970,9 +8970,37 @@ tech.errorTest.send:
   sv: "Skicka ett testfel"
   machine: { fi: true, sv: true }
 
+tech.look.title:
+  en: "Style to try"
+  description: "Heading of the tech screen's choice of style for the designers' try (outside production only): today's look, or neubrutalism's outlines and hard shadows."
+  fi: "Kokeiltava tyyli"
+  sv: "Stil att prova"
+  machine: { fi: true, sv: true }
+
+tech.look.today:
+  en: "Today's"
+  description: "The style of the app as it is today, one of the tech screen's choices of style (outside production only)."
+  fi: "Nykyinen"
+  sv: "Nuvarande"
+  machine: { fi: true, sv: true }
+
+tech.look.neubrutalism:
+  en: "Neubrutalism"
+  description: "The style of neubrutalism.com, outlines and hard shadows in one ink, one of the tech screen's choices of style (outside production only)."
+  fi: "Neobrutalismi"
+  sv: "Nybrutalism"
+  machine: { fi: true, sv: true }
+
+tech.palette.today:
+  en: "Today's"
+  description: "The app's colours as they are today, one of the tech screen's choices of palette (outside production only)."
+  fi: "Nykyiset"
+  sv: "Nuvarande"
+  machine: { fi: true, sv: true }
+
 tech.palette.title:
   en: "Colours to try"
-  description: "Heading of the tech screen's choice of palette for the neubrutalism try (outside production only); the released app stays in Ice."
+  description: "Heading of the tech screen's choice of palette for the designers' try (outside production only); a released app keeps today's colours."
   fi: "Kokeiltavat värit"
   sv: "Färger att prova"
   machine: { fi: true, sv: true }

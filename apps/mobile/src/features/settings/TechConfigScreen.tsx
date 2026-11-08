@@ -1,4 +1,4 @@
-import { formatDateTime } from "@kuutti/i18n";
+import { formatDateTime, type PlainMessageKey } from "@kuutti/i18n";
 import type { HealthResponse } from "@kuutti/schema";
 import * as Sentry from "@sentry/react-native";
 import { useRouter } from "expo-router";
@@ -17,7 +17,7 @@ import { buildInfo } from "@/lib/build";
 import { appEnvironment, isProduction } from "@/lib/environment";
 import { useT } from "@/lib/locale";
 import { useHapticTap } from "@/theme/haptics";
-import { PALETTES, useTheme } from "@/theme/ThemeProvider";
+import { LOOKS, PALETTES, useTheme } from "@/theme/ThemeProvider";
 import { SourceOffer } from "./SourceOffer";
 
 type State =
@@ -157,9 +157,10 @@ export function TechConfigScreen() {
               </View>
             </Card>
 
-            {/* The neubrutalism try's palettes (tokens.css): this screen exists
-                outside production only, so a released app stays in Ice. */}
-            <PaletteChoices />
+            {/* The designers' try: a style and a palette apart (tokens.css). This
+                screen exists outside production only, so a released app keeps
+                today's look. */}
+            <TryChoices />
 
             {/* Proves error reporting end to end (#11): a real JS error with a stack
                 for Sentry to symbolicate. A no-op in a build without a DSN. */}
@@ -192,38 +193,59 @@ export function TechConfigScreen() {
   );
 }
 
+const LOOK_LABELS = {
+  today: "tech.look.today",
+  neubrutalism: "tech.look.neubrutalism",
+} as const;
+
 const PALETTE_LABELS = {
+  today: "tech.palette.today",
   ice: "tech.palette.ice",
   dusk: "tech.palette.dusk",
   birch: "tech.palette.birch",
 } as const;
 
-function PaletteChoices() {
+function TryChoices() {
   const { t } = useT();
   const theme = useTheme();
   const tap = useHapticTap();
-  return (
+  const group = <Option extends string>(
+    title: "tech.look.title" | "tech.palette.title",
+    options: readonly Option[],
+    labels: Record<Option, PlainMessageKey>,
+    chosen: Option,
+    choose: (option: Option) => void,
+  ) => (
     <View className="w-full max-w-md gap-2">
       <Text variant="group" role="heading" aria-level="2">
-        {t("tech.palette.title")}
+        {t(title)}
       </Text>
       <View
         accessibilityRole="radiogroup"
-        accessibilityLabel={t("tech.palette.title")}
+        accessibilityLabel={t(title)}
         className="flex-row flex-wrap gap-2"
       >
-        {PALETTES.map((palette) => (
-          <Choice
-            key={palette}
-            label={t(PALETTE_LABELS[palette])}
-            chosen={theme.palette === palette}
-            onPress={() => {
-              tap();
-              theme.setPalette(palette);
-            }}
-          />
-        ))}
+        {options.map((option) => {
+          const label: PlainMessageKey = labels[option];
+          return (
+            <Choice
+              key={option}
+              label={t(label)}
+              chosen={chosen === option}
+              onPress={() => {
+                tap();
+                choose(option);
+              }}
+            />
+          );
+        })}
       </View>
     </View>
+  );
+  return (
+    <>
+      {group("tech.look.title", LOOKS, LOOK_LABELS, theme.look, theme.setLook)}
+      {group("tech.palette.title", PALETTES, PALETTE_LABELS, theme.palette, theme.setPalette)}
+    </>
   );
 }

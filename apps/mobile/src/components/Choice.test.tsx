@@ -51,7 +51,7 @@ describe("Choice", () => {
     await show({ chosen: true });
     expect(screen.getByRole("radio").props.className).toMatch(/\bbg-primary\b/);
     await show({ chosen: false });
-    expect(screen.getByRole("radio").props.className).toMatch(/\bborder-stroke\b/);
+    expect(screen.getByRole("radio").props.className).toMatch(/\bborder-input\b/);
     expect(screen.getByRole("radio").props.className).not.toMatch(/\bbg-primary\b/);
   });
 
