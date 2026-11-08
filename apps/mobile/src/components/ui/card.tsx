@@ -34,9 +34,10 @@ function CardTitle({
   return (
     <Text
       ref={ref}
+      variant="title"
       role="heading"
       aria-level={3}
-      className={cn("font-semibold", className)}
+      className={className}
       {...props}
     />
   );
@@ -46,7 +47,7 @@ function CardDescription({
   className,
   ...props
 }: React.ComponentProps<typeof Text> & React.RefAttributes<typeof Text>) {
-  return <Text className={cn("text-muted-foreground text-sm", className)} {...props} />;
+  return <Text className={cn("text-small text-muted-foreground", className)} {...props} />;
 }
 
 function CardContent({

@@ -47,6 +47,15 @@ describe("RowGroup", () => {
     }
     expect(theme.props.className).toMatch(/\bborder-0\b/);
     expect(theme.props.className).not.toMatch(/(^| )border(-b)?( |$)/);
+    // A row is read: its words are in the phone's font, not the Button's
+    // Saiga, the title at body size and the summary smaller (#408).
+    const words = (text: string) => String(screen.getByText(text).props.className).split(" ");
+    expect(words("The basics")).toEqual(expect.arrayContaining(["font-system", "text-body"]));
+    expect(words("Name and height")).toEqual(expect.arrayContaining(["font-system", "text-small"]));
+    for (const text of ["The basics", "Name and height"]) {
+      expect(words(text)).not.toContain("font-sans");
+      expect(words(text)).not.toContain("text-control");
+    }
     await fireEvent.press(basics);
     expect(open).toHaveBeenCalledTimes(1);
     expect(pressables(screen.toJSON() as HostNode).flatMap((node) => a11yProblems(node))).toEqual(

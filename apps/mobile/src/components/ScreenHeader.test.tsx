@@ -34,9 +34,9 @@ describe("ScreenHeader", () => {
     // It grows with the OS as h1 does, and shrinks from there only as needed.
     expect(title.props.maxFontSizeMultiplier).toBe(HEADING_FONT_SCALE.h1);
     // h1's size with no fixed line height, which would keep a shrunk title
-    // low on iOS: the variant's own text-4xl and its 2.5rem line are gone.
-    expect(title.props.className).toMatch(/(^| )text-4xl\/\[normal\]( |$)/);
-    expect(title.props.className).not.toMatch(/(^| )text-4xl( |$)/);
+    // low on iOS: the variant's own text-h1 and its 36 pt line are gone.
+    expect(title.props.className).toMatch(/(^| )text-h1\/\[normal\]( |$)/);
+    expect(title.props.className).not.toMatch(/(^| )text-h1( |$)/);
   });
 
   it("lets the title wrap in the web preview, which cannot shrink it and would cut it at one line", async () => {

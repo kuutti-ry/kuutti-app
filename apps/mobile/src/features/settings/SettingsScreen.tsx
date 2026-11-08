@@ -70,7 +70,7 @@ function Section({ title, rows }: { title: string; rows: readonly Row[] }) {
   );
   return (
     <View className="gap-2">
-      <Text variant="large" role="heading" aria-level="2">
+      <Text variant="group" role="heading" aria-level="2">
         {title}
       </Text>
       <RowGroup rows={shown} />

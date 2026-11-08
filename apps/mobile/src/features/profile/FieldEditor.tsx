@@ -213,7 +213,7 @@ function FieldHeading({
           >
             <View className="flex-row items-center gap-1">
               <Icon as={chose ? Eye : EyeOff} size={16} />
-              <Text className="text-sm font-medium">
+              <Text className="text-label">
                 {t(chose ? "profile.hide.show" : "profile.hide.action")}
               </Text>
             </View>

@@ -104,9 +104,11 @@ function RowView({ row, last }: { row: Row; last: boolean }) {
   );
   const words = (
     <View className="flex-1 gap-0.5">
-      <Text>{row.needed ? `${row.title}${NEEDED_MARK}` : row.title}</Text>
+      <Text className="font-system text-body">
+        {row.needed ? `${row.title}${NEEDED_MARK}` : row.title}
+      </Text>
       {row.summary && (
-        <Text className="text-sm font-normal text-muted-foreground">{row.summary}</Text>
+        <Text className="font-system text-small text-muted-foreground">{row.summary}</Text>
       )}
     </View>
   );

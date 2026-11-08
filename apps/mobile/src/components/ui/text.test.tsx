@@ -18,7 +18,7 @@ describe("Text", () => {
     expect(heading.props["aria-level"]).toBe(level);
   });
 
-  it.each(["default", "lead", "large", "small", "muted", "code"] as const)(
+  it.each(["default", "group", "small", "muted"] as const)(
     "is plain text, not a heading, as %s",
     async (variant) => {
       await renderWithTheme(<Text variant={variant}>Body</Text>);
@@ -27,52 +27,92 @@ describe("Text", () => {
     },
   );
 
-  // Headings grow less with the OS, the larger they are (#467).
-  const HEADINGS = ["h1", "h2", "h3", "h4", "default"] as const;
-  const growth = (variant: (typeof HEADINGS)[number]): number =>
-    (HEADING_FONT_SCALE as Partial<Record<string, number>>)[variant] ?? MAX_FONT_SCALE;
-  // Tailwind's font sizes in rem; NativeWind's rem on native is 14.
-  const REM: Record<string, number> = {
-    base: 1,
-    lg: 1.125,
-    xl: 1.25,
-    "2xl": 1.5,
-    "3xl": 1.875,
-    "4xl": 2.25,
+  // What is read is in the phone's own font; Saiga draws headings and short
+  // labels (#408, ADR-052 §4).
+  const VARIANTS = ["h1", "h2", "h3", "h4", "title", "group", "small", "muted", "default"] as const;
+  const SAIGA = new Set<(typeof VARIANTS)[number]>([
+    "h1",
+    "h2",
+    "h3",
+    "h4",
+    "title",
+    "group",
+    "small",
+  ]);
+  const classesOf = async (variant: (typeof VARIANTS)[number]): Promise<string> => {
+    await renderWithTheme(<Text variant={variant}>Words</Text>);
+    return String(screen.getByText("Words").props.className);
   };
-  const points = (className: string): number => {
-    const size = /(?:^| )text-(base|lg|xl|2xl|3xl|4xl)(?: |$)/.exec(className)?.[1];
-    if (size === undefined) throw new Error(`no font size in "${className}"`);
-    return (REM[size] as number) * 14;
-  };
+  const has = (className: string, utility: string): boolean =>
+    className.split(" ").includes(utility);
 
-  it.each(HEADINGS.slice(0, 4))("lets %s grow as far as its own scale", async (variant) => {
-    await renderWithTheme(<Text variant={variant}>Title</Text>);
-    expect(screen.getByRole("heading", { name: "Title" }).props.maxFontSizeMultiplier).toBe(
-      growth(variant),
-    );
+  it.each(VARIANTS)("draws %s in the family of its role", async (variant) => {
+    const className = await classesOf(variant);
+    const [own, other] = SAIGA.has(variant)
+      ? ["font-sans", "font-system"]
+      : ["font-system", "font-sans"];
+    expect(has(className, own)).toBe(true);
+    expect(has(className, other)).toBe(false);
   });
 
-  it("keeps the headings in order at the largest size, each above body text", async () => {
+  // Saiga Regular is as dark as the system font's Semibold: it takes
+  // Semibold's jobs, Bold is h1's alone, and Saiga has no semibold of its own.
+  it.each(VARIANTS)("gives %s no semibold, and Bold only if it is h1", async (variant) => {
+    const className = await classesOf(variant);
+    expect(has(className, "font-semibold")).toBe(false);
+    expect(has(className, "font-extrabold")).toBe(false);
+    expect(has(className, "font-bold")).toBe(variant === "h1");
+  });
+
+  // Headings grow less with the OS, the larger they are (#467).
+  const growth = (variant: (typeof VARIANTS)[number]): number =>
+    (HEADING_FONT_SCALE as Partial<Record<string, number>>)[variant] ?? MAX_FONT_SCALE;
+  // The scale's sizes, in points on a phone, read from the theme itself.
+  const SCALE = jest.requireActual<{
+    theme: { extend: { fontSize: Record<string, [string, object]> } };
+  }>("../../../tailwind.config.js").theme.extend.fontSize;
+  const points = (className: string): number => {
+    const size = Object.keys(SCALE).find((name) => has(className, `text-${name}`));
+    if (size === undefined) throw new Error(`no font size in "${className}"`);
+    return Number.parseFloat((SCALE[size] as [string, object])[0]);
+  };
+
+  it.each(["h1", "h2", "h3", "h4", "title"] as const)(
+    "lets %s grow as far as its own scale",
+    async (variant) => {
+      await renderWithTheme(<Text variant={variant}>Title</Text>);
+      expect(screen.getByRole("heading", { name: "Title" }).props.maxFontSizeMultiplier).toBe(
+        growth(variant),
+      );
+    },
+  );
+
+  it("keeps the headings in order at the largest size, h1 to h3 and a title above body text", async () => {
     // From the sizes the variants draw, so a new text class is held too.
+    const ORDER = ["h1", "h2", "h3", "h4", "title", "default"] as const;
     await renderWithTheme(
       <>
-        {HEADINGS.map((variant) => (
+        {ORDER.map((variant) => (
           <Text key={variant} variant={variant}>
             {variant}
           </Text>
         ))}
       </>,
     );
-    const largest = HEADINGS.map((variant) => {
-      const text = screen.getByText(variant);
-      return points(text.props.className) * text.props.maxFontSizeMultiplier;
-    });
-    for (let level = 1; level < largest.length; level++) {
-      expect(largest[level - 1]).toBeGreaterThan(largest[level] as number);
-    }
+    const largest = Object.fromEntries(
+      ORDER.map((variant) => {
+        const text = screen.getByText(variant);
+        return [variant, points(text.props.className) * text.props.maxFontSizeMultiplier];
+      }),
+    ) as Record<(typeof ORDER)[number], number>;
+    expect(largest.h1).toBeGreaterThan(largest.h2);
+    expect(largest.h2).toBeGreaterThan(largest.h3);
+    expect(largest.h3).toBeGreaterThan(largest.h4);
+    expect(largest.title).toBeGreaterThan(largest.default);
+    // h4 is body text's size at every size, set apart by Saiga Medium.
+    expect(largest.h4).toBe(largest.default);
     // And none grows more than text does.
-    for (const variant of HEADINGS) expect(growth(variant)).toBeLessThanOrEqual(MAX_FONT_SCALE);
+    for (const variant of VARIANTS) expect(growth(variant)).toBeLessThanOrEqual(MAX_FONT_SCALE);
   });
 
   it("takes a caller's own maxFontSizeMultiplier over its variant's", async () => {
@@ -99,7 +139,7 @@ describe("Text", () => {
     );
     const heading = screen.getByRole("heading", { name: "Child" });
     expect(heading.props["aria-level"]).toBe("2");
-    expect(heading.props.className).toMatch(/text-3xl/);
+    expect(heading.props.className).toMatch(/(^| )text-h2( |$)/);
     // One host text, not a text inside a text.
     expect(screen.getAllByText("Child")).toHaveLength(1);
   });

@@ -146,7 +146,7 @@ export function SeekScreen() {
         <View className="gap-3">
           {/* A 44 pt row around a line of text: the margins keep the heading with its rows. */}
           <View className="-my-2 min-h-touch flex-row items-center gap-2">
-            <Text variant="large" role="heading" aria-level="2" className="shrink">
+            <Text variant="group" role="heading" aria-level="2" className="shrink">
               {t("profile.dealBreakers.title")}
             </Text>
             {dealBreakers && (

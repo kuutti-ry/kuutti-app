@@ -2674,7 +2674,7 @@ describe("the short pool (#99, ADR-042)", () => {
       );
     });
 
-    it("leaves only the group's heading bold: the field in medium, how much in regular", async () => {
+    it("heads each group with a title, the field in medium and how much in regular inside the button (#408)", async () => {
       api(offering(mixed), EMPTY);
       await show();
       const row = screen.getByRole("button", {
@@ -2687,8 +2687,10 @@ describe("the short pool (#99, ADR-042)", () => {
         /(^| )font-normal( |$)/,
       );
       expect(classes(within(row).getByText("About 20 more people"))).not.toMatch(/font-semibold/);
-      expect(classes(screen.getByText(ASIDE_HEADING))).toMatch(/(^| )font-semibold( |$)/);
-      expect(classes(screen.getByText(INCLUDE_HEADING))).toMatch(/(^| )font-semibold( |$)/);
+      for (const heading of [ASIDE_HEADING, INCLUDE_HEADING]) {
+        expect(classes(screen.getByText(heading))).toMatch(/(^| )text-title( |$)/);
+        expect(classes(screen.getByText(heading))).toMatch(/(^| )font-sans( |$)/);
+      }
     });
 
     it.each([

@@ -12,7 +12,7 @@ export function UnreadBadge({ unread }: { unread: number }) {
   const { t } = useT();
   return (
     <View className="rounded-full bg-primary px-2 py-0.5" {...DECORATIVE}>
-      <Text className="text-sm font-semibold text-primary-foreground">
+      <Text className="text-caption font-semibold text-primary-foreground">
         {t("chat.unread.badge", { unread })}
       </Text>
     </View>

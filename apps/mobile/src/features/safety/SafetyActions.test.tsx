@@ -6,6 +6,7 @@ import { useState } from "react";
 import { AccessibilityInfo, DeviceEventEmitter, Platform, StyleSheet } from "react-native";
 import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
 import { renderWithTheme, underProviders } from "@/test/render";
+import { HEADING_FONT_SCALE } from "@/theme/a11y";
 import {
   ConversationActions,
   ConversationPhotoReport,
@@ -717,13 +718,14 @@ describe("SafetyActions", () => {
     expect(announced()).toEqual([]);
   });
 
-  it("is bounded by the window, scrolls its middle, keeps the app's text-size cap, and lets the keyboard go", async () => {
+  it("is bounded by the window, scrolls its middle, keeps the app's text-size caps, and lets the keyboard go", async () => {
     api(done);
     await show();
     await press("Block or report");
     await press("Report and block");
+    // The title grows as a title does, below h1 at the largest text (#408); the text as text does.
     const title = screen.getByText("Report and block");
-    expect(title.props.maxFontSizeMultiplier).toBe(2);
+    expect(title.props.maxFontSizeMultiplier).toBe(HEADING_FONT_SCALE.title);
     expect(screen.getByText(ALSO_BLOCKS).props.maxFontSizeMultiplier).toBe(2);
     const field = screen.getByLabelText(NOTE_LABEL);
     expect(field.props).toMatchObject({ submitBehavior: "blurAndSubmit", returnKeyType: "done" });
