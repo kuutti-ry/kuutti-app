@@ -27,12 +27,18 @@ describe("contrast", () => {
     expect(hslChannelsToRgb("8px")).toBeNull();
   });
 
-  it("finds the four token sets of tokens.css", () => {
+  it("finds the token sets of tokens.css: the base four and the try's palettes", () => {
     expect(Object.keys(parseTokenSets(TOKENS))).toEqual([
       ":root",
       ".dark:root",
       ".high-contrast",
       ".high-contrast-dark",
+      ".palette-ice",
+      ".palette-ice-dark",
+      ".palette-dusk",
+      ".palette-dusk-dark",
+      ".palette-birch",
+      ".palette-birch-dark",
     ]);
   });
 
@@ -80,6 +86,19 @@ describe("contrast", () => {
       expect(failing({ "seeks-women": set["seeks-men"] ?? "" })).toEqual([]);
     },
   );
+
+  // The neubrutalism try's stroke bounds a control or a container (WCAG 1.4.11).
+  it("fails a stroke fainter than 3:1 on the background or a card", () => {
+    const light = parseTokenSets(TOKENS)[":root"];
+    if (!light) throw new Error("no :root set");
+    // A pale ink on the near-white background and the white card: about 1.5:1.
+    const failures = checkContrast({ ":root": { ...light, stroke: "214 25% 78%" } });
+    expect(failures.map((f) => `${f.foreground}/${f.background}`)).toEqual([
+      "stroke/background",
+      "stroke/card",
+    ]);
+    expect(failures.every((f) => f.required === 3 && f.ratio < 3)).toBe(true);
+  });
 
   it("fails a seeks bar that misses a band", () => {
     const light = parseTokenSets(TOKENS)[":root"];

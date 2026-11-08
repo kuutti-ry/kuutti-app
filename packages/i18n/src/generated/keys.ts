@@ -1611,6 +1611,14 @@ export type MessageParams = {
   "tech.licenses.texts": Record<never, never>;
   "tech.licenses.title": Record<never, never>;
   "tech.licenses.version": { "version": string; "license": string };
+  "tech.look.neubrutalism": Record<never, never>;
+  "tech.look.title": Record<never, never>;
+  "tech.look.today": Record<never, never>;
+  "tech.palette.birch": Record<never, never>;
+  "tech.palette.dusk": Record<never, never>;
+  "tech.palette.ice": Record<never, never>;
+  "tech.palette.title": Record<never, never>;
+  "tech.palette.today": Record<never, never>;
   "tech.title": Record<never, never>;
   "tech.unavailable": Record<never, never>;
 };

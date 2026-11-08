@@ -60,6 +60,8 @@ function Probe() {
       <Text testID="scheme">{theme.scheme}</Text>
       <Text testID="preference">{theme.preference}</Text>
       <Text testID="contrast">{String(theme.highContrast)}</Text>
+      <Text testID="palette">{theme.palette}</Text>
+      <Text testID="look">{theme.look}</Text>
       <Pressable
         accessibilityRole="button"
         accessibilityLabel="dark"
@@ -79,6 +81,26 @@ function Probe() {
         accessibilityRole="button"
         accessibilityLabel="contrast off"
         onPress={() => theme.setHighContrast(false)}
+      />
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="dusk"
+        onPress={() => theme.setPalette("dusk")}
+      />
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="today's colours"
+        onPress={() => theme.setPalette("today")}
+      />
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="neubrutalism"
+        onPress={() => theme.setLook("neubrutalism")}
+      />
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="today's style"
+        onPress={() => theme.setLook("today")}
       />
     </>
   );
@@ -209,6 +231,83 @@ describe("ThemeProvider", () => {
     await fireEvent.press(screen.getByLabelText("contrast off"));
     expect(rootClass()).not.toMatch(/high-contrast/);
     await waitFor(() => expect(store.get("kuutti.preference.highContrast")).toBe("false"));
+  });
+
+  // The designers' try (tokens.css): today's colours are the base sets, the
+  // try's palettes a class on the root view in the scheme's set, high contrast
+  // wins; and the style, today's or neubrutalism's, is apart from the palette.
+  it.each([
+    ["light", "palette-dusk"],
+    ["dark", "palette-dusk-dark"],
+  ] as const)(
+    "puts Dusk's %s set on the root view, keeps it, and forgets it for today's colours",
+    async (scheme, set) => {
+      mockColorScheme = scheme;
+      osSettings();
+      await show();
+      expect(textOf("palette")).toBe("today");
+      expect(rootClass()).not.toMatch(/palette-/);
+      await fireEvent.press(screen.getByLabelText("dusk"));
+      expect(textOf("palette")).toBe("dusk");
+      expect(rootClass().split(" ")).toContain(set);
+      await waitFor(() => expect(store.get("kuutti.preference.palette")).toBe("dusk"));
+      await fireEvent.press(screen.getByLabelText("today's colours"));
+      expect(rootClass()).not.toMatch(/palette-/);
+      await waitFor(() => expect(store.has("kuutti.preference.palette")).toBe(false));
+    },
+  );
+
+  it("takes the palette chosen last time", async () => {
+    osSettings();
+    store.set("kuutti.preference.palette", "birch");
+    await show();
+    expect(textOf("palette")).toBe("birch");
+    expect(rootClass().split(" ")).toContain("palette-birch");
+  });
+
+  it("keeps today's colours for a stored palette it does not know", async () => {
+    osSettings();
+    store.set("kuutti.preference.palette", "neon");
+    await show();
+    expect(textOf("palette")).toBe("today");
+    expect(rootClass()).not.toMatch(/palette-/);
+  });
+
+  it("draws today's style until neubrutalism is chosen, keeps that, and forgets it again", async () => {
+    osSettings();
+    await show();
+    expect(textOf("look")).toBe("today");
+    await fireEvent.press(screen.getByLabelText("neubrutalism"));
+    expect(textOf("look")).toBe("neubrutalism");
+    await waitFor(() => expect(store.get("kuutti.preference.look")).toBe("neubrutalism"));
+    // The style is no token set: the root view's class stays the palette's.
+    expect(rootClass()).not.toMatch(/palette-/);
+    await fireEvent.press(screen.getByLabelText("today's style"));
+    expect(textOf("look")).toBe("today");
+    await waitFor(() => expect(store.has("kuutti.preference.look")).toBe(false));
+  });
+
+  it("takes the style chosen last time", async () => {
+    osSettings();
+    store.set("kuutti.preference.look", "neubrutalism");
+    await show();
+    expect(textOf("look")).toBe("neubrutalism");
+  });
+
+  it("keeps today's style for a stored one it does not know", async () => {
+    osSettings();
+    store.set("kuutti.preference.look", "memphis");
+    await show();
+    expect(textOf("look")).toBe("today");
+  });
+
+  it("lets high contrast win over a palette", async () => {
+    osSettings({ darker: true });
+    store.set("kuutti.preference.palette", "dusk");
+    await show();
+    expect(textOf("palette")).toBe("dusk");
+    expect(rootClass()).toMatch(/\bhigh-contrast\b/);
+    expect(rootClass()).not.toMatch(/palette-/);
   });
 
   it("fades a change of appearance in, briefly", async () => {

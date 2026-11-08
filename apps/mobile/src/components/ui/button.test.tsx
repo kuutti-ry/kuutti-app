@@ -1,4 +1,5 @@
-import { fireEvent, screen } from "@testing-library/react-native";
+import { fireEvent, screen, waitFor } from "@testing-library/react-native";
+import * as SecureStore from "expo-secure-store";
 import X from "lucide-react-native/icons/x";
 import { useContext } from "react";
 import { Text as RNText, StyleSheet } from "react-native";
@@ -6,6 +7,16 @@ import { renderWithTheme, underProviders } from "@/test/render";
 import { Button } from "./button";
 import { Icon } from "./icon";
 import { Text, TextClassContext } from "./text";
+
+// The ink a phone reads from the root view's token set; the test runner has no
+// compiled stylesheet to read it from.
+jest.mock("nativewind", () => ({
+  ...jest.requireActual("nativewind"),
+  useUnstableNativeVariable: (name: string) =>
+    name === "--stroke" ? [222, "40%", "14%"] : undefined,
+}));
+
+const store = (SecureStore as unknown as { __store: Map<string, string> }).__store;
 
 // The button (#12, TD-9): a 44 pt target whatever its size, a role a screen
 // reader announces, plain text that labels itself, and a disabled state that
@@ -175,5 +186,84 @@ describe("Button", () => {
       </Button>,
     );
     expect(screen.getByText("Label").props.className).toMatch(pattern);
+  });
+});
+
+// Today's look is what a released app draws: no hard shadow, no press offset.
+describe("Button in today's look", () => {
+  it("lies flat and stays put when pressed", async () => {
+    await renderWithTheme(<Button>Send</Button>);
+    const button = () => screen.getByRole("button", { name: "Send" });
+    expect(StyleSheet.flatten(button().props.style).boxShadow).toBeUndefined();
+    await fireEvent(button(), "pressIn");
+    expect(StyleSheet.flatten(button().props.style).transform).toBeUndefined();
+  });
+});
+
+// The designers' try, chosen on the tech screen outside production: a 2 px
+// stroke in the ink, and a hard shadow the button moves into when pressed.
+describe("Button in the neubrutalism try", () => {
+  beforeEach(() => store.set("kuutti.preference.look", "neubrutalism"));
+  afterEach(() => store.delete("kuutti.preference.look"));
+
+  const shown = async (ui: React.ReactElement, name: string) => {
+    await renderWithTheme(ui);
+    const button = () => screen.getByRole("button", { name });
+    await waitFor(() => expect(String(button().props.className).split(" ")).toContain("border-2"));
+    return button;
+  };
+
+  it.each([
+    ["default", "border-stroke"],
+    ["destructive", "border-stroke"],
+    ["outline", "border-stroke"],
+    ["secondary", "border-stroke"],
+    ["ghost", "border-transparent"],
+  ] as const)("gives the %s variant the same 2 px border, here %s", async (variant, colour) => {
+    const button = await shown(<Button variant={variant}>Block</Button>, "Block");
+    const classes = String(button().props.className).split(" ");
+    expect(classes).toContain(colour);
+    expect(classes).not.toContain("border");
+  });
+
+  it("lies on its hard shadow, and pressed moves down into it", async () => {
+    const button = await shown(<Button>Send</Button>, "Send");
+    expect(StyleSheet.flatten(button().props.style)).toMatchObject({
+      boxShadow: "2px 2px 0px 0px hsl(222, 40%, 14%)",
+      minHeight: 44,
+    });
+    await fireEvent(button(), "pressIn");
+    const pressed = StyleSheet.flatten(button().props.style);
+    expect(pressed.boxShadow).toBeUndefined();
+    expect(pressed.transform).toEqual([{ translateX: 2 }, { translateY: 2 }]);
+    await fireEvent(button(), "pressOut");
+    expect(StyleSheet.flatten(button().props.style).boxShadow).toBe(
+      "2px 2px 0px 0px hsl(222, 40%, 14%)",
+    );
+  });
+
+  it("still tells a caller's own press handlers", async () => {
+    const pressIn = jest.fn();
+    const pressOut = jest.fn();
+    const button = await shown(
+      <Button onPressIn={pressIn} onPressOut={pressOut}>
+        Send
+      </Button>,
+      "Send",
+    );
+    await fireEvent(button(), "pressIn");
+    await fireEvent(button(), "pressOut");
+    expect(pressIn).toHaveBeenCalledTimes(1);
+    expect(pressOut).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    ["a ghost button, a row or a link", { variant: "ghost" as const }],
+    ["a disabled button, which lies flat", { disabled: true }],
+  ])("draws no shadow on %s", async (_what, props) => {
+    const button = await shown(<Button {...props}>Later</Button>, "Later");
+    expect(StyleSheet.flatten(button().props.style).boxShadow).toBeUndefined();
+    await fireEvent(button(), "pressIn");
+    expect(StyleSheet.flatten(button().props.style).transform).toBeUndefined();
   });
 });
