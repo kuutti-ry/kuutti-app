@@ -1,6 +1,6 @@
 # ADR-053: The previews share one certificate, obtained by DNS-01
 
-- Status: proposed (#448, built as written here at the maintainer's word of 2026-10-24, option 1 of the four weighed; the staging apply on merge and one run of `dokploy-setup.sh staging` switch it on; accepting it is the maintainer's), amended by ADR-054 on 2026-10-25 (What a pull request may do now: no certificate key from the backup) and on 2026-11-06 (§5: the CAA record admits ACM as well; the wildcard is checked on the box, #198; see History)
+- Status: accepted 2026-11-08 (#203, the maintainer's word of that day; #448, built as written here at his word of 2026-10-24, option 1 of the four weighed, and on staging since its apply and the run of `dokploy-setup.sh staging`), amended by ADR-054 on 2026-10-25 (What a pull request may do now: no certificate key from the backup) and on 2026-11-06 (§5: the CAA record admits ACM as well; the wildcard is checked on the box, #198; see History)
 - Date: 2026-10-24
 - Follows: TD-2 (three previews), TD-19 (one staging box with the previews on it), ADR-001 (Dokploy's configuration is the one manual island; each environment declares its own records in `envs/<env>/dns.tf`), ADR-004 §3 (write access to the repository is a preview's trust, and staging-level trust), ADR-048 (`dokploy-setup.sh` writes what Traefik routes once Dokploy has its owner), ADR-049 (production runs under the same registered domain since 2026-10-24); issues #448, #9, #25
 

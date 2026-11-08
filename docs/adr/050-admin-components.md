@@ -1,6 +1,6 @@
 # ADR-050: The moderation panel's components: shadcn/ui on Tailwind, inside the panel's CSP
 
-- Status: proposed (built as written here; it reverses #302's component decision at the maintainer's word of 2026-10-24; accepting it, and the points under "Open, the maintainer's", are his), amended by ADR-052 on 2026-10-24 (§4 and §6: Saiga in front of the system fonts, the build's `@font-face` for `/fonts/`)
+- Status: accepted 2026-11-08 (#203, the maintainer's word of that day; built as written here; it reverses #302's component decision at his word of 2026-10-24; the points under "Open, the maintainer's" are his to confirm or change), amended by ADR-052 on 2026-10-24 (§4 and §6: Saiga in front of the system fonts, the build's `@font-face` for `/fonts/`)
 - Date: 2026-10-24
 - Follows: TD-9 (the app's design tokens and React Native Reusables, shadcn/ui's port to React Native), TD-2 (the stack, free tiers), ADR-025 §3 (the panel's content security policy), ADR-021 (tests at every level), CLAUDE.md (Accessibility; a new dependency: maintained, pinned, its licence in the policy), rules/admin.md (the component line of #302, which this replaces), the maintainer's request of 2026-10-24 ("an adequate UI for the admin panel, it looks like from the 90s, use some default best-practice UI library"); issues #302, #106
 

@@ -1,6 +1,6 @@
 # ADR-047: The drawings follow the code: what a view draws is redrawn in the change, or said still true
 
-- Status: proposed (built as written here for `docs/architecture/`; #395's flows and #396's register join as they land; accepting it, and the lists' breadth, are the maintainer's)
+- Status: accepted 2026-11-08 (#203, the maintainer's word of that day; built as written here for `docs/architecture/` and, since #396, for `docs/decisions.md`; #395's flows join as they land; the lists' breadth is his)
 - Date: 2026-10-24
 - Follows: #397 (the architecture views, "They stay true"), #395 (the user flows, PR #429), #396 (the register of product decisions), ADR-002 (`check:scenarios`, a check that holds a document to the code by name), CLAUDE.md (Code: "Understand first, then write the least"; Decisions), `.claude/rules/mobile.md` (the `Unwalked:` line), the maintainer's request of 2026-10-24
 

@@ -1,6 +1,6 @@
 # ADR-063: TestFlight: the staging app on internal testing, for the team
 
-- Status: proposed (#193, written on 2026-11-02, the day Apple approved the association's membership, and on the maintainer's answer of that day: internal testing, for the team alone; the profile, the submission and the runbooks built as written here; the move of `fi.kuutti.app`, the first interactive run and the testers are the maintainer's, and so is accepting it)
+- Status: accepted 2026-11-08 (#203, the maintainer's word of that day; #193, written on 2026-11-02, the day Apple approved the association's membership, and on his answer of that day: internal testing, for the team alone; the profile, the submission and the runbooks built as written here, and the move of `fi.kuutti.app`, the first interactive run and the first build in the internal group done the same day, see History; the testers are his)
 - Date: 2026-11-02
 - Follows: TD-2 (Expo and EAS as the native shell and the update channel), TD-4 (the accounts belong to the association), ADR-004 §3 and §4 (write access is the trust of the staging channel; signing returns before a production build reaches people outside the team), ADR-018 (staging holds test persons only), ADR-049 (production has no bank identification yet), ADR-055 (push through Expo), ADR-057 (the same for Google Play), CLAUDE.md (GitHub Actions reach clouds by OIDC only); issues #193, #184, #188, #299, #560
 

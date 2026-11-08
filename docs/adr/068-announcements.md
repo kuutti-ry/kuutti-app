@@ -1,6 +1,6 @@
 # ADR-068: Announcements: one text to everybody, approved by a second admin
 
-- Status: proposed (#573, built as written here on the maintainer's decisions of 2026-11-07, #573's comment of that day: a push, a notice in the app and an email; the `admin` role and a second admin's approval; English and Finnish required, Swedish falling back to English; the push in the app's own words; every confirmed address mailed; one switch for the push and the email; no cap; kept for good; the email in the language of the person's terms; accepting it is the maintainer's)
+- Status: accepted 2026-11-08 (#203, the maintainer's word of that day; #573, built as written here on his decisions of 2026-11-07, #573's comment of that day: a push, a notice in the app and an email; the `admin` role and a second admin's approval; English and Finnish required, Swedish falling back to English; the push in the app's own words; every confirmed address mailed; one switch for the push and the email; no cap; kept for good; the email in the language of the person's terms)
 - Date: 2026-11-07
 - Follows: TD-3 (one box, the work in process), TD-18 (mail and notices only with a reason; its reading changes here for one kind, §5), ADR-032 (the notices and the switches, amended here), ADR-055 (the push, amended here), ADR-043 (the confirmed address, amended here), ADR-024 §7 (a shadow ban tells nobody anything), ADR-007 §3 and §4 (export and erasure), ADR-009 (the plain-text rule), CLAUDE.md Product constraints (no real-time engagement push); issues #573, #196, #188, #176, #102, #385
 

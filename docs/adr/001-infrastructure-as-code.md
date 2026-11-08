@@ -1,6 +1,6 @@
 # ADR-001: Infrastructure as code with OpenTofu
 
-- Status: proposed (built in `infra/` and applied to staging, and to production on 2026-10-24, ADR-049; accepting it is the maintainer's), amended 2026-09-13 (#6: admin access through IAM Identity Center), 2026-09-17 and 2026-09-18 (the domain; the placeholder page), 2026-09-28 (the site moved to a repository of its own) and 2026-10-03 (#110: the organisation renamed)
+- Status: accepted 2026-11-08 (#203, the maintainer's word of that day; built in `infra/` and applied to staging, and to production on 2026-10-24, ADR-049), amended 2026-09-13 (#6: admin access through IAM Identity Center), 2026-09-17 and 2026-09-18 (the domain; the placeholder page), 2026-09-28 (the site moved to a repository of its own) and 2026-10-03 (#110: the organisation renamed)
 - Date: 2026-09-12
 - Follows: TD-4 (single-vendor AWS, eu-central-1), TD-19 (RDS, SSM, instance role)
 
