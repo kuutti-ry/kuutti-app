@@ -67,7 +67,7 @@ const gateRoute = createRoute({
   path: "/gate",
   summary: "Whether matching is open for the caller",
   description:
-    "Between a finished profile and the first round: incomplete while the profile or onboarding lacks something, closed once it is finished and matching has not opened in the caller's pond yet, open once it has. An admin opens a pond; nothing here counts anybody.",
+    "Between a finished profile and the first read of the queue: incomplete while the profile or onboarding lacks something, closed once it is finished and matching has not opened in the caller's pond yet, open once it has. An admin opens a pond; nothing here counts anybody.",
   ...bearer,
   responses: {
     200: { description: "What stands for the caller.", ...json(GateResponse) },

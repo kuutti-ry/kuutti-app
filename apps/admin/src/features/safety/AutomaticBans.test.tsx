@@ -235,8 +235,8 @@ describe("the automatic shadow bans", () => {
     ],
     ["cards_served", 1, "Was served the cards of 1 person"],
     ["cards_served", 45, "Was served the cards of 45 people"],
-    ["round_reads", 1, "Read the day's round 1 time"],
-    ["round_reads", 30, "Read the day's round 30 times"],
+    ["round_reads", 1, "Read the queue or opened a starred card 1 time"],
+    ["round_reads", 30, "Read the queue or opened a starred card 30 times"],
   ])("says the %s rule's count of %d as %s", async (rule, count, words) => {
     const item = ban(1, { rule, count });
     fetchMock([listOf(queue([item]))]);

@@ -28,7 +28,7 @@ The reasoning behind Kuutti's rules lives in two places. The technical decisions
 
 ## A TD cited in a doc
 
-- CLAUDE.md, CONTRIBUTING.md, these rules, `docs/` and the README at the root of an app, a package, a service or `infra/` cite a TD by number where a rule or a step follows from it. A new citation joins the TD's last cell in the README's second table, by the file's path or its basename, a README with its folder, with a few words on what the file says; a citation removed leaves the cell. A slice's README, a workflow or a flow may cite a TD without a place in the cell, and may have one where no record decides the TD.
+- CLAUDE.md, CONTRIBUTING.md, these rules, `docs/` and the README at the root of an app, a package, a service or `infra/` cite a TD by number where a rule or a step follows from it. A new citation joins the TD's last cell in the README's second table, by the file's path or its basename, a README with its folder, with a few words on what the file says; a citation removed leaves the cell. A slice's README, a workflow or a Maestro flow may cite a TD without a place in the cell, and may have one where no record decides the TD; a user flow of `docs/flows/` is a doc of `docs/` and has its place.
 - "TD-1 to TD-19" names the log, not a decision; a narrower range cites every number in it.
 
 ## After the edit

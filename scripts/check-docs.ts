@@ -11,9 +11,10 @@
  *       infra/modules/media/
  *       -->
  *
- * - Every view of docs/architecture/ has one (#397), its README aside, and so
- *   does the register of decisions (#396). Another folder or file joins
- *   REQUIRED in the change that lands it.
+ * - Every view of docs/architecture/ has one (#397), and so does every user
+ *   flow of docs/flows/ (#395), each folder's README aside, and the register
+ *   of decisions (#396). Another folder or file joins REQUIRED in the change
+ *   that lands it.
  * - Fails on a required document without a block, a path in a block that is
  *   not in the repository (a rename or a removal changes what is drawn), and a
  *   drawn file this change touches while its document is neither touched nor
@@ -37,7 +38,7 @@ type Doc = { file: string; draws: string[] | undefined };
 
 const ROOT = join(import.meta.dirname, "..");
 // As in a block: a trailing `/` is a folder and everything in it.
-const REQUIRED = ["docs/architecture/", "docs/decisions.md"];
+const REQUIRED = ["docs/architecture/", "docs/flows/", "docs/decisions.md"];
 // Right under the title, so a block quoted further down is no block.
 const BLOCK = /^# [^\n]*\n\s*<!--\s*draws\s*\n([\s\S]*?)-->/;
 const STILL_TRUE = /^still-true:(.*)$/gim;
@@ -173,6 +174,22 @@ function selfTest(): void {
       [],
       "",
       ['docs/architecture/new.md has no "<!-- draws" block'],
+    ],
+    [
+      "a flow without a block",
+      [{ file: "docs/flows/new.md", draws: undefined }],
+      all,
+      [],
+      "",
+      ['docs/flows/new.md has no "<!-- draws" block'],
+    ],
+    [
+      "the flows' README without one",
+      [{ file: "docs/flows/README.md", draws: undefined }],
+      all,
+      [],
+      "",
+      [],
     ],
     [
       "the register without a block",

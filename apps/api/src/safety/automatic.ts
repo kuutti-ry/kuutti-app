@@ -56,7 +56,7 @@ const RULE_NOTE: Record<SanctionRule, string> = {
   same_first_message: "Applied by the automatic rule on the same first message to several people",
   photo_fetches: "Applied by the automatic rule on other people's photos fetched within the window",
   cards_served: "Applied by the automatic rule on cards served within the window",
-  round_reads: "Applied by the automatic rule on reads of the round within the window",
+  round_reads: "Applied by the automatic rule on reads of the queue within the window",
 };
 
 /** The reason on the sanction: the velocity rules' is scraping (the maintainer, 21/10/2026), the others' other. */
@@ -303,10 +303,10 @@ function roundReadLog(now: () => Date) {
 }
 
 /**
- * The check after a read of the day's round (#86, ADR-041): cards served,
- * then the reads themselves. One per app, since it holds the reads; app.ts
- * hands it to the round's routes, so the matching slice never imports
- * safety.
+ * The check after a served read of the queue, or a starred card opened from
+ * the Starred list (#86, ADR-041, ADR-064 §4): cards served, then the reads
+ * themselves. One per app, since it holds the reads; app.ts hands it to the
+ * queue's and the stars' routes, so the matching slice never imports safety.
  */
 export function roundReadRule(deps: RuleDeps): (accountId: string) => Promise<void> {
   const reads = roundReadLog(deps.now);

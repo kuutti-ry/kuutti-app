@@ -204,7 +204,7 @@ export const enXA: Readonly<Record<string, string>> = {
   "admin.automaticBans.rule.first_messages": "Sent the first message of {conversations, plural, one {# conversation} other {# conversations}} between {first} and {at}.",
   "admin.automaticBans.rule.photo_fetches": "Was handed {photos, plural, one {# URL} other {# URLs}} of other people's photos in the card and full sizes between {first} and {at}.",
   "admin.automaticBans.rule.reports": "{people, plural, one {# person} other {# people}} reported this account between {first} and {at}.",
-  "admin.automaticBans.rule.round_reads": "Read the day's round {reads, plural, one {# time} other {# times}} between {first} and {at}.",
+  "admin.automaticBans.rule.round_reads": "Read the queue or opened a starred card {reads, plural, one {# time} other {# times}} between {first} and {at}.",
   "admin.automaticBans.rule.same_first_message": "Sent the same first message to {people, plural, one {# person} other {# people}} between {first} and {at}.",
   "admin.automaticBans.shown": "Showing the first {shown} of them.",
   "admin.automaticBans.title": "Automatic shadow bans",
