@@ -1,6 +1,6 @@
 # ADR-047: The drawings follow the code: what a view draws is redrawn in the change, or said still true
 
-- Status: proposed (built as written here for `docs/architecture/`; #395's flows and #396's register join as they land; accepting it, and the lists' breadth, are the maintainer's)
+- Status: proposed (built as written here for `docs/architecture/`, #396's register and #395's flows; accepting it, and the lists' breadth, are the maintainer's)
 - Date: 2026-10-24
 - Follows: #397 (the architecture views, "They stay true"), #395 (the user flows, PR #429), #396 (the register of product decisions), ADR-002 (`check:scenarios`, a check that holds a document to the code by name), CLAUDE.md (Code: "Understand first, then write the least"; Decisions), `.claude/rules/mobile.md` (the `Unwalked:` line), the maintainer's request of 2026-10-24
 
@@ -46,7 +46,6 @@ The rule existed already, in three places: the views' README ("Keeping them true
 ## Open, the maintainer's
 
 - **Accepting it, and the lists' breadth.** The lists are drawn from each view's "Where it lives". A few files that change for other reasons were left out: the catalog in `pnpm-workspace.yaml`, the contracts' field lists in `packages/schema`, the identity table's columns (which `check:schema-words` holds), and the logger. A narrower cut would ask less often and miss more.
-- **#429's flows.** Whether they join before #429 merges (each flow's block, `docs/flows` in `REQUIRED_DIRS`) or in a change of their own after it.
 
 ## Not done, and what would make it needed
 
@@ -63,3 +62,5 @@ The rule existed already, in three places: the views' README ("Keeping them true
 ## History
 
 - 2026-10-24: written, with the blocks of the nine views and the check in CI.
+- 2026-10-28 (#396, PR #484): the register joins, as §2 says: `docs/decisions.md` has its block and is in the check's `REQUIRED`.
+- 2026-11-08 (#395, PR #429): the flows join in the pull request that lands them, on the maintainer's word in chat that day, which settles what Open asked about them. Each flow of `docs/flows/` has its block, and `docs/flows/` is in `REQUIRED`, its README aside as in `docs/architecture/`.

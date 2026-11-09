@@ -1,6 +1,6 @@
 # User flows
 
-Each file here shows one flow of Kuutti from the side of whoever goes through it: what the person does, what the app and the API do in answer, and who else takes part (the bank, the other person, a moderator, the night's jobs). It is written for anyone joining, a designer, a tester or a new volunteer, who wants to see how a part of the app works without reading code. The rules themselves are the specs in `features/`, the reasons are the ADRs in `docs/adr/`, and #397's architecture views draw the same sign-in, upload and chat from the system's side.
+Each file here shows one flow of Kuutti from the side of whoever goes through it: what the person does, what the app and the API do in answer, and who else takes part (the bank, the other person, a moderator, the night's jobs). It is written for anyone joining, a designer, a tester or a new volunteer, who wants to see how a part of the app works without reading code. The rules themselves are the specs in `features/`, their values and who decided them are the register of product decisions, [`docs/decisions.md`](../decisions.md) (#396), the reasons are the ADRs in `docs/adr/`, and the [architecture views](../architecture/README.md) (#397) draw the same sign-in, upload, chat and night from the system's side.
 
 ## The flows
 
@@ -8,27 +8,28 @@ In the order a person meets them, then the moderators' side.
 
 | Flow | What it covers | Not built yet |
 |---|---|---|
-| [Signing in](sign-in.md) | The screens before the bank, the bank login every time, each refusal, a known account or a new one; how a session ends, Log out and Log out everywhere | nothing |
-| [Onboarding](onboarding.md) | From a new account's first sign-in to a finished profile: a friend's code, the eight steps, the sensitive-answers consent on whom one seeks, the area, leaving midway, the terms asked again | nothing |
-| [The profile, the card and deal-breakers](profile.md) | The profile's sections, the card as others see it, the later questions with Ask me later, setting deal-breakers, and how they pause and apply | nothing |
-| [Photos](photos.md) | Adding a photo, the automatic check and description, a person's look, what an approved photo opens, captions, order, removing, and the moderators' photo queue | the phone's own check before upload, #184 |
-| [The waitlist and the pond's gate](waitlist-and-gate.md) | From a finished profile to the first round: the area's counter, the Matching card, the night's count, what is said and in steps of what, what sends a person back in line | nothing |
-| [The round, likes, fish and the match](round.md) | The day's round from the night that builds it, one card at a time with like, pass and the fish, the match, and the short round's relaxing a deal-breaker for the day | the round's push, #102 |
-| [Chat](chat.md) | From a match to a conversation: the list, writing, messages live or later, a photo, sharing a contact, ending a conversation | a message's push, #102; the phone's own photo check, #184 |
-| [Report and block](report-and-block.md) | Blocking, or reporting and blocking, from a card or a conversation; the moderators' queue and what each outcome means for the person reported | nothing |
+| [Signing in](sign-in.md) | The screens before the bank, the bank login every time, each refusal and what it offers, a known account or a new one; a session renewed while in use, Log out and Log out everywhere | nothing |
+| [Onboarding](onboarding.md) | From a new account's first sign-in to a finished profile: a friend's code, one question a step, whom one seeks under the sensitive-answers consent, the home postal code, the photos and a few words, leaving midway, the terms asked again | nothing |
+| [People on Kuutti and the Matching switch](people-on-kuutti.md) | From a finished profile to the first people: what the matching card says, the number of finished profiles and the bar of whom they seek, an admin opening or closing matching for everybody, the night's count | nothing |
+| [People: the queue, likes, fish, the star and the match](queue.md) | From See people on: the queue's order, like, pass and Later, the fish, the likes left, the inbox stop and the your-turn limit, the star and Starred, the short card and the whole card, a deal-breaker relaxed at the end, the match | nothing |
+| [The profile, the card and What you seek](profile.md) | The profile's sections, the card as others see it in its two depths, hiding an answer from it, the later questions, and What you seek: whom, the ages, the intent and each deal-breaker | nothing |
+| [Photos](photos.md) | Adding a photo, the automatic check and description, a person's look, what an approved photo opens, captions, order, removing, the night's sweep, the moderators' photo queue and taking one approved photo down | the phone's own check before upload, #184 |
+| [Chat](chat.md) | From a match to a conversation: Your turn, Their turn and Archived, writing, messages live or by push, a photo, sharing a way to reach you, ending a conversation | the phone's own photo check, #184 |
+| [Report and block](report-and-block.md) | Blocking, or reporting and blocking, from a card, a photo or a conversation; the moderators' queue and what each outcome means for the person reported; the support page | nothing |
 | [Taking a break](break.md) | Pausing the account: the tick, every phone signed out, what others meet meanwhile, the next bank login back | nothing |
 | [Found them](found-them.md) | Telling Kuutti one found someone: one of three reasons, counted with nobody's name, nothing else changes | nothing |
 | [Deleting the account and downloading one's data](erasure-and-export.md) | Deleting the account: what goes at once, what is kept and why, what the night takes later, the cooldown; downloading the zip of one's data | nothing |
-| [E-mail and its confirmation](email.md) | The optional e-mail: adding one, the code sent by mail and typed in the app, changing or removing it, what it is used for | further mail to a confirmed address, #196 |
-| [The app lock](app-lock.md) | Turning the optional lock on and off, locking at a start and after time away, unlocking by face, fingerprint or passcode, the bank as the way out | nothing |
-| [Inviting a friend](invitations.md) | Making, sharing and withdrawing a code; the friend typing it; the night's count and what an invitation earns | nothing |
-| [Notifications and notices](notifications.md) | The notification switches, kept but with nothing sent yet; the notices on home and Got it | push itself, and whether the phone lets Kuutti notify, #102 |
-| [Settings, consents and feedback](settings-and-feedback.md) | The Settings list, theme and language, the legal texts, the research and sensitive-answers consents given and withdrawn, Give feedback | nothing |
+| [E-mail and its confirmation](email.md) | The optional e-mail: adding one, the code sent by mail and typed in the app, changing or removing it, what it is used for, an announcement's e-mail | further mail to a confirmed address, each kind under its own consent, #196 |
+| [The app lock](app-lock.md) | Turning the optional lock on and off, locking at a start and after time away, unlocking by face, fingerprint or passcode, the phone's pause after too many tries, the bank as the way out | nothing |
+| [Inviting a friend](invitations.md) | Making, sharing and withdrawing a code, the one link to the store, the friend typing it, the night's count and the fish it earns both | the app taking the code from the link by itself, #184 |
+| [Notifications and notices](notifications.md) | Being asked once, the switches, what a push says and never says, the quiet hours, the notices on home and Got it | nothing |
+| [Announcements](announcements.md) | One admin writes, a second approves, and everybody is told: the notice on home, a push and an e-mail | nothing |
+| [Settings, consents and feedback](settings-and-feedback.md) | Settings' one list, theme and language, the legal texts and the licences, the sensitive-answers consent given and withdrawn, the support page, Give feedback | nothing |
 | [Moderation in the admin panel](moderation.md) | Staff sign-in and the menu by role, a report to its decision, the sanctions and what each does, the automatic shadow bans and their review, and the panel's other screens | nothing |
 
 ## How a flow is drawn
 
-**What is drawn.** What the code does on `main`, not what is planned. Where the code and its spec disagree, the step is drawn neither way: the disagreement is raised as an issue and named under the file's Open until it is settled. Something planned and not built is drawn only where the flow already reaches it, dashed, with its issue.
+**What is drawn.** What the code does on `main`, not what is planned. Where the code and its spec or its ADR disagree, the step is drawn neither way: the disagreement is named under the file's Open until it is settled, with its issue or its note in the register's [Found on the way](../decisions.md#found-on-the-way). Something planned and not built is drawn only where the flow already reaches it, dashed, with its issue.
 
 **The diagram.** A Mermaid `flowchart TB`, which GitHub draws in the Markdown itself, so the diagram is text, reviewed in the pull request like code. One `subgraph` per actor, a lane, in this order where they appear, under these names:
 
@@ -39,7 +40,7 @@ In the order a person meets them, then the moderators' side.
 | `api` | The API |
 | `bank` | The bank, through Telia |
 | `other` | The other person |
-| `moderator` | A moderator |
+| `moderator` | A moderator; An admin, and Another admin where two must act, for what only an admin may do |
 | `admin` | The admin panel |
 | `night` | The night's jobs |
 
@@ -59,7 +60,7 @@ Every label is in double quotes, so punctuation cannot break the diagram. The da
 
 **Steps.** Under the diagram, the same flow as numbered steps, one per box, numbered as the boxes' ids (`s3` is step 3). A choice says where each answer leads ("yes: 4; no: 9"). A diagram alone is not readable by a screen reader; the steps are, and they are what the diagram is checked against.
 
-**Words.** English, plain, and the app's own names for things, as the English of `packages/i18n/messages.yaml` says them ("the round", "a fish", "taking a break"). A number appears by its name in `matching_config` (`round_size`), never by its value, so that values live in one place: `matching_config`, and the register of product decisions once #396 has written it. No route, table or file names in the diagram or the steps; they go under "Where it lives".
+**Words.** English, plain, and the app's own names for things, as the English of `packages/i18n/messages.yaml` says them ("the round", "a fish", "taking a break"). A number appears by its name in `matching_config` (`like_expiry_days`), never by its value, so that values live in one place: `matching_config`, which the register gives row by row with who decided each. A constant that lives in code is described without its value. No route, table or file names in the diagram or the steps; they go under "Where it lives", whose Rules line names the register's areas that hold the flow's rules. No TD number either: a flow links the ADR, which cites the TD.
 
 **History.** Each file ends with its History: one line per pull request that changed the flow as a person or a moderator meets it, oldest first, the date the pull request merged, the issue and the pull request:
 
@@ -67,12 +68,26 @@ Every label is in double quotes, so punctuation cannot break the diagram. The da
 
 A refactor, a fix that changes no step, a test or a translation is no line. The lines before #395 were read from the git history of each flow's spec, screens and routes.
 
-**Keeping them true.** A pull request that changes the steps of a flow here redraws its diagram, rewrites its steps and adds its History line, in that pull request (CLAUDE.md, Code). Nothing checks a drawing against the code: the specs and the Maestro flows hold the behaviour, and a check that diagrams match the code was left out on purpose (#395).
+**What it draws.** Under its title each flow names, in a block that GitHub does not show, the files whose change would change its steps: its screens, the components and hooks that decide them, the API's routes and rules, the night's jobs, the panel's features. One path from the repository's root per line, a trailing `/` for a whole folder; never a test, a spec, a Maestro flow, an ADR or the messages (ADR-047 §1):
+
+```
+<!-- draws
+apps/mobile/app/account/break.tsx
+apps/api/src/identity/pause.ts
+-->
+```
+
+**Keeping them true.** A pull request that changes the steps of a flow redraws its diagram, rewrites its steps and adds its History line, in that pull request (CLAUDE.md, Code). `pnpm check:docs`, in CI's `scenarios` job, fails a pull request that touches a file a flow names unless the flow is touched too or a commit message carries `Still-true: docs/flows/<file>`, written only after looking (ADR-047); a renamed or removed file fails it until the block follows. What it cannot see is whether a drawing is right: the specs and the Maestro flows hold the behaviour, review holds the drawing, and a check that diagrams match the code was left out on purpose (#395).
 
 ## A flow file
 
 ~~~markdown
 # Signing in
+
+<!-- draws
+apps/mobile/app/auth/…
+apps/api/src/identity/…
+-->
 
 One or two sentences for a person: what this flow is and who goes through it.
 
@@ -98,7 +113,7 @@ flowchart TB
 
 ## Open
 
-Only when there is something: a step the code and its spec disagree on, with its issue.
+Only when there is something: a step the code and its spec or ADR disagree on, with its issue or its note in the register.
 
 ## Where it lives
 
@@ -107,6 +122,7 @@ Only when there is something: a step the code and its spec disagree on, with its
 - Spec: links to `features/<slice>/….feature`
 - Maestro: links to `apps/mobile/e2e/flows/….yaml`
 - ADRs: links to `docs/adr/…`
+- Rules: the register's areas, links to `docs/decisions.md#…`
 
 ## History
 

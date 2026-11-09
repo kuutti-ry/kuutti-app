@@ -1,6 +1,6 @@
 # Architecture
 
-How Kuutti is built and where it runs, from the system's side: which apps and services exist, what talks to what, what runs on which machine, how a change reaches them, and the steps of the bank login, a photo upload, a chat message and the night's jobs. It is written for a contributor or a reviewer who wants to see the whole before reading the code. The person's side of the same journeys is drawn in #395 (`docs/flows/`, once it lands); the reasons are the ADRs in `docs/adr/`, and each view names the ones it draws.
+How Kuutti is built and where it runs, from the system's side: which apps and services exist, what talks to what, what runs on which machine, how a change reaches them, and the steps of the bank login, a photo upload, a chat message and the night's jobs. It is written for a contributor or a reviewer who wants to see the whole before reading the code. The person's side of the same journeys is drawn in the user flows of [`docs/flows/`](../flows/README.md) (#395); the reasons are the ADRs in `docs/adr/`, and each view names the ones it draws.
 
 ## The views
 
@@ -21,7 +21,7 @@ How Kuutti is built and where it runs, from the system's side: which apps and se
 
 **Nothing beyond the public infra code**: no IP address, no AWS account id, no secret's value. Parameters and secrets appear by name, as `infra/` names them.
 
-**The diagrams** are Mermaid, which GitHub draws in the Markdown itself, so they are text, reviewed in a pull request like code. The conventions are those #395's user flows use (`docs/flows/README.md`, once it lands):
+**The diagrams** are Mermaid, which GitHub draws in the Markdown itself, so they are text, reviewed in a pull request like code. The conventions are those the user flows use ([`docs/flows/README.md`](../flows/README.md), #395):
 
 - Context, components, deployment, delivery and trust are `flowchart`s, with one `subgraph` per place or owner.
 - The sequences are `sequenceDiagram`s with `autonumber`.

@@ -7,3 +7,5 @@ The earned, non-transferable reward ledger (TD-15), and the invitations that ear
 - `InvitationStep.tsx`: onboarding's optional step right after the welcome, what the code earns while it gives the reader a fish, the field and Skip, then that the code is in and Continue. Onboarding (the identity slice) offers it once a walk, while the name is still to come, when `fetchInvitations` says `redeemable`; a read that fails passes it over.
 - `useInvitations.ts`: the read when the screen comes to the front and when the app comes back to the foreground, as `useGate` reads the gate. `client.ts`: `GET /invitations`, `POST /invitations`, `DELETE /invitations/{id}`, `POST /invitations/redeem`.
 - `words.ts`: `rewardParams`, which picks the sentence for the two sides of what an invitation earns, for the screen's `settings.invite.earns` and for `invite.redeem.earns`.
+
+Flows, from the person's side (#395): [Inviting a friend](../../../../../docs/flows/invitations.md).
