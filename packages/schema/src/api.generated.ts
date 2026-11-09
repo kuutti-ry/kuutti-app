@@ -6074,7 +6074,7 @@ export interface paths {
         put?: never;
         /**
          * Open or close matching in a pond
-         * @description Sets the pond's switch. Open, its complete people are told so, and the night and the day's first read build their rounds (not in production yet: ADR-035 Open 1); closed, they build none, and rounds already built and conversations stay. Nothing else turns it. A press that finds the switch as it asks changes nothing and writes nothing. Admins only; written to audit_log.
+         * @description Sets the switch of the one pond, which stands for the whole country (ADR-061 §8). Open, each complete person reads their queue from their next read, and their matching card says so; closed, nobody new joins a queue, cards already queued stay for the day, and conversations go on (ADR-060, ADR-062). Nothing else turns it. A press that finds the switch as it asks changes nothing and writes nothing. Admins only; written to audit_log.
          */
         post: {
             parameters: {
@@ -6434,7 +6434,7 @@ export interface paths {
         };
         /**
          * Whether matching is open for the caller
-         * @description Between a finished profile and the first round: incomplete while the profile or onboarding lacks something, closed once it is finished and matching has not opened in the caller's pond yet, open once it has. An admin opens a pond; nothing here counts anybody.
+         * @description Between a finished profile and the first read of the queue: incomplete while the profile or onboarding lacks something, closed once it is finished and matching has not opened in the caller's pond yet, open once it has. An admin opens a pond; nothing here counts anybody.
          */
         get: {
             parameters: {

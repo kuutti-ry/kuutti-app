@@ -45,7 +45,7 @@ const matchingRoute = createRoute({
   path: "/admin/ponds/{id}/matching",
   summary: "Open or close matching in a pond",
   description:
-    "Sets the pond's switch. Open, its complete people are told so, and the night and the day's first read build their rounds (not in production yet: ADR-035 Open 1); closed, they build none, and rounds already built and conversations stay. Nothing else turns it. A press that finds the switch as it asks changes nothing and writes nothing. Admins only; written to audit_log.",
+    "Sets the switch of the one pond, which stands for the whole country (ADR-061 §8). Open, each complete person reads their queue from their next read, and their matching card says so; closed, nobody new joins a queue, cards already queued stay for the day, and conversations go on (ADR-060, ADR-062). Nothing else turns it. A press that finds the switch as it asks changes nothing and writes nothing. Admins only; written to audit_log.",
   ...bearer,
   request: { params: PondIdParams, body: { required: true, ...json(PondMatchingChange) } },
   responses: {

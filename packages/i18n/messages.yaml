@@ -6029,8 +6029,8 @@ admin.automaticBans.rule.cards_served:
   description: "Admin panel, the automatic shadow bans: the velocity rule on cards served applied it; {people} is of how many different people, {first} the first card's time and {at} when the rule applied the ban (#86)."
 
 admin.automaticBans.rule.round_reads:
-  en: "Read the day's round {reads, plural, one {# time} other {# times}} between {first} and {at}."
-  description: "Admin panel, the automatic shadow bans: the velocity rule on reads of the round applied it; {reads} is how many reads, {first} the first one's time and {at} when the rule applied the ban (#86)."
+  en: "Read the queue or opened a starred card {reads, plural, one {# time} other {# times}} between {first} and {at}."
+  description: "Admin panel, the automatic shadow bans: the velocity rule on reads of the queue applied it; {reads} is how many served reads of the queue, each starred card opened from the Starred list counted as one (ADR-064 §4), {first} the first one's time and {at} when the rule applied the ban (#86, ADR-041)."
 
 admin.automaticBans.hidden:
   en: "Hidden: {age}."

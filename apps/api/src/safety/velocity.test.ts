@@ -128,7 +128,7 @@ async function sanctionsOf(db: Queryable, accountId: string): Promise<SanctionRo
 const RULE_NOTE: Record<string, string> = {
   photo_fetches: "Applied by the automatic rule on other people's photos fetched within the window",
   cards_served: "Applied by the automatic rule on cards served within the window",
-  round_reads: "Applied by the automatic rule on reads of the round within the window",
+  round_reads: "Applied by the automatic rule on reads of the queue within the window",
 };
 
 const byRule = (rule: string, count: number) => ({
