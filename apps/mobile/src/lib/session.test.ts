@@ -2,6 +2,7 @@ import type { SessionTokens } from "@kuutti/schema";
 import * as SecureStore from "expo-secure-store";
 import { Platform } from "react-native";
 import { api, sessionMiddleware } from "./api";
+import { assert } from "./app-attest";
 import {
   accessTokenIsStale,
   clearSession,
@@ -37,9 +38,17 @@ const json = (body: unknown, status = 200) =>
 
 const fetchMock = jest.fn<Promise<Response>, [Request | string, RequestInit?]>();
 
+// The phone's App Attest key (ADR-069): its own tests are app-attest.test.ts.
+// Here it signs what a test tells it to, and nothing unless told.
+jest.mock("./app-attest", () => ({ assert: jest.fn() }));
+const assertMock = assert as jest.Mock;
+const KEY_ID = `${"k".repeat(43)}=`;
+const ASSERTION = "omlzaWduYXR1cmU=";
+
 beforeEach(async () => {
   globalThis.fetch = fetchMock as unknown as typeof fetch;
   fetchMock.mockReset();
+  assertMock.mockReset().mockResolvedValue(null);
   await clearSession();
 });
 
@@ -77,6 +86,22 @@ describe("session storage", () => {
 
   it("treats a value that does not parse as no session", async () => {
     await SecureStore.setItemAsync("kuutti.session", "{not json");
+    expect(await loadSession()).toBeNull();
+  });
+
+  it("keeps the identifier of the session's App Attest key with the tokens, on this device (ADR-069)", async () => {
+    await saveSession({ ...tokens(1), attestKeyId: KEY_ID });
+    expect(await loadSession()).toEqual({ ...tokens(1), attestKeyId: KEY_ID });
+    expect(SecureStore.setItemAsync).toHaveBeenLastCalledWith(
+      "kuutti.session",
+      JSON.stringify({ ...tokens(1), attestKeyId: KEY_ID }),
+      { keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY },
+    );
+  });
+
+  it("treats a stored session whose key identifier is no key identifier as no session", async () => {
+    const odd = { ...tokens(1), attestKeyId: "AAAA" };
+    await SecureStore.setItemAsync("kuutti.session", JSON.stringify(odd));
     expect(await loadSession()).toBeNull();
   });
 
@@ -170,6 +195,58 @@ describe("refresh", () => {
     expect(a?.accessToken).toBe(token("access2"));
     expect(b).toEqual(a);
     expect(currentSession()?.refreshToken).toBe(tokens(2).refreshToken);
+  });
+
+  it("asks no key for an assertion when the session began without one", async () => {
+    await saveSession(tokens(1));
+    fetchMock.mockResolvedValueOnce(json(tokens(2)));
+    await refreshSession();
+    expect(assertMock).not.toHaveBeenCalled();
+    expect(currentSession()).toEqual(tokens(2));
+  });
+
+  it("refreshes a session that began with an attestation with its key's assertion over the refresh token, and keeps the key", async () => {
+    await saveSession({ ...tokens(1), attestKeyId: KEY_ID });
+    assertMock.mockResolvedValueOnce(ASSERTION);
+    fetchMock.mockResolvedValueOnce(json(tokens(2)));
+    const next = await refreshSession();
+    expect(assertMock).toHaveBeenCalledWith(KEY_ID, tokens(1).refreshToken);
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(JSON.parse(String(init.body))).toEqual({
+      refreshToken: tokens(1).refreshToken,
+      assertion: ASSERTION,
+    });
+    // The rotation's answer names no key: the phone keeps it for the next one.
+    expect(next).toEqual({ ...tokens(2), attestKeyId: KEY_ID });
+    expect(await loadSession()).toEqual({ ...tokens(2), attestKeyId: KEY_ID });
+    assertMock.mockResolvedValueOnce(ASSERTION);
+    fetchMock.mockResolvedValueOnce(json(tokens(3)));
+    await refreshSession();
+    expect(assertMock).toHaveBeenLastCalledWith(KEY_ID, tokens(2).refreshToken);
+  });
+
+  it("refreshes without an assertion when the key is gone, and is signed out when the API refuses that", async () => {
+    await saveSession({ ...tokens(1), attestKeyId: KEY_ID });
+    fetchMock.mockResolvedValueOnce(json({ error: { code: "session_revoked" } }, 401));
+    expect(await refreshSession()).toBeNull();
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(JSON.parse(String(init.body))).toEqual({ refreshToken: tokens(1).refreshToken });
+    expect(currentSession()).toBeNull();
+  });
+
+  it("asks the API nothing when the device was signed out while its key was signing", async () => {
+    await saveSession({ ...tokens(1), attestKeyId: KEY_ID });
+    let signed!: (assertion: string) => void;
+    assertMock.mockReturnValueOnce(
+      new Promise<string>((resolve) => {
+        signed = resolve;
+      }),
+    );
+    const refreshing = refreshSession();
+    await clearSession();
+    signed(ASSERTION);
+    expect(await refreshing).toBeNull();
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it("signs the device out when the API refuses the refresh token", async () => {

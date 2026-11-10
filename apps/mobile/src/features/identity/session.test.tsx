@@ -1,6 +1,7 @@
 import { act, renderHook, waitFor } from "@testing-library/react-native";
 import * as SecureStore from "expo-secure-store";
 import { ApiError } from "@/lib/api";
+import { attest } from "@/lib/app-attest";
 import { clearSession, currentSession, saveSession } from "@/lib/session";
 import { exportFileName, SessionProvider, useSession } from "./session";
 
@@ -60,7 +61,13 @@ async function session(onLogoutUnheard?: () => Promise<void>) {
   return view;
 }
 
+// The phone's App Attest key (ADR-069), whose own tests are lib/app-attest.test.ts:
+// it attests what a test tells it to, and nothing unless told.
+jest.mock("@/lib/app-attest", () => ({ attest: jest.fn() }));
+const attestMock = attest as jest.Mock;
+
 beforeEach(async () => {
+  attestMock.mockReset().mockResolvedValue(null);
   await clearSession();
 });
 afterEach(() => jest.restoreAllMocks());
@@ -125,6 +132,35 @@ describe("SessionProvider: signing in", () => {
       outcome: "created",
     });
     expect(currentSession()).toEqual(tokens());
+  });
+
+  it("sends an iPhone's attestation over the code with the exchange, and keeps the key's identifier with the session (ADR-069)", async () => {
+    const attestation = { keyId: `${"k".repeat(43)}=`, attestation: "o2NmbXRv+/8=" };
+    attestMock.mockResolvedValueOnce(attestation);
+    const seen = serve({ "POST /auth/exchange": () => json({ ...tokens(), outcome: "resumed" }) });
+    const { result } = await session();
+    await act(async () => {
+      await result.current.signIn(token("code"), VERIFIER);
+    });
+    expect(attestMock).toHaveBeenCalledWith(token("code"));
+    expect(seen[0]?.body).toEqual({ code: token("code"), verifier: VERIFIER, attestation });
+    expect(currentSession()).toEqual({ ...tokens(), attestKeyId: attestation.keyId });
+    expect(result.current).toMatchObject({ status: "signed-in", outcome: "resumed" });
+  });
+
+  it("keeps no key when the API refuses the exchange for its attestation, and says which refusal it was", async () => {
+    attestMock.mockResolvedValueOnce({ keyId: `${"k".repeat(43)}=`, attestation: "AAAA" });
+    serve({ "POST /auth/exchange": () => refusal("attestation_refused", 403) });
+    const { result } = await session();
+    let error: unknown;
+    await act(async () => {
+      error = await result.current
+        .signIn(token("code"), VERIFIER)
+        .catch((caught: unknown) => caught);
+    });
+    expect(error).toMatchObject({ status: 403, code: "attestation_refused" });
+    expect(result.current.status).toBe("signed-out");
+    expect(currentSession()).toBeNull();
   });
 
   it("keeps the outcome through a later store change of the same session, not of another", async () => {

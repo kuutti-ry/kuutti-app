@@ -429,6 +429,10 @@ describe("SignInScreen", () => {
         "sv-FI",
         "Den här inloggningslänken begärdes inte från den här telefonen.",
       ],
+      // The API refused the exchange for want of Apple's word on the app (ADR-069).
+      ["attestation_refused", "en-US", "Apple could not confirm the app on this iPhone."],
+      ["attestation_refused", "fi-FI", "Apple ei voinut varmistaa sovellusta tällä iPhonella."],
+      ["attestation_refused", "sv-FI", "Apple kunde inte bekräfta appen på den här iPhonen."],
     ])("says %s on a %s phone in the one line, under the title", async (error, tag, line) => {
       (useLocales as jest.Mock).mockReturnValue([{ languageTag: tag }]);
       try {
@@ -475,6 +479,7 @@ describe("SignInScreen", () => {
       ["rate_limited"],
       ["auth_unavailable"],
       ["unexpected_link"],
+      ["attestation_refused"],
       ["something_else"],
       ["toString"],
     ])("keeps Try again under %s, a refusal that may pass", async (error) => {

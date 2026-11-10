@@ -1166,6 +1166,7 @@ export const fi: Readonly<Record<string, string>> = {
   "settings.version.label": "Versio",
   "signIn.agreements.research": "Kumpi tahansa vastaus vie sinut eteenpäin kirjautumaan pankkitunnuksilla.",
   "signIn.button": "Kirjaudu pankkitunnuksilla",
+  "signIn.error.attestation_refused": "Apple ei voinut varmistaa sovellusta tällä iPhonella.",
   "signIn.error.auth_banned": "Tämä henkilö ei voi käyttää Kuuttia.",
   "signIn.error.auth_cancelled": "Mitään ei tallennettu.",
   "signIn.error.auth_cooldown": "Poistit tilisi äskettäin. Uuden tilin voi luoda aikaisintaan: {date}",
