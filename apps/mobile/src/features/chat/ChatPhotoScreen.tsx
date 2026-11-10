@@ -1,6 +1,6 @@
 import type { ChatPhoto } from "@kuutti/schema";
 import { Image } from "expo-image";
-import { useFocusEffect, useRouter } from "expo-router";
+import { useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -71,7 +71,6 @@ export function ChatPhotoScreen({
   report,
 }: ChatPhotoParams) {
   const { t } = useT();
-  const router = useRouter();
   const handToList = useHandToList(conversation);
   // The conversation as the socket has told it since the link was made: an
   // end meanwhile changes what the report says, with no read (ADR-008).
@@ -128,14 +127,10 @@ export function ChatPhotoScreen({
 
   const placeholder = blurhash ? { blurhash } : undefined;
   const ready = view.status === "ready" ? view : null;
-  const words = ready && described.shown ? described.describe(ready.photo.description) : null;
+  const words = ready ? described.under(ready.photo.description) : null;
   return (
     <SafeAreaView className="flex-1 bg-background">
-      <ScreenHeader
-        title={t("chat.photo.photo")}
-        backLabel={t("chat.photo.back")}
-        onBack={() => router.back()}
-      />
+      <ScreenHeader title={t("chat.photo.photo")} backLabel={t("chat.photo.back")} />
       {view.status === "loading" && (
         <>
           <Text accessibilityLiveRegion="polite" className="p-6">

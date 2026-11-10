@@ -1,7 +1,7 @@
 import { act, fireEvent, screen } from "@testing-library/react-native";
 import { useLocales } from "expo-localization";
 import { AccessibilityInfo, Platform } from "react-native";
-import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
+import { type HostNode, noProblems, pressables } from "@/test/a11y";
 import { renderWithTheme, underProviders } from "@/test/render";
 import type { BiometricAnswer, Biometrics } from "./biometrics";
 import { LockScreen, type PasscodeAnswer } from "./LockScreen";
@@ -38,8 +38,6 @@ const UNLOCK = {
 
 const announced = () =>
   (AccessibilityInfo.announceForAccessibility as jest.Mock).mock.calls.map(([words]) => words);
-const noProblems = () =>
-  expect(pressables(screen.toJSON() as HostNode).flatMap((node) => a11yProblems(node))).toEqual([]);
 const field = () => screen.getByLabelText(FIELD);
 const button = (name: string) => screen.getByRole("button", { name });
 

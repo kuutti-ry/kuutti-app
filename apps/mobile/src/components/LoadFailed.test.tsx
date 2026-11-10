@@ -4,7 +4,7 @@ import { ApiError } from "@/lib/api";
 import { updateApp } from "@/lib/app-update";
 import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
 import { renderWithTheme } from "@/test/render";
-import { LoadFailed } from "./LoadFailed";
+import { LoadFailed, LoadFailedScreen, LoadingScreen } from "./LoadFailed";
 
 // What a screen shows when something did not load (outside production): why in
 // words, heard at once, and the way out that fits the failure (#581).
@@ -91,5 +91,26 @@ describe("LoadFailed", () => {
     fireEvent.press(screen.getByRole("button", { name: "Open the install page" }));
     expect(open).toHaveBeenCalledWith("https://expo.dev/accounts/kuutti/projects/kuutti/builds");
     open.mockRestore();
+  });
+});
+
+describe("the whole-screen frames", () => {
+  it("says the screen is loading in a polite live region, and nothing else", async () => {
+    await renderWithTheme(<LoadingScreen />);
+    expect(screen.getByText("Loading…").props.accessibilityLiveRegion).toBe("polite");
+    expect(pressables(screen.toJSON() as HostNode)).toEqual([]);
+  });
+
+  it("says why the screen did not load and tries again from there", async () => {
+    const onRetry = jest.fn();
+    await renderWithTheme(
+      <LoadFailedScreen error={new ApiError("profile answered 503", 503)} onRetry={onRetry} />,
+    );
+    expect(screen.getByText("Kuutti's server had a problem. Try again in a moment.")).toBeTruthy();
+    fireEvent.press(screen.getByRole("button", { name: "Try again" }));
+    expect(onRetry).toHaveBeenCalledTimes(1);
+    expect(pressables(screen.toJSON() as HostNode).flatMap((node) => a11yProblems(node))).toEqual(
+      [],
+    );
   });
 });

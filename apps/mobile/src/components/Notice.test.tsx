@@ -1,7 +1,7 @@
-import { screen } from "@testing-library/react-native";
+import { act, renderHook, screen } from "@testing-library/react-native";
 import { AccessibilityInfo, Platform } from "react-native";
 import { renderWithTheme, underProviders } from "@/test/render";
-import { Notice, sayAloud } from "./Notice";
+import { Notice, sayAloud, sayOnIos, useSaid, useSpokenOnIos } from "./Notice";
 
 // What came of a change (#511): a live region for Android and the web, and
 // said aloud on iOS, which has none. Words for a screen reader alone (#581):
@@ -59,5 +59,65 @@ describe("sayAloud", () => {
     sayAloud("Saved.");
     expect(plain.mock.calls).toEqual([["Saved."]]);
     expect(queued).not.toHaveBeenCalled();
+  });
+});
+
+describe("sayOnIos and useSpokenOnIos", () => {
+  const plain = () => jest.spyOn(AccessibilityInfo, "announceForAccessibility").mockClear();
+  afterEach(() => jest.restoreAllMocks());
+
+  function Spoken({ words }: { words: string | null }) {
+    useSpokenOnIos(words);
+    return null;
+  }
+
+  it("tells iOS's reader the words, plainly, since it has no live regions", () => {
+    jest.replaceProperty(Platform, "OS", "ios");
+    const said = plain();
+    sayOnIos("Saved.");
+    expect(said.mock.calls).toEqual([["Saved."]]);
+  });
+
+  it.each(["android", "web"] as const)("leaves %s to its live region", (os) => {
+    jest.replaceProperty(Platform, "OS", os);
+    const said = plain();
+    sayOnIos("Saved.");
+    expect(said).not.toHaveBeenCalled();
+  });
+
+  it("says the words on iOS as they come, once each, and nothing for none", async () => {
+    jest.replaceProperty(Platform, "OS", "ios");
+    const said = plain();
+    const view = await renderWithTheme(<Spoken words={null} />);
+    expect(said).not.toHaveBeenCalled();
+    await view.rerender(underProviders(<Spoken words="Loading…" />));
+    await view.rerender(underProviders(<Spoken words="Loading…" />));
+    expect(said.mock.calls).toEqual([["Loading…"]]);
+    await view.rerender(underProviders(<Spoken words="Saved." />));
+    expect(said.mock.calls).toEqual([["Loading…"], ["Saved."]]);
+  });
+
+  it("says nothing on Android, whose live region reads the line", async () => {
+    jest.replaceProperty(Platform, "OS", "android");
+    const said = plain();
+    await renderWithTheme(<Spoken words="Saved." />);
+    expect(said).not.toHaveBeenCalled();
+  });
+});
+
+describe("useSaid", () => {
+  it("counts each answer, so the same words said again are heard again, and forgets them on null", async () => {
+    const { result } = await renderHook(() => useSaid<"saved" | "failed">());
+    expect(result.current.said).toBeNull();
+    await act(async () => result.current.say("saved"));
+    expect(result.current.said).toEqual({ notice: "saved", answer: 1 });
+    await act(async () => result.current.say("saved"));
+    expect(result.current.said).toEqual({ notice: "saved", answer: 2 });
+    await act(async () => result.current.say("failed"));
+    expect(result.current.said).toEqual({ notice: "failed", answer: 3 });
+    await act(async () => result.current.say(null));
+    expect(result.current.said).toBeNull();
+    await act(async () => result.current.say("saved"));
+    expect(result.current.said).toEqual({ notice: "saved", answer: 1 });
   });
 });

@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Text } from "@/components/ui/text";
 import { useT } from "@/lib/locale";
-import { readPreference, writePreference } from "@/lib/preferences";
+import { readPreference, storedObject, writePreference } from "@/lib/preferences";
 import { useHapticTap } from "@/theme/haptics";
 
 /**
@@ -66,15 +66,9 @@ function writeSeenTips(next: SeenTips): Promise<void> {
 async function readSeenTips(): Promise<SeenTips> {
   await pendingWrite;
   const raw = await readPreference(SEEN_KEY);
-  if (raw === null) return NOTHING_SEEN;
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(raw);
-  } catch {
-    return NOTHING_SEEN;
-  }
-  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return NOTHING_SEEN;
-  const { mainId, kinds } = parsed as Record<string, unknown>;
+  const stored = storedObject(raw);
+  if (!stored) return NOTHING_SEEN;
+  const { mainId, kinds } = stored;
   if (typeof mainId !== "string" || !Array.isArray(kinds)) return NOTHING_SEEN;
   // Only kinds this build knows: anything else stored is dropped.
   return {

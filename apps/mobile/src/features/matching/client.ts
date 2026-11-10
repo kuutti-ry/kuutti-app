@@ -1,8 +1,6 @@
 import {
   type ApiComponents,
-  ConversationList,
   type DealBreakerField,
-  ErrorResponse,
   type Relaxation,
   RelaxationAnswer,
   RelaxationsResponse,
@@ -15,20 +13,11 @@ import {
   StarList,
   type StarredPerson,
 } from "@kuutti/schema";
-import { ApiError, api } from "@/lib/api";
+import { api, failed } from "@/lib/api";
 
 // The queue as the app calls it (#379, #502, ADR-034 §4, ADR-062), through the
 // typed client; the zod contracts guard the runtime (ADR-003). A refusal keeps
 // the envelope's code, which the screen says in words.
-
-function failed(response: Response, error: unknown, what: string): ApiError {
-  const parsed = ErrorResponse.safeParse(error);
-  return new ApiError(
-    `${what} answered ${response.status}`,
-    response.status,
-    parsed.success ? parsed.data.error.code : undefined,
-  );
-}
 
 /**
  * The day and the next cards, undecided, in order, a page of them: a read with
@@ -47,20 +36,6 @@ export async function reportSeen(day: string, position: number): Promise<void> {
     params: { path: { day, position } },
   });
   if (!response.ok) throw failed(response, error, "seen");
-}
-
-/**
- * How many conversations wait on the person's answer now (ADR-062 §5), for the
- * refusal that carries no number: the list without thumbs, which signs and spends
- * nothing, where a read of the queue would serve its cards again (ADR-008) and
- * count towards its alarm (ADR-041).
- */
-export async function fetchYourTurn(): Promise<number> {
-  const { data, error, response } = await api.GET("/conversations", {
-    params: { query: { thumbs: "false" } },
-  });
-  if (!data) throw failed(response, error, "conversations");
-  return ConversationList.parse(data).yourTurn.waiting;
 }
 
 /**

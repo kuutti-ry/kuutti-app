@@ -7,6 +7,7 @@ import {
   bindAgreements,
   dropAgreements,
   dropUnboundAgreements,
+  giveAgreements,
   heldAgreements,
   holdAgreements,
   recordAgreements,
@@ -270,6 +271,27 @@ describe("recordAgreements", () => {
     const posted = serve({ terms: networkDown });
     await expect(recordAgreements(answers)).resolves.toBeUndefined();
     expect(posted.map((p) => p.kind)).toEqual(["terms"]);
+    expect(store.has(AGREED)).toBe(false);
+  });
+});
+
+describe("giveAgreements", () => {
+  it("gives the terms, then the privacy summary, then remembers this phone", async () => {
+    const posted = serve();
+    await giveAgreements(answers);
+    expect(posted).toEqual([
+      { kind: "terms", version: TERMS, locale: "sv" },
+      { kind: "privacy", version: PRIVACY, locale: "sv" },
+    ]);
+    expect(await agreedOnThisPhone()).toBe(true);
+  });
+
+  it("hands a refusal on to the step that asked, and remembers nothing", async () => {
+    const posted = serve({ privacy: () => refusal("consent_version_outdated", 409) });
+    await expect(giveAgreements(answers)).rejects.toMatchObject({
+      code: "consent_version_outdated",
+    });
+    expect(posted.map((p) => p.kind)).toEqual(["terms", "privacy"]);
     expect(store.has(AGREED)).toBe(false);
   });
 });

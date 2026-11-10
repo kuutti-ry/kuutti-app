@@ -2,8 +2,9 @@ import type { StarredPerson } from "@kuutti/schema";
 import { act, fireEvent, screen, within } from "@testing-library/react-native";
 import { useLocales } from "expo-localization";
 import { clearSession, saveSession } from "@/lib/session";
-import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
+import { noProblems } from "@/test/a11y";
 import { FAILED_TO_LOAD } from "@/test/failed";
+import { textsInOrder as said } from "@/test/layout";
 import { renderWithTheme } from "@/test/render";
 import { StarredScreen } from "./StarredScreen";
 import { StarsButton } from "./StarsButton";
@@ -76,11 +77,6 @@ const press = async (name: string) => {
   });
   await settle();
 };
-const noProblems = () =>
-  expect(pressables(screen.toJSON() as HostNode).flatMap((node) => a11yProblems(node))).toEqual([]);
-/** Everything the screen draws, in order, so that a line nobody asked for is seen. */
-const said = (node: HostNode | string = screen.toJSON() as HostNode): string[] =>
-  typeof node === "string" ? [node] : (node.children ?? []).flatMap((child) => said(child));
 
 beforeEach(async () => {
   router.push.mockReset();

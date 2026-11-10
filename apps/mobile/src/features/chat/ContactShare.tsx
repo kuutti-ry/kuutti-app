@@ -1,15 +1,8 @@
 import type { PlainMessageKey } from "@kuutti/i18n";
 import type { ContactKind, ConversationContacts, ConversationDetail } from "@kuutti/schema";
-import { useCallback, useEffect, useRef, useState } from "react";
-import {
-  AccessibilityInfo,
-  Platform,
-  ScrollView,
-  type Text as TextNode,
-  useWindowDimensions,
-  View,
-} from "react-native";
-import { sayAloud } from "@/components/Notice";
+import { useEffect, useRef, useState } from "react";
+import { ScrollView, useWindowDimensions, View } from "react-native";
+import { sayAloud, sayOnIos } from "@/components/Notice";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -19,8 +12,9 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Text } from "@/components/ui/text";
-import { ApiError } from "@/lib/api";
+import { codeOf } from "@/lib/api";
 import { useT } from "@/lib/locale";
+import { focusOnMount } from "@/theme/a11y";
 import { useHapticTap } from "@/theme/haptics";
 import { ContactMark } from "./ContactMark";
 import { shareContact, stopSharing } from "./client";
@@ -101,11 +95,6 @@ export function ContactShare({
     isOpen.current = open;
   }, [open]);
 
-  // The title as the dialog opens: the button that opened it is under the scrim.
-  const focusTitle = useCallback((node: TextNode | null) => {
-    if (node) AccessibilityInfo.sendAccessibilityEvent(node, "focus");
-  }, []);
-
   const press = async (kind: ContactKind, shared: boolean) => {
     tap();
     setRefusal(null);
@@ -121,12 +110,11 @@ export function ContactShare({
         );
       }
     } catch (error) {
-      const code = (error instanceof ApiError ? error.code : undefined) ?? "";
+      const code = codeOf(error) ?? "";
       if (isOpen.current) {
         const refused = REFUSALS.get(code) ?? "load.failed.press";
         setRefusal(refused);
-        // iOS has no live regions; Android's speaks the same words already.
-        if (Platform.OS === "ios") AccessibilityInfo.announceForAccessibility(t(refused));
+        sayOnIos(t(refused));
       }
       if (STALE.has(code)) onStale();
     } finally {
@@ -149,7 +137,7 @@ export function ContactShare({
         style={{ maxHeight: height * WINDOW_SHARE }}
       >
         <DialogHeader>
-          <DialogTitle ref={focusTitle}>{t("chat.contact.share.title")}</DialogTitle>
+          <DialogTitle ref={focusOnMount}>{t("chat.contact.share.title")}</DialogTitle>
         </DialogHeader>
         <ScrollView style={{ flexShrink: 1 }} contentContainerClassName="gap-4">
           <DialogDescription>{t("chat.contact.share.body", { name })}</DialogDescription>

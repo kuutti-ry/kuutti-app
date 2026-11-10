@@ -8,7 +8,6 @@ apps/mobile/src/features/settings/SettingsScreen.tsx
 apps/mobile/src/features/settings/open-rows.ts
 apps/mobile/src/features/settings/LanguageChoices.tsx
 apps/mobile/src/features/settings/ThemeChoices.tsx
-apps/mobile/src/features/settings/LegalSummary.tsx
 apps/mobile/src/features/settings/SourcePanel.tsx
 apps/mobile/src/features/settings/LicensesScreen.tsx
 apps/mobile/src/features/settings/LicenseTextsScreen.tsx
@@ -16,6 +15,7 @@ apps/mobile/src/features/settings/SupportScreen.tsx
 apps/mobile/src/features/settings/support-lines.ts
 apps/mobile/src/features/settings/FeedbackForm.tsx
 apps/mobile/src/features/identity/ConsentSwitches.tsx
+apps/mobile/src/features/identity/LegalSummary.tsx
 apps/mobile/src/features/identity/LegalTextLink.tsx
 apps/api/src/identity/onboarding-routes.ts
 apps/api/src/identity/onboarding.ts
@@ -195,7 +195,7 @@ flowchart TB
 
 ## Where it lives
 
-- Screens: [settings/index.tsx](../../apps/mobile/app/settings/index.tsx) (the list), [settings/support.tsx](../../apps/mobile/app/settings/support.tsx), [settings/licenses/](../../apps/mobile/app/settings/licenses); the settings slice's [SettingsScreen.tsx](../../apps/mobile/src/features/settings/SettingsScreen.tsx) (the rows, their values and marks), [open-rows.ts](../../apps/mobile/src/features/settings/open-rows.ts) (one row open, remembered while the app runs), [LanguageChoices.tsx](../../apps/mobile/src/features/settings/LanguageChoices.tsx), [ThemeChoices.tsx](../../apps/mobile/src/features/settings/ThemeChoices.tsx), [LegalSummary.tsx](../../apps/mobile/src/features/settings/LegalSummary.tsx), [SourcePanel.tsx](../../apps/mobile/src/features/settings/SourcePanel.tsx) with [SourceOffer.tsx](../../apps/mobile/src/features/settings/SourceOffer.tsx), [LicensesScreen.tsx](../../apps/mobile/src/features/settings/LicensesScreen.tsx), [LicenseTextsScreen.tsx](../../apps/mobile/src/features/settings/LicenseTextsScreen.tsx), [SupportScreen.tsx](../../apps/mobile/src/features/settings/SupportScreen.tsx) with [support-lines.ts](../../apps/mobile/src/features/settings/support-lines.ts), [FeedbackForm.tsx](../../apps/mobile/src/features/settings/FeedbackForm.tsx); the identity slice's [ConsentSwitches.tsx](../../apps/mobile/src/features/identity/ConsentSwitches.tsx) and [LegalTextLink.tsx](../../apps/mobile/src/features/identity/LegalTextLink.tsx); the way to the support page from elsewhere, [SupportLink.tsx](../../apps/mobile/src/components/SupportLink.tsx); what the phone keeps, [preferences.ts](../../apps/mobile/src/lib/preferences.ts), and the languages offered, [locale.tsx](../../apps/mobile/src/lib/locale.tsx)
+- Screens: [settings/index.tsx](../../apps/mobile/app/settings/index.tsx) (the list), [settings/support.tsx](../../apps/mobile/app/settings/support.tsx), [settings/licenses/](../../apps/mobile/app/settings/licenses); the settings slice's [SettingsScreen.tsx](../../apps/mobile/src/features/settings/SettingsScreen.tsx) (the rows, their values and marks), [open-rows.ts](../../apps/mobile/src/features/settings/open-rows.ts) (one row open, remembered while the app runs), [LanguageChoices.tsx](../../apps/mobile/src/features/settings/LanguageChoices.tsx), [ThemeChoices.tsx](../../apps/mobile/src/features/settings/ThemeChoices.tsx), [SourcePanel.tsx](../../apps/mobile/src/features/settings/SourcePanel.tsx) with [SourceOffer.tsx](../../apps/mobile/src/features/settings/SourceOffer.tsx), [LicensesScreen.tsx](../../apps/mobile/src/features/settings/LicensesScreen.tsx), [LicenseTextsScreen.tsx](../../apps/mobile/src/features/settings/LicenseTextsScreen.tsx), [SupportScreen.tsx](../../apps/mobile/src/features/settings/SupportScreen.tsx) with [support-lines.ts](../../apps/mobile/src/features/settings/support-lines.ts), [FeedbackForm.tsx](../../apps/mobile/src/features/settings/FeedbackForm.tsx); the identity slice's [ConsentSwitches.tsx](../../apps/mobile/src/features/identity/ConsentSwitches.tsx), [LegalSummary.tsx](../../apps/mobile/src/features/identity/LegalSummary.tsx) (the summary shown before the bank too) and [LegalTextLink.tsx](../../apps/mobile/src/features/identity/LegalTextLink.tsx); the way to the support page from elsewhere, [SupportLink.tsx](../../apps/mobile/src/components/SupportLink.tsx); what the phone keeps, [preferences.ts](../../apps/mobile/src/lib/preferences.ts), and the languages offered, [locale.tsx](../../apps/mobile/src/lib/locale.tsx)
 - Admin: the feedback list, [FeedbackList.tsx](../../apps/admin/src/features/safety/FeedbackList.tsx)
 - API: `GET /consents`, `POST /consents` and `DELETE /consents/{kind}` in the identity slice ([onboarding-routes.ts](../../apps/api/src/identity/onboarding-routes.ts), [onboarding.ts](../../apps/api/src/identity/onboarding.ts)); `POST /feedback`, and the panel's `GET /admin/feedback` and `POST /admin/feedback/{id}/handled`, in the safety slice ([feedback-routes.ts](../../apps/api/src/safety/feedback-routes.ts), [feedback.ts](../../apps/api/src/safety/feedback.ts)); the source's address from `GET /health` ([health/index.ts](../../apps/api/src/health/index.ts))
 - Config: `feedback_per_day` in `matching_config` (defaults in [seed.ts](../../packages/db/src/seed.ts))
@@ -226,3 +226,4 @@ flowchart TB
 - 2026-11-01 (#514, PR #556): Licences also names the data the app carries, the postal areas, with where they come from and on what terms.
 - 2026-11-03 (#507, PR #585): the sensitive-answers consent's new wording says that whom one seeks is also counted, with everyone else's answers, for the shares on the home screen, and it is asked of everybody again.
 - 2026-11-04 (#545, PR #595): the Research row leaves Settings: nothing is asked about research until there is a researcher, and a yes given before can no longer be withdrawn in the app.
+- 2026-11-10 (#610): the legal texts' summary is the identity slice's `LegalSummary.tsx`, the same card the person reads before the bank; nothing a person sees changed.

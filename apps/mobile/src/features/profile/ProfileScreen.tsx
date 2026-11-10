@@ -2,9 +2,9 @@ import type { Gender } from "@kuutti/schema";
 import { useFocusEffect, useRouter } from "expo-router";
 import Eye from "lucide-react-native/icons/eye";
 import { useCallback, useRef, useState } from "react";
-import { ScrollView, View } from "react-native";
+import { ScrollView } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { LoadFailed } from "@/components/LoadFailed";
+import { LoadFailedScreen, LoadingScreen } from "@/components/LoadFailed";
 import { type Row, RowGroup } from "@/components/RowGroup";
 import { ScreenHeader } from "@/components/ScreenHeader";
 import { Button } from "@/components/ui/button";
@@ -107,28 +107,18 @@ export function ProfileScreen() {
     router.push(path);
   };
   if (profile.status === "loading") {
-    return (
-      <SafeAreaView className="flex-1 bg-background">
-        <View className="flex-1 items-center justify-center p-6">
-          <Text accessibilityLiveRegion="polite">{t("load.loading")}</Text>
-        </View>
-      </SafeAreaView>
-    );
+    return <LoadingScreen />;
   }
   if (profile.status === "error") {
     return (
-      <SafeAreaView className="flex-1 bg-background">
-        <View className="flex-1 items-center justify-center gap-4 p-6">
-          <LoadFailed
-            error={profile.error}
-            onRetry={() => {
-              readPhotos();
-              readGender();
-              void profile.reload();
-            }}
-          />
-        </View>
-      </SafeAreaView>
+      <LoadFailedScreen
+        error={profile.error}
+        onRetry={() => {
+          readPhotos();
+          readGender();
+          void profile.reload();
+        }}
+      />
     );
   }
 
@@ -139,11 +129,7 @@ export function ProfileScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-background">
-      <ScreenHeader
-        title={t("profile.title")}
-        backLabel={t("profile.back")}
-        onBack={() => router.back()}
-      >
+      <ScreenHeader title={t("profile.title")} backLabel={t("profile.back")}>
         <Button
           variant="ghost"
           size="icon"

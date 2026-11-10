@@ -13,7 +13,7 @@ import {
 } from "react-native";
 import { pickPrepared } from "@/features/media";
 import { clearSession, saveSession } from "@/lib/session";
-import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
+import { type HostNode, noProblems, pressables } from "@/test/a11y";
 import { FAILED_TO_LOAD } from "@/test/failed";
 import { expectPinnedHeader } from "@/test/layout";
 import { renderWithTheme } from "@/test/render";
@@ -71,8 +71,6 @@ const json = (body: unknown, status = 200) =>
 const refusal = (code: string, status: number) =>
   json({ error: { code, message: "x", requestId: "r" } }, status);
 const settle = () => act(() => new Promise<void>((resolve) => setTimeout(resolve, 20)));
-const noProblems = () =>
-  expect(pressables(screen.toJSON() as HostNode).flatMap((node) => a11yProblems(node))).toEqual([]);
 
 const ID = "3f9a2c1e-5b7d-4f01-8a2b-1c3d4e5f6a70";
 const DAY_1 = "2026-10-16T07:59:00.000Z";

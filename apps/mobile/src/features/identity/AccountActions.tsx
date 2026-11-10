@@ -3,18 +3,11 @@ import { Directory, File, Paths } from "expo-file-system";
 import { useRouter } from "expo-router";
 import { useState } from "react";
 import { Platform, Share, View } from "react-native";
-import { Notice as Said } from "@/components/Notice";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { Notice as Said, useSaid } from "@/components/Notice";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { Text } from "@/components/ui/text";
-import { ApiError } from "@/lib/api";
+import { codeOf } from "@/lib/api";
 import { useT } from "@/lib/locale";
 import { useHapticTap } from "@/theme/haptics";
 import { type ExportFile, useSession } from "./session";
@@ -89,14 +82,6 @@ export async function shareExport(
   }
 }
 
-/** What the last change came to, said under its button (#511): in words, and aloud on iOS. */
-function useSaid() {
-  const [said, setSaid] = useState<{ notice: Notice; answer: number } | null>(null);
-  const say = (notice: Notice | null) =>
-    setSaid((was) => (notice === null ? null : { notice, answer: (was?.answer ?? 0) + 1 }));
-  return { said, say };
-}
-
 /**
  * A copy of what Kuutti holds about the person (#51, ADR-007; #237, #465),
  * under its row of Settings (#511): the one button that hands it over, as the
@@ -107,7 +92,7 @@ export function ExportData({ share }: { share?: typeof Share.share }) {
   const session = useSession();
   // `choosing`: Android's folder picker is open and nothing is fetched yet, so nothing is said (#465).
   const [busy, setBusy] = useState<"idle" | "choosing" | "exporting">("idle");
-  const { said, say } = useSaid();
+  const { said, say } = useSaid<Notice>();
   if (session.status !== "signed-in") return null;
 
   const exportData = async () => {
@@ -123,7 +108,7 @@ export function ExportData({ share }: { share?: typeof Share.share }) {
       if (handed === "saved") say("export_saved");
     } catch (error) {
       // The day's copies are used up (#237): said as the API says it, not as a failure.
-      const limited = error instanceof ApiError && error.code === "export_budget_exceeded";
+      const limited = codeOf(error) === "export_budget_exceeded";
       say(limited ? "export_limited" : "export_failed");
     } finally {
       setBusy("idle");
@@ -169,7 +154,7 @@ export function AccountActions() {
   const tap = useHapticTap();
   const [deleting, setDeleting] = useState(false);
   const [confirming, setConfirming] = useState(false);
-  const { said, say } = useSaid();
+  const { said, say } = useSaid<Notice>();
   if (session.status !== "signed-in") return null;
 
   const deleteAccount = async () => {
@@ -228,24 +213,16 @@ export function AccountActions() {
         {said !== null && <Said refused words={t(NOTICE[said.notice])} answer={said.answer} />}
       </View>
 
-      <Dialog open={confirming} onOpenChange={(open) => !open && setConfirming(false)}>
-        <DialogContent closeLabel={t("account.delete.close")}>
-          <DialogHeader>
-            <DialogTitle>{t("account.delete.title")}</DialogTitle>
-            <DialogDescription>
-              {t("account.delete.body", { days: REREGISTER_COOLDOWN_DAYS })}
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onPress={() => setConfirming(false)}>
-              {t("account.delete.cancel")}
-            </Button>
-            <Button variant="destructive" onPress={() => void deleteAccount()}>
-              {t("account.delete.confirm")}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <ConfirmDialog
+        open={confirming}
+        closeLabel={t("account.delete.close")}
+        title={t("account.delete.title")}
+        body={t("account.delete.body", { days: REREGISTER_COOLDOWN_DAYS })}
+        cancel={t("account.delete.cancel")}
+        confirm={t("account.delete.confirm")}
+        onCancel={() => setConfirming(false)}
+        onConfirm={() => void deleteAccount()}
+      />
     </View>
   );
 }

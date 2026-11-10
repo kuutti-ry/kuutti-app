@@ -1,10 +1,9 @@
-import { CONSENT_VERSIONS, formatDate, realLocale } from "@kuutti/i18n";
+import { formatDate, realLocale } from "@kuutti/i18n";
 import {
   AGE_MAX,
   AGE_MIN,
   BIO_MIN_FOR_COMPLETENESS,
   bioOrPromptsComplete,
-  type ConsentKind,
   type Gender,
   type HomeSummary,
   type HomeUpdate,
@@ -19,14 +18,15 @@ import { type ScrollView, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Choice } from "@/components/Choice";
 import { KeyboardScrollView } from "@/components/KeyboardScrollView";
-import { LoadFailed } from "@/components/LoadFailed";
+import { LoadFailedScreen, LoadingScreen } from "@/components/LoadFailed";
+import { useSpokenOnIos } from "@/components/Notice";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Stepper } from "@/components/ui/stepper";
 import { Switch } from "@/components/ui/switch";
 import { Text } from "@/components/ui/text";
 import { PhotosScreen } from "@/features/media";
 import {
+  AgeWindowSteppers,
   BioEditor,
   GenderChips,
   IdentityLabelChips,
@@ -41,15 +41,15 @@ import {
   saveHome,
   savePreferences,
   useProfile,
-  useSpokenOnIos,
+  withField,
 } from "@/features/profile";
 import { fetchInvitations, InvitationStep } from "@/features/rewards";
 import { useT } from "@/lib/locale";
 import { useHapticTap } from "@/theme/haptics";
-import { rememberAgreed } from "../agreements";
+import { agreementsOf, giveAgreements } from "../agreements";
 import { NormsAndConsents } from "../BeforeSignIn";
 import { LegalTextLink } from "../LegalTextLink";
-import { consentLocale, giveConsent } from "./client";
+import { bundledVersion, consentLocale, giveConsent } from "./client";
 import { useOnboarding } from "./useOnboarding";
 
 type Step =
@@ -140,16 +140,6 @@ function nextStep(status: OnboardingStatus, local: LocalAnswers): Step {
   return "done";
 }
 
-/**
- * The version of a wording as built into this app: what the person actually
- * read, and therefore what a consent names (ADR-010 §4). When the API has a
- * newer wording, the app asks for an update instead of recording a consent
- * for a text it never showed.
- */
-function bundledVersion(kind: ConsentKind): string {
-  return CONSENT_VERSIONS[kind] ?? "";
-}
-
 /** The age window the steppers start from: the person's own age, five years each way, inside the bounds. */
 export function defaultAgeWindow(age: number): { min: number; max: number } {
   return {
@@ -235,12 +225,8 @@ export function OnboardingScreen() {
     if (current === "age" && ages === null && age !== null) setAges(defaultAgeWindow(age));
   }, [current, ages, age]);
 
-  const setField = (key: keyof ProfileFields, value: string | undefined) => {
-    const fields: Record<string, unknown> = { ...profile.draft.fields };
-    if (value === undefined) delete fields[key];
-    else fields[key] = value;
-    profile.update({ fields: fields as ProfileFields });
-  };
+  const setField = (key: keyof ProfileFields, value: string | undefined) =>
+    profile.update({ fields: withField(profile.draft.fields, key, value) });
   /** A profile step: the draft is saved, then the status read again. */
   const saveProfileStep = () => step(() => profile.save());
   /** The home's two steps: the API's answer says what the card will say, for the second. */
@@ -271,13 +257,7 @@ export function OnboardingScreen() {
     // The invitation's own heading comes only with the answer that offers it.
     (current === "invitation" && !(invitation === "offered" && invitationReward))
   ) {
-    return (
-      <SafeAreaView className="flex-1 bg-background">
-        <View className="flex-1 items-center justify-center p-6">
-          <Text accessibilityLiveRegion="polite">{t("load.loading")}</Text>
-        </View>
-      </SafeAreaView>
-    );
+    return <LoadingScreen />;
   }
   if (
     state.status === "error" ||
@@ -286,25 +266,17 @@ export function OnboardingScreen() {
     current === "stuck"
   ) {
     return (
-      <SafeAreaView className="flex-1 bg-background">
-        <View className="flex-1 items-center justify-center gap-4 p-6">
-          <LoadFailed
-            // A status that has no step for this person (`stuck`) is no failed
-            // read: it reads as "other".
-            error={
-              state.status === "error"
-                ? state.error
-                : profile.status === "error"
-                  ? profile.error
-                  : null
-            }
-            onRetry={() => {
-              void reload();
-              void profile.reload();
-            }}
-          />
-        </View>
-      </SafeAreaView>
+      <LoadFailedScreen
+        // A status that has no step for this person (`stuck`) is no failed
+        // read: it reads as "other".
+        error={
+          state.status === "error" ? state.error : profile.status === "error" ? profile.error : null
+        }
+        onRetry={() => {
+          void reload();
+          void profile.reload();
+        }}
+      />
     );
   }
   // Home takes over at once (the effect above), and says what comes next.
@@ -363,13 +335,7 @@ export function OnboardingScreen() {
                 disabled={busy}
                 onPress={() => {
                   tap();
-                  void step(async () => {
-                    for (const kind of ["terms", "privacy"] as ConsentKind[]) {
-                      await giveConsent(kind, bundledVersion(kind), consentLocale(locale));
-                    }
-                    // This phone has them now: the next sign-in here goes straight to the bank (#418).
-                    await rememberAgreed();
-                  });
+                  void step(() => giveAgreements(agreementsOf(locale)));
                 }}
               >
                 {t("onboarding.welcome.accept")}
@@ -561,27 +527,7 @@ export function OnboardingScreen() {
             <Text variant="h1" accessibilityRole="header">
               {t("onboarding.age.title")}
             </Text>
-            {/* One above the other, as on What you seek: side by side, with the minus and the plus further from the number, they overflow a small phone (#581). */}
-            <Stepper
-              label={t("onboarding.age.youngest")}
-              value={ages.min}
-              shown={t("onboarding.age.years", { years: ages.min })}
-              downLabel={t("onboarding.age.youngestDown")}
-              upLabel={t("onboarding.age.youngestUp")}
-              canDown={ages.min > AGE_MIN}
-              canUp={ages.min < ages.max}
-              onChange={(min) => setAges({ ...ages, min })}
-            />
-            <Stepper
-              label={t("onboarding.age.oldest")}
-              value={ages.max}
-              shown={t("onboarding.age.years", { years: ages.max })}
-              downLabel={t("onboarding.age.oldestDown")}
-              upLabel={t("onboarding.age.oldestUp")}
-              canDown={ages.max > ages.min}
-              canUp={ages.max < AGE_MAX}
-              onChange={(max) => setAges({ ...ages, max })}
-            />
+            <AgeWindowSteppers ages={ages} onChange={setAges} />
             <Button
               disabled={busy}
               onPress={() => {

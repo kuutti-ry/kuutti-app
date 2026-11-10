@@ -6,7 +6,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Text } from "@/components/ui/text";
-import { ApiError, apiBaseUrl } from "@/lib/api";
+import { apiBaseUrl, codeOf } from "@/lib/api";
 import { useT } from "@/lib/locale";
 import { markLoginStarted, takeLoginStarted } from "@/lib/session";
 import { useHapticTap } from "@/theme/haptics";
@@ -148,7 +148,7 @@ export function SignInScreen({ code, error, until }: SignInParams) {
       } catch (failure: unknown) {
         setPhase({
           kind: "error",
-          code: failure instanceof ApiError && failure.code ? failure.code : "generic",
+          code: codeOf(failure) || "generic",
         });
         dropAgreements();
         setAgreed(null);

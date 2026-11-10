@@ -2,7 +2,7 @@ import { act, fireEvent, screen } from "@testing-library/react-native";
 import { AccessibilityInfo } from "react-native";
 import { saveSession } from "@/lib/session";
 import { renderWithTheme, underProviders } from "@/test/render";
-import { PhotoImage } from "./PhotoImage";
+import { PhotoImage, photoRefusalKey } from "./PhotoImage";
 
 // One photo (rules/mobile.md Images): its variant's signed URL fetched on
 // mount, cached under photoId/variant and never the URL, the blurhash meanwhile,
@@ -135,4 +135,17 @@ describe("PhotoImage", () => {
     await show();
     expect(image().props.transition).toMatchObject({ duration: 0 });
   });
+});
+
+describe("photoRefusalKey", () => {
+  it("says the day's photos are used up for the budget's refusal", () => {
+    expect(photoRefusalKey("photo_budget_exceeded")).toBe("photos.error.photo_budget_exceeded");
+  });
+
+  it.each([["not_found"], ["unknown"], [undefined], [null]])(
+    "says the photo is not shown for anything else (%s)",
+    (code) => {
+      expect(photoRefusalKey(code)).toBe("photos.error.notShown");
+    },
+  );
 });

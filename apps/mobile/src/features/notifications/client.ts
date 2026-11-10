@@ -1,24 +1,14 @@
 import {
-  ErrorResponse,
   Notices,
   NotificationChoices,
   type NotificationKind,
   type PushTokenRequest,
 } from "@kuutti/schema";
-import { ApiError, api } from "@/lib/api";
+import { api, failed } from "@/lib/api";
 
 // The notification choices, the notices and this phone's push token as the
 // app calls them (#176, ADR-032; #102, ADR-055), through the typed client;
 // the zod contracts guard the runtime.
-
-function failed(response: Response, error: unknown, what: string): ApiError {
-  const parsed = ErrorResponse.safeParse(error);
-  return new ApiError(
-    `${what} answered ${response.status}`,
-    response.status,
-    parsed.success ? parsed.data.error.code : undefined,
-  );
-}
 
 /** Every kind and whether it is on. */
 export async function fetchChoices(): Promise<NotificationChoices> {

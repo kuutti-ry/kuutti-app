@@ -12,6 +12,7 @@ import {
   useWindowDimensions,
   View,
 } from "react-native";
+import { sayOnIos } from "@/components/Notice";
 import { Button } from "@/components/ui/button";
 import { Text } from "@/components/ui/text";
 import { useT } from "@/lib/locale";
@@ -74,8 +75,7 @@ export function SharedContacts({
 
   const tell = (said: Notice) => {
     setNotice(said);
-    // iOS has no live regions; Android's speak the same words already.
-    if (Platform.OS === "ios") AccessibilityInfo.announceForAccessibility(words(said));
+    sayOnIos(words(said));
   };
 
   const open = async (link: string) => {

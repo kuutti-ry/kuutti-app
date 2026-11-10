@@ -13,6 +13,7 @@ import {
   ConsentSwitch,
   EmailCard,
   ExportData,
+  LegalSummary,
   useConsentStates,
   useEmailSummary,
   useLock,
@@ -33,7 +34,6 @@ import { DecisionButtonChoices } from "./DecisionButtonChoices";
 import { DeviceActions } from "./DeviceActions";
 import { FeedbackForm } from "./FeedbackForm";
 import { LanguageChoices } from "./LanguageChoices";
-import { LegalSummary } from "./LegalSummary";
 import { LockControls } from "./LockControls";
 import { useOpenRow } from "./open-rows";
 import { PhotoDescriptionChoices } from "./PhotoDescriptionChoices";

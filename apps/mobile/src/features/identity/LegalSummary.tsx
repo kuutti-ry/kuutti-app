@@ -1,6 +1,6 @@
 import { Text } from "@/components/ui/text";
-import { LegalTextLink } from "@/features/identity";
 import { useT } from "@/lib/locale";
+import { LegalTextLink } from "./LegalTextLink";
 
 export type LegalKind = "terms" | "privacy";
 

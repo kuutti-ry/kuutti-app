@@ -1,15 +1,13 @@
-import { AGE_MAX, AGE_MIN, type AgeWindow } from "@kuutti/schema";
-import { useRouter } from "expo-router";
+import type { AgeWindow } from "@kuutti/schema";
 import { useState } from "react";
-import { ScrollView, View } from "react-native";
+import { ScrollView } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { LoadFailed } from "@/components/LoadFailed";
+import { LoadFailedScreen, LoadingScreen } from "@/components/LoadFailed";
 import { ScreenHeader } from "@/components/ScreenHeader";
-import { Stepper } from "@/components/ui/stepper";
-import { Text } from "@/components/ui/text";
 import { useT } from "@/lib/locale";
 import { ConfirmLeaveDialog } from "../ConfirmLeave";
 import { useRefusedDraft, useSaveOnLeave } from "../useSaveOnLeave";
+import { AgeWindowSteppers } from "./AgeWindowSteppers";
 import { savedOrHeld, useSeeking } from "./useSeeking";
 
 export const SEEK_AGES_PATH = "/profile/seek/ages" as const;
@@ -22,7 +20,6 @@ export const SEEK_AGES_PATH = "/profile/seek/ages" as const;
  */
 export function SeekAgesScreen() {
   const { t } = useT();
-  const router = useRouter();
   const held = useRefusedDraft<AgeWindow>(SEEK_AGES_PATH);
   const seeking = useSeeking();
   const stored = seeking.status === "ready" ? seeking.seeking.ageWindow : null;
@@ -41,52 +38,17 @@ export function SeekAgesScreen() {
 
   // A change brought back outlives a read that failed: see SeekWhomScreen.
   if (seeking.status === "error" && !draft) {
-    return (
-      <SafeAreaView className="flex-1 bg-background">
-        <View className="flex-1 items-center justify-center gap-4 p-6">
-          <LoadFailed error={seeking.error} onRetry={() => void seeking.reload()} />
-        </View>
-      </SafeAreaView>
-    );
+    return <LoadFailedScreen error={seeking.error} onRetry={() => void seeking.reload()} />;
   }
   if (!ages) {
-    return (
-      <SafeAreaView className="flex-1 bg-background">
-        <View className="flex-1 items-center justify-center p-6">
-          <Text accessibilityLiveRegion="polite">{t("load.loading")}</Text>
-        </View>
-      </SafeAreaView>
-    );
+    return <LoadingScreen />;
   }
 
   return (
     <SafeAreaView className="flex-1 bg-background">
-      <ScreenHeader
-        title={t("onboarding.age.title")}
-        backLabel={t("profile.seek.back")}
-        onBack={() => router.back()}
-      />
+      <ScreenHeader title={t("onboarding.age.title")} backLabel={t("profile.seek.back")} />
       <ScrollView contentContainerClassName="flex-grow gap-6 p-6">
-        <Stepper
-          label={t("onboarding.age.youngest")}
-          value={ages.min}
-          shown={t("onboarding.age.years", { years: ages.min })}
-          downLabel={t("onboarding.age.youngestDown")}
-          upLabel={t("onboarding.age.youngestUp")}
-          canDown={ages.min > AGE_MIN}
-          canUp={ages.min < ages.max}
-          onChange={(min) => setDraft({ ...ages, min })}
-        />
-        <Stepper
-          label={t("onboarding.age.oldest")}
-          value={ages.max}
-          shown={t("onboarding.age.years", { years: ages.max })}
-          downLabel={t("onboarding.age.oldestDown")}
-          upLabel={t("onboarding.age.oldestUp")}
-          canDown={ages.max > ages.min}
-          canUp={ages.max < AGE_MAX}
-          onChange={(max) => setDraft({ ...ages, max })}
-        />
+        <AgeWindowSteppers ages={ages} onChange={setDraft} />
       </ScrollView>
       <ConfirmLeaveDialog {...leaving} reason={t("load.failed.press")} />
     </SafeAreaView>

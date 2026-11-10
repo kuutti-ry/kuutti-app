@@ -5,7 +5,7 @@ import * as SecureStore from "expo-secure-store";
 import { AccessibilityInfo, Platform } from "react-native";
 import { clearSession, saveSession } from "@/lib/session";
 import { UnsavedRow } from "@/lib/unsaved";
-import { a11yProblems, type HostNode, markBefore, pressables } from "@/test/a11y";
+import { type HostNode, markBefore, noProblems, pressables } from "@/test/a11y";
 import { FAILED_TO_LOAD } from "@/test/failed";
 import { renderWithTheme, underProviders } from "@/test/render";
 import { YourContacts } from "./YourContacts";
@@ -40,8 +40,6 @@ const json = (body: unknown, status = 200) =>
 const refusal = (code: string, status: number) =>
   json({ error: { code, message: "x", requestId: "r" } }, status);
 const settle = () => act(() => new Promise<void>((resolve) => setTimeout(resolve, 20)));
-const noProblems = () =>
-  expect(pressables(screen.toJSON() as HostNode).flatMap((node) => a11yProblems(node))).toEqual([]);
 
 type Call = { method: string; path: string; body: unknown };
 /**

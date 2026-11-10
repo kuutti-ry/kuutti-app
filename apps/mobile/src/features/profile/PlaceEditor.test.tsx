@@ -4,7 +4,7 @@ import { act, fireEvent, screen } from "@testing-library/react-native";
 import { useLocales } from "expo-localization";
 import type * as React from "react";
 import { AccessibilityInfo, Keyboard, PixelRatio, Platform, StyleSheet } from "react-native";
-import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
+import { type HostNode, noProblems } from "@/test/a11y";
 import { hasCutText } from "@/test/layout";
 import { renderWithTheme, underProviders } from "@/test/render";
 import { MAX_FONT_SCALE, TOUCH_TARGET } from "@/theme/a11y";
@@ -30,10 +30,6 @@ const press = (element: ReturnType<typeof screen.getByRole>) =>
     fireEvent.press(element);
     await settle();
   });
-const noProblems = () => {
-  const found = pressables(screen.toJSON() as HostNode);
-  expect(found.flatMap((node) => a11yProblems(node))).toEqual([]);
-};
 /** The list's buttons by their heard names, in order. */
 const rowNames = () =>
   screen.queryAllByRole("button").map((row) => row.props.accessibilityLabel as string);

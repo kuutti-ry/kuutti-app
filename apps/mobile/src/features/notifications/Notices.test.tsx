@@ -2,7 +2,8 @@ import { act, fireEvent, screen } from "@testing-library/react-native";
 import { useLocales } from "expo-localization";
 import { AccessibilityInfo, Platform } from "react-native";
 import { clearSession, saveSession } from "@/lib/session";
-import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
+import { noProblems } from "@/test/a11y";
+import { textsInOrder as said } from "@/test/layout";
 import { renderWithTheme } from "@/test/render";
 import { Notices } from "./Notices";
 
@@ -17,8 +18,6 @@ const token = (seed: string) => (seed + "x".repeat(43)).slice(0, 43);
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
 const settle = () => act(() => new Promise<void>((resolve) => setTimeout(resolve, 20)));
-const noProblems = () =>
-  expect(pressables(screen.toJSON() as HostNode).flatMap((node) => a11yProblems(node))).toEqual([]);
 const notice = (n: number, readAt: string | null = null) => ({
   id: `00000000-0000-4000-8000-00000000000${n}`,
   kind: "warning",
@@ -56,9 +55,6 @@ const AROUND = {
   fi: ["Tiedotteet", "Selvä"],
   sv: ["Notiser", "Uppfattat"],
 } as const;
-/** Everything the screen says, in order, so what a notice leaves out is seen to be left out. */
-const said = (node: HostNode | string = screen.toJSON() as HostNode): string[] =>
-  typeof node === "string" ? [node] : (node.children ?? []).flatMap((child) => said(child));
 
 function api(notices: unknown[], read: () => Response = () => new Response(null, { status: 204 })) {
   const seen: string[] = [];

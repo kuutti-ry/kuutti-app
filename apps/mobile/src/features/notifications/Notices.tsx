@@ -2,7 +2,8 @@ import type { PlainMessageKey } from "@kuutti/i18n";
 import type { Notice, SanctionReason } from "@kuutti/schema";
 import { useFocusEffect } from "expo-router";
 import { useCallback, useRef, useState } from "react";
-import { AccessibilityInfo, Platform, View } from "react-native";
+import { View } from "react-native";
+import { sayOnIos } from "@/components/Notice";
 import { Button } from "@/components/ui/button";
 import { Text } from "@/components/ui/text";
 import { useT } from "@/lib/locale";
@@ -81,8 +82,7 @@ export function Notices() {
       setNotices((shown) => shown.filter((n) => n.id !== notice.id));
     } catch {
       setFailed(notice.id);
-      // Android's live region speaks it; iOS has none.
-      if (Platform.OS === "ios") AccessibilityInfo.announceForAccessibility(t("load.failed.press"));
+      sayOnIos(t("load.failed.press"));
     }
   };
 

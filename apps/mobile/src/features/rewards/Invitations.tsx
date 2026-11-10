@@ -6,20 +6,13 @@ import type {
   OpenInvitation,
 } from "@kuutti/schema";
 import { useEffect, useRef, useState } from "react";
-import { AccessibilityInfo, Platform, Share, View } from "react-native";
+import { Share, View } from "react-native";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { LoadFailed } from "@/components/LoadFailed";
-import { sayAloud } from "@/components/Notice";
+import { sayAloud, sayOnIos } from "@/components/Notice";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { Text } from "@/components/ui/text";
-import { ApiError } from "@/lib/api";
+import { codeOf } from "@/lib/api";
 import { apiBaseUrl } from "@/lib/api-url";
 import { useT } from "@/lib/locale";
 import { useRevealOn } from "@/lib/reveal";
@@ -115,8 +108,7 @@ export function Invitations({
     }
     setNotice(next);
     setAnswers((n) => n + 1);
-    // Android's live region speaks it; iOS has none.
-    if (Platform.OS === "ios") AccessibilityInfo.announceForAccessibility(t(NOTICE[next]));
+    sayOnIos(t(NOTICE[next]));
   };
 
   /** One change at a time: the last notice goes, the list is read again after it, then what came of it is said. */
@@ -139,9 +131,7 @@ export function Invitations({
         setMade(created);
         return "made";
       } catch (error) {
-        return (
-          MAKE_REFUSALS.get(error instanceof ApiError ? error.code : undefined) ?? "makeFailed"
-        );
+        return MAKE_REFUSALS.get(codeOf(error)) ?? "makeFailed";
       }
     });
 
@@ -302,28 +292,19 @@ export function Invitations({
 
       {withdrawing !== null && (
         // Open while it asks: the close control and a tap outside are its only ways to change that.
-        <Dialog open onOpenChange={() => setWithdrawing(null)}>
-          <DialogContent closeLabel={t("settings.invite.withdraw.close")}>
-            <DialogHeader>
-              <DialogTitle>{t("settings.invite.withdraw.title")}</DialogTitle>
-              <DialogDescription>{t("settings.invite.withdraw.body")}</DialogDescription>
-            </DialogHeader>
-            <DialogFooter>
-              <Button variant="outline" onPress={() => setWithdrawing(null)}>
-                {t("settings.invite.withdraw.cancel")}
-              </Button>
-              <Button
-                variant="destructive"
-                onPress={() => {
-                  setWithdrawing(null);
-                  void withdraw(withdrawing);
-                }}
-              >
-                {t("settings.invite.withdraw.confirm")}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+        <ConfirmDialog
+          open
+          closeLabel={t("settings.invite.withdraw.close")}
+          title={t("settings.invite.withdraw.title")}
+          body={t("settings.invite.withdraw.body")}
+          cancel={t("settings.invite.withdraw.cancel")}
+          confirm={t("settings.invite.withdraw.confirm")}
+          onCancel={() => setWithdrawing(null)}
+          onConfirm={() => {
+            setWithdrawing(null);
+            void withdraw(withdrawing);
+          }}
+        />
       )}
     </View>
   );

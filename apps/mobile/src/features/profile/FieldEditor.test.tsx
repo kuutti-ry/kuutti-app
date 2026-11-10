@@ -10,7 +10,7 @@ import { useState } from "react";
 import { AccessibilityInfo } from "react-native";
 import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
 import { renderWithTheme } from "@/test/render";
-import { FieldEditor, optionTextKey, toggled, visibleOptions } from "./FieldEditor";
+import { FieldEditor, OptionSearch, optionTextKey, toggled, visibleOptions } from "./FieldEditor";
 
 // One field of the registry as the person answers it (#47, #148, ADR-019):
 // a setting as a switch, choices as chips that say whether they are chosen, or
@@ -778,5 +778,16 @@ describe("optionTextKey", () => {
     expect(optionTextKey("smoking", "never", { hasKids: "yes_with_me" } as ProfileFields)).toBe(
       "profile.option.smoking.never",
     );
+  });
+});
+
+describe("OptionSearch", () => {
+  it("is a labelled field that hands on what is typed", async () => {
+    const onChange = jest.fn();
+    await renderWithTheme(<OptionSearch value="" onChange={onChange} />);
+    const field = screen.getByLabelText("Search");
+    expect(field.props.placeholder).toBe("Search");
+    fireEvent.changeText(field, "fin");
+    expect(onChange).toHaveBeenCalledWith("fin");
   });
 });

@@ -1,7 +1,7 @@
 import { act, fireEvent, screen } from "@testing-library/react-native";
 import { useLocales } from "expo-localization";
 import { clearSession, saveSession } from "@/lib/session";
-import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
+import { noProblems } from "@/test/a11y";
 import { renderWithTheme } from "@/test/render";
 import { InvitationStep } from "./InvitationStep";
 
@@ -16,8 +16,6 @@ const EARNS = "The code earns you a fish and your friend a fish once your profil
 const drawn = () => screen.queryAllByText(/./).map((node) => node.props.children);
 const token = (seed: string) => (seed + "x".repeat(43)).slice(0, 43);
 const settle = () => act(() => new Promise<void>((resolve) => setTimeout(resolve, 20)));
-const noProblems = () =>
-  expect(pressables(screen.toJSON() as HostNode).flatMap((node) => a11yProblems(node))).toEqual([]);
 const press = async (name: string) => {
   await act(async () => fireEvent.press(screen.getByRole("button", { name })));
   await settle();

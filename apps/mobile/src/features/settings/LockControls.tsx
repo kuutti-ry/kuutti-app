@@ -1,9 +1,9 @@
 import type { PlainMessageKey } from "@kuutti/i18n";
 import * as Sentry from "@sentry/react-native";
 import { useEffect, useState } from "react";
-import { AccessibilityInfo, AppState, Keyboard, Linking, Platform, View } from "react-native";
+import { AppState, Keyboard, Linking, View } from "react-native";
 import { Choice } from "@/components/Choice";
-import { sayAloud } from "@/components/Notice";
+import { sayAloud, sayOnIos } from "@/components/Notice";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -11,11 +11,6 @@ import { Text } from "@/components/ui/text";
 import { GRACE_MINUTES, PasscodeField, useLock } from "@/features/identity";
 import { useT } from "@/lib/locale";
 import { useHapticTap } from "@/theme/haptics";
-
-/** Said aloud on iOS; Android's live region below says it already. */
-function announce(words: string) {
-  if (Platform.OS === "ios") AccessibilityInfo.announceForAccessibility(words);
-}
 
 /** Why the face or fingerprint was not turned on: not confirmed, or paused by the phone (#464). */
 const REFUSED: Record<"failed" | "lockout", PlainMessageKey> = {
@@ -63,7 +58,7 @@ function PasscodeSetup({
           } else {
             setFirst(null);
             setMismatch(true);
-            announce(t("lock.passcode.mismatch"));
+            sayOnIos(t("lock.passcode.mismatch"));
           }
         }}
       />
@@ -120,10 +115,10 @@ export function LockControls() {
       const answer = await lock.setBiometrics(wanted);
       if (answer === "denied") {
         // The line above takes the switch's place, and says it from here on.
-        announce(t("lock.settings.biometricsDenied"));
+        sayOnIos(t("lock.settings.biometricsDenied"));
       } else if (answer !== "ok") {
         setRefused(answer);
-        announce(t(REFUSED[answer]));
+        sayOnIos(t(REFUSED[answer]));
       }
     } finally {
       setBusy(false);

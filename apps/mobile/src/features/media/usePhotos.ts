@@ -1,6 +1,6 @@
 import type { Photo, PhotoCaption, PhotoList } from "@kuutti/schema";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ApiError } from "@/lib/api";
+import { codeOf } from "@/lib/api";
 import {
   appealPhoto,
   deletePhoto,
@@ -100,6 +100,18 @@ export function usePhotos() {
     );
   }, [update]);
 
+  /** A change the API took: counted, so a read under way gives way to it (`changes`), and put on the list shown. */
+  const settle = useCallback((apply: (list: PhotosState["list"]) => PhotosState["list"]) => {
+    changes.current += 1;
+    setState((previous) => ({ ...previous, busy: { kind: "idle" }, list: apply(previous.list) }));
+  }, []);
+  /** A change the API refused, said with its code. */
+  const fail = useCallback(
+    (error: unknown) =>
+      update({ busy: { kind: "idle" }, notice: { kind: "error", code: codeOf(error) } }),
+    [update],
+  );
+
   const add = useCallback(async () => {
     update({ busy: { kind: "picking" }, notice: null });
     try {
@@ -115,42 +127,32 @@ export function usePhotos() {
       const photo = await uploadPhoto(picked.photo, (fraction) =>
         update({ busy: { kind: "uploading", percent: Math.round(fraction * 100) } }),
       );
-      changes.current += 1;
-      setState((previous) => ({
-        ...previous,
-        busy: { kind: "idle" },
-        list: previous.list
-          ? { ...previous.list, photos: [...previous.list.photos, photo] }
-          : previous.list,
-      }));
+      settle((list) => (list ? { ...list, photos: [...list.photos, photo] } : list));
     } catch (error) {
-      return update({ busy: { kind: "idle" }, notice: { kind: "error", code: codeOf(error) } });
+      return fail(error);
     }
     await refresh();
-  }, [update, refresh]);
+  }, [update, refresh, settle, fail]);
 
   const remove = useCallback(
     async (id: string) => {
       update({ busy: { kind: "removing", id }, notice: null });
       try {
         await deletePhoto(id);
-        changes.current += 1;
-        setState((previous) => ({
-          ...previous,
-          busy: { kind: "idle" },
-          list: previous.list
+        settle((list) =>
+          list
             ? renumber(
-                previous.list,
-                previous.list.photos.filter((p) => p.id !== id),
+                list,
+                list.photos.filter((p) => p.id !== id),
               )
             : null,
-        }));
+        );
       } catch (error) {
-        return update({ busy: { kind: "idle" }, notice: { kind: "error", code: codeOf(error) } });
+        return fail(error);
       }
       await refresh();
     },
-    [update, refresh],
+    [update, refresh, settle, fail],
   );
 
   // The check's rejection to a person (#253): the photo comes back queued, in its place.
@@ -159,18 +161,13 @@ export function usePhotos() {
       update({ busy: { kind: "appealing", id }, notice: null });
       try {
         const photo = await appealPhoto(id);
-        changes.current += 1;
-        setState((previous) => ({
-          ...previous,
-          busy: { kind: "idle" },
-          list: withPhoto(previous.list, photo),
-        }));
+        settle((list) => withPhoto(list, photo));
       } catch (error) {
-        return update({ busy: { kind: "idle" }, notice: { kind: "error", code: codeOf(error) } });
+        return fail(error);
       }
       await refresh();
     },
-    [update, refresh],
+    [update, refresh, settle, fail],
   );
 
   /** The owner's line under a photo (#296), or none: the photo comes back with it, in its place. */
@@ -179,17 +176,12 @@ export function usePhotos() {
       update({ busy: { kind: "captioning", id }, notice: null });
       try {
         const photo = await setPhotoCaption(id, line);
-        changes.current += 1;
-        setState((previous) => ({
-          ...previous,
-          busy: { kind: "idle" },
-          list: withPhoto(previous.list, photo),
-        }));
+        settle((list) => withPhoto(list, photo));
       } catch {
         update({ busy: { kind: "idle" }, notice: { kind: "caption_failed" } });
       }
     },
-    [update],
+    [update, settle],
   );
 
   const reorder = useCallback(
@@ -202,11 +194,11 @@ export function usePhotos() {
         const list = await reorderPhotos(photos.map((p) => p.id));
         update({ busy: { kind: "idle" }, list });
       } catch (error) {
-        update({ busy: { kind: "idle" }, notice: { kind: "error", code: codeOf(error) } });
+        fail(error);
         await reload();
       }
     },
-    [state.list, update, reload],
+    [state.list, update, reload, fail],
   );
 
   /**
@@ -270,8 +262,4 @@ function withPhoto(list: PhotoList | null, photo: Photo): PhotoList | null {
 
 function renumber(list: PhotoList, photos: Photo[]): PhotoList {
   return { ...list, photos: photos.map((photo, position) => ({ ...photo, position })) };
-}
-
-function codeOf(error: unknown): string | undefined {
-  return error instanceof ApiError ? error.code : undefined;
 }

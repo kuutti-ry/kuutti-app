@@ -1,7 +1,7 @@
 import type { HiddenField, HomeSummary, ProfileUpdate } from "@kuutti/schema";
 import { act, renderHook, waitFor } from "@testing-library/react-native";
 import { saveSession } from "@/lib/session";
-import { changesOf, EMPTY_PROFILE, useProfile, withChanges } from "./useProfile";
+import { changesOf, EMPTY_PROFILE, useProfile, withChanges, withField } from "./useProfile";
 
 // The profile as a draft (#47): what the API stored, what is typed since, the
 // save that trims and leaves unanswered prompts out, and what a failed read or
@@ -504,5 +504,29 @@ describe("changesOf and withChanges: what a draft changed, put on another docume
       fields: { intent: "casual", smoking: "never" },
     });
     expect(withChanges(DOCUMENT, {})).toEqual(DOCUMENT);
+  });
+});
+
+describe("withField", () => {
+  const fields = { height: 180, smoking: "no" } as ProfileUpdate["fields"];
+
+  it("puts an answer on the fields and leaves the rest as they were", () => {
+    expect(withField(fields, "drinking", "socially")).toEqual({
+      height: 180,
+      smoking: "no",
+      drinking: "socially",
+    });
+    expect(withField(fields, "height", 181)).toEqual({ height: 181, smoking: "no" });
+  });
+
+  it("takes an answer off when it is undefined", () => {
+    expect(withField(fields, "smoking", undefined)).toEqual({ height: 180 });
+    expect(withField(fields, "religion", undefined)).toEqual(fields);
+  });
+
+  it("never changes the fields it is given", () => {
+    withField(fields, "smoking", undefined);
+    withField(fields, "drinking", "socially");
+    expect(fields).toEqual({ height: 180, smoking: "no" });
   });
 });

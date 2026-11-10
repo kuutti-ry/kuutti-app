@@ -4,9 +4,9 @@ import { useLocales } from "expo-localization";
 import * as SecureStore from "expo-secure-store";
 import { AccessibilityInfo, AppState, PixelRatio, Platform, StyleSheet } from "react-native";
 import { clearSession, saveSession } from "@/lib/session";
-import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
+import { type HostNode, noProblems } from "@/test/a11y";
 import { FAILED_TO_LOAD } from "@/test/failed";
-import { expectPinnedHeader } from "@/test/layout";
+import { expectPinnedHeader, textsInOrder as inOrder } from "@/test/layout";
 import { renderWithTheme } from "@/test/render";
 import { FakeWebSocket } from "@/test/websocket";
 import { MAX_FONT_SCALE } from "@/theme/a11y";
@@ -44,11 +44,6 @@ const tokens = {
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
 const settle = () => act(() => new Promise<void>((resolve) => setTimeout(resolve, 20)));
-const noProblems = () =>
-  expect(pressables(screen.toJSON() as HostNode).flatMap((node) => a11yProblems(node))).toEqual([]);
-/** The words on the screen in the order a screen reader meets them. */
-const inOrder = (node: HostNode | string): string[] =>
-  typeof node === "string" ? [node] : (node.children ?? []).flatMap(inOrder);
 const words = () => inOrder(screen.toJSON() as HostNode);
 
 const OLD = "2026-01-05T10:00:00.000Z";

@@ -2,10 +2,23 @@
  * The accessibility baseline as constants (#12, CLAUDE.md Accessibility), so
  * components and their tests agree on one number.
  */
-import { Platform } from "react-native";
+import {
+  AccessibilityInfo,
+  Platform,
+  type Text as TextNode,
+  type View,
+  type ViewStyle,
+} from "react-native";
 
 /** Minimum touch target edge in points. */
 export const TOUCH_TARGET = 44;
+
+/**
+ * A pressable at least the touch target, whatever its content: Button, the
+ * dialog's close control, a row. A style, not a class: the guarantee must hold
+ * wherever the stylesheet does not (tests, a class merged away by a caller).
+ */
+export const MINIMUM_TARGET: ViewStyle = { minHeight: TOUCH_TARGET, minWidth: TOUCH_TARGET };
 
 /**
  * Hides a purely decorative element (an icon beside its label, the logo above
@@ -38,4 +51,15 @@ export function hitSlopFor(width: number, height: number) {
   const horizontal = Math.max(0, Math.ceil((TOUCH_TARGET - width) / 2));
   const vertical = Math.max(0, Math.ceil((TOUCH_TARGET - height) / 2));
   return { top: vertical, bottom: vertical, left: horizontal, right: horizontal };
+}
+
+/**
+ * A callback ref that moves a screen reader's focus to what it is set on as
+ * that mounts: a dialog's title, since the button that opened the dialog is
+ * under the scrim, or the line that takes a removed button's place. One
+ * function for the whole app, so it runs as the element mounts, never on a
+ * render.
+ */
+export function focusOnMount(node: TextNode | View | null): void {
+  if (node) AccessibilityInfo.sendAccessibilityEvent(node, "focus");
 }

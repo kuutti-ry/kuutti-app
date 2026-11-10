@@ -5,7 +5,7 @@ import { useLocales } from "expo-localization";
 import { AccessibilityInfo, AppState, Platform, Share } from "react-native";
 import { RevealProvider } from "@/lib/reveal";
 import { clearSession, saveSession } from "@/lib/session";
-import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
+import { noProblems } from "@/test/a11y";
 import { FAILED_TO_LOAD } from "@/test/failed";
 import { renderWithTheme } from "@/test/render";
 import { Invitations } from "./Invitations";
@@ -26,8 +26,6 @@ const json = (body: unknown, status = 200) =>
 const refusal = (code: string, status: number) =>
   json({ error: { code, message: "x", requestId: "r" } }, status);
 const settle = () => act(() => new Promise<void>((resolve) => setTimeout(resolve, 20)));
-const noProblems = () =>
-  expect(pressables(screen.toJSON() as HostNode).flatMap((node) => a11yProblems(node))).toEqual([]);
 const press = async (element: ReturnType<typeof screen.getByRole>) => {
   await act(async () => fireEvent.press(element));
   await settle();

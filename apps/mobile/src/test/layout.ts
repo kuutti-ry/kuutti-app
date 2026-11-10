@@ -1,16 +1,10 @@
 import { screen } from "@testing-library/react-native";
-import type { HostNode } from "./a11y";
-
-function each(node: HostNode | string, visit: (node: HostNode) => void): void {
-  if (typeof node === "string") return;
-  visit(node);
-  for (const child of node.children ?? []) each(child, visit);
-}
+import { type HostNode, rootsOf, visit } from "./a11y";
 
 /** The texts and the screen-reader labels inside a tree, for asking where something is. */
 function wordsIn(node: HostNode): string[] {
   const words: string[] = [];
-  each(node, (inner) => {
+  visit(node, (inner) => {
     const label = inner.props.accessibilityLabel;
     if (typeof label === "string") words.push(label);
     for (const child of inner.children ?? []) if (typeof child === "string") words.push(child);
@@ -25,8 +19,8 @@ function wordsIn(node: HostNode): string[] {
  */
 export function hasCutText(tree: HostNode | HostNode[] | null): boolean {
   let cut = false;
-  for (const root of Array.isArray(tree) ? tree : tree ? [tree] : []) {
-    each(root, (node) => {
+  for (const root of rootsOf(tree)) {
+    visit(root, (node) => {
       if (node.type !== "Text") return;
       const style = ([] as unknown[]).concat(node.props.style ?? []) as { height?: unknown }[];
       const counted =
@@ -46,8 +40,8 @@ export function expectPinnedHeader(title: string, backLabel: string): void {
   expect(screen.getByRole("button", { name: backLabel })).toBeTruthy();
   const tree = screen.toJSON() as HostNode | HostNode[] | null;
   const scrolls: HostNode[] = [];
-  for (const root of Array.isArray(tree) ? tree : tree ? [tree] : []) {
-    each(root, (node) => {
+  for (const root of rootsOf(tree)) {
+    visit(root, (node) => {
       if (node.type === "RCTScrollView") scrolls.push(node);
     });
   }
@@ -57,3 +51,7 @@ export function expectPinnedHeader(title: string, backLabel: string): void {
     expect(wordsIn(scroll)).not.toContain(backLabel);
   }
 }
+
+/** Every text a tree draws, in order, so that a line nobody asked for is seen: the whole screen by default. */
+export const textsInOrder = (node: HostNode | string = screen.toJSON() as HostNode): string[] =>
+  typeof node === "string" ? [node] : (node.children ?? []).flatMap((child) => textsInOrder(child));

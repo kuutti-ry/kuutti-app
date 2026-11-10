@@ -1,7 +1,6 @@
 import { formatDateTime, type PlainMessageKey } from "@kuutti/i18n";
 import type { HealthResponse } from "@kuutti/schema";
 import * as Sentry from "@sentry/react-native";
-import { useRouter } from "expo-router";
 import * as Updates from "expo-updates";
 import { useCallback, useEffect, useState } from "react";
 import { ScrollView, View } from "react-native";
@@ -38,7 +37,6 @@ type State =
  */
 export function TechConfigScreen() {
   const { t, locale } = useT();
-  const router = useRouter();
   const tap = useHapticTap();
   const [state, setState] = useState<State>({ kind: "loading" });
   const [errorSent, setErrorSent] = useState(false);
@@ -82,11 +80,7 @@ export function TechConfigScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-background">
-      <ScreenHeader
-        title={t("tech.title")}
-        backLabel={t("tech.back")}
-        onBack={() => router.back()}
-      />
+      <ScreenHeader title={t("tech.title")} backLabel={t("tech.back")} />
       <ScrollView contentContainerClassName="items-center gap-4 p-6">
         {isProduction() ? (
           <Text className="w-full max-w-md">{t("tech.unavailable")}</Text>

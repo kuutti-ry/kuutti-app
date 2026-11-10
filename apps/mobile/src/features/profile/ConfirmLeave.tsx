@@ -1,14 +1,6 @@
 import { useNavigation } from "expo-router";
 import { useEffect, useRef, useState } from "react";
-import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { useT } from "@/lib/locale";
 
 /** A leaving that was held: carried out on the person's word, or called off. */
@@ -117,21 +109,15 @@ export function ConfirmLeaveDialog({
 }) {
   const { t } = useT();
   return (
-    <Dialog open={asking} onOpenChange={(open) => !open && keep()}>
-      <DialogContent closeLabel={t("profile.discard.close")}>
-        <DialogHeader>
-          <DialogTitle>{t("profile.discard.title")}</DialogTitle>
-          {reason !== undefined && <DialogDescription>{reason}</DialogDescription>}
-        </DialogHeader>
-        <DialogFooter>
-          <Button variant="outline" onPress={keep}>
-            {t("profile.discard.keep")}
-          </Button>
-          <Button variant="destructive" onPress={leave}>
-            {t("profile.discard.leave")}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+    <ConfirmDialog
+      open={asking}
+      closeLabel={t("profile.discard.close")}
+      title={t("profile.discard.title")}
+      body={reason}
+      cancel={t("profile.discard.keep")}
+      confirm={t("profile.discard.leave")}
+      onCancel={keep}
+      onConfirm={leave}
+    />
   );
 }

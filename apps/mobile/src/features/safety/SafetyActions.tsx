@@ -6,15 +6,9 @@ import {
   type SanctionReason,
 } from "@kuutti/schema";
 import Ellipsis from "lucide-react-native/icons/ellipsis";
-import { useCallback, useEffect, useRef, useState } from "react";
-import {
-  AccessibilityInfo,
-  Platform,
-  ScrollView,
-  type Text as TextNode,
-  useWindowDimensions,
-  View,
-} from "react-native";
+import { useEffect, useRef, useState } from "react";
+import { AccessibilityInfo, ScrollView, useWindowDimensions, View } from "react-native";
+import { sayOnIos } from "@/components/Notice";
 import { SupportLink } from "@/components/SupportLink";
 import { Button } from "@/components/ui/button";
 import {
@@ -29,8 +23,9 @@ import { Icon } from "@/components/ui/icon";
 import { Input } from "@/components/ui/input";
 import { Text } from "@/components/ui/text";
 import { CachedPhoto } from "@/features/media";
-import { ApiError } from "@/lib/api";
+import { codeOf } from "@/lib/api";
 import { useT } from "@/lib/locale";
+import { focusOnMount } from "@/theme/a11y";
 import { useHapticTap } from "@/theme/haptics";
 import { blockConversation, blockPerson, reportConversation, reportPerson } from "./client";
 
@@ -391,19 +386,6 @@ function SafetyDialog({
     shown.current = open;
   }, [open]);
 
-  // Each step's title as it appears: the step replaced the button that had
-  // the focus, so the screen reader goes to the title rather than to wherever
-  // the removed button leaves it. Stable, so it runs as a title mounts, not
-  // on every render.
-  const focusTitle = useCallback((node: TextNode | null) => {
-    if (node) AccessibilityInfo.sendAccessibilityEvent(node, "focus");
-  }, []);
-
-  /** iOS has no live regions; Android's speak the same words already. */
-  const say = (words: string) => {
-    if (Platform.OS === "ios") AccessibilityInfo.announceForAccessibility(words);
-  };
-
   const go = (next: Step) => {
     tap();
     setNotice(null);
@@ -449,7 +431,7 @@ function SafetyDialog({
     tap();
     setNotice(null);
     setSending(true);
-    say(t("safety.sending"));
+    sayOnIos(t("safety.sending"));
     try {
       await request();
       if (settle === "screen" || outcome === "unmatched") {
@@ -459,7 +441,7 @@ function SafetyDialog({
       const words = t(outcome === "blocked" ? "safety.block.done" : "safety.report.done");
       if (shown.current) {
         setStep(outcome);
-        say(words);
+        sayOnIos(words);
       } else {
         // Closed meanwhile: the card goes, and no live region is there to say
         // why, so the words are announced on both platforms.
@@ -468,7 +450,7 @@ function SafetyDialog({
         onOutcome(outcome);
       }
     } catch (error) {
-      const code = error instanceof ApiError ? error.code : null;
+      const code = codeOf(error);
       if (code === "not_found") {
         // The card's person, the photos it showed, or the conversation are
         // gone meanwhile: trying again cannot help.
@@ -477,18 +459,18 @@ function SafetyDialog({
           return;
         }
         setStep("gone");
-        say(t("safety.gone"));
+        sayOnIos(t("safety.gone"));
       } else if (code === "report_budget_exceeded") {
         setNotice("limited");
-        say(t(limitedWords));
+        sayOnIos(t(limitedWords));
       } else if (code === "report_window_closed") {
         setNotice("late");
-        say(t("errors.report_window_closed"));
+        sayOnIos(t("errors.report_window_closed"));
         // What the screen holds says it can be reported: read it again.
         onStale?.();
       } else {
         setNotice("failed");
-        say(t(failed));
+        sayOnIos(t(failed));
       }
       if (!shown.current) onOpenChange(true);
     } finally {
@@ -543,7 +525,7 @@ function SafetyDialog({
         {step === "choose" && (
           <>
             <DialogHeader>
-              <DialogTitle ref={focusTitle}>{t(texts.title)}</DialogTitle>
+              <DialogTitle ref={focusOnMount}>{t(texts.title)}</DialogTitle>
             </DialogHeader>
             <ScrollView style={{ flexShrink: 1 }} contentContainerClassName="gap-4">
               {offers.block && (
@@ -573,7 +555,7 @@ function SafetyDialog({
         {step === "block" && (
           <>
             <DialogHeader>
-              <DialogTitle ref={focusTitle}>{t("safety.block.title")}</DialogTitle>
+              <DialogTitle ref={focusOnMount}>{t("safety.block.title")}</DialogTitle>
             </DialogHeader>
             <ScrollView style={{ flexShrink: 1 }} contentContainerClassName="gap-4">
               <DialogDescription>{t(texts.blockBody)}</DialogDescription>
@@ -597,7 +579,7 @@ function SafetyDialog({
         {step === "unmatch" && (
           <>
             <DialogHeader>
-              <DialogTitle ref={focusTitle}>{t("chat.unmatch.title")}</DialogTitle>
+              <DialogTitle ref={focusOnMount}>{t("chat.unmatch.title")}</DialogTitle>
             </DialogHeader>
             <ScrollView style={{ flexShrink: 1 }} contentContainerClassName="gap-4">
               <DialogDescription>{t("chat.unmatch.body")}</DialogDescription>
@@ -618,7 +600,7 @@ function SafetyDialog({
         {step === "report" && (
           <>
             <DialogHeader>
-              <DialogTitle ref={focusTitle}>{t("safety.actions.report")}</DialogTitle>
+              <DialogTitle ref={focusOnMount}>{t("safety.actions.report")}</DialogTitle>
             </DialogHeader>
             {/* What it does, six reasons and a text field outgrow a phone's screen at a large
                 text size, and the keyboard takes the lower half: they scroll, a drag puts the
@@ -761,7 +743,7 @@ function SafetyDialog({
         {FINAL.has(step) && (
           <>
             <DialogHeader accessibilityLiveRegion="polite">
-              <DialogTitle ref={focusTitle}>
+              <DialogTitle ref={focusOnMount}>
                 {step === "blocked"
                   ? t("safety.block.done")
                   : step === "reported"

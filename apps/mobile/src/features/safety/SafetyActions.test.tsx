@@ -4,7 +4,8 @@ import { Image, type ImageRef } from "expo-image";
 import { useLocales } from "expo-localization";
 import { useState } from "react";
 import { AccessibilityInfo, DeviceEventEmitter, Platform, StyleSheet } from "react-native";
-import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
+import { type HostNode, noProblems, pressables } from "@/test/a11y";
+import { textsInOrder as said } from "@/test/layout";
 import { renderWithTheme, underProviders } from "@/test/render";
 import { HEADING_FONT_SCALE } from "@/theme/a11y";
 import {
@@ -123,8 +124,6 @@ const type = (words: string) =>
   });
 const disabled = (name: string) =>
   screen.getByRole("button", { name }).props.accessibilityState?.disabled === true;
-const noProblems = () =>
-  expect(pressables(screen.toJSON() as HostNode).flatMap((node) => a11yProblems(node))).toEqual([]);
 
 type Node = ReturnType<typeof screen.container.queryAll>[number];
 /** The host views around a node, outward. */
@@ -173,9 +172,6 @@ async function expectNoteAboveKeyboard() {
 
 const announced = () =>
   (AccessibilityInfo.announceForAccessibility as jest.Mock).mock.calls.map(([words]) => words);
-/** Everything drawn, in order, so that what a step leaves out is seen to be left out. */
-const said = (node: HostNode | string = screen.toJSON() as HostNode): string[] =>
-  typeof node === "string" ? [node] : (node.children ?? []).flatMap((child) => said(child));
 
 beforeEach(() => {
   (useLocales as jest.Mock).mockReturnValue([{ languageTag: "en-US" }]);

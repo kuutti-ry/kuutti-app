@@ -4,7 +4,6 @@ import {
   ConversationContacts,
   ConversationDetail,
   ConversationList,
-  ErrorResponse,
   MessagePage,
   type MessagesQuery,
   type SendMessageRequest,
@@ -12,21 +11,12 @@ import {
   StoredContacts,
 } from "@kuutti/schema";
 import { type PickedPhoto, uploadPicture, uploadRefusal } from "@/features/media";
-import { ApiError, api } from "@/lib/api";
+import { api, failed } from "@/lib/api";
 import { messageWithKnownDescription } from "./known";
 
 // The chat's routes as the app calls them (#348, ADR-031), through the typed
 // client; the zod contracts guard the runtime (ADR-003). A photo goes through
 // the media slice's upload, the one transport that reports progress (#350).
-
-function failed(response: Response, error: unknown, what: string): ApiError {
-  const parsed = ErrorResponse.safeParse(error);
-  return new ApiError(
-    `${what} answered ${response.status}`,
-    response.status,
-    parsed.success ? parsed.data.error.code : undefined,
-  );
-}
 
 const readMessage = (data: unknown): ChatMessage =>
   ChatMessage.parse(messageWithKnownDescription(data));

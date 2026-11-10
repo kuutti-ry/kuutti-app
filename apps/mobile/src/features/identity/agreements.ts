@@ -1,6 +1,6 @@
 import { CONSENT_VERSIONS } from "@kuutti/i18n";
 import { readPreference, writePreference } from "@/lib/preferences";
-import { consentLocale, giveConsent } from "./onboarding/client";
+import { bundledVersion, consentLocale, giveConsent } from "./onboarding/client";
 
 /**
  * What a person answered on the screen before the bank login (#418,
@@ -42,8 +42,8 @@ function fresh(): Agreements | null {
 /** The answers as this app's own wordings name them: the versions built in are what the person read (ADR-010 §4). */
 export function agreementsOf(locale: string): Agreements {
   return {
-    terms: CONSENT_VERSIONS.terms ?? "",
-    privacy: CONSENT_VERSIONS.privacy ?? "",
+    terms: bundledVersion("terms"),
+    privacy: bundledVersion("privacy"),
     locale: consentLocale(locale),
   };
 }
@@ -133,10 +133,19 @@ export function rememberAgreed(): Promise<void> {
  */
 export async function recordAgreements(agreements: Agreements): Promise<void> {
   try {
-    await giveConsent("terms", agreements.terms, agreements.locale);
-    await giveConsent("privacy", agreements.privacy, agreements.locale);
-    await rememberAgreed();
+    await giveAgreements(agreements);
   } catch {
     // The welcome step asks again.
   }
+}
+
+/**
+ * The terms and the privacy summary given, in that order, then remembered on
+ * this phone, so that the next sign-in here goes straight to the bank (#418):
+ * right after the exchange, and on the welcome step.
+ */
+export async function giveAgreements(agreements: Agreements): Promise<void> {
+  await giveConsent("terms", agreements.terms, agreements.locale);
+  await giveConsent("privacy", agreements.privacy, agreements.locale);
+  await rememberAgreed();
 }

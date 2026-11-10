@@ -1,7 +1,7 @@
 import { useRouter } from "expo-router";
 import { useEffect } from "react";
-import { KeyboardAvoidingView, Platform, ScrollView } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { KeyboardScrollView } from "@/components/KeyboardScrollView";
 import { Button } from "@/components/ui/button";
 import { Text } from "@/components/ui/text";
 import { markLockOffered, useLock } from "@/features/identity";
@@ -14,7 +14,7 @@ import { LockControls } from "./LockControls";
  * (#418, the maintainer's proposal): the same controls as Settings, and a
  * plain Not now that leaves it off. Shown is offered: it does not come again
  * on this phone. It keeps the passcode's field above the keyboard as the
- * e-mail's screen does (SettingsPage, #103).
+ * e-mail's screen does (KeyboardScrollView, #103).
  */
 export function LockOfferScreen() {
   const { t } = useT();
@@ -26,32 +26,22 @@ export function LockOfferScreen() {
   }, []);
   return (
     <SafeAreaView className="flex-1 bg-background">
-      <KeyboardAvoidingView
-        className="flex-1"
-        behavior="padding"
-        enabled={Platform.OS === "android"}
-      >
-        <ScrollView
-          contentContainerClassName="flex-grow gap-6 p-6"
-          keyboardShouldPersistTaps="handled"
-          automaticallyAdjustKeyboardInsets
+      <KeyboardScrollView contentContainerClassName="flex-grow gap-6 p-6">
+        <Text variant="h1" accessibilityRole="header">
+          {t("profile.later.title")}
+        </Text>
+        <Text variant="h2">{t("lock.offer.title")}</Text>
+        <LockControls />
+        <Button
+          variant={lock.settings === null ? "outline" : "default"}
+          onPress={() => {
+            tap();
+            router.replace("/");
+          }}
         >
-          <Text variant="h1" accessibilityRole="header">
-            {t("profile.later.title")}
-          </Text>
-          <Text variant="h2">{t("lock.offer.title")}</Text>
-          <LockControls />
-          <Button
-            variant={lock.settings === null ? "outline" : "default"}
-            onPress={() => {
-              tap();
-              router.replace("/");
-            }}
-          >
-            {lock.settings === null ? t("lock.offer.notNow") : t("lock.offer.done")}
-          </Button>
-        </ScrollView>
-      </KeyboardAvoidingView>
+          {lock.settings === null ? t("lock.offer.notNow") : t("lock.offer.done")}
+        </Button>
+      </KeyboardScrollView>
     </SafeAreaView>
   );
 }

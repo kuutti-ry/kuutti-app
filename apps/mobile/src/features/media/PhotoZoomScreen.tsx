@@ -10,7 +10,7 @@ import { usePhotoDescriptionText } from "@/lib/photo-descriptions";
 import { useHapticTap } from "@/theme/haptics";
 import { captionKey } from "./captions";
 import { PhotoDescriptionText } from "./PhotoDescriptionText";
-import { PhotoImage } from "./PhotoImage";
+import { PhotoImage, photoRefusalKey } from "./PhotoImage";
 
 export type PhotoZoomParams = {
   id: string;
@@ -48,7 +48,7 @@ export function PhotoZoomScreen({
       : t("photos.zoom.label", { position, total }),
     description,
   );
-  const words = described.shown ? described.describe(description) : null;
+  const words = described.under(description);
   const router = useRouter();
   const tap = useHapticTap();
   // The API said no (#52): the person reads why under the placeholder, never a
@@ -85,11 +85,7 @@ export function PhotoZoomScreen({
         )}
         {refusal !== null && (
           <Text variant="muted" className="px-4 py-3 text-center">
-            {t(
-              refusal === "photo_budget_exceeded"
-                ? "photos.error.photo_budget_exceeded"
-                : "photos.error.notShown",
-            )}
+            {t(photoRefusalKey(refusal))}
           </Text>
         )}
       </View>

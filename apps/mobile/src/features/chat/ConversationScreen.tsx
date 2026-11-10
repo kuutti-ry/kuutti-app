@@ -7,7 +7,7 @@ import {
   messageLength,
 } from "@kuutti/schema";
 import { Image } from "expo-image";
-import { useFocusEffect, useRouter } from "expo-router";
+import { useFocusEffect } from "expo-router";
 import ContactRound from "lucide-react-native/icons/contact-round";
 import ImagePlus from "lucide-react-native/icons/image-plus";
 import { Fragment, useCallback, useEffect, useRef, useState } from "react";
@@ -21,9 +21,9 @@ import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
 import { Input } from "@/components/ui/input";
 import { Text } from "@/components/ui/text";
-import { type PickedPhoto, pickPrepared } from "@/features/media";
+import { type PickedPhoto, pickPrepared, UPLOAD_REFUSALS } from "@/features/media";
 import { ConversationActions, type SafetyOutcome } from "@/features/safety";
-import { ApiError } from "@/lib/api";
+import { codeOf, statusOf } from "@/lib/api";
 import { useT } from "@/lib/locale";
 import { DECORATIVE } from "@/theme/a11y";
 import { useHapticTap } from "@/theme/haptics";
@@ -68,12 +68,7 @@ const REFUSALS: ReadonlyMap<string, PlainMessageKey> = new Map([
   ["photo_rejected_violence", "errors.photo_rejected_violence"],
   ["photo_rejected_other", "errors.photo_rejected_other"],
   ["message_photo_budget_exceeded", "errors.message_photo_budget_exceeded"],
-  ["photo_unsupported", "photos.error.photo_unsupported"],
-  ["photo_invalid", "photos.error.photo_invalid"],
-  ["photo_too_many_pixels", "photos.error.tooLarge"],
-  ["payload_too_large", "photos.error.tooLarge"],
-  ["media_busy", "photos.error.media_busy"],
-  ["media_unavailable", "photos.error.media_unavailable"],
+  ...UPLOAD_REFUSALS,
 ]);
 
 /**
@@ -167,7 +162,6 @@ function withLive(
  */
 export function ConversationScreen({ id }: { id: string }) {
   const { t } = useT();
-  const router = useRouter();
   const tap = useHapticTap();
   const handToList = useHandToList();
   const [view, setView] = useState<ScreenView>({ status: "loading" });
@@ -294,7 +288,7 @@ export function ConversationScreen({ id }: { id: string }) {
         show(merged(loaded.current, page.reverse()));
       }
     } catch (error) {
-      if (error instanceof ApiError && error.status === 404) setView({ status: "gone" });
+      if (statusOf(error) === 404) setView({ status: "gone" });
       else if (loaded.current.length === 0) setView({ status: "failed", error });
     }
   }, [id, show, takeDetail]);
@@ -329,7 +323,7 @@ export function ConversationScreen({ id }: { id: string }) {
       try {
         takeContacts(read, await fetchSharedContacts(id));
       } catch (error) {
-        if (error instanceof ApiError && error.status === 404) {
+        if (statusOf(error) === 404) {
           setView({ status: "gone" });
           break;
         }
@@ -480,7 +474,7 @@ export function ConversationScreen({ id }: { id: string }) {
         return;
       }
       setText(body);
-      const code = (error instanceof ApiError ? error.code : undefined) ?? "";
+      const code = codeOf(error) ?? "";
       const refused = REFUSALS.get(code);
       setRefusal(refused ?? "chat.composer.error.failed");
       if (photo && (!refused || KEEPS_PHOTO.has(code))) setAttached(photo);
@@ -541,7 +535,7 @@ export function ConversationScreen({ id }: { id: string }) {
   }, [state, closedHow, acting, view, t]);
   return (
     <SafeAreaView className="flex-1 bg-background">
-      <ScreenHeader title={title} backLabel={t("chat.back")} onBack={() => router.back()}>
+      <ScreenHeader title={title} backLabel={t("chat.back")}>
         {offered && (
           <Button
             variant="ghost"

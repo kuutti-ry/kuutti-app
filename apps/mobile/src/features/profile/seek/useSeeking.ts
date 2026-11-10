@@ -1,7 +1,7 @@
 import type { AgeWindow, Gender, PreferencesUpdate, ProfileFields } from "@kuutti/schema";
 import { useRouter } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ApiError } from "@/lib/api";
+import { codeOf } from "@/lib/api";
 import { fetchPreferences, fetchProfile, savePreferences } from "../client";
 
 type Seeking = {
@@ -76,6 +76,5 @@ export const savedOrHeld = <Draft>(
 ): Promise<Draft | null> =>
   savePreferences(update).then(
     () => null,
-    (error: unknown) =>
-      error instanceof ApiError && error.code === "consent_required" ? null : draft,
+    (error: unknown) => (codeOf(error) === "consent_required" ? null : draft),
   );

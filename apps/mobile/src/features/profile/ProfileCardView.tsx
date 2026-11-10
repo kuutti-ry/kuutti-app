@@ -28,7 +28,7 @@ import { SafetyActions } from "@/features/safety";
 import { useT } from "@/lib/locale";
 import { usePhotoDescriptionText } from "@/lib/photo-descriptions";
 import { cn } from "@/lib/utils";
-import { DECORATIVE, TOUCH_TARGET } from "@/theme/a11y";
+import { DECORATIVE, MINIMUM_TARGET } from "@/theme/a11y";
 import { useHapticTap } from "@/theme/haptics";
 import { FIELD_ICONS, HOBBY_GROUP_ICONS } from "./fieldIcons";
 import { OptionGlyph, optionGlyph } from "./glyphs";
@@ -197,8 +197,7 @@ export function ProfileCardView({
   const photoLabel = (photo: ProfileCard["photos"][number], position: number) =>
     described.label(photoText(photo, position), photo.description);
   /** The description under a photo for the eye, where the setting asks for it. */
-  const wordsUnder = (photo: ProfileCard["photos"][number]) =>
-    described.shown ? described.describe(photo.description) : null;
+  const wordsUnder = (photo: ProfileCard["photos"][number]) => described.under(photo.description);
   const frontWords = front ? wordsUnder(front) : null;
   /** The photo `step` away comes to the front, and a screen reader hears which it is. */
   const go = (step: -1 | 1) => {
@@ -379,7 +378,7 @@ export function ProfileCardView({
                     accessibilityState={{ disabled: none }}
                     disabled={none}
                     className={cn("absolute inset-y-0 w-1/2", side)}
-                    style={{ minHeight: TOUCH_TARGET, minWidth: TOUCH_TARGET }}
+                    style={MINIMUM_TARGET}
                     onPress={() => go(step)}
                   />
                 );

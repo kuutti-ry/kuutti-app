@@ -2,15 +2,16 @@ import type { PlainMessageKey } from "@kuutti/i18n";
 import { type AccountEmailResponse, EMAIL_CODE_LENGTH, EMAIL_MAX } from "@kuutti/schema";
 import { useRouter } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { AccessibilityInfo, KeyboardAvoidingView, Platform, ScrollView, View } from "react-native";
+import { AccessibilityInfo, Platform, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { KeyboardScrollView } from "@/components/KeyboardScrollView";
 import { LoadFailed } from "@/components/LoadFailed";
 import { sayAloud } from "@/components/Notice";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Text } from "@/components/ui/text";
-import { ApiError } from "@/lib/api";
+import { codeOf, statusOf } from "@/lib/api";
 import { useT } from "@/lib/locale";
 import { useRowData } from "@/lib/row-data";
 import { useReportUnsaved } from "@/lib/unsaved";
@@ -215,7 +216,7 @@ function EmailForm({
 
   /** A refused send or confirmation in words; the refusals that leave no code take the waiting one away. */
   const refused = async (error: unknown): Promise<readonly Notice[]> => {
-    const reason = error instanceof ApiError ? error.code : undefined;
+    const reason = codeOf(error);
     if (CHANGED_ELSEWHERE.has(reason)) {
       try {
         const now = await fetchEmail();
@@ -261,7 +262,7 @@ function EmailForm({
     try {
       next = await call();
     } catch (error) {
-      return [error instanceof ApiError && error.status === 400 ? "invalid" : "failed"];
+      return [statusOf(error) === 400 ? "invalid" : "failed"];
     }
     setForm({ stored: next, typed: next.email ?? "" });
     setCode("");
@@ -414,10 +415,7 @@ function CodeSection({
  * The e-mail among the later screens (#148): the card, and the way on, to
  * the lock's one offer (#418) or home. It scrolls, so at the largest text every line and every button can
  * still be reached (#217), and it keeps the code's field and Confirm above
- * the keyboard as a settings screen does (SettingsPage, #103): iOS insets the
- * scroll view itself; Android draws edge to edge, so the padding ends the
- * scroll view at the keyboard's top. Padding on iOS too would take the
- * keyboard's height twice.
+ * the keyboard as a settings screen does (KeyboardScrollView, #103).
  */
 export function EmailScreen() {
   const { t } = useT();
@@ -427,30 +425,20 @@ export function EmailScreen() {
   const lockOfferDue = useLockOfferDue();
   return (
     <SafeAreaView className="flex-1 bg-background">
-      <KeyboardAvoidingView
-        className="flex-1"
-        behavior="padding"
-        enabled={Platform.OS === "android"}
-      >
-        <ScrollView
-          contentContainerClassName="flex-grow items-center gap-6 p-6"
-          keyboardShouldPersistTaps="handled"
-          automaticallyAdjustKeyboardInsets
+      <KeyboardScrollView contentContainerClassName="flex-grow items-center gap-6 p-6">
+        <Text variant="h1" accessibilityRole="header">
+          {t("profile.later.title")}
+        </Text>
+        <EmailCard />
+        <Button
+          onPress={() => {
+            tap();
+            router.replace(lockOfferDue ? "/account/lock" : "/");
+          }}
         >
-          <Text variant="h1" accessibilityRole="header">
-            {t("profile.later.title")}
-          </Text>
-          <EmailCard />
-          <Button
-            onPress={() => {
-              tap();
-              router.replace(lockOfferDue ? "/account/lock" : "/");
-            }}
-          >
-            {t("account.email.done")}
-          </Button>
-        </ScrollView>
-      </KeyboardAvoidingView>
+          {t("account.email.done")}
+        </Button>
+      </KeyboardScrollView>
     </SafeAreaView>
   );
 }

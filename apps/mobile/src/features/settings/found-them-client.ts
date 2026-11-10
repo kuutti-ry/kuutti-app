@@ -1,17 +1,8 @@
-import { ErrorResponse, type FoundReason, FoundThemStatus } from "@kuutti/schema";
-import { ApiError, api } from "@/lib/api";
+import { type FoundReason, FoundThemStatus } from "@kuutti/schema";
+import { api, failed } from "@/lib/api";
 
 // "Löysin hänet" as the app calls it (#83, ADR-040), through the typed client;
 // the zod contract guards the runtime (ADR-003).
-
-function failed(response: Response, error: unknown, what: string): ApiError {
-  const parsed = ErrorResponse.safeParse(error);
-  return new ApiError(
-    `${what} answered ${response.status}`,
-    response.status,
-    parsed.success ? parsed.data.error.code : undefined,
-  );
-}
 
 /** Whether this account told Kuutti already; never which reason. */
 export async function readFoundThem(): Promise<boolean> {

@@ -2,7 +2,7 @@ import { ALL_DESCRIPTION_PARTS, describePhoto, type PhotoDescriptionParts } from
 import type { PhotoDescription } from "@kuutti/schema";
 import * as React from "react";
 import { useT } from "./locale";
-import { readPreference, writePreference } from "./preferences";
+import { readPreference, storedObject, writePreference } from "./preferences";
 
 /**
  * The Photo descriptions setting (#296 part 3): whether the automatic
@@ -31,16 +31,10 @@ const KEYS = ["shown", "people", "face", "objects"] as const satisfies ReadonlyA
 /** What was stored, field by field; anything not a boolean is the default, and so is a store that holds nothing. */
 export function readPhotoDescriptionSettings(raw: string | null): PhotoDescriptionSettings {
   const settings = { ...DEFAULT_PHOTO_DESCRIPTION_SETTINGS };
-  if (raw === null) return settings;
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(raw);
-  } catch {
-    return settings;
-  }
-  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return settings;
+  const stored = storedObject(raw);
+  if (!stored) return settings;
   for (const key of KEYS) {
-    const value = (parsed as Record<string, unknown>)[key];
+    const value = stored[key];
     if (typeof value === "boolean") settings[key] = value;
   }
   return settings;
@@ -92,11 +86,13 @@ export function usePhotoDescriptionSettings(): Settings {
  * gives the text of the parts turned on, or null when there is nothing to
  * say; `label` appends it to a photo's screen-reader label, so the caption
  * is heard first and then "Automatic description: ..."; `shown` says whether
- * the same text goes under the photo for the eye.
+ * the same text goes under the photo for the eye, and `under` gives it there,
+ * or null when the setting keeps it to the screen reader.
  */
 export function usePhotoDescriptionText(): {
   shown: boolean;
   describe: (description: PhotoDescription | null | undefined) => string | null;
+  under: (description: PhotoDescription | null | undefined) => string | null;
   label: (base: string, description: PhotoDescription | null | undefined) => string;
 } {
   const { t } = useT();
@@ -107,6 +103,7 @@ export function usePhotoDescriptionText(): {
     return {
       shown: settings.shown,
       describe,
+      under: (description) => (settings.shown ? describe(description) : null),
       label: (base, description) => {
         const said = describe(description);
         if (!said) return base;

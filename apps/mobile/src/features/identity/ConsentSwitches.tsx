@@ -1,4 +1,3 @@
-import { CONSENT_VERSIONS } from "@kuutti/i18n";
 import type { ConsentsResponse, WithdrawableConsentKind } from "@kuutti/schema";
 import { useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -11,7 +10,13 @@ import { Text } from "@/components/ui/text";
 import { useT } from "@/lib/locale";
 import { useHapticTap } from "@/theme/haptics";
 import { LegalTextLink } from "./LegalTextLink";
-import { consentLocale, fetchConsents, giveConsent, withdrawConsent } from "./onboarding/client";
+import {
+  bundledVersion,
+  consentLocale,
+  fetchConsents,
+  giveConsent,
+  withdrawConsent,
+} from "./onboarding/client";
 import { useSession } from "./session";
 
 export type ConsentState = "loading" | "unavailable" | "on" | "off" | "outdated";
@@ -20,8 +25,6 @@ export type ConsentState = "loading" | "unavailable" | "on" | "off" | "outdated"
 // though the API keeps the kind. R3 Research (#194) widens this to WithdrawableConsentKind, and the
 // compiler names each table below to fill; Settings' row comes back with it.
 type SwitchedKind = Exclude<WithdrawableConsentKind, "research">;
-
-const bundledVersion = (kind: SwitchedKind): string => CONSENT_VERSIONS[kind] ?? "";
 
 /**
  * A withdrawable consent as the API holds it (#46, #146, ADR-010 §4): on when

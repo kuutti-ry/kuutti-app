@@ -133,3 +133,20 @@ describe("usePhotoDescriptionText", () => {
     expect(none.current.label("Photo 1 / 1", lakeside)).toBe("Photo 1 / 1");
   });
 });
+
+describe("usePhotoDescriptionText's words under a photo", () => {
+  it("gives none while the setting keeps the description to the screen reader", async () => {
+    const { result } = await renderHook(() => usePhotoDescriptionText(), { wrapper });
+    await waitFor(() => expect(result.current.shown).toBe(false));
+    expect(result.current.under(lakeside)).toBeNull();
+  });
+
+  it("gives the description's words once the setting shows them, and none for a photo without one", async () => {
+    store.set(KEY, JSON.stringify({ shown: true }));
+    const { result } = await renderHook(() => usePhotoDescriptionText(), { wrapper });
+    await waitFor(() => expect(result.current.shown).toBe(true));
+    expect(result.current.under(lakeside)).toBe(result.current.describe(lakeside));
+    expect(result.current.under(lakeside)).toMatch(/^Automatic description: /);
+    expect(result.current.under(null)).toBeNull();
+  });
+});

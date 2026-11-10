@@ -5,11 +5,12 @@ import {
   normaliseInvitationCode,
 } from "@kuutti/schema";
 import { useState } from "react";
-import { AccessibilityInfo, Platform, View } from "react-native";
+import { View } from "react-native";
+import { sayOnIos } from "@/components/Notice";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Text } from "@/components/ui/text";
-import { ApiError } from "@/lib/api";
+import { codeOf } from "@/lib/api";
 import { useT } from "@/lib/locale";
 import { useHapticTap } from "@/theme/haptics";
 import { redeemInvitation } from "./client";
@@ -46,16 +47,14 @@ export function RedeemInvitation({ onRedeemed }: { onRedeemed: () => void }) {
     try {
       await redeemInvitation(typed);
     } catch (error) {
-      const words =
-        REFUSALS.get(error instanceof ApiError ? error.code : undefined) ?? "load.failed.press";
+      const words = REFUSALS.get(codeOf(error)) ?? "load.failed.press";
       setRefusal(words);
       setAnswers((n) => n + 1);
       setBusy(false);
-      // Android's live region speaks it; iOS has none.
-      if (Platform.OS === "ios") AccessibilityInfo.announceForAccessibility(t(words));
+      sayOnIos(t(words));
       return;
     }
-    if (Platform.OS === "ios") AccessibilityInfo.announceForAccessibility(t("invite.redeem.done"));
+    sayOnIos(t("invite.redeem.done"));
     onRedeemed();
   };
 

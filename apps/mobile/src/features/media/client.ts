@@ -1,5 +1,4 @@
 import {
-  ErrorResponse,
   FishSpecies,
   Photo,
   type PhotoCaption,
@@ -11,7 +10,7 @@ import {
   TipKind,
 } from "@kuutti/schema";
 import { Platform } from "react-native";
-import { ApiError, api, apiBaseUrl } from "@/lib/api";
+import { ApiError, api, apiBaseUrl, failed } from "@/lib/api";
 import {
   accessTokenIsStale,
   currentSession,
@@ -26,15 +25,6 @@ import type { PickedPhoto } from "./pick";
 // on React Native that reports upload progress and streams a file from disk
 // without loading it into JavaScript; the chat sends its photos through the
 // same one (#350).
-
-function failed(response: Response, error: unknown, what: string): ApiError {
-  const parsed = ErrorResponse.safeParse(error);
-  return new ApiError(
-    `${what} answered ${response.status}`,
-    response.status,
-    parsed.success ? parsed.data.error.code : undefined,
-  );
-}
 
 /**
  * A rejection reason this build has no words for is no reason (#376): the
@@ -219,12 +209,7 @@ export async function uploadPicture(
 
 /** An upload's answer the caller does not take, as an error with the API's code when it sent the envelope. */
 export function uploadRefusal(answer: UploadAnswer): ApiError {
-  const envelope = ErrorResponse.safeParse(answer.body);
-  return new ApiError(
-    `photo upload answered ${answer.status}`,
-    answer.status,
-    envelope.success ? envelope.data.error.code : undefined,
-  );
+  return failed(answer, answer.body, "photo upload");
 }
 
 /** Uploads a prepared picture as one of the person's photos (#48). */

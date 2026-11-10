@@ -1,7 +1,7 @@
 import type { OnboardingStatus } from "@kuutti/schema";
 import { useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ApiError } from "@/lib/api";
+import { codeOf } from "@/lib/api";
 import { fetchOnboarding } from "./client";
 
 export type OnboardingState =
@@ -55,7 +55,7 @@ export function useOnboarding() {
         await call();
         return await reload();
       } catch (error) {
-        const code = error instanceof ApiError ? (error.code ?? "unknown") : "unknown";
+        const code = codeOf(error) ?? "unknown";
         if (mounted.current) setFailedCode(code);
         // The consent is gone (taken back on another device, or a new wording):
         // the status says so, and the step's switch can be given again (ADR-010 §16).
