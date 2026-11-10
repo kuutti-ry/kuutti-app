@@ -20,7 +20,9 @@ import {
 } from "../../components/ui/table.tsx";
 import { api } from "../../lib/api.ts";
 import { ScreenTitle } from "../../lib/screen-title.tsx";
+import { short } from "../../lib/utils.ts";
 import { AuditDetail } from "./audit-detail.tsx";
+import { codeOf } from "./use-send.ts";
 
 // The audit log's reader (#309, admins only): who did or saw what, narrowed
 // by who, what, whom and when, a page at a time and never all at once
@@ -93,7 +95,7 @@ export function AuditLog() {
       if (response.status === 403) return settle({ kind: "forbidden" });
       if (!data) {
         // A filter the API refused says so; a cursor it refused is a failure like any other.
-        const code = (error as { error?: { code?: string } } | undefined)?.error?.code;
+        const code = codeOf(error);
         return settle({
           kind: "error",
           invalid: response.status === 400 && code !== "cursor_invalid",
@@ -219,11 +221,11 @@ export function AuditLog() {
                           <TableCell className="whitespace-normal [&_code]:wrap-normal">
                             {row.accountId ? (
                               <Link className="target" to={`/accounts/${row.accountId}`}>
-                                {row.subjectType} <code>{row.subjectId.slice(0, 8)}</code>
+                                {row.subjectType} <code>{short(row.subjectId)}</code>
                               </Link>
                             ) : (
                               <>
-                                {row.subjectType} <code>{row.subjectId.slice(0, 8)}</code>
+                                {row.subjectType} <code>{short(row.subjectId)}</code>
                               </>
                             )}
                           </TableCell>

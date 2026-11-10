@@ -5,3 +5,6 @@ import { twMerge } from "tailwind-merge";
 export function cn(...inputs: ClassValue[]): string {
   return twMerge(clsx(inputs));
 }
+
+/** An id as the panel shortens it (#171): its first eight characters, enough to tell two apart on a screen. */
+export const short = (id: string) => id.slice(0, 8);

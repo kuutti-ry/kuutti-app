@@ -6,7 +6,7 @@ import {
   ConfigList as ConfigPage,
   type ConfigValue,
 } from "@kuutti/schema";
-import { ChevronRight, RefreshCw } from "lucide-react";
+import { ChevronRight } from "lucide-react";
 import { type FormEvent, useEffect, useId, useRef, useState } from "react";
 import { Alert } from "../../components/ui/alert.tsx";
 import { Button } from "../../components/ui/button.tsx";
@@ -25,8 +25,10 @@ import {
 } from "../../components/ui/table.tsx";
 import { Textarea } from "../../components/ui/textarea.tsx";
 import { api } from "../../lib/api.ts";
+import { RefreshButton } from "../../lib/refresh-button.tsx";
 import { ScreenTitle } from "../../lib/screen-title.tsx";
 import { useList } from "../../lib/use-list.ts";
+import { codeOf } from "./use-send.ts";
 
 // The tunables (#304, #305, admins only): every key of matching_config with
 // its value and history, and a change with a reason, shown old and new before
@@ -109,10 +111,7 @@ export function ConfigList() {
     <section aria-labelledby="config-title" className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <ScreenTitle id="config-title">{t("admin.config.title")}</ScreenTitle>
-        <Button variant="outline" onClick={() => void reload()}>
-          <RefreshCw aria-hidden="true" />
-          {t("admin.config.refresh")}
-        </Button>
+        <RefreshButton onClick={() => void reload()}>{t("admin.config.refresh")}</RefreshButton>
       </div>
       <p aria-live="polite" className="font-medium empty:sr-only">
         {saved ? t("admin.config.changed", { key: saved.key, value: shown(saved.value) }) : ""}
@@ -197,7 +196,7 @@ function Tunable({
     // A 403 is the shell's to say (#302): back to the form without a failure of its own.
     if (answer?.response.status === 403) return setStep({ kind: "editing" });
     if (!answer?.data) {
-      const code = (answer?.error as { error?: { code?: string } } | undefined)?.error?.code;
+      const code = codeOf(answer?.error);
       return setStep({
         kind: "editing",
         // The API's refusal of a shape says what the form's own check does: one text serves both.

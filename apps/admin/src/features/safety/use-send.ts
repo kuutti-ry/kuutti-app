@@ -21,6 +21,10 @@ type Outcome<T> =
   | { kind: "refused"; code: string | undefined; message: PlainMessageKey }
   | { kind: "shell" };
 
+/** The envelope's code of a refusal, as the API sends it. */
+export const codeOf = (error: unknown) =>
+  (error as { error?: { code?: string } } | undefined)?.error?.code;
+
 export async function outcomeOf<T>(
   request: Promise<Answer>,
   answer: z.ZodType<T>,
@@ -30,7 +34,7 @@ export async function outcomeOf<T>(
   if (settled?.response.status === 403) return { kind: "shell" };
   const parsed = answer.safeParse(settled?.data);
   if (parsed.success) return { kind: "done", value: parsed.data };
-  const code = (settled?.error as { error?: { code?: string } } | undefined)?.error?.code;
+  const code = codeOf(settled?.error);
   return { kind: "refused", code, message: (code && refusals.codes[code]) || refusals.failed };
 }
 
