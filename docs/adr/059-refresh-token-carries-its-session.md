@@ -1,6 +1,6 @@
 # ADR-059: A refresh token carries a secret of its session
 
-- Status: accepted 2026-10-28 (#490, the maintainer's answer of that day on the shape: the issue's two 256-bit parts, over two 128-bit parts in today's 43 characters; every installed app is his, and the new rules overtake the old; built as written here)
+- Status: accepted 2026-10-28 (#490, the maintainer's answer of that day on the shape: the issue's two 256-bit parts, over two 128-bit parts in today's 43 characters; every installed app is his, and the new rules overtake the old; built as written here), amended 2026-11-10 by ADR-069 (§3, §6: a session that attested a key rotates only with that key's assertion, #580; see History)
 - Date: 2026-10-28
 - Follows: TD-1 (every account is a bank login), ADR-003 (the contract and `pnpm openapi`), ADR-018 (staging's people are Telia's test persons), ADR-024 (a sanction ends every session), ADR-027 (the sign-in bound to the device), ADR-055 §3 (a push token goes with its session), ADR-056 (what a lifted refresh token can do; attestation later), ADR-058 (the ninety days and the year; its Open 1 is settled here), CLAUDE.md rule 10 (a custom migration's SQL in an ADR), `.claude/rules/api.md` (session tokens), `docs/security-checklist.md` (the sessions item), RFC 9700 §4.14.2; issues #35, #472, #490
 
@@ -69,3 +69,4 @@ RFC 9700 §4.14.2 describes rotation: the previous refresh token is invalidated,
 ## History
 
 - 2026-10-28: written with #490, on the maintainer's answer of that day on the shape (the last of the Alternatives). It settles ADR-058 Open 1.
+- 2026-11-10, ADR-069 (#580): the refresh takes an optional `assertion` beside the token (§6), and the rotation (§3) moves a session that attested a key at its exchange only with that key's assertion over the presented token, its counter past the one kept, in the same `UPDATE`. A missing or refused assertion answers `session_revoked` and leaves the row as it is; §4's recognition of a retired token is unchanged, with an assertion or without. A session with no key rotates as written here.

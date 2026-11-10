@@ -34,6 +34,13 @@ const REDACTED_PATHS = [
   "postalCode",
   "homePlace",
   "home_place",
+  // App Attest (ADR-069): what the phone sends and the key a session keeps. A
+  // net: no line is written with any of them.
+  "attestation",
+  "assertion",
+  "keyId",
+  "attestKey",
+  "attest_key",
   "*.hetu",
   "*.personal_identity_code",
   "*.email",
@@ -51,6 +58,11 @@ const REDACTED_PATHS = [
   "*.postalCode",
   "*.homePlace",
   "*.home_place",
+  "*.attestation",
+  "*.assertion",
+  "*.keyId",
+  "*.attestKey",
+  "*.attest_key",
 ];
 
 type LogDestination = { write(line: string): void };

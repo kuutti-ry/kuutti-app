@@ -74,6 +74,40 @@ describe("logger redaction", () => {
     expect(out).toContain("acc-1");
   });
 
+  it("keeps what a phone attests with out of a line, at the top and one level down (ADR-069)", async () => {
+    const { logger, lines } = await captureLogger();
+    logger.info(
+      {
+        attestation: "o2NmbXRv",
+        assertion: "omlzaWdu",
+        keyId: "zgSY9YSD",
+        attestKey: "BEMyVErP",
+        attest_key: "BIjANKGQ",
+        body: { attestation: "o2NmbXR2", keyId: "zgSY9YSE" },
+        session: { assertion: "omlzaWdv", attestKey: "BEMyVErQ", attest_key: "BIjANKGR" },
+        attested: true,
+      },
+      "probe",
+    );
+    const out = JSON.stringify(lines());
+    for (const value of [
+      "o2NmbXRv",
+      "omlzaWdu",
+      "zgSY9YSD",
+      "BEMyVErP",
+      "BIjANKGQ",
+      "o2NmbXR2",
+      "zgSY9YSE",
+      "omlzaWdv",
+      "BEMyVErQ",
+      "BIjANKGR",
+    ]) {
+      expect(out, value).not.toContain(value);
+    }
+    // Whether a session was attested is no secret and is what the line is for.
+    expect(lines()[0]).toMatchObject({ attested: true });
+  });
+
   it("keeps stack frames but not the message on the stack's first line", async () => {
     const { logger, lines } = await captureLogger();
     logger.error({ err: new Error("duplicate key value (email)=(a@b.fi)") }, "unhandled error");

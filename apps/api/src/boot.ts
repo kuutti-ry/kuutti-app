@@ -224,6 +224,9 @@ export async function boot({
   // Push (#102, ADR-055 §8): Expo, the log locally, none where PUSH is off.
   const pusher = pusherFor(config, logger);
   logger.info({ push: config.PUSH, authenticated: Boolean(config.EXPO_ACCESS_TOKEN) }, "push");
+  // App Attest (ADR-069 §5): what an iPhone's sign-in is asked for here, and
+  // the team an attestation is held to; with no team, none is read.
+  logger.info({ ios: config.IOS_ATTESTATION, team: config.IOS_TEAM_ID }, "app attestation");
   // The process's one push (#102, ADR-055): the app's message and match
   // pushes and the round's, asking the same live registry who is in the app.
   const push = createPush({

@@ -165,7 +165,7 @@ export interface paths {
         put?: never;
         /**
          * Exchange the one-time code for a session
-         * @description Single use, within 60 seconds of the callback, and only with the verifier whose SHA-256 the attempt's /auth/start carried (ADR-027); a wrong verifier leaves the code unspent. Answers with this device's access and refresh tokens; the app keeps both in secure storage.
+         * @description Single use, within 60 seconds of the callback, and only with the verifier whose SHA-256 the attempt's /auth/start carried (ADR-027); a wrong verifier leaves the code unspent. An iPhone adds its attestation (ADR-069), verified before the code is spent, and a refused one leaves the code unspent too. Answers with this device's access and refresh tokens; the app keeps both in secure storage.
          */
         post: {
             parameters: {
@@ -207,6 +207,15 @@ export interface paths {
                         "application/json": components["schemas"]["ErrorResponse"];
                     };
                 };
+                /** @description attestation_refused: the attestation did not verify, or this environment asks an iPhone for one and none came (ADR-069). The code is unspent. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
                 /** @description rate_limited: too many requests from this address (ADR-026 §1); Retry-After is the wait. */
                 429: {
                     headers: {
@@ -235,7 +244,7 @@ export interface paths {
         put?: never;
         /**
          * Rotate the session's tokens
-         * @description Presents the refresh token, receives a new pair; the old refresh token is retired. Presenting a retired token ends the device's session (session_revoked): sign in through the bank again.
+         * @description Presents the refresh token, receives a new pair; the old refresh token is retired. Presenting a retired token ends the device's session (session_revoked): sign in through the bank again. A session that attested a key at its exchange also presents that key's assertion over the refresh token (ADR-069), and without a good one it is refused and left as it is.
          */
         post: {
             parameters: {
@@ -268,7 +277,7 @@ export interface paths {
                         "application/json": components["schemas"]["ErrorResponse"];
                     };
                 };
-                /** @description Retired, revoked, expired or unknown refresh token (session_revoked). */
+                /** @description Retired, revoked, expired or unknown refresh token, or a missing or refused assertion (session_revoked). */
                 401: {
                     headers: {
                         [name: string]: unknown;
@@ -7596,6 +7605,7 @@ export interface components {
                 /** Format: date-time */
                 expiresAt: string;
                 push: components["schemas"]["ExportedPush"];
+                attested: boolean;
             }[];
             profile: components["schemas"]["ProfileDocument"];
             photos: components["schemas"]["ExportedPhoto"][];
@@ -8150,6 +8160,13 @@ export interface components {
             code: string;
             /** @description The verifier whose SHA-256 /auth/start carried (ADR-027). */
             verifier: string;
+            /** @description On an iPhone, the proof that the real app on a real device is signing in (ADR-069). Verified before the code is spent; the session then answers a refresh only with an assertion of this key. */
+            attestation?: {
+                /** @description The key's identifier as App Attest gave it: the SHA-256 of its public half, in base64. */
+                keyId: string;
+                /** @description The attestation object in base64, from attestKey with the one-time code's characters as the challenge. */
+                attestation: string;
+            };
         };
         SessionTokens: {
             /**
@@ -8171,6 +8188,8 @@ export interface components {
         };
         AuthRefreshRequest: {
             refreshToken: string;
+            /** @description For a session that attested a key at its exchange (ADR-069): that key's assertion in base64, from generateAssertion with this refresh token's characters as the challenge. Such a session is refreshed with nothing less. */
+            assertion?: string;
         };
         SessionResponse: {
             /** Format: uuid */

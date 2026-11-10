@@ -203,6 +203,8 @@ export const AccountExport = z
         expiresAt: z.iso.datetime(),
         /** Whether the device gets pushes, and in which language (#102); never its token. Null when it has none. */
         push: ExportedPush.nullable(),
+        /** Whether the device proved at sign-in that it runs the real app (ADR-069); never its key. */
+        attested: z.boolean(),
       }),
     ),
     /** The profile as written (#47); null when never saved. */

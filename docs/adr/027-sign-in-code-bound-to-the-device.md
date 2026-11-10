@@ -1,6 +1,6 @@
 # ADR-027: The sign-in code works only on the phone that started the login
 
-- Status: accepted (the random source of §5 is a `shortcut:` until the native batch, #184)
+- Status: accepted (the random source of §5 is a `shortcut:` until the native batch, #184), amended 2026-11-10 by ADR-069 (§3: the exchange also takes an iPhone's attestation, and a refused one is a second refusal, #580; see History)
 - Date: 2026-10-17
 - Follows: TD-1 (every account is a bank login), RFC 8252 §8.1 (a native app's code can be intercepted by another app on the device), RFC 7636 (its method: a verifier kept, its hash sent ahead), ADR-016 (Telia's PKCE stays its own question), ADR-025 (the panel's host), ADR-026 §8 (a callback spends its attempt), CLAUDE.md "Decisions" (the identity flow changes); issues #186, #35 (the security review rerun of 2026-10-10, finding 1), #184
 
@@ -58,3 +58,4 @@ RFC 8252 asks for PKCE between the app and its authorization server. Here that s
 
 - 2026-10-28, ADR-058 (#472): a session's ninety days count from its last refresh, up to a year from the bank login, so the app of Context that took the code holds the person's tokens as long as it refreshes them at least every ninety days, up to that year. No point changes.
 - 2026-10-28, ADR-059 (#490): an earlier refresh token of a session presented again ends the session for every holder, however many refreshes back it is. That does not reach the app of Context, nor one that starts an attempt of its own (What it does not close): the person's own app never held a token of that session, so none comes back, and the line above stands. No point changes.
+- 2026-11-10, ADR-069 (#580): §3's body is no longer exactly the code and its verifier: an iPhone may add an attestation of a key it made, over the code. It is verified before the code is spent, and a refused one answers `attestation_refused` and leaves the code unspent, so not every refusal is `auth_code_used` any more. `consumeAppCode` is still the one statement that spends the code. Where an environment requires the attestation, the attempt another app or a desktop script starts (What it does not close) no longer gets a session that says `ios`; one that says `android` still does.

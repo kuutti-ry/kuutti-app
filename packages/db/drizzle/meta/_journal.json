@@ -22,6 +22,13 @@
       "when": 1794072410348,
       "tag": "0002_announcements",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1794331596564,
+      "tag": "0003_session_attest_key",
+      "breakpoints": true
     }
   ]
 }

@@ -423,6 +423,7 @@ export async function exportAccount(
       lastUsedAt: s.lastUsedAt.toISOString(),
       expiresAt: s.expiresAt.toISOString(),
       push: pushes.get(s.id) ?? null,
+      attested: s.attested,
     })),
     profile,
     // The check's description in words too (#296): what the person's photo is
