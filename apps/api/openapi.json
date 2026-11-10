@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Kuutti API",
-    "version": "0.118.6",
+    "version": "0.119.0",
     "description": "Free, non-commercial dating app for Finland. Every account is verified through a Finnish bank. Source: AGPL-3.0 with App Store exception."
   },
   "components": {
@@ -217,6 +217,9 @@
                 },
                 "push": {
                   "$ref": "#/components/schemas/ExportedPush"
+                },
+                "attested": {
+                  "type": "boolean"
                 }
               },
               "required": [
@@ -226,7 +229,8 @@
                 "createdAt",
                 "lastUsedAt",
                 "expiresAt",
-                "push"
+                "push",
+                "attested"
               ]
             }
           },
@@ -2565,6 +2569,28 @@
             "type": "string",
             "pattern": "^[0-9a-f]{64}$",
             "description": "The verifier whose SHA-256 /auth/start carried (ADR-027)."
+          },
+          "attestation": {
+            "type": "object",
+            "properties": {
+              "keyId": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9+/]{43}=$",
+                "description": "The key's identifier as App Attest gave it: the SHA-256 of its public half, in base64."
+              },
+              "attestation": {
+                "type": "string",
+                "maxLength": 16384,
+                "pattern": "^[A-Za-z0-9+/]+={0,2}$",
+                "description": "The attestation object in base64, from attestKey with the one-time code's characters as the challenge."
+              }
+            },
+            "required": [
+              "keyId",
+              "attestation"
+            ],
+            "additionalProperties": false,
+            "description": "On an iPhone, the proof that the real app on a real device is signing in (ADR-069). Verified before the code is spent; the session then answers a refresh only with an assertion of this key."
           }
         },
         "required": [
@@ -2615,6 +2641,12 @@
           "refreshToken": {
             "type": "string",
             "pattern": "^[A-Za-z0-9_-]{43}\\.[A-Za-z0-9_-]{43}$"
+          },
+          "assertion": {
+            "type": "string",
+            "maxLength": 2048,
+            "pattern": "^[A-Za-z0-9+/]+={0,2}$",
+            "description": "For a session that attested a key at its exchange (ADR-069): that key's assertion in base64, from generateAssertion with this refresh token's characters as the challenge. Such a session is refreshed with nothing less."
           }
         },
         "required": [
@@ -7278,7 +7310,7 @@
     "/auth/exchange": {
       "post": {
         "summary": "Exchange the one-time code for a session",
-        "description": "Single use, within 60 seconds of the callback, and only with the verifier whose SHA-256 the attempt's /auth/start carried (ADR-027); a wrong verifier leaves the code unspent. Answers with this device's access and refresh tokens; the app keeps both in secure storage.",
+        "description": "Single use, within 60 seconds of the callback, and only with the verifier whose SHA-256 the attempt's /auth/start carried (ADR-027); a wrong verifier leaves the code unspent. An iPhone adds its attestation (ADR-069), verified before the code is spent, and a refused one leaves the code unspent too. Answers with this device's access and refresh tokens; the app keeps both in secure storage.",
         "requestBody": {
           "content": {
             "application/json": {
@@ -7319,6 +7351,16 @@
               }
             }
           },
+          "403": {
+            "description": "attestation_refused: the attestation did not verify, or this environment asks an iPhone for one and none came (ADR-069). The code is unspent.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "429": {
             "description": "rate_limited: too many requests from this address (ADR-026 §1); Retry-After is the wait.",
             "content": {
@@ -7335,7 +7377,7 @@
     "/auth/refresh": {
       "post": {
         "summary": "Rotate the session's tokens",
-        "description": "Presents the refresh token, receives a new pair; the old refresh token is retired. Presenting a retired token ends the device's session (session_revoked): sign in through the bank again.",
+        "description": "Presents the refresh token, receives a new pair; the old refresh token is retired. Presenting a retired token ends the device's session (session_revoked): sign in through the bank again. A session that attested a key at its exchange also presents that key's assertion over the refresh token (ADR-069), and without a good one it is refused and left as it is.",
         "requestBody": {
           "content": {
             "application/json": {
@@ -7367,7 +7409,7 @@
             }
           },
           "401": {
-            "description": "Retired, revoked, expired or unknown refresh token (session_revoked).",
+            "description": "Retired, revoked, expired or unknown refresh token, or a missing or refused assertion (session_revoked).",
             "content": {
               "application/json": {
                 "schema": {
