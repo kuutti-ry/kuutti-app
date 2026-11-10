@@ -45,7 +45,7 @@
  *   spends the API's time (its address limit counts each viewer since ADR-066).
  * - The sessions file is refused inside any git work tree, readable by others, with a token twice,
  *   or naming another API than the target: an unknown token and a revoked one get the same 401.
- * - Hard caps no flag passes: 20 visits a second, 8 stages, 10 minutes, 64 requests in flight,
+ * - Hard caps no flag passes: 50 visits a second, 8 stages, 10 minutes, 64 requests in flight,
  *   50 sessions, 60 thumbnail URLs per account (a tenth of the day's budget), 10 s a request,
  *   200 sockets and 4 an account (the API holds 5 and closes the oldest for a sixth, which must
  *   never be a persona's own phone).
@@ -105,7 +105,9 @@ const LOOPBACK = new Set(["localhost", "127.0.0.1", "[::1]"]);
 
 /** Hard caps: a flag may ask for less, never for more. */
 const CAP = {
-  rate: 20, // visits a second, some 150 requests a second
+  // Visits a second, some 270 requests a second. 20 until 10/11/2026, when staging held 20
+  // without bending (#200), so the ceiling was not named.
+  rate: 50,
   stages: 8,
   // An access token lives fifteen minutes and is refreshed once, at the start.
   runSeconds: 600,
@@ -1269,7 +1271,7 @@ async function selfTest(): Promise<never> {
   const confirm =
     "staging is the demo, and its address limit is the team's phones' too: add --confirm-staging once the run is announced (docs/runbooks/capacity.md)";
   const rates = (what: string) =>
-    `--rates wants visits a second, each above 0 and at most 20, not ${what}`;
+    `--rates wants visits a second, each above 0 and at most 50, not ${what}`;
   const lines: Array<[string[], string, Record<string, string>?]> = [
     [[], `--target is required: http://localhost:3000, or ${STAGING} with --confirm-staging`],
     [["--target", local], `local ${local} 0.5 60 16 1000 - 0`],
@@ -1326,7 +1328,8 @@ async function selfTest(): Promise<never> {
     [["--self-test=1"], "--self-test takes no value"],
     [["--target", local, "--rates", "0"], rates("0")],
     [["--target", local, "--rates", "1,,2"], rates("nothing")],
-    [["--target", local, "--rates", "21"], rates("21")],
+    [["--target", local, "--rates", "50"], `local ${local} 50 60 16 1000 - 0`],
+    [["--target", local, "--rates", "50.5"], rates("50.5")],
     [["--target", local, "--rates", "fast"], rates("fast")],
     [["--target", local, "--rates", "-1"], "--rates takes a value"],
     [
