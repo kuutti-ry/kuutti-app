@@ -42,19 +42,22 @@ function within<T>(ms: number, work: Promise<T>): Promise<T | null> {
 
 /**
  * A new key and Apple's attestation of it over `challenge`, the one-time code
- * of a sign-in. Null where nothing can be made, where Apple does not answer in
- * time or refuses, and where what came back is not what the exchange takes: the
- * exchange then goes without, and only an API that requires one refuses it.
+ * of a sign-in. Null where nothing can be made, where the phone or Apple does
+ * not answer in time or refuses, and where what came back is not what the
+ * exchange takes: the exchange then goes without, and only an API that
+ * requires one refuses it.
  */
 export async function attest(challenge: string): Promise<AppAttestation | null> {
-  const native = appIntegrity();
-  if (!native) return null;
   try {
-    const keyId = await native.generateKeyAsync();
-    const attestation = await within(ATTEST_WAIT_MS, native.attestKeyAsync(keyId, challenge));
+    const native = appIntegrity();
+    if (!native) return null;
+    const making = (async () => {
+      const keyId = await native.generateKeyAsync();
+      return { keyId, attestation: await native.attestKeyAsync(keyId, challenge) };
+    })();
     // Held to the exchange's contract here: a value it would turn down as
     // malformed costs the attestation, not the sign-in.
-    const made = AppAttestation.safeParse({ keyId, attestation });
+    const made = AppAttestation.safeParse(await within(ATTEST_WAIT_MS, making));
     return made.success ? made.data : null;
   } catch {
     return null;
@@ -64,18 +67,40 @@ export async function attest(challenge: string): Promise<AppAttestation | null> 
 const Assertion = AuthRefreshRequest.shape.assertion.unwrap();
 
 /**
- * The key's assertion over `challenge`, the refresh token being presented.
- * Null where the key is gone (it does not outlive a reinstall or a move to
- * another phone) or nothing can be made: the refresh then goes without, and
- * the API ends the wait of a session that owed one by refusing it.
+ * What became of an assertion. With none made, `retry` says whether the same
+ * key may yet sign: not where the key is gone or this phone signs nothing.
  */
-export async function assert(keyId: string, challenge: string): Promise<string | null> {
-  const native = appIntegrity();
-  if (!native) return null;
+export type Asserted = { assertion: string } | { assertion: null; retry: boolean };
+
+/**
+ * The module's codes for a failure that will not pass: the key is no longer
+ * in this phone (it does not outlive a reinstall or a move to another phone),
+ * or the phone has no App Attest. Any other failure may pass.
+ */
+const LASTING: ReadonlySet<unknown> = new Set([
+  "ERR_APP_INTEGRITY_INVALID_KEY",
+  "ERR_APP_INTEGRITY_FEATURE_UNSUPPORTED",
+]);
+
+/** As long as the phone's own key may take to sign: a refresh, and every request behind it, waits on this. */
+const ASSERT_WAIT_MS = 5_000;
+
+/**
+ * The key's assertion over `challenge`, the refresh token being presented.
+ * The caller tells the two ways of having none apart: a key that is gone is
+ * refreshed without, and the API ends the session that owed an assertion; a
+ * key that did not sign this once is tried again, since the API keeps such a
+ * session for exactly that (ADR-069 §3).
+ */
+export async function assert(keyId: string, challenge: string): Promise<Asserted> {
   try {
-    const made = Assertion.safeParse(await native.generateAssertionAsync(keyId, challenge));
-    return made.success ? made.data : null;
-  } catch {
-    return null;
+    const native = appIntegrity();
+    if (!native) return { assertion: null, retry: false };
+    const signed = await within(ASSERT_WAIT_MS, native.generateAssertionAsync(keyId, challenge));
+    if (signed === null) return { assertion: null, retry: true };
+    const made = Assertion.safeParse(signed);
+    return made.success ? { assertion: made.data } : { assertion: null, retry: false };
+  } catch (error) {
+    return { assertion: null, retry: !LASTING.has((error as { code?: unknown } | null)?.code) };
   }
 }

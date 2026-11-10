@@ -49,7 +49,7 @@ describe("attest", () => {
       jest.replaceProperty(Platform, "OS", os);
       lookup.mockReturnValue(module());
       expect(await attest("code")).toBeNull();
-      expect(await assert(KEY_ID, "token")).toBeNull();
+      expect(await assert(KEY_ID, "token")).toEqual({ assertion: null, retry: false });
       expect(lookup).not.toHaveBeenCalled();
     },
   );
@@ -57,14 +57,14 @@ describe("attest", () => {
   it("makes nothing in a build that holds no such module", async () => {
     lookup.mockReturnValue(null);
     expect(await attest("code")).toBeNull();
-    expect(await assert(KEY_ID, "token")).toBeNull();
+    expect(await assert(KEY_ID, "token")).toEqual({ assertion: null, retry: false });
   });
 
   it("makes nothing where Apple says the device has no App Attest, such as a simulator", async () => {
     const native = module({ isSupported: false });
     lookup.mockReturnValue(native);
     expect(await attest("code")).toBeNull();
-    expect(await assert(KEY_ID, "token")).toBeNull();
+    expect(await assert(KEY_ID, "token")).toEqual({ assertion: null, retry: false });
     expect(native.generateKeyAsync).not.toHaveBeenCalled();
     expect(native.generateAssertionAsync).not.toHaveBeenCalled();
   });
@@ -117,6 +117,20 @@ describe("attest", () => {
     expect(answer).toBeNull();
   });
 
+  it("waits no longer when it is the phone's own key that never comes", async () => {
+    jest.useFakeTimers();
+    const never = new Promise<string>(() => undefined);
+    const native = module({ generateKeyAsync: jest.fn(() => never) });
+    lookup.mockReturnValue(native);
+    let answer: unknown = "pending";
+    void attest("code").then((made) => {
+      answer = made;
+    });
+    await jest.advanceTimersByTimeAsync(10_000);
+    expect(answer).toBeNull();
+    expect(native.attestKeyAsync).not.toHaveBeenCalled();
+  });
+
   it("leaves no timer behind once Apple has answered", async () => {
     jest.useFakeTimers();
     lookup.mockReturnValue(module());
@@ -126,17 +140,50 @@ describe("attest", () => {
 });
 
 describe("assert", () => {
+  const GONE = { assertion: null, retry: false };
+  const LATER = { assertion: null, retry: true };
+  /** A rejection as Expo's module makes one: an error with the module's code. */
+  const coded = (code: string) => Object.assign(new Error("[ExpoAppIntegrity]"), { code });
+
   it("has the key sign the challenge", async () => {
     const native = module();
     lookup.mockReturnValue(native);
-    expect(await assert(KEY_ID, "family.rotating")).toBe(ASSERTION);
+    expect(await assert(KEY_ID, "family.rotating")).toEqual({ assertion: ASSERTION });
     expect(native.generateAssertionAsync).toHaveBeenCalledWith(KEY_ID, "family.rotating");
   });
 
-  it("answers nothing when the key is gone, as after a reinstall, and throws nothing", async () => {
-    const gone = jest.fn().mockRejectedValue(new Error("invalidKey"));
-    lookup.mockReturnValue(module({ generateAssertionAsync: gone }));
-    await expect(assert(KEY_ID, "token")).resolves.toBeNull();
+  it.each([
+    ["the key is gone, as after a reinstall", "ERR_APP_INTEGRITY_INVALID_KEY"],
+    ["the phone has no App Attest after all", "ERR_APP_INTEGRITY_FEATURE_UNSUPPORTED"],
+  ])("says there is none to wait for when %s", async (_, code) => {
+    lookup.mockReturnValue(
+      module({ generateAssertionAsync: jest.fn().mockRejectedValue(coded(code)) }),
+    );
+    await expect(assert(KEY_ID, "token")).resolves.toEqual(GONE);
+  });
+
+  it.each([
+    ["the system failed this once", coded("ERR_APP_INTEGRITY_SYSTEM_FAILURE")],
+    ["the module does not know why", coded("ERR_APP_INTEGRITY_UNKNOWN")],
+    ["the failure has no code", new Error("anything")],
+    ["what was thrown is no error", null],
+  ])("says the key may yet sign when %s", async (_, thrown) => {
+    lookup.mockReturnValue(module({ generateAssertionAsync: jest.fn().mockRejectedValue(thrown) }));
+    await expect(assert(KEY_ID, "token")).resolves.toEqual(LATER);
+  });
+
+  it("waits five seconds for the key and then says it may yet sign, so that no refresh hangs on it", async () => {
+    jest.useFakeTimers();
+    const never = new Promise<string>(() => undefined);
+    lookup.mockReturnValue(module({ generateAssertionAsync: jest.fn(() => never) }));
+    let answer: unknown = "pending";
+    void assert(KEY_ID, "token").then((made) => {
+      answer = made;
+    });
+    await jest.advanceTimersByTimeAsync(4_999);
+    expect(answer).toBe("pending");
+    await jest.advanceTimersByTimeAsync(1);
+    expect(answer).toEqual(LATER);
   });
 
   it.each([
@@ -144,14 +191,24 @@ describe("assert", () => {
     ["empty", ""],
     ["longer than the refresh takes", "A".repeat(2049)],
     ["no text", 7],
-  ])("answers nothing for an assertion that is %s", async (_, made) => {
+  ])("says there is none to wait for when the assertion is %s", async (_, made) => {
     lookup.mockReturnValue(module({ generateAssertionAsync: jest.fn(async () => made) }));
-    expect(await assert(KEY_ID, "token")).toBeNull();
+    expect(await assert(KEY_ID, "token")).toEqual(GONE);
   });
 
   it("takes an assertion of the longest length the refresh takes", async () => {
     const longest = "A".repeat(2048);
     lookup.mockReturnValue(module({ generateAssertionAsync: jest.fn(async () => longest) }));
-    expect(await assert(KEY_ID, "token")).toBe(longest);
+    expect(await assert(KEY_ID, "token")).toEqual({ assertion: longest });
+  });
+});
+
+describe("a lookup that throws", () => {
+  it("costs the attestation and no more, and leaves the key to be tried again", async () => {
+    lookup.mockImplementation(() => {
+      throw new Error("no such module");
+    });
+    await expect(attest("code")).resolves.toBeNull();
+    await expect(assert(KEY_ID, "token")).resolves.toEqual({ assertion: null, retry: true });
   });
 });
