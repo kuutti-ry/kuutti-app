@@ -1,6 +1,7 @@
 import { AuthExchangeResponse } from "@kuutti/schema";
 import * as React from "react";
 import { ApiError, api } from "@/lib/api";
+import { attest } from "@/lib/app-attest";
 import {
   clearSession,
   currentSession,
@@ -116,8 +117,11 @@ export function SessionProvider({
   const signIn = React.useCallback(async (code: string, verifier: string) => {
     const owner = sessionGeneration();
     const attempt = ++signInAttempt.current;
+    // An iPhone whose build can says with Apple's word that it is the app
+    // (ADR-069 §2), over the code itself; anything else signs in without.
+    const attestation = await attest(code);
     const { data, error, response } = await api.POST("/auth/exchange", {
-      body: { code, verifier },
+      body: { code, verifier, ...(attestation ? { attestation } : {}) },
     });
     if (!data) {
       throw new ApiError(`sign-in answered ${response.status}`, response.status, error?.error.code);
@@ -126,7 +130,9 @@ export function SessionProvider({
     if (!isCurrentSession(owner) || signInAttempt.current !== attempt) {
       throw new ApiError("sign-in was superseded", 401, "session_revoked");
     }
-    const saving = saveSession(tokens);
+    const saving = saveSession(
+      attestation ? { ...tokens, attestKeyId: attestation.keyId } : tokens,
+    );
     const saved = sessionGeneration();
     await saving;
     if (!isCurrentSession(saved) || signInAttempt.current !== attempt) {

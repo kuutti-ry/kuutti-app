@@ -3977,6 +3977,13 @@ signIn.error.unexpected_link:
   sv: "Den här inloggningslänken begärdes inte från den här telefonen."
   machine: { fi: true, sv: true }
 
+signIn.error.attestation_refused:
+  en: "Apple could not confirm the app on this iPhone."
+  description: Sign-in screen, the one line under the title "Sign-in did not complete", above the button "Try again". On an iPhone the app asks Apple to certify that it is the real app (App Attest, ADR-069), and the server refused the sign-in because that proof was missing or did not verify. Usually Apple's service did not answer; an old build of the app is the other cause. Nothing was saved.
+  fi: "Apple ei voinut varmistaa sovellusta tällä iPhonella."
+  sv: "Apple kunde inte bekräfta appen på den här iPhonen."
+  machine: { fi: true, sv: true }
+
 signIn.unavailable:
   en: "There is no bank sign-in here: the web version and pull-request previews have none. Try the change locally, with the mock bank."
   description: Sign-in screen where no bank login exists at all, so only testers see it. The web target shows it instead of the button; a pull-request preview, whose API has no broker (ADR-014 §1), sends the deep link's auth_unavailable. "The mock bank" is the local stand-in for the bank login (services/mock-idp).

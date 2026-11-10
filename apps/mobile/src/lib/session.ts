@@ -1,7 +1,8 @@
-import { AuthExchangeRequest, SessionTokens } from "@kuutti/schema";
+import { AppAttestation, AuthExchangeRequest, SessionTokens } from "@kuutti/schema";
 import * as SecureStore from "expo-secure-store";
 import { Platform } from "react-native";
 import { apiBaseUrl } from "./api-url";
+import { assert } from "./app-attest";
 
 /**
  * The device's session (#35, rules/mobile.md Auth): the access token, the
@@ -12,8 +13,14 @@ import { apiBaseUrl } from "./api-url";
  * refuses signs the device out (the refresh token was retired, revoked or is
  * past its end, ninety days unused or a year after the bank login, ADR-058:
  * the person logs in through their bank again).
+ *
+ * A session that began with an attestation (ADR-069) keeps the identifier of
+ * its App Attest key beside the tokens, and each refresh carries that key's
+ * assertion over the refresh token. The key itself never leaves the Secure
+ * Enclave, and the identifier is no secret.
  */
-export type StoredSession = SessionTokens;
+const Stored = SessionTokens.extend({ attestKeyId: AppAttestation.shape.keyId.optional() });
+export type StoredSession = SessionTokens & { attestKeyId?: string };
 
 const KEY = "kuutti.session";
 
@@ -78,7 +85,7 @@ export async function loadSession(): Promise<StoredSession | null> {
       if (revision !== read) return memory;
     }
     const raw = await SecureStore.getItemAsync(KEY);
-    loaded = raw ? SessionTokens.parse(JSON.parse(raw)) : null;
+    loaded = raw ? Stored.parse(JSON.parse(raw)) : null;
   } catch {
     loaded = null;
   }
@@ -92,7 +99,10 @@ export async function loadSession(): Promise<StoredSession | null> {
 export const currentSession = (): StoredSession | null => memory;
 
 export async function saveSession(session: StoredSession): Promise<void> {
-  if (memory?.sessionId !== session.sessionId) generation += 1;
+  if (memory?.sessionId !== session.sessionId) {
+    generation += 1;
+    assertFailingSince = null;
+  }
   await persist(session);
 }
 
@@ -112,6 +122,17 @@ export function onSessionChange(listener: Listener): () => void {
   listeners.add(listener);
   return () => void listeners.delete(listener);
 }
+
+/**
+ * How long a key that does not sign, for a reason that may pass, is waited for
+ * (ADR-069 §3). The API refuses a refresh that owes an assertion and leaves
+ * the session as it is, so that the next good one gets through; sending such
+ * a refresh without would end here in a sign-out and a bank login, for a
+ * hiccup. So the session is kept and the next request tries again, for this
+ * long; after it the refresh goes without, and the API decides.
+ */
+const ASSERT_PATIENCE_MS = 60 * 1000;
+let assertFailingSince: number | null = null;
 
 /** Refresh when the access token has under this long left, rather than after a 401. */
 const REFRESH_AHEAD_MS = 30 * 1000;
@@ -148,10 +169,26 @@ export function refreshSession(): Promise<StoredSession | null> {
   inFlight = flight;
   flight.promise = (async () => {
     try {
+      // What a session with a key owes (ADR-069 §3). Without one, or where the
+      // key is gone, the refresh goes as it always did and the API decides.
+      let assertion: string | null = null;
+      if (session.attestKeyId) {
+        const signed = await assert(session.attestKeyId, session.refreshToken);
+        if (!ownsInput()) return null;
+        if (signed.assertion === null && signed.retry) {
+          assertFailingSince ??= Date.now();
+          if (Date.now() - assertFailingSince < ASSERT_PATIENCE_MS) return session;
+        }
+        assertion = signed.assertion;
+      }
+      assertFailingSince = null;
       const response = await fetch(`${apiBaseUrl()}/auth/refresh`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ refreshToken: session.refreshToken }),
+        body: JSON.stringify({
+          refreshToken: session.refreshToken,
+          ...(assertion ? { assertion } : {}),
+        }),
       });
       if (!ownsInput()) return null;
       if (response.status === 401) {
@@ -162,7 +199,8 @@ export function refreshSession(): Promise<StoredSession | null> {
       const next = SessionTokens.parse(await response.json());
       if (!ownsInput()) return null;
       if (next.sessionId !== session.sessionId) throw new Error("refresh changed session");
-      await persist(next);
+      // The key is the session's for its life: a rotation keeps it.
+      await persist(session.attestKeyId ? { ...next, attestKeyId: session.attestKeyId } : next);
       return isCurrentSession(owner) ? memory : null;
     } catch (error) {
       if (!isCurrentSession(owner)) return null;

@@ -1538,6 +1538,7 @@ export const enXA: Readonly<Record<string, string>> = {
   "settings.version.label": "［Vééršííóóñ］",
   "signIn.agreements.research": "［ÉÉííthéér ááñšwéér táákééš ýýóóúú óóñ tóó théé šíígñ-ííñ wííth ýýóóúúr bááñk.］",
   "signIn.button": "［Šíígñ ííñ wííth ýýóóúúr bááñk］",
+  "signIn.error.attestation_refused": "［ÁÁppléé çóóúúld ñóót çóóñfíírm théé áápp óóñ thííš ííPhóóñéé.］",
   "signIn.error.auth_banned": "［Thííš pééršóóñ mááýý ñóót úúšéé Kúúúúttíí.］",
   "signIn.error.auth_cancelled": "［Ñóóthííñg wááš šáávééd.］",
   "signIn.error.auth_cooldown": "［ÝÝóóúú dééléétééd ýýóóúúr ááççóóúúñt rééçééñtlýý. Théé ééáárlííééšt dááýý fóór áá ñééw óóñéé: {date}］",

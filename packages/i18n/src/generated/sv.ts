@@ -1158,6 +1158,7 @@ export const sv: Readonly<Record<string, string>> = {
   "settings.version.label": "Version",
   "signIn.agreements.research": "Vilket svar du än ger går du vidare till inloggningen med din bank.",
   "signIn.button": "Logga in med din bank",
+  "signIn.error.attestation_refused": "Apple kunde inte bekräfta appen på den här iPhonen.",
   "signIn.error.auth_banned": "Den här personen får inte använda Kuutti.",
   "signIn.error.auth_cancelled": "Inget sparades.",
   "signIn.error.auth_cooldown": "Du raderade ditt konto nyligen. Tidigaste dagen för ett nytt konto: {date}",

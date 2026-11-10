@@ -50,6 +50,7 @@ const REFUSALS: ReadonlyMap<string, PlainMessageKey> = new Map([
   ["rate_limited", "signIn.error.auth_rate_limited"],
   ["auth_unavailable", "signIn.unavailable"],
   ["unexpected_link", "signIn.error.unexpected_link"],
+  ["attestation_refused", "signIn.error.attestation_refused"],
 ]);
 
 /**

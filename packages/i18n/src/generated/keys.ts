@@ -1539,6 +1539,7 @@ export type MessageParams = {
   "settings.version.label": Record<never, never>;
   "signIn.agreements.research": Record<never, never>;
   "signIn.button": Record<never, never>;
+  "signIn.error.attestation_refused": Record<never, never>;
   "signIn.error.auth_banned": Record<never, never>;
   "signIn.error.auth_cancelled": Record<never, never>;
   "signIn.error.auth_cooldown": { "date": string };
