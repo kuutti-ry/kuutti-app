@@ -5,23 +5,20 @@ import Fish from "lucide-react-native/icons/fish";
 import Star from "lucide-react-native/icons/star";
 import Undo2 from "lucide-react-native/icons/undo-2";
 import { type ReactNode, type Ref, useCallback, useRef, useState } from "react";
-import {
-  AccessibilityInfo,
-  ScrollView,
-  type Text as TextNode,
-  useWindowDimensions,
-  View,
-} from "react-native";
+import { ScrollView, useWindowDimensions, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LoadFailed } from "@/components/LoadFailed";
+import { useSpokenOnIos } from "@/components/Notice";
 import { ScreenHeader } from "@/components/ScreenHeader";
 import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
 import { Text } from "@/components/ui/text";
-import { fieldLabelKey, ProfileCardView, SEEK_PATH, useSpokenOnIos } from "@/features/profile";
+import { photoRefusalKey } from "@/features/media";
+import { fieldLabelKey, ProfileCardView, SEEK_PATH } from "@/features/profile";
 import { useDecisionButtons } from "@/lib/decision-buttons";
 import { useT } from "@/lib/locale";
 import { cn } from "@/lib/utils";
+import { focusOnMount } from "@/theme/a11y";
 import { useHapticTap } from "@/theme/haptics";
 import { DECISION_ICONS, type DecisionIcons } from "./faceButtons";
 import { ShortPool } from "./ShortPool";
@@ -121,10 +118,6 @@ export function RoundScreen({ star }: { star?: string }) {
     }, [closeMatch]),
   );
 
-  // Stable, so it runs as a line mounts rather than on every render.
-  const focus = useCallback((node: TextNode | View | null) => {
-    if (node) AccessibilityInfo.sendAccessibilityEvent(node, "focus");
-  }, []);
   const words =
     notice === null
       ? null
@@ -200,7 +193,6 @@ export function RoundScreen({ star }: { star?: string }) {
       <ScreenHeader
         title={t(star ? "stars.title" : "round.title")}
         backLabel={t(star ? "stars.card.back" : "round.back")}
-        onBack={() => router.back()}
       >
         {!placement.oneHanded && undo}
       </ScreenHeader>
@@ -219,22 +211,22 @@ export function RoundScreen({ star }: { star?: string }) {
         )}
         {view.status === "failed" && <LoadFailed error={view.error} onRetry={round.retry} />}
         {view.status === "budget" && (
-          <Text ref={focus} accessibilityLiveRegion="polite">
+          <Text ref={focusOnMount} accessibilityLiveRegion="polite">
             {t("errors.card_budget_exceeded")}
           </Text>
         )}
         {view.status === "gone" && (
           <>
-            <Text ref={focus} accessibilityLiveRegion="polite">
+            <Text ref={focusOnMount} accessibilityLiveRegion="polite">
               {t("round.gone")}
             </Text>
             {backToStars()}
           </>
         )}
-        {entries === null && <Text ref={focus}>{t("round.none")}</Text>}
+        {entries === null && <Text ref={focusOnMount}>{t("round.none")}</Text>}
         {match !== null && (
           <View className="gap-4">
-            <Text ref={focus} variant="h2" accessibilityLiveRegion="polite">
+            <Text ref={focusOnMount} variant="h2" accessibilityLiveRegion="polite">
               {t("round.match.title")}
             </Text>
             <Button
@@ -265,7 +257,7 @@ export function RoundScreen({ star }: { star?: string }) {
           <View className="gap-3">
             <View className="flex-row flex-wrap items-center justify-between gap-2">
               <Text
-                ref={focus}
+                ref={focusOnMount}
                 variant="small"
                 className="rounded-full bg-secondary px-3 py-1 text-secondary-foreground"
               >
@@ -315,11 +307,7 @@ export function RoundScreen({ star }: { star?: string }) {
             />
             {refused?.day === current.day && refused.position === current.entry.position && (
               <Text variant="muted" accessibilityLiveRegion="polite">
-                {t(
-                  refused.code === "photo_budget_exceeded"
-                    ? "photos.error.photo_budget_exceeded"
-                    : "photos.error.notShown",
-                )}
+                {t(photoRefusalKey(refused.code))}
               </Text>
             )}
           </View>
@@ -330,11 +318,11 @@ export function RoundScreen({ star }: { star?: string }) {
           !entry &&
           entries &&
           view.status === "ready" &&
-          backToStars(focus)}
+          backToStars(focusOnMount)}
         {/* The queue's end (ADR-062 §11): the line the reader is taken to, what may be relaxed for today (#99, ADR-042), and the same way into What you seek for everybody. */}
         {!star && match === null && !entry && entries && view.status === "ready" && (
           <>
-            <Text ref={focus}>{t("round.done")}</Text>
+            <Text ref={focusOnMount}>{t("round.done")}</Text>
             <ShortPool
               day={view.round.day}
               busy={round.busy}

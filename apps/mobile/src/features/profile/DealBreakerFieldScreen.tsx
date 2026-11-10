@@ -10,21 +10,20 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { ScrollView, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Choice } from "@/components/Choice";
-import { LoadFailed } from "@/components/LoadFailed";
+import { LoadFailedScreen, LoadingScreen } from "@/components/LoadFailed";
 import { Notice, sayAloud } from "@/components/Notice";
 import { ScreenHeader } from "@/components/ScreenHeader";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Text } from "@/components/ui/text";
-import { ApiError } from "@/lib/api";
+import { codeOf } from "@/lib/api";
 import { useT } from "@/lib/locale";
 import { useHapticTap } from "@/theme/haptics";
 import { ConfirmLeaveDialog } from "./ConfirmLeave";
 import { type DealBreakerFilter, fetchDealBreakers, saveDealBreaker } from "./client";
 import { dealBreakerPath, isOpenToFilter, ownAnswerPath } from "./DealBreakerRows";
 import { profileErrorText } from "./errorText";
-import { Chip, ROWS_UP_TO, SEARCHABLE_FROM, visibleOptions } from "./FieldEditor";
+import { Chip, OptionSearch, ROWS_UP_TO, SEARCHABLE_FROM, visibleOptions } from "./FieldEditor";
 import { fieldLabelKey, filterOptionKey } from "./keys";
 import { SEEK_PATH } from "./seek/SeekScreen";
 import { type ProfileNotice, useProfile } from "./useProfile";
@@ -141,7 +140,7 @@ export function DealBreakerFieldScreen({ field: key }: { field: string }) {
         () => null,
         (error: unknown) => ({
           filter: draft,
-          notice: { kind: "error", code: error instanceof ApiError ? error.code : undefined },
+          notice: { kind: "error", code: codeOf(error) },
         }),
       );
     },
@@ -153,27 +152,17 @@ export function DealBreakerFieldScreen({ field: key }: { field: string }) {
   // A change brought back outlives a read that failed: see SeekWhomScreen.
   if (failed && !draft) {
     return (
-      <SafeAreaView className="flex-1 bg-background">
-        <View className="flex-1 items-center justify-center gap-4 p-6">
-          <LoadFailed
-            error={profile.status === "error" ? profile.error : failure}
-            onRetry={() => {
-              void reload();
-              void load();
-            }}
-          />
-        </View>
-      </SafeAreaView>
+      <LoadFailedScreen
+        error={profile.status === "error" ? profile.error : failure}
+        onRetry={() => {
+          void reload();
+          void load();
+        }}
+      />
     );
   }
   if (!failed && (profile.status === "loading" || !response)) {
-    return (
-      <SafeAreaView className="flex-1 bg-background">
-        <View className="flex-1 items-center justify-center p-6">
-          <Text accessibilityLiveRegion="polite">{t("load.loading")}</Text>
-        </View>
-      </SafeAreaView>
-    );
+    return <LoadingScreen />;
   }
 
   const filter = draft ?? stored ?? EVERYONE;
@@ -229,11 +218,7 @@ export function DealBreakerFieldScreen({ field: key }: { field: string }) {
 
   return (
     <SafeAreaView className="flex-1 bg-background">
-      <ScreenHeader
-        title={t(fieldLabelKey(field))}
-        backLabel={t("profile.dealBreakers.back")}
-        onBack={() => router.back()}
-      />
+      <ScreenHeader title={t(fieldLabelKey(field))} backLabel={t("profile.dealBreakers.back")} />
       <ScrollView
         contentContainerClassName="flex-grow gap-6 p-6"
         keyboardShouldPersistTaps="handled"
@@ -258,13 +243,7 @@ export function DealBreakerFieldScreen({ field: key }: { field: string }) {
           <View className="gap-2">
             <Text variant="muted">{t("profile.dealBreakers.accept")}</Text>
             {answered && options.length >= SEARCHABLE_FROM && (
-              <Input
-                accessibilityLabel={t("profile.later.search")}
-                placeholder={t("profile.later.search")}
-                value={search}
-                autoCapitalize="none"
-                onChangeText={setSearch}
-              />
+              <OptionSearch value={search} onChange={setSearch} />
             )}
             <View
               accessibilityRole={rows && takesOne(field) ? "radiogroup" : undefined}

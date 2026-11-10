@@ -1,3 +1,4 @@
+import { screen } from "@testing-library/react-native";
 import { StyleSheet } from "react-native";
 import { TOUCH_TARGET } from "@/theme/a11y";
 
@@ -8,7 +9,13 @@ export type HostNode = {
   children: Array<HostNode | string> | null;
 };
 
-function visit(node: HostNode | string, each: (node: HostNode) => void): void {
+/** The roots of a tree, which `screen.toJSON()` gives as one node, several or none. */
+export function rootsOf(tree: HostNode | HostNode[] | null): HostNode[] {
+  return Array.isArray(tree) ? tree : tree ? [tree] : [];
+}
+
+/** Every host node of a tree, the root first, depth first. */
+export function visit(node: HostNode | string, each: (node: HostNode) => void): void {
   if (typeof node === "string") return;
   each(node);
   for (const child of node.children ?? []) visit(child, each);
@@ -22,7 +29,7 @@ function textOf(node: HostNode | string): string {
 /** Everything a finger can activate: host views wired for presses, and text inputs. */
 export function pressables(tree: HostNode | HostNode[] | null): HostNode[] {
   const found: HostNode[] = [];
-  for (const root of Array.isArray(tree) ? tree : tree ? [tree] : []) {
+  for (const root of rootsOf(tree)) {
     visit(root, (node) => {
       const pressable =
         typeof node.props.onClick === "function" ||
@@ -79,7 +86,7 @@ export function a11yProblems(node: HostNode): string[] {
 /** The nodes hidden from a screen reader: what a decorative icon, glyph or mark renders as. */
 export function hiddenNodes(tree: HostNode | HostNode[] | null): HostNode[] {
   const found: HostNode[] = [];
-  for (const root of Array.isArray(tree) ? tree : tree ? [tree] : []) {
+  for (const root of rootsOf(tree)) {
     visit(root, (node) => {
       if (node.props.accessibilityElementsHidden === true) found.push(node);
     });
@@ -93,7 +100,7 @@ export function hiddenNodes(tree: HostNode | HostNode[] | null): HostNode[] {
  * there is none, null when no text node holds the words.
  */
 export function markBefore(tree: HostNode | HostNode[] | null, words: string): boolean | null {
-  for (const root of Array.isArray(tree) ? tree : tree ? [tree] : []) {
+  for (const root of rootsOf(tree)) {
     let found: boolean | null = null;
     visit(root, (node) => {
       if (found !== null) return;
@@ -109,4 +116,9 @@ export function markBefore(tree: HostNode | HostNode[] | null, words: string): b
     if (found !== null) return found;
   }
   return null;
+}
+
+/** Nothing pressable on the screen is unlabelled, without its role, or smaller than a finger. */
+export function noProblems(): void {
+  expect(pressables(screen.toJSON() as HostNode).flatMap((node) => a11yProblems(node))).toEqual([]);
 }

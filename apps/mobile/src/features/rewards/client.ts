@@ -1,18 +1,9 @@
-import { ErrorResponse, InvitationCreated, Invitations } from "@kuutti/schema";
-import { ApiError, api } from "@/lib/api";
+import { InvitationCreated, Invitations } from "@kuutti/schema";
+import { api, failed } from "@/lib/api";
 
 // The invitations as the app calls them (#107, ADR-044), through the typed
 // client; the zod contracts guard the runtime (ADR-003). A refusal carries the
 // envelope's code, for the screens to say it in their words.
-
-function failed(response: Response, error: unknown, what: string): ApiError {
-  const parsed = ErrorResponse.safeParse(error);
-  return new ApiError(
-    `${what} answered ${response.status}`,
-    response.status,
-    parsed.success ? parsed.data.error.code : undefined,
-  );
-}
 
 /** The caller's own: whether they may invite and still type a code, the open ones, what they earned. */
 export async function fetchInvitations(): Promise<Invitations> {

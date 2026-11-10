@@ -5,7 +5,7 @@ import type * as React from "react";
 import { AccessibilityInfo, DeviceEventEmitter, Platform, StyleSheet, View } from "react-native";
 import { clearSession, saveSession } from "@/lib/session";
 import { UnsavedRow } from "@/lib/unsaved";
-import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
+import { noProblems } from "@/test/a11y";
 import { FAILED_TO_LOAD } from "@/test/failed";
 import { renderWithTheme, underProviders } from "@/test/render";
 import { EmailCard, EmailScreen } from "./EmailCard";
@@ -76,8 +76,6 @@ const liveRegion = () =>
   )[0];
 /** What the notice says; null when the card says nothing. */
 const spoken = () => liveRegion()?.children.join("") ?? null;
-const noProblems = () =>
-  expect(pressables(screen.toJSON() as HostNode).flatMap((node) => a11yProblems(node))).toEqual([]);
 
 /** When a code ends, whatever the test machine's clock says: the card reads no clock and shows no time. */
 const LATER = "2099-06-01T12:34:00.000Z";

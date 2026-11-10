@@ -7,7 +7,7 @@ import { Notice, sayAloud } from "@/components/Notice";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Text } from "@/components/ui/text";
-import { ApiError } from "@/lib/api";
+import { statusOf } from "@/lib/api";
 import { buildInfo } from "@/lib/build";
 import { useT } from "@/lib/locale";
 import { useReportUnsaved } from "@/lib/unsaved";
@@ -62,7 +62,7 @@ export function FeedbackForm() {
       setState("sent");
       sayAloud(t("feedback.thanks.title"));
     } catch (error) {
-      setState(error instanceof ApiError && error.status === 429 ? "limited" : "failed");
+      setState(statusOf(error) === 429 ? "limited" : "failed");
     }
   };
 

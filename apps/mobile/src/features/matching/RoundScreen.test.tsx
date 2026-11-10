@@ -4,8 +4,9 @@ import { useLocales } from "expo-localization";
 import * as SecureStore from "expo-secure-store";
 import { AccessibilityInfo, AppState, Dimensions, Platform, StyleSheet, View } from "react-native";
 import { clearSession, saveSession } from "@/lib/session";
-import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
+import { a11yProblems, type HostNode, noProblems, pressables } from "@/test/a11y";
 import { FAILED_TO_LOAD } from "@/test/failed";
+import { textsInOrder as said } from "@/test/layout";
 import { renderWithTheme, underProviders } from "@/test/render";
 import { TOUCH_TARGET } from "@/theme/a11y";
 import { RoundScreen } from "./RoundScreen";
@@ -142,8 +143,6 @@ const press = async (name: string) => {
   await settle();
 };
 const heading = (name: string) => screen.getByRole("heading", { name });
-const noProblems = () =>
-  expect(pressables(screen.toJSON() as HostNode).flatMap((node) => a11yProblems(node))).toEqual([]);
 const announced = () =>
   (AccessibilityInfo.announceForAccessibility as jest.Mock).mock.calls.map(([words]) => words);
 /** The app's AppState listeners, while subscribed. */
@@ -160,9 +159,6 @@ const liveLines = () =>
     .queryAllByText(/./)
     .filter((node) => node.props.accessibilityLiveRegion === "polite")
     .map((node) => node.props.children);
-/** Everything the screen draws, in order, so that what a state leaves out is seen to be left out. */
-const said = (node: HostNode | string = screen.toJSON() as HostNode): string[] =>
-  typeof node === "string" ? [node] : (node.children ?? []).flatMap((child) => said(child));
 /** The words inside a component or an element: a line's own, or a button's. */
 const wordsIn = (node: unknown): string[] => {
   if (typeof node === "string") return [node];

@@ -3,7 +3,7 @@ import { useRouter } from "expo-router";
 import { useEffect } from "react";
 import { ScrollView, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { LoadFailed } from "@/components/LoadFailed";
+import { LoadFailedScreen, LoadingScreen } from "@/components/LoadFailed";
 import { NEEDED_MARK } from "@/components/RowGroup";
 import { ScreenHeader } from "@/components/ScreenHeader";
 import { Input } from "@/components/ui/input";
@@ -135,22 +135,10 @@ export function SectionScreen({ section: id, once = false }: { section: string; 
   if (!section) return null;
 
   if (profile.status === "loading") {
-    return (
-      <SafeAreaView className="flex-1 bg-background">
-        <View className="flex-1 items-center justify-center p-6">
-          <Text accessibilityLiveRegion="polite">{t("load.loading")}</Text>
-        </View>
-      </SafeAreaView>
-    );
+    return <LoadingScreen />;
   }
   if (profile.status === "error") {
-    return (
-      <SafeAreaView className="flex-1 bg-background">
-        <View className="flex-1 items-center justify-center gap-4 p-6">
-          <LoadFailed error={profile.error} onRetry={() => void profile.reload()} />
-        </View>
-      </SafeAreaView>
-    );
+    return <LoadFailedScreen error={profile.error} onRetry={() => void profile.reload()} />;
   }
 
   return (
@@ -164,7 +152,6 @@ export function SectionScreen({ section: id, once = false }: { section: string; 
               ? "profile.seek.back"
               : "profile.section.back",
         )}
-        onBack={() => router.back()}
       />
       <ScrollView
         contentContainerClassName="flex-grow gap-6 p-6"

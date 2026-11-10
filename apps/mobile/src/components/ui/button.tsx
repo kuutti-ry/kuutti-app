@@ -3,7 +3,7 @@ import * as React from "react";
 import { Platform, Pressable, type StyleProp, type ViewStyle } from "react-native";
 import { Text, TextClassContext } from "@/components/ui/text";
 import { cn } from "@/lib/utils";
-import { TOUCH_TARGET } from "@/theme/a11y";
+import { MINIMUM_TARGET } from "@/theme/a11y";
 import { HARD_SHADOW, useHardShadow } from "@/theme/shadow";
 import { useLook } from "@/theme/ThemeProvider";
 
@@ -130,10 +130,6 @@ type ButtonProps = Omit<
 } & React.RefAttributes<React.ComponentRef<typeof Pressable>> &
   VariantProps<typeof todaysButton> &
   ButtonContent & { style?: StyleProp<ViewStyle> };
-
-// A style, not a class: the guarantee must hold wherever the stylesheet does
-// not (tests, a class merged away by a caller).
-const MINIMUM_TARGET: ViewStyle = { minHeight: TOUCH_TARGET, minWidth: TOUCH_TARGET };
 
 // Pressed, a drawn button moves into its hard shadow, which it then covers: the
 // neubrutalism try's press, at once, so no motion to reduce.

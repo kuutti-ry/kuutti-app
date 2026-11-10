@@ -1,4 +1,3 @@
-import { useRouter } from "expo-router";
 import { useState } from "react";
 import { ScrollView, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -27,7 +26,6 @@ const CONSEQUENCES = [
  */
 export function BreakScreen() {
   const { t } = useT();
-  const router = useRouter();
   const tap = useHapticTap();
   const session = useSession();
   const [understood, setUnderstood] = useState(false);
@@ -49,11 +47,7 @@ export function BreakScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-background">
-      <ScreenHeader
-        title={t("account.break.title")}
-        backLabel={t("account.break.back")}
-        onBack={() => router.back()}
-      />
+      <ScreenHeader title={t("account.break.title")} backLabel={t("account.break.back")} />
       <ScrollView contentContainerClassName="gap-6 p-6">
         <View className="gap-3" accessibilityRole="list">
           {CONSEQUENCES.map((key) => (

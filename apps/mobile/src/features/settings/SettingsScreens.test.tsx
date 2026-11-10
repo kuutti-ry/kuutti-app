@@ -4,13 +4,13 @@ import { act, fireEvent, screen, waitFor, within } from "@testing-library/react-
 import { useLocales } from "expo-localization";
 import * as SecureStore from "expo-secure-store";
 import { DeviceEventEmitter, Linking, Platform, StyleSheet } from "react-native";
+import { LegalSummary } from "@/features/identity";
 import { clearSession, currentSession, saveSession } from "@/lib/session";
-import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
+import { noProblems } from "@/test/a11y";
 import { expectPinnedHeader } from "@/test/layout";
 import { renderWithTheme } from "@/test/render";
 import { DeviceActions } from "./DeviceActions";
 import { LanguageChoices } from "./LanguageChoices";
-import { LegalSummary } from "./LegalSummary";
 import { LicensesScreen } from "./LicensesScreen";
 import { LicenseTextsScreen } from "./LicenseTextsScreen";
 import { LICENCES, type LicenceList } from "./licences";
@@ -58,8 +58,6 @@ const tokens = {
 const settle = () => act(() => new Promise<void>((resolve) => setTimeout(resolve, 20)));
 /** Every text on the screen, in order. */
 const drawn = () => screen.queryAllByText(/./).map((node) => node.props.children);
-const noProblems = () =>
-  expect(pressables(screen.toJSON() as HostNode).flatMap((node) => a11yProblems(node))).toEqual([]);
 /** Settings with the row named open, as the app left it in the session given (#511); signed out by default. */
 const settingsWith = async (open: string, session: string | null = null) => {
   rememberOpenRow(open, session);

@@ -5,7 +5,6 @@ import {
   type DealBreakerField,
   DealBreakersResponse,
   type DealBreakersUpdate,
-  ErrorResponse,
   type Gender,
   HomeSummary,
   type HomeUpdate,
@@ -17,19 +16,10 @@ import {
   type ProfileUpdate,
   photoWithKnownDescription,
 } from "@kuutti/schema";
-import { ApiError, api } from "@/lib/api";
+import { api, failed } from "@/lib/api";
 
 // The profile routes as the app calls them (#47), through the typed client;
 // the zod contracts guard the runtime (ADR-003).
-
-function failed(response: Response, error: unknown, what: string): ApiError {
-  const parsed = ErrorResponse.safeParse(error);
-  return new ApiError(
-    `${what} answered ${response.status}`,
-    response.status,
-    parsed.success ? parsed.data.error.code : undefined,
-  );
-}
 
 // A section saves as the person leaves it (#238), so the next screen can be
 // reading while the save is still on its way. A save waits for the one before
@@ -37,6 +27,13 @@ function failed(response: Response, error: unknown, what: string): ApiError {
 // card and the deal-breakers show what was stored, and two saves never land
 // out of order. Settled either way: a failed save is its screen's to report.
 let lastSave: Promise<unknown> = Promise.resolve();
+
+/** A save in the line: it goes once the one before has settled, taken or not, and the next one waits for it. */
+function inLine<T>(send: () => Promise<T>): Promise<T> {
+  const sent = lastSave.then(send);
+  lastSave = sent.catch(() => undefined);
+  return sent;
+}
 
 async function readProfile(): Promise<ProfileResponse> {
   const { data, error, response } = await api.GET("/profile");
@@ -59,7 +56,7 @@ export async function fetchProfile(): Promise<ProfileResponse> {
 export function saveProfile(
   build: (stored: ProfileDocument | null) => ProfileUpdate,
 ): Promise<ProfileResponse> {
-  const sent = lastSave.then(async () => {
+  return inLine(async () => {
     const { profile } = await readProfile();
     // The generated body type spells the strict objects with an index signature
     // the zod type has no room for; the contract is the zod schema (ADR-003).
@@ -69,8 +66,6 @@ export function saveProfile(
     if (!data) throw failed(response, error, "profile save");
     return ProfileResponse.parse(data);
   });
-  lastSave = sent.catch(() => undefined);
-  return sent;
 }
 
 export async function fetchCardPreview(): Promise<CardPreviewResponse> {
@@ -90,15 +85,13 @@ export async function fetchCardPreview(): Promise<CardPreviewResponse> {
  * in this body and nowhere else: never a path, a query or a log (§9).
  */
 export function saveHome(update: HomeUpdate): Promise<HomeSummary> {
-  const sent = lastSave.then(async () => {
+  return inLine(async () => {
     const { data, error, response } = await api.PUT("/account/home", {
       body: update as unknown as ApiComponents["schemas"]["HomeUpdate"],
     });
     if (!data) throw failed(response, error, "home");
     return HomeSummary.parse(data);
   });
-  lastSave = sent.catch(() => undefined);
-  return sent;
 }
 
 // The gender is the account's and no part of the document, and GET /onboarding
@@ -116,12 +109,10 @@ export async function fetchOwnGender(): Promise<OwnGender> {
 }
 
 export function saveGender(gender: Gender): Promise<void> {
-  const sent = lastSave.then(async () => {
+  return inLine(async () => {
     const { error, response } = await api.PUT("/account/gender", { body: { gender } });
     if (!response.ok) throw failed(response, error, "gender");
   });
-  lastSave = sent.catch(() => undefined);
-  return sent;
 }
 
 // What one seeks lives with the profile here (#542): onboarding asks it once,
@@ -135,7 +126,7 @@ export async function fetchPreferences(): Promise<PreferencesResponse> {
 }
 
 export function savePreferences(update: PreferencesUpdate): Promise<PreferencesResponse> {
-  const sent = lastSave.then(async () => {
+  return inLine(async () => {
     // The generated body type spells the strict object with an index signature the zod type has no room for (ADR-003).
     const { data, error, response } = await api.PUT("/preferences", {
       body: update as unknown as ApiComponents["schemas"]["PreferencesUpdate"],
@@ -143,8 +134,6 @@ export function savePreferences(update: PreferencesUpdate): Promise<PreferencesR
     if (!data) throw failed(response, error, "preferences");
     return PreferencesResponse.parse(data);
   });
-  lastSave = sent.catch(() => undefined);
-  return sent;
 }
 
 // The deal-breakers (#149) live with the preferences on the API and with the
@@ -176,7 +165,7 @@ export function saveDealBreaker(
   field: DealBreakerField,
   filter: DealBreakerFilter,
 ): Promise<DealBreakersResponse> {
-  const sent = lastSave.then(async () => {
+  return inLine(async () => {
     const { dealBreakers } = await readDealBreakers();
     const update: DealBreakersUpdate = {
       dealBreakers: [
@@ -190,6 +179,4 @@ export function saveDealBreaker(
     if (!data) throw failed(response, error, "deal-breakers save");
     return DealBreakersResponse.parse(data);
   });
-  lastSave = sent.catch(() => undefined);
-  return sent;
 }

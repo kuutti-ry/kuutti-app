@@ -1,9 +1,9 @@
 import { LATER_COMPANIONS, LATER_FIELD_ORDER, type ProfileFieldKey } from "@kuutti/schema";
 import { useRouter } from "expo-router";
 import { useEffect, useRef } from "react";
-import { ScrollView, View } from "react-native";
+import { ScrollView } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { LoadFailed } from "@/components/LoadFailed";
+import { LoadFailedScreen, LoadingScreen } from "@/components/LoadFailed";
 import { sayAloud } from "@/components/Notice";
 import { ScreenHeader } from "@/components/ScreenHeader";
 import { Button } from "@/components/ui/button";
@@ -126,22 +126,10 @@ export function LaterFieldScreen({ field, once = false }: { field: string; once?
   if (index < 0 || !key) return null;
 
   if (profile.status === "loading") {
-    return (
-      <SafeAreaView className="flex-1 bg-background">
-        <View className="flex-1 items-center justify-center p-6">
-          <Text accessibilityLiveRegion="polite">{t("load.loading")}</Text>
-        </View>
-      </SafeAreaView>
-    );
+    return <LoadingScreen />;
   }
   if (profile.status === "error") {
-    return (
-      <SafeAreaView className="flex-1 bg-background">
-        <View className="flex-1 items-center justify-center gap-4 p-6">
-          <LoadFailed error={profile.error} onRetry={() => void profile.reload()} />
-        </View>
-      </SafeAreaView>
-    );
+    return <LoadFailedScreen error={profile.error} onRetry={() => void profile.reload()} />;
   }
   const { draft, saved, update } = profile;
   const progress = laterProgress(draft.fields);

@@ -1,14 +1,13 @@
 import { formatDateTime } from "@kuutti/i18n";
 import type { Gender, ProfileFields } from "@kuutti/schema";
-import { useRouter } from "expo-router";
 import { useState } from "react";
 import { ScrollView, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { LoadFailed } from "@/components/LoadFailed";
+import { LoadFailedScreen, LoadingScreen } from "@/components/LoadFailed";
 import { Notice } from "@/components/Notice";
 import { ScreenHeader } from "@/components/ScreenHeader";
 import { Text } from "@/components/ui/text";
-import { ApiError } from "@/lib/api";
+import { codeOf } from "@/lib/api";
 import { useT } from "@/lib/locale";
 import { ConfirmLeaveDialog } from "../ConfirmLeave";
 import { saveGender } from "../client";
@@ -39,7 +38,6 @@ type HeldGender = { gender: Gender | null; word: Word; code: string | undefined 
  */
 export function GenderScreen() {
   const { t, locale } = useT();
-  const router = useRouter();
   const held = useRefusedDraft<HeldGender>(GENDER_PATH);
   const own = useOwnGender();
   const profile = useProfile();
@@ -69,7 +67,7 @@ export function GenderScreen() {
         if (labelOffered && word) await saveChanges({ fields: { identityLabel: word } });
         return null;
       } catch (error) {
-        const code = error instanceof ApiError ? error.code : undefined;
+        const code = codeOf(error);
         return { gender: chosen, word, code };
       }
     },
@@ -79,27 +77,17 @@ export function GenderScreen() {
   // the save usually loses the read too, and it must not vanish behind this.
   if ((own.status === "error" || profile.status === "error") && !draft) {
     return (
-      <SafeAreaView className="flex-1 bg-background">
-        <View className="flex-1 items-center justify-center gap-4 p-6">
-          <LoadFailed
-            error={own.status === "error" ? own.error : profile.error}
-            onRetry={() => {
-              void own.reload();
-              void profile.reload();
-            }}
-          />
-        </View>
-      </SafeAreaView>
+      <LoadFailedScreen
+        error={own.status === "error" ? own.error : profile.error}
+        onRetry={() => {
+          void own.reload();
+          void profile.reload();
+        }}
+      />
     );
   }
   if (own.status === "loading" || profile.status === "loading") {
-    return (
-      <SafeAreaView className="flex-1 bg-background">
-        <View className="flex-1 items-center justify-center p-6">
-          <Text accessibilityLiveRegion="polite">{t("load.loading")}</Text>
-        </View>
-      </SafeAreaView>
-    );
+    return <LoadingScreen />;
   }
 
   const waiting = nextChange
@@ -117,11 +105,7 @@ export function GenderScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-background">
-      <ScreenHeader
-        title={t("profile.gender.title")}
-        backLabel={t("profile.section.back")}
-        onBack={() => router.back()}
-      />
+      <ScreenHeader title={t("profile.gender.title")} backLabel={t("profile.section.back")} />
       <ScrollView contentContainerClassName="flex-grow gap-6 p-6">
         <Text>{t("profile.gender.explain")}</Text>
         <GenderChips chosen={chosen} onChoose={choose} />

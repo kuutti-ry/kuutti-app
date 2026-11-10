@@ -1,23 +1,17 @@
 import type { ConversationSummary, YourTurnCount } from "@kuutti/schema";
 import { Image } from "expo-image";
 import { useFocusEffect, useRouter } from "expo-router";
-import { useCallback, useEffect, useState } from "react";
-import {
-  AccessibilityInfo,
-  Platform,
-  Pressable,
-  RefreshControl,
-  ScrollView,
-  View,
-} from "react-native";
+import { useCallback, useState } from "react";
+import { Pressable, RefreshControl, ScrollView, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LoadFailed } from "@/components/LoadFailed";
+import { sayOnIos, useSpokenOnIos } from "@/components/Notice";
 import { ScreenHeader } from "@/components/ScreenHeader";
 import { SupportLink } from "@/components/SupportLink";
 import { Text } from "@/components/ui/text";
 import type { SafetyOutcome } from "@/features/safety";
 import { useT } from "@/lib/locale";
-import { DECORATIVE, TOUCH_TARGET } from "@/theme/a11y";
+import { DECORATIVE, MINIMUM_TARGET } from "@/theme/a11y";
 import { useHapticTap } from "@/theme/haptics";
 import { ConnectionLine } from "./ConnectionLine";
 import { NOTICES, takeNotice } from "./notice";
@@ -26,9 +20,6 @@ import { UnreadBadge } from "./UnreadBadge";
 import { useConversations } from "./useConversations";
 
 type T = ReturnType<typeof useT>["t"];
-
-/** A row is at least the touch target, whatever its text (CLAUDE.md Accessibility). */
-const ROW_TARGET = { minHeight: TOUCH_TARGET, minWidth: TOUCH_TARGET };
 
 /**
  * Who the counterpart is, as a row and the conversation's header say it; an
@@ -81,7 +72,7 @@ function Row({ conversation }: { conversation: ConversationSummary }) {
       accessibilityRole="button"
       accessibilityLabel={label}
       className="flex-row items-center gap-3 rounded-lg px-2 py-2 active:bg-accent"
-      style={ROW_TARGET}
+      style={MINIMUM_TARGET}
       onPress={() => {
         tap();
         router.push(`/chats/${conversation.id}`);
@@ -156,9 +147,7 @@ function TurnWarning({ count }: { count: YourTurnCount }) {
   const { waiting, limit, warning } = count;
   const words =
     limit > 0 && warning > 0 && waiting >= warning ? t("chat.list.turnWarning", { limit }) : null;
-  useEffect(() => {
-    if (words !== null && Platform.OS === "ios") AccessibilityInfo.announceForAccessibility(words);
-  }, [words]);
+  useSpokenOnIos(words);
   if (words === null) return null;
   return (
     <View testID="turn-warning" className="rounded-lg border border-border p-4">
@@ -179,7 +168,6 @@ function TurnWarning({ count }: { count: YourTurnCount }) {
  */
 export function ConversationsScreen() {
   const { t } = useT();
-  const router = useRouter();
   const view = useConversations();
   const [refreshing, setRefreshing] = useState(false);
   const [notice, setNotice] = useState<SafetyOutcome | null>(null);
@@ -188,9 +176,7 @@ export function ConversationsScreen() {
     useCallback(() => {
       const left = takeNotice();
       setNotice(left);
-      // Android's live region speaks it; iOS has none.
-      if (left && Platform.OS === "ios")
-        AccessibilityInfo.announceForAccessibility(t(NOTICES[left]));
+      if (left) sayOnIos(t(NOTICES[left]));
     }, [t]),
   );
 
@@ -202,11 +188,7 @@ export function ConversationsScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-background">
-      <ScreenHeader
-        title={t("chat.list.title")}
-        backLabel={t("chat.back")}
-        onBack={() => router.back()}
-      />
+      <ScreenHeader title={t("chat.list.title")} backLabel={t("chat.back")} />
       <ConnectionLine />
       <ScrollView
         testID="conversations"

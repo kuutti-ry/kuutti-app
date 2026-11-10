@@ -7,7 +7,7 @@ import type {
   ProfileUpdate,
 } from "@kuutti/schema";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ApiError } from "@/lib/api";
+import { codeOf } from "@/lib/api";
 import { fetchProfile, saveProfile } from "./client";
 
 export type ProfileNotice = { kind: "error"; code: string | undefined } | null;
@@ -72,6 +72,14 @@ export function changesOf(from: ProfileUpdate, to: ProfileUpdate): ProfileChange
   }
   if (Object.keys(hidden).length > 0) changes.hidden = hidden;
   return changes;
+}
+
+/** The fields with one answer put on them, or taken off when it is undefined. */
+export function withField(fields: ProfileFields, key: string, value: unknown): ProfileFields {
+  const next: Record<string, unknown> = { ...fields };
+  if (value === undefined) delete next[key];
+  else next[key] = value;
+  return next as ProfileFields;
 }
 
 /** The document with the changes put on it; what they do not name stays as the document has it. */
@@ -200,7 +208,7 @@ export function useProfile(held?: HeldDraft) {
     } catch (error) {
       const refusal = {
         kind: "error",
-        code: error instanceof ApiError ? error.code : undefined,
+        code: codeOf(error),
       } as const;
       if (mounted.current) setNotice(refusal);
       return refusal;

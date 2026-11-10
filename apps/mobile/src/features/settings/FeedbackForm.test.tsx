@@ -3,7 +3,7 @@ import { useLocales } from "expo-localization";
 import * as SecureStore from "expo-secure-store";
 import { AccessibilityInfo, Platform } from "react-native";
 import { clearSession, saveSession } from "@/lib/session";
-import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
+import { noProblems } from "@/test/a11y";
 import { renderWithTheme } from "@/test/render";
 import { FeedbackForm } from "./FeedbackForm";
 
@@ -30,8 +30,6 @@ const tokens = {
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
 const settle = () => act(() => new Promise<void>((resolve) => setTimeout(resolve, 20)));
-const noProblems = () =>
-  expect(pressables(screen.toJSON() as HostNode).flatMap((node) => a11yProblems(node))).toEqual([]);
 
 type Sent = { method: string; path: string; body: unknown };
 /** The API as the screen sees it: every feedback request recorded, answered as told. */

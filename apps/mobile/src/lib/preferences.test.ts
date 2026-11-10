@@ -1,7 +1,7 @@
 import * as Sentry from "@sentry/react-native";
 import * as SecureStore from "expo-secure-store";
 import { Platform } from "react-native";
-import { readPreference, writePreference } from "./preferences";
+import { readPreference, storedObject, writePreference } from "./preferences";
 
 // The three small settings that survive a restart (#13, #143): the secure
 // store on the phone, localStorage on the web preview, and a store that fails
@@ -86,5 +86,25 @@ describe("on the web preview", () => {
     await expect(writePreference("scheme", "dark")).resolves.toBeUndefined();
     await expect(writePreference("scheme", null)).resolves.toBeUndefined();
     expect(captured).not.toHaveBeenCalled();
+  });
+});
+
+describe("storedObject", () => {
+  it("reads back an object stored as JSON", () => {
+    expect(storedObject(JSON.stringify({ hand: "left", oneHanded: true }))).toEqual({
+      hand: "left",
+      oneHanded: true,
+    });
+  });
+
+  it.each([
+    ["nothing stored", null],
+    ["text that is not JSON", "{hand: left"],
+    ["a number", "3"],
+    ["a string", JSON.stringify("left")],
+    ["null", "null"],
+    ["a list", JSON.stringify(["left"])],
+  ])("gives null for %s, so a reader falls back to its defaults", (_, raw) => {
+    expect(storedObject(raw)).toBeNull();
   });
 });

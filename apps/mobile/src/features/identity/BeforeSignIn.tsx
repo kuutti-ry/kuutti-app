@@ -7,7 +7,7 @@ import { Text } from "@/components/ui/text";
 import { useT } from "@/lib/locale";
 import { useHapticTap } from "@/theme/haptics";
 import { type Agreements, agreementsOf } from "./agreements";
-import { LegalTextLink } from "./LegalTextLink";
+import { LegalSummary } from "./LegalSummary";
 
 /**
  * The norms and the two consents a person accepts before anything else, under
@@ -40,8 +40,7 @@ export function NormsAndConsents() {
             </CardTitle>
           </CardHeader>
           <CardContent className="gap-2">
-            <Text>{t(kind === "terms" ? "legal.terms.summary" : "legal.privacy.summary")}</Text>
-            <LegalTextLink kind={kind} />
+            <LegalSummary kind={kind} />
           </CardContent>
         </Card>
       ))}

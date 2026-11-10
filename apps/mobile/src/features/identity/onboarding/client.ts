@@ -1,23 +1,23 @@
-import { realLocale } from "@kuutti/i18n";
+import { CONSENT_VERSIONS, realLocale } from "@kuutti/i18n";
 import {
   type ConsentKind,
   ConsentsResponse,
-  ErrorResponse,
   OnboardingStatus,
   type WithdrawableConsentKind,
 } from "@kuutti/schema";
-import { ApiError, api } from "@/lib/api";
+import { api, failed } from "@/lib/api";
 
 // The onboarding routes as the app calls them (#46), through the typed
 // client; the zod contracts guard the runtime (ADR-003).
 
-function failed(response: Response, error: unknown, what: string): ApiError {
-  const parsed = ErrorResponse.safeParse(error);
-  return new ApiError(
-    `${what} answered ${response.status}`,
-    response.status,
-    parsed.success ? parsed.data.error.code : undefined,
-  );
+/**
+ * The version of a wording as built into this app: what the person actually
+ * read, and therefore what a consent names (ADR-010 §4). When the API has a
+ * newer wording, the app asks for an update instead of recording a consent
+ * for a text it never showed.
+ */
+export function bundledVersion(kind: ConsentKind): string {
+  return CONSENT_VERSIONS[kind] ?? "";
 }
 
 export async function fetchOnboarding(): Promise<OnboardingStatus> {

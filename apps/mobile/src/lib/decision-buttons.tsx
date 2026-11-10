@@ -1,5 +1,5 @@
 import * as React from "react";
-import { readPreference, writePreference } from "./preferences";
+import { readPreference, storedObject, writePreference } from "./preferences";
 
 /**
  * Where the round's decision buttons sit (#82): for the right hand or the
@@ -27,15 +27,9 @@ export const DEFAULT_DECISION_BUTTONS: Readonly<DecisionButtons> = {
 /** What was stored; anything unknown is the default, field by field, and so is a store that holds nothing. */
 export function readDecisionButtons(raw: string | null): DecisionButtons {
   const settings = { ...DEFAULT_DECISION_BUTTONS };
-  if (raw === null) return settings;
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(raw);
-  } catch {
-    return settings;
-  }
-  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return settings;
-  const { hand, oneHanded, style } = parsed as Record<string, unknown>;
+  const stored = storedObject(raw);
+  if (!stored) return settings;
+  const { hand, oneHanded, style } = stored;
   if (hand === "right" || hand === "left") settings.hand = hand;
   if (typeof oneHanded === "boolean") settings.oneHanded = oneHanded;
   if (style === "kuutti" || style === "shapes" || style === "letters") settings.style = style;

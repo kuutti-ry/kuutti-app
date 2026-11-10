@@ -4,7 +4,7 @@ export { AccountActions, ExportData } from "./AccountActions";
 export { BreakScreen } from "./BreakScreen";
 export { type ConsentState, ConsentSwitch, useConsentStates } from "./ConsentSwitches";
 export { EmailCard, EmailScreen, useEmailSummary } from "./EmailCard";
-export { LegalTextLink } from "./LegalTextLink";
+export { LegalSummary } from "./LegalSummary";
 export {
   LockProvider,
   markLockOffered,

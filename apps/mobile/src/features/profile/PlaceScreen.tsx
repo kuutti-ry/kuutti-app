@@ -1,18 +1,16 @@
 import type { PlainMessageKey } from "@kuutti/i18n";
 import type { HomeSummary, HomeUpdate } from "@kuutti/schema";
-import { useRouter } from "expo-router";
 import { useState } from "react";
-import { View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { KeyboardScrollView } from "@/components/KeyboardScrollView";
-import { LoadFailed } from "@/components/LoadFailed";
-import { sayAloud } from "@/components/Notice";
+import { LoadFailedScreen, LoadingScreen } from "@/components/LoadFailed";
+import { sayAloud, useSpokenOnIos } from "@/components/Notice";
 import { ScreenHeader } from "@/components/ScreenHeader";
 import { Text } from "@/components/ui/text";
-import { ApiError } from "@/lib/api";
+import { codeOf } from "@/lib/api";
 import { useT } from "@/lib/locale";
 import { saveHome } from "./client";
-import { PlaceChoice, PlacePicker, useSpokenOnIos } from "./PlaceEditor";
+import { PlaceChoice, PlacePicker } from "./PlaceEditor";
 import { useProfile } from "./useProfile";
 
 type Notice = "unknown" | "failed";
@@ -32,7 +30,6 @@ const NOTICE: Readonly<Record<Notice, PlainMessageKey>> = {
  */
 export function PlaceScreen() {
   const { t } = useT();
-  const router = useRouter();
   const profile = useProfile();
   // The API's answer to the last save, which the profile's read is older than.
   const [saved, setSaved] = useState<HomeSummary | null>(null);
@@ -43,22 +40,10 @@ export function PlaceScreen() {
   useSpokenOnIos(words);
 
   if (profile.status === "loading") {
-    return (
-      <SafeAreaView className="flex-1 bg-background">
-        <View className="flex-1 items-center justify-center p-6">
-          <Text accessibilityLiveRegion="polite">{t("load.loading")}</Text>
-        </View>
-      </SafeAreaView>
-    );
+    return <LoadingScreen />;
   }
   if (profile.status === "error") {
-    return (
-      <SafeAreaView className="flex-1 bg-background">
-        <View className="flex-1 items-center justify-center gap-4 p-6">
-          <LoadFailed error={profile.error} onRetry={() => void profile.reload()} />
-        </View>
-      </SafeAreaView>
-    );
+    return <LoadFailedScreen error={profile.error} onRetry={() => void profile.reload()} />;
   }
 
   const save = async (update: HomeUpdate) => {
@@ -71,7 +56,7 @@ export function PlaceScreen() {
       // A new key clears the field: the digits go with their save.
       if (update.postalCode !== undefined) setPicks((n) => n + 1);
     } catch (error) {
-      const unknown = error instanceof ApiError && error.code === "postal_code_unknown";
+      const unknown = codeOf(error) === "postal_code_unknown";
       setNotice(unknown ? "unknown" : "failed");
     } finally {
       setSaving(false);
@@ -81,11 +66,7 @@ export function PlaceScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-background">
-      <ScreenHeader
-        title={t("profile.place.title")}
-        backLabel={t("profile.place.back")}
-        onBack={() => router.back()}
-      />
+      <ScreenHeader title={t("profile.place.title")} backLabel={t("profile.place.back")} />
       <KeyboardScrollView contentContainerClassName="flex-grow gap-6 p-6">
         <Text>{t("profile.place.othersSee")}</Text>
         {home && (

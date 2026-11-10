@@ -3,7 +3,7 @@ import { act, fireEvent, screen, waitFor } from "@testing-library/react-native";
 import { useLocales } from "expo-localization";
 import { AccessibilityInfo, PixelRatio, Platform } from "react-native";
 import { saveSession } from "@/lib/session";
-import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
+import { type HostNode, noProblems } from "@/test/a11y";
 import { FAILED_TO_LOAD } from "@/test/failed";
 import { expectPinnedHeader, hasCutText } from "@/test/layout";
 import { renderWithTheme } from "@/test/render";
@@ -38,10 +38,6 @@ const json = (body: unknown, status = 200) =>
 const refusal = (code: string, status: number) =>
   json({ error: { code, message: "x", requestId: "r" } }, status);
 const token = (seed: string) => (seed + "x".repeat(43)).slice(0, 43);
-const noProblems = () => {
-  const found = pressables(screen.toJSON() as HostNode);
-  expect(found.flatMap((node) => a11yProblems(node))).toEqual([]);
-};
 /** A place by its name, chosen or not: the chosen one's name carries its mark. */
 const option = (name: string) => screen.getByRole("radio", { name: new RegExp(`^(✓ )?${name}$`) });
 const checked = (name: string) => option(name).props.accessibilityState?.checked;

@@ -1,4 +1,4 @@
-import { type ApiPaths, HealthResponse } from "@kuutti/schema";
+import { type ApiPaths, ErrorResponse, HealthResponse } from "@kuutti/schema";
 import createClient, { type Middleware } from "openapi-fetch";
 import { apiBaseUrl } from "./api-url";
 import {
@@ -22,6 +22,27 @@ export class ApiError extends Error {
     this.name = "ApiError";
   }
 }
+
+/**
+ * An answer the caller does not take, as an error with the API's code when it
+ * sent the envelope: what every client throws for a refusal.
+ */
+export function failed(response: { status: number }, error: unknown, what: string): ApiError {
+  const parsed = ErrorResponse.safeParse(error);
+  return new ApiError(
+    `${what} answered ${response.status}`,
+    response.status,
+    parsed.success ? parsed.data.error.code : undefined,
+  );
+}
+
+/** The envelope's code of a failure, when the API sent one. */
+export const codeOf = (error: unknown): string | undefined =>
+  error instanceof ApiError ? error.code : undefined;
+
+/** The status of a failure, when it was the API's answer. */
+export const statusOf = (error: unknown): number | undefined =>
+  error instanceof ApiError ? error.status : undefined;
 
 /** Routes that never carry a session: the login itself and the probe. */
 const ANONYMOUS = new Set(["/health", "/auth/exchange", "/auth/refresh"]);

@@ -41,6 +41,15 @@ function useSignedUrl(id: string, variant: PhotoVariant, onRefused?: OnRefused) 
 /** The API's code when it refused the URL (#52: photo_budget_exceeded above the day's budget), or undefined for a failure without one. */
 export type OnRefused = (code: string | undefined) => void;
 
+/** The words for a photo the API would not sign: the day's photos are used up, or it is not shown. */
+export function photoRefusalKey(
+  code: string | null | undefined,
+): "photos.error.photo_budget_exceeded" | "photos.error.notShown" {
+  return code === "photo_budget_exceeded"
+    ? "photos.error.photo_budget_exceeded"
+    : "photos.error.notShown";
+}
+
 type Props = {
   id: string;
   variant: PhotoVariant;

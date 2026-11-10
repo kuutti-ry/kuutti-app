@@ -4,5 +4,6 @@ export { ChatPhotoScreen } from "./ChatPhotoScreen";
 export { ChatsButton } from "./ChatsButton";
 export { ConversationScreen } from "./ConversationScreen";
 export { ConversationsScreen } from "./ConversationsScreen";
+export { fetchConversations } from "./client";
 export { ChatLiveProvider } from "./store";
 export { useContactsSummary, YourContacts } from "./YourContacts";

@@ -2,9 +2,9 @@ import { GENDERS } from "@kuutti/schema";
 import { useFocusEffect, useRouter } from "expo-router";
 import Info from "lucide-react-native/icons/info";
 import { useCallback, useRef, useState } from "react";
-import { AccessibilityInfo, ScrollView, type Text as TextNode, View } from "react-native";
+import { ScrollView, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { LoadFailed } from "@/components/LoadFailed";
+import { LoadFailedScreen, LoadingScreen } from "@/components/LoadFailed";
 import { RowGroup } from "@/components/RowGroup";
 import { ScreenHeader } from "@/components/ScreenHeader";
 import { Button } from "@/components/ui/button";
@@ -18,6 +18,7 @@ import {
 import { Icon } from "@/components/ui/icon";
 import { Text } from "@/components/ui/text";
 import { useT } from "@/lib/locale";
+import { focusOnMount } from "@/theme/a11y";
 import { useHapticTap } from "@/theme/haptics";
 import { DealBreakerRows, useDealBreakers } from "../DealBreakerRows";
 import { optionKey, seeksKey } from "../keys";
@@ -51,10 +52,6 @@ export function SeekScreen() {
   const { reload } = seeking;
   const [dealBreakers, readDealBreakers] = useDealBreakers();
   const [aboutDealBreakers, setAboutDealBreakers] = useState(false);
-  // The title as the (i)'s dialog opens: the button that opened it is under the scrim.
-  const focusTitle = useCallback((node: TextNode | null) => {
-    if (node) AccessibilityInfo.sendAccessibilityEvent(node, "focus");
-  }, []);
   // The first focus is the mount, which the hook reads already.
   const shown = useRef(false);
   useFocusEffect(
@@ -70,27 +67,17 @@ export function SeekScreen() {
   };
 
   if (seeking.status === "loading") {
-    return (
-      <SafeAreaView className="flex-1 bg-background">
-        <View className="flex-1 items-center justify-center p-6">
-          <Text accessibilityLiveRegion="polite">{t("load.loading")}</Text>
-        </View>
-      </SafeAreaView>
-    );
+    return <LoadingScreen />;
   }
   if (seeking.status === "error") {
     return (
-      <SafeAreaView className="flex-1 bg-background">
-        <View className="flex-1 items-center justify-center gap-4 p-6">
-          <LoadFailed
-            error={seeking.error}
-            onRetry={() => {
-              readDealBreakers();
-              void reload();
-            }}
-          />
-        </View>
-      </SafeAreaView>
+      <LoadFailedScreen
+        error={seeking.error}
+        onRetry={() => {
+          readDealBreakers();
+          void reload();
+        }}
+      />
     );
   }
 
@@ -106,11 +93,7 @@ export function SeekScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-background">
-      <ScreenHeader
-        title={t("profile.seek.title")}
-        backLabel={t("profile.back")}
-        onBack={() => router.back()}
-      />
+      <ScreenHeader title={t("profile.seek.title")} backLabel={t("profile.back")} />
       <ScrollView contentContainerClassName="flex-grow gap-6 p-6">
         <Text>{t("profile.seek.explain")}</Text>
         {/* Each answer is the row's state: drawn under the title, heard once, as
@@ -184,7 +167,7 @@ export function SeekScreen() {
         <Dialog open={aboutDealBreakers} onOpenChange={setAboutDealBreakers}>
           <DialogContent closeLabel={t("profile.dealBreakers.aboutClose")}>
             <DialogHeader>
-              <DialogTitle ref={focusTitle}>{t("profile.dealBreakers.title")}</DialogTitle>
+              <DialogTitle ref={focusOnMount}>{t("profile.dealBreakers.title")}</DialogTitle>
               <DialogDescription>
                 {t("profile.dealBreakers.explain", { max: dealBreakers.max })}
               </DialogDescription>

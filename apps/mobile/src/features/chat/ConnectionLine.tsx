@@ -1,5 +1,4 @@
-import { useEffect } from "react";
-import { AccessibilityInfo, Platform } from "react-native";
+import { useSpokenOnIos } from "@/components/Notice";
 import { Text } from "@/components/ui/text";
 import { useT } from "@/lib/locale";
 import { useChatLive } from "./store";
@@ -15,9 +14,7 @@ export function ConnectionLine() {
   const { status } = useChatLive();
   const lost = status === "lost";
   const words = t("chat.connection.lost");
-  useEffect(() => {
-    if (lost && Platform.OS === "ios") AccessibilityInfo.announceForAccessibility(words);
-  }, [lost, words]);
+  useSpokenOnIos(lost ? words : null);
   if (!lost) return null;
   return (
     <Text accessibilityLiveRegion="polite" className="border-b border-border px-6 py-2">

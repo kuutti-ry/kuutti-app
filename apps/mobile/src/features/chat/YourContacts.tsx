@@ -10,7 +10,7 @@ import CircleAlert from "lucide-react-native/icons/circle-alert";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Keyboard, Platform, type TextInput, View } from "react-native";
 import { LoadFailed } from "@/components/LoadFailed";
-import { Notice as Said, sayAloud } from "@/components/Notice";
+import { Notice as Said, sayAloud, useSaid } from "@/components/Notice";
 import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
 import { Input } from "@/components/ui/input";
@@ -158,7 +158,7 @@ function ContactCard({
   );
   const [picking, setPicking] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [said, setSaid] = useState<{ notice: Notice; answer: number } | null>(null);
+  const { said, say: tell } = useSaid<Notice>();
   // Whether the person typed after the request went: its answer then leaves the field alone.
   const typedSince = useRef(false);
   // What the listeners and the leaving read, which outlive a render.
@@ -167,7 +167,7 @@ function ContactCard({
 
   const notice = said?.notice ?? null;
   const say = (next: Notice) => {
-    setSaid((was) => ({ notice: next, answer: (was?.answer ?? 0) + 1 }));
+    tell(next);
     if (REFUSED.has(next)) warn();
   };
 
@@ -202,7 +202,7 @@ function ContactCard({
         say("saved");
       } else {
         // The field empties, Remove goes and the row's value changes: said, not drawn (#581).
-        setSaid(null);
+        tell(null);
         sayAloud(t("settings.contacts.removed"));
       }
     } catch (error) {
@@ -299,7 +299,7 @@ function ContactCard({
       returnKeyType="done"
       onFocus={() => {
         // "Saved." stays until the field is taken up again.
-        if (notice !== null && !REFUSED.has(notice)) setSaid(null);
+        if (notice !== null && !REFUSED.has(notice)) tell(null);
       }}
       onBlur={leave}
       onChangeText={(text) => {
@@ -308,7 +308,7 @@ function ContactCard({
         // Once refused, read again as typed, and the refusal goes the moment the words are right.
         if (notice !== null && REFUSED.has(notice) && notice !== "pace" && notice !== "failed") {
           const now = formOf(text.trim(), region);
-          if (now !== null && !REFUSED.has(now as Notice)) setSaid(null);
+          if (now !== null && !REFUSED.has(now as Notice)) tell(null);
         }
       }}
     />
@@ -377,7 +377,7 @@ function ContactCard({
             setPicking(false);
             setRegion(chosen);
             typedSince.current = true;
-            setSaid(null);
+            tell(null);
             // Back to the number: leaving it keeps it under the code chosen.
             field.current?.focus();
           }}

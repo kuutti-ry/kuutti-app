@@ -6,7 +6,7 @@ import { Choice } from "@/components/Choice";
 import { Button } from "@/components/ui/button";
 import { Text } from "@/components/ui/text";
 import { useSession } from "@/features/identity";
-import { ApiError } from "@/lib/api";
+import { codeOf } from "@/lib/api";
 import { useT } from "@/lib/locale";
 import { useHapticTap } from "@/theme/haptics";
 import { readFoundThem, tellFoundThem } from "./found-them-client";
@@ -57,7 +57,7 @@ export function FoundThemScreen() {
       await tellFoundThem(reason);
       setState("thanked");
     } catch (error) {
-      const told = error instanceof ApiError && error.code === "found_them_answered";
+      const told = codeOf(error) === "found_them_answered";
       setState(told ? "thanked" : "failed");
     }
   };

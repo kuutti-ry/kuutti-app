@@ -15,7 +15,7 @@ import { FullWindowOverlay as RNFullWindowOverlay } from "react-native-screens";
 import { Icon } from "@/components/ui/icon";
 import { NativeOnlyAnimatedView } from "@/components/ui/native-only-animated-view";
 import { cn } from "@/lib/utils";
-import { HEADING_FONT_SCALE, MAX_FONT_SCALE, TOUCH_TARGET } from "@/theme/a11y";
+import { HEADING_FONT_SCALE, MAX_FONT_SCALE, MINIMUM_TARGET } from "@/theme/a11y";
 import { HARD_SHADOW, useHardShadow } from "@/theme/shadow";
 import { useLook } from "@/theme/ThemeProvider";
 
@@ -24,7 +24,6 @@ import { useLook } from "@/theme/ThemeProvider";
 // entering and exiting animations follow the OS reduce-motion setting, and
 // the title and the description keep the app's cap on text size, as the
 // Text primitive does (the primitive's own are plain React Native text).
-const MINIMUM_TARGET = { minHeight: TOUCH_TARGET, minWidth: TOUCH_TARGET };
 
 // The dialog shrinks into the space it is given rather than overflow it; a
 // caller's own cap (a share of the window) holds while that space is larger.

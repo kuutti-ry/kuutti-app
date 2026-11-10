@@ -1,9 +1,9 @@
 import type { HomeSummary } from "@kuutti/schema";
 import { POSTAL_CODE_LENGTH, type PostalMatch, postalMatches } from "@kuutti/schema/postal-areas";
 import { useEffect, useState } from "react";
-import { AccessibilityInfo, Keyboard, Platform, View } from "react-native";
+import { Keyboard, View } from "react-native";
 import { Choice } from "@/components/Choice";
-import { sayAloud } from "@/components/Notice";
+import { sayAloud, useSpokenOnIos } from "@/components/Notice";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Text } from "@/components/ui/text";
@@ -59,13 +59,6 @@ function offerWords(t: ReturnType<typeof useT>["t"], offer: PlaceOffer): string 
     case "unknown":
       return t("errors.postal_code_unknown");
   }
-}
-
-/** iOS has no live regions; Android's speak the same words already. */
-export function useSpokenOnIos(words: string | null): void {
-  useEffect(() => {
-    if (words !== null && Platform.OS === "ios") AccessibilityInfo.announceForAccessibility(words);
-  }, [words]);
 }
 
 /**

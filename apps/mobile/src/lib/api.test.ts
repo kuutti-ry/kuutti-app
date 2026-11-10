@@ -1,5 +1,5 @@
 import type { SessionTokens } from "@kuutti/schema";
-import { ApiError, api, fetchHealth } from "./api";
+import { ApiError, api, codeOf, failed, fetchHealth, statusOf } from "./api";
 import { clearSession, currentSession, saveSession } from "./session";
 
 // The typed client's own behaviour beyond the session round trip of
@@ -87,5 +87,37 @@ describe("a request with a session about to expire", () => {
     expect(currentSession()).toBeNull();
     // No second refresh for a request that carried no token.
     expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("failed, codeOf and statusOf", () => {
+  const envelope = { error: { code: "photo_limit", message: "x", requestId: "r" } };
+
+  it("turns the API's envelope into an ApiError with its code and status", () => {
+    const error = failed({ status: 409 }, envelope, "photo upload");
+    expect(error).toBeInstanceOf(ApiError);
+    expect(error.message).toBe("photo upload answered 409");
+    expect(codeOf(error)).toBe("photo_limit");
+    expect(statusOf(error)).toBe(409);
+  });
+
+  it.each([
+    ["a body that is not the envelope", { message: "Bad Gateway" }],
+    ["a proxy's page", "<html>502</html>"],
+    ["no body", undefined],
+    ["an envelope without a code", { error: { code: "", message: "x", requestId: "r" } }],
+  ])("keeps the status and has no code for %s", (_, body) => {
+    const error = failed({ status: 502 }, body, "profile");
+    expect(codeOf(error)).toBeUndefined();
+    expect(statusOf(error)).toBe(502);
+  });
+
+  it.each([
+    ["a failure that is not the API's", new TypeError("Network request failed")],
+    ["a thrown string", "offline"],
+    ["nothing", undefined],
+  ])("reads no code and no status from %s", (_, error) => {
+    expect(codeOf(error)).toBeUndefined();
+    expect(statusOf(error)).toBeUndefined();
   });
 });

@@ -7,7 +7,7 @@ import * as SecureStore from "expo-secure-store";
 import type * as React from "react";
 import { AccessibilityInfo, AppState, Keyboard, Linking, Platform, View } from "react-native";
 import { clearSession, saveSession } from "@/lib/session";
-import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
+import { noProblems } from "@/test/a11y";
 import { renderWithTheme, underProviders } from "@/test/render";
 import { LockControls } from "./LockControls";
 import { LockOfferScreen } from "./LockOfferScreen";
@@ -109,8 +109,6 @@ const queued = () =>
   );
 /** Every text on the screen, in order. */
 const drawn = () => screen.queryAllByText(/./).map((node) => node.props.children);
-const noProblems = () =>
-  expect(pressables(screen.toJSON() as HostNode).flatMap((node) => a11yProblems(node))).toEqual([]);
 
 /** A phone with a face enrolled, whose prompt answers as `answer` says. */
 function phoneWithFace(answer: { success: true } | { success: false; error: string }) {

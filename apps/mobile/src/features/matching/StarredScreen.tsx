@@ -10,12 +10,9 @@ import { Icon } from "@/components/ui/icon";
 import { Text } from "@/components/ui/text";
 import { PhotoImage } from "@/features/media";
 import { useT } from "@/lib/locale";
-import { DECORATIVE, TOUCH_TARGET } from "@/theme/a11y";
+import { DECORATIVE, MINIMUM_TARGET } from "@/theme/a11y";
 import { useHapticTap } from "@/theme/haptics";
 import { useStars } from "./useStars";
-
-/** A row is at least the touch target, whatever its text (CLAUDE.md Accessibility). */
-const ROW_TARGET = { minHeight: TOUCH_TARGET, minWidth: TOUCH_TARGET };
 
 function Row({ person, onClear }: { person: StarredPerson; onClear: () => void }) {
   const { t } = useT();
@@ -29,7 +26,7 @@ function Row({ person, onClear }: { person: StarredPerson; onClear: () => void }
         accessibilityRole="button"
         accessibilityLabel={who}
         className="flex-1 flex-row items-center gap-3 rounded-lg px-2 py-2 active:bg-accent"
-        style={ROW_TARGET}
+        style={MINIMUM_TARGET}
         onPress={() => {
           tap();
           router.push(`/stars/${person.id}`);
@@ -75,15 +72,10 @@ function Row({ person, onClear }: { person: StarredPerson; onClear: () => void }
  */
 export function StarredScreen() {
   const { t } = useT();
-  const router = useRouter();
   const { view, clearFailed, clear, retry } = useStars();
   return (
     <SafeAreaView className="flex-1 bg-background">
-      <ScreenHeader
-        title={t("stars.title")}
-        backLabel={t("stars.back")}
-        onBack={() => router.back()}
-      />
+      <ScreenHeader title={t("stars.title")} backLabel={t("stars.back")} />
       {clearFailed && (
         <Text accessibilityLiveRegion="polite" className="px-6 pt-4">
           {t("load.failed.press")}

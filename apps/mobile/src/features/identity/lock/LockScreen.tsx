@@ -1,7 +1,9 @@
 import type { PlainMessageKey } from "@kuutti/i18n";
 import { useEffect, useRef, useState } from "react";
-import { AccessibilityInfo, KeyboardAvoidingView, Platform, ScrollView, View } from "react-native";
+import { AccessibilityInfo, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { KeyboardScrollView } from "@/components/KeyboardScrollView";
+import { sayOnIos } from "@/components/Notice";
 import { Button } from "@/components/ui/button";
 import { Text } from "@/components/ui/text";
 import { useT } from "@/lib/locale";
@@ -71,7 +73,7 @@ export function LockScreen({
   const say = (words: string | null) => {
     setNotice(words);
     setSaid((n) => n + 1);
-    if (words !== null && Platform.OS === "ios") AccessibilityInfo.announceForAccessibility(words);
+    if (words !== null) sayOnIos(words);
   };
 
   /** Asks the phone, and says a refusal in the words of the kind that was asked. */
@@ -115,65 +117,55 @@ export function LockScreen({
   return (
     <SafeAreaView className="flex-1 bg-background">
       {/* The wrong try's words and the bank stay above the number pad, as on a
-          settings screen (SettingsPage, #103). */}
-      <KeyboardAvoidingView
-        className="flex-1"
-        behavior="padding"
-        enabled={Platform.OS === "android"}
-      >
-        <ScrollView
-          contentContainerClassName="flex-grow items-center justify-center gap-6 p-6"
-          keyboardShouldPersistTaps="handled"
-          automaticallyAdjustKeyboardInsets
-        >
-          <Text variant="h1" accessibilityRole="header">
-            {t("lock.title")}
-          </Text>
-          <View className="w-full max-w-md gap-4">
-            {biometrics !== null && (
-              <Button
-                disabled={busy}
-                onPress={() => {
-                  tap();
-                  void askBiometrics(biometrics);
-                }}
-              >
-                {t(UNLOCK_WITH[biometrics])}
-              </Button>
-            )}
-            {denied && <Text>{t("lock.denied")}</Text>}
-            {passcode && (
-              <PasscodeField
-                label={t("lock.passcode.label")}
-                value={code}
-                autoFocus={biometrics === null}
-                onChange={(digits) => {
-                  if (checking.current) return;
-                  setCode(digits);
-                  if (digits.length > 0 && notice !== null) setNotice(null);
-                }}
-                onComplete={(typed) => void tryPasscode(typed)}
-              />
-            )}
-            {notice !== null && (
-              <Text key={said} accessibilityLiveRegion="assertive">
-                {notice}
-              </Text>
-            )}
-            <Text variant="muted">{t("lock.bank.explain")}</Text>
+          settings screen (KeyboardScrollView, #103). */}
+      <KeyboardScrollView contentContainerClassName="flex-grow items-center justify-center gap-6 p-6">
+        <Text variant="h1" accessibilityRole="header">
+          {t("lock.title")}
+        </Text>
+        <View className="w-full max-w-md gap-4">
+          {biometrics !== null && (
             <Button
-              variant="outline"
               disabled={busy}
               onPress={() => {
                 tap();
-                onBank();
+                void askBiometrics(biometrics);
               }}
             >
-              {t("lock.bank")}
+              {t(UNLOCK_WITH[biometrics])}
             </Button>
-          </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
+          )}
+          {denied && <Text>{t("lock.denied")}</Text>}
+          {passcode && (
+            <PasscodeField
+              label={t("lock.passcode.label")}
+              value={code}
+              autoFocus={biometrics === null}
+              onChange={(digits) => {
+                if (checking.current) return;
+                setCode(digits);
+                if (digits.length > 0 && notice !== null) setNotice(null);
+              }}
+              onComplete={(typed) => void tryPasscode(typed)}
+            />
+          )}
+          {notice !== null && (
+            <Text key={said} accessibilityLiveRegion="assertive">
+              {notice}
+            </Text>
+          )}
+          <Text variant="muted">{t("lock.bank.explain")}</Text>
+          <Button
+            variant="outline"
+            disabled={busy}
+            onPress={() => {
+              tap();
+              onBank();
+            }}
+          >
+            {t("lock.bank")}
+          </Button>
+        </View>
+      </KeyboardScrollView>
     </SafeAreaView>
   );
 }

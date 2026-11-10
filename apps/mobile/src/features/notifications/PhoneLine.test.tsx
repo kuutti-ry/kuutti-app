@@ -5,7 +5,7 @@ import * as SecureStore from "expo-secure-store";
 import { AccessibilityInfo, AppState, Linking, Platform, View } from "react-native";
 import { useLocaleSettings } from "@/lib/locale";
 import { clearSession, saveSession } from "@/lib/session";
-import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
+import { noProblems } from "@/test/a11y";
 import { renderWithTheme, underProviders } from "@/test/render";
 import { PhoneLine } from "./PhoneLine";
 
@@ -50,8 +50,6 @@ const LINES = {
 
 const token = (seed: string) => (seed + "x".repeat(43)).slice(0, 43);
 const settle = () => act(() => new Promise<void>((resolve) => setTimeout(resolve, 20)));
-const noProblems = () =>
-  expect(pressables(screen.toJSON() as HostNode).flatMap((node) => a11yProblems(node))).toEqual([]);
 const phoneSays = (answer: ReturnType<typeof status>) =>
   notifications.getPermissionsAsync.mockResolvedValue(answer as never);
 const phoneCannotSay = () =>

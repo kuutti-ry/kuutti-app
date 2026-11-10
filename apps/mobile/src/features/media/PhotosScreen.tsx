@@ -11,23 +11,16 @@ import Trash from "lucide-react-native/icons/trash";
 import { useEffect, useRef, useState } from "react";
 import { Animated, Pressable, ScrollView, useWindowDimensions, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { sayAloud } from "@/components/Notice";
 import { ScreenHeader } from "@/components/ScreenHeader";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/card";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { Icon } from "@/components/ui/icon";
 import { Text } from "@/components/ui/text";
 import { useT } from "@/lib/locale";
 import { usePhotoDescriptionText } from "@/lib/photo-descriptions";
-import { TOUCH_TARGET } from "@/theme/a11y";
+import { MINIMUM_TARGET } from "@/theme/a11y";
 import { useHapticTap } from "@/theme/haptics";
 import { useMotionDuration } from "@/theme/useReducedMotion";
 import { CaptionDialog } from "./CaptionDialog";
@@ -35,6 +28,7 @@ import { captionKey } from "./captions";
 import { PhotoDescriptionText } from "./PhotoDescriptionText";
 import { PhotoImage } from "./PhotoImage";
 import { PhotoTip } from "./tips";
+import { UPLOAD_REFUSALS } from "./uploadRefusals";
 import { useDragOrder } from "./useDragOrder";
 import { type PhotosNotice, usePhotos } from "./usePhotos";
 
@@ -62,14 +56,9 @@ const refusalText = (photo: Photo, t: ReturnType<typeof useT>["t"]): string =>
  * `toString` finds nothing rather than a prototype member.
  */
 const ERROR_TEXT: ReadonlyMap<string, PlainMessageKey> = new Map([
+  ...UPLOAD_REFUSALS,
   ["photo_limit", "photos.error.photo_limit"],
-  ["photo_unsupported", "photos.error.photo_unsupported"],
   ["photo_not_appealable", "photos.error.photo_not_appealable"],
-  ["photo_invalid", "photos.error.photo_invalid"],
-  ["photo_too_many_pixels", "photos.error.tooLarge"],
-  ["payload_too_large", "photos.error.tooLarge"],
-  ["media_busy", "photos.error.media_busy"],
-  ["media_unavailable", "photos.error.media_unavailable"],
   ["photo_order_invalid", "photos.error.photo_order_invalid"],
   ["photo_budget_exceeded", "photos.error.photo_budget_exceeded"],
 ]);
@@ -177,13 +166,7 @@ export function PhotosScreen({
 
   return (
     <SafeAreaView className="flex-1 bg-background">
-      {!step && (
-        <ScreenHeader
-          title={t("photos.title")}
-          backLabel={t("photos.back")}
-          onBack={() => router.back()}
-        />
-      )}
+      {!step && <ScreenHeader title={t("photos.title")} backLabel={t("photos.back")} />}
       <ScrollView
         contentContainerClassName="flex-grow gap-4 p-6"
         scrollEnabled={drag.active === null}
@@ -225,7 +208,7 @@ export function PhotosScreen({
         <View className="flex-row flex-wrap gap-3">
           {list?.photos.map((photo, index) => {
             const tile = drag.tile(index);
-            const words = described.shown ? described.describe(photo.description) : null;
+            const words = described.under(photo.description);
             return (
               // The slot: laid out by the grid, measured for the drag, and the
               // view that holds the touch once the tile is lifted. Nothing for
@@ -247,7 +230,7 @@ export function PhotosScreen({
                       accessibilityActions={tileActions}
                       onAccessibilityAction={(event) => act(photo, event.nativeEvent.actionName)}
                       className="overflow-hidden rounded-lg bg-muted"
-                      style={{ minHeight: TOUCH_TARGET, minWidth: TOUCH_TARGET }}
+                      style={MINIMUM_TARGET}
                       onPress={() => {
                         tap();
                         router.push({
@@ -431,29 +414,20 @@ export function PhotosScreen({
         onClose={() => setCaptioningId(null)}
       />
 
-      <Dialog open={removing !== null} onOpenChange={(open) => !open && setRemoving(null)}>
-        <DialogContent closeLabel={t("photos.dialog.close")}>
-          <DialogHeader>
-            <DialogTitle>{t("photos.remove.title")}</DialogTitle>
-            <DialogDescription>{t("photos.remove.body")}</DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onPress={() => setRemoving(null)}>
-              {t("photos.remove.cancel")}
-            </Button>
-            <Button
-              variant="destructive"
-              onPress={() => {
-                const photo = removing;
-                setRemoving(null);
-                if (photo) void photos.remove(photo.id);
-              }}
-            >
-              {t("photos.remove.confirm")}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <ConfirmDialog
+        open={removing !== null}
+        closeLabel={t("photos.dialog.close")}
+        title={t("photos.remove.title")}
+        body={t("photos.remove.body")}
+        cancel={t("photos.remove.cancel")}
+        confirm={t("photos.remove.confirm")}
+        onCancel={() => setRemoving(null)}
+        onConfirm={() => {
+          const photo = removing;
+          setRemoving(null);
+          if (photo) void photos.remove(photo.id);
+        }}
+      />
     </SafeAreaView>
   );
 }

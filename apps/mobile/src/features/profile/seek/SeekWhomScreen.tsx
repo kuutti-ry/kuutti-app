@@ -1,12 +1,10 @@
 import type { Gender } from "@kuutti/schema";
-import { useRouter } from "expo-router";
 import { useState } from "react";
-import { ScrollView, View } from "react-native";
+import { ScrollView } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { LoadFailed } from "@/components/LoadFailed";
+import { LoadFailedScreen, LoadingScreen } from "@/components/LoadFailed";
 import { Notice } from "@/components/Notice";
 import { ScreenHeader } from "@/components/ScreenHeader";
-import { Text } from "@/components/ui/text";
 import { useT } from "@/lib/locale";
 import { ConfirmLeaveDialog } from "../ConfirmLeave";
 import { useRefusedDraft, useSaveOnLeave } from "../useSaveOnLeave";
@@ -26,7 +24,6 @@ const sameSet = (a: readonly Gender[], b: readonly Gender[]) =>
  */
 export function SeekWhomScreen() {
   const { t } = useT();
-  const router = useRouter();
   const held = useRefusedDraft<Gender[]>(SEEK_WHOM_PATH);
   const seeking = useSeeking();
   const stored = seeking.status === "ready" ? seeking.seeking.seeks : null;
@@ -46,31 +43,15 @@ export function SeekWhomScreen() {
   // A change brought back outlives a read that failed: the network that lost
   // the save usually loses the read too, and it must not vanish behind this.
   if (seeking.status === "error" && !draft) {
-    return (
-      <SafeAreaView className="flex-1 bg-background">
-        <View className="flex-1 items-center justify-center gap-4 p-6">
-          <LoadFailed error={seeking.error} onRetry={() => void seeking.reload()} />
-        </View>
-      </SafeAreaView>
-    );
+    return <LoadFailedScreen error={seeking.error} onRetry={() => void seeking.reload()} />;
   }
   if (!chosen) {
-    return (
-      <SafeAreaView className="flex-1 bg-background">
-        <View className="flex-1 items-center justify-center p-6">
-          <Text accessibilityLiveRegion="polite">{t("load.loading")}</Text>
-        </View>
-      </SafeAreaView>
-    );
+    return <LoadingScreen />;
   }
 
   return (
     <SafeAreaView className="flex-1 bg-background">
-      <ScreenHeader
-        title={t("onboarding.seeks.title")}
-        backLabel={t("profile.seek.back")}
-        onBack={() => router.back()}
-      />
+      <ScreenHeader title={t("onboarding.seeks.title")} backLabel={t("profile.seek.back")} />
       <ScrollView contentContainerClassName="flex-grow gap-6 p-6">
         <SeeksChips
           chosen={chosen}

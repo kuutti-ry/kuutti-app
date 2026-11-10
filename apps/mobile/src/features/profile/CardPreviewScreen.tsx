@@ -1,11 +1,11 @@
 import type { CardPreviewResponse } from "@kuutti/schema";
-import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import { ScrollView, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LoadFailed } from "@/components/LoadFailed";
 import { ScreenHeader } from "@/components/ScreenHeader";
 import { Text } from "@/components/ui/text";
+import { photoRefusalKey } from "@/features/media";
 import { useT } from "@/lib/locale";
 import { fetchCardPreview } from "./client";
 import { completenessText } from "./keys";
@@ -23,7 +23,6 @@ type State =
  */
 export function CardPreviewScreen() {
   const { t } = useT();
-  const router = useRouter();
   const [state, setState] = useState<State>({ status: "loading" });
   // A photo URL the API refused (the day's budget, #52): said under the card, never a
   // silent gap; anything else is a photo not shown, never an upload (#235).
@@ -44,11 +43,7 @@ export function CardPreviewScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-background">
-      <ScreenHeader
-        title={t("profile.card.title")}
-        backLabel={t("profile.card.back")}
-        onBack={() => router.back()}
-      />
+      <ScreenHeader title={t("profile.card.title")} backLabel={t("profile.card.back")} />
       <ScrollView contentContainerClassName="flex-grow gap-4 p-6">
         {state.status === "loading" && (
           <Text accessibilityLiveRegion="polite">{t("load.loading")}</Text>
@@ -75,11 +70,7 @@ export function CardPreviewScreen() {
         )}
         {refusal !== null && (
           <Text variant="muted" accessibilityLiveRegion="polite">
-            {t(
-              refusal === "photo_budget_exceeded"
-                ? "photos.error.photo_budget_exceeded"
-                : "photos.error.notShown",
-            )}
+            {t(photoRefusalKey(refusal))}
           </Text>
         )}
       </ScrollView>

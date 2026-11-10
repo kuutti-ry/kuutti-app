@@ -1,7 +1,7 @@
 import type { StarredPerson } from "@kuutti/schema";
 import { useFocusEffect } from "expo-router";
 import { useCallback, useRef, useState } from "react";
-import { ApiError } from "@/lib/api";
+import { statusOf } from "@/lib/api";
 import { clearStar, fetchStars } from "./client";
 
 export type StarsView =
@@ -45,7 +45,7 @@ export function useStars() {
     try {
       await clearStar(id);
     } catch (error) {
-      if (!(error instanceof ApiError && error.status === 404)) {
+      if (statusOf(error) !== 404) {
         setClearFailed(true);
         return;
       }

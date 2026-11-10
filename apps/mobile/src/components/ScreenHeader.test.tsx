@@ -61,3 +61,24 @@ describe("ScreenHeader", () => {
     );
   });
 });
+
+describe("ScreenHeader's way back", () => {
+  const { __router: router } = jest.requireMock("expo-router") as { __router: { back: jest.Mock } };
+  beforeEach(() => router.back.mockClear());
+
+  it("goes one step back when the screen gives no other way", async () => {
+    await renderWithTheme(<ScreenHeader title="Photos" backLabel="Back to your profile" />);
+    fireEvent.press(screen.getByRole("button", { name: "Back to your profile" }));
+    expect(router.back).toHaveBeenCalledTimes(1);
+  });
+
+  it("goes the screen's own way, and not back, when it is given one", async () => {
+    const onBack = jest.fn();
+    await renderWithTheme(
+      <ScreenHeader title="Photos" backLabel="Back to your profile" onBack={onBack} />,
+    );
+    fireEvent.press(screen.getByRole("button", { name: "Back to your profile" }));
+    expect(onBack).toHaveBeenCalledTimes(1);
+    expect(router.back).not.toHaveBeenCalled();
+  });
+});

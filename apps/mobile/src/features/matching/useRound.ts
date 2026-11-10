@@ -9,12 +9,12 @@ import type {
 import { useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AppState } from "react-native";
-import { ApiError } from "@/lib/api";
+import { fetchConversations } from "@/features/chat";
+import { codeOf, statusOf } from "@/lib/api";
 import {
   clearStar,
   decide,
   fetchRound,
-  fetchYourTurn,
   openStar,
   putStar,
   relaxToday,
@@ -69,9 +69,6 @@ export type RoundNotice =
 
 /** The card on the screen, with the day its round is of. */
 export type RoundCard = { day: string; entry: RoundEntry };
-
-const codeOf = (error: unknown) => (error instanceof ApiError ? error.code : undefined);
-const statusOf = (error: unknown) => (error instanceof ApiError ? error.status : undefined);
 
 /** The Finnish day of an instant, only ever compared: a round is Finland's day (ADR-034). */
 const finnishDay = (at: Date | number) => formatDate("fi", at, { timeZone: "Europe/Helsinki" });
@@ -364,8 +361,12 @@ export function useRound(star?: string) {
         } else if (code === "your_turn_limit") {
           // Nothing was saved: the card stays, for a pass or Later (ADR-062 §5). The
           // refusal carries no number, and the one held may be hours old, so the list
-          // says how many wait now; a read that fails leaves the number held.
-          const now = await fetchYourTurn().catch(() => null);
+          // says how many wait now (ADR-062 §5): without thumbs, which signs and spends
+          // nothing, where a read of the queue would serve its cards again (ADR-008) and
+          // count towards its alarm (ADR-041). A read that fails leaves the number held.
+          const now = await fetchConversations(false)
+            .then((list) => list.yourTurn.waiting)
+            .catch(() => null);
           const held = onDay(day);
           if (!held) return;
           const waiting = now ?? held.yourTurn;

@@ -25,6 +25,7 @@ import { useHapticTap } from "@/theme/haptics";
 import { FieldLabel, HobbyGroupLabel } from "./fieldIcons";
 import { OptionGlyph, optionGlyph } from "./glyphs";
 import { fieldLabelKey, optionKey } from "./keys";
+import { withField } from "./useProfile";
 
 /**
  * Lists of this many options or more get a search box (#148): the languages,
@@ -101,6 +102,26 @@ export function optionTextKey(
     return `profile.optionWithKids.wantsKids.${option}` as PlainMessageKey;
   }
   return optionKey(field, option);
+}
+
+/** The search over a long list of options: the field editor's and a deal-breaker's. */
+export function OptionSearch({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (text: string) => void;
+}) {
+  const { t } = useT();
+  return (
+    <Input
+      accessibilityLabel={t("profile.later.search")}
+      placeholder={t("profile.later.search")}
+      value={value}
+      autoCapitalize="none"
+      onChangeText={onChange}
+    />
+  );
 }
 
 /** One choice: a button that says whether it is chosen, never a colour alone. */
@@ -259,12 +280,7 @@ export function FieldEditor({
   // the finger and the screen reader's focus, with no way to undo (#239).
   const [seen, setSeen] = useState<readonly string[]>([]);
   const label = t(fieldLabelKey(field));
-  const setField = (next: unknown) => {
-    const fields: Record<string, unknown> = { ...draft.fields };
-    if (next === undefined) delete fields[field];
-    else fields[field] = next;
-    update({ fields: fields as ProfileFields });
-  };
+  const setField = (next: unknown) => update({ fields: withField(draft.fields, field, next) });
 
   if (spec.kind === "flag") {
     return (
@@ -395,13 +411,7 @@ export function FieldEditor({
       {!rows && (spec.kind === "single" || spec.kind === "multi") && (
         <>
           {spec.options.length >= SEARCHABLE_FROM && (
-            <Input
-              accessibilityLabel={t("profile.later.search")}
-              placeholder={t("profile.later.search")}
-              value={search}
-              autoCapitalize="none"
-              onChangeText={setSearch}
-            />
+            <OptionSearch value={search} onChange={setSearch} />
           )}
           {field === "hobbies" ? (
             <View className="gap-3">

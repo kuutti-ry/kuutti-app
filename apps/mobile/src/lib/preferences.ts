@@ -60,3 +60,20 @@ export async function writePreference(key: PreferenceKey, value: string | null):
     Sentry.captureException(error);
   }
 }
+
+/**
+ * A stored setting written as one JSON object: null when nothing is stored,
+ * when it does not parse, or when it is not a plain object, so that a reader
+ * falls back to its defaults.
+ */
+export function storedObject(raw: string | null): Record<string, unknown> | null {
+  if (raw === null) return null;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return null;
+  }
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null;
+  return parsed as Record<string, unknown>;
+}

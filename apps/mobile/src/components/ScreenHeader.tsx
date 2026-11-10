@@ -1,3 +1,4 @@
+import { useRouter } from "expo-router";
 import ArrowLeft from "lucide-react-native/icons/arrow-left";
 import type { ReactNode } from "react";
 import { Platform, View } from "react-native";
@@ -35,12 +36,14 @@ export function ScreenHeader({
   title: string;
   /** What a screen reader says for the arrow: where it goes. */
   backLabel: string;
-  onBack: () => void;
+  /** Where the arrow goes when that is not one step back. */
+  onBack?: () => void;
   /** Buttons after the title, at the right (the profile's card preview). */
   children?: ReactNode;
   className?: string;
 }) {
   const tap = useHapticTap();
+  const router = useRouter();
   return (
     <View
       className={cn(
@@ -54,7 +57,8 @@ export function ScreenHeader({
         accessibilityLabel={backLabel}
         onPress={() => {
           tap();
-          onBack();
+          if (onBack) onBack();
+          else router.back();
         }}
       >
         <Icon as={ArrowLeft} />
