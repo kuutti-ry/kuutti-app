@@ -6,7 +6,7 @@ import {
   PhotoReviewQueue,
   PhotoUrlResponse,
 } from "@kuutti/schema";
-import { Check, EyeOff, RefreshCw, X } from "lucide-react";
+import { Check, EyeOff, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link } from "react-router";
 import { Alert } from "../../components/ui/alert.tsx";
@@ -17,9 +17,11 @@ import { Label } from "../../components/ui/label.tsx";
 import { NativeSelect } from "../../components/ui/native-select.tsx";
 import { Loading } from "../../components/ui/spinner.tsx";
 import { api } from "../../lib/api.ts";
+import { RefreshButton } from "../../lib/refresh-button.tsx";
 import { ScreenTitle } from "../../lib/screen-title.tsx";
 import { useList } from "../../lib/use-list.ts";
-import { REJECTION_REASONS } from "./reasons.ts";
+import { short } from "../../lib/utils.ts";
+import { RejectionReasonOptions } from "./RejectionReasonOptions.tsx";
 
 // The photo review queue (#49, rules/admin.md): what a person decides about
 // the photos the automatic check would not approve. Keyboard first: every
@@ -41,10 +43,7 @@ export function PhotoQueue() {
     <section aria-labelledby="queue-title" className="space-y-6">
       <header className="flex flex-wrap items-center justify-between gap-3">
         <ScreenTitle id="queue-title">{t("admin.queue.title")}</ScreenTitle>
-        <Button variant="outline" onClick={() => void reload()}>
-          <RefreshCw aria-hidden="true" />
-          {t("admin.queue.refresh")}
-        </Button>
+        <RefreshButton onClick={() => void reload()}>{t("admin.queue.refresh")}</RefreshButton>
       </header>
       {state.kind === "loading" && <Loading>{t("load.loading")}</Loading>}
       {state.kind === "error" && <Alert>{t("admin.loadFailed")}</Alert>}
@@ -171,7 +170,7 @@ function QueueItem({ item, onDecided }: { item: PhotoReviewItem; onDecided: () =
             <figcaption className="flex flex-col items-start text-xs text-muted-foreground">
               <span>{t("admin.queue.uploaded", { time: uploaded })}</span>
               <Link className="target" to={`/accounts/${item.accountId}`}>
-                {t("admin.queue.account", { account: item.accountId.slice(0, 8) })}
+                {t("admin.queue.account", { account: short(item.accountId) })}
               </Link>
             </figcaption>
           </figure>
@@ -221,14 +220,7 @@ function QueueItem({ item, onDecided }: { item: PhotoReviewItem; onDecided: () =
                         })
                       }
                     >
-                      <option value="" disabled>
-                        {t("admin.queue.reason.choose")}
-                      </option>
-                      {REJECTION_REASONS.map((reason) => (
-                        <option key={reason.value} value={reason.value}>
-                          {t(reason.label)}
-                        </option>
-                      ))}
+                      <RejectionReasonOptions />
                     </NativeSelect>
                   </Label>
                   <Button type="submit" variant="destructive" disabled={!state.reason}>

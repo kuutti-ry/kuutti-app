@@ -8,7 +8,6 @@ import {
   type AnnouncementDraft,
   type AnnouncementReach,
 } from "@kuutti/schema";
-import { RefreshCw } from "lucide-react";
 import { type FormEvent, type ReactNode, useId, useState } from "react";
 import { z } from "zod";
 import { Alert } from "../../components/ui/alert.tsx";
@@ -20,6 +19,7 @@ import { Loading } from "../../components/ui/spinner.tsx";
 import { Textarea } from "../../components/ui/textarea.tsx";
 import { api } from "../../lib/api.ts";
 import { Dialog } from "../../lib/dialog.tsx";
+import { RefreshButton } from "../../lib/refresh-button.tsx";
 import { ScreenTitle } from "../../lib/screen-title.tsx";
 import { useList } from "../../lib/use-list.ts";
 import { type Refusals, useSend } from "../safety/index.ts";
@@ -106,16 +106,14 @@ export function Announcements() {
     <section aria-labelledby="announcements-title" className="space-y-8">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <ScreenTitle id="announcements-title">{t("admin.announcements.title")}</ScreenTitle>
-        <Button
-          variant="outline"
+        <RefreshButton
           onClick={() => {
             setSaid(null);
             void reload();
           }}
         >
-          <RefreshCw aria-hidden="true" />
           {t("admin.announcements.refresh")}
-        </Button>
+        </RefreshButton>
       </div>
       <p aria-live="polite" className="font-medium empty:sr-only">
         {said && t(`admin.announcements.${said}Now`)}

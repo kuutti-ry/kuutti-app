@@ -1,6 +1,5 @@
 import { useT } from "@kuutti/i18n/react";
 import { AdminPond, AdminPondList } from "@kuutti/schema";
-import { RefreshCw } from "lucide-react";
 import { useState } from "react";
 import { Alert } from "../../components/ui/alert.tsx";
 import { Badge } from "../../components/ui/badge.tsx";
@@ -9,6 +8,7 @@ import { Card, CardContent } from "../../components/ui/card.tsx";
 import { Loading } from "../../components/ui/spinner.tsx";
 import { api } from "../../lib/api.ts";
 import { Dialog } from "../../lib/dialog.tsx";
+import { RefreshButton } from "../../lib/refresh-button.tsx";
 import { ScreenTitle } from "../../lib/screen-title.tsx";
 import { useList } from "../../lib/use-list.ts";
 import { type Refusals, useSend } from "../safety/index.ts";
@@ -44,16 +44,14 @@ export function MatchingSwitch() {
     <section aria-labelledby="matching-title" className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <ScreenTitle id="matching-title">{t("admin.matching.title")}</ScreenTitle>
-        <Button
-          variant="outline"
+        <RefreshButton
           onClick={() => {
             setSaid(null);
             void reload();
           }}
         >
-          <RefreshCw aria-hidden="true" />
           {t("admin.matching.refresh")}
-        </Button>
+        </RefreshButton>
       </div>
       <p aria-live="polite" className="sr-only">
         {said === true && t("admin.matching.opened")}

@@ -1,12 +1,9 @@
 import type { PlainMessageKey } from "@kuutti/i18n";
 import { useT } from "@kuutti/i18n/react";
 import { AdminOverview, type FoundReason, type OverviewQueue } from "@kuutti/schema";
-import { Clock, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router";
 import { Alert } from "../../components/ui/alert.tsx";
-import { badgeVariants } from "../../components/ui/badge.tsx";
-import { Button } from "../../components/ui/button.tsx";
 import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card.tsx";
 import { Loading } from "../../components/ui/spinner.tsx";
 import {
@@ -19,7 +16,9 @@ import {
 } from "../../components/ui/table.tsx";
 import { isLate, useAge } from "../../lib/age.ts";
 import { api } from "../../lib/api.ts";
+import { RefreshButton } from "../../lib/refresh-button.tsx";
 import { ScreenTitle } from "../../lib/screen-title.tsx";
+import { Late } from "./late.tsx";
 
 // The panel's front page (#303): what waits in each queue and how long the
 // oldest has, measured by the API's clock, with the response time the
@@ -75,10 +74,7 @@ export function Overview() {
     <section aria-labelledby="overview-title" className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <ScreenTitle id="overview-title">{t("admin.overview.title")}</ScreenTitle>
-        <Button variant="outline" onClick={() => void load()}>
-          <RefreshCw aria-hidden="true" />
-          {t("admin.overview.refresh")}
-        </Button>
+        <RefreshButton onClick={() => void load()}>{t("admin.overview.refresh")}</RefreshButton>
       </div>
       {state.kind === "loading" && <Loading>{t("load.loading")}</Loading>}
       {state.kind === "error" && <Alert>{t("admin.loadFailed")}</Alert>}
@@ -108,15 +104,7 @@ export function Overview() {
                               age: ageOf(q.oldestSince, now),
                             })}
                       </p>
-                      {late && (
-                        <>
-                          {" "}
-                          <strong className={badgeVariants({ variant: "destructive" })}>
-                            <Clock aria-hidden="true" />
-                            {t("admin.late", { hours: String(hours) })}
-                          </strong>
-                        </>
-                      )}
+                      {late && <Late hours={hours} />}
                     </CardContent>
                   </Card>
                 </li>
