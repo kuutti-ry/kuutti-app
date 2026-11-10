@@ -1,10 +1,8 @@
 import { formatDateTime } from "@kuutti/i18n";
 import { useT } from "@kuutti/i18n/react";
 import { StaffList as StaffPage } from "@kuutti/schema";
-import { RefreshCw } from "lucide-react";
 import { Alert } from "../../components/ui/alert.tsx";
 import { Badge } from "../../components/ui/badge.tsx";
-import { Button } from "../../components/ui/button.tsx";
 import { Card, CardContent } from "../../components/ui/card.tsx";
 import { Loading } from "../../components/ui/spinner.tsx";
 import {
@@ -16,6 +14,7 @@ import {
   TableRow,
 } from "../../components/ui/table.tsx";
 import { api } from "../../lib/api.ts";
+import { RefreshButton } from "../../lib/refresh-button.tsx";
 import { ScreenTitle } from "../../lib/screen-title.tsx";
 import { useList } from "../../lib/use-list.ts";
 
@@ -38,10 +37,7 @@ export function StaffList() {
     <section aria-labelledby="staff-title" className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <ScreenTitle id="staff-title">{t("admin.staff.title")}</ScreenTitle>
-        <Button variant="outline" onClick={() => void reload()}>
-          <RefreshCw aria-hidden="true" />
-          {t("admin.staff.refresh")}
-        </Button>
+        <RefreshButton onClick={() => void reload()}>{t("admin.staff.refresh")}</RefreshButton>
       </div>
       {state.kind === "loading" && <Loading>{t("load.loading")}</Loading>}
       {state.kind === "error" && <Alert>{t("admin.loadFailed")}</Alert>}

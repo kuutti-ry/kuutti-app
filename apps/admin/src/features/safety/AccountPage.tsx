@@ -28,9 +28,11 @@ import {
 } from "../../components/ui/table.tsx";
 import { api } from "../../lib/api.ts";
 import { ScreenTitle } from "../../lib/screen-title.tsx";
+import { short } from "../../lib/utils.ts";
 import { AuditDetail } from "./audit-detail.tsx";
 import { usePhotoOnRequest } from "./photo-on-request.ts";
 import { Sanctions } from "./Sanctions.tsx";
+import { useStatusFocus } from "./status-focus.ts";
 import { TakeDown } from "./TakeDown.tsx";
 
 // A person's page in the panel (#306): one account by its id, never a
@@ -155,16 +157,13 @@ export function AccountPage() {
   // A take-down (#477) is said in the photos' status line, and the focus goes
   // there: the button that opened the step goes with the change.
   const [photoDone, setPhotoDone] = useState("");
-  const photoStatus = useRef<HTMLParagraphElement>(null);
-  useEffect(() => {
-    if (photoDone) photoStatus.current?.focus();
-  }, [photoDone]);
+  const photoStatus = useStatusFocus(photoDone);
   const takenDown = useCallback(async () => {
     setPhotoDone(t("admin.takeDown.done"));
     await refresh();
   }, [refresh, t]);
 
-  const title = t("admin.account.title", { account: id.slice(0, 8) });
+  const title = t("admin.account.title", { account: short(id) });
   if (state.kind !== "ready") {
     return (
       <section aria-labelledby="account-title" className="space-y-6">
@@ -345,7 +344,7 @@ export function AccountPage() {
                       {row.actorIdentityId === null ? (
                         t("admin.audit.actorAutomatic")
                       ) : (
-                        <code>{row.actorIdentityId.slice(0, 8)}</code>
+                        <code>{short(row.actorIdentityId)}</code>
                       )}
                     </TableCell>
                     <TableCell>{row.action}</TableCell>

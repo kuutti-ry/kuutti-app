@@ -5,11 +5,10 @@ import {
   ReportQueue as ReportPage,
   type ReportQueueQuery,
 } from "@kuutti/schema";
-import { Clock, RefreshCw } from "lucide-react";
+import { RefreshCw } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router";
 import { Alert } from "../../components/ui/alert.tsx";
-import { badgeVariants } from "../../components/ui/badge.tsx";
 import { Button } from "../../components/ui/button.tsx";
 import {
   Card,
@@ -23,6 +22,8 @@ import { isLate, useAge } from "../../lib/age.ts";
 import { api } from "../../lib/api.ts";
 import { ScreenTitle } from "../../lib/screen-title.tsx";
 import { useList } from "../../lib/use-list.ts";
+import { short } from "../../lib/utils.ts";
+import { Late } from "./late.tsx";
 import { OUTCOME, REASON, SOURCE } from "./report-words.ts";
 
 // The report queue (#311, TD-5, rules/admin.md): the reports waiting for a
@@ -36,9 +37,6 @@ import { OUTCOME, REASON, SOURCE } from "./report-words.ts";
 // page (report-words.ts). Keyboard first; English only (TD-17).
 
 type State = ReportQueueQuery["state"];
-
-/** The account id as the panel shortens it elsewhere (#171). */
-const short = (accountId: string) => accountId.slice(0, 8);
 
 /** Reports about one person under one heading, named by the first one's id. */
 type Group = { id: string; reported: ReportListItem["reported"]; items: ReportListItem[] };
@@ -176,15 +174,7 @@ function ReportGroup({
                 {item.decidedAt === null ? (
                   <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-muted-foreground">
                     {t("admin.reports.waiting", { age: ageOf(item.createdAt, now) })}
-                    {isLate(item.createdAt, now, responseHours) && (
-                      <>
-                        {" "}
-                        <strong className={badgeVariants({ variant: "destructive" })}>
-                          <Clock aria-hidden="true" />
-                          {t("admin.late", { hours: String(responseHours) })}
-                        </strong>
-                      </>
-                    )}
+                    {isLate(item.createdAt, now, responseHours) && <Late hours={responseHours} />}
                   </p>
                 ) : (
                   <p className="text-muted-foreground">

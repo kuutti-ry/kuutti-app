@@ -22,9 +22,11 @@ import { Loading } from "../../components/ui/spinner.tsx";
 import { api } from "../../lib/api.ts";
 import { Dialog } from "../../lib/dialog.tsx";
 import { ScreenTitle } from "../../lib/screen-title.tsx";
+import { short } from "../../lib/utils.ts";
 import { usePhotoOnRequest } from "./photo-on-request.ts";
 import { OUTCOME, REASON, SOURCE } from "./report-words.ts";
 import { KIND_WORDS, SanctionActions } from "./Sanctions.tsx";
+import { useStatusFocus } from "./status-focus.ts";
 import { TakeDown } from "./TakeDown.tsx";
 import { outcomeOf, type Refusals, useSend } from "./use-send.ts";
 
@@ -60,9 +62,6 @@ const SIDE: Record<ReportCopyLine["side"], PlainMessageKey> = {
   reporter: "admin.report.side.reporter",
   reported: "admin.report.side.reported",
 };
-
-/** An id as the panel shortens it elsewhere (#171). */
-const short = (id: string) => id.slice(0, 8);
 
 const decide = (id: string, body: ReportDecisionRequest) =>
   api.POST("/admin/reports/{id}/decision", { params: { path: { id } }, body });
@@ -145,7 +144,6 @@ function ReportBody({ opened }: { opened: ReportDetail }) {
   // Refused as decided by somebody else: the page offers nothing that claims
   // to close it, without reading it again (another conversation.view).
   const [elsewhere, setElsewhere] = useState(false);
-  const status = useRef<HTMLParagraphElement>(null);
   const ids = useId();
   const when = (at: string) => formatDateTime(locale, new Date(at));
   const decision = decisionOf(report);
@@ -154,9 +152,7 @@ function ReportBody({ opened }: { opened: ReportDetail }) {
 
   // An outcome is said in the status line, and the focus goes there: the
   // button that led to it is gone with the decision area.
-  useEffect(() => {
-    if (said) status.current?.focus();
-  }, [said]);
+  const status = useStatusFocus(said);
 
   const settle = (answer: ReportDecision) => {
     setStep(null);
@@ -579,10 +575,7 @@ function PointedPhoto({
   const line = useId();
   const [state, setState] = useState(photo.state);
   const [done, setDone] = useState("");
-  const status = useRef<HTMLParagraphElement>(null);
-  useEffect(() => {
-    if (done) status.current?.focus();
-  }, [done]);
+  const status = useStatusFocus(done);
   const { url, failed, pending, show, picture } = usePhotoOnRequest(() =>
     api.GET("/admin/reports/{id}/photo", { params: { path: { id: reportId } } }),
   );

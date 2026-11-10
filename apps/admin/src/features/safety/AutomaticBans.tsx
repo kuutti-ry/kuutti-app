@@ -1,11 +1,10 @@
 import { formatDateTime, type TFunction } from "@kuutti/i18n";
 import { useT } from "@kuutti/i18n/react";
 import { type AutomaticBan, AutomaticBanQueue, type SanctionRule } from "@kuutti/schema";
-import { Clock, RefreshCw } from "lucide-react";
-import { useEffect, useId, useRef, useState } from "react";
+import { RefreshCw } from "lucide-react";
+import { useId, useState } from "react";
 import { Link } from "react-router";
 import { Alert } from "../../components/ui/alert.tsx";
-import { badgeVariants } from "../../components/ui/badge.tsx";
 import { Button } from "../../components/ui/button.tsx";
 import { Card, CardContent, CardTitle } from "../../components/ui/card.tsx";
 import { Loading } from "../../components/ui/spinner.tsx";
@@ -13,7 +12,10 @@ import { isLate, useAge } from "../../lib/age.ts";
 import { api } from "../../lib/api.ts";
 import { ScreenTitle } from "../../lib/screen-title.tsx";
 import { useList } from "../../lib/use-list.ts";
+import { short } from "../../lib/utils.ts";
+import { Late } from "./late.tsx";
 import { ReviewStep } from "./Sanctions.tsx";
+import { useStatusFocus } from "./status-focus.ts";
 
 // The automatic shadow bans (#105, ADR-033; #86's velocity, ADR-041): the
 // shadow bans a rule applied on its own, oldest first, each waiting for a moderator to confirm or reverse
@@ -24,9 +26,6 @@ import { ReviewStep } from "./Sanctions.tsx";
 // decision fixed by the button pressed, so the step presets nothing
 // (rules/admin.md). The person's page, linked from each line, has the rest.
 // English only (TD-17); keyboard first.
-
-/** The account id as the panel shortens it elsewhere (#171). */
-const short = (accountId: string) => accountId.slice(0, 8);
 
 /** The span a rule counted over: its first event, and when it applied the ban. */
 type Span = { first: string; at: string };
@@ -56,13 +55,10 @@ export function AutomaticBans() {
   });
   const [step, setStep] = useState<Decision | null>(null);
   const [done, setDone] = useState<Decision | null>(null);
-  const status = useRef<HTMLParagraphElement>(null);
 
   // A decision takes its line off the list, and the button that opened the
   // step with it: the status line says what was done and takes the focus.
-  useEffect(() => {
-    if (done) status.current?.focus();
-  }, [done]);
+  const status = useStatusFocus(done);
 
   // The step names the account and what the rule counted: several people
   // share this screen, and the step is the last look before the decision.
@@ -190,15 +186,7 @@ function BanLine({
           </p>
           <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-muted-foreground">
             {t("admin.automaticBans.hidden", { age: ageOf(ban.createdAt, now) })}
-            {isLate(ban.createdAt, now, reviewHours) && (
-              <>
-                {" "}
-                <strong className={badgeVariants({ variant: "destructive" })}>
-                  <Clock aria-hidden="true" />
-                  {t("admin.late", { hours: String(reviewHours) })}
-                </strong>
-              </>
-            )}
+            {isLate(ban.createdAt, now, reviewHours) && <Late hours={reviewHours} />}
           </p>
           {/* Each button is described by whose ban it is and what the rule counted, so a screen reader says which. */}
           <div className="flex flex-wrap gap-3 border-t pt-3">

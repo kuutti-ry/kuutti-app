@@ -5,10 +5,10 @@ import {
   Sanction,
   type SanctionEntry,
   type SanctionKind,
-  type SanctionReason,
+  SanctionReason,
   SUSPENSION_DAYS_MAX,
 } from "@kuutti/schema";
-import { type FormEvent, useEffect, useId, useRef, useState } from "react";
+import { type FormEvent, useId, useState } from "react";
 import { Alert } from "../../components/ui/alert.tsx";
 import { Button } from "../../components/ui/button.tsx";
 import { Input } from "../../components/ui/input.tsx";
@@ -18,6 +18,9 @@ import { Textarea } from "../../components/ui/textarea.tsx";
 import { api } from "../../lib/api.ts";
 import { Dialog } from "../../lib/dialog.tsx";
 import { useStaffRole } from "../../lib/role.ts";
+import { short } from "../../lib/utils.ts";
+import { REASON } from "./report-words.ts";
+import { useStatusFocus } from "./status-focus.ts";
 import { type Refusals, useSend } from "./use-send.ts";
 
 // The sanctions on a person's page (#308), the panel's side of #307: warn,
@@ -75,18 +78,8 @@ export const KIND_WORDS: Record<SanctionKind, PlainMessageKey> = {
   ban: "admin.sanction.kind.ban",
 };
 
-const REASONS: ReadonlyArray<{ value: SanctionReason; label: PlainMessageKey }> = [
-  { value: "harassment", label: "admin.sanction.reason.harassment" },
-  { value: "misrepresentation", label: "admin.sanction.reason.misrepresentation" },
-  { value: "under_age", label: "admin.sanction.reason.under_age" },
-  { value: "commercial_use", label: "admin.sanction.reason.commercial_use" },
-  { value: "scraping", label: "admin.sanction.reason.scraping" },
-  { value: "other", label: "admin.sanction.reason.other" },
-];
-const REASON_WORDS = Object.fromEntries(REASONS.map((r) => [r.value, r.label])) as Record<
-  SanctionReason,
-  PlainMessageKey
->;
+/** The reasons a sanction gives, in the schema's order, in the words a report's screens use. */
+const REASONS = SanctionReason.options.map((value) => ({ value, label: REASON[value] }));
 
 /** The refusals the API answers with a code of their own, in words. */
 const REFUSALS: Refusals = {
@@ -193,22 +186,19 @@ export function Sanctions({
   const admin = useStaffRole() === "admin";
   const [step, setStep] = useState<Step | null>(null);
   const [done, setDone] = useState<string>("");
-  const status = useRef<HTMLParagraphElement>(null);
   const ids = useId();
   const when = (at: string) => formatDateTime(locale, new Date(at));
   const who = (id: string | null, role: SanctionEntry["createdByRole"]) =>
     id
       ? t("admin.sanction.who", {
-          id: id.slice(0, 8),
+          id: short(id),
           role: role ?? t("admin.sanction.noRole"),
         })
       : t("admin.sanction.nobody");
 
   // A change is said in the status line, and the focus goes there: the button
   // that opened the step may be gone with the change (a lift, a second look).
-  useEffect(() => {
-    if (done) status.current?.focus();
-  }, [done]);
+  const status = useStatusFocus(done);
 
   const finish = async (message: string) => {
     setStep(null);
@@ -241,7 +231,7 @@ export function Sanctions({
             return (
               <li key={s.id} className="space-y-1 rounded-lg border px-3 py-2">
                 <p id={line}>
-                  <strong>{t(KIND_WORDS[s.kind])}</strong> · {t(REASON_WORDS[s.reason])} ·{" "}
+                  <strong>{t(KIND_WORDS[s.kind])}</strong> · {t(REASON[s.reason])} ·{" "}
                   {when(s.createdAt)}
                   {s.endsAt && ` · ${t("admin.account.until", { time: when(s.endsAt) })}`}
                 </p>
@@ -329,6 +319,10 @@ type StepProps = {
   onDone: (sanction: Sanction) => Promise<void>;
 };
 
+/** A step's send: the answer is the sanction, and the refusals are the steps' own. */
+const useSanctionSend = ({ onShell, onDone }: Pick<StepProps, "onShell" | "onDone">) =>
+  useSend({ answer: Sanction, refusals: REFUSALS, onShell, onDone });
+
 function ApplyStep({
   accountId,
   sanction,
@@ -342,12 +336,7 @@ function ApplyStep({
   const [reason, setReason] = useState<SanctionReason | "">("");
   const [note, setNote] = useState("");
   const [endsOn, setEndsOn] = useState("");
-  const { sending, refused, send } = useSend({
-    answer: Sanction,
-    refusals: REFUSALS,
-    onShell,
-    onDone,
-  });
+  const { sending, refused, send } = useSanctionSend({ onShell, onDone });
   const meta = STEPS[sanction];
   const ready = reason !== "" && note.trim() !== "" && (sanction !== "suspend" || endsOn !== "");
 
@@ -392,24 +381,7 @@ function ApplyStep({
             ))}
           </NativeSelect>
         </div>
-        <div className="grid gap-2">
-          <Label htmlFor={`${ids}-note`}>{t("admin.sanction.note")}</Label>
-          <Textarea
-            id={`${ids}-note`}
-            required
-            rows={3}
-            maxLength={SANCTION_NOTE_MAX}
-            aria-describedby={`${ids}-count`}
-            value={note}
-            onChange={(event) => setNote(event.target.value)}
-          />
-          <p id={`${ids}-count`} className="text-xs text-muted-foreground">
-            {t("admin.sanction.noteCount", {
-              characters: String(note.length),
-              max: String(SANCTION_NOTE_MAX),
-            })}
-          </p>
-        </div>
+        <NoteField ids={ids} label={t("admin.sanction.note")} note={note} onChange={setNote} />
         {sanction === "suspend" && (
           <div className="grid gap-2">
             <Label htmlFor={`${ids}-ends`}>{t("admin.sanction.endsOn")}</Label>
@@ -451,12 +423,7 @@ const CHOICE =
 
 function LiftStep({ item, onCancel, onShell, onDone }: StepProps & { item: SanctionEntry }) {
   const { t } = useT();
-  const { sending, refused, send } = useSend({
-    answer: Sanction,
-    refusals: REFUSALS,
-    onShell,
-    onDone,
-  });
+  const { sending, refused, send } = useSanctionSend({ onShell, onDone });
   return (
     <Dialog
       title={t("admin.sanction.liftTitle", { kind: t(KIND_WORDS[item.kind]) })}
@@ -517,12 +484,7 @@ export function ReviewStep({
   const [note, setNote] = useState("");
   const [chosen, setOutcome] = useState<"keep" | "lift" | "">("");
   const outcome = fixed?.outcome ?? chosen;
-  const { sending, refused, send } = useSend({
-    answer: Sanction,
-    refusals: REFUSALS,
-    onShell,
-    onDone,
-  });
+  const { sending, refused, send } = useSanctionSend({ onShell, onDone });
   const ready = note.trim() !== "" && outcome !== "";
   const submit = (event: FormEvent) => {
     event.preventDefault();
@@ -542,24 +504,12 @@ export function ReviewStep({
       <form className="grid gap-4" onSubmit={submit}>
         {fixed && <p>{fixed.effect}</p>}
         {refused && <Alert>{t(refused)}</Alert>}
-        <div className="grid gap-2">
-          <Label htmlFor={`${ids}-note`}>{t("admin.sanction.reviewNote")}</Label>
-          <Textarea
-            id={`${ids}-note`}
-            required
-            rows={3}
-            maxLength={SANCTION_NOTE_MAX}
-            aria-describedby={`${ids}-count`}
-            value={note}
-            onChange={(event) => setNote(event.target.value)}
-          />
-          <p id={`${ids}-count`} className="text-xs text-muted-foreground">
-            {t("admin.sanction.noteCount", {
-              characters: String(note.length),
-              max: String(SANCTION_NOTE_MAX),
-            })}
-          </p>
-        </div>
+        <NoteField
+          ids={ids}
+          label={t("admin.sanction.reviewNote")}
+          note={note}
+          onChange={setNote}
+        />
         {!fixed && (
           <fieldset className="grid gap-2">
             <legend className="mb-2 text-sm font-medium">{t("admin.sanction.outcome")}</legend>
@@ -605,5 +555,40 @@ export function ReviewStep({
         </div>
       </form>
     </Dialog>
+  );
+}
+
+/** A step's note and its count, which a screen reader hears as the field's description. */
+function NoteField({
+  ids,
+  label,
+  note,
+  onChange,
+}: {
+  ids: string;
+  label: string;
+  note: string;
+  onChange: (note: string) => void;
+}) {
+  const { t } = useT();
+  return (
+    <div className="grid gap-2">
+      <Label htmlFor={`${ids}-note`}>{label}</Label>
+      <Textarea
+        id={`${ids}-note`}
+        required
+        rows={3}
+        maxLength={SANCTION_NOTE_MAX}
+        aria-describedby={`${ids}-count`}
+        value={note}
+        onChange={(event) => onChange(event.target.value)}
+      />
+      <p id={`${ids}-count`} className="text-xs text-muted-foreground">
+        {t("admin.sanction.noteCount", {
+          characters: String(note.length),
+          max: String(SANCTION_NOTE_MAX),
+        })}
+      </p>
+    </div>
   );
 }

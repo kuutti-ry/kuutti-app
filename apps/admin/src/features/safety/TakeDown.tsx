@@ -11,7 +11,7 @@ import { Label } from "../../components/ui/label.tsx";
 import { NativeSelect } from "../../components/ui/native-select.tsx";
 import { api } from "../../lib/api.ts";
 import { Dialog } from "../../lib/dialog.tsx";
-import { REJECTION_REASONS } from "../media/index.ts";
+import { RejectionReasonOptions } from "../media/index.ts";
 import { type Refusals, useSend } from "./use-send.ts";
 
 // Taking down one approved photo (#477, ADR-006 §2): a person's rejection of
@@ -129,14 +129,7 @@ function TakeDownStep({
             value={reason}
             onChange={(event) => setReason(event.target.value as ModeratorRejectionReason)}
           >
-            <option value="" disabled>
-              {t("admin.queue.reason.choose")}
-            </option>
-            {REJECTION_REASONS.map((r) => (
-              <option key={r.value} value={r.value}>
-                {t(r.label)}
-              </option>
-            ))}
+            <RejectionReasonOptions />
           </NativeSelect>
         </div>
         <div className="flex flex-wrap gap-3">
