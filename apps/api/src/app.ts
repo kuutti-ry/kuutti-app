@@ -1,3 +1,4 @@
+import type { X509Certificate } from "node:crypto";
 import { swaggerUI } from "@hono/swagger-ui";
 import { OpenAPIHono } from "@hono/zod-openapi";
 import type { Queryable } from "@kuutti/db";
@@ -100,6 +101,8 @@ export type Deps = {
   pusher?: Pusher;
   /** The pushes (#102): boot hands in the process's one, which its shutdown waits for; absent, the app makes its own over `pusher`. */
   push?: Push;
+  /** The authority an iPhone's attestation must lead to (ADR-069): Apple's when absent; a test hands in its own. */
+  attestRoot?: X509Certificate;
 };
 
 /**

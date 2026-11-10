@@ -354,19 +354,37 @@ async function deriveFromBroker(
 /** /auth/exchange: the one-time code, once, within its minute, with its attempt's verifier (ADR-027). */
 export async function exchangeCode(
   deps: Pick<LoginDeps, "db" | "now">,
-  input: { code: string; verifier: string },
+  input: { code: string; verifier: string; attested: boolean; attestationRequired: boolean },
 ): Promise<{
   accountId: string;
   platform: AuthPlatform;
   outcome: AuthExchangeResponse["outcome"];
 }> {
-  const login = await repo.consumeAppCode(deps.db, {
+  const attempt = {
     codeHash: hashOneTimeCode(input.code),
     // The challenge is the same SHA-256 hex as the code's hash (ADR-027).
     codeChallenge: hashOneTimeCode(input.verifier),
     at: deps.now(),
+  };
+  const login = await repo.consumeAppCode(deps.db, {
+    ...attempt,
+    attested: input.attested,
+    attestationRequired: input.attestationRequired,
   });
-  if (!login) throw new AppError(401, "auth_code_used", "This code is unknown, used or expired");
+  if (!login) {
+    // The one refusal the app has something else to say about (ADR-069 §2): an
+    // iPhone's good code, left unspent because nothing attested the app.
+    if (
+      input.attestationRequired &&
+      !input.attested &&
+      (await repo.isCodeUnspent(deps.db, attempt))
+    ) {
+      throw new AppError(403, "attestation_refused", "The app could not be verified", {
+        reason: "missing",
+      });
+    }
+    throw new AppError(401, "auth_code_used", "This code is unknown, used or expired");
+  }
   return {
     accountId: login.accountId,
     platform: login.platform === "android" ? "android" : "ios",

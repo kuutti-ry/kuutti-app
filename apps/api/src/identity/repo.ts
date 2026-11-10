@@ -240,10 +240,21 @@ export async function expireAuthRequest(db: Queryable, id: string, at: Date): Pr
  * expired or staff code and a wrong verifier alike find nothing, and a wrong
  * verifier leaves the code unspent. Two exchanges at once: the second waits
  * on the row's lock and then reads the mark.
+ *
+ * An attestation is Apple's, and so an iPhone's (ADR-069 §2): an attempt that
+ * said ios is spent without one only where none is required, and an attempt
+ * that said anything else is never spent with one. Either leaves the code
+ * unspent, as a wrong verifier does.
  */
 export async function consumeAppCode(
   db: Queryable,
-  input: { codeHash: string; codeChallenge: string; at: Date },
+  input: {
+    codeHash: string;
+    codeChallenge: string;
+    attested: boolean;
+    attestationRequired: boolean;
+    at: Date;
+  },
 ): Promise<{ accountId: string; platform: string; outcome: string | null } | null> {
   const { rows } = await db.query<{
     account_id: string;
@@ -253,11 +264,32 @@ export async function consumeAppCode(
     `UPDATE auth_request SET code_used_at = $3
      WHERE code_hash = $1 AND code_challenge = $2 AND account_id IS NOT NULL
        AND code_used_at IS NULL AND code_expires_at >= $3
+       AND CASE WHEN platform = 'ios' THEN $4::boolean OR NOT $5::boolean
+                ELSE NOT $4::boolean END
      RETURNING account_id, platform, outcome`,
-    [input.codeHash, input.codeChallenge, input.at],
+    [input.codeHash, input.codeChallenge, input.at, input.attested, input.attestationRequired],
   );
   const row = rows[0];
   return row ? { accountId: row.account_id, platform: row.platform, outcome: row.outcome } : null;
+}
+
+/**
+ * Whether a code `consumeAppCode` just left unspent is good in everything the
+ * exchange asks but the attestation (ADR-069 §2): then it is an iPhone's, in
+ * want of one. It is asked with the code and its verifier, so the answer tells
+ * nothing to anybody who could not have spent the code.
+ */
+export async function isCodeUnspent(
+  db: Queryable,
+  input: { codeHash: string; codeChallenge: string; at: Date },
+): Promise<boolean> {
+  const { rows } = await db.query(
+    `SELECT 1 FROM auth_request
+     WHERE code_hash = $1 AND code_challenge = $2 AND account_id IS NOT NULL
+       AND code_used_at IS NULL AND code_expires_at >= $3`,
+    [input.codeHash, input.codeChallenge, input.at],
+  );
+  return rows.length > 0;
 }
 
 /** The staff exchange's spend; the row count says whether this call was the first to. */
@@ -376,6 +408,8 @@ export type SessionRow = {
   createdAt: Date;
   expiresAt: Date;
   revokedAt: Date | null;
+  /** Whether the device attested a key at its exchange (ADR-069); the key itself is read by a refresh alone. */
+  attested: boolean;
 };
 
 const sessionFrom = (r: Row): SessionRow => ({
@@ -386,9 +420,11 @@ const sessionFrom = (r: Row): SessionRow => ({
   createdAt: r.created_at as Date,
   expiresAt: r.expires_at as Date,
   revokedAt: (r.revoked_at as Date | null) ?? null,
+  attested: r.attested as boolean,
 });
 
-const SESSION_COLUMNS = "id, account_id, platform, user_agent, created_at, expires_at, revoked_at";
+const SESSION_COLUMNS =
+  "id, account_id, platform, user_agent, created_at, expires_at, revoked_at, attest_key IS NOT NULL AS attested";
 
 /**
  * Null when the account is no longer live: a login that outlived the erasure
@@ -408,12 +444,16 @@ export async function insertSession(
     refreshHash: string;
     familyHash: string;
     expiresAt: Date;
+    /** The key the device attested, an X9.62 point in base64 (ADR-069); absent when it attested none. */
+    attestKey?: string;
     at: Date;
   },
 ): Promise<SessionRow | null> {
+  // An attested key starts at the counter its attestation carried, 0.
   const { rows } = await db.query<Row>(
-    `INSERT INTO session (account_id, platform, user_agent, access_hash, access_expires_at, refresh_hash, family_hash, expires_at, created_at, last_used_at)
-     SELECT $1, $2, $3, $4, $5, $6, $7, $8, $9, $9
+    `INSERT INTO session (account_id, platform, user_agent, access_hash, access_expires_at, refresh_hash, family_hash, expires_at, created_at, last_used_at, attest_key, attest_counter)
+     SELECT $1, $2, $3, $4, $5, $6, $7, $8, $9, $9, $10::text,
+       CASE WHEN $10::text IS NULL THEN NULL ELSE 0 END
      WHERE EXISTS (
        SELECT 1 FROM account a JOIN identity i ON i.id = a.identity_id
        WHERE a.id = $1 AND i.standing = 'ok'
@@ -430,6 +470,7 @@ export async function insertSession(
       input.familyHash,
       input.expiresAt,
       input.at,
+      input.attestKey ?? null,
     ],
   );
   return rows[0] ? sessionFrom(rows[0]) : null;
@@ -523,6 +564,13 @@ export async function touchSession(db: Queryable, sessionId: string, at: Date): 
  * The end moves to `nextExpiresAt`, never past `ceilingMs` after the row's
  * creation, the bank login (ADR-058); once it is reached, the next refresh
  * finds the end passed.
+ *
+ * A session that attested a key (ADR-069 §3) rotates only with the counter of
+ * a verified assertion, past the one it keeps, in this one statement: of two
+ * assertions racing, the lower never lands after the higher. With no counter,
+ * or one not past the kept, such a session is not rotated; a session with no
+ * key takes none. Where App Attest is switched off (`unasserted`, §5) a keyed
+ * session rotates as one without a key, its counter left where it was.
  */
 export async function rotateSession(
   db: Queryable,
@@ -533,14 +581,19 @@ export async function rotateSession(
     nextRefreshHash: string;
     nextExpiresAt: Date;
     ceilingMs: number;
+    attestCounter: number | null;
+    unasserted: boolean;
     at: Date;
   },
 ): Promise<SessionRow | null> {
   const { rows } = await db.query<Row>(
     `UPDATE session
      SET refresh_hash = $2, access_hash = $3, access_expires_at = $4, last_used_at = $5,
-       expires_at = LEAST($6::timestamptz, created_at + $7::double precision * interval '1 millisecond')
+       expires_at = LEAST($6::timestamptz, created_at + $7::double precision * interval '1 millisecond'),
+       attest_counter = CASE WHEN attest_key IS NULL THEN NULL
+                             WHEN $9::boolean THEN attest_counter ELSE $8::bigint END
      WHERE refresh_hash = $1 AND revoked_at IS NULL AND expires_at > $5 AND ${SESSION_ALIVE}
+       AND (attest_key IS NULL OR $9::boolean OR attest_counter < $8::bigint)
      RETURNING ${SESSION_COLUMNS}`,
     [
       input.refreshHash,
@@ -550,9 +603,29 @@ export async function rotateSession(
       input.at,
       input.nextExpiresAt,
       input.ceilingMs,
+      input.attestCounter,
+      input.unasserted,
     ],
   );
   return rows[0] ? sessionFrom(rows[0]) : null;
+}
+
+/**
+ * The key a session attested and the counter of its last assertion (ADR-069
+ * §3), by the hash of its live refresh token: null for a session that attested
+ * none, and for a hash no session has.
+ */
+export async function findAttestKey(
+  db: Queryable,
+  refreshHash: string,
+): Promise<{ key: string; counter: number } | null> {
+  const { rows } = await db.query<{ attest_key: string; attest_counter: string }>(
+    "SELECT attest_key, attest_counter FROM session WHERE refresh_hash = $1 AND attest_key IS NOT NULL",
+    [refreshHash],
+  );
+  const row = rows[0];
+  // A bigint arrives as text; an assertion's counter is 32 bits.
+  return row ? { key: row.attest_key, counter: Number(row.attest_counter) } : null;
 }
 
 /**

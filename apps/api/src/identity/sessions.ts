@@ -3,6 +3,7 @@ import type { Queryable } from "@kuutti/db";
 import type { AuthPlatform, SessionResponse, SessionTokens } from "@kuutti/schema";
 import { hashToken } from "../lib/auth-middleware.ts";
 import { AppError } from "../lib/errors.ts";
+import { AttestationError, clientDataHashOf, verifyAssertion } from "./app-attest.ts";
 import * as repo from "./repo.ts";
 
 // Device-bound sessions (#35, TD-1). The access token is a 256-bit random
@@ -15,6 +16,9 @@ import * as repo from "./repo.ts";
 // A refresh also moves the session's end (ADR-058): a phone in use stays signed
 // in, one left alone for ninety days, or a year past its bank login, goes to
 // the bank again.
+// A session whose device attested a key at the exchange (ADR-069) is refreshed
+// only with that key's assertion over the refresh token it presents: a token
+// lifted off the phone is then worth one access token's fifteen minutes.
 
 const ACCESS_TOKEN_TTL_MS = 15 * 60 * 1000;
 /** A session ends this long after the bank login or its last refresh (ADR-058 §1). */
@@ -24,7 +28,14 @@ const SESSION_CEILING_MS = 365 * 24 * 60 * 60 * 1000;
 /** Ended sessions stay this long for the person's device list and for support, then the sweep removes them. */
 const ENDED_SESSION_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
 
-export type SessionDeps = { db: Queryable; now: () => Date };
+export type SessionDeps = {
+  db: Queryable;
+  now: () => Date;
+  /** The App ID an assertion is held to (ADR-069); absent where no team id is configured. */
+  appId?: string;
+  /** True where App Attest is switched off (ADR-069 §5): a session that keeps a key is refreshed without its assertion. */
+  unasserted?: boolean;
+};
 
 const newToken = () => randomBytes(32).toString("base64url");
 
@@ -44,7 +55,13 @@ function pair(now: Date, family: string) {
 /** A fresh session for the device that just exchanged a one-time code. */
 export async function issueSession(
   deps: SessionDeps,
-  input: { accountId: string; platform: AuthPlatform; userAgent: string | null },
+  input: {
+    accountId: string;
+    platform: AuthPlatform;
+    userAgent: string | null;
+    /** The key the exchange's attestation vouched for, an X9.62 point (ADR-069); absent with none. */
+    attestKey?: Buffer;
+  },
 ): Promise<SessionTokens> {
   const now = deps.now();
   const family = newToken();
@@ -59,6 +76,7 @@ export async function issueSession(
     refreshHash: tokens.refreshHash,
     familyHash: hashToken(family),
     expiresAt: refreshExpiresAt,
+    attestKey: input.attestKey?.toString("base64"),
     at: now,
   });
   // The account was erased between the callback and the exchange (#51): the
@@ -75,6 +93,40 @@ export async function issueSession(
 }
 
 /**
+ * The counter of a keyed session's assertion over the refresh token it
+ * presents (ADR-069 §3); null when the token's session attested no key, or is
+ * no session's, and then an assertion means nothing and the rotation and the
+ * reuse check answer as they always did. A refused assertion leaves the row as
+ * it is: the phone's own next refresh still works.
+ */
+async function assertedCounter(
+  deps: SessionDeps,
+  input: { refreshToken: string; refreshHash: string; assertion: string },
+): Promise<number | null> {
+  const attested = await repo.findAttestKey(deps.db, input.refreshHash);
+  if (!attested) return null;
+  try {
+    // A key was attested under a team id this process no longer has.
+    if (deps.appId === undefined) throw new AttestationError("app_id");
+    return verifyAssertion(
+      { appId: deps.appId },
+      {
+        assertion: Buffer.from(input.assertion, "base64"),
+        publicKey: Buffer.from(attested.key, "base64"),
+        clientDataHash: clientDataHashOf(input.refreshToken),
+        lastCounter: attested.counter,
+      },
+    ).counter;
+  } catch (error) {
+    if (!(error instanceof AttestationError)) throw error;
+    throw new AppError(401, "session_revoked", "The refresh token is not valid", {
+      reason: "assertion",
+      step: error.reason,
+    });
+  }
+}
+
+/**
  * Rotation with reuse detection. The update is keyed by the live refresh hash,
  * so of two concurrent refreshes exactly one wins; the loser, and anyone who
  * copied any earlier token of the session, however often it was refreshed
@@ -84,9 +136,15 @@ export async function issueSession(
 export async function refreshSession(
   deps: SessionDeps,
   refreshToken: string,
+  assertion?: string,
 ): Promise<SessionTokens> {
   const now = deps.now();
   const presented = hashToken(refreshToken);
+  const unasserted = deps.unasserted === true;
+  const attestCounter =
+    assertion === undefined || unasserted
+      ? null
+      : await assertedCounter(deps, { refreshToken, refreshHash: presented, assertion });
   // The contract holds the shape: the family part is everything before the
   // dot. The next token keeps it: a token that matches the live hash carries
   // the session's own.
@@ -99,6 +157,8 @@ export async function refreshSession(
     nextRefreshHash: tokens.refreshHash,
     nextExpiresAt: new Date(now.getTime() + REFRESH_TOKEN_TTL_MS),
     ceilingMs: SESSION_CEILING_MS,
+    attestCounter,
+    unasserted,
     at: now,
   });
   if (rotated) {
@@ -122,10 +182,14 @@ export async function refreshSession(
   if (reused && known.revokedAt === null) {
     await repo.revokeSession(deps.db, known.id, now, "refresh_reuse");
   }
+  // The live token of a keyed session with no assertion beside it is somebody
+  // holding the token without the phone's key (ADR-069 §3). The row is left as
+  // it is, as above.
+  const keyless = !unasserted && known?.live === true && known.attested && attestCounter === null;
   // A retired, revoked, expired or unknown token all read the same to the
   // caller: this device signs in through the bank again.
   throw new AppError(401, "session_revoked", "The refresh token is not valid", {
-    reason: reused ? "reuse" : "unknown_or_expired",
+    reason: reused ? "reuse" : keyless ? "assertion" : "unknown_or_expired",
   });
 }
 

@@ -639,3 +639,107 @@ describe("parseConfig for the proof of Kuutti's distribution (ADR-066)", () => {
     expect(parseConfig({ ...staging, ORIGIN_SECRET: secret }).ORIGIN_SECRET).toBe(secret);
   });
 });
+
+describe("parseConfig for App Attest (ADR-069 §5)", () => {
+  const environments: Record<AppEnv, Record<string, string>> = {
+    development: { DATABASE_URL: "postgres://x", APP_ENV: "development" },
+    test: { DATABASE_URL: "postgres://x", APP_ENV: "test" },
+    preview: { DATABASE_URL: "postgres://x", APP_ENV: "preview", PR_NUMBER: "1" },
+    staging: { DATABASE_URL: "postgres://x", APP_ENV: "staging" },
+    production: {
+      DATABASE_URL: "postgres://x",
+      APP_ENV: "production",
+      ADMIN_APP_URL: "https://admin.kuutti.app",
+    },
+  };
+  const each = Object.entries(environments) as Array<[AppEnv, Record<string, string>]>;
+  const deployed = new Set<AppEnv>(["staging", "production"]);
+  const local = new Set<AppEnv>(["development", "test"]);
+  const team = { IOS_TEAM_ID: "2NC5W5B372" };
+
+  /** The refusal's missing keys and words; fails when the configuration was taken. */
+  function refusalOf(raw: Record<string, string>): { missing: string[]; issues: string } {
+    try {
+      parseConfig(raw);
+    } catch (error) {
+      if (error instanceof ConfigError) {
+        return { missing: error.missing, issues: error.issues.join("; ") };
+      }
+      throw error;
+    }
+    throw new Error("the configuration was taken");
+  }
+
+  it.each(each)("in %s, asks an iPhone for nothing unless told to", (_, raw) => {
+    expect(parseConfig(raw).IOS_ATTESTATION).toBe("optional");
+    expect(parseConfig({ ...raw, ...team }).IOS_ATTESTATION).toBe("optional");
+    expect(parseConfig({ ...raw, ...team, IOS_ATTESTATION: "optional" }).IOS_ATTESTATION).toBe(
+      "optional",
+    );
+  });
+
+  it("with APP_ENV unset too, asks for nothing and refuses to be told to", () => {
+    expect(parseConfig({ DATABASE_URL: "postgres://x" }).IOS_ATTESTATION).toBe("optional");
+    expect(
+      refusalOf({ DATABASE_URL: "postgres://x", ...team, IOS_ATTESTATION: "required" }),
+    ).toEqual({
+      missing: ["IOS_ATTESTATION"],
+      issues: "IOS_ATTESTATION: required is for staging and production, not development",
+    });
+  });
+
+  it.each(each.filter(([name]) => deployed.has(name)))(
+    "in %s, requires an attestation when told to, with the team's id",
+    (_, raw) => {
+      const config = parseConfig({ ...raw, ...team, IOS_ATTESTATION: "required" });
+      expect(config.IOS_ATTESTATION).toBe("required");
+      expect(config.IOS_TEAM_ID).toBe("2NC5W5B372");
+    },
+  );
+
+  it.each(each.filter(([name]) => deployed.has(name)))(
+    "in %s, refuses to require what it could hold to no App ID, and names IOS_TEAM_ID",
+    (_, raw) => {
+      expect(refusalOf({ ...raw, IOS_ATTESTATION: "required" })).toEqual({
+        missing: ["IOS_TEAM_ID"],
+        issues: "IOS_TEAM_ID: an attestation is held to the team's App ID (ADR-069)",
+      });
+    },
+  );
+
+  it("in a preview, which reads staging's parameters, does not ask what staging asks, and starts", () => {
+    // /kuutti/staging/ios-attestation reaches a preview's process as it does staging's.
+    for (const inherited of ["required", "off", "optional"]) {
+      const config = parseConfig({ ...environments.preview, ...team, IOS_ATTESTATION: inherited });
+      expect(config.IOS_ATTESTATION, inherited).toBe("optional");
+    }
+    // Not even without the team id, which staging's own start would need.
+    expect(
+      parseConfig({ ...environments.preview, IOS_ATTESTATION: "required" }).IOS_ATTESTATION,
+    ).toBe("optional");
+  });
+
+  it.each(each.filter(([name]) => name !== "preview"))(
+    "in %s, reads nothing of App Attest when switched off, with the team id or without",
+    (_, raw) => {
+      expect(parseConfig({ ...raw, ...team, IOS_ATTESTATION: "off" }).IOS_ATTESTATION).toBe("off");
+      expect(parseConfig({ ...raw, IOS_ATTESTATION: "off" }).IOS_ATTESTATION).toBe("off");
+    },
+  );
+
+  it.each(each.filter(([name]) => local.has(name)))(
+    "in %s, where simulators and the demo tools sign in, never requires one",
+    (name, raw) => {
+      expect(refusalOf({ ...raw, ...team, IOS_ATTESTATION: "required" })).toEqual({
+        missing: ["IOS_ATTESTATION"],
+        issues: `IOS_ATTESTATION: required is for staging and production, not ${name}`,
+      });
+    },
+  );
+
+  it.each(["on", "REQUIRED", ""])("refuses %j, which is none of the three words", (value) => {
+    expect(
+      refusalOf({ ...environments.staging, ...team, IOS_ATTESTATION: value }).issues,
+    ).toContain("IOS_ATTESTATION");
+  });
+});

@@ -630,9 +630,19 @@ describe("a device's session (#35, ADR-059)", () => {
         .filter((column) => column.isUnique)
         .map((column) => column.name)
         .sort(),
-    ).toEqual(["access_hash", "family_hash", "refresh_hash"]);
+    ).toEqual(["access_hash", "attest_key", "family_hash", "refresh_hash"]);
     expect(columns.find((column) => column.name === "family_hash")?.notNull).toBe(true);
     expect(columns.map((column) => column.name)).not.toContain("retired_refresh_hash");
+  });
+
+  it("keeps an attested key in one session only, and only where a device attested one (ADR-069)", () => {
+    const table = byName.get("session");
+    const key = table?.columns.find((column) => column.name === "attest_key");
+    const counter = table?.columns.find((column) => column.name === "attest_counter");
+    expect(key).toMatchObject({ isUnique: true, notNull: false });
+    expect(counter).toMatchObject({ notNull: false });
+    // The two set together or not at all, which only the database can hold.
+    expect(table?.checks.map((check) => check.name)).toContain("session_attest_check");
   });
 });
 

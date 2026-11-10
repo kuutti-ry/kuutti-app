@@ -54,6 +54,36 @@ export type AuthCallbackQuery = z.infer<typeof AuthCallbackQuery>;
 /** 32 random bytes as base64url: 43 characters, single use, 60 seconds. */
 const ONE_TIME_CODE_PATTERN = /^[A-Za-z0-9_-]{43}$/;
 
+/** Base64 as iOS writes it (`base64EncodedString()`): the standard alphabet, padded. */
+const BASE64 = /^[A-Za-z0-9+/]+={0,2}$/;
+/** An attestation object in base64: Apple's own sample is 7,876 characters, and the receipt in it may grow. */
+const APP_ATTESTATION_MAX = 16_384;
+/** An assertion in base64: a signature and some forty to a hundred bytes of authenticator data. */
+const APP_ASSERTION_MAX = 2048;
+
+/**
+ * What an iPhone adds to the exchange (ADR-069): a key it made in its Secure
+ * Enclave for this sign-in, and Apple's attestation of that key, asked for
+ * with the one-time code as the challenge.
+ */
+export const AppAttestation = z
+  .object({
+    keyId: z
+      .string()
+      .regex(/^[A-Za-z0-9+/]{43}=$/)
+      .meta({
+        description:
+          "The key's identifier as App Attest gave it: the SHA-256 of its public half, in base64.",
+      }),
+    attestation: z.string().max(APP_ATTESTATION_MAX).regex(BASE64).meta({
+      description:
+        "The attestation object in base64, from attestKey with the one-time code's characters as the challenge.",
+    }),
+  })
+  .strict()
+  .meta({ id: "AppAttestation" });
+export type AppAttestation = z.infer<typeof AppAttestation>;
+
 export const AuthExchangeRequest = z
   .object({
     code: z.string().regex(ONE_TIME_CODE_PATTERN).meta({
@@ -61,6 +91,10 @@ export const AuthExchangeRequest = z
     }),
     verifier: z.string().regex(HEX_256).meta({
       description: "The verifier whose SHA-256 /auth/start carried (ADR-027).",
+    }),
+    attestation: AppAttestation.optional().meta({
+      description:
+        "On an iPhone, the proof that the real app on a real device is signing in (ADR-069). Verified before the code is spent; the session then answers a refresh only with an assertion of this key.",
     }),
   })
   .strict()
@@ -110,7 +144,13 @@ export const AuthExchangeResponse = SessionTokens.extend({
 export type AuthExchangeResponse = z.infer<typeof AuthExchangeResponse>;
 
 export const AuthRefreshRequest = z
-  .object({ refreshToken: RefreshToken })
+  .object({
+    refreshToken: RefreshToken,
+    assertion: z.string().max(APP_ASSERTION_MAX).regex(BASE64).optional().meta({
+      description:
+        "For a session that attested a key at its exchange (ADR-069): that key's assertion in base64, from generateAssertion with this refresh token's characters as the challenge. Such a session is refreshed with nothing less.",
+    }),
+  })
   .strict()
   .meta({ id: "AuthRefreshRequest" });
 export type AuthRefreshRequest = z.infer<typeof AuthRefreshRequest>;

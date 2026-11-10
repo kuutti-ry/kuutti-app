@@ -147,6 +147,80 @@ describe("the one-time code and the session tokens", () => {
     });
   });
 
+  // What an iPhone adds (ADR-069): a key identifier of 32 bytes and an
+  // attestation, both in base64 as iOS writes it, and at a refresh an assertion.
+  const keyId = `${"A".repeat(43)}=`;
+
+  it("takes an exchange with an iPhone's attestation beside the code and its verifier", () => {
+    const attestation = { keyId, attestation: "o2NmbXRv+/8=" };
+    expect(AuthExchangeRequest.parse({ code: token, verifier: hex, attestation })).toEqual({
+      code: token,
+      verifier: hex,
+      attestation,
+    });
+  });
+
+  it.each([
+    [keyId, true],
+    [`${"A".repeat(21)}+/${"A".repeat(20)}=`, true],
+    ["A".repeat(44), false],
+    [`${"A".repeat(42)}=`, false],
+    [`${"A".repeat(44)}=`, false],
+    [`${"A".repeat(42)}-=`, false],
+    [`${"A".repeat(42)}_=`, false],
+    ["", false],
+  ])("takes a key identifier only as 32 bytes of padded base64: %s is %s", (value, ok) => {
+    const body = { code: token, verifier: hex, attestation: { keyId: value, attestation: "AAAA" } };
+    expect(AuthExchangeRequest.safeParse(body).success).toBe(ok);
+  });
+
+  it.each([
+    ["AAAA", true],
+    ["AAA=", true],
+    ["AA==", true],
+    ["A".repeat(16_384), true],
+    ["A".repeat(16_385), false],
+    ["", false],
+    ["AA=A", false],
+    ["AAA===", false],
+    ["AA-_", false],
+    ["AAAA AAAA", false],
+    ["ÄÄÄÄ", false],
+  ])("takes an attestation only as base64 of at most 16,384 characters: %#", (value, ok) => {
+    const body = { code: token, verifier: hex, attestation: { keyId, attestation: value } };
+    expect(AuthExchangeRequest.safeParse(body).success).toBe(ok);
+  });
+
+  it("refuses an attestation that is half there, null, or carries anything else", () => {
+    const body = (attestation: unknown) => ({ code: token, verifier: hex, attestation });
+    expect(codes(AuthExchangeRequest, body({ keyId }))).toEqual(["invalid_type"]);
+    expect(codes(AuthExchangeRequest, body({ attestation: "AAAA" }))).toEqual(["invalid_type"]);
+    expect(codes(AuthExchangeRequest, body(null))).toEqual(["invalid_type"]);
+    expect(codes(AuthExchangeRequest, body("AAAA"))).toEqual(["invalid_type"]);
+    expect(
+      codes(AuthExchangeRequest, body({ keyId, attestation: "AAAA", receipt: "AAAA" })),
+    ).toEqual(["unrecognized_keys"]);
+  });
+
+  it.each([
+    ["AAAA", true],
+    ["A".repeat(2048), true],
+    ["A".repeat(2049), false],
+    ["", false],
+    ["AA-_", false],
+    [7, false],
+    [null, false],
+  ])(
+    "takes a refresh with an assertion only as base64 of at most 2,048 characters: %#",
+    (assertion, ok) => {
+      expect(AuthRefreshRequest.safeParse({ refreshToken: refresh, assertion }).success).toBe(ok);
+    },
+  );
+
+  it("takes a refresh with no assertion, as before", () => {
+    expect(AuthRefreshRequest.parse({ refreshToken: refresh })).toEqual({ refreshToken: refresh });
+  });
+
   it("refuses an exchange or a refresh with an extra field", () => {
     expect(codes(AuthExchangeRequest, { code: token, verifier: hex, platform: "ios" })).toEqual([
       "unrecognized_keys",

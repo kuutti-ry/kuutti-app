@@ -1,4 +1,5 @@
-import { index, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
+import { bigint, check, index, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
 import { account } from "./identity.ts";
 
 /**
@@ -11,6 +12,11 @@ import { account } from "./identity.ts";
  * is one update and the next request with any of the device's tokens fails.
  * No IP address, ever; the platform and a truncated user agent name the device
  * for the person's own list of them.
+ *
+ * A session whose device attested a key at sign-in (ADR-069) keeps the key's
+ * public half, an X9.62 point in base64, and the counter of the last assertion
+ * that key signed at a refresh: the two are set together or not at all, and a
+ * key belongs to one session. Nothing else of the attestation is kept.
  */
 export const session = pgTable(
   "session",
@@ -31,6 +37,14 @@ export const session = pgTable(
     lastUsedAt: timestamp("last_used_at", { withTimezone: true }).notNull().defaultNow(),
     revokedAt: timestamp("revoked_at", { withTimezone: true }),
     revokedReason: text("revoked_reason"),
+    attestKey: text("attest_key").unique(),
+    attestCounter: bigint("attest_counter", { mode: "number" }),
   },
-  (table) => [index("session_account_idx").on(table.accountId)],
+  (table) => [
+    index("session_account_idx").on(table.accountId),
+    check(
+      "session_attest_check",
+      sql`(${table.attestKey} IS NULL) = (${table.attestCounter} IS NULL) AND ${table.attestCounter} >= 0`,
+    ),
+  ],
 );

@@ -195,6 +195,7 @@ function anExport(): Record<string, unknown> {
         lastUsedAt: at,
         expiresAt: at,
         push: null,
+        attested: false,
       },
     ],
     profile: null,
@@ -471,6 +472,21 @@ describe("the account export", () => {
     const negative = anExport();
     negative.identity = { ...(negative.identity as object), refusedAttempts: -1 };
     expect(codes(AccountExport, negative)).toEqual(["too_small"]);
+  });
+
+  it("says whether a device proved it runs the real app, and never its key (ADR-069)", () => {
+    const attested = anExport();
+    attested.sessions = [
+      { ...(attested.sessions as object[])[0], attested: true, attestKey: "BIjANKGQqn28WgYV" },
+    ];
+    const parsed = AccountExport.parse(attested);
+    expect(parsed.sessions[0]?.attested).toBe(true);
+    expect(JSON.stringify(parsed)).not.toContain("BIjANKGQqn28WgYV");
+    for (const value of [undefined, null, "true", 1]) {
+      const wrong = anExport();
+      wrong.sessions = [{ ...(wrong.sessions as object[])[0], attested: value }];
+      expect(codes(AccountExport, wrong), String(value)).toEqual(["invalid_type"]);
+    }
   });
 
   it("says whether a device gets pushes, its platform, language and since when, and never its token (#102)", () => {

@@ -28,8 +28,17 @@ import {
   endAdminSession,
   exchangeAdminCode,
 } from "./admin-session.ts";
+import {
+  APPLE_APP_ATTEST_ROOT,
+  type AppAttestConfig,
+  AttestationError,
+  type Attested,
+  clientDataHashOf,
+  verifyAttestation,
+} from "./app-attest.ts";
 import { appErrorUrl } from "./codes.ts";
 import { hmacKeyFromHex } from "./hetu.ts";
+import { IOS_BUNDLE_ID } from "./links.ts";
 import { completeLogin, exchangeCode, type LoginDeps, startLogin } from "./login.ts";
 import {
   describeSession,
@@ -46,6 +55,9 @@ const errorContent = (description: string) => ({
 });
 const json = <T>(schema: T) => ({ content: { "application/json": { schema } } });
 const bearer = { security: [{ session: [] }] };
+
+/** As much of the bundle version Apple read as a log line takes; ours are a few digits. */
+const BUNDLE_VERSION_LOGGED = 32;
 
 /** The sign-in doors' window (ADR-026 §4): a minute, which the demo's wait of at most 65 s outlasts. */
 const SIGN_IN_WINDOW_MS = 60_000;
@@ -104,13 +116,16 @@ const exchangeRoute = createRoute({
   path: "/auth/exchange",
   summary: "Exchange the one-time code for a session",
   description:
-    "Single use, within 60 seconds of the callback, and only with the verifier whose SHA-256 the attempt's /auth/start carried (ADR-027); a wrong verifier leaves the code unspent. Answers with this device's access and refresh tokens; the app keeps both in secure storage.",
+    "Single use, within 60 seconds of the callback, and only with the verifier whose SHA-256 the attempt's /auth/start carried (ADR-027); a wrong verifier leaves the code unspent. An iPhone adds its attestation (ADR-069), verified before the code is spent, and a refused one leaves the code unspent too. Answers with this device's access and refresh tokens; the app keeps both in secure storage.",
   request: { body: json(AuthExchangeRequest) },
   responses: {
     200: { description: "The device's session.", ...json(AuthExchangeResponse) },
     400: errorContent("Validation failed."),
     401: errorContent(
       "Unknown, used or expired code, or a verifier that is not its attempt's (auth_code_used).",
+    ),
+    403: errorContent(
+      "attestation_refused: the attestation did not verify, or this environment asks an iPhone for one and none came (ADR-069). The code is unspent.",
     ),
     429: errorContent(
       "rate_limited: too many requests from this address (ADR-026 §1); Retry-After is the wait.",
@@ -123,12 +138,14 @@ const refreshRoute = createRoute({
   path: "/auth/refresh",
   summary: "Rotate the session's tokens",
   description:
-    "Presents the refresh token, receives a new pair; the old refresh token is retired. Presenting a retired token ends the device's session (session_revoked): sign in through the bank again.",
+    "Presents the refresh token, receives a new pair; the old refresh token is retired. Presenting a retired token ends the device's session (session_revoked): sign in through the bank again. A session that attested a key at its exchange also presents that key's assertion over the refresh token (ADR-069), and without a good one it is refused and left as it is.",
   request: { body: json(AuthRefreshRequest) },
   responses: {
     200: { description: "The new pair.", ...json(SessionTokens) },
     400: errorContent("Validation failed."),
-    401: errorContent("Retired, revoked, expired or unknown refresh token (session_revoked)."),
+    401: errorContent(
+      "Retired, revoked, expired or unknown refresh token, or a missing or refused assertion (session_revoked).",
+    ),
   },
 });
 
@@ -259,7 +276,28 @@ export function authRoutes(
   const app = new OpenAPIHono<AppEnv>();
   const hmacKey = deps.config.HETU_HMAC_KEY ? hmacKeyFromHex(deps.config.HETU_HMAC_KEY) : null;
   const now = () => new Date();
-  const sessionDeps: SessionDeps = { db: deps.db, now };
+  // App Attest (ADR-069 §5): attestations are held to the team's App ID, and
+  // where no team id is configured none can be, so one that comes is left
+  // unread and its session is as any without; so it is where the environment
+  // has switched App Attest off. Apple's development keys count everywhere but
+  // in production.
+  const teamId = deps.config.IOS_TEAM_ID;
+  const attestationOff = deps.config.IOS_ATTESTATION === "off";
+  const appAttest: AppAttestConfig | null =
+    teamId && !attestationOff
+      ? {
+          appId: `${teamId}.${IOS_BUNDLE_ID}`,
+          allowDevelopment: deps.config.APP_ENV !== "production",
+          root: deps.attestRoot ?? APPLE_APP_ATTEST_ROOT,
+        }
+      : null;
+  const attestationRequired = deps.config.IOS_ATTESTATION === "required";
+  const sessionDeps: SessionDeps = {
+    db: deps.db,
+    now,
+    appId: appAttest?.appId,
+    unasserted: attestationOff,
+  };
   const adminAppUrl = deps.config.ADMIN_APP_URL;
 
   const loginDeps = (requestId: string): LoginDeps => {
@@ -344,13 +382,52 @@ export function authRoutes(
   });
 
   app.openapi(exchangeRoute, async (c) => {
-    const { code, verifier } = c.req.valid("json");
-    const login = await exchangeCode(sessionDeps, { code, verifier });
+    const { code, verifier, attestation } = c.req.valid("json");
+    // Verified before the code is spent, against the code itself as the
+    // challenge (ADR-069 §2): a refusal costs the person nothing but the try.
+    let attested: Attested | null = null;
+    if (attestation && appAttest) {
+      try {
+        attested = verifyAttestation(appAttest, {
+          attestation: Buffer.from(attestation.attestation, "base64"),
+          keyId: Buffer.from(attestation.keyId, "base64"),
+          clientDataHash: clientDataHashOf(code),
+          now: now(),
+        });
+      } catch (error) {
+        if (!(error instanceof AttestationError)) throw error;
+        throw new AppError(403, "attestation_refused", "The app could not be verified", {
+          reason: error.reason,
+        });
+      }
+    }
+    const login = await exchangeCode(sessionDeps, {
+      code,
+      verifier,
+      attested: attested !== null,
+      attestationRequired,
+    });
     const tokens = await issueSession(sessionDeps, {
       accountId: login.accountId,
       platform: login.platform,
       userAgent: c.req.header("user-agent")?.slice(0, USER_AGENT_MAX) ?? null,
+      attestKey: attested?.publicKey,
     });
+    // What tells the app's sessions from the rest, and what Apple said of the
+    // build (§2): counts for the day refusal is switched on, and nothing of the key.
+    deps.logger.info(
+      {
+        requestId: c.get("requestId"),
+        accountId: login.accountId,
+        platform: login.platform,
+        attested: attested !== null,
+        // One that came and was not read: no team id here, or App Attest off.
+        unread: attestation !== undefined && attested === null,
+        validationCategory: attested?.validationCategory ?? null,
+        bundleVersion: attested?.bundleVersion?.slice(0, BUNDLE_VERSION_LOGGED) ?? null,
+      },
+      "session issued",
+    );
     // Tokens are for the device alone: nothing between may keep the answer (#636).
     // The authenticated routes get the same header from their guard.
     c.header("Cache-Control", "no-store");
@@ -358,9 +435,9 @@ export function authRoutes(
   });
 
   app.openapi(refreshRoute, async (c) => {
-    const { refreshToken } = c.req.valid("json");
+    const { refreshToken, assertion } = c.req.valid("json");
     c.header("Cache-Control", "no-store");
-    return c.json(await refreshSession(sessionDeps, refreshToken), 200);
+    return c.json(await refreshSession(sessionDeps, refreshToken, assertion), 200);
   });
 
   // The guard is registered on the path before the handler (app.test.ts

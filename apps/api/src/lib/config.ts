@@ -123,6 +123,13 @@ const Env = z.object({
     .string()
     .regex(/^[A-Z0-9]{10}$/, "ten characters")
     .optional(),
+  // App Attest (ADR-069 §5). With the team id set, an attestation an iPhone
+  // sends at its exchange is verified; `required` also refuses an iPhone's
+  // exchange that carries none; `off` reads nothing of it, neither an
+  // attestation nor the assertion a session with a key owes at a refresh: the
+  // way out, without a deploy, when assertions fail for a reason that is no
+  // attack. Unset reads as optional.
+  IOS_ATTESTATION: z.enum(["off", "optional", "required"]).optional(),
   // The stores' listings for the one link (#574, rewards/link.ts): public
   // values, unset until each listing is out (#193), the website meanwhile.
   APP_STORE_URL: z.url({ protocol: /^https$/ }).optional(),
@@ -214,7 +221,12 @@ export type PreviewConfig = {
 
 export type Config = Omit<
   z.infer<typeof Env>,
-  "RATE_LIMIT_PER_MINUTE" | "SIGN_IN_RATE_LIMIT_PER_MINUTE" | "TRUSTED_PROXY" | "MAIL" | "PUSH"
+  | "RATE_LIMIT_PER_MINUTE"
+  | "SIGN_IN_RATE_LIMIT_PER_MINUTE"
+  | "TRUSTED_PROXY"
+  | "MAIL"
+  | "PUSH"
+  | "IOS_ATTESTATION"
 > & {
   RATE_LIMIT_PER_MINUTE: number;
   SIGN_IN_RATE_LIMIT_PER_MINUTE: number;
@@ -223,6 +235,8 @@ export type Config = Omit<
   originSecrets: readonly string[];
   MAIL: "ses" | "log" | "off";
   PUSH: "expo" | "log" | "off";
+  /** What is asked of an iPhone (ADR-069 §5): nothing read, an attestation verified when it comes, or one required; optional when unset. */
+  IOS_ATTESTATION: "off" | "optional" | "required";
   databaseUrl: string;
   corsAllowedOrigins: ReadonlySet<string>;
   preview?: PreviewConfig;
@@ -318,6 +332,26 @@ export function parseConfig(raw: Record<string, string | undefined>): Config {
     env.TELIA_SIGNING_KEY = undefined;
     env.TELIA_ENCRYPTION_KEY = undefined;
     env.HETU_HMAC_KEY = undefined;
+    // And what staging asks of an iPhone (ADR-069 §5): a preview has no bank
+    // login to ask it at, and must still start on the day staging requires it.
+    env.IOS_ATTESTATION = undefined;
+  }
+  // Development and test never ask for an attestation: simulators, the demo
+  // tools and the flows sign in there with none. And an environment that asks
+  // for one must be able to hold it to the team's App ID (ADR-069 §5).
+  if (env.IOS_ATTESTATION === "required") {
+    if (env.APP_ENV !== "staging" && env.APP_ENV !== "production") {
+      throw new ConfigError(
+        ["IOS_ATTESTATION"],
+        [`IOS_ATTESTATION: required is for staging and production, not ${env.APP_ENV}`],
+      );
+    }
+    if (!env.IOS_TEAM_ID) {
+      throw new ConfigError(
+        ["IOS_TEAM_ID"],
+        ["IOS_TEAM_ID: an attestation is held to the team's App ID (ADR-069)"],
+      );
+    }
   }
   // A deployed log is no place for a confirmation code (ADR-043 §4).
   if (env.MAIL === "log" && env.APP_ENV !== "development" && env.APP_ENV !== "test") {
@@ -368,6 +402,7 @@ export function parseConfig(raw: Record<string, string | undefined>): Config {
     originSecrets,
     MAIL: mail,
     PUSH: push,
+    IOS_ATTESTATION: env.IOS_ATTESTATION ?? "optional",
     databaseUrl: preview ? withDatabase(baseUrl, preview.database) : baseUrl,
     corsAllowedOrigins: allowedOrigins(env),
     ...(preview

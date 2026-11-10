@@ -112,7 +112,7 @@ sequenceDiagram
 ```mermaid
 sequenceDiagram
   accTitle: The bank login, part 3: back in the app
-  accDescr: The deep link brings the one-time code to the app, which takes its verifier from the pending mark and posts both to the API's exchange. The API spends the code only with the matching verifier, within its minute, and opens a session for this device, keeping only hashes. The app keeps the tokens in the secure store and records the answers given before the bank.
+  accDescr: The deep link brings the one-time code to the app, which takes its verifier from the pending mark and posts both to the API's exchange. The API verifies an iPhone's attestation if one came, which no build sends yet, spends the code only with the matching verifier, within its minute, and opens a session for this device, keeping only hashes. The app keeps the tokens in the secure store and records the answers given before the bank.
   autonumber 23
   participant browser as The phone's browser
   participant app as The app
@@ -121,9 +121,9 @@ sequenceDiagram
   browser->>app: Opens the deep link kuutti://auth?code=…
   app->>app: Takes the pending mark and its verifier, once, or refuses the link
   app->>api: POST /auth/exchange with the code and the verifier
-  api->>db: Spends the code if its hash, the verifier's SHA-256 and its minute match
+  api->>db: Verifies an iPhone's attestation if one came, then spends the code if its hash, the verifier's SHA-256 and its minute match
   api->>db: Opens this device's session, keeping only the tokens' SHA-256
-  api-->>app: 200 with the access and refresh tokens and the outcome, or 401 auth_code_used
+  api-->>app: 200 with the access and refresh tokens and the outcome, 401 auth_code_used or 403 attestation_refused
   app->>app: Keeps the session in the secure store, this device only
   app->>api: POST /consents with the answers given before the bank, if any
 ```
@@ -133,8 +133,8 @@ sequenceDiagram
 23. The phone opens the deep link `kuutti://auth?code=…` in the app.
 24. The app takes the pending mark and its verifier, once: reading the mark spends it. No mark, a mark older than ten minutes, or a phone already signed in: the link is refused as `unexpected_link`, and nothing is sent. A code somebody else sent as a link stops here.
 25. The app posts the code and the verifier to `POST /auth/exchange`. The verifier travels only in this body.
-26. One statement spends the code, and only when all hold: its hash matches, the attempt's `code_challenge` is the SHA-256 of the verifier, the attempt belongs to an account, the code is unused and within its minute. Anything else is 401 `auth_code_used`, and a wrong verifier leaves the code unspent (ADR-027 §3). The exchange is no sign-in door, but the address's own limit can answer 429.
-27. The API opens this device's session: a new access token (15 minutes) of 256 random bits, and a refresh token of two such parts joined by a dot, the session's own secret, fixed for its life, and the part each refresh replaces (ADR-059). The database keeps only SHA-256 hashes: of the access token, of the refresh token, and of the secret, by which any earlier refresh token of the session, presented again, is recognised and ends the session. The session ends ninety days on; each refresh moves the end to ninety days from the refresh, never past a year from this login (ADR-058).
+26. The body may also carry an iPhone's attestation: a key the phone made in its Secure Enclave and Apple's certificate for it, asked for with the code as the challenge (ADR-069 §2). No build sends one yet (#184). When one comes and the environment has the team's id, the API verifies it by Apple's eleven steps before the code is touched; a refusal is 403 `attestation_refused` and the code stays unspent. Then one statement spends the code, and only when all hold: its hash matches, the attempt's `code_challenge` is the SHA-256 of the verifier, the attempt belongs to an account, the code is unused and within its minute. An attempt that said `ios` is spent without an attestation only where the environment does not require one, which none does yet, and an attempt that said `android` never with one. Anything else is 401 `auth_code_used`, and a wrong verifier leaves the code unspent (ADR-027 §3); an iPhone's good code refused for want of a required attestation is 403 `attestation_refused`. The exchange is no sign-in door, but the address's own limit can answer 429.
+27. The API opens this device's session: a new access token (15 minutes) of 256 random bits, and a refresh token of two such parts joined by a dot, the session's own secret, fixed for its life, and the part each refresh replaces (ADR-059). The database keeps only SHA-256 hashes: of the access token, of the refresh token, and of the secret, by which any earlier refresh token of the session, presented again, is recognised and ends the session. A session opened with an attestation also keeps the attested key's public half and a counter, and is refreshed from then on only with that key's assertion over the refresh token it presents (ADR-069 §3). The session ends ninety days on; each refresh moves the end to ninety days from the refresh, never past a year from this login (ADR-058).
 28. The app receives both tokens and the outcome: `created`, `resumed` or `unpaused`. A failure is said on the sign-in screen.
 29. The app keeps the session in the phone's secure store, readable while the phone is unlocked and on this device only.
 30. If the person answered the screens before the bank for this attempt, the app records the answers with `POST /consents` before anything else. The app then asks whether onboarding is finished (#395's sign-in flow).
