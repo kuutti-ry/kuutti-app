@@ -111,7 +111,7 @@ The recipe's 28 sockets are four for each of the seven accounts, the most the sc
 | `--target` | the API: `http://localhost:3000` (or `127.0.0.1`, `[::1]`), or `https://api.staging.kuutti.app` | required | |
 | `--confirm-staging` | required for staging, refused anywhere else | | |
 | `--sessions` | the sessions file; without it, the public part of each visit alone | none | 50 sessions |
-| `--rates` | visits a second, one stage each | `0.5` | 8 stages, 20 a second each |
+| `--rates` | visits a second, one stage each | `0.5` | 8 stages, 50 a second each |
 | `--stage` | seconds per stage | 60 | 300, and 600 for the whole run (an access token lives fifteen minutes and is refreshed once, at the start) |
 | `--sockets` | the chat's sockets (`GET /ws`, #349) held idle through the run: opened round the accounts and their sessions, `--concurrency` at a time, before the first stage; each signs in with its first frame, resumes no conversation and answers every ping. Needs `--sessions` | none | 200, and 4 per account |
 | `--concurrency` | requests in flight | 16 | 64 |
