@@ -205,6 +205,13 @@ type AttestChange = {
   object?: (fields: Map<string, unknown>) => unknown;
 };
 
+/** What the attestation's and the assertion's authenticator data begin with: the App ID's hash, the flags, the counter. */
+function authenticatorHead(appId: string, counter: number): Buffer {
+  const count = Buffer.alloc(4);
+  count.writeUInt32BE(counter);
+  return Buffer.concat([sha256(Buffer.from(appId)), Buffer.from([0x40]), count]);
+}
+
 /**
  * A phone with one App Attest key, whose attestations `issuer` signs and
  * `chain` leads to the root from (the issuer's certificate first).
@@ -232,15 +239,11 @@ export function makePhone(input: { issuer: Issuer; chain: Buffer[]; appId: strin
 
     /** An attestation object over `clientDataHash`. */
     attest(clientDataHash: Buffer, change: AttestChange = {}): Buffer {
-      const counter = Buffer.alloc(4);
-      counter.writeUInt32BE(change.counter ?? 0);
       const credentialId = change.credentialId ?? keyId;
       const credentialLength = Buffer.alloc(2);
       credentialLength.writeUInt16BE(change.credentialLength ?? credentialId.length);
       const authData = Buffer.concat([
-        sha256(Buffer.from(change.appId ?? input.appId)),
-        Buffer.from([0x40]),
-        counter,
+        authenticatorHead(change.appId ?? input.appId, change.counter ?? 0),
         change.aaguid ?? AAGUID_PRODUCTION,
         credentialLength,
         credentialId,
@@ -281,13 +284,7 @@ export function makePhone(input: { issuer: Issuer; chain: Buffer[]; appId: strin
         object?: (fields: Map<string, unknown>) => unknown;
       } = {},
     ): Buffer {
-      const count = Buffer.alloc(4);
-      count.writeUInt32BE(counter);
-      const authenticatorData = Buffer.concat([
-        sha256(Buffer.from(change.appId ?? input.appId)),
-        Buffer.from([0x40]),
-        count,
-      ]);
+      const authenticatorData = authenticatorHead(change.appId ?? input.appId, counter);
       const nonce = sha256(authenticatorData, clientDataHash);
       const fields = new Map<string, unknown>([
         ["signature", sign("sha256", nonce, change.signer ?? privateKey)],

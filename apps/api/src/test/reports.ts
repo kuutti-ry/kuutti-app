@@ -1,5 +1,6 @@
 import type { Queryable } from "@kuutti/db";
 import { type SignedIn, signedInAccount } from "./account.ts";
+import type { TestContext } from "./harness.ts";
 
 // Reports as filing and the moderators' decision leave them (#311, #312),
 // written straight into the test's database: plain SQL like
@@ -63,4 +64,30 @@ export async function signedInPeople(db: Queryable, n: number): Promise<SignedIn
   const out: SignedIn[] = [];
   for (let i = 0; i < n; i++) out.push(await signedInAccount(db));
   return out;
+}
+
+/** The audit log as the test's transaction holds it, oldest first. */
+export async function auditRows(ctx: TestContext) {
+  return (await ctx.client.query("SELECT * FROM audit_log ORDER BY at, id")).rows;
+}
+
+export type SanctionRow = {
+  kind: string;
+  reason: string;
+  note: string;
+  created_by: string | null;
+  rule: string | null;
+  rule_count: number | null;
+  lifted_at: Date | null;
+};
+
+/** The person's sanctions, oldest first. */
+export async function sanctionsOf(db: Queryable, accountId: string): Promise<SanctionRow[]> {
+  return (
+    await db.query<SanctionRow>(
+      `SELECT kind, reason, note, created_by, rule, rule_count, lifted_at FROM sanction
+        WHERE account_id = $1 ORDER BY created_at, id`,
+      [accountId],
+    )
+  ).rows;
 }

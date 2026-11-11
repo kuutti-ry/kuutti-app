@@ -1,22 +1,24 @@
 import { randomUUID } from "node:crypto";
 import type { Queryable } from "@kuutti/db";
-import {
-  ChatMessage,
-  ConversationDetail,
-  ConversationList,
-  ErrorResponse,
-  MessagePage,
-} from "@kuutti/schema";
+import { ChatMessage, ConversationList, MessagePage } from "@kuutti/schema";
 import type { QueryResultRow } from "pg";
 import { describe, expect } from "vitest";
 import { createApp } from "../app.ts";
-import { CURRENT_CONSENT_VERSIONS, eraseAccount } from "../identity/index.ts";
+import { eraseAccount } from "../identity/index.ts";
 import { ageInYears } from "../profile/index.ts";
 import { applySanction } from "../safety/index.ts";
-import { signInAs, staffSession, withMatchingConfig } from "../test/account.ts";
+import { joinStudy, signInAs, staffSession, withMatchingConfig } from "../test/account.ts";
+import { errorCode } from "../test/answers.ts";
 import { cardShown } from "../test/cards.ts";
-import { conversationBetween, interleaved } from "../test/chat.ts";
-import { captureLogger, type TestContext, test, testConfig } from "../test/harness.ts";
+import { block, conversationBetween, detailOf, interleaved, listOf } from "../test/chat.ts";
+import {
+  captureLogger,
+  count,
+  jsonHeaders,
+  type TestContext,
+  test,
+  testConfig,
+} from "../test/harness.ts";
 import { testMediaDeps } from "../test/media.ts";
 import { type PeopleOptions, people } from "../test/people.ts";
 import { archiveSilentConversations } from "./archive.ts";
@@ -55,10 +57,6 @@ async function peopleNamed(ctx: TestContext, names: string[]): Promise<Person[]>
   return out;
 }
 
-const jsonHeaders = (headers: Record<string, string>) => ({
-  ...headers,
-  "content-type": "application/json",
-});
 type App = ReturnType<typeof createApp>;
 const send = (app: App, who: Person, id: string, body: string, clientId: string = randomUUID()) =>
   app.request(`/conversations/${id}/messages`, {
@@ -72,16 +70,6 @@ const markRead = (app: App, who: Person, id: string, upTo: unknown) =>
     headers: jsonHeaders(who.headers),
     body: JSON.stringify({ upTo }),
   });
-async function listOf(app: App, who: Person, query = ""): Promise<ConversationList> {
-  const answer = await app.request(`/conversations${query}`, { headers: who.headers });
-  expect(answer.status).toBe(200);
-  return ConversationList.parse(await answer.json());
-}
-async function detailOf(app: App, who: Person, id: string): Promise<ConversationDetail> {
-  const answer = await app.request(`/conversations/${id}`, { headers: who.headers });
-  expect(answer.status).toBe(200);
-  return ConversationDetail.parse(await answer.json());
-}
 async function pageOf(app: App, who: Person, id: string, query = ""): Promise<number[]> {
   const answer = await app.request(`/conversations/${id}/messages${query}`, {
     headers: who.headers,
@@ -89,32 +77,8 @@ async function pageOf(app: App, who: Person, id: string, query = ""): Promise<nu
   expect(answer.status).toBe(200);
   return MessagePage.parse(await answer.json()).messages.map((m) => m.seq);
 }
-const errorCode = async (answer: Response) => ErrorResponse.parse(await answer.json()).error.code;
-const count = async (ctx: TestContext, sql: string, params: unknown[] = []) =>
-  Number((await ctx.client.query<{ n: string }>(sql, params)).rows[0]?.n ?? 0);
 const messagesIn = (ctx: TestContext, id: string) =>
   count(ctx, "SELECT count(*) AS n FROM message WHERE conversation_id = $1", [id]);
-const block = async (ctx: TestContext, blocker: Person, blocked: Person) => {
-  await cardShown(ctx.client, blocker.accountId, blocked.accountId);
-  const answer = await ctx.app.request("/blocks", {
-    method: "POST",
-    headers: jsonHeaders(blocker.headers),
-    body: JSON.stringify({ accountId: blocked.accountId }),
-  });
-  expect(answer.status).toBe(204);
-};
-const giveResearchConsent = async (ctx: TestContext, who: Person) => {
-  const answer = await ctx.app.request("/consents", {
-    method: "POST",
-    headers: jsonHeaders(who.headers),
-    body: JSON.stringify({
-      kind: "research",
-      version: CURRENT_CONSENT_VERSIONS.research,
-      locale: "fi",
-    }),
-  });
-  expect(answer.status).toBe(200);
-};
 const silent = () => captureLogger().then(({ logger }) => logger);
 
 /** An app with object storage and URL signing, so the list signs thumbs (#48). */
@@ -760,7 +724,7 @@ describe("who may reach a conversation", () => {
     const b = await person(ctx, "Bea");
     const c = await person(ctx, "Cia");
     // With the research consent, so an event would be written if a ban wrote one.
-    await giveResearchConsent(ctx, b);
+    await joinStudy(ctx.app, b.headers);
     const withB = await conversationBetween(ctx.client, a.accountId, b.accountId);
     const withC = await conversationBetween(ctx.client, c.accountId, a.accountId);
     const sanction = (kind: "suspend" | "ban") =>
@@ -869,7 +833,7 @@ describe("the night's archive", () => {
     const now = new Date();
     const [a, b, c, d, e] = await peopleNamed(ctx, ["Aino", "Bea", "Cia", "Dan", "Eli"]);
     if (!a || !b || !c || !d || !e) throw new Error("people");
-    await giveResearchConsent(ctx, a);
+    await joinStudy(ctx.app, a.headers);
     const silentOne = await conversationBetween(ctx.client, a.accountId, b.accountId, {
       openedAt: new Date(now.getTime() - 20 * DAY),
       messages: [{ from: "a", body: "Hei", at: new Date(now.getTime() - 8 * DAY) }],
@@ -1018,8 +982,8 @@ describe("what a message tells, and to whom", () => {
   test("Each send, archive and close is a research event with no text", async ({ ctx }) => {
     const a = await person(ctx, "Aino");
     const b = await person(ctx, "Bea");
-    await giveResearchConsent(ctx, a);
-    await giveResearchConsent(ctx, b);
+    await joinStudy(ctx.app, a.headers);
+    await joinStudy(ctx.app, b.headers);
     const opened = new Date(Date.now() - 2 * DAY);
     const id = await conversationBetween(ctx.client, a.accountId, b.accountId, {
       openedAt: opened,

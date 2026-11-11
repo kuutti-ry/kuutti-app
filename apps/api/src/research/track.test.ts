@@ -1,6 +1,13 @@
 import { CURRENT_CONSENT_VERSIONS } from "../identity/index.ts";
-import { signedInAccount } from "../test/account.ts";
-import { captureLogger, describe, expect, type TestContext, test } from "../test/harness.ts";
+import { joinStudy, signedInAccount } from "../test/account.ts";
+import {
+  captureLogger,
+  describe,
+  expect,
+  jsonHeaders as json,
+  type TestContext,
+  test,
+} from "../test/harness.ts";
 import { ensureEventPartitions } from "./partitions.ts";
 import * as repo from "./repo.ts";
 import { track } from "./track.ts";
@@ -8,24 +15,6 @@ import { track } from "./track.ts";
 // The one door for research events (#50, ADR-011): nothing without the
 // consent, a coarse snapshot with it, refusals before any write, and a failure
 // that never reaches the caller.
-
-const json = (headers: Record<string, string>) => ({
-  ...headers,
-  "content-type": "application/json",
-});
-
-async function researchConsent(ctx: TestContext, headers: Record<string, string>) {
-  const response = await ctx.app.request("/consents", {
-    method: "POST",
-    headers: json(headers),
-    body: JSON.stringify({
-      kind: "research",
-      version: CURRENT_CONSENT_VERSIONS.research,
-      locale: "fi",
-    }),
-  });
-  expect(response.status).toBe(200);
-}
 
 /** Gender, a pond and a profile document with a closed-list value, a text value and a retired option. */
 async function onboarded(ctx: TestContext, accountId: string) {
@@ -105,7 +94,7 @@ describe("track", () => {
     await ensureEventPartitions(ctx.client, at);
     const a = await signedInAccount(ctx.client); // born 1990-06
     await onboarded(ctx, a.accountId);
-    await researchConsent(ctx, a.headers);
+    await joinStudy(ctx.app, a.headers);
     const { deps } = await trackDeps(ctx, at);
     const result = await track(deps, a.accountId, "profile_saved", {
       complete: true,
@@ -131,7 +120,7 @@ describe("track", () => {
 
   test("the opt-in itself is the first event", async ({ ctx }) => {
     const a = await signedInAccount(ctx.client);
-    await researchConsent(ctx, a.headers);
+    await joinStudy(ctx.app, a.headers);
     const rows = await eventsOf(ctx, a.accountId, "research_opt_in");
     expect(rows).toHaveLength(1);
     expect(rows[0]?.pond).toBeNull(); // consent before the pond: null, not a made-up value
@@ -149,7 +138,7 @@ describe("track", () => {
       "UPDATE account SET registered_at = now() - interval '3 days 2 hours' WHERE id = $1",
       [a.accountId],
     );
-    await researchConsent(ctx, a.headers);
+    await joinStudy(ctx.app, a.headers);
     const rows = await eventsOf(ctx, a.accountId, "research_opt_in");
     const props = rows[0]?.props as { sinceRegistrationD?: number } | undefined;
     expect(props?.sinceRegistrationD).toBe(3);
@@ -159,7 +148,7 @@ describe("track", () => {
     ctx,
   }) => {
     const a = await signedInAccount(ctx.client);
-    await researchConsent(ctx, a.headers);
+    await joinStudy(ctx.app, a.headers);
     const { rows } = await ctx.client.query<{ at: Date; given_at: Date }>(
       `SELECT e.at, c.given_at FROM events e
        JOIN research_subject s ON s.research_id = e.research_id
@@ -178,7 +167,7 @@ describe("track", () => {
     ctx,
   }) => {
     const a = await signedInAccount(ctx.client);
-    await researchConsent(ctx, a.headers);
+    await joinStudy(ctx.app, a.headers);
     const at = new Date();
     const { deps, lines } = await trackDeps(ctx, at);
     const result = await track(deps, a.accountId, "profile_saved", {
@@ -195,7 +184,7 @@ describe("track", () => {
 
   test("a failed insert is a warning and the caller's transaction goes on", async ({ ctx }) => {
     const a = await signedInAccount(ctx.client);
-    await researchConsent(ctx, a.headers);
+    await joinStudy(ctx.app, a.headers);
     // No partition holds 2001: the insert fails, inside its own savepoint.
     const { deps, lines } = await trackDeps(ctx, new Date("2001-01-01T00:00:00Z"));
     const result = await track(deps, a.accountId, "profile_saved", {
@@ -217,7 +206,7 @@ describe("track", () => {
   }) => {
     const a = await signedInAccount(ctx.client);
     const b = await signedInAccount(ctx.client);
-    await researchConsent(ctx, a.headers);
+    await joinStudy(ctx.app, a.headers);
     for (const who of [a, b]) {
       const response = await ctx.app.request("/profile", {
         method: "PUT",
@@ -249,7 +238,7 @@ describe("track, the remaining branches", () => {
     ctx,
   }) => {
     const a = await signedInAccount(ctx.client);
-    await researchConsent(ctx, a.headers);
+    await joinStudy(ctx.app, a.headers);
     await ctx.client.query(
       "UPDATE account SET birth_year = NULL, birth_month = NULL WHERE id = $1",
       [a.accountId],
@@ -275,7 +264,7 @@ describe("track, the remaining branches", () => {
     const at = new Date("2026-09-26T12:00:00Z");
     await ensureEventPartitions(ctx.client, at); // before any event is written, as above
     const a = await signedInAccount(ctx.client);
-    await researchConsent(ctx, a.headers);
+    await joinStudy(ctx.app, a.headers);
     await ctx.client.query("UPDATE account SET birth_year = 1991, birth_month = 11 WHERE id = $1", [
       a.accountId,
     ]);

@@ -1,8 +1,14 @@
 import { randomBytes, randomUUID } from "node:crypto";
 import type { Queryable } from "@kuutti/db";
-import { PHOTO_VARIANTS } from "@kuutti/schema";
+import { ConversationDetail, ConversationList, PHOTO_VARIANTS } from "@kuutti/schema";
 import type { QueryResultRow } from "pg";
+import { expect } from "vitest";
+import type { App } from "../app.ts";
 import { type MediaStore, objectKey } from "../media/index.ts";
+import { signInAs } from "./account.ts";
+import { cardShown } from "./cards.ts";
+import { jsonHeaders, type TestContext } from "./harness.ts";
+import { people } from "./people.ts";
 
 /**
  * A conversation between two accounts, as the match's record will write it
@@ -117,6 +123,75 @@ export function interleaved(
     },
   };
 }
+
+/**
+ * The same, with the other work slipped in just after the first statement
+ * matching the pattern, as if a concurrent request had committed at that
+ * moment (identity/races.test.ts).
+ */
+export function interleavedAfter(
+  db: Queryable,
+  after: RegExp,
+  other: () => Promise<unknown>,
+): Queryable & { ran: () => boolean } {
+  let ran = false;
+  return {
+    ran: () => ran,
+    async query<R extends QueryResultRow = QueryResultRow>(text: string, values?: unknown[]) {
+      const result = await db.query<R>(text, values);
+      if (!ran && after.test(text)) {
+        ran = true;
+        await other();
+      }
+      return result;
+    },
+  };
+}
+
+/** A person of a conversation test: their account, and the headers of a session of theirs. */
+export type ChatPerson = { accountId: string; headers: Record<string, string> };
+
+export async function person(ctx: TestContext, name: string): Promise<ChatPerson> {
+  const [accountId] = await people(ctx.client, null, 1, { complete: true });
+  if (!accountId) throw new Error("no person");
+  await ctx.client.query("UPDATE profile SET display_name = $2 WHERE account_id = $1", [
+    accountId,
+    name,
+  ]);
+  return { accountId, headers: (await signInAs(ctx.client, accountId)).headers };
+}
+
+export async function detailOf(app: App, who: ChatPerson, id: string): Promise<ConversationDetail> {
+  const answer = await app.request(`/conversations/${id}`, { headers: who.headers });
+  expect(answer.status).toBe(200);
+  return ConversationDetail.parse(await answer.json());
+}
+
+export async function listOf(app: App, who: ChatPerson, query = ""): Promise<ConversationList> {
+  const answer = await app.request(`/conversations${query}`, { headers: who.headers });
+  expect(answer.status).toBe(200);
+  return ConversationList.parse(await answer.json());
+}
+
+export const blockFrom = (app: App, who: ChatPerson, id: string) =>
+  app.request(`/conversations/${id}/block`, { method: "POST", headers: who.headers });
+
+export const send = (app: App, who: ChatPerson, id: string, body: string) =>
+  app.request(`/conversations/${id}/messages`, {
+    method: "POST",
+    headers: jsonHeaders(who.headers),
+    body: JSON.stringify({ clientId: randomUUID(), body }),
+  });
+
+export const block = async (ctx: TestContext, blocker: ChatPerson, blocked: ChatPerson) => {
+  await cardShown(ctx.client, blocker.accountId, blocked.accountId);
+  const answer = await ctx.app.request("/blocks", {
+    method: "POST",
+    headers: jsonHeaders(blocker.headers),
+    body: JSON.stringify({ accountId: blocked.accountId }),
+  });
+  expect(answer.status).toBe(204);
+};
 
 /** Two active accounts with their identities, and a conversation between them, side a and side b. */
 export async function twoInAConversation(db: Queryable, label: string) {

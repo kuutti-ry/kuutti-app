@@ -1,6 +1,6 @@
 import { CURRENT_CONSENT_VERSIONS } from "../identity/index.ts";
 import { signedInAccount, staffSession, withMatchingConfig } from "../test/account.ts";
-import { describe, expect, type TestContext, test } from "../test/harness.ts";
+import { describe, expect, jsonHeaders as json, type TestContext, test } from "../test/harness.ts";
 import { recordFeedback } from "./feedback.ts";
 
 // Feedback from inside the app (#171, ADR-023, features/safety/feedback.feature):
@@ -10,10 +10,6 @@ import { recordFeedback } from "./feedback.ts";
 // millisecond timestamp and fail the test by chance.
 const MARK = "qzxv";
 const TEXT = `The photos screen shows yesterday's tip ${MARK}.`;
-const json = (headers: Record<string, string>) => ({
-  ...headers,
-  "content-type": "application/json",
-});
 const body = (patch: Record<string, unknown> = {}) => ({
   kind: "bug",
   text: TEXT,

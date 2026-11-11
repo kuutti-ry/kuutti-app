@@ -1,5 +1,5 @@
 import type { Queryable } from "@kuutti/db";
-import { Invitations, Notices } from "@kuutti/schema";
+import { Invitations } from "@kuutti/schema";
 import type { App } from "../app.ts";
 import { eraseAccount } from "../identity/index.ts";
 import { applySanction } from "../safety/index.ts";
@@ -8,6 +8,7 @@ import { interleaved } from "../test/chat.ts";
 import { captureLogger, describe, expect, type TestContext, test } from "../test/harness.ts";
 import { completed, consented, invitationOf } from "../test/invitations.ts";
 import { people } from "../test/people.ts";
+import { noticesOf } from "../test/push.ts";
 import { pidOf, waitsFor, watched, withTwoConnections } from "../test/races.ts";
 import { invitationCountJob } from "./invitation-count.ts";
 import { runNightly } from "./nightly.ts";
@@ -48,12 +49,6 @@ async function countablePair(ctx: TestContext) {
   await completed(ctx.client, pair.friend.accountId);
   return pair;
 }
-
-const noticesOf = async (app: App, who: Person) => {
-  const answer = await app.request("/notices", { headers: who.headers });
-  expect(answer.status).toBe(200);
-  return Notices.parse(await answer.json()).notices;
-};
 
 const invitationsOf = async (app: App, who: Person) =>
   Invitations.parse(await (await app.request("/invitations", { headers: who.headers })).json());

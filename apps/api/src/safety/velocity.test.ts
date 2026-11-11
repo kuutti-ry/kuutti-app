@@ -10,6 +10,7 @@ import {
   withMatchingConfig,
 } from "../test/account.ts";
 import { cardShown } from "../test/cards.ts";
+import { STOPPED_CLOCK as T } from "../test/global-setup.ts";
 import {
   test as base,
   captureLogger,
@@ -22,6 +23,7 @@ import { testMediaDeps } from "../test/media.ts";
 import { completeProfiles, consentsOf, people, pondNamed } from "../test/people.ts";
 import { FITTING, fitIn, queued } from "../test/queue.ts";
 import { pidOf, waitsFor, watched, withTwoConnections } from "../test/races.ts";
+import { sanctionsOf } from "../test/reports.ts";
 import { checkPhotoFetches, roundReadRule } from "./automatic.ts";
 
 // The velocity rules (#86, ADR-041, features/safety/velocity.feature): other
@@ -35,7 +37,6 @@ import { checkPhotoFetches, roundReadRule } from "./automatic.ts";
 // round's reads, which live in the app's memory and come through the route.
 
 /** 12:00 in Finland, one Friday. */
-const T = new Date("2026-10-16T09:00:00.000Z");
 const SECOND = 1000;
 const MINUTE = 60 * SECOND;
 const HOUR = 60 * MINUTE;
@@ -102,26 +103,6 @@ async function fetched(app: App, who: SignedIn, photoId: string, variant = "card
   const answer = await fetchPhoto(app, who, photoId, variant);
   expect(answer.status).toBe(200);
   return PhotoUrlResponse.parse(await answer.json());
-}
-
-type SanctionRow = {
-  kind: string;
-  reason: string;
-  note: string;
-  created_by: string | null;
-  rule: string | null;
-  rule_count: number | null;
-  lifted_at: Date | null;
-};
-
-async function sanctionsOf(db: Queryable, accountId: string): Promise<SanctionRow[]> {
-  return (
-    await db.query<SanctionRow>(
-      `SELECT kind, reason, note, created_by, rule, rule_count, lifted_at FROM sanction
-        WHERE account_id = $1 ORDER BY created_at, id`,
-      [accountId],
-    )
-  ).rows;
 }
 
 /** Staff's words on a rule's ban: which rule applied it and no more, since by the time anybody reads them a moderator may have confirmed it (#581). */

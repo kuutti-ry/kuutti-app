@@ -11,11 +11,13 @@ import {
 import { type App, createApp } from "../app.ts";
 import { isComplete } from "../jobs/pool.ts";
 import { signedInAccount, withMatchingConfig } from "../test/account.ts";
+import { errorCode } from "../test/answers.ts";
 import { interleaved } from "../test/chat.ts";
 import {
   captureLogger,
   describe,
   expect,
+  jsonHeaders as json,
   type LogLine,
   test,
   testConfig,
@@ -39,12 +41,6 @@ type Person = Awaited<ReturnType<typeof signedInAccount>>;
 
 /** 12:00 in Finland, one Thursday. */
 const T = new Date("2026-10-22T09:00:00.000Z");
-
-const json = (headers: Record<string, string>) => ({
-  ...headers,
-  "content-type": "application/json",
-});
-const errorCode = async (answer: Response) => ErrorResponse.parse(await answer.json()).error.code;
 
 async function appOn(db: Queryable, now: () => Date = () => T) {
   const { logger, lines } = await captureLogger();

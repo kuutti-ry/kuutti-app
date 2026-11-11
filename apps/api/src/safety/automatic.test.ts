@@ -15,6 +15,7 @@ import {
   withMatchingConfig,
 } from "../test/account.ts";
 import { conversationBetween } from "../test/chat.ts";
+import { STOPPED_CLOCK as T } from "../test/global-setup.ts";
 import {
   test as base,
   captureLogger,
@@ -24,7 +25,7 @@ import {
   testConfig,
 } from "../test/harness.ts";
 import { pidOf, waitsFor, watched, withTwoConnections } from "../test/races.ts";
-import { accountOf, reportIn, signedInPeople } from "../test/reports.ts";
+import { accountOf, reportIn, sanctionsOf, signedInPeople } from "../test/reports.ts";
 import { checkFirstMessage, checkReports } from "./automatic.ts";
 import { applySanction, listSanctionsOfAccount } from "./sanctions.ts";
 
@@ -37,7 +38,6 @@ import { applySanction, listSanctionsOfAccount } from "./sanctions.ts";
 // what came before is written straight into the test's transaction.
 
 /** 12:00 in Finland, one Friday. */
-const T = new Date("2026-10-16T09:00:00.000Z");
 const MINUTE = 60_000;
 const HOUR = 60 * MINUTE;
 const DAY = 24 * HOUR;
@@ -134,26 +134,6 @@ const send = (app: App, who: SignedIn, conversationId: string, body: string) =>
     `/conversations/${conversationId}/messages`,
     json(who.headers, { clientId: randomUUID(), body }),
   );
-
-type SanctionRow = {
-  kind: string;
-  reason: string;
-  note: string;
-  created_by: string | null;
-  rule: string | null;
-  rule_count: number | null;
-  lifted_at: Date | null;
-};
-
-async function sanctionsOf(db: Queryable, accountId: string): Promise<SanctionRow[]> {
-  return (
-    await db.query<SanctionRow>(
-      `SELECT kind, reason, note, created_by, rule, rule_count, lifted_at FROM sanction
-        WHERE account_id = $1 ORDER BY created_at, id`,
-      [accountId],
-    )
-  ).rows;
-}
 
 /** Staff's words on a rule's ban: which rule applied it and no more, since by the time anybody reads them a moderator may have confirmed it (#581). */
 const RULE_NOTE: Record<string, string> = {

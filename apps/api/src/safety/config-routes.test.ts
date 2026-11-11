@@ -1,8 +1,8 @@
 import type { Queryable } from "@kuutti/db";
 import { ConfigChange, ConfigList } from "@kuutti/schema";
-import type { QueryResultRow } from "pg";
 import { type App, createApp } from "../app.ts";
 import { signedInAccount, staffSession, withMatchingConfig } from "../test/account.ts";
+import { interleavedAfter as interleaved } from "../test/chat.ts";
 import {
   test as base,
   captureLogger,
@@ -84,30 +84,6 @@ async function footprint(ctx: TestContext) {
 
 async function admin(ctx: TestContext) {
   return staffSession(ctx.client, "admin");
-}
-
-/**
- * The test's transaction with another request's work slipped in once, just
- * after the first statement matching the pattern, as if a concurrent request
- * had committed at that moment (identity/races.test.ts).
- */
-function interleaved(
-  db: Queryable,
-  after: RegExp,
-  other: () => Promise<unknown>,
-): Queryable & { ran: () => boolean } {
-  let ran = false;
-  return {
-    ran: () => ran,
-    async query<R extends QueryResultRow = QueryResultRow>(text: string, values?: unknown[]) {
-      const result = await db.query<R>(text, values);
-      if (!ran && after.test(text)) {
-        ran = true;
-        await other();
-      }
-      return result;
-    },
-  };
 }
 
 describe("GET /admin/config", () => {

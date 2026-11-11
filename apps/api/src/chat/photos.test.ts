@@ -4,7 +4,6 @@ import {
   CardPreviewResponse,
   ChatMessage,
   ConversationList,
-  ErrorResponse,
   MessagePage,
   PHOTO_MAX_BYTES,
   Photo,
@@ -24,9 +23,10 @@ import {
   objectKey,
   queueSummary,
 } from "../media/index.ts";
-import { signInAs, staffSession, withMatchingConfig } from "../test/account.ts";
+import { staffSession, withMatchingConfig } from "../test/account.ts";
+import { errorCode as codeOf } from "../test/answers.ts";
 import { cardShown } from "../test/cards.ts";
-import { conversationBetween } from "../test/chat.ts";
+import { conversationBetween, person } from "../test/chat.ts";
 import { openExport } from "../test/export.ts";
 import { captureLogger, type TestContext, test, testConfig } from "../test/harness.ts";
 import {
@@ -39,7 +39,6 @@ import {
   TEST_MEDIA_BASE,
   testMediaDeps,
 } from "../test/media.ts";
-import { people } from "../test/people.ts";
 
 // features/chat/photos.feature (#350, ADR-031 §3): a photo sent in a
 // conversation, end to end on real Postgres in a rolled-back transaction, a
@@ -56,16 +55,6 @@ const PER_DAY = 3;
 const NOON = new Date("2026-10-18T09:00:00.000Z");
 
 type Person = { accountId: string; headers: Record<string, string> };
-
-async function person(ctx: TestContext, name: string): Promise<Person> {
-  const [accountId] = await people(ctx.client, null, 1, { complete: true });
-  if (!accountId) throw new Error("no person");
-  await ctx.client.query("UPDATE profile SET display_name = $2 WHERE account_id = $1", [
-    accountId,
-    name,
-  ]);
-  return { accountId, headers: (await signInAs(ctx.client, accountId)).headers };
-}
 
 async function appWith(
   ctx: TestContext,
@@ -128,8 +117,6 @@ const sendPhoto = (
   Promise.resolve(
     app.request(`/conversations/${id}/photos`, { method: "POST", headers: who.headers, body }),
   );
-
-const codeOf = async (res: Response) => ErrorResponse.parse(await res.json()).error.code;
 
 const pageOf = async (app: ReturnType<typeof createApp>, who: Person, id: string) =>
   MessagePage.parse(

@@ -7,7 +7,7 @@ import {
 } from "@aws-sdk/client-s3";
 import { afterAll, describe, expect, it } from "vitest";
 import { createS3Client } from "../lib/s3.ts";
-import { testConfig } from "../test/harness.ts";
+import { composeS3Config } from "../test/harness.ts";
 import { COPY_PREFIX, memoryCopyStore, s3CopyStore } from "./copy-store.ts";
 
 // Where the copy's files live (ADR-029 §1): a day's key, a listing from a
@@ -34,13 +34,7 @@ describe("the in-memory store the tests use", () => {
 const endpoint = process.env.S3_ENDPOINT;
 
 describe.skipIf(!endpoint)("the bucket (compose stand-in)", () => {
-  const config = testConfig({
-    S3_ENDPOINT: endpoint,
-    S3_BUCKET: process.env.S3_BUCKET ?? "kuutti-media",
-    S3_ACCESS_KEY: process.env.S3_ACCESS_KEY ?? "kuutti",
-    S3_SECRET_KEY: process.env.S3_SECRET_KEY ?? "kuutti-dev-only",
-    S3_FORCE_PATH_STYLE: "true",
-  });
+  const config = composeS3Config(endpoint);
   const client = createS3Client(config);
   const root = `test-research-${randomBytes(6).toString("hex")}/`;
 

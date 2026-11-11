@@ -5,6 +5,7 @@ import { messageReaders } from "../chat/index.ts";
 import { EXPO_PROJECT, MIXED_PROJECTS, PushFailed, type PushMessage } from "../lib/push.ts";
 import { withMatchingConfig } from "../test/account.ts";
 import { conversationBetween } from "../test/chat.ts";
+import { STOPPED_CLOCK as T } from "../test/global-setup.ts";
 import { captureLogger, type LogLine, type TestContext, test } from "../test/harness.ts";
 import { people } from "../test/people.ts";
 import {
@@ -39,7 +40,6 @@ import {
 // scene records is held to the payload rule (§1) after its test.
 
 /** 12:00 in Helsinki, a Friday in summer time (UTC+3). */
-const T = new Date("2026-10-16T09:00:00.000Z");
 const SECOND = 1000;
 const MINUTE = 60 * SECOND;
 const HOUR = 60 * MINUTE;

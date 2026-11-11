@@ -1,5 +1,5 @@
 import type { Queryable } from "@kuutti/db";
-import { InvitationCreated, Invitations, Notices, normaliseInvitationCode } from "@kuutti/schema";
+import { InvitationCreated, Invitations, normaliseInvitationCode } from "@kuutti/schema";
 import type { App } from "../app.ts";
 import { eraseAccount } from "../identity/index.ts";
 import { isComplete } from "../jobs/pool.ts";
@@ -7,6 +7,7 @@ import { signedInAccount } from "../test/account.ts";
 import { openExport } from "../test/export.ts";
 import { captureLogger, describe, expect, type TestContext, test } from "../test/harness.ts";
 import { completed, consented, earnedUnits, hashOf } from "../test/invitations.ts";
+import { noticesOf } from "../test/push.ts";
 import { countInvitations } from "./invitations.ts";
 
 // Invitations in erasure and the export (#107, #503, ADR-044 §10, ADR-007,
@@ -77,12 +78,6 @@ const invitationsOf = async (app: App, who: Person) => {
 const usedOf = async (app: App, who: Person) =>
   (await openExport(await app.request("/account/export", { headers: who.headers }))).document
     .invitations.used;
-
-const noticesOf = async (app: App, who: Person) => {
-  const answer = await app.request("/notices", { headers: who.headers });
-  expect(answer.status).toBe(200);
-  return Notices.parse(await answer.json()).notices;
-};
 
 /** The person's units and notices as stored, and what each is about: what an erasure took or left. */
 const heldBy = async (db: Queryable, accountId: string) => ({

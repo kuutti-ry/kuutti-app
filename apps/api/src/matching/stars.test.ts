@@ -1,6 +1,5 @@
 import type { Queryable } from "@kuutti/db";
 import {
-  ErrorResponse,
   RoundDecisionAnswer,
   RoundResponse,
   STARS_CEILING,
@@ -8,11 +7,12 @@ import {
   StarList,
 } from "@kuutti/schema";
 import { type App, createApp } from "../app.ts";
-import { CURRENT_CONSENT_VERSIONS, eraseAccount, exportAccount } from "../identity/index.ts";
+import { eraseAccount, exportAccount } from "../identity/index.ts";
 import { starPlace } from "../jobs/stars.ts";
 import { finnishDay } from "../lib/finnish-day.ts";
 import { ensureEventPartitions } from "../research/index.ts";
-import { signInAs, withMatchingConfig } from "../test/account.ts";
+import { joinStudy, signInAs, withMatchingConfig } from "../test/account.ts";
+import { errorCode } from "../test/answers.ts";
 import { cardShown } from "../test/cards.ts";
 import {
   captureLogger,
@@ -26,7 +26,7 @@ import {
 import { openPond, people, pondNamed } from "../test/people.ts";
 import { FITTING } from "../test/queue.ts";
 import { pidOf, waitsFor, watched, withTwoConnections } from "../test/races.ts";
-import { type LoggedCard, logged, shownAt } from "../test/rounds.ts";
+import { block, type LoggedCard, logged, shownAt } from "../test/rounds.ts";
 
 // The stars (#575, ADR-064, features/matching/stars.feature): a star on a card, the
 // queue leaving a starred person out, the list and whoever it leaves out, a card
@@ -119,10 +119,6 @@ const decide = (app: App, who: Person, day: string, position: number, decision: 
     body: JSON.stringify({ decision }),
   });
 
-async function errorCode(answer: Response): Promise<string> {
-  return ErrorResponse.parse(await answer.json()).error.code;
-}
-
 /** Whose cards `who` is shown, in order. */
 const cardsOf = (round: RoundResponse) => (round.entries ?? []).map((e) => e.card.accountId);
 
@@ -195,27 +191,6 @@ const setPhotos = (db: Queryable, who: Person, state: string) =>
     state,
   ]);
 
-async function block(db: Queryable, blocker: Person, blocked: Person) {
-  await db.query(
-    `INSERT INTO block (blocker_identity_id, blocked_identity_id)
-     SELECT x.identity_id, y.identity_id FROM account x, account y WHERE x.id = $1 AND y.id = $2`,
-    [blocker.accountId, blocked.accountId],
-  );
-}
-
-async function joinStudy(app: App, who: Person) {
-  const answer = await app.request("/consents", {
-    method: "POST",
-    headers: { ...who.headers, "content-type": "application/json" },
-    body: JSON.stringify({
-      kind: "research",
-      version: CURRENT_CONSENT_VERSIONS.research,
-      locale: "fi",
-    }),
-  });
-  expect(answer.status).toBe(200);
-}
-
 describe("a star on a card", () => {
   test("A star spends nothing and leaves the card undecided", async ({ ctx }) => {
     const { app, who } = await scene(ctx, 3);
@@ -244,7 +219,7 @@ describe("a star on a card", () => {
     await ensureEventPartitions(ctx.client, NOON);
     const { app, who } = await scene(ctx, 2);
     const [a, b] = [person(who, 0), person(who, 1)];
-    await joinStudy(app, a);
+    await joinStudy(app, a.headers);
     await queued(ctx.client, a, [b.accountId]);
     const before = await readToday(app, b);
     const events = async () =>

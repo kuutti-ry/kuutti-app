@@ -1,13 +1,21 @@
 import { randomUUID } from "node:crypto";
-import { ConversationDetail, ConversationList, ErrorResponse, MessagePage } from "@kuutti/schema";
+import { MessagePage } from "@kuutti/schema";
 import { describe, expect } from "vitest";
 import { createApp } from "../app.ts";
 import { CURRENT_CONSENT_VERSIONS, eraseAccount } from "../identity/index.ts";
 import { applySanction } from "../safety/index.ts";
-import { signInAs, withMatchingConfig } from "../test/account.ts";
-import { conversationBetween, interleaved } from "../test/chat.ts";
-import { captureLogger, type TestContext, test, testConfig } from "../test/harness.ts";
-import { people } from "../test/people.ts";
+import { withMatchingConfig } from "../test/account.ts";
+import { errorCode } from "../test/answers.ts";
+import {
+  blockFrom,
+  conversationBetween,
+  detailOf,
+  interleaved,
+  listOf,
+  person,
+  send,
+} from "../test/chat.ts";
+import { captureLogger, count, jsonHeaders, test, testConfig } from "../test/harness.ts";
 
 // features/chat/closing.feature (#351): the unmatch, which ends a
 // conversation for both and blocks nobody; the ended conversation as both
@@ -19,49 +27,14 @@ const DAY = 86_400_000;
 type Person = { accountId: string; headers: Record<string, string> };
 type App = ReturnType<typeof createApp>;
 
-async function person(ctx: TestContext, name: string): Promise<Person> {
-  const [accountId] = await people(ctx.client, null, 1, { complete: true });
-  if (!accountId) throw new Error("no person");
-  await ctx.client.query("UPDATE profile SET display_name = $2 WHERE account_id = $1", [
-    accountId,
-    name,
-  ]);
-  return { accountId, headers: (await signInAs(ctx.client, accountId)).headers };
-}
-
-const jsonHeaders = (headers: Record<string, string>) => ({
-  ...headers,
-  "content-type": "application/json",
-});
 const unmatch = (app: App, who: { headers: Record<string, string> }, id: string) =>
   app.request(`/conversations/${id}/unmatch`, { method: "POST", headers: who.headers });
-const blockFrom = (app: App, who: Person, id: string) =>
-  app.request(`/conversations/${id}/block`, { method: "POST", headers: who.headers });
-const send = (app: App, who: Person, id: string, body: string) =>
-  app.request(`/conversations/${id}/messages`, {
-    method: "POST",
-    headers: jsonHeaders(who.headers),
-    body: JSON.stringify({ clientId: randomUUID(), body }),
-  });
 const markRead = (app: App, who: Person, id: string, upTo: number) =>
   app.request(`/conversations/${id}/read`, {
     method: "POST",
     headers: jsonHeaders(who.headers),
     body: JSON.stringify({ upTo }),
   });
-const errorCode = async (answer: Response) => ErrorResponse.parse(await answer.json()).error.code;
-const count = async (ctx: TestContext, sql: string, params: unknown[] = []) =>
-  Number((await ctx.client.query<{ n: string }>(sql, params)).rows[0]?.n ?? 0);
-async function listOf(app: App, who: Person): Promise<ConversationList> {
-  const answer = await app.request("/conversations", { headers: who.headers });
-  expect(answer.status).toBe(200);
-  return ConversationList.parse(await answer.json());
-}
-async function detailOf(app: App, who: Person, id: string): Promise<ConversationDetail> {
-  const answer = await app.request(`/conversations/${id}`, { headers: who.headers });
-  expect(answer.status).toBe(200);
-  return ConversationDetail.parse(await answer.json());
-}
 async function pageOf(app: App, who: Person, id: string): Promise<MessagePage> {
   const answer = await app.request(`/conversations/${id}/messages`, { headers: who.headers });
   expect(answer.status).toBe(200);

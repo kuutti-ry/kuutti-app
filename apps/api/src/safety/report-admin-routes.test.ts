@@ -1,17 +1,12 @@
 import type { Queryable } from "@kuutti/db";
-import { ErrorResponse, ReportQueue } from "@kuutti/schema";
+import { ReportQueue } from "@kuutti/schema";
 import { type App, createApp } from "../app.ts";
 import { signedInAccount, staffSession } from "../test/account.ts";
+import { errorCode } from "../test/answers.ts";
 import { conversationBetween } from "../test/chat.ts";
-import {
-  test as base,
-  captureLogger,
-  describe,
-  expect,
-  type TestContext,
-  testConfig,
-} from "../test/harness.ts";
-import { accountOf, reportIn, sanctionOn, signedInPeople } from "../test/reports.ts";
+import { STOPPED_CLOCK as T } from "../test/global-setup.ts";
+import { test as base, captureLogger, describe, expect, testConfig } from "../test/harness.ts";
+import { accountOf, auditRows, reportIn, sanctionOn, signedInPeople } from "../test/reports.ts";
 
 // The panel's report queue (#311, features/safety/report-queue.feature): the
 // order of what waits and its groups, both people's figures, the closed
@@ -22,7 +17,6 @@ import { accountOf, reportIn, sanctionOn, signedInPeople } from "../test/reports
 // carries are the point: those are filed through the route.
 
 /** The route's clock: 12:00 in Finland, one Friday. */
-const T = new Date("2026-10-16T09:00:00.000Z");
 
 type Headers = Record<string, string>;
 
@@ -44,14 +38,6 @@ async function read(app: App, headers: Headers, query = ""): Promise<ReportQueue
   const response = await queue(app, headers, query);
   expect(response.status).toBe(200);
   return ReportQueue.parse(await response.json());
-}
-
-async function errorCode(response: Response): Promise<string> {
-  return ErrorResponse.parse(await response.json()).error.code;
-}
-
-async function auditRows(ctx: TestContext) {
-  return (await ctx.client.query("SELECT * FROM audit_log ORDER BY at, id")).rows;
 }
 
 describe("GET /admin/reports", () => {

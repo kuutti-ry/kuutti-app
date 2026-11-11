@@ -11,7 +11,7 @@ import { createApp } from "../app.ts";
 import { ageInYears } from "../profile/index.ts";
 import { signedInAccount } from "../test/account.ts";
 import { exportOf } from "../test/export.ts";
-import { captureLogger, type TestContext, test, testConfig } from "../test/harness.ts";
+import { captureLogger, jsonHeaders, type TestContext, test, testConfig } from "../test/harness.ts";
 import { fixturePng, testMediaDeps } from "../test/media.ts";
 import {
   activationWaitsFor,
@@ -34,7 +34,6 @@ async function appWith(ctx: TestContext) {
 type App = Awaited<ReturnType<typeof appWith>>["app"];
 type Headers = Record<string, string>;
 
-const jsonHeaders = (headers: Headers) => ({ ...headers, "content-type": "application/json" });
 const consent = (app: App, headers: Headers, kind: string, version: string) =>
   app.request("/consents", {
     method: "POST",

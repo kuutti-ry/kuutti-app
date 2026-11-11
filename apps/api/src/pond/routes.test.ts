@@ -10,7 +10,13 @@ import type { QueryResultRow } from "pg";
 import { describe, expect } from "vitest";
 import { createApp } from "../app.ts";
 import { signedInAccount, signInAs, withMatchingConfig } from "../test/account.ts";
-import { captureLogger, type TestContext, test, testConfig } from "../test/harness.ts";
+import {
+  captureLogger,
+  jsonHeaders as json,
+  type TestContext,
+  test,
+  testConfig,
+} from "../test/harness.ts";
 import { HOME, openPond, people, pondNamed } from "../test/people.ts";
 import { readHome } from "./home.ts";
 
@@ -18,10 +24,6 @@ import { readHome } from "./home.ts";
 // route. The other routes' figures are counter.test.ts. The database is real
 // and rolled back; the one statement this file spies on is the digits' path.
 
-const json = (headers: Record<string, string>) => ({
-  ...headers,
-  "content-type": "application/json",
-});
 const errorCode = async (res: Response) =>
   ((await res.json()) as { error: { code: string } }).error.code;
 

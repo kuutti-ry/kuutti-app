@@ -1,4 +1,3 @@
-import { resolve } from "node:path";
 import {
   createPool,
   migrate,
@@ -7,6 +6,7 @@ import {
   type Queryable,
   withTemporaryDatabase,
 } from "@kuutti/db";
+import { MIGRATIONS } from "./global-setup.ts";
 
 // Races between connections on committed rows (#348, #103, #351): a piece
 // of work watched as it runs, and Postgres asked until one backend waits for
@@ -57,8 +57,6 @@ export async function waitsFor(
     if (settled()) return false;
   }
 }
-
-const MIGRATIONS = resolve(import.meta.dirname, "../../../../packages/db/drizzle");
 
 /**
  * A database of its own, migrated, with two connections held for the work

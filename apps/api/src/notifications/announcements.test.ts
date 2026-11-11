@@ -13,6 +13,7 @@ import {
   captureLogger,
   describe,
   expect,
+  jsonHeaders as json,
   type TestContext,
   test,
   testConfig,
@@ -45,7 +46,6 @@ const SWEDISH = {
 };
 
 type Headers = Record<string, string>;
-const json = (headers: Headers) => ({ ...headers, "content-type": "application/json" });
 
 /** The app with a push of its own over a memory pusher and a memory mailer, a held schedule and a clock. */
 async function appWith(ctx: TestContext, at = NOON) {

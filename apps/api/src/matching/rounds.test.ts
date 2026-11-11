@@ -8,11 +8,13 @@ import {
   RoundResponse,
 } from "@kuutti/schema";
 import { type App, createApp } from "../app.ts";
-import { CURRENT_CONSENT_VERSIONS, eraseAccount, exportAccount } from "../identity/index.ts";
+import { eraseAccount, exportAccount } from "../identity/index.ts";
 import { addDays, finnishDay } from "../lib/finnish-day.ts";
 import { ensureEventPartitions } from "../research/index.ts";
-import { signInAs, withMatchingConfig } from "../test/account.ts";
+import { joinStudy, signInAs, withMatchingConfig } from "../test/account.ts";
+import { errorCode } from "../test/answers.ts";
 import { interleaved } from "../test/chat.ts";
+import { STOPPED_CLOCK as T } from "../test/global-setup.ts";
 import {
   test as base,
   captureLogger,
@@ -23,7 +25,15 @@ import {
   testConfig,
 } from "../test/harness.ts";
 import { pidOf, waitsFor, watched, withTwoConnections } from "../test/races.ts";
-import { fitsAt, logged, MATCHES, peopleWhoFit, shownAt } from "../test/rounds.ts";
+import {
+  block,
+  fitsAt,
+  likesLeftAfter,
+  logged,
+  MATCHES,
+  peopleWhoFit,
+  shownAt,
+} from "../test/rounds.ts";
 import {
   addPlaces,
   type CardOf,
@@ -45,7 +55,6 @@ import {
 // wrote and adds nobody.
 
 /** 12:00 in Finland, one Friday: the round's day is 2026-10-16. */
-const T = new Date("2026-10-16T09:00:00.000Z");
 const TODAY = finnishDay(T);
 const YESTERDAY = "2026-10-15";
 const SECOND = 1000;
@@ -100,10 +109,6 @@ async function readToday(app: App, who: Person): Promise<RoundResponse> {
   return RoundResponse.parse(await answer.json());
 }
 
-async function errorCode(answer: Response): Promise<string> {
-  return ErrorResponse.parse(await answer.json()).error.code;
-}
-
 /** `owner`'s log of `day` with these cards, all matching every filter unless said; its id. */
 const roundFor = (
   db: Queryable,
@@ -145,27 +150,6 @@ async function eventsOf(db: Queryable, name: string) {
       [name],
     )
   ).rows.map((row) => row.props);
-}
-
-async function joinStudy(app: App, who: Person) {
-  const answer = await app.request("/consents", {
-    method: "POST",
-    headers: { ...who.headers, "content-type": "application/json" },
-    body: JSON.stringify({
-      kind: "research",
-      version: CURRENT_CONSENT_VERSIONS.research,
-      locale: "fi",
-    }),
-  });
-  expect(answer.status).toBe(200);
-}
-
-async function block(db: Queryable, blocker: Person, blocked: Person) {
-  await db.query(
-    `INSERT INTO block (blocker_identity_id, blocked_identity_id)
-     SELECT x.identity_id, y.identity_id FROM account x, account y WHERE x.id = $1 AND y.id = $2`,
-    [blocker.accountId, blocked.accountId],
-  );
 }
 
 describe("reading the queue", () => {
@@ -359,7 +343,7 @@ describe("seen and decided", () => {
   test("A card seen is recorded once, as profile_viewed", async ({ ctx, app }) => {
     const [a, b] = await cast(ctx, 2);
     if (!a || !b) throw new Error("cast not written");
-    await joinStudy(app, a);
+    await joinStudy(app, a.headers);
     const roundId = await roundFor(ctx.client, a, [{ person: b, reason: "liked_you" }]);
     expect((await seen(app, a, TODAY, 1)).status).toBe(204);
     const first = (await entriesOf(ctx.client, roundId))[0]?.seen_at;
@@ -374,7 +358,7 @@ describe("seen and decided", () => {
   test("A like is recorded, and the same decision again writes nothing", async ({ ctx, app }) => {
     const [a, b] = await cast(ctx, 2);
     if (!a || !b) throw new Error("cast not written");
-    await joinStudy(app, a);
+    await joinStudy(app, a.headers);
     const roundId = await roundFor(ctx.client, a, [b]);
     expect((await seen(app, a, TODAY, 1)).status).toBe(204);
     expect((await decideBy(app, a, TODAY, 1, "like")).status).toBe(200);
@@ -399,7 +383,7 @@ describe("seen and decided", () => {
   }) => {
     const [a, b] = await cast(ctx, 2);
     if (!a || !b) throw new Error("cast not written");
-    await joinStudy(app, a);
+    await joinStudy(app, a.headers);
     const roundId = await roundFor(ctx.client, a, [b]);
     const times: (Date | null | undefined)[] = [];
     for (const decision of ["like", "pass", "like"]) {
@@ -592,7 +576,7 @@ describe("seen and decided", () => {
       // A in the study, so each decision is an event that says whether it revised another;
       // a database of its own has no month of events until the night makes one.
       await ensureEventPartitions(pool, T);
-      await joinStudy(await appOn(pool), await signInAs(pool, a));
+      await joinStudy(await appOn(pool), (await signInAs(pool, a)).headers);
       // Both decisions after the consent, which the ticking clock stamped a second after T.
       const later = (seconds: number) => new Date(T.getTime() + seconds * SECOND);
       const deps = await depsOn(pool, () => later(10));
@@ -682,7 +666,7 @@ describe("the day's likes (#98, ADR-036)", () => {
     await likeBudget(ctx.client, 2);
     const [a, b, c, d] = await cast(ctx, 4);
     if (!a || !b || !c || !d) throw new Error("cast not written");
-    await joinStudy(app, a);
+    await joinStudy(app, a.headers);
     const roundId = await roundFor(ctx.client, a, [b, c, d]);
 
     expect((await decideBy(app, a, TODAY, 1, "like")).status).toBe(200);
@@ -742,7 +726,7 @@ describe("the day's likes (#98, ADR-036)", () => {
     await likeBudget(ctx.client, 1);
     const [a, b, c] = await cast(ctx, 3);
     if (!a || !b || !c) throw new Error("cast not written");
-    await joinStudy(app, a);
+    await joinStudy(app, a.headers);
     const ofB = await likedYesterday(ctx.client, b, a);
     const roundId = await roundFor(ctx.client, a, [{ person: b, reason: "liked_you" }, c]);
 
@@ -862,10 +846,6 @@ describe("the day's likes (#98, ADR-036)", () => {
 });
 
 /** What a decision's answer says of the caller's likes after it (#524). */
-async function likesLeftAfter(answer: Response) {
-  expect(answer.status).toBe(200);
-  return RoundDecisionAnswer.parse(await answer.json()).likesLeft;
-}
 
 describe("the likes left (#524, ADR-036 §6)", () => {
   test("The round says how many of the day's likes are left, and each decision's answer says it again", async ({
@@ -1217,7 +1197,7 @@ describe("a skip (ADR-062 §3)", () => {
     await likeBudget(ctx.client, 1);
     const [a, b, c] = await cast(ctx, 3);
     if (!a || !b || !c) throw new Error("cast not written");
-    await joinStudy(app, a);
+    await joinStudy(app, a.headers);
     const roundId = await roundFor(ctx.client, a, [b, c]);
 
     expect(await likesLeftAfter(await decideBy(app, a, TODAY, 1, "skip"))).toBe(1);

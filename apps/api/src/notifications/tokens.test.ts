@@ -1,12 +1,13 @@
 import type { Queryable } from "@kuutti/db";
-import { ErrorResponse } from "@kuutti/schema";
 import { describe, expect } from "vitest";
 import { type App, createApp } from "../app.ts";
 import { eraseAccount } from "../identity/index.ts";
 import { hashToken } from "../lib/auth-middleware.ts";
 import { signedInAccount, withMatchingConfig } from "../test/account.ts";
+import { errorCode } from "../test/answers.ts";
 import { interleaved } from "../test/chat.ts";
 import { openExport } from "../test/export.ts";
+import { STOPPED_CLOCK as T } from "../test/global-setup.ts";
 import { captureLogger, type TestContext, test, testConfig } from "../test/harness.ts";
 import { deviceOf, tokensLeft } from "../test/push.ts";
 
@@ -18,7 +19,6 @@ import { deviceOf, tokensLeft } from "../test/push.ts";
 // (features/notifications/push.feature, features/identity/erasure.feature).
 
 /** 12:00 in Helsinki, a Friday in summer time. */
-const T = new Date("2026-10-16T09:00:00.000Z");
 const LATER = new Date("2026-10-17T09:00:00.000Z");
 
 type Person = Awaited<ReturnType<typeof signedInAccount>>;
@@ -68,8 +68,6 @@ async function rowsOf(ctx: TestContext, accountIds: string[]): Promise<Row[]> {
   );
   return rows;
 }
-
-const errorCode = async (answer: Response) => ErrorResponse.parse(await answer.json()).error.code;
 
 let devices = 0;
 

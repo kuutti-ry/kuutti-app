@@ -1,6 +1,13 @@
 import { randomUUID } from "node:crypto";
 import type { Queryable } from "@kuutti/db";
-import type { DistanceBand, RoundDecision, RoundReason } from "@kuutti/schema";
+import {
+  type DistanceBand,
+  type RoundDecision,
+  RoundDecisionAnswer,
+  type RoundReason,
+} from "@kuutti/schema";
+import { expect } from "vitest";
+import { type App, createApp } from "../app.ts";
 import {
   conversationsOnTurn,
   openConversation,
@@ -9,8 +16,10 @@ import {
 import { fitsNow } from "../jobs/round-builder.ts";
 import { finnishDay } from "../lib/finnish-day.ts";
 import { addPlaces, type Queue } from "../matching/index.ts";
+import { signInAs } from "./account.ts";
 import { conversationBetween } from "./chat.ts";
-import { captureLogger } from "./harness.ts";
+import { STOPPED_CLOCK } from "./global-setup.ts";
+import { captureLogger, testConfig } from "./harness.ts";
 import { type PeopleOptions, people, pondNamed } from "./people.ts";
 import { FITTING } from "./queue.ts";
 
@@ -176,3 +185,40 @@ export const MATCHES = {
 export const fitsAt = (now: () => Date): Pick<Queue, "fits"> => ({
   fits: (db, accountId, candidateIds) => fitsNow({ now }, db, accountId, candidateIds),
 });
+
+/** `count` people who fit one another, each signed in. */
+export async function cast(db: Queryable, count: number) {
+  const ids = await peopleWhoFit(db, count);
+  return Promise.all(ids.map((id) => signInAs(db, id)));
+}
+
+/** A block from one person to the other, written straight into the table by their identities. */
+export async function block(
+  db: Queryable,
+  blocker: { accountId: string },
+  blocked: { accountId: string },
+) {
+  await db.query(
+    `INSERT INTO block (blocker_identity_id, blocked_identity_id)
+     SELECT x.identity_id, y.identity_id FROM account x, account y WHERE x.id = $1 AND y.id = $2`,
+    [blocker.accountId, blocked.accountId],
+  );
+}
+
+/** The fish left to send, from a decision's answer. */
+export async function fishToSendAfter(answer: Response) {
+  expect(answer.status).toBe(200);
+  return RoundDecisionAnswer.parse(await answer.json()).fishToSend;
+}
+
+/** The likes left, from a decision's answer. */
+export async function likesLeftAfter(answer: Response) {
+  expect(answer.status).toBe(200);
+  return RoundDecisionAnswer.parse(await answer.json()).likesLeft;
+}
+
+/** An app on the test's connection whose clock stands at `at`. */
+export async function appAt(db: Queryable, at: Date = STOPPED_CLOCK): Promise<App> {
+  const { logger } = await captureLogger();
+  return createApp({ config: testConfig(), logger, db, now: () => at });
+}

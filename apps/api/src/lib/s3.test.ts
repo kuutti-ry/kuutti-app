@@ -1,7 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { DeleteObjectCommand, GetObjectCommand, PutObjectCommand } from "@aws-sdk/client-s3";
 import { describe, expect, it } from "vitest";
-import { testConfig } from "../test/harness.ts";
+import { composeS3Config } from "../test/harness.ts";
 import { createS3Client } from "./s3.ts";
 
 // Runs against the S3 stand-in from docker compose when S3_ENDPOINT is set (CI's compose job,
@@ -10,13 +10,7 @@ const endpoint = process.env.S3_ENDPOINT;
 
 describe.skipIf(!endpoint)("object storage (compose stand-in)", () => {
   it("puts and gets an object through the path-style client", async () => {
-    const config = testConfig({
-      S3_ENDPOINT: endpoint,
-      S3_BUCKET: process.env.S3_BUCKET ?? "kuutti-media",
-      S3_ACCESS_KEY: process.env.S3_ACCESS_KEY ?? "kuutti",
-      S3_SECRET_KEY: process.env.S3_SECRET_KEY ?? "kuutti-dev-only",
-      S3_FORCE_PATH_STYLE: "true",
-    });
+    const config = composeS3Config(endpoint);
     const s3 = createS3Client(config);
     const key = `probe/${randomBytes(6).toString("hex")}.txt`;
     const body = `kuutti probe ${new Date().toISOString()}`;

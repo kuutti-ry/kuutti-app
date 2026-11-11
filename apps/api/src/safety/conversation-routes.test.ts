@@ -1,28 +1,32 @@
 import { randomUUID } from "node:crypto";
-import { resolve } from "node:path";
-import { createPool, migrate, type Pool, type Queryable, withTemporaryDatabase } from "@kuutti/db";
-import {
-  ConversationDetail,
-  ConversationList,
-  ErrorResponse,
-  MessagePage,
-  ReportDetail,
-} from "@kuutti/schema";
+import type { Pool, Queryable } from "@kuutti/db";
+import { MessagePage, ReportDetail } from "@kuutti/schema";
 import { describe, expect, it } from "vitest";
 import { createApp } from "../app.ts";
 import { eraseAccount } from "../identity/index.ts";
 import { objectKey } from "../media/index.ts";
 import { signInAs, staffSession, withMatchingConfig } from "../test/account.ts";
+import { errorCode } from "../test/answers.ts";
 import { cardShown } from "../test/cards.ts";
 import {
+  blockFrom,
   conversationBetween,
+  detailOf,
   interleaved,
+  listOf,
+  person,
   photoMessage,
   twoInAConversation,
 } from "../test/chat.ts";
-import { captureLogger, type TestContext, test, testConfig } from "../test/harness.ts";
+import {
+  captureLogger,
+  count,
+  jsonHeaders,
+  type TestContext,
+  test,
+  testConfig,
+} from "../test/harness.ts";
 import { testMediaDeps } from "../test/media.ts";
-import { people } from "../test/people.ts";
 import { pidOf, waitsFor, watched, withTwoConnections } from "../test/races.ts";
 import { recordConversationBlock } from "./blocks.ts";
 import { pruneReports, REPORT_RETENTION_DAYS, recordConversationReport } from "./reports.ts";
@@ -38,48 +42,19 @@ const DAY = 86_400_000;
 
 type Person = { accountId: string; headers: Record<string, string> };
 
-async function person(ctx: TestContext, name: string): Promise<Person> {
-  const [accountId] = await people(ctx.client, null, 1, { complete: true });
-  if (!accountId) throw new Error("no person");
-  await ctx.client.query("UPDATE profile SET display_name = $2 WHERE account_id = $1", [
-    accountId,
-    name,
-  ]);
-  return { accountId, headers: (await signInAs(ctx.client, accountId)).headers };
-}
-
 type App = ReturnType<typeof createApp>;
-const jsonHeaders = (headers: Record<string, string>) => ({
-  ...headers,
-  "content-type": "application/json",
-});
 const report = (app: App, who: Person, id: string, body: unknown = { reason: "harassment" }) =>
   app.request(`/conversations/${id}/report`, {
     method: "POST",
     headers: jsonHeaders(who.headers),
     body: JSON.stringify(body),
   });
-const blockFrom = (app: App, who: Person, id: string) =>
-  app.request(`/conversations/${id}/block`, { method: "POST", headers: who.headers });
-const errorCode = async (answer: Response) => ErrorResponse.parse(await answer.json()).error.code;
-const count = async (ctx: TestContext, sql: string, params: unknown[] = []) =>
-  Number((await ctx.client.query<{ n: string }>(sql, params)).rows[0]?.n ?? 0);
 const written = async (ctx: TestContext) => ({
   reports: await count(ctx, "SELECT count(*) AS n FROM report"),
   copies: await count(ctx, "SELECT count(*) AS n FROM report_message"),
   blocks: await count(ctx, "SELECT count(*) AS n FROM block"),
   closed: await count(ctx, "SELECT count(*) AS n FROM conversation WHERE closed_at IS NOT NULL"),
 });
-async function listOf(app: App, who: Person): Promise<ConversationList> {
-  const answer = await app.request("/conversations", { headers: who.headers });
-  expect(answer.status).toBe(200);
-  return ConversationList.parse(await answer.json());
-}
-async function detailOf(app: App, who: Person, id: string): Promise<ConversationDetail> {
-  const answer = await app.request(`/conversations/${id}`, { headers: who.headers });
-  expect(answer.status).toBe(200);
-  return ConversationDetail.parse(await answer.json());
-}
 const blockStands = (ctx: TestContext, blocker: Person, blocked: Person) =>
   count(
     ctx,
@@ -878,122 +853,94 @@ describe("a block from a conversation", () => {
 // there, never holding the conversation the erasure or the ban must close.
 // Taken the other way round, each would wait for the other until Postgres
 // broke the cycle with 40P01.
-const MIGRATIONS = resolve(import.meta.dirname, "../../../../packages/db/drizzle");
-
 describe("a report or a block against the other person's erasure or ban", () => {
   it("a report waits for the other person's erasure before it takes the conversation, and then finds nobody to report", async () => {
-    await withTemporaryDatabase(async (url) => {
-      const pool = createPool({
-        connectionString: url,
-        max: 4,
-        applicationName: "kuutti-351-erase",
-      });
-      const erasing = await pool.connect();
-      const reporting = await pool.connect();
-      try {
-        await migrate(pool, MIGRATIONS);
-        const { a, b, id } = await twoInAConversation(pool, "kuutti 351 erase");
-        const { logger } = await captureLogger();
-        const erasurePid = await pidOf(erasing);
-        const reportPid = await pidOf(reporting);
-        await erasing.query("BEGIN");
-        await reporting.query("BEGIN");
-        // The erasure holds B's account and is about to close B's conversations
-        // when the report starts; it goes on once the report waits for it.
-        let waited = false;
-        let report: ReturnType<typeof watched<unknown>> | undefined;
-        const db = interleaved(erasing, /WITH closing AS/, async () => {
-          const at = new Date();
-          report = watched(
-            recordConversationReport(reporting, {
-              reporterAccountId: a,
-              conversationId: id,
-              reason: "harassment",
-              note: null,
-              seq: null,
-              at,
-              since: new Date(at.getTime() - DAY),
-              limit: 5,
-              afterCloseDays: 30,
-            }),
-          );
-          waited = await waitsFor(pool, reportPid, erasurePid, report.settled);
-        });
-        const erased = await eraseAccount({ db, logger, now: () => new Date() }, b).then(
-          () => null,
-          (error: unknown) => String(error),
+    await withTwoConnections("kuutti-351-erase", async (pool, erasing, reporting) => {
+      const { a, b, id } = await twoInAConversation(pool, "kuutti 351 erase");
+      const { logger } = await captureLogger();
+      const erasurePid = await pidOf(erasing);
+      const reportPid = await pidOf(reporting);
+      await erasing.query("BEGIN");
+      await reporting.query("BEGIN");
+      // The erasure holds B's account and is about to close B's conversations
+      // when the report starts; it goes on once the report waits for it.
+      let waited = false;
+      let report: ReturnType<typeof watched<unknown>> | undefined;
+      const db = interleaved(erasing, /WITH closing AS/, async () => {
+        const at = new Date();
+        report = watched(
+          recordConversationReport(reporting, {
+            reporterAccountId: a,
+            conversationId: id,
+            reason: "harassment",
+            note: null,
+            seq: null,
+            at,
+            since: new Date(at.getTime() - DAY),
+            limit: 5,
+            afterCloseDays: 30,
+          }),
         );
-        await erasing.query(erased === null ? "COMMIT" : "ROLLBACK");
-        const reported = await report?.outcome;
-        await reporting.query("COMMIT");
-        expect(db.ran()).toBe(true);
-        expect(waited).toBe(true);
-        expect({ erased, reported }).toEqual({
-          erased: null,
-          reported: { outcome: "window_closed" },
-        });
-        const count = async (table: string) =>
-          Number(
-            (await pool.query<{ n: string }>(`SELECT count(*) AS n FROM ${table}`)).rows[0]?.n,
-          );
-        expect(await count("report")).toBe(0);
-        expect(await count("block")).toBe(0);
-      } finally {
-        erasing.release();
-        reporting.release();
-        await pool.end();
-      }
+        waited = await waitsFor(pool, reportPid, erasurePid, report.settled);
+      });
+      const erased = await eraseAccount({ db, logger, now: () => new Date() }, b).then(
+        () => null,
+        (error: unknown) => String(error),
+      );
+      await erasing.query(erased === null ? "COMMIT" : "ROLLBACK");
+      const reported = await report?.outcome;
+      await reporting.query("COMMIT");
+      expect(db.ran()).toBe(true);
+      expect(waited).toBe(true);
+      expect({ erased, reported }).toEqual({
+        erased: null,
+        reported: { outcome: "window_closed" },
+      });
+      const count = async (table: string) =>
+        Number((await pool.query<{ n: string }>(`SELECT count(*) AS n FROM ${table}`)).rows[0]?.n);
+      expect(await count("report")).toBe(0);
+      expect(await count("block")).toBe(0);
     });
   }, 30_000);
 
   it("a block waits for a ban of the other person before it takes the conversation, and then closes it as the block's", async () => {
-    await withTemporaryDatabase(async (url) => {
-      const pool = createPool({ connectionString: url, max: 4, applicationName: "kuutti-351-ban" });
-      const banning = await pool.connect();
-      const blocking = await pool.connect();
-      try {
-        await migrate(pool, MIGRATIONS);
-        const { a, b, id } = await twoInAConversation(pool, "kuutti 351 ban");
-        const banPid = await pidOf(banning);
-        const blockPid = await pidOf(blocking);
-        await banning.query("BEGIN");
-        await blocking.query("BEGIN");
-        let waited = false;
-        let block: ReturnType<typeof watched<unknown>> | undefined;
-        const db = interleaved(banning, /WITH closing AS/, async () => {
-          block = watched(
-            recordConversationBlock(blocking, { accountId: a, conversationId: id, at: new Date() }),
-          );
-          waited = await waitsFor(pool, blockPid, banPid, block.settled);
-        });
-        const banned = await applySanction(db, {
-          accountId: b,
-          kind: "ban",
-          reason: "harassment",
-          note: "Threats.",
-          actor: null,
-          at: new Date(),
-        }).then(
-          () => null,
-          (error: unknown) => String(error),
+    await withTwoConnections("kuutti-351-ban", async (pool, banning, blocking) => {
+      const { a, b, id } = await twoInAConversation(pool, "kuutti 351 ban");
+      const banPid = await pidOf(banning);
+      const blockPid = await pidOf(blocking);
+      await banning.query("BEGIN");
+      await blocking.query("BEGIN");
+      let waited = false;
+      let block: ReturnType<typeof watched<unknown>> | undefined;
+      const db = interleaved(banning, /WITH closing AS/, async () => {
+        block = watched(
+          recordConversationBlock(blocking, { accountId: a, conversationId: id, at: new Date() }),
         );
-        await banning.query(banned === null ? "COMMIT" : "ROLLBACK");
-        const blocked = await block?.outcome;
-        await blocking.query("COMMIT");
-        expect(db.ran()).toBe(true);
-        expect(waited).toBe(true);
-        expect({ banned, blocked }).toEqual({ banned: null, blocked: "blocked" });
-        // The ban closed it first; the block, after it, wrote its own close over it.
-        const closed = await pool.query(
-          "SELECT closed_how, closed_by FROM conversation WHERE id = $1",
-          [id],
-        );
-        expect(closed.rows).toEqual([{ closed_how: "block", closed_by: "a" }]);
-      } finally {
-        banning.release();
-        blocking.release();
-        await pool.end();
-      }
+        waited = await waitsFor(pool, blockPid, banPid, block.settled);
+      });
+      const banned = await applySanction(db, {
+        accountId: b,
+        kind: "ban",
+        reason: "harassment",
+        note: "Threats.",
+        actor: null,
+        at: new Date(),
+      }).then(
+        () => null,
+        (error: unknown) => String(error),
+      );
+      await banning.query(banned === null ? "COMMIT" : "ROLLBACK");
+      const blocked = await block?.outcome;
+      await blocking.query("COMMIT");
+      expect(db.ran()).toBe(true);
+      expect(waited).toBe(true);
+      expect({ banned, blocked }).toEqual({ banned: null, blocked: "blocked" });
+      // The ban closed it first; the block, after it, wrote its own close over it.
+      const closed = await pool.query(
+        "SELECT closed_how, closed_by FROM conversation WHERE id = $1",
+        [id],
+      );
+      expect(closed.rows).toEqual([{ closed_how: "block", closed_by: "a" }]);
     });
   }, 30_000);
 });

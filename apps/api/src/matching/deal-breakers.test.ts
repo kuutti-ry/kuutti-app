@@ -2,7 +2,7 @@ import { DealBreakersResponse, type ProfileUpdate } from "@kuutti/schema";
 import { describe, expect } from "vitest";
 import { consentedAccount, signedInAccount, withMatchingConfig } from "../test/account.ts";
 import { exportOf } from "../test/export.ts";
-import { type TestContext, test } from "../test/harness.ts";
+import { jsonHeaders, type TestContext, test } from "../test/harness.ts";
 import { dealBreakersFrom } from "./deal-breakers.ts";
 
 // features/matching/preferences.feature (#149): the deal-breakers under the
@@ -12,7 +12,6 @@ import { dealBreakersFrom } from "./deal-breakers.ts";
 type App = TestContext["app"];
 type Headers = Record<string, string>;
 const PATH = "/preferences/deal-breakers";
-const jsonHeaders = (headers: Headers) => ({ ...headers, "content-type": "application/json" });
 
 const putDealBreakers = (app: App, headers: Headers, body: unknown) =>
   app.request(PATH, { method: "PUT", headers: jsonHeaders(headers), body: JSON.stringify(body) });

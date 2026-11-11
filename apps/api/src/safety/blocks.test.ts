@@ -1,5 +1,5 @@
-import { ErrorResponse } from "@kuutti/schema";
 import { signedInAccount, staffSession } from "../test/account.ts";
+import { errorCode } from "../test/answers.ts";
 import { cardShown } from "../test/cards.ts";
 import { describe, expect, type TestContext, test } from "../test/harness.ts";
 import { listBlocksOfAccount, recordBlock } from "./blocks.ts";
@@ -18,8 +18,6 @@ const block = (ctx: TestContext, headers: Record<string, string>, body: unknown)
     headers: { ...headers, "content-type": "application/json" },
     body: JSON.stringify(body),
   });
-const errorCode = async (response: Response) =>
-  ErrorResponse.parse(await response.json()).error.code;
 
 async function identityOf(ctx: TestContext, accountId: string): Promise<string> {
   const { rows } = await ctx.client.query<{ identity_id: string }>(

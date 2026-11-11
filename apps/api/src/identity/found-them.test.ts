@@ -3,6 +3,7 @@ import { ConversationList, ErrorResponse, FoundThemStatus } from "@kuutti/schema
 import { type App, createApp } from "../app.ts";
 import { finnishDay } from "../lib/finnish-day.ts";
 import { signedInAccount } from "../test/account.ts";
+import { errorCode as codeOf } from "../test/answers.ts";
 import {
   captureLogger,
   describe,
@@ -50,10 +51,6 @@ async function counts(ctx: TestContext) {
       "SELECT day::text AS day, reason, count FROM found_them_count ORDER BY reason",
     )
   ).rows;
-}
-
-async function codeOf(response: Response): Promise<string> {
-  return ErrorResponse.parse(await response.json()).error.code;
 }
 
 describe("Löysin hänet", () => {
