@@ -28,6 +28,7 @@ import {
   formatUsage,
   submitBatch,
 } from "./lib/anthropic-translator.ts";
+import { fail, refuseEmptyValues } from "./lib/command-line.ts";
 import { reviewHash } from "./lib/review-hash.ts";
 import {
   isTranslatedLocale,
@@ -65,16 +66,9 @@ const { values } = parseArgs({
   },
 });
 
-function fail(message: string): never {
-  console.error(`✖ ${message}`);
-  process.exit(1);
-}
-
 // An empty value is no value: `--prefix=` or `--keys ""` would otherwise select
 // every namespace, and without --dry-run send it and write the answers (#235).
-for (const [name, value] of Object.entries(values)) {
-  if (value === "") fail(`--${name} takes a value`);
-}
+refuseEmptyValues(values);
 
 if (values.locale !== undefined && !isTranslatedLocale(values.locale)) {
   fail(`--locale is ${TRANSLATED_LOCALES.join(" or ")}`);

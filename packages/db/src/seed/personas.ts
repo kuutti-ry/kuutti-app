@@ -335,6 +335,22 @@ export const DEMO_PERSONAS: readonly DemoPersona[] = [
 export const MOCK_BANK_ACR = "http://ftn.ficora.fi/2017/loatest2";
 export const MOCK_BANK_AMR = "https://tunnistus-pp.telia.fi/uas/saml2/names/ac/oidc.mock.1";
 
+/**
+ * Anybody else at the mock bank: the claims its form starts with, and the
+ * flow check's login as somebody else. Under the names the Telia broker uses
+ * for a Finnish user (docs/vendors/telia.md, guide 2.6.4), with an artificial
+ * code (individual number 900 to 999), never a person's.
+ */
+export const SOMEBODY_CLAIMS = {
+  "urn:oid:1.2.246.21": `010190-999${checkCharacter("010190", "999")}`,
+  "urn:oid:1.3.6.1.5.5.7.9.1": "1990-01-01",
+  "urn:oid:2.5.4.4": "Henkilö",
+  "urn:oid:1.2.246.575.1.14": "Testi",
+  "urn:oid:2.16.840.1.113730.3.1.241": "Testi Henkilö",
+  acr: MOCK_BANK_ACR,
+  amr: [MOCK_BANK_AMR],
+};
+
 const two = (n: number) => String(n).padStart(2, "0");
 
 /** The day the persona was born, as seen on the UTC day of `at`. */

@@ -3,7 +3,12 @@ import { POSTAL_CODE_LENGTH } from "@kuutti/schema/postal-areas";
 import type { Queryable } from "../pool.ts";
 import type { PersonaConversation } from "./conversations.ts";
 import { assetsFor, type PhotoAsset } from "./photos.ts";
-import { DEMO_EPOCH, DEMO_LABEL_PREFIX, type SyntheticPerson } from "./population.ts";
+import {
+  DEMO_EPOCH,
+  DEMO_LABEL_PREFIX,
+  POPULATION_CONSENTS,
+  type SyntheticPerson,
+} from "./population.ts";
 import type { WaitingLikes } from "./rounds.ts";
 import { DEMO_SUBJECT_PREFIX } from "./write-population.ts";
 
@@ -743,7 +748,7 @@ export function castPeople(keep: (postalCode: string) => string | null): Synthet
       },
       gender: person.gender,
       preferences: { seeks: [...person.answers.seeks], ageWindow: { ...person.answers.ageWindow } },
-      consents: (["terms", "privacy", "special_category"] as const).map((kind) => ({
+      consents: POPULATION_CONSENTS.map((kind) => ({
         kind,
         localeShown: person.locale,
         givenAt,

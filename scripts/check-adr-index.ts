@@ -35,6 +35,7 @@
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { expectProblems } from "./lib/self-test.ts";
 
 type Adr = { file: string; status: string | undefined; date: string | undefined; tds: Set<number> };
 type Doc = { path: string; tds: Set<number> };
@@ -516,17 +517,7 @@ function selfTest(): void {
       ["TD-3: the row names README.md with no folder"],
     ],
   ];
-  for (const [name, given, expected] of cases) {
-    const problems = problemsOf(given);
-    const matches =
-      problems.length === expected.length &&
-      expected.every((start, i) => problems[i]?.startsWith(start));
-    if (!matches) {
-      console.error(`✖ self-test, ${name}: expected ${JSON.stringify(expected)}`);
-      console.error(`  got ${JSON.stringify(problems)}`);
-      process.exit(1);
-    }
-  }
+  for (const [name, given, expected] of cases) expectProblems(name, problemsOf(given), expected);
   const ranges: Array<[string, number[]]> = [
     ["TD-1 and TD-7", [1, 7]],
     ["TD-10 to TD-15", [10, 11, 12, 13, 14, 15]],

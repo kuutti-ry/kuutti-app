@@ -314,22 +314,8 @@ export async function seed(pool: Pool, createdBy = "seed"): Promise<SeedResult> 
         }
         await db
           .insert(profile)
-          .values({
-            accountId: current.id,
-            displayName: SEED_PROFILE.displayName,
-            bio: SEED_PROFILE.bio,
-            fields: SEED_PROFILE.fields,
-            prompts: SEED_PROFILE.prompts,
-          })
-          .onConflictDoUpdate({
-            target: profile.accountId,
-            set: {
-              displayName: SEED_PROFILE.displayName,
-              bio: SEED_PROFILE.bio,
-              fields: SEED_PROFILE.fields,
-              prompts: SEED_PROFILE.prompts,
-            },
-          });
+          .values({ accountId: current.id, ...SEED_PROFILE })
+          .onConflictDoUpdate({ target: profile.accountId, set: SEED_PROFILE });
       }
     }
   }

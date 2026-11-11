@@ -19,6 +19,7 @@ import { resolve } from "node:path";
 import { parseArgs } from "node:util";
 import { commandData } from "./lib/annotate.ts";
 import { stale, unreviewed } from "./lib/check.ts";
+import { fail, refuseEmptyValues } from "./lib/command-line.ts";
 import {
   approve,
   decodeSheet,
@@ -60,16 +61,9 @@ const { values, positionals } = parseArgs({
   },
 });
 
-function fail(message: string): never {
-  console.error(`✖ ${message}`);
-  process.exit(1);
-}
-
 // An empty value is no value: `--approved-since=` would otherwise pass the
 // one-command check below and fall through to printing the table (#235).
-for (const [name, value] of Object.entries(values)) {
-  if (value === "") fail(`--${name} takes a value`);
-}
+refuseEmptyValues(values);
 
 function requireLocale(): TranslatedLocale {
   if (!isTranslatedLocale(values.locale)) fail(`--locale is ${TRANSLATED_LOCALES.join(" or ")}`);

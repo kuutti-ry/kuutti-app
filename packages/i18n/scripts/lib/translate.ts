@@ -1,5 +1,6 @@
-import { isMap, parseDocument, Scalar, YAMLMap } from "yaml";
-import { argumentsOf, branchProblems, inflectionProblems, tagsOf } from "./icu.ts";
+import { isMap, parseDocument, Scalar, type YAMLMap } from "yaml";
+import { argumentsOf, branchProblems, inflectionProblems, sameArguments, sameTags } from "./icu.ts";
+import { mark, unmark } from "./marks.ts";
 import { isStale } from "./review-hash.ts";
 import { isAdminKey, isLegalKey, type Messages, type TranslatedLocale } from "./schema.ts";
 
@@ -226,15 +227,10 @@ export function rejectionReason(
     return `is over its max_length of ${maxLength}`;
   }
   try {
-    const source = argumentsOf(en);
-    const target = argumentsOf(text);
-    const same =
-      Object.keys(source).sort().join() === Object.keys(target).sort().join() &&
-      Object.keys(source).every((name) => source[name] === target[name]);
-    if (!same) return "does not keep the ICU arguments of the English source";
-    if ([...tagsOf(text)].sort().join() !== [...tagsOf(en)].sort().join()) {
-      return "does not keep the tags of the English source";
+    if (!sameArguments(argumentsOf(en), argumentsOf(text))) {
+      return "does not keep the ICU arguments of the English source";
     }
+    if (!sameTags(text, en)) return "does not keep the tags of the English source";
     const [problem] = [...inflectionProblems(text, locale), ...branchProblems(en, text, locale)];
     return problem;
   } catch (error) {
@@ -257,20 +253,8 @@ export function writeText(entry: YAMLMap, locale: TranslatedLocale, text: string
 
 /** Marks `locale`'s text as machine text awaiting a native review: `machine: { <locale>: true }`. */
 export function flagMachine(entry: YAMLMap, locale: TranslatedLocale): void {
-  const reviewed = entry.get("reviewed");
-  if (isMap(reviewed)) {
-    reviewed.delete(locale);
-    if (reviewed.items.length === 0) entry.delete("reviewed");
-  }
-  const machine = entry.get("machine");
-  if (isMap(machine)) {
-    machine.set(locale, true);
-    return;
-  }
-  const flags = new YAMLMap();
-  flags.flow = true;
-  flags.set(locale, true);
-  entry.set("machine", flags);
+  unmark(entry, "reviewed", locale);
+  mark(entry, "machine", locale, true);
 }
 
 /**

@@ -4,7 +4,8 @@ import {
   argumentsOf,
   branchProblems,
   inflectionProblems,
-  tagsOf,
+  sameArguments,
+  sameTags,
 } from "./icu.ts";
 import { isStale } from "./review-hash.ts";
 import {
@@ -53,13 +54,6 @@ const DRAFT_VERSION = /draft/i;
 const DRAFT_TEXT = /(?<![\p{L}])(DRAFT|LUONNOS|UTKAST)(?![\p{L}])/iu;
 
 export type CheckResult = { errors: string[]; warnings: string[] };
-
-function sameArguments(a: Record<string, ArgumentType>, b: Record<string, ArgumentType>): boolean {
-  const names = Object.keys(a).sort();
-  return (
-    names.join() === Object.keys(b).sort().join() && names.every((name) => a[name] === b[name])
-  );
-}
 
 /** True for legal text still in draft: its version or its wording says so. */
 export function isDraftLegal(message: Message): boolean {
@@ -135,7 +129,7 @@ export function checkMessages(messages: Messages, options: { release: boolean })
           errors.push(`${key}: ${locale} does not use the same arguments as en`);
         }
         // The tags are markup the app renders: a translation keeps exactly the English's.
-        if ([...tagsOf(text)].sort().join() !== [...tagsOf(message.en)].sort().join()) {
+        if (!sameTags(text, message.en)) {
           errors.push(`${key}: ${locale} does not keep the tags of en`);
         }
         for (const problem of inflectionProblems(text, locale)) {

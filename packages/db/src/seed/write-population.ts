@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { PHOTOS_FOR_COMPLETENESS } from "@kuutti/schema";
 import type { Queryable } from "../pool.ts";
 import { transaction } from "../pool.ts";
-import { DEMO_LABEL_PREFIX, type SyntheticPerson } from "./population.ts";
+import { DEMO_LABEL_PREFIX, POPULATION_CONSENTS, type SyntheticPerson } from "./population.ts";
 
 /**
  * Writes the synthetic population (#73, ADR-014) and removes the one that was
@@ -102,13 +102,6 @@ export async function removePopulation(db: Queryable): Promise<RemoveResult> {
     return { removed: ids.length, spared };
   });
 }
-
-/** The kinds the population consents to: never research (population.ts says why). */
-const POPULATION_CONSENTS = [
-  "terms",
-  "privacy",
-  "special_category",
-] as const satisfies readonly (keyof ConsentVersions)[];
 
 /** How many consent rows of the wording in force a renewal gave, by kind. */
 export type RenewResult = Record<keyof ConsentVersions, number>;

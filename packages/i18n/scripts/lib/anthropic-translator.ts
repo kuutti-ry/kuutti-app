@@ -19,7 +19,7 @@ export const MODEL = "claude-opus-5-5";
 const MAX_TOKENS = 16000;
 // Opus 5.5 thinks at "medium" unless told otherwise; "high" is the level
 // Opus 5 translated at by default.
-const EFFORT = "high";
+const EFFORT = "high" as const;
 // fallbacks: "default" re-runs a request the model's classifiers decline on
 // the model Anthropic recommends for that case, in the same call. The Batches
 // API refuses it, so batch requests go without.
@@ -67,6 +67,22 @@ function systemBlocks(
 /** The user turn: the items and the examples, as JSON. Nothing else is sent. */
 function userContent(items: readonly TranslationItem[], context: TranslationContext): string {
   return JSON.stringify({ items, examples: context.examples ?? [] }, null, 2);
+}
+
+/** What a request asks, in sync and batch mode alike; the sync adds the fallback, which batches refuse. */
+function requestOf(
+  locale: TranslatedLocale,
+  items: readonly TranslationItem[],
+  context: TranslationContext,
+) {
+  return {
+    model: MODEL,
+    max_tokens: MAX_TOKENS,
+    thinking: { type: "adaptive" as const },
+    system: systemBlocks(locale, context),
+    messages: [{ role: "user" as const, content: userContent(items, context) }],
+    output_config: { effort: EFFORT, format: zodOutputFormat(Output) },
+  };
 }
 
 /** Only the keys a request asked for, each once; the rest are counted, never kept. */
@@ -121,14 +137,9 @@ export function anthropicTranslator(options: TranslatorOptions = {}): Translator
   const client = options.client ?? new Anthropic();
   return async (locale, items, context) => {
     const response = await client.beta.messages.parse({
-      model: MODEL,
-      max_tokens: MAX_TOKENS,
-      thinking: { type: "adaptive" },
+      ...requestOf(locale, items, context),
       betas: [FALLBACK_BETA],
       fallbacks: "default",
-      system: systemBlocks(locale, context),
-      messages: [{ role: "user", content: userContent(items, context) }],
-      output_config: { effort: EFFORT, format: zodOutputFormat(Output) },
     });
     // The fallback leaves its mark in the usage iterations (the model id alone may be a snapshot name).
     const fellBack = (response.usage.iterations ?? []).some(
@@ -190,14 +201,7 @@ export async function submitBatch(
       requests[id] = { locale: chunk.locale, keys: chunk.items.map((item) => item.key) };
       return {
         custom_id: id,
-        params: {
-          model: MODEL,
-          max_tokens: MAX_TOKENS,
-          thinking: { type: "adaptive" as const },
-          system: systemBlocks(chunk.locale, chunk.context),
-          messages: [{ role: "user" as const, content: userContent(chunk.items, chunk.context) }],
-          output_config: { effort: EFFORT, format: zodOutputFormat(Output) },
-        },
+        params: requestOf(chunk.locale, chunk.items, chunk.context),
       };
     }),
   });
