@@ -24,6 +24,7 @@
  */
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import { expectProblems } from "./lib/self-test.ts";
 
 const ROOT = join(import.meta.dirname, "..");
 const MIGRATIONS = join(ROOT, "packages", "db", "drizzle");
@@ -191,15 +192,7 @@ INSERT INTO "ponds" ("slug", "name") VALUES ('suomi', 'Suomi');`;
     ],
   ];
   for (const [name, register, expected] of cases) {
-    const problems = problemsOf(keys, register);
-    const matches =
-      problems.length === expected.length &&
-      expected.every((start, i) => problems[i]?.startsWith(start));
-    if (!matches) {
-      console.error(`✖ self-test, ${name}: expected ${JSON.stringify(expected)}`);
-      console.error(`  got ${JSON.stringify(problems)}`);
-      process.exit(1);
-    }
+    expectProblems(name, problemsOf(keys, register), expected);
   }
   console.log(`✔ check-decisions self-test: ${cases.length + 4} cases`);
 }

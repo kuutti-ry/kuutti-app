@@ -84,22 +84,25 @@ export const ExportedReport = z
   .meta({ id: "ExportedReport" });
 export type ExportedReport = z.infer<typeof ExportedReport>;
 
-export const ExportedReports = z
-  .object({
-    about: z.string().meta({ description: "What this part is, in the request's language." }),
-    /** The reports the person filed, newest first, at most 1000. */
-    items: z.array(ExportedReport).max(1000),
-  })
-  .meta({ id: "ExportedReports" });
+/** An export part's line saying what the part is (ADR-007 §3). */
+export const ExportAbout = z
+  .string()
+  .meta({ description: "What this part is, in the request's language." });
+
+/** A part of the person's export: what it is, then its items. */
+export const exportPart = <T extends z.ZodType>(items: T) =>
+  z.object({ about: ExportAbout, items });
+
+// The reports the person filed, newest first, at most 1000.
+export const ExportedReports = exportPart(z.array(ExportedReport).max(1000)).meta({
+  id: "ExportedReports",
+});
 export type ExportedReports = z.infer<typeof ExportedReports>;
 
-export const ExportedBlocks = z
-  .object({
-    about: z.string().meta({ description: "What this part is, in the request's language." }),
-    /** The blocks the person set, by date only, newest first, at most 1000. */
-    items: z.array(z.object({ at: z.iso.datetime() })).max(1000),
-  })
-  .meta({ id: "ExportedBlocks" });
+// The blocks the person set, by date only, newest first, at most 1000.
+export const ExportedBlocks = exportPart(
+  z.array(z.object({ at: z.iso.datetime() })).max(1000),
+).meta({ id: "ExportedBlocks" });
 export type ExportedBlocks = z.infer<typeof ExportedBlocks>;
 
 /** The panel's report queue (#311): the reports waiting for a moderator, or those decided, for the record. */

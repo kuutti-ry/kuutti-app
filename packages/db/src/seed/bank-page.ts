@@ -1,5 +1,10 @@
-import { checkCharacter } from "@kuutti-ry/tunnistus-oidc/hetu";
-import { assertArtificial, type DemoPersona, MOCK_BANK_ACR, MOCK_BANK_AMR } from "./personas.ts";
+import {
+  assertArtificial,
+  type DemoPersona,
+  MOCK_BANK_ACR,
+  MOCK_BANK_AMR,
+  SOMEBODY_CLAIMS,
+} from "./personas.ts";
 
 /**
  * The login page of the mock bank (#73, ADR-014): one button per persona and,
@@ -45,17 +50,6 @@ const escapeHtml = (text: string): string =>
 
 /** `<` never appears in the script's data, so no persona's text can close the script element. */
 const scriptJson = (value: unknown): string => JSON.stringify(value).replace(/</g, "\\u003c");
-
-/** The claims the form for anybody else starts with: an artificial person, to be edited. */
-const SOMEBODY = {
-  "urn:oid:1.2.246.21": `010190-999${checkCharacter("010190", "999")}`,
-  "urn:oid:1.3.6.1.5.5.7.9.1": "1990-01-01",
-  "urn:oid:2.5.4.4": "Henkilö",
-  "urn:oid:1.2.246.575.1.14": "Testi",
-  "urn:oid:2.16.840.1.113730.3.1.241": "Testi Henkilö",
-  acr: MOCK_BANK_ACR,
-  amr: [MOCK_BANK_AMR],
-};
 
 /** Where the same person is on Telia's bed, under the note; nothing for a persona of the mock bank only. */
 const bankLine = (p: DemoPersona): string =>
@@ -170,7 +164,7 @@ ${sections}
           <label for="username">Name at the bank</label>
           <input id="username" name="username" value="testi" autocomplete="off" required />
           <label for="claims">Claims</label>
-          <textarea id="claims" name="claims" spellcheck="false">${escapeHtml(JSON.stringify(SOMEBODY, null, 2))}</textarea>
+          <textarea id="claims" name="claims" spellcheck="false">${escapeHtml(JSON.stringify(SOMEBODY_CLAIMS, null, 2))}</textarea>
           <button type="submit">Identify</button>
         </form>
       </section>

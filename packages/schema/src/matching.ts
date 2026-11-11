@@ -2,6 +2,7 @@ import { z } from "zod";
 import { DEAL_BREAKERS_CAP, DealBreakerField } from "./deal-breakers.ts";
 import { DistanceBand } from "./distance.ts";
 import { ProfileCard } from "./profile.ts";
+import { exportPart } from "./report.ts";
 
 // The queue (#502, ADR-062) and the day's log of it, the round (#96, TD-11,
 // TD-12, ADR-034): what one person goes through on one Finnish calendar day,
@@ -251,12 +252,9 @@ export const StarList = z
 export type StarList = z.infer<typeof StarList>;
 
 /** The person's own stars in their export (ADR-007 §4): when each was put, never on whom. */
-export const ExportedStars = z
-  .object({
-    about: z.string().meta({ description: "What this part is, in the request's language." }),
-    items: z.array(z.object({ at: z.iso.datetime() })).max(STARS_CEILING),
-  })
-  .meta({ id: "ExportedStars" });
+export const ExportedStars = exportPart(
+  z.array(z.object({ at: z.iso.datetime() })).max(STARS_CEILING),
+).meta({ id: "ExportedStars" });
 export type ExportedStars = z.infer<typeof ExportedStars>;
 
 /** The research events' coarse time from a card seen to its decision (ADR-011 §1), never the time itself. */
@@ -320,11 +318,8 @@ export const ExportedRound = z
   .meta({ id: "ExportedRound" });
 export type ExportedRound = z.infer<typeof ExportedRound>;
 
-export const ExportedRounds = z
-  .object({
-    about: z.string().meta({ description: "What this part is, in the request's language." }),
-    /** The person's own rounds, newest day first, at most 1000. */
-    items: z.array(ExportedRound).max(1000),
-  })
-  .meta({ id: "ExportedRounds" });
+// The person's own rounds, newest day first, at most 1000.
+export const ExportedRounds = exportPart(z.array(ExportedRound).max(1000)).meta({
+  id: "ExportedRounds",
+});
 export type ExportedRounds = z.infer<typeof ExportedRounds>;

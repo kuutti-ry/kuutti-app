@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { AccountState } from "./account-state.ts";
 import { ModeratorRejectionReason, PhotoId, PhotoRejectionReason, PhotoState } from "./media.ts";
 import { BioPreset, PromptAnswer } from "./profile.ts";
 import { ProfileFields } from "./profile-fields.ts";
@@ -196,15 +197,7 @@ export type AuditPage = z.infer<typeof AuditPage>;
 export const AdminAccount = z
   .object({
     id: z.uuid(),
-    state: z.enum([
-      "registered",
-      "active",
-      "paused",
-      "shadow_banned",
-      "suspended",
-      "banned",
-      "deleted",
-    ]),
+    state: AccountState,
     stateChangedAt: z.iso.datetime().nullable(),
     /** Null for an erased account, as every field but id, state and deletedAt (#306). */
     registeredAt: z.iso.datetime().nullable(),

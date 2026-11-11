@@ -17,6 +17,7 @@ import {
   DEMO_PERSONAS,
   MOCK_BANK_ACR,
   personaClaims,
+  SOMEBODY_CLAIMS,
 } from "../../packages/db/src/seed/personas.ts";
 
 const issuer = (process.argv[2] ?? process.env.OIDC_ISSUER ?? "http://127.0.0.1:8080/ftn").replace(
@@ -26,19 +27,6 @@ const issuer = (process.argv[2] ?? process.env.OIDC_ISSUER ?? "http://127.0.0.1:
 // The client as env.example gives it to the API.
 const clientId = "kuutti-local";
 const redirectUri = "http://localhost:3000/auth/callback";
-// The claim names the Telia broker uses for a Finnish user (docs/vendors/telia.md,
-// guide 2.6.4): the hetu and the date of birth under their OIDs, the FTN
-// pre-production acr, the bank as an amr URI. An artificial code (individual
-// number 900 to 999), never a person's.
-const somebody = {
-  "urn:oid:1.2.246.21": "010190-999W",
-  "urn:oid:1.3.6.1.5.5.7.9.1": "1990-01-01",
-  "urn:oid:2.5.4.4": "Henkilö",
-  "urn:oid:1.2.246.575.1.14": "Testi",
-  "urn:oid:2.16.840.1.113730.3.1.241": "Testi Henkilö",
-  acr: "http://ftn.ficora.fi/2017/loatest2",
-  amr: ["https://tunnistus-pp.telia.fi/uas/saml2/names/ac/oidc.mock.1"],
-};
 
 function fail(msg: string): never {
   console.error(`✖ ${msg}`);
@@ -164,9 +152,9 @@ for (const persona of DEMO_PERSONAS) {
 }
 console.log(`✔ personas: ${DEMO_PERSONAS.map((p) => p.key).join(", ")}`);
 
-const payload = await login("testi", somebody);
+const payload = await login("testi", SOMEBODY_CLAIMS);
 console.log(
-  `✔ somebody else: ${Object.keys(somebody).join(", ")} (iss ${String(payload.iss)}, sub ${String(payload.sub)})`,
+  `✔ somebody else: ${Object.keys(SOMEBODY_CLAIMS).join(", ")} (iss ${String(payload.iss)}, sub ${String(payload.sub)})`,
 );
 
 // Step 4: one login through the Telia kit's client, in the plain dialect the

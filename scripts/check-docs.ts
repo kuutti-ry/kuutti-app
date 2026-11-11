@@ -33,6 +33,7 @@
 import { execFileSync } from "node:child_process";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
+import { expectProblems } from "./lib/self-test.ts";
 
 type Doc = { file: string; draws: string[] | undefined };
 
@@ -209,15 +210,7 @@ function selfTest(): void {
     ],
   ];
   for (const [name, given, exists, changed, messages, expected] of cases) {
-    const problems = problemsOf(given, exists, changed, messages);
-    const matches =
-      problems.length === expected.length &&
-      expected.every((start, i) => problems[i]?.startsWith(start));
-    if (!matches) {
-      console.error(`✖ self-test, ${name}: expected ${JSON.stringify(expected)}`);
-      console.error(`  got ${JSON.stringify(problems)}`);
-      process.exit(1);
-    }
+    expectProblems(name, problemsOf(given, exists, changed, messages), expected);
   }
   const block = "# T\n\n<!-- draws\napps/a.ts\n\n  infra/b/\n-->\n";
   const quoted = "# T\n\nText.\n\n```\n<!-- draws\napps/a.ts\n-->\n```\n";

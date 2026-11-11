@@ -140,13 +140,7 @@ export type DemoTarget = {
 
 /** What the server says it is. Asked of the connection the rows would go through. */
 export async function describeTarget(db: Queryable): Promise<DemoTarget> {
-  const { rows } = await db.query<{
-    database: string;
-    user: string;
-    host: string | null;
-    port: number | null;
-    managed: boolean;
-  }>(
+  const { rows } = await db.query<DemoTarget>(
     `SELECT current_database() AS database, current_user AS "user",
             host(inet_server_addr()) AS host, inet_server_port() AS port,
             EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'rdsadmin') AS managed`,

@@ -105,6 +105,9 @@ const SEEKS: Readonly<Record<Gender, Readonly<Record<string, number>>>> = {
  * research_id mapping together, synthetic people emit no events, and events
  * of people who never were would muddy the first real numbers (#73, out of scope).
  */
+/** The kinds the population consents to, in this order: never research (above). */
+export const POPULATION_CONSENTS = ["terms", "privacy", "special_category"] as const;
+
 type SyntheticConsent = {
   /** The two of the welcome screen and the special-category consent of the seek screen (#146, ADR-019 §4). */
   kind: "terms" | "privacy" | "special_category";
@@ -333,11 +336,11 @@ function onboarded(
   const agreedAt = new Date(
     registeredAt.getTime() + random.int(1, CONSENT_DELAY_MAX_MINUTES) * 60_000,
   );
-  const consents: SyntheticConsent[] = [
-    { kind: "terms", localeShown: language, givenAt: agreedAt },
-    { kind: "privacy", localeShown: language, givenAt: agreedAt },
-    { kind: "special_category", localeShown: language, givenAt: agreedAt },
-  ];
+  const consents: SyntheticConsent[] = POPULATION_CONSENTS.map((kind) => ({
+    kind,
+    localeShown: language,
+    givenAt: agreedAt,
+  }));
   return {
     label,
     state: "active",

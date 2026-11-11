@@ -248,3 +248,19 @@ export function pseudoLocalise(message: string): string {
     });
   return `［${printAST(transform(parse(message)))}］`;
 }
+
+/** Whether two texts use the same arguments: the same names, each of the same type. */
+export function sameArguments(
+  a: Record<string, ArgumentType>,
+  b: Record<string, ArgumentType>,
+): boolean {
+  const names = Object.keys(a).sort();
+  return (
+    names.join() === Object.keys(b).sort().join() && names.every((name) => a[name] === b[name])
+  );
+}
+
+/** Whether two texts carry the same tags: markup the app renders, kept exactly. */
+export function sameTags(a: string, b: string): boolean {
+  return [...tagsOf(a)].sort().join() === [...tagsOf(b)].sort().join();
+}

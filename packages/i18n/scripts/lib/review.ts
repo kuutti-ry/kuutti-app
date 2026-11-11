@@ -1,5 +1,6 @@
-import { isMap, parseDocument, Scalar, YAMLMap } from "yaml";
+import { isMap, parseDocument, Scalar, type YAMLMap } from "yaml";
 import { checkMessages } from "./check.ts";
+import { mark, unmark } from "./marks.ts";
 import { isStale, reviewHash } from "./review-hash.ts";
 import {
   isAdminKey,
@@ -184,22 +185,10 @@ function approvalProblem(
 
 /** Writes an approval: the flag goes, the hash of en and the text comes in its place. */
 function markReviewed(entry: YAMLMap, locale: TranslatedLocale, en: string, text: string): void {
-  const machine = entry.get("machine");
-  if (isMap(machine)) {
-    machine.delete(locale);
-    if (machine.items.length === 0) entry.delete("machine");
-  }
+  unmark(entry, "machine", locale);
   const hash = new Scalar(reviewHash(en, text));
   hash.type = "QUOTE_DOUBLE";
-  const reviewed = entry.get("reviewed");
-  if (isMap(reviewed)) {
-    reviewed.set(locale, hash);
-  } else {
-    const hashes = new YAMLMap();
-    hashes.flow = true;
-    hashes.set(locale, hash);
-    entry.set("reviewed", hashes);
-  }
+  mark(entry, "reviewed", locale, hash);
 }
 
 function entryOf(document: ReturnType<typeof parseDocument>, key: string): YAMLMap {

@@ -23,7 +23,7 @@ import {
   PreferencesResponse,
 } from "./onboarding.ts";
 import { ProfileDocument } from "./profile.ts";
-import { ExportedBlocks, ExportedReports } from "./report.ts";
+import { ExportAbout, ExportedBlocks, ExportedReports } from "./report.ts";
 import { ResearchExport } from "./research.ts";
 import { ExportedInvitations } from "./rewards.ts";
 import { ExportedSanction } from "./sanction.ts";
@@ -76,25 +76,19 @@ export const AccountEmailConfirmation = z
   .meta({ id: "AccountEmailConfirmation" });
 export type AccountEmailConfirmation = z.infer<typeof AccountEmailConfirmation>;
 
-export const AccountDeletionRequest = z
-  .object({
-    confirm: z
-      .literal(true)
-      .meta({ description: "Must be true: the person confirmed in the app." }),
-  })
-  .strict()
-  .meta({ id: "AccountDeletionRequest" });
+/** A body that only says yes: `confirm` must be true, the description saying who confirmed what. */
+const confirmation = (description: string) =>
+  z.object({ confirm: z.literal(true).meta({ description }) }).strict();
+
+export const AccountDeletionRequest = confirmation(
+  "Must be true: the person confirmed in the app.",
+).meta({ id: "AccountDeletionRequest" });
 export type AccountDeletionRequest = z.infer<typeof AccountDeletionRequest>;
 
 /** A body, so a stray call cannot pause an account; the screen asks the person to say they understand first (#170, ADR-022). */
-export const AccountPauseRequest = z
-  .object({
-    confirm: z
-      .literal(true)
-      .meta({ description: "Must be true: the person said they understand what a break means." }),
-  })
-  .strict()
-  .meta({ id: "AccountPauseRequest" });
+export const AccountPauseRequest = confirmation(
+  "Must be true: the person said they understand what a break means.",
+).meta({ id: "AccountPauseRequest" });
 export type AccountPauseRequest = z.infer<typeof AccountPauseRequest>;
 
 export const ExportedPhoto = Photo.extend({
@@ -114,7 +108,7 @@ export type ExportedPhoto = z.infer<typeof ExportedPhoto>;
  */
 export const ExportedPhotoCheck = z
   .object({
-    about: z.string().meta({ description: "What this part is, in the request's language." }),
+    about: ExportAbout,
     photosNotShown: z
       .array(
         z.object({
