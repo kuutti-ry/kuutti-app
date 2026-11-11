@@ -8,7 +8,7 @@ import {
   type ProfileUpdate,
   SPECIAL_CATEGORY_FIELDS,
 } from "@kuutti/schema";
-import { AppError } from "../lib/errors.ts";
+import { AppError, noLiveAccount } from "../lib/errors.ts";
 import { listApprovedPhotos } from "../media/index.ts";
 import { readHome } from "../pond/index.ts";
 import { track } from "../research/index.ts";
@@ -141,7 +141,7 @@ export async function saveProfile(
       [accountId],
     );
     // No row, no profile: the account was erased meanwhile (#51).
-    if (live.rows.length === 0) throw new AppError(404, "not_found", "No live account");
+    if (live.rows.length === 0) throw noLiveAccount();
     const consent = await (deps.specialCategoryConsent ?? noConsentYet)(tx, accountId);
     const missing = consentMissingFor(update.fields, consent !== null);
     if (missing.length > 0) {
@@ -151,7 +151,7 @@ export async function saveProfile(
       });
     }
     const row = await repo.upsertProfile(tx, accountId, update, deps.now());
-    if (!row) throw new AppError(404, "not_found", "No live account");
+    if (!row) throw noLiveAccount();
     return { row, consent };
   });
   const approved = await listApprovedPhotos(deps.db, accountId);

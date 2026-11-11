@@ -1,6 +1,8 @@
 import { type Queryable, transaction } from "@kuutti/db";
 import type { PlainMessageKey } from "@kuutti/i18n";
 import type { NotificationKind, PushData } from "@kuutti/schema";
+import { holdAccount } from "../lib/db.ts";
+import { errorName } from "../lib/errors.ts";
 import { finnishHour, msUntilFinnishHour } from "../lib/finnish-day.ts";
 import { tFor } from "../lib/i18n.ts";
 import type { Logger } from "../lib/logger.ts";
@@ -209,11 +211,7 @@ export function createPush(deps: PushDeps) {
         // Match lifecycle writers' order: account, sessions, then token rows.
         // Hold these through the bounded transport attempt. A committed change
         // must precede this check or wait until this submission has finished.
-        const account = await tx.query(
-          "SELECT 1 FROM account WHERE id = $1 AND state <> 'deleted' FOR SHARE",
-          [accountId],
-        );
-        if (account.rows.length === 0) return [];
+        if (!(await holdAccount(tx, accountId))) return [];
         const sessions = await tx.query<{ id: string; revoked_at: Date | null; expires_at: Date }>(
           `SELECT id, revoked_at, expires_at FROM session
             WHERE account_id = $1 AND id = ANY($2::uuid[]) ORDER BY id FOR SHARE`,
@@ -446,5 +444,5 @@ export type Push = ReturnType<typeof createPush>;
 function failure(error: unknown, kind: PushData["kind"]): Record<string, unknown> {
   return error instanceof PushFailed
     ? { push: kind, reason: error.reason, status: error.status }
-    : { push: kind, reason: error instanceof Error ? error.name : "unknown" };
+    : { push: kind, reason: errorName(error) };
 }

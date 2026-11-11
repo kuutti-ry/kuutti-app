@@ -7,6 +7,15 @@ import type {
   SanctionReason,
 } from "@kuutti/schema";
 
+/** The person keeps announcements to everybody on: no row is on (#573, ADR-068 §5). */
+const announcementsOn = (account: string) =>
+  `NOT EXISTS (SELECT 1 FROM notification_preference p
+                WHERE p.account_id = ${account} AND p.kind = 'announcement' AND NOT p.enabled)`;
+
+/** An address an announcement is mailed to: the account live, its address confirmed, the switch on. */
+const MAILED = `a.state <> 'deleted' AND a.email IS NOT NULL AND a.email_confirmed_at IS NOT NULL
+  AND ${announcementsOn("a.id")}`;
+
 // The notification choices and the notices (#176, ADR-032). Raw
 // parameterised SQL, as in the other slices; every statement names the
 // caller's account (rule 6). A warning's notice reads its sanction, the
@@ -301,14 +310,9 @@ export async function announcementReach(
           JOIN session s ON s.id = t.session_id AND s.account_id = t.account_id
           JOIN account a ON a.id = t.account_id AND a.state <> 'deleted'
          WHERE s.revoked_at IS NULL AND s.expires_at > $1
-           AND NOT EXISTS (SELECT 1 FROM notification_preference p
-                            WHERE p.account_id = t.account_id AND p.kind = 'announcement'
-                              AND NOT p.enabled)) AS phones,
+           AND ${announcementsOn("t.account_id")}) AS phones,
        (SELECT count(*)::int FROM account a
-         WHERE a.state <> 'deleted' AND a.email IS NOT NULL AND a.email_confirmed_at IS NOT NULL
-           AND NOT EXISTS (SELECT 1 FROM notification_preference p
-                            WHERE p.account_id = a.id AND p.kind = 'announcement'
-                              AND NOT p.enabled)) AS addresses`,
+         WHERE ${MAILED}) AS addresses`,
     [at],
   );
   return rows[0] ?? { accounts: 0, phones: 0, addresses: 0 };
@@ -362,10 +366,7 @@ export async function announcementMailOf(
               WHERE c.account_id = a.id AND c.kind = 'terms'
               ORDER BY c.given_at DESC LIMIT 1) AS locale
        FROM account a
-      WHERE a.id = $1 AND a.state <> 'deleted'
-        AND a.email IS NOT NULL AND a.email_confirmed_at IS NOT NULL
-        AND NOT EXISTS (SELECT 1 FROM notification_preference p
-                         WHERE p.account_id = a.id AND p.kind = 'announcement' AND NOT p.enabled)`,
+      WHERE a.id = $1 AND ${MAILED}`,
     [accountId],
   );
   const row = rows[0];

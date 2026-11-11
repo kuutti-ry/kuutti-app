@@ -5,7 +5,7 @@ import {
   PutObjectCommand,
   type S3Client,
 } from "@aws-sdk/client-s3";
-import type { PhotoVariant } from "@kuutti/schema";
+import { PHOTO_VARIANTS, type PhotoVariant } from "@kuutti/schema";
 
 // Where the variants live. One implementation over S3 (the compose stand-in locally, the
 // media bucket through the instance role on AWS, both via lib/s3.ts); tests
@@ -30,6 +30,11 @@ export type MediaStore = {
 /** media/<content address>/<variant>.webp: the object path of one variant. */
 export function objectKey(contentKey: string, variant: PhotoVariant): string {
   return `media/${contentKey}/${variant}.webp`;
+}
+
+/** The object paths of every variant of one content key. */
+export function variantKeys(contentKey: string): string[] {
+  return PHOTO_VARIANTS.map((variant) => objectKey(contentKey, variant));
 }
 
 export const WEBP = "image/webp";

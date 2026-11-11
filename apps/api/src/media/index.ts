@@ -26,8 +26,10 @@ export {
   issueConversationThumb,
   issueMessagePhotoUrls,
   type MediaDeps,
+  mediaUnavailable,
   type PreparedMessagePhoto,
   prepareMessagePhoto,
+  RETRY_AFTER_SECONDS,
   storeMessagePhoto,
   uploadPhoto,
 } from "./photos.ts";
@@ -41,7 +43,7 @@ export {
   recordCardServed,
   wasShown,
 } from "./repo.ts";
-export { photoRoutes, UPLOAD_ROUTE } from "./routes.ts";
+export { photoBodyLimit, photoRoutes, UPLOAD_ROUTE } from "./routes.ts";
 export { type MediaStore, memoryMediaStore, objectKey } from "./store.ts";
-export { cloudFrontSigner, staffPhotoUrl } from "./urls.ts";
+export { cloudFrontSigner, signedPhotoUrl } from "./urls.ts";
 export { createMediaDeps } from "./wiring.ts";

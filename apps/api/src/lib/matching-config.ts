@@ -1,5 +1,6 @@
 import type { Queryable } from "@kuutti/db";
 import type { DistanceEdges } from "@kuutti/schema";
+import type { z } from "zod";
 import { AppError } from "./errors.ts";
 
 /**
@@ -13,18 +14,43 @@ export async function readMatchingConfig(db: Queryable, key: string): Promise<un
     "SELECT value FROM matching_config WHERE key = $1 ORDER BY version DESC LIMIT 1",
     [key],
   );
-  if (rows.length === 0) {
-    throw new AppError(500, "internal_error", `matching_config has no row for ${key}`, { key });
-  }
+  if (rows.length === 0) throw noRow(key);
   return rows[0]?.value;
 }
 
-export async function matchingConfigNumber(db: Queryable, key: string): Promise<number> {
-  const value = await readMatchingConfig(db, key);
-  if (typeof value !== "number" || !Number.isFinite(value)) {
-    throw new AppError(500, "internal_error", `matching_config ${key} is not a number`, { key });
-  }
+/** A missing key: a deployment without its seed. */
+function noRow(key: string): AppError {
+  return new AppError(500, "internal_error", `matching_config has no row for ${key}`, { key });
+}
+
+/** A value of another shape than its reader's, `shape` in words: a broken deployment. */
+function notA(key: string, shape: string): AppError {
+  return new AppError(500, "internal_error", `matching_config ${key} is not ${shape}`, { key });
+}
+
+/** A value read as a number: finite, or `notA` a number. */
+function asNumber(key: string, value: unknown): number {
+  if (typeof value !== "number" || !Number.isFinite(value)) throw notA(key, "a number");
   return value;
+}
+
+export async function matchingConfigNumber(db: Queryable, key: string): Promise<number> {
+  return asNumber(key, await readMatchingConfig(db, key));
+}
+
+/**
+ * A value read as its contract's schema reads it; one of another shape is a
+ * broken deployment, answered 500 with the key named, its `shape` in words.
+ */
+export async function matchingConfigOf<T>(
+  db: Queryable,
+  key: string,
+  schema: z.ZodType<T>,
+  shape: string,
+): Promise<T> {
+  const parsed = schema.safeParse(await readMatchingConfig(db, key));
+  if (!parsed.success) throw notA(key, shape);
+  return parsed.data;
 }
 
 /**
@@ -42,14 +68,8 @@ export async function matchingConfigNumbers<K extends string>(
   const latest = new Map(rows.map((row) => [row.key, row.value]));
   const out = {} as Record<K, number>;
   for (const key of keys) {
-    if (!latest.has(key)) {
-      throw new AppError(500, "internal_error", `matching_config has no row for ${key}`, { key });
-    }
-    const value = latest.get(key);
-    if (typeof value !== "number" || !Number.isFinite(value)) {
-      throw new AppError(500, "internal_error", `matching_config ${key} is not a number`, { key });
-    }
-    out[key] = value;
+    if (!latest.has(key)) throw noRow(key);
+    out[key] = asNumber(key, latest.get(key));
   }
   return out;
 }
@@ -76,7 +96,7 @@ export async function distanceEdges(db: Queryable): Promise<DistanceEdges> {
  */
 export function asHour(key: string, value: number): number {
   if (!Number.isInteger(value) || value < 0 || value > 23) {
-    throw new AppError(500, "internal_error", `matching_config ${key} is not an hour`, { key });
+    throw notA(key, "an hour");
   }
   return value;
 }

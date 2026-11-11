@@ -1,6 +1,5 @@
 import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
 import {
-  ErrorResponse,
   InvitationCreated,
   InvitationParams,
   InvitationRedeemRequest,
@@ -12,6 +11,7 @@ import { callerOf } from "../lib/auth-middleware.ts";
 import type { AppEnv } from "../lib/env.ts";
 import { localisedEnvelope } from "../lib/errors.ts";
 import { matchingConfigNumber } from "../lib/matching-config.ts";
+import { bearer, errorContent, json, unauthenticated } from "../lib/openapi.ts";
 import { personOf, rateLimit } from "../lib/rate-limit.ts";
 import { dayWindow } from "../media/index.ts";
 import {
@@ -29,13 +29,6 @@ import {
 // answer once and in the redeem's body; neither reaches a log line, since
 // the request line names the route and the status alone.
 
-const errorContent = (description: string) => ({
-  description,
-  content: { "application/json": { schema: ErrorResponse } },
-});
-const json = <T>(schema: T) => ({ content: { "application/json": { schema } } });
-const bearer = { security: [{ session: [] }] };
-const unauthenticated = errorContent("unauthenticated, session_expired or session_revoked.");
 const erased = errorContent("not_found: the account was erased while the request was on its way.");
 
 const listRoute = createRoute({

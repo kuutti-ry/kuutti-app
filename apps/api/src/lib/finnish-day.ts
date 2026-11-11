@@ -32,8 +32,15 @@ export function finnishHour(at: Date): number {
   return Number(hour) % 24;
 }
 
-const HOUR_MS = 60 * 60 * 1000;
-const DAY_MS = 24 * HOUR_MS;
+/** An hour in milliseconds. */
+export const HOUR_MS = 60 * 60 * 1000;
+
+/**
+ * 24 hours in milliseconds: a day as the counts and windows here measure it,
+ * in SQL as in JS, whatever summer time does. Not a Finnish calendar day,
+ * which is 23 or 25 hours when the clocks change (`finnishDay`).
+ */
+export const DAY_MS = 24 * HOUR_MS;
 
 /**
  * Milliseconds from `now` to the next `hour`:00 Europe/Helsinki, whatever the

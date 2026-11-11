@@ -6,6 +6,7 @@ import {
   type FeedbackKind,
   type FeedbackPlatform,
 } from "@kuutti/schema";
+import { advisoryLock } from "../lib/db.ts";
 
 /**
  * Feedback from inside the app (#171, ADR-023, features/safety/feedback.feature):
@@ -44,7 +45,7 @@ export type FeedbackRecord = {
 /** One row under the day's cap: the count and the insert in one statement, so two sends cannot both pass a separate count. */
 export async function recordFeedback(db: Queryable, input: NewFeedback): Promise<FeedbackRecord> {
   return transaction(db, async (tx) => {
-    await tx.query("SELECT pg_advisory_xact_lock(hashtext($1))", [`feedback:${input.accountId}`]);
+    await advisoryLock(tx, `feedback:${input.accountId}`);
     const { rows } = await tx.query<{ live: boolean; used: number; id: string | null }>(
       // Hold the live account through the insert: erasure must see this row or refuse it (TD-7).
       `WITH live AS (SELECT 1 FROM account WHERE id = $1 AND state <> 'deleted' FOR SHARE),

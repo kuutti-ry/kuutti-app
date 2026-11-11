@@ -1,7 +1,7 @@
 import type { Queryable } from "@kuutti/db";
 import type { ModeratorRole } from "@kuutti/schema";
 import type { Context, MiddlewareHandler } from "hono";
-import { hashToken } from "./auth-middleware.ts";
+import { admit, bearerToken, hashToken, TOKEN } from "./auth-middleware.ts";
 import type { AppEnv } from "./env.ts";
 import { AppError } from "./errors.ts";
 
@@ -13,8 +13,6 @@ import { AppError } from "./errors.ts";
 // access today, eight-hour token or not.
 
 export { hashToken };
-
-const TOKEN = /^[A-Za-z0-9_-]{43}$/;
 
 export type AdminLookup = {
   sessionId: string;
@@ -46,8 +44,7 @@ export function requireAdmin(deps: {
   // The function's name is what the route-table test looks for, and the roles
   // ride on it so the test can hold a route to the guard it needs (ADR-024 §3).
   const guard: MiddlewareHandler<AppEnv> = async function requireAdmin(c, next) {
-    const header = c.req.header("authorization") ?? "";
-    const token = header.startsWith("Bearer ") ? header.slice(7).trim() : "";
+    const token = bearerToken(c);
     if (!TOKEN.test(token)) throw new AppError(401, "unauthenticated", "No admin token");
     const found = await deps.store.findByAccessHash(deps.db, hashToken(token));
     const at = now();
@@ -69,12 +66,7 @@ export function requireAdmin(deps: {
     c.set("adminExpiresAt", found.expiresAt.toISOString());
     // Never kept by a browser or anybody in between: the panel reads people's answers (ADR-010 §16).
     c.header("Cache-Control", "no-store");
-    // A request the limiter refuses writes nothing, not even the touch.
-    const admitted = async () => {
-      await deps.store.touch(deps.db, found.sessionId, at);
-      await next();
-    };
-    return deps.limit ? deps.limit(c, admitted) : admitted();
+    return admit(c, next, deps, found.sessionId, at);
   };
   return Object.assign(guard, { roles: deps.roles });
 }

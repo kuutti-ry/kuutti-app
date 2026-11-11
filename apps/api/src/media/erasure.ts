@@ -1,14 +1,15 @@
 import type { Queryable } from "@kuutti/db";
-import {
-  type ExportedPhoto,
-  type ExportedPhotoReview,
-  type ExportedSentPhoto,
+import type {
+  ExportedPhoto,
+  ExportedPhotoReview,
+  ExportedSentPhoto,
   PHOTO_VARIANTS,
+  PhotoPurpose,
 } from "@kuutti/schema";
 import type { Logger } from "../lib/logger.ts";
 import { type PhotoServiceDeps, toPhoto } from "./photos.ts";
 import * as repo from "./repo.ts";
-import { type MediaStore, objectKey } from "./store.ts";
+import { type MediaStore, objectKey, variantKeys } from "./store.ts";
 
 // The media slice's half of erasure and export (#51, TD-7), called by the
 // identity slice through index.ts. Rows go inside the caller's transaction;
@@ -79,9 +80,7 @@ export async function deleteOrphanedObjects(
   let objectKeys: string[] = [];
   try {
     const orphaned = await repo.orphanedKeys(deps.db, keys);
-    objectKeys = orphaned.flatMap((key) =>
-      PHOTO_VARIANTS.map((variant) => objectKey(key, variant)),
-    );
+    objectKeys = orphaned.flatMap((key) => variantKeys(key));
     if (objectKeys.length === 0) return 0;
     await deps.store.delete(objectKeys);
     return objectKeys.length;
@@ -206,21 +205,24 @@ export async function exportPhotos(
   const store = "store" in deps ? deps.store : null;
   const photos: Array<Omit<ExportedPhoto, "descriptionText">> = [];
   const files: ExportedPhotoFile[] = [];
+  /** A photo's full size into the zip, named by its row's id, and the read in the fetch log. */
+  const carry = async (photoId: string, bytes: Uint8Array, purpose: PhotoPurpose) => {
+    const file = exportedPhotoPath(photoId);
+    files.push({ path: file, bytes });
+    await repo.logPhotoAccess(deps.db, {
+      accountId,
+      photoId,
+      variant: "full",
+      at: deps.now(),
+      purpose,
+    });
+    return file;
+  };
   for (const row of rows) {
-    let file: string | null = null;
     // Two rows may share one object (the same picture uploaded twice): each
     // row gets its own file, named by the row's id.
     const bytes = store ? await store.get(objectKey(row.key, "full")) : null;
-    if (bytes) {
-      file = exportedPhotoPath(row.id);
-      files.push({ path: file, bytes });
-      await repo.logPhotoAccess(deps.db, {
-        accountId,
-        photoId: row.id,
-        variant: "full",
-        at: deps.now(),
-      });
-    }
+    const file = bytes ? await carry(row.id, bytes, "profile") : null;
     const review = reviews.get(row.id);
     photos.push({ ...toPhoto(row), file, review: review ? exportedReview(review) : null });
   }
@@ -236,18 +238,7 @@ export async function exportPhotos(
       store && sent.size < EXPORT_MESSAGE_PHOTOS_MAX
         ? await store.get(objectKey(photo.key, "full"))
         : null;
-    let file: string | null = null;
-    if (bytes) {
-      file = exportedPhotoPath(photo.id);
-      files.push({ path: file, bytes });
-      await repo.logPhotoAccess(deps.db, {
-        accountId,
-        photoId: photo.id,
-        variant: "full",
-        at: deps.now(),
-        purpose: "message",
-      });
-    }
+    const file = bytes ? await carry(photo.id, bytes, "message") : null;
     const review = reviews.get(photo.id);
     sent.set(photo.id, {
       file,

@@ -29,6 +29,9 @@ type PreferenceReader = (
   accountId: string,
 ) => Promise<{ seeks: unknown | null; ageWindow: unknown | null }>;
 
+/** Every refusal of a card, whatever the reason, so the answer tells none of them apart. */
+const noCard = () => new AppError(404, "not_found", "No such card");
+
 const noPreferencesYet: PreferenceReader = async () => ({ seeks: null, ageWindow: null });
 
 /** The special-category consent as the identity slice's consent rows hold it (ADR-019 §4, #204); without a reader nothing special is stored and the document echoes none. */
@@ -126,17 +129,13 @@ export async function buildCard(
 ): Promise<{ card: ProfileCard | null; completeness: Completeness }> {
   const own = input.viewerAccountId === input.subjectAccountId;
   const subject = await repo.findCardSubject(deps.db, input);
-  if (!subject || subject.state === "deleted") {
-    throw new AppError(404, "not_found", "No such card");
-  }
+  if (!subject || subject.state === "deleted") throw noCard();
   // For anyone but the owner only a live account is a card: a suspension or
   // a shadow ban holds at this gate too, whatever the caller filtered. A
   // block of either side holds here as well (rule 7, #84, ADR-030 §2), the
   // same answer as for anybody outside the pool, before anything is
   // recorded or counted.
-  if (!own && (subject.state !== "active" || subject.blocked)) {
-    throw new AppError(404, "not_found", "No such card");
-  }
+  if (!own && (subject.state !== "active" || subject.blocked)) throw noCard();
   const [photos, rules, viewer] = await Promise.all([
     listApprovedPhotos(deps.db, subject.accountId),
     homeRules(deps.db),
@@ -147,10 +146,10 @@ export async function buildCard(
   const at = deps.now();
   if (!subject.profile || subject.birthYear === null || subject.birthMonth === null) {
     if (own) return { card: null, completeness: done };
-    throw new AppError(404, "not_found", "No such card");
+    throw noCard();
   }
   if (!own) {
-    if (!done.complete) throw new AppError(404, "not_found", "No such card");
+    if (!done.complete) throw noCard();
     const day = dayWindow(at);
     const limit = await matchingConfigNumber(deps.db, CARDS_PER_DAY_KEY);
     const served = await recordCardServed(deps.db, {
@@ -163,7 +162,7 @@ export async function buildCard(
     });
     // A block that landed after findCardSubject's look, or the viewer erased
     // meanwhile: the same 404, nothing written.
-    if (served.blocked || !served.live) throw new AppError(404, "not_found", "No such card");
+    if (served.blocked || !served.live) throw noCard();
     if (!served.recorded) {
       const retryAfterSeconds = secondsUntil(day.end, at);
       deps.logger.warn(

@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import type { Queryable } from "@kuutti/db";
-import type { Context, MiddlewareHandler } from "hono";
+import type { Context, MiddlewareHandler, Next } from "hono";
 import type { AppEnv, Caller } from "./env.ts";
 import { AppError } from "./errors.ts";
 
@@ -10,7 +10,37 @@ import { AppError } from "./errors.ts";
 // comes from here (rule 6), and app.test.ts checks that every route outside the
 // public list sits behind it.
 
-const TOKEN = /^[A-Za-z0-9_-]{43}$/;
+/** A token's shape, a session's or an admin session's: 256 random bits in base64url, refused before any lookup otherwise. */
+export const TOKEN = /^[A-Za-z0-9_-]{43}$/;
+
+/** The request's bearer value, or "" when it carries none. */
+export function bearerToken(c: Context<AppEnv>): string {
+  const header = c.req.header("authorization") ?? "";
+  return header.startsWith("Bearer ") ? header.slice(7).trim() : "";
+}
+
+/**
+ * A guard's last step: the person's limiter when there is one, then the
+ * session's touch and the route. A request the limiter refuses writes
+ * nothing, not even the touch.
+ */
+export function admit(
+  c: Context<AppEnv>,
+  next: Next,
+  deps: {
+    db: Queryable;
+    store: { touch(db: Queryable, sessionId: string, at: Date): Promise<void> };
+    limit?: MiddlewareHandler<AppEnv>;
+  },
+  sessionId: string,
+  at: Date,
+) {
+  const admitted = async () => {
+    await deps.store.touch(deps.db, sessionId, at);
+    await next();
+  };
+  return deps.limit ? deps.limit(c, admitted) : admitted();
+}
 
 export type SessionLookup = {
   accountId: string;
@@ -79,21 +109,14 @@ export function requireSession(deps: {
   const now = deps.now ?? (() => new Date());
   // The function's name is what the route-table test looks for.
   return async function requireSession(c, next) {
-    const header = c.req.header("authorization") ?? "";
-    const token = header.startsWith("Bearer ") ? header.slice(7).trim() : "";
     const at = now();
-    const found = await authenticate(deps, token, at);
+    const found = await authenticate(deps, bearerToken(c), at);
     c.set("accountId", found.accountId);
     c.set("sessionId", found.sessionId);
     // Never kept by anybody in between, the phone's own HTTP cache included: what
     // a session reads is that person's, whom they seek among it (ADR-010 §16).
     c.header("Cache-Control", "no-store");
-    // A request the limiter refuses writes nothing, not even the touch.
-    const admitted = async () => {
-      await deps.store.touch(deps.db, found.sessionId, at);
-      await next();
-    };
-    return deps.limit ? deps.limit(c, admitted) : admitted();
+    return admit(c, next, deps, found.sessionId, at);
   };
 }
 

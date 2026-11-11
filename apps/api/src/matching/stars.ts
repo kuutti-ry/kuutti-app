@@ -14,14 +14,15 @@ import {
   addPlaces,
   budgetsOf,
   type CardOf,
+  ENTRY_COLUMNS,
   type EntryRow,
   entriesOf,
+  lockCard,
   type Matches,
   notFound,
   type Place,
   type RoundDeps,
   SERVABLE,
-  STAR_OF_ENTRY,
   todayOrRefuse,
 } from "./rounds.ts";
 
@@ -74,21 +75,11 @@ export async function putStar(
 ): Promise<StarAnswer> {
   const { at, today } = todayOrRefuse(deps, input.day);
   return transaction(deps.db, async (tx) => {
-    const card = await tx.query<{ candidate_id: string }>(
-      `SELECT e.candidate_id FROM round_entries e JOIN rounds r ON r.id = e.round_id
-        WHERE r.account_id = $1 AND r.day = $2 AND e.position = $3`,
-      [input.accountId, today, input.position],
-    );
-    const candidateId = card.rows[0]?.candidate_id;
-    if (!candidateId) throw notFound();
-    await tx.query("SELECT 1 FROM account WHERE id = ANY($1::uuid[]) ORDER BY id FOR SHARE", [
-      [input.accountId, candidateId],
-    ]);
-    const round = await tx.query(
-      "SELECT 1 FROM rounds WHERE account_id = $1 AND day = $2 FOR UPDATE",
-      [input.accountId, today],
-    );
-    if (round.rows.length === 0) throw notFound();
+    const { candidateId } = await lockCard(tx, {
+      accountId: input.accountId,
+      today,
+      position: input.position,
+    });
     const open = await tx.query(
       `SELECT 1 FROM round_entries e JOIN rounds r ON r.id = e.round_id
         WHERE r.account_id = $1 AND r.day = $2 AND e.position = $3
@@ -145,8 +136,7 @@ async function entryOfCandidate(
   candidateId: string,
 ): Promise<EntryRow | null> {
   const { rows } = await db.query<EntryRow>(
-    `SELECT e.position, e.candidate_id, e.reason, e.decision, e.fish, e.relaxed_field, e.distance,
-            ${STAR_OF_ENTRY}
+    `SELECT ${ENTRY_COLUMNS}
        FROM round_entries e JOIN rounds r ON r.id = e.round_id
       WHERE r.account_id = $1 AND r.day = $2 AND e.candidate_id = $3`,
     [accountId, day, candidateId],

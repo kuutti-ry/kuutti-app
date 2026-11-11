@@ -1,5 +1,6 @@
 import type { Queryable } from "@kuutti/db";
 import type { PhotoCheckKind } from "@kuutti/schema";
+import { DAY_MS } from "../lib/finnish-day.ts";
 import { matchingConfigNumbers } from "../lib/matching-config.ts";
 
 /**
@@ -28,9 +29,6 @@ export type CloserLook = {
   /** The reject line of every hard group while it is on. */
   reject: number;
 };
-
-/** A day here is 24 hours, in SQL as in JS, whatever the session's time zone does with summer time. */
-const DAY_MS = 86_400_000;
 
 /**
  * One note, written in the transaction that rejects the photo. A message

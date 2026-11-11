@@ -10,6 +10,7 @@ import {
 } from "@kuutti/schema";
 import { z } from "zod";
 import type { NightlyJob } from "../jobs/nightly.ts";
+import { addDays } from "../lib/finnish-day.ts";
 import type { Logger } from "../lib/logger.ts";
 import { census, type Released, remember } from "./copy-census.ts";
 import { type CopyRow, encodeDay, releasedIn } from "./copy-file.ts";
@@ -42,11 +43,9 @@ const WINDOW_DAYS = EVENTS_RETENTION_DAYS;
  * hours after midnight UTC.
  */
 const SETTLE_MS = 60 * 60 * 1000;
-const DAY_MS = 24 * 60 * 60 * 1000;
 
 const dayOf = (at: Date) => at.toISOString().slice(0, 10);
 const startOf = (day: string) => new Date(`${day}T00:00:00.000Z`);
-const addDays = (day: string, n: number) => dayOf(new Date(startOf(day).getTime() + n * DAY_MS));
 
 export type CopyRun = {
   /** 1 when another container held the lock and this run wrote nothing. */

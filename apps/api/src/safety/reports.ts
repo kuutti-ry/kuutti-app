@@ -6,15 +6,16 @@ import {
   lockReportedConversation,
   reportWindowHolds,
 } from "../chat/index.ts";
+import { advisoryLock, holdAccount } from "../lib/db.ts";
+import { DAY_MS } from "../lib/finnish-day.ts";
 import type { Logger } from "../lib/logger.ts";
 import {
   deleteOrphanedObjects,
   eraseReleasedPhotos,
   holdShownPhoto,
   type MediaStore,
-  wasShown,
 } from "../media/index.ts";
-import { blockStandsBetween, insertBlock } from "./blocks.ts";
+import { contactProven, insertBlock } from "./blocks.ts";
 
 /**
  * Reports (#84, ADR-030, features/safety/reports.feature): a person tells the
@@ -39,9 +40,6 @@ export const REPORTS_PER_DAY_KEY = "reports_per_day";
 
 /** Twelve months (TD-7's report snapshots, rules/db.md); the nightly prune keeps it. */
 export const REPORT_RETENTION_DAYS = 365;
-
-/** A day here is 24 hours, in SQL as in JS, as for the photo check's notes. */
-const DAY_MS = 86_400_000;
 
 export type NewReport = {
   reporterAccountId: string;
@@ -80,36 +78,15 @@ export type ReportRecord =
  */
 export async function recordReport(db: Queryable, input: NewReport): Promise<ReportRecord> {
   return transaction(db, async (tx) => {
-    await tx.query("SELECT pg_advisory_xact_lock(hashtext($1))", [
-      `report:${input.reporterAccountId}`,
-    ]);
-    const live = await tx.query(
-      "SELECT 1 FROM account WHERE id = $1 AND state <> 'deleted' FOR SHARE",
-      [input.reporterAccountId],
-    );
-    if (live.rows.length === 0) return { outcome: "not_found" };
-    const { rows } = await tx.query<{ open: boolean; used: number }>(
-      `SELECT EXISTS (SELECT 1 FROM report WHERE reporter_account_id = $1
-                        AND reported_account_id = $2 AND decided_at IS NULL) AS open,
-              (SELECT count(*)::int FROM report
-               WHERE reporter_account_id = $1 AND created_at >= $3) AS used`,
-      [input.reporterAccountId, input.reportedAccountId, input.since],
-    );
-    const row = rows[0];
-    if (!row) throw new Error("report count returned no row");
-    if (row.open) return { outcome: "open" };
-    if (row.used >= input.limit) return { outcome: "over_budget", used: row.used };
+    if (!(await holdReporter(tx, input.reporterAccountId))) return { outcome: "not_found" };
+    const refused = await pairRefusal(tx, input);
+    if (refused) return refused;
     // Proof of contact: a block that stands between the two (a report blocks
     // too, so a report decided and asked again finds one), else a card shown.
-    const proven =
-      (await blockStandsBetween(tx, {
-        callerAccountId: input.reporterAccountId,
-        otherAccountId: input.reportedAccountId,
-      })) ||
-      (await wasShown(tx, {
-        viewerAccountId: input.reporterAccountId,
-        subjectAccountId: input.reportedAccountId,
-      }));
+    const proven = await contactProven(tx, {
+      callerAccountId: input.reporterAccountId,
+      otherAccountId: input.reportedAccountId,
+    });
     if (!proven) return { outcome: "not_found" };
     // The photo the report points at (#476), asked only now, so a pointer
     // changes no answer: one of the card's the reporter was shown, held until
@@ -192,14 +169,7 @@ export async function recordConversationReport(
   input: NewConversationReport,
 ): Promise<ConversationReportRecord> {
   return transaction(db, async (tx) => {
-    await tx.query("SELECT pg_advisory_xact_lock(hashtext($1))", [
-      `report:${input.reporterAccountId}`,
-    ]);
-    const live = await tx.query(
-      "SELECT 1 FROM account WHERE id = $1 AND state <> 'deleted' FOR SHARE",
-      [input.reporterAccountId],
-    );
-    if (live.rows.length === 0) return { outcome: "not_found" };
+    if (!(await holdReporter(tx, input.reporterAccountId))) return { outcome: "not_found" };
     const found = await lockReportedConversation(tx, input.reporterAccountId, input.conversationId);
     if (!found) return { outcome: "not_found" };
     const reported = found.counterpartId;
@@ -212,17 +182,13 @@ export async function recordConversationReport(
     if (reported === null || !reportWindowHolds(found.closedAt, input.at, input.afterCloseDays)) {
       return { outcome: "window_closed" };
     }
-    const { rows } = await tx.query<{ open: boolean; used: number }>(
-      `SELECT EXISTS (SELECT 1 FROM report WHERE reporter_account_id = $1
-                        AND reported_account_id = $2 AND decided_at IS NULL) AS open,
-              (SELECT count(*)::int FROM report
-               WHERE reporter_account_id = $1 AND created_at >= $3) AS used`,
-      [input.reporterAccountId, reported, input.since],
-    );
-    const row = rows[0];
-    if (!row) throw new Error("report count returned no row");
-    if (row.open) return { outcome: "open" };
-    if (row.used >= input.limit) return { outcome: "over_budget", used: row.used };
+    const refused = await pairRefusal(tx, {
+      reporterAccountId: input.reporterAccountId,
+      reportedAccountId: reported,
+      since: input.since,
+      limit: input.limit,
+    });
+    if (refused) return refused;
     // The photo line the report points at (#476), asked only now and before
     // the block hides the conversation from the reporter: a photo the other
     // person sent that the reporter could read; any other line is left out.
@@ -266,6 +232,38 @@ export async function recordConversationReport(
     });
     return { outcome: "filed", reportedAccountId: reported };
   });
+}
+
+/**
+ * The reporter's advisory lock, under which every report of theirs is filed
+ * so that two at once cannot both pass the day's count, then their row held;
+ * false when they are erased.
+ */
+async function holdReporter(db: Queryable, reporterAccountId: string): Promise<boolean> {
+  await advisoryLock(db, `report:${reporterAccountId}`);
+  return holdAccount(db, reporterAccountId);
+}
+
+/**
+ * A report's two refusals, from a card or a conversation alike: one of the
+ * pair still open, then the day's cap spent; null when neither refuses.
+ */
+async function pairRefusal(
+  db: Queryable,
+  input: { reporterAccountId: string; reportedAccountId: string; since: Date; limit: number },
+): Promise<{ outcome: "open" } | { outcome: "over_budget"; used: number } | null> {
+  const { rows } = await db.query<{ open: boolean; used: number }>(
+    `SELECT EXISTS (SELECT 1 FROM report WHERE reporter_account_id = $1
+                      AND reported_account_id = $2 AND decided_at IS NULL) AS open,
+            (SELECT count(*)::int FROM report
+             WHERE reporter_account_id = $1 AND created_at >= $3) AS used`,
+    [input.reporterAccountId, input.reportedAccountId, input.since],
+  );
+  const row = rows[0];
+  if (!row) throw new Error("report count returned no row");
+  if (row.open) return { outcome: "open" };
+  if (row.used >= input.limit) return { outcome: "over_budget", used: row.used };
+  return null;
 }
 
 /** The caller's own report from this conversation, still waiting for a moderator. */

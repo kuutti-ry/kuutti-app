@@ -1,8 +1,9 @@
 import { createServer, type Server, type Socket } from "node:net";
 import { createPool } from "@kuutti/db";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { testPool } from "../test/harness.ts";
-import { checkDb } from "./db.ts";
+import { signedInAccount } from "../test/account.ts";
+import { test, testPool } from "../test/harness.ts";
+import { advisoryLock, checkDb, holdAccount, lockLiveAccount } from "./db.ts";
 
 // The health probe's database check (#5): SELECT 1 under a hard timeout, where
 // a database that does not answer is a state of the probe, never a hang.
@@ -57,5 +58,49 @@ describe("checkDb", () => {
       for (const socket of sockets) socket.destroy();
       await hanging.end().catch(() => undefined);
     }
+  });
+});
+
+// The shared locks (#610): a name's advisory lock, and the account's row held or locked.
+
+describe("advisoryLock", () => {
+  test("holds its name for the caller's transaction, and only that name", async ({ ctx }) => {
+    await advisoryLock(ctx.client, "lib_test:one");
+    const other = await testPool().connect();
+    try {
+      await other.query("BEGIN");
+      const tryLock = async (name: string) =>
+        (
+          await other.query<{ got: boolean }>(
+            "SELECT pg_try_advisory_xact_lock(hashtext($1)) AS got",
+            [name],
+          )
+        ).rows[0]?.got;
+      expect(await tryLock("lib_test:one")).toBe(false);
+      expect(await tryLock("lib_test:two")).toBe(true);
+    } finally {
+      await other.query("ROLLBACK");
+      other.release();
+    }
+  });
+});
+
+describe.each([
+  ["holdAccount", holdAccount],
+  ["lockLiveAccount", lockLiveAccount],
+])("%s", (_name, take) => {
+  test("is true for a live account", async ({ ctx }) => {
+    const { accountId } = await signedInAccount(ctx.client);
+    expect(await take(ctx.client, accountId)).toBe(true);
+  });
+
+  test("is false for an erased account and for nobody", async ({ ctx }) => {
+    const { accountId } = await signedInAccount(ctx.client);
+    await ctx.client.query(
+      "UPDATE account SET state = 'deleted', deleted_at = now() WHERE id = $1",
+      [accountId],
+    );
+    expect(await take(ctx.client, accountId)).toBe(false);
+    expect(await take(ctx.client, "00000000-0000-4000-8000-000000000000")).toBe(false);
   });
 });

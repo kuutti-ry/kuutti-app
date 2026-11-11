@@ -11,6 +11,7 @@ import type {
   PhotoState,
   PhotoVariant,
 } from "@kuutti/schema";
+import { advisoryLock } from "../lib/db.ts";
 
 // Raw parameterised SQL for the same reason as identity/repo.ts: Deps.db is
 // the Queryable seam the test harness hands a rolled-back transaction through.
@@ -294,9 +295,7 @@ export async function recordCardServed(
   },
 ): Promise<CardServed> {
   return transaction(db, async (tx) => {
-    await tx.query("SELECT pg_advisory_xact_lock(hashtext($1))", [
-      `card_shown:${input.viewerAccountId}`,
-    ]);
+    await advisoryLock(tx, `card_shown:${input.viewerAccountId}`);
     const { rows } = await tx.query<{
       used: number;
       allowed: boolean;
@@ -424,9 +423,7 @@ export async function insertPhotoAccess(
   },
 ): Promise<PhotoAccessResult> {
   return transaction(db, async (tx) => {
-    await tx.query("SELECT pg_advisory_xact_lock(hashtext($1))", [
-      `photo_access:${input.accountId}:${input.variant}`,
-    ]);
+    await advisoryLock(tx, `photo_access:${input.accountId}:${input.variant}`);
     const { rows } = await tx.query<{
       live: boolean;
       used: number;

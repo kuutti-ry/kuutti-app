@@ -1,7 +1,6 @@
 import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
 import { DEFAULT_LOCALE } from "@kuutti/i18n";
 import {
-  ErrorResponse,
   NoticeParams,
   Notices,
   NotificationChoices,
@@ -13,6 +12,7 @@ import type { MiddlewareHandler } from "hono";
 import type { Deps } from "../app.ts";
 import { callerOf } from "../lib/auth-middleware.ts";
 import type { AppEnv } from "../lib/env.ts";
+import { bearer, errorContent, json, unauthenticated } from "../lib/openapi.ts";
 import { choicesOf, noticesOf, readNotice, setChoice } from "./notifications.ts";
 import { registerPushToken } from "./tokens.ts";
 
@@ -20,14 +20,6 @@ import { registerPushToken } from "./tokens.ts";
 // the device's push token (#102, ADR-055 §2), behind the session guard, each
 // statement naming the caller's account (rule 6) but the token's one move,
 // which says why in tokens.ts. Nothing here sends anything.
-
-const errorContent = (description: string) => ({
-  description,
-  content: { "application/json": { schema: ErrorResponse } },
-});
-const json = <T>(schema: T) => ({ content: { "application/json": { schema } } });
-const bearer = { security: [{ session: [] }] };
-const unauthenticated = errorContent("unauthenticated, session_expired or session_revoked.");
 
 const choicesRoute = createRoute({
   method: "get",

@@ -13,6 +13,7 @@ import {
   type PhotoRejectionReason,
 } from "@kuutti/schema";
 import sharp from "sharp";
+import { DAY_MS } from "../lib/finnish-day.ts";
 import type { Logger } from "../lib/logger.ts";
 import { matchingConfigNumbers } from "../lib/matching-config.ts";
 import { closerLookOf, recordPhotoCheckNote } from "../safety/index.ts";
@@ -369,6 +370,17 @@ export function rekognitionModerator(client: RekognitionClient): Moderator {
   };
 }
 
+/** What a check that never ran saw: nothing. Read, never changed, by every decision. */
+const UNCHECKED: Inspection = {
+  checked: false,
+  labels: [],
+  tipLabels: [],
+  faceConfidences: [],
+  seen: NOTHING_SEEN,
+  modelVersion: null,
+  calls: 0,
+};
+
 /**
  * No automatic check: everything goes to a person. What a developer's machine
  * runs (no Rekognition without the instance role), and the fail-closed answer
@@ -379,15 +391,7 @@ export function queueAllModerator(): Moderator {
   return {
     kind: "queue",
     async inspect() {
-      return {
-        checked: false,
-        labels: [],
-        tipLabels: [],
-        faceConfidences: [],
-        seen: NOTHING_SEEN,
-        modelVersion: null,
-        calls: 0,
-      };
+      return UNCHECKED;
     },
   };
 }
@@ -545,16 +549,6 @@ export type MessagePhotoCheck = {
 /** The check could not run: a message photo is then refused, never delivered unchecked. */
 export class CheckUnavailableError extends Error {}
 
-const UNCHECKED: Inspection = {
-  checked: false,
-  labels: [],
-  tipLabels: [],
-  faceConfidences: [],
-  seen: NOTHING_SEEN,
-  modelVersion: null,
-  calls: 0,
-};
-
 /**
  * The check of a photo sent in a conversation (#350), before anything is
  * stored: the full size, since that is what the recipient sees and the
@@ -685,8 +679,6 @@ export async function sweepPendingPhotos(
 }
 
 const QUEUE_REJECT_DAYS_KEY = "photo_queue_reject_days";
-/** A day here is 24 hours, as the closer look counts it, whatever summer time does. */
-const DAY_MS = 86_400_000;
 
 /**
  * The nightly limit on the queue (#376, ADR-006 §2, the maintainer's decision

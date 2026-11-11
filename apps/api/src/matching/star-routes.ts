@@ -1,31 +1,18 @@
 import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
-import {
-  ErrorResponse,
-  RoundEntryParams,
-  RoundResponse,
-  StarAnswer,
-  StarList,
-  StarParams,
-} from "@kuutti/schema";
+import { RoundEntryParams, RoundResponse, StarAnswer, StarList, StarParams } from "@kuutti/schema";
 import type { MiddlewareHandler } from "hono";
 import type { Deps } from "../app.ts";
 import { callerOf } from "../lib/auth-middleware.ts";
 import type { AppEnv } from "../lib/env.ts";
-import { AppError } from "../lib/errors.ts";
-import { type OwnFieldsReader, readDealBreakers } from "./deal-breakers.ts";
+import { retryAfterOf } from "../lib/errors.ts";
+import { bearer, errorContent, json, unauthenticated } from "../lib/openapi.ts";
+import { filteringDealBreakers, type OwnFieldsReader } from "./deal-breakers.ts";
 import type { CardOf, Matches, RoundDeps } from "./rounds.ts";
 import { clearStar, openStar, putStar, type Stars } from "./stars.ts";
 
 // The stars for the app (#575, ADR-064). A star is put on a card by its place, and
 // read, opened and cleared by its own id; no route takes another person's id.
 
-const errorContent = (description: string) => ({
-  description,
-  content: { "application/json": { schema: ErrorResponse } },
-});
-const json = <T>(schema: T) => ({ content: { "application/json": { schema } } });
-const bearer = { security: [{ session: [] }] };
-const unauthenticated = errorContent("unauthenticated, session_expired or session_revoked.");
 const noStar = errorContent(
   "not_found: no such star of the caller's, or somebody the list leaves out now.",
 );
@@ -145,11 +132,7 @@ export function starRoutes(
     const { accountId } = callerOf(c);
     try {
       // The caller's own deal-breakers that filter now, for the card's "did not answer" (ADR-042 §8).
-      const dealBreakers = (
-        await readDealBreakers(deps.db, accountId, await readOwnFields(accountId))
-      )
-        .filter((dealBreaker) => !dealBreaker.paused)
-        .map(({ paused: _paused, ...dealBreaker }) => dealBreaker);
+      const dealBreakers = await filteringDealBreakers(deps.db, accountId, readOwnFields);
       const answer = await openStar(rounds(), matches, stars, cardOf, dealBreakers, {
         accountId,
         id: c.req.valid("param").id,
@@ -157,11 +140,8 @@ export function starRoutes(
       await read(accountId);
       return c.json(answer, 200);
     } catch (error) {
-      if (error instanceof AppError) {
-        const wait = (error.detail as { retryAfterSeconds?: number } | undefined)
-          ?.retryAfterSeconds;
-        if (wait !== undefined) c.header("Retry-After", String(wait));
-      }
+      const wait = retryAfterOf(error);
+      if (wait !== undefined) c.header("Retry-After", String(wait));
       throw error;
     }
   });

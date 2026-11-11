@@ -1,5 +1,5 @@
 import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
-import { AdminOverview, ErrorResponse } from "@kuutti/schema";
+import { AdminOverview } from "@kuutti/schema";
 import type { MiddlewareHandler } from "hono";
 import type { Deps } from "../app.ts";
 import { foundThemCounts } from "../identity/index.ts";
@@ -7,6 +7,7 @@ import { staffOf } from "../lib/admin-middleware.ts";
 import type { AppEnv } from "../lib/env.ts";
 import { finnishDay } from "../lib/finnish-day.ts";
 import { matchingConfigNumber } from "../lib/matching-config.ts";
+import { bearer, errorContent, json, unauthenticated } from "../lib/openapi.ts";
 import { queueSummary } from "../media/index.ts";
 import { AUTO_SHADOW_BAN_REVIEW_HOURS_KEY, automaticBanSummary } from "./automatic.ts";
 import { feedbackSummary } from "./feedback.ts";
@@ -29,24 +30,19 @@ const FOUND_THEM_RECENT_DAYS = 30;
 /** matching_config: the hours the association promises to answer within (#299). */
 export const MODERATION_RESPONSE_HOURS_KEY = "moderation_response_hours";
 
-const errorContent = (description: string) => ({
-  description,
-  content: { "application/json": { schema: ErrorResponse } },
-});
-
 const overviewRoute = createRoute({
   method: "get",
   path: "/admin/overview",
   summary: "What waits for the moderators",
   description:
     "Per queue (reports not decided that the reader is no party to, the automatic shadow bans nobody has confirmed or reversed but the reader's own, photos waiting for a person, feedback not handled), how many wait and since when the oldest; the API's clock; matching_config moderation_response_hours, past which the oldest is late, and auto_shadow_ban_review_hours, the automatic bans' own. And the association's measure (#83): how many told Kuutti they found somebody, by reason, over the last thirty Finnish days and in all, from a count that names nobody. Moderators and admins.",
-  security: [{ session: [] }],
+  ...bearer,
   responses: {
     200: {
       description: "The queues.",
-      content: { "application/json": { schema: AdminOverview } },
+      ...json(AdminOverview),
     },
-    401: errorContent("unauthenticated, session_expired or session_revoked."),
+    401: unauthenticated,
     403: errorContent("admin_forbidden: the role does not allow this."),
   },
 });

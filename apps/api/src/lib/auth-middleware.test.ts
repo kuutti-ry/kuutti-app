@@ -2,7 +2,13 @@ import { ErrorResponse } from "@kuutti/schema";
 import { Hono, type MiddlewareHandler } from "hono";
 import { describe, expect, it, vi } from "vitest";
 import { captureLogger } from "../test/harness.ts";
-import { callerOf, hashToken, requireSession, type SessionLookup } from "./auth-middleware.ts";
+import {
+  bearerToken,
+  callerOf,
+  hashToken,
+  requireSession,
+  type SessionLookup,
+} from "./auth-middleware.ts";
 import type { AppEnv } from "./env.ts";
 import { onError } from "./errors.ts";
 import { serverRequestId } from "./request-id.ts";
@@ -265,5 +271,21 @@ describe("callerOf", () => {
     const answer = await call(`Bearer ${TOKEN}`, "/unguarded");
     expect(answer.status).toBe(401);
     expect(code(answer.body)).toBe("unauthenticated");
+  });
+});
+
+describe("bearerToken", () => {
+  const app = new Hono<AppEnv>().get("/", (c) => c.json({ token: bearerToken(c) }));
+  const read = async (authorization?: string) => {
+    const init = authorization === undefined ? {} : { headers: { authorization } };
+    return ((await (await app.request("/", init)).json()) as { token: string }).token;
+  };
+
+  it("is the value after Bearer, trimmed, and empty for any other header or none", async () => {
+    expect(await read("Bearer abc")).toBe("abc");
+    expect(await read("Bearer  abc ")).toBe("abc");
+    expect(await read("bearer abc")).toBe("");
+    expect(await read("Basic abc")).toBe("");
+    expect(await read()).toBe("");
   });
 });

@@ -1,31 +1,15 @@
 import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
-import {
-  ConfigChange,
-  ConfigChangeRequest,
-  ConfigKeyParams,
-  ConfigList,
-  ErrorResponse,
-} from "@kuutti/schema";
+import { ConfigChange, ConfigChangeRequest, ConfigKeyParams, ConfigList } from "@kuutti/schema";
 import type { MiddlewareHandler } from "hono";
 import type { Deps } from "../app.ts";
 import { staffOf } from "../lib/admin-middleware.ts";
 import type { AppEnv } from "../lib/env.ts";
+import { bearer, errorContent, json, staffErrors } from "../lib/openapi.ts";
 import { changeConfig, listConfig } from "./config.ts";
 
 // The tunables in the panel (#304, #305): admins read every key with its
 // versions and write a new version with a reason. The log line names the key
 // and the version, never the reason, which is an admin's words.
-
-const errorContent = (description: string) => ({
-  description,
-  content: { "application/json": { schema: ErrorResponse } },
-});
-const json = <T>(schema: T) => ({ content: { "application/json": { schema } } });
-const bearer = { security: [{ session: [] }] };
-const staffErrors = {
-  401: errorContent("unauthenticated, session_expired or session_revoked."),
-  403: errorContent("admin_forbidden: the role does not allow this."),
-};
 
 const listRoute = createRoute({
   method: "get",

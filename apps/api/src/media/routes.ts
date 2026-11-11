@@ -1,6 +1,5 @@
 import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
 import {
-  ErrorResponse,
   PHOTO_MAX_BYTES,
   Photo,
   PhotoCaptionRequest,
@@ -16,26 +15,27 @@ import { bodyLimit } from "hono/body-limit";
 import type { Deps } from "../app.ts";
 import { callerOf } from "../lib/auth-middleware.ts";
 import type { AppEnv } from "../lib/env.ts";
-import { AppError, localisedEnvelope } from "../lib/errors.ts";
+import { AppError, localisedEnvelope, retryAfterOf } from "../lib/errors.ts";
+import { bearer, errorContent, json, unauthenticated } from "../lib/openapi.ts";
 import {
   appealPhoto,
   captionPhoto,
   deletePhoto,
   issuePhotoUrl,
   listPhotos,
+  mediaUnavailable,
   type PhotoServiceDeps,
   RETRY_AFTER_SECONDS,
   reorderPhotos,
   uploadPhoto,
 } from "./photos.ts";
 
-const errorContent = (description: string) => ({
-  description,
-  content: { "application/json": { schema: ErrorResponse } },
-});
-const json = <T>(schema: T) => ({ content: { "application/json": { schema } } });
-const bearer = { security: [{ session: [] }] };
-const unauthenticated = errorContent("unauthenticated, session_expired or session_revoked.");
+/** A photo's own 10 MB cap, in place of the app-wide one: the profile's upload and a conversation's photo (#350). */
+export const photoBodyLimit = () =>
+  bodyLimit({
+    maxSize: PHOTO_MAX_BYTES,
+    onError: (c) => c.json(localisedEnvelope(c, "payload_too_large"), 413),
+  });
 
 const listRoute = createRoute({
   method: "get",
@@ -182,7 +182,7 @@ export function photoRoutes(
 
   const serviceDeps = (): PhotoServiceDeps => {
     if (!deps.media) {
-      throw new AppError(503, "media_unavailable", "Object storage is not configured here");
+      throw mediaUnavailable();
     }
     return { ...deps.media, db: deps.db, logger: deps.logger, now };
   };
@@ -196,13 +196,7 @@ export function photoRoutes(
     ),
   );
   for (const path of paths) app.use(path, requireSession);
-  app.use(
-    uploadRoute.getRoutingPath(),
-    bodyLimit({
-      maxSize: PHOTO_MAX_BYTES,
-      onError: (c) => c.json(localisedEnvelope(c, "payload_too_large"), 413),
-    }),
-  );
+  app.use(uploadRoute.getRoutingPath(), photoBodyLimit());
 
   app.openapi(listRoute, async (c) => {
     return c.json(await listPhotos(serviceDeps(), callerOf(c).accountId), 200);
@@ -258,9 +252,7 @@ export function photoRoutes(
       return c.json(url, 200);
     } catch (error) {
       if (error instanceof AppError && error.code === "photo_budget_exceeded") {
-        const wait = (error.detail as { retryAfterSeconds?: number } | undefined)
-          ?.retryAfterSeconds;
-        c.header("Retry-After", String(wait ?? 1));
+        c.header("Retry-After", String(retryAfterOf(error) ?? 1));
       }
       throw error;
     }

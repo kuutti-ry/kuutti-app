@@ -257,6 +257,16 @@ type Today = {
   config: Record<(typeof ALL_KEYS)[number], number>;
 };
 
+/** Everybody in the person's log of `day`, decided or not. */
+async function inLogOf(db: Queryable, accountId: string, day: string): Promise<Set<string>> {
+  const { rows } = await db.query<{ candidate_id: string }>(
+    `SELECT e.candidate_id FROM round_entries e JOIN rounds r ON r.id = e.round_id
+      WHERE r.account_id = $1 AND r.day = $2`,
+    [accountId, day],
+  );
+  return new Set(rows.map((row) => row.candidate_id));
+}
+
 /** The person's day, or null when their matching is not open or their profile not complete. */
 async function todayOf(deps: BuilderDeps, accountId: string): Promise<Today | null> {
   const at = deps.now();
@@ -275,12 +285,7 @@ async function todayOf(deps: BuilderDeps, accountId: string): Promise<Today | nu
   if (!owner) return null;
   const config = await matchingConfigNumbers(deps.db, ALL_KEYS);
   const history = await historyOf(deps.db, accountId, day, config);
-  const placed = await deps.db.query<{ candidate_id: string }>(
-    `SELECT e.candidate_id FROM round_entries e JOIN rounds r ON r.id = e.round_id
-      WHERE r.account_id = $1 AND r.day = $2`,
-    [accountId, day],
-  );
-  const inLog = new Set(placed.rows.map((row) => row.candidate_id));
+  const inLog = await inLogOf(deps.db, accountId, day);
   // A star is the person's own way back to somebody, so they are no ordinary card
   // meanwhile (ADR-064 §4); nothing else of this walk, or anybody else's, reads it.
   const starred = await deps.db.query<{ candidate_id: string }>(
@@ -379,12 +384,7 @@ export async function heldFromStars(
   const day = finnishDay(deps.now());
   const config = await matchingConfigNumbers(db, KEYS);
   const waits = new Set((await waitingOn(db, accountId, day, config)).map((like) => like.id));
-  const inLog = await db.query<{ candidate_id: string }>(
-    `SELECT e.candidate_id FROM round_entries e JOIN rounds r ON r.id = e.round_id
-      WHERE r.account_id = $1 AND r.day = $2`,
-    [accountId, day],
-  );
-  const queued = new Set(inLog.rows.map((row) => row.candidate_id));
+  const queued = await inLogOf(db, accountId, day);
   const stopped = await atTheStop(
     db,
     { day, config },

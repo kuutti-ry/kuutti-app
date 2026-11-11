@@ -307,7 +307,7 @@ export async function pointedPhotoKeyOf(
   return row ? { photoId: row.id, key: row.key } : null;
 }
 
-const notFound = () => new AppError(404, "not_found", "No such report");
+export const notFound = () => new AppError(404, "not_found", "No such report");
 const decided = () => new AppError(409, "report_decided", "The report is decided already");
 
 /**

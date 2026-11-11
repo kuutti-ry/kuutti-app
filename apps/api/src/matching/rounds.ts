@@ -17,7 +17,7 @@ import {
   sinceSeenBand,
 } from "@kuutti/schema";
 import { AppError } from "../lib/errors.ts";
-import { addDays, finnishDay } from "../lib/finnish-day.ts";
+import { addDays, DAY_MS, finnishDay } from "../lib/finnish-day.ts";
 import type { Logger } from "../lib/logger.ts";
 import { matchingConfigNumber } from "../lib/matching-config.ts";
 import { dayWindow, secondsUntil } from "../media/index.ts";
@@ -118,8 +118,73 @@ const PLACES = `greatest(r.last_position,
 export const notFound = () => new AppError(404, "not_found", "No such card in today's round");
 
 /** The round's owner's own star on an entry `e`'s person, for `entriesOf` (#575, ADR-064). */
-export const STAR_OF_ENTRY = `(SELECT s.id FROM star s
+const STAR_OF_ENTRY = `(SELECT s.id FROM star s
       WHERE s.account_id = r.account_id AND s.candidate_id = e.candidate_id) AS star`;
+
+/** An entry `e` of a round `r` as `EntryRow` reads it, its owner's star included. */
+export const ENTRY_COLUMNS = `e.position, e.candidate_id, e.reason, e.decision, e.fish, e.relaxed_field, e.distance,
+            ${STAR_OF_ENTRY}`;
+
+/**
+ * Today's card at `position`, locked as a decision takes it. The two accounts
+ * first, shared and in id order, before any row of a round: erasure and a
+ * sanction take an account FOR UPDATE before they touch rounds or
+ * conversations, so one under way finishes before this decision reads, and
+ * one that comes later waits for it to commit; an erasure or a ban then
+ * closes the match it opened, and a warning, a shadow ban or a suspension
+ * leaves it as it leaves every conversation (ADR-024, ADR-031 §2). Taken
+ * after the round, they deadlocked with an erasure, and a sanction could slip
+ * a match past its own check (ADR-038 §2). Then the round's row. `notFound`
+ * when the card or the round is not there.
+ */
+export async function lockCard(
+  tx: Queryable,
+  input: { accountId: string; today: string; position: number },
+): Promise<{ candidateId: string; roundId: string }> {
+  const card = await tx.query<{ candidate_id: string }>(
+    `SELECT e.candidate_id FROM round_entries e JOIN rounds r ON r.id = e.round_id
+        WHERE r.account_id = $1 AND r.day = $2 AND e.position = $3`,
+    [input.accountId, input.today, input.position],
+  );
+  const candidateId = card.rows[0]?.candidate_id;
+  if (!candidateId) throw notFound();
+  await tx.query("SELECT 1 FROM account WHERE id = ANY($1::uuid[]) ORDER BY id FOR SHARE", [
+    [input.accountId, candidateId],
+  ]);
+  const round = await tx.query<{ id: string }>(
+    "SELECT id FROM rounds WHERE account_id = $1 AND day = $2 FOR UPDATE",
+    [input.accountId, input.today],
+  );
+  const roundId = round.rows[0]?.id;
+  if (!roundId) throw notFound();
+  return { candidateId, roundId };
+}
+
+/** The round's places now end at `last`, and it is open again: what was added is still to decide. */
+async function givePlaces(
+  tx: Queryable,
+  roundId: string,
+  accountId: string,
+  last: number,
+): Promise<void> {
+  await tx.query(
+    `UPDATE rounds SET completed_at = NULL, last_position = $3
+      WHERE id = $1 AND account_id = $2`,
+    [roundId, accountId, last],
+  );
+}
+
+/** Today's round of the person, locked for a change of its relaxations, its owner's account held first; `noRound` when there is none. */
+async function lockRoundToday(tx: Queryable, accountId: string, today: string): Promise<string> {
+  await tx.query("SELECT 1 FROM account WHERE id = $1 FOR SHARE", [accountId]);
+  const round = await tx.query<{ id: string }>(
+    "SELECT id FROM rounds WHERE account_id = $1 AND day = $2 FOR UPDATE",
+    [accountId, today],
+  );
+  const roundId = round.rows[0]?.id;
+  if (!roundId) throw noRound();
+  return roundId;
+}
 
 /**
  * The day's likes (#98's first cut, the maintainer's of 20/10/2026): one
@@ -177,7 +242,6 @@ const FISH_WINDOW_KEY = "fish_window_days";
 
 /** A Monday, from which the fish's periods are counted. */
 const FISH_PERIODS_FROM = Date.parse("1970-01-05");
-const DAY_MS = 24 * 60 * 60 * 1000;
 
 /**
  * The person's standing fish of the period that holds today against the
@@ -310,11 +374,7 @@ export async function addPlaces(
     const added = written.rows.length;
     if (added > 0) {
       // The places are the list's order: the highest a dropped candidate leaves empty is still given.
-      await tx.query(
-        `UPDATE rounds SET completed_at = NULL, last_position = $3
-          WHERE id = $1 AND account_id = $2`,
-        [stands.id, input.accountId, stands.last + input.places.length],
-      );
+      await givePlaces(tx, stands.id, input.accountId, stands.last + input.places.length);
     }
     // After the people above are held: an erasure holds the person, then deletes
     // their entries, so an entry of somebody also in today's places, deleted first,
@@ -401,8 +461,7 @@ async function nextCards(
   dealBreakers: readonly DealBreaker[],
 ): Promise<RoundEntry[] | null> {
   const { rows } = await deps.db.query<EntryRow & { id: string }>(
-    `SELECT r.id, e.position, e.candidate_id, e.reason, e.decision, e.fish, e.relaxed_field,
-            e.distance, ${STAR_OF_ENTRY}
+    `SELECT r.id, ${ENTRY_COLUMNS}
        FROM rounds r JOIN account me ON me.id = r.account_id
        LEFT JOIN round_entries e ON e.round_id = r.id AND e.decision IS NULL
         AND NOT (me.state = 'shadow_banned' AND e.reason IN ('liked_you', 'fish'))
@@ -538,30 +597,11 @@ export async function decide(
   const { at, today } = todayOrRefuse(deps, input.day);
   const decision: RoundDecision = input.decision === "fish" ? "like" : input.decision;
   const written = await transaction(deps.db, async (tx) => {
-    // The two accounts first, shared and in id order, before any row of a
-    // round: erasure and a sanction take an account FOR UPDATE before they
-    // touch rounds or conversations, so one under way finishes before this
-    // decision reads, and one that comes later waits for it to commit; an
-    // erasure or a ban then closes the match it opened, and a warning, a
-    // shadow ban or a suspension leaves it as it leaves every conversation
-    // (ADR-024, ADR-031 §2). Taken after the round, they deadlocked with an
-    // erasure, and a sanction could slip a match past its own check (ADR-038 §2).
-    const card = await tx.query<{ candidate_id: string }>(
-      `SELECT e.candidate_id FROM round_entries e JOIN rounds r ON r.id = e.round_id
-        WHERE r.account_id = $1 AND r.day = $2 AND e.position = $3`,
-      [input.accountId, today, input.position],
-    );
-    const candidateId = card.rows[0]?.candidate_id;
-    if (!candidateId) throw notFound();
-    await tx.query("SELECT 1 FROM account WHERE id = ANY($1::uuid[]) ORDER BY id FOR SHARE", [
-      [input.accountId, candidateId],
-    ]);
-    const round = await tx.query<{ id: string }>(
-      "SELECT id FROM rounds WHERE account_id = $1 AND day = $2 FOR UPDATE",
-      [input.accountId, today],
-    );
-    const roundId = round.rows[0]?.id;
-    if (!roundId) throw notFound();
+    const { roundId } = await lockCard(tx, {
+      accountId: input.accountId,
+      today,
+      position: input.position,
+    });
     const found = await tx.query<{
       id: string;
       candidate_id: string;
@@ -832,13 +872,7 @@ export async function appendRelaxed(
 ): Promise<number[]> {
   const { today } = todayOrRefuse(deps, input.day);
   return transaction(deps.db, async (tx) => {
-    await tx.query("SELECT 1 FROM account WHERE id = $1 FOR SHARE", [input.accountId]);
-    const round = await tx.query<{ id: string }>(
-      "SELECT id FROM rounds WHERE account_id = $1 AND day = $2 FOR UPDATE",
-      [input.accountId, today],
-    );
-    const roundId = round.rows[0]?.id;
-    if (!roundId) throw noRound();
+    const roundId = await lockRoundToday(tx, input.accountId, today);
     const standing = await tx.query<Relaxation>(
       "SELECT field, kind FROM round_relaxation WHERE round_id = $1",
       [roundId],
@@ -892,11 +926,7 @@ export async function appendRelaxed(
         taken.rows.map((row) => candidates.get(row.candidate)?.distance),
       ],
     );
-    await tx.query(
-      `UPDATE rounds SET completed_at = NULL, last_position = $3
-        WHERE id = $1 AND account_id = $2`,
-      [roundId, input.accountId, last + positions.length],
-    );
+    await givePlaces(tx, roundId, input.accountId, last + positions.length);
     return positions;
   });
 }
@@ -915,13 +945,7 @@ export async function undoRelaxation(
 ): Promise<number[]> {
   const { at, today } = todayOrRefuse(deps, input.day);
   return transaction(deps.db, async (tx) => {
-    await tx.query("SELECT 1 FROM account WHERE id = $1 FOR SHARE", [input.accountId]);
-    const round = await tx.query<{ id: string }>(
-      "SELECT id FROM rounds WHERE account_id = $1 AND day = $2 FOR UPDATE",
-      [input.accountId, today],
-    );
-    const roundId = round.rows[0]?.id;
-    if (!roundId) throw noRound();
+    const roundId = await lockRoundToday(tx, input.accountId, today);
     const undone = await tx.query(
       "DELETE FROM round_relaxation WHERE round_id = $1 AND field = $2",
       [roundId, input.field],
@@ -1000,8 +1024,7 @@ export async function readAdded(
 ): Promise<RoundEntry[]> {
   if (positions.length === 0) return [];
   const { rows } = await deps.db.query<EntryRow>(
-    `SELECT e.position, e.candidate_id, e.reason, e.decision, e.fish, e.relaxed_field, e.distance,
-            ${STAR_OF_ENTRY}
+    `SELECT ${ENTRY_COLUMNS}
        FROM round_entries e JOIN rounds r ON r.id = e.round_id
       WHERE r.account_id = $1 AND r.day = $2 AND e.position = ANY($3::smallint[])
       ORDER BY e.position`,

@@ -8,7 +8,7 @@ import {
   NotificationKind,
   type SanctionReason,
 } from "@kuutti/schema";
-import { AppError } from "../lib/errors.ts";
+import { AppError, noLiveAccount } from "../lib/errors.ts";
 import { announcementTextFor } from "./announcements.ts";
 import * as repo from "./repo.ts";
 
@@ -33,7 +33,7 @@ export async function setChoice(
   input: { accountId: string; kind: NotificationKind; enabled: boolean },
 ): Promise<NotificationChoice[]> {
   if (!(await repo.upsertChoice(deps.db, { ...input, at: deps.now() }))) {
-    throw new AppError(404, "not_found", "No live account");
+    throw noLiveAccount();
   }
   return choicesOf(deps.db, input.accountId);
 }

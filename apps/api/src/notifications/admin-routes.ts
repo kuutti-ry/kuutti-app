@@ -4,12 +4,12 @@ import {
   AdminAnnouncementList,
   AnnouncementDraft,
   AnnouncementParams,
-  ErrorResponse,
 } from "@kuutti/schema";
 import type { MiddlewareHandler } from "hono";
 import type { Deps } from "../app.ts";
 import { staffOf } from "../lib/admin-middleware.ts";
 import type { AppEnv } from "../lib/env.ts";
+import { bearer, errorContent, json, staffErrors } from "../lib/openapi.ts";
 import {
   approveAnnouncement,
   deleteAnnouncement,
@@ -21,17 +21,6 @@ import type { Push } from "./push.ts";
 // Announcements in the panel (#573, ADR-068 §2): admins only. One admin
 // writes it, another approves it, and the approval sends it to everybody;
 // before then either may delete it. Each act is an audit row with no words.
-
-const errorContent = (description: string) => ({
-  description,
-  content: { "application/json": { schema: ErrorResponse } },
-});
-const json = <T>(schema: T) => ({ content: { "application/json": { schema } } });
-const bearer = { security: [{ session: [] }] };
-const staffErrors = {
-  401: errorContent("unauthenticated, session_expired or session_revoked."),
-  403: errorContent("admin_forbidden: the role does not allow this."),
-};
 
 const listRoute = createRoute({
   method: "get",

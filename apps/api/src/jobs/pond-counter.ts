@@ -5,8 +5,8 @@ import { finnishDay } from "../lib/finnish-day.ts";
 import type { Logger } from "../lib/logger.ts";
 import { preferencesFrom } from "../matching/index.ts";
 import { listPonds, readPondCounterK, readStandingFigures } from "../pond/index.ts";
-import { answeredPromptsOf, completeness } from "../profile/index.ts";
 import type { NightlyJob } from "./nightly.ts";
+import { PROFILE_FACTS, profileComplete } from "./pool.ts";
 
 /**
  * The pond counter's figures (#54, #581, ADR-013). It counts the people
@@ -74,12 +74,7 @@ const empty = (): PondCounterCounts => ({
 export async function countPonds(db: Queryable): Promise<Map<string, PondCounterCounts>> {
   const { rows } = await db.query<FactsRow>(
     `SELECT a.pond_id, p.display_name, p.bio, p.bio_preset, p.prompts,
-            (SELECT count(*) FROM photo ph
-              WHERE ph.account_id = a.id AND ph.purpose = 'profile' AND ph.state = 'approved') AS approved_photos,
-            (SELECT r.value FROM preferences r
-              WHERE r.account_id = a.id AND r.mode = 'hard' AND r.field = 'seeks') AS seeks,
-            (SELECT r.value FROM preferences r
-              WHERE r.account_id = a.id AND r.mode = 'hard' AND r.field = 'age_window') AS age_window,
+            ${PROFILE_FACTS},
             EXISTS (SELECT 1 FROM consent c
               WHERE c.account_id = a.id AND c.kind = 'special_category'
                 AND c.withdrawn_at IS NULL AND c.version = $1) AS seeks_consented
@@ -94,16 +89,7 @@ export async function countPonds(db: Queryable): Promise<Map<string, PondCounter
   const ponds = new Map<string, PondCounterCounts>();
   for (const row of rows) {
     const preferences = preferencesFrom({ seeks: row.seeks, ageWindow: row.age_window });
-    const { complete } = completeness({
-      displayName: row.display_name,
-      bio: row.bio,
-      bioPreset: row.bio_preset,
-      answeredPrompts: answeredPromptsOf(row.prompts),
-      approvedPhotos: Number(row.approved_photos),
-      seeks: preferences.seeks,
-      ageWindow: preferences.ageWindow,
-    });
-    if (!complete) continue;
+    if (!profileComplete(row, preferences)) continue;
     const counts = ponds.get(row.pond_id) ?? empty();
     counts.finished += 1;
     const band = row.seeks_consented ? seeksBand(preferences.seeks) : null;

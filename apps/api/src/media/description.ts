@@ -8,6 +8,7 @@ import {
   type PhotoScene,
   type PhotoSetting,
 } from "@kuutti/schema";
+import { byLabel } from "./label-groups.ts";
 
 /**
  * The automatic photo description (#296, ADR-006 §1 and §3): what the photo
@@ -178,24 +179,9 @@ export type DescriptionSignals = {
 
 export const NOTHING_SEEN: DescriptionSignals = { scene: [], face: null };
 
-const NAME_TO_SETTING: ReadonlyMap<string, PhotoSetting> = new Map(
-  (Object.entries(SETTING_LABELS) as [PhotoSetting, string][]).map(([key, name]) => [
-    name.toLowerCase(),
-    key,
-  ]),
-);
-const NAME_TO_SCENE: ReadonlyMap<string, PhotoScene> = new Map(
-  (Object.entries(SCENE_LABELS) as [PhotoScene, string][]).map(([key, name]) => [
-    name.toLowerCase(),
-    key,
-  ]),
-);
-const NAME_TO_OBJECT: ReadonlyMap<string, PhotoObject> = new Map(
-  (Object.entries(OBJECT_LABELS) as [PhotoObject, string][]).map(([key, name]) => [
-    name.toLowerCase(),
-    key,
-  ]),
-);
+const NAME_TO_SETTING = byLabel(SETTING_LABELS);
+const NAME_TO_SCENE = byLabel(SCENE_LABELS);
+const NAME_TO_OBJECT = byLabel(OBJECT_LABELS);
 const DESCRIBED: ReadonlySet<string> = new Set([
   ...NAME_TO_SETTING.keys(),
   ...NAME_TO_SCENE.keys(),

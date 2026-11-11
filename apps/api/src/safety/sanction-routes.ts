@@ -2,7 +2,6 @@ import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
 import {
   AutomaticBanQueue,
   BanRequest,
-  ErrorResponse,
   Sanction,
   SanctionAccountParams,
   SanctionList,
@@ -16,6 +15,7 @@ import { staffOf } from "../lib/admin-middleware.ts";
 import type { AppEnv } from "../lib/env.ts";
 import { AppError } from "../lib/errors.ts";
 import { matchingConfigNumber } from "../lib/matching-config.ts";
+import { bearer, errorContent, json, staffErrors } from "../lib/openapi.ts";
 import { AUTO_SHADOW_BAN_REVIEW_HOURS_KEY, listAutomaticBans } from "./automatic.ts";
 import {
   applySanction,
@@ -30,16 +30,6 @@ import {
 // own for admins, so the role is the guard's and never the handler's. The log
 // lines carry ids, the kind and the reason, never staff's note.
 
-const errorContent = (description: string) => ({
-  description,
-  content: { "application/json": { schema: ErrorResponse } },
-});
-const json = <T>(schema: T) => ({ content: { "application/json": { schema } } });
-const bearer = { security: [{ session: [] }] };
-const staffErrors = {
-  401: errorContent("unauthenticated, session_expired or session_revoked."),
-  403: errorContent("admin_forbidden: the role does not allow this."),
-};
 const validation = errorContent("Validation failed.");
 
 const automaticRoute = createRoute({

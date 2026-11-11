@@ -3,16 +3,16 @@ import {
   BlockRequest,
   ConversationParams,
   ConversationReportRequest,
-  ErrorResponse,
   ReportRequest,
 } from "@kuutti/schema";
-import type { MiddlewareHandler } from "hono";
+import type { Context, MiddlewareHandler } from "hono";
 import type { Deps } from "../app.ts";
 import { REPORT_AFTER_CLOSE_DAYS_KEY } from "../chat/index.ts";
 import { callerOf } from "../lib/auth-middleware.ts";
 import type { AppEnv } from "../lib/env.ts";
 import { AppError } from "../lib/errors.ts";
 import { matchingConfigNumber } from "../lib/matching-config.ts";
+import { bearer, errorContent, json, unauthenticated } from "../lib/openapi.ts";
 import { dayWindow, secondsUntil } from "../media/index.ts";
 import { checkReports } from "./automatic.ts";
 import { recordBlock, recordConversationBlock } from "./blocks.ts";
@@ -28,15 +28,12 @@ import { REPORTS_PER_DAY_KEY, recordConversationReport, recordReport } from "./r
 // says that the caller did it, a refusal its code, and the cap's refusal how
 // many and until when.
 
-const errorContent = (description: string) => ({
-  description,
-  content: { "application/json": { schema: ErrorResponse } },
-});
-const json = <T>(schema: T) => ({ content: { "application/json": { schema } } });
-const bearer = { security: [{ session: [] }] };
-const unauthenticated = errorContent("unauthenticated, session_expired or session_revoked.");
 const notShown = errorContent(
   "not_found: no card of that account was shown to the caller and no block stands between the two accounts (never shown, oneself, nobody, a later account of somebody blocked), or the caller was erased meanwhile; nothing is written.",
+);
+
+const budgetSpent = errorContent(
+  "report_budget_exceeded: the day's reports are filed and nothing was written, the block neither; Retry-After is the wait until the day rolls.",
 );
 
 const blockRoute = createRoute({
@@ -75,9 +72,7 @@ const reportRoute = createRoute({
     ),
     401: unauthenticated,
     404: notShown,
-    429: errorContent(
-      "report_budget_exceeded: the day's reports are filed and nothing was written, the block neither; Retry-After is the wait until the day rolls.",
-    ),
+    429: budgetSpent,
   },
 });
 
@@ -130,9 +125,7 @@ const conversationReportRoute = createRoute({
     409: errorContent(
       "report_window_closed: the conversation closed longer ago than report_after_close_days, or the other person deleted their account; nothing is written.",
     ),
-    429: errorContent(
-      "report_budget_exceeded: the day's reports are filed and nothing was written, the block neither; Retry-After is the wait until the day rolls.",
-    ),
+    429: budgetSpent,
   },
 });
 
@@ -150,15 +143,12 @@ export function reportRoutes(deps: Deps, guard: MiddlewareHandler<AppEnv>) {
 
   /**
    * The cap's refusal, from a card or a conversation alike, logged with how
-   * many and until when, never whom or why; the wait, for Retry-After.
+   * many and until when, never whom or why; the wait goes in Retry-After.
    */
-  const overBudget = (input: {
-    accountId: string;
-    used: number;
-    limit: number;
-    at: Date;
-    end: Date;
-  }): { retryAfterSeconds: number; error: AppError } => {
+  const overBudget = (
+    c: Context<AppEnv>,
+    input: { accountId: string; used: number; limit: number; at: Date; end: Date },
+  ): AppError => {
     const retryAfterSeconds = secondsUntil(input.end, input.at);
     deps.logger.warn(
       {
@@ -170,10 +160,10 @@ export function reportRoutes(deps: Deps, guard: MiddlewareHandler<AppEnv>) {
       },
       "report refused",
     );
-    const error = new AppError(429, "report_budget_exceeded", "The day's reports are filed", {
+    c.header("Retry-After", String(retryAfterSeconds));
+    return new AppError(429, "report_budget_exceeded", "The day's reports are filed", {
       retryAfterSeconds,
     });
-    return { retryAfterSeconds, error };
   };
 
   app.openapi(blockRoute, async (c) => {
@@ -206,9 +196,7 @@ export function reportRoutes(deps: Deps, guard: MiddlewareHandler<AppEnv>) {
     });
     if (record.outcome === "not_found") throw new AppError(404, "not_found", "No such card");
     if (record.outcome === "over_budget") {
-      const refused = overBudget({ accountId, used: record.used, limit, at, end: day.end });
-      c.header("Retry-After", String(refused.retryAfterSeconds));
-      throw refused.error;
+      throw overBudget(c, { accountId, used: record.used, limit, at, end: day.end });
     }
     if (record.outcome === "filed") await afterFiled(record.reportedAccountId);
     return c.body(null, 204);
@@ -251,9 +239,7 @@ export function reportRoutes(deps: Deps, guard: MiddlewareHandler<AppEnv>) {
       throw new AppError(409, "report_window_closed", "The conversation can no longer be reported");
     }
     if (record.outcome === "over_budget") {
-      const refused = overBudget({ accountId, used: record.used, limit, at, end: day.end });
-      c.header("Retry-After", String(refused.retryAfterSeconds));
-      throw refused.error;
+      throw overBudget(c, { accountId, used: record.used, limit, at, end: day.end });
     }
     if (record.outcome === "filed") await afterFiled(record.reportedAccountId);
     return c.body(null, 204);

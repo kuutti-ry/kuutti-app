@@ -10,6 +10,7 @@ import {
   type StoredDealBreaker,
 } from "@kuutti/schema";
 import { z } from "zod";
+import { lockLiveAccount } from "../lib/db.ts";
 import { AppError } from "../lib/errors.ts";
 import { matchingConfigNumber } from "../lib/matching-config.ts";
 
@@ -75,6 +76,17 @@ export function dealBreakersFrom(rows: readonly DealBreakerRow[]): DealBreaker[]
     const includeUnknown = field === "distance" || row.include_unknown;
     return accept.length === 0 ? [] : [{ field, accept, includeUnknown }];
   });
+}
+
+/** The person's own deal-breakers that filter now, without the pause: the cards' "did not answer" (ADR-042 §8). */
+export async function filteringDealBreakers(
+  db: Queryable,
+  accountId: string,
+  readOwnFields: OwnFieldsReader,
+) {
+  return (await readDealBreakers(db, accountId, await readOwnFields(accountId)))
+    .filter((dealBreaker) => !dealBreaker.paused)
+    .map(({ paused: _paused, ...dealBreaker }) => dealBreaker);
 }
 
 /** The caller's own deal-breakers, with each one's pause read off the own answers. */
@@ -150,11 +162,7 @@ export async function saveDealBreakers(
   return transaction(db, async (tx) => {
     // The lock erasure takes first (ADR-009 §8): a save racing an erasure
     // lands before the deletes or sees the tombstone and writes nothing.
-    const live = await tx.query(
-      "SELECT 1 FROM account WHERE id = $1 AND state <> 'deleted' FOR UPDATE",
-      [accountId],
-    );
-    if (live.rows.length === 0) return false;
+    if (!(await lockLiveAccount(tx, accountId))) return false;
     // Read under the lock, so the number and a paused filter are held to what is stored now.
     const { rows } = await tx.query<DealBreakerRow>(
       `SELECT field, value, include_unknown FROM preferences

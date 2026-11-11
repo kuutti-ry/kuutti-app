@@ -1,5 +1,6 @@
 import { type Queryable, transaction } from "@kuutti/db";
 import { closeConversationsBetween, lockReportedConversation } from "../chat/index.ts";
+import { holdAccount } from "../lib/db.ts";
 import { wasShown } from "../media/index.ts";
 
 /**
@@ -76,6 +77,24 @@ export async function blockStandsBetween(
 }
 
 /**
+ * Proof of contact (ADR-030 §6), for a block or a report from a card: a block
+ * that stands between the two (`blockStandsBetween`), else a card of the
+ * other shown to the caller (`wasShown`), asked in that order.
+ */
+export async function contactProven(
+  db: Queryable,
+  input: { callerAccountId: string; otherAccountId: string },
+): Promise<boolean> {
+  return (
+    (await blockStandsBetween(db, input)) ||
+    (await wasShown(db, {
+      viewerAccountId: input.callerAccountId,
+      subjectAccountId: input.otherAccountId,
+    }))
+  );
+}
+
+/**
  * A block from a card: only of somebody whose card the caller was shown
  * (`wasShown`), or with whom a block stands already, set by either while both
  * accounts existed (`blockStandsBetween`). False, and nothing written,
@@ -89,15 +108,10 @@ export async function recordBlock(
   input: { blockerAccountId: string; blockedAccountId: string; at: Date },
 ): Promise<boolean> {
   return transaction(db, async (tx) => {
-    const proven =
-      (await blockStandsBetween(tx, {
-        callerAccountId: input.blockerAccountId,
-        otherAccountId: input.blockedAccountId,
-      })) ||
-      (await wasShown(tx, {
-        viewerAccountId: input.blockerAccountId,
-        subjectAccountId: input.blockedAccountId,
-      }));
+    const proven = await contactProven(tx, {
+      callerAccountId: input.blockerAccountId,
+      otherAccountId: input.blockedAccountId,
+    });
     return proven && (await insertBlock(tx, input));
   });
 }
@@ -119,11 +133,7 @@ export async function recordConversationBlock(
 ): Promise<"blocked" | "not_found"> {
   return transaction(db, async (tx) => {
     // The caller first, as every writer holds it: an erasure finishes first, or waits.
-    const live = await tx.query(
-      "SELECT 1 FROM account WHERE id = $1 AND state <> 'deleted' FOR SHARE",
-      [input.accountId],
-    );
-    if (live.rows.length === 0) return "not_found";
+    if (!(await holdAccount(tx, input.accountId))) return "not_found";
     const found = await lockReportedConversation(tx, input.accountId, input.conversationId);
     if (!found) return "not_found";
     if (found.hidden || found.counterpartId === null) return "blocked";

@@ -1,6 +1,5 @@
 import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
 import {
-  ErrorResponse,
   Relaxation,
   RelaxationAnswer,
   RelaxationParams,
@@ -16,8 +15,9 @@ import type { MiddlewareHandler } from "hono";
 import type { Deps } from "../app.ts";
 import { callerOf } from "../lib/auth-middleware.ts";
 import type { AppEnv } from "../lib/env.ts";
-import { AppError } from "../lib/errors.ts";
-import { type OwnFieldsReader, readDealBreakers } from "./deal-breakers.ts";
+import { retryAfterOf } from "../lib/errors.ts";
+import { bearer, errorContent, json, unauthenticated } from "../lib/openapi.ts";
+import { filteringDealBreakers, type OwnFieldsReader } from "./deal-breakers.ts";
 import {
   type CardOf,
   decide,
@@ -39,24 +39,10 @@ import {
 // never decides the next day's card at the same place. No route takes another
 // person's id.
 
-const errorContent = (description: string) => ({
-  description,
-  content: { "application/json": { schema: ErrorResponse } },
-});
-const json = <T>(schema: T) => ({ content: { "application/json": { schema } } });
-const bearer = { security: [{ session: [] }] };
-const unauthenticated = errorContent("unauthenticated, session_expired or session_revoked.");
 const noCard = errorContent(
   "not_found: no round today, no card at that place, a card that can no longer be shown (a block, a sanction, or for a like a filter of either side), or a day not begun.",
 );
 const expired = errorContent("round_expired: the day named has ended; nothing was written.");
-
-/** A budget's refusal names its wait; it goes in the header (the card budget's, the day's likes). */
-function retryAfterOf(error: unknown): number | undefined {
-  return error instanceof AppError
-    ? (error.detail as { retryAfterSeconds?: number } | undefined)?.retryAfterSeconds
-    : undefined;
-}
 
 const todayRoute = createRoute({
   method: "get",
@@ -213,10 +199,7 @@ export function roundRoutes(
     now: deps.now ?? (() => new Date()),
   });
   // The caller's own deal-breakers that filter now, for the cards' "did not answer" (ADR-042 §8).
-  const filtering = async (accountId: string) =>
-    (await readDealBreakers(deps.db, accountId, await readOwnFields(accountId)))
-      .filter((dealBreaker) => !dealBreaker.paused)
-      .map(({ paused: _paused, ...dealBreaker }) => dealBreaker);
+  const filtering = (accountId: string) => filteringDealBreakers(deps.db, accountId, readOwnFields);
 
   app.openapi(todayRoute, async (c) => {
     const { accountId } = callerOf(c);

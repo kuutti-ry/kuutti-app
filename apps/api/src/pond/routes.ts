@@ -1,25 +1,12 @@
 import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
-import {
-  ErrorResponse,
-  GateResponse,
-  HomeSummary,
-  HomeUpdate,
-  PondCounterResponse,
-} from "@kuutti/schema";
+import { GateResponse, HomeSummary, HomeUpdate, PondCounterResponse } from "@kuutti/schema";
 import type { MiddlewareHandler } from "hono";
 import type { Deps } from "../app.ts";
 import { callerOf } from "../lib/auth-middleware.ts";
 import type { AppEnv } from "../lib/env.ts";
+import { bearer, errorContent, json, unauthenticated } from "../lib/openapi.ts";
 import { readPondCounter } from "./counter.ts";
 import { saveHome } from "./home.ts";
-
-const errorContent = (description: string) => ({
-  description,
-  content: { "application/json": { schema: ErrorResponse } },
-});
-const json = <T>(schema: T) => ({ content: { "application/json": { schema } } });
-const bearer = { security: [{ session: [] }] };
-const unauthenticated = errorContent("unauthenticated, session_expired or session_revoked.");
 
 const homeRoute = createRoute({
   method: "put",

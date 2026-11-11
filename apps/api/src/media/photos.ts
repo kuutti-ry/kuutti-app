@@ -9,7 +9,7 @@ import {
   type PhotoVariant,
 } from "@kuutti/schema";
 import type { LimitFunction } from "p-limit";
-import { AppError } from "../lib/errors.ts";
+import { AppError, noLiveAccount } from "../lib/errors.ts";
 import type { Logger } from "../lib/logger.ts";
 import { matchingConfigNumber } from "../lib/matching-config.ts";
 import { recordPhotoCheckNote } from "../safety/index.ts";
@@ -22,11 +22,11 @@ import {
   moderatePhoto,
   recordMessagePhotoCheck,
 } from "./moderation.ts";
-import { PipelineError, processPhoto } from "./pipeline.ts";
+import { PipelineError, type ProcessedPhoto, processPhoto } from "./pipeline.ts";
 import * as repo from "./repo.ts";
-import { type MediaStore, objectKey, WEBP } from "./store.ts";
+import { type MediaStore, objectKey, variantKeys, WEBP } from "./store.ts";
 import { photoTips } from "./tips.ts";
-import { URL_TTL_MS, type UrlSigner } from "./urls.ts";
+import { signedPhotoUrl, URL_TTL_MS, type UrlSigner } from "./urls.ts";
 
 /** What the photo routes need beyond the database: injected, so tests hand in a memory store and a test key. */
 export type MediaDeps = {
@@ -48,7 +48,15 @@ export type MediaDeps = {
 export type PhotoServiceDeps = MediaDeps & { db: Queryable; logger: Logger; now: () => Date };
 
 export const RETRY_AFTER_SECONDS = 5;
+
+/** No object storage is configured here: a photo can be neither stored nor shown. */
+export const mediaUnavailable = () =>
+  new AppError(503, "media_unavailable", "Object storage is not configured here");
 const MAX_PHOTOS_KEY = "max_photos";
+
+const photoLimit = (maxPhotos: number) =>
+  new AppError(409, "photo_limit", "The account has its maximum number of photos", { maxPhotos });
+const noPhotoOfAccount = () => new AppError(404, "not_found", "No such photo of this account");
 
 const toPhoto = ({ key: _key, ...photo }: repo.PhotoRow): Photo => photo;
 
@@ -77,9 +85,7 @@ export async function uploadPhoto(
   // The cheap refusal before any pixel is touched; the insert below applies
   // the same cap again in its own statement, which is the one that holds.
   if ((await repo.countPhotos(deps.db, input.accountId)) >= maxPhotos) {
-    throw new AppError(409, "photo_limit", "The account has its maximum number of photos", {
-      maxPhotos,
-    });
+    throw photoLimit(maxPhotos);
   }
   const processed = await processUnderLimit(deps, input.bytes);
   // The objects first, then the row that owns them. Whatever fails in
@@ -89,11 +95,7 @@ export async function uploadPhoto(
   const dropOrphans = () => dropOrphansOf(deps, processed.key, input.accountId);
   let row: repo.PhotoRow | null;
   try {
-    await Promise.all(
-      PHOTO_VARIANTS.map((variant) =>
-        deps.store.put(objectKey(processed.key, variant), processed.variants[variant], WEBP),
-      ),
-    );
+    await putVariants(deps, processed);
     row = await repo.insertPhoto(deps.db, {
       accountId: input.accountId,
       key: processed.key,
@@ -112,11 +114,9 @@ export async function uploadPhoto(
     // upload was processed (#51), or two uploads raced past the count above
     // and this one lost. Only the second is the cap (#235).
     if (!(await repo.isAccountLive(deps.db, input.accountId))) {
-      throw new AppError(404, "not_found", "No live account");
+      throw noLiveAccount();
     }
-    throw new AppError(409, "photo_limit", "The account has its maximum number of photos", {
-      maxPhotos,
-    });
+    throw photoLimit(maxPhotos);
   }
   deps.logger.info(
     { accountId: input.accountId, photoId: row.id, width: row.width, height: row.height },
@@ -184,12 +184,24 @@ async function processUnderLimit(deps: PhotoServiceDeps, bytes: Uint8Array) {
 // what it leaves behind once a day old.
 async function dropOrphansOf(deps: PhotoServiceDeps, key: string, accountId: string) {
   try {
-    if ((await repo.countRowsForKey(deps.db, key)) === 0) {
-      await deps.store.delete(PHOTO_VARIANTS.map((variant) => objectKey(key, variant)));
-    }
+    await deleteUnheld(deps, key);
   } catch (error) {
     deps.logger.error({ accountId, err: error }, "photo orphan cleanup failed");
   }
+}
+
+/** The pipeline's three variants under the content address: never the original (rule 4). */
+async function putVariants(deps: PhotoServiceDeps, processed: ProcessedPhoto): Promise<void> {
+  await Promise.all(
+    PHOTO_VARIANTS.map((variant) =>
+      deps.store.put(objectKey(processed.key, variant), processed.variants[variant], WEBP),
+    ),
+  );
+}
+
+/** The content's objects go once no row names its key; another row sharing it keeps them. */
+async function deleteUnheld(deps: PhotoServiceDeps, key: string): Promise<void> {
+  if ((await repo.countRowsForKey(deps.db, key)) === 0) await deps.store.delete(variantKeys(key));
 }
 
 /** A message photo through the pipeline and the check, its objects stored, its row not yet written. */
@@ -265,11 +277,7 @@ export async function prepareMessagePhoto(
   }
   const dropOrphans = () => dropOrphansOf(deps, processed.key, input.accountId);
   try {
-    await Promise.all(
-      PHOTO_VARIANTS.map((variant) =>
-        deps.store.put(objectKey(processed.key, variant), processed.variants[variant], WEBP),
-      ),
-    );
+    await putVariants(deps, processed);
   } catch (error) {
     await dropOrphans();
     throw error;
@@ -371,11 +379,9 @@ export async function deletePhoto(
   photoId: string,
 ): Promise<void> {
   const row = await repo.deletePhoto(deps.db, accountId, photoId);
-  if (!row) throw new AppError(404, "not_found", "No such photo of this account");
+  if (!row) throw noPhotoOfAccount();
   await repo.compactPositions(deps.db, accountId);
-  if ((await repo.countRowsForKey(deps.db, row.key)) === 0) {
-    await deps.store.delete(PHOTO_VARIANTS.map((variant) => objectKey(row.key, variant)));
-  }
+  await deleteUnheld(deps, row.key);
   deps.logger.info({ accountId, photoId }, "photo deleted");
 }
 
@@ -398,9 +404,7 @@ export async function appealPhoto(
     return toPhoto(row);
   }
   const mine = await repo.listPhotos(deps.db, accountId);
-  if (!mine.some((photo) => photo.id === photoId)) {
-    throw new AppError(404, "not_found", "No such photo of this account");
-  }
+  if (!mine.some((photo) => photo.id === photoId)) throw noPhotoOfAccount();
   throw new AppError(
     409,
     "photo_not_appealable",
@@ -419,7 +423,7 @@ export async function captionPhoto(
   caption: PhotoCaption | null,
 ): Promise<Photo> {
   const row = await repo.setCaption(deps.db, { accountId, photoId, caption });
-  if (!row) throw new AppError(404, "not_found", "No such photo of this account");
+  if (!row) throw noPhotoOfAccount();
   deps.logger.info({ accountId, photoId }, "photo captioned");
   return toPhoto(row);
 }
@@ -480,11 +484,10 @@ export async function issuePhotoUrl(
   const row = await repo.findVisiblePhoto(deps.db, input.accountId, input.photoId, input.variant);
   if (!row) throw notVisible();
   const at = deps.now();
-  const expiresAt = new Date(at.getTime() + URL_TTL_MS);
   // Signed first: signing has no side effect, so a failure there costs the
   // person nothing, while a row written before a failed signature would have
   // spent budget on a URL nobody received. The URL leaves only with the row.
-  const url = await deps.signer.sign(objectKey(row.key, input.variant), expiresAt);
+  const answer = await signedPhotoUrl(deps.signer, row.key, input.variant, at);
   const day = dayWindow(at);
   const limit = (await readPhotoFetchBudget(deps.db))[input.variant];
   const access = await repo.insertPhotoAccess(deps.db, {
@@ -522,7 +525,7 @@ export async function issuePhotoUrl(
     { accountId: input.accountId, photoId: input.photoId, variant: input.variant, at },
     "photo url issued",
   );
-  return { url, variant: input.variant, expiresAt: expiresAt.toISOString() };
+  return answer;
 }
 
 /**
@@ -543,8 +546,7 @@ export async function issueConversationThumb(
   const row = await repo.findMainPhotoOf(deps.db, input);
   if (!row) return null;
   const at = deps.now();
-  const expiresAt = new Date(at.getTime() + URL_TTL_MS);
-  const url = await deps.signer.sign(objectKey(row.key, "thumb"), expiresAt);
+  const { url, expiresAt } = await signedPhotoUrl(deps.signer, row.key, "thumb", at);
   const day = dayWindow(at);
   const limit = (await readPhotoFetchBudget(deps.db)).thumb;
   const access = await repo.insertPhotoAccess(deps.db, {
@@ -573,5 +575,5 @@ export async function issueConversationThumb(
     { accountId: input.viewerAccountId, photoId: row.id, variant: "thumb", at },
     "photo url issued",
   );
-  return { photoId: row.id, url, blurhash: row.blurhash, expiresAt: expiresAt.toISOString() };
+  return { photoId: row.id, url, blurhash: row.blurhash, expiresAt };
 }

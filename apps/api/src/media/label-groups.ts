@@ -143,12 +143,16 @@ export const FISH_SPECIES_LABELS: Readonly<Record<FishSpecies, string>> = {
   halibut: "Halibut",
 };
 
-const SPECIES_BY_LABEL: ReadonlyMap<string, FishSpecies> = new Map(
-  (Object.entries(FISH_SPECIES_LABELS) as [FishSpecies, string][]).map(([species, label]) => [
-    label.toLowerCase(),
-    species,
-  ]),
-);
+/** Our keys' Rekognition label names turned around: the name, lowercased, to its key. */
+export function byLabel<K extends string>(
+  labels: Readonly<Record<K, string>>,
+): ReadonlyMap<string, K> {
+  return new Map(
+    (Object.entries(labels) as [K, string][]).map(([key, name]) => [name.toLowerCase(), key]),
+  );
+}
+
+const SPECIES_BY_LABEL = byLabel(FISH_SPECIES_LABELS);
 
 /** The fish a scene label names, or undefined for any other label. */
 export const fishSpeciesOf = (name: string): FishSpecies | undefined =>

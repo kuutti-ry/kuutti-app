@@ -1,5 +1,6 @@
 import { type Queryable, transaction } from "@kuutti/db";
 import type { NightlyJob } from "../jobs/nightly.ts";
+import { DAY_MS } from "../lib/finnish-day.ts";
 
 /**
  * The monthly partitions of `events` (#50, ADR-011; rules/db.md: monthly
@@ -12,7 +13,6 @@ import type { NightlyJob } from "../jobs/nightly.ts";
  * bounds are UTC: research reads months, not Finnish days.
  */
 export const EVENTS_RETENTION_DAYS = 90;
-const DAY_MS = 24 * 60 * 60 * 1000;
 /** Distinct from the migration lock (MIGRATE_LOCK_KEY); two containers booting at once take turns here. */
 const PARTITIONS_LOCK_KEY = 725_121_150;
 
