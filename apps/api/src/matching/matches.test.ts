@@ -7,18 +7,17 @@ import {
   type RoundReason,
   RoundResponse,
 } from "@kuutti/schema";
-import { type App, createApp } from "../app.ts";
+import type { App } from "../app.ts";
 import { archiveJob, conversationBetween } from "../chat/index.ts";
-import {
-  CURRENT_CONSENT_VERSIONS,
-  eraseAccount,
-  lockAccountForSanction,
-} from "../identity/index.ts";
+import { eraseAccount, lockAccountForSanction } from "../identity/index.ts";
 import { finnishDay } from "../lib/finnish-day.ts";
-import { signInAs, withMatchingConfig } from "../test/account.ts";
-import { captureLogger, describe, expect, test, testConfig } from "../test/harness.ts";
+import { joinStudy, withMatchingConfig } from "../test/account.ts";
+import { STOPPED_CLOCK as T } from "../test/global-setup.ts";
+import { captureLogger, describe, expect, test } from "../test/harness.ts";
 import { pidOf, waitsFor, watched, withTwoConnections } from "../test/races.ts";
 import {
+  appAt,
+  cast,
   conversationsWaiting,
   endedConversation,
   fitsAt,
@@ -39,7 +38,6 @@ import { decide } from "./rounds.ts";
 // person's turn is chat/your-turn.test.ts.
 
 /** 12:00 in Finland, one Friday. */
-const T = new Date("2026-10-16T09:00:00.000Z");
 const DAY_MS = 24 * 60 * 60 * 1000;
 const TODAY = finnishDay(T);
 const FITS = fitsAt(() => T);
@@ -47,16 +45,6 @@ const FITS = fitsAt(() => T);
 type Person = { accountId: string; headers: { authorization: string } };
 
 const daysBefore = (days: number) => new Date(T.getTime() - days * DAY_MS);
-
-async function appAt(db: Queryable, at: Date = T): Promise<App> {
-  const { logger } = await captureLogger();
-  return createApp({ config: testConfig(), logger, db, now: () => at });
-}
-
-async function cast(db: Queryable, count: number): Promise<Person[]> {
-  const ids = await peopleWhoFit(db, count);
-  return Promise.all(ids.map((id) => signInAs(db, id)));
-}
 
 /** A round for `owner` on the day `days` before today, these people its cards, in order. */
 const roundOf = (
@@ -134,19 +122,6 @@ const refusal = async (response: Response) => {
   expect(response.status).toBe(409);
   return ErrorResponse.parse(await response.json()).error;
 };
-
-async function joinStudy(app: App, who: Person) {
-  const answer = await app.request("/consents", {
-    method: "POST",
-    headers: { ...who.headers, "content-type": "application/json" },
-    body: JSON.stringify({
-      kind: "research",
-      version: CURRENT_CONSENT_VERSIONS.research,
-      locale: "fi",
-    }),
-  });
-  expect(answer.status).toBe(200);
-}
 
 describe("a match", () => {
   test("Two likes make a match, and the match is a conversation for both", async ({ ctx }) => {
@@ -331,8 +306,8 @@ describe("a match", () => {
     const [a, b] = await cast(ctx.client, 2);
     if (!a || !b) throw new Error("cast not written");
     const earlier = await appAt(ctx.client, new Date(T.getTime() - 60_000));
-    await joinStudy(earlier, a);
-    await joinStudy(earlier, b);
+    await joinStudy(earlier, a.headers);
+    await joinStudy(earlier, b.headers);
     await likedBefore(ctx.client, b, a, 1);
     await roundOf(ctx.client, a, [b]);
 

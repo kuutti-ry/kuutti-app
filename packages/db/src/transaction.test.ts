@@ -1,12 +1,21 @@
 import { afterAll, describe, expect, it } from "vitest";
-import { createPool, type PoolClient, type Queryable, transaction } from "./index.ts";
+import {
+  createPool,
+  type PoolClient,
+  type Queryable,
+  TEST_DATABASE_URL,
+  transaction,
+} from "./index.ts";
 
 // The unit-of-work seam (#49): commit, rollback on a throw, and a savepoint
 // when the caller is already inside a transaction, which is how every route
 // runs under the API's test harness.
 
-const URL = process.env.DATABASE_URL ?? "postgres://kuutti:kuutti@127.0.0.1:5432/kuutti_test";
-const pool = createPool({ connectionString: URL, max: 2, applicationName: "kuutti-db-test" });
+const pool = createPool({
+  connectionString: TEST_DATABASE_URL,
+  max: 2,
+  applicationName: "kuutti-db-test",
+});
 afterAll(() => pool.end());
 
 describe("transaction", () => {
@@ -57,9 +66,9 @@ describe("transaction", () => {
 
 describe("the pool", () => {
   it("names itself kuutti, holds ten connections and waits five seconds for one, unless told otherwise", async () => {
-    const plain = createPool({ connectionString: URL });
+    const plain = createPool({ connectionString: TEST_DATABASE_URL });
     const tuned = createPool({
-      connectionString: URL,
+      connectionString: TEST_DATABASE_URL,
       max: 3,
       applicationName: "kuutti-probe",
       // Distinct from the default's five seconds, and long enough that a busy
@@ -91,7 +100,7 @@ describe("the pool", () => {
 
 describe("a transaction whose rollback fails", () => {
   it("throws the error of the work, and discards the connection instead of returning it to the pool", async () => {
-    const own = createPool({ connectionString: URL, max: 1 });
+    const own = createPool({ connectionString: TEST_DATABASE_URL, max: 1 });
     try {
       await expect(
         transaction(own, async (tx) => {

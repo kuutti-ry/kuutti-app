@@ -1,7 +1,9 @@
 import type { Queryable } from "@kuutti/db";
-import { AdminOverview, ErrorResponse } from "@kuutti/schema";
+import { AdminOverview } from "@kuutti/schema";
 import { type App, createApp } from "../app.ts";
 import { signedInAccount, staffSession } from "../test/account.ts";
+import { errorCode } from "../test/answers.ts";
+import { STOPPED_CLOCK as T } from "../test/global-setup.ts";
 import {
   test as base,
   captureLogger,
@@ -10,6 +12,7 @@ import {
   type TestContext,
   testConfig,
 } from "../test/harness.ts";
+import { auditRows } from "../test/reports.ts";
 import { MODERATION_RESPONSE_HOURS_KEY } from "./overview-routes.ts";
 
 // The panel's front page (#303): the figures read back exactly as the queues
@@ -20,7 +23,6 @@ import { MODERATION_RESPONSE_HOURS_KEY } from "./overview-routes.ts";
 // into the test's transaction in the states moderation leaves them in.
 
 /** The route's clock: 12:00 in Finland, one Friday. */
-const T = new Date("2026-10-16T09:00:00.000Z");
 
 type Headers = Record<string, string>;
 
@@ -41,10 +43,6 @@ async function read(app: App, headers: Headers): Promise<AdminOverview> {
   const response = await overview(app, headers);
   expect(response.status).toBe(200);
   return AdminOverview.parse(await response.json());
-}
-
-async function errorCode(response: Response): Promise<string> {
-  return ErrorResponse.parse(await response.json()).error.code;
 }
 
 type PhotoState = "pending" | "queued" | "approved" | "rejected";
@@ -110,10 +108,6 @@ async function nothingWaiting(ctx: TestContext, accountId: string, handledBy: st
     at: "2026-10-02T11:00:00.000Z",
     by: handledBy,
   });
-}
-
-async function auditRows(ctx: TestContext) {
-  return (await ctx.client.query("SELECT * FROM audit_log ORDER BY at, id")).rows;
 }
 
 describe("GET /admin/overview", () => {

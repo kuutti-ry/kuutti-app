@@ -1,12 +1,12 @@
-import { resolve } from "node:path";
 import { createPool, migrate, type Queryable, withTemporaryDatabase } from "@kuutti/db";
-import { Photo, type PhotoFetchBudget, type PhotoVariant } from "@kuutti/schema";
+import type { Photo, PhotoFetchBudget, PhotoVariant } from "@kuutti/schema";
 import type { QueryResultRow } from "pg";
 import { describe, expect, it } from "vitest";
 import { createApp } from "../app.ts";
 import { signedInAccount, withMatchingConfig } from "../test/account.ts";
+import { MIGRATIONS } from "../test/global-setup.ts";
 import { captureLogger, type TestContext, test, testConfig } from "../test/harness.ts";
-import { fixturePng, testMediaDeps } from "../test/media.ts";
+import { fixturePng, testMediaDeps, upload } from "../test/media.ts";
 import { dayWindow, localYearMonth, secondsUntil } from "./budget.ts";
 import { findVisiblePhoto, insertPhoto, insertPhotoAccess, recordCardServed } from "./repo.ts";
 
@@ -25,14 +25,6 @@ async function appWith(ctx: TestContext, budget: PhotoFetchBudget = BUDGET) {
 }
 
 type App = Awaited<ReturnType<typeof appWith>>["app"];
-
-async function upload(app: App, headers: Record<string, string>, bytes: Buffer): Promise<Photo> {
-  const form = new FormData();
-  form.append("photo", new Blob([new Uint8Array(bytes)], { type: "image/png" }), "p.png");
-  const response = await app.request("/photos", { method: "POST", headers, body: form });
-  expect(response.status).toBe(201);
-  return Photo.parse(await response.json());
-}
 
 const fetchUrl = (app: App, headers: Record<string, string>, id: string, variant: PhotoVariant) =>
   app.request(`/photos/${id}/${variant}`, { headers });
@@ -434,7 +426,7 @@ describe("the budget under load", () => {
     await withTemporaryDatabase(async (url) => {
       const pool = createPool({ connectionString: url, max: 6, applicationName: "kuutti-burst" });
       try {
-        await migrate(pool, resolve(import.meta.dirname, "../../../../packages/db/drizzle"));
+        await migrate(pool, MIGRATIONS);
         const identity = await pool.query<{ id: string }>(
           "INSERT INTO identity (hetu_hmac) VALUES ('burst') RETURNING id",
         );

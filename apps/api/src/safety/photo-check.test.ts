@@ -1,6 +1,7 @@
 import { describe, expect } from "vitest";
 import { signedInAccount, withMatchingConfig } from "../test/account.ts";
-import { type TestContext, test } from "../test/harness.ts";
+import { test } from "../test/harness.ts";
+import { photoCheckNote as note } from "../test/media.ts";
 import {
   closerLookOf,
   deletePhotoCheckNotesOfAccount,
@@ -19,12 +20,6 @@ import {
 const DAY = 86_400_000;
 const T = new Date("2026-10-01T12:00:00Z");
 const daysFrom = (base: Date, days: number) => new Date(base.getTime() + days * DAY);
-
-const note = (ctx: TestContext, accountId: string, at: Date) =>
-  ctx.client.query(
-    "INSERT INTO photo_check_note (account_id, kind, at) VALUES ($1, 'nudity', $2)",
-    [accountId, at],
-  );
 
 describe("the closer look", () => {
   test("one note, or two further apart than the window, start none", async ({ ctx }) => {

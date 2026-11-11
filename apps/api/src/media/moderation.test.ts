@@ -12,7 +12,7 @@ import { closerLookOf } from "../safety/index.ts";
 import { signedInAccount, staffSession, withMatchingConfig } from "../test/account.ts";
 import { openExport } from "../test/export.ts";
 import { captureLogger, type TestContext, test, testConfig } from "../test/harness.ts";
-import { fixtureJpeg, fixtureWebp, testMediaDeps } from "../test/media.ts";
+import { fixtureJpeg, fixtureWebp, photoCheckNote as note, testMediaDeps } from "../test/media.ts";
 import {
   DESCRIPTION_LABELS,
   type DescriptionSignals,
@@ -1437,11 +1437,6 @@ describe("notes of the photo check and the closer look (#253)", () => {
     );
     return rows[0]?.id ?? "";
   };
-  const note = (ctx: TestContext, accountId: string, at: Date) =>
-    ctx.client.query(
-      "INSERT INTO photo_check_note (account_id, kind, at) VALUES ($1, 'nudity', $2)",
-      [accountId, at],
-    );
   const notesOf = async (ctx: TestContext, accountId: string) =>
     (
       await ctx.client.query<{ kind: string; at: Date; photo_id: string | null }>(

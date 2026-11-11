@@ -1,7 +1,14 @@
 import { CURRENT_CONSENT_VERSIONS } from "../identity/index.ts";
-import { signedInAccount } from "../test/account.ts";
+import { joinStudy, signedInAccount } from "../test/account.ts";
 import { exportOf } from "../test/export.ts";
-import { captureLogger, describe, expect, type TestContext, test } from "../test/harness.ts";
+import {
+  captureLogger,
+  describe,
+  expect,
+  jsonHeaders as json,
+  type TestContext,
+  test,
+} from "../test/harness.ts";
 import { ensureEventPartitions } from "./partitions.ts";
 import * as repo from "./repo.ts";
 import { track } from "./track.ts";
@@ -9,24 +16,6 @@ import { track } from "./track.ts";
 // The research_id mapping's life (#50, ADR-011): features/identity/onboarding.feature
 // and features/identity/erasure.feature carry the scenarios; the row is the
 // research slice's, so the tests live here.
-
-const json = (headers: Record<string, string>) => ({
-  ...headers,
-  "content-type": "application/json",
-});
-
-async function consent(ctx: TestContext, headers: Record<string, string>) {
-  const response = await ctx.app.request("/consents", {
-    method: "POST",
-    headers: json(headers),
-    body: JSON.stringify({
-      kind: "research",
-      version: CURRENT_CONSENT_VERSIONS.research,
-      locale: "fi",
-    }),
-  });
-  expect(response.status).toBe(200);
-}
 
 async function withdraw(ctx: TestContext, headers: Record<string, string>) {
   const response = await ctx.app.request("/consents/research", { method: "DELETE", headers });
@@ -61,7 +50,7 @@ describe("the research_id mapping", () => {
   }) => {
     const research = await deps(ctx);
     const a = await signedInAccount(ctx.client);
-    await consent(ctx, a.headers);
+    await joinStudy(ctx.app, a.headers);
     const subject = await repo.findSubject(ctx.client, a.accountId);
     expect(subject).not.toBeNull();
     expect(subject?.consentVersion).toBe(CURRENT_CONSENT_VERSIONS.research);
@@ -87,16 +76,16 @@ describe("the research_id mapping", () => {
 
   test("A new research opt-in is a new research_id", async ({ ctx }) => {
     const a = await signedInAccount(ctx.client);
-    await consent(ctx, a.headers);
+    await joinStudy(ctx.app, a.headers);
     const first = (await repo.findSubject(ctx.client, a.accountId))?.researchId;
     await withdraw(ctx, a.headers);
-    await consent(ctx, a.headers);
+    await joinStudy(ctx.app, a.headers);
     const second = (await repo.findSubject(ctx.client, a.accountId))?.researchId;
     expect(first).toBeTruthy();
     expect(second).toBeTruthy();
     expect(second).not.toBe(first);
     // A repeated consent for the same wording keeps the pseudonym.
-    await consent(ctx, a.headers);
+    await joinStudy(ctx.app, a.headers);
     expect((await repo.findSubject(ctx.client, a.accountId))?.researchId).toBe(second);
   });
 
@@ -104,7 +93,7 @@ describe("the research_id mapping", () => {
     ctx,
   }) => {
     const a = await signedInAccount(ctx.client);
-    await consent(ctx, a.headers);
+    await joinStudy(ctx.app, a.headers);
     const before = await repo.findSubject(ctx.client, a.accountId);
     const outcome = await repo.enrolSubject(ctx.client, a.accountId, "2099-01-final-1", new Date());
     expect(outcome).toBe("updated");
@@ -122,7 +111,7 @@ describe("the research_id mapping", () => {
   test("Erasure removes the research_id mapping and keeps the events", async ({ ctx }) => {
     const research = await deps(ctx);
     const a = await signedInAccount(ctx.client);
-    await consent(ctx, a.headers);
+    await joinStudy(ctx.app, a.headers);
     const researchId = (await repo.findSubject(ctx.client, a.accountId))?.researchId ?? "";
     await track(research, a.accountId, "profile_saved", {
       complete: false,
@@ -150,7 +139,7 @@ describe("the research_id mapping", () => {
   }) => {
     const research = await deps(ctx);
     const a = await signedInAccount(ctx.client);
-    await consent(ctx, a.headers);
+    await joinStudy(ctx.app, a.headers);
     const researchId = (await repo.findSubject(ctx.client, a.accountId))?.researchId ?? "";
     await track(research, a.accountId, "profile_saved", {
       complete: false,

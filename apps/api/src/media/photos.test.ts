@@ -1,9 +1,10 @@
 import type { Queryable } from "@kuutti/db";
-import { ErrorResponse, Photo, PhotoList } from "@kuutti/schema";
+import { Photo, PhotoList } from "@kuutti/schema";
 import type { LimitFunction } from "p-limit";
 import { describe, expect } from "vitest";
 import { createApp } from "../app.ts";
 import { signedInAccount, withMatchingConfig } from "../test/account.ts";
+import { errorCode } from "../test/answers.ts";
 import { captureLogger, type TestContext, test, testConfig } from "../test/harness.ts";
 import { fixtureJpeg, fixturePng, testMediaDeps } from "../test/media.ts";
 import { type MediaStore, memoryMediaStore } from "./store.ts";
@@ -45,8 +46,6 @@ function upload(app: App, headers: Record<string, string>, bytes: Uint8Array) {
   form.append("photo", new Blob([new Uint8Array(bytes)], { type: "image/jpeg" }), "p.jpg");
   return app.request("/photos", { method: "POST", headers, body: form });
 }
-
-const errorCode = async (res: Response) => ErrorResponse.parse(await res.json()).error.code;
 
 /** A memory bucket whose put or delete can be made to fail, the way S3 fails: by rejecting. */
 function flakyStore() {

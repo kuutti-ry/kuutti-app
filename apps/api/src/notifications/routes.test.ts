@@ -1,18 +1,24 @@
 import { randomUUID } from "node:crypto";
-import { resolve } from "node:path";
-import { createPool, migrate, withTemporaryDatabase } from "@kuutti/db";
-import { ErrorResponse, Notices, NotificationChoices } from "@kuutti/schema";
+import { NotificationChoices } from "@kuutti/schema";
 import { describe, expect, it } from "vitest";
 import { createApp } from "../app.ts";
 import { eraseAccount } from "../identity/index.ts";
 import { invitationCountJob } from "../jobs/invitation-count.ts";
 import { applySanction } from "../safety/index.ts";
 import { signedInAccount, withMatchingConfig } from "../test/account.ts";
+import { errorCode } from "../test/answers.ts";
 import { interleaved } from "../test/chat.ts";
 import { exportOf } from "../test/export.ts";
-import { captureLogger, type TestContext, test, testConfig } from "../test/harness.ts";
+import {
+  captureLogger,
+  jsonHeaders as json,
+  type TestContext,
+  test,
+  testConfig,
+} from "../test/harness.ts";
 import { completed, invitationOf } from "../test/invitations.ts";
-import { pidOf, waitsFor, watched } from "../test/races.ts";
+import { noticesOf } from "../test/push.ts";
+import { pidOf, waitsFor, watched, withTwoConnections } from "../test/races.ts";
 import { setChoice } from "./notifications.ts";
 
 // The notification choices and the notices in the app (#176, ADR-032): every
@@ -25,10 +31,6 @@ import { setChoice } from "./notifications.ts";
 type Person = Awaited<ReturnType<typeof signedInAccount>>;
 type App = ReturnType<typeof createApp>;
 
-const json = (headers: Record<string, string>) => ({
-  ...headers,
-  "content-type": "application/json",
-});
 const choicesOf = async (app: App, who: Person) => {
   const answer = await app.request("/account/notifications", { headers: who.headers });
   expect(answer.status).toBe(200);
@@ -40,14 +42,8 @@ const choose = (app: App, who: { headers: Record<string, string> }, kind: string
     headers: json(who.headers),
     body: JSON.stringify(body),
   });
-const noticesOf = async (app: App, who: Person) => {
-  const answer = await app.request("/notices", { headers: who.headers });
-  expect(answer.status).toBe(200);
-  return Notices.parse(await answer.json()).notices;
-};
 const read = (app: App, who: { headers: Record<string, string> }, id: string) =>
   app.request(`/notices/${id}/read`, { method: "POST", headers: who.headers });
-const errorCode = async (answer: Response) => ErrorResponse.parse(await answer.json()).error.code;
 const warn = (ctx: TestContext, who: Person, kind: "warn" | "shadow_ban" = "warn") =>
   applySanction(ctx.client, {
     accountId: who.accountId,
@@ -129,49 +125,34 @@ describe("the notification choices", () => {
 
 describe("a choice against the account's erasure", () => {
   it("a choice saved while the account is being erased waits for it, and writes nothing", async () => {
-    await withTemporaryDatabase(async (url) => {
-      const pool = createPool({
-        connectionString: url,
-        max: 4,
-        applicationName: "kuutti-176-race",
-      });
-      const erasing = await pool.connect();
-      const choosing = await pool.connect();
-      try {
-        await migrate(pool, resolve(import.meta.dirname, "../../../../packages/db/drizzle"));
-        const { rows } = await pool.query<{ id: string }>(
-          `WITH i AS (INSERT INTO identity (hetu_hmac) VALUES ('kuutti 176 race') RETURNING id)
-           INSERT INTO account (identity_id, state, birth_year, birth_month)
-           SELECT id, 'active', 1990, 6 FROM i RETURNING id`,
-        );
-        const accountId = rows[0]?.id as string;
-        const { logger } = await captureLogger();
-        // Asked before the work: a client runs one query at a time.
-        const erasurePid = await pidOf(erasing);
-        const choicePid = await pidOf(choosing);
-        // The erasure has done its work and holds the account, not yet committed.
-        await erasing.query("BEGIN");
-        await eraseAccount({ db: erasing, logger, now: () => new Date() }, accountId);
-        const choice = watched(
-          setChoice(
-            { db: choosing, now: () => new Date() },
-            { accountId, kind: "message", enabled: false },
-          ),
-        );
-        const waited = await waitsFor(pool, choicePid, erasurePid, choice.settled);
-        await erasing.query("COMMIT");
-        expect(waited).toBe(true);
-        expect(await choice.outcome).toBe("not_found");
-        const left = await pool.query(
-          "SELECT 1 FROM notification_preference WHERE account_id = $1",
-          [accountId],
-        );
-        expect(left.rows).toEqual([]);
-      } finally {
-        erasing.release();
-        choosing.release();
-        await pool.end();
-      }
+    await withTwoConnections("kuutti-176-race", async (pool, erasing, choosing) => {
+      const { rows } = await pool.query<{ id: string }>(
+        `WITH i AS (INSERT INTO identity (hetu_hmac) VALUES ('kuutti 176 race') RETURNING id)
+         INSERT INTO account (identity_id, state, birth_year, birth_month)
+         SELECT id, 'active', 1990, 6 FROM i RETURNING id`,
+      );
+      const accountId = rows[0]?.id as string;
+      const { logger } = await captureLogger();
+      // Asked before the work: a client runs one query at a time.
+      const erasurePid = await pidOf(erasing);
+      const choicePid = await pidOf(choosing);
+      // The erasure has done its work and holds the account, not yet committed.
+      await erasing.query("BEGIN");
+      await eraseAccount({ db: erasing, logger, now: () => new Date() }, accountId);
+      const choice = watched(
+        setChoice(
+          { db: choosing, now: () => new Date() },
+          { accountId, kind: "message", enabled: false },
+        ),
+      );
+      const waited = await waitsFor(pool, choicePid, erasurePid, choice.settled);
+      await erasing.query("COMMIT");
+      expect(waited).toBe(true);
+      expect(await choice.outcome).toBe("not_found");
+      const left = await pool.query("SELECT 1 FROM notification_preference WHERE account_id = $1", [
+        accountId,
+      ]);
+      expect(left.rows).toEqual([]);
     });
   }, 30_000);
 });

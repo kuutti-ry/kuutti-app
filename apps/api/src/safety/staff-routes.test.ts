@@ -1,8 +1,10 @@
-import { ErrorResponse, StaffList } from "@kuutti/schema";
+import { StaffList } from "@kuutti/schema";
 import type { App } from "../app.ts";
 import { sweepAdminSessions } from "../identity/index.ts";
 import { signedInAccount, staffSession } from "../test/account.ts";
+import { errorCode } from "../test/answers.ts";
 import { describe, expect, type TestContext, test } from "../test/harness.ts";
+import { auditRows } from "../test/reports.ts";
 
 // The staff list through the app (#310): the list against moderator_roles
 // and the latest admin_session, a revoked role gone, the admins' guard in
@@ -15,14 +17,6 @@ type Headers = Record<string, string>;
 const staffList = (app: App, headers: Headers) => app.request("/admin/staff", { headers });
 /** The audit reader, asked bare: the guard test holds both of the admins' read routes to the same variants. */
 const audit = (app: App, headers: Headers) => app.request("/admin/audit", { headers });
-
-async function errorCode(response: Response): Promise<string> {
-  return ErrorResponse.parse(await response.json()).error.code;
-}
-
-async function auditRows(ctx: TestContext) {
-  return (await ctx.client.query("SELECT * FROM audit_log ORDER BY at, id")).rows;
-}
 
 async function memberIn(
   ctx: TestContext,

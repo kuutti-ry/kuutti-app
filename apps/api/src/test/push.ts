@@ -1,5 +1,7 @@
 import type { Queryable } from "@kuutti/db";
+import { Notices } from "@kuutti/schema";
 import { expect } from "vitest";
+import type { App } from "../app.ts";
 import type { Pusher, PushMessage, PushReceipt, PushTicket } from "../lib/push.ts";
 
 // The push's doubles (#102, ADR-055 §8): a pusher that keeps what it was
@@ -195,3 +197,10 @@ export function expectNamesNothing(messages: readonly PushMessage[], withheld: W
   }
   return messages.length;
 }
+
+/** The person's notices, through the route the app reads. */
+export const noticesOf = async (app: App, who: { headers: Record<string, string> }) => {
+  const answer = await app.request("/notices", { headers: who.headers });
+  expect(answer.status).toBe(200);
+  return Notices.parse(await answer.json()).notices;
+};

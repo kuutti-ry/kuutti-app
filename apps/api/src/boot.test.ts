@@ -1,4 +1,3 @@
-import { resolve } from "node:path";
 import { createPool, migrate, type Pool, seed, withTemporaryDatabase } from "@kuutti/db";
 import { ErrorResponse } from "@kuutti/schema";
 import {
@@ -19,6 +18,7 @@ import { type BootOptions, boot } from "./boot.ts";
 import { type IdentityBroker, OidcBroker } from "./identity/index.ts";
 import { runNightly } from "./jobs/nightly.ts";
 import { CHALLENGE } from "./test/attempt.ts";
+import { MIGRATIONS } from "./test/global-setup.ts";
 import { captureLogger, type LogLine, TEST_DATABASE_URL, testConfig } from "./test/harness.ts";
 import { testSigningKeys } from "./test/media.ts";
 
@@ -53,7 +53,6 @@ vi.mock("@sentry/node", () => ({
   }),
 }));
 
-const MIGRATIONS = resolve(import.meta.dirname, "..", "..", "..", "packages", "db", "drizzle");
 // An artificial key, not the all-zero placeholder: only its shape matters here.
 const HMAC_KEY = "1f".repeat(32);
 const MOCK_ISSUER = "http://127.0.0.1:8080/ftn";

@@ -1,7 +1,6 @@
 import type { Queryable } from "@kuutti/db";
 import {
   DealBreakersResponse,
-  ErrorResponse,
   type ProfileFields,
   QUEUE_PAGE,
   RelaxationAnswer,
@@ -13,12 +12,14 @@ import { vi } from "vitest";
 import { type App, createApp } from "../app.ts";
 import { exportAccount } from "../identity/index.ts";
 import { finnishDay } from "../lib/finnish-day.ts";
-import { signInAs } from "../test/account.ts";
+import { signInAs, withMatchingConfig } from "../test/account.ts";
+import { errorCode as codeOf } from "../test/answers.ts";
 import {
   captureLogger,
   describe,
   englishT,
   expect,
+  jsonHeaders,
   type TestContext,
   test,
   testConfig,
@@ -62,14 +63,6 @@ const deps = async (db: Queryable, now = NOON) => ({
 /** The person's next people, as a read that finds nothing left adds them: the day opened and its first page. */
 const opens = async (db: Queryable, accountId: string, now = NOON) =>
   fillQueue(await deps(db, now), accountId);
-
-async function setConfig(db: Queryable, key: string, value: unknown) {
-  await db.query(
-    `INSERT INTO matching_config (version, key, value, created_by)
-     SELECT coalesce(max(version), 0) + 1, $1, $2::jsonb, 'test' FROM matching_config WHERE key = $1`,
-    [key, JSON.stringify(value)],
-  );
-}
 
 /** A deal-breaker of the person's, stored as the deal-breakers route stores it. */
 async function dealBreaker(
@@ -141,7 +134,6 @@ async function appAt(db: Queryable, now = NOON): Promise<App> {
 }
 
 type Headers = Record<string, string>;
-const jsonHeaders = (headers: Headers) => ({ ...headers, "content-type": "application/json" });
 
 async function readToday(app: App, headers: Headers): Promise<RoundResponse> {
   const answer = await app.request("/rounds/today", { headers });
@@ -190,8 +182,6 @@ async function added(response: Response) {
   expect(response.status).toBe(200);
   return RelaxationAnswer.parse(await response.json()).entries;
 }
-
-const codeOf = async (response: Response) => ErrorResponse.parse(await response.json()).error.code;
 
 const UNANSWERED = { field: "smoking", kind: "unanswered" } as const;
 const ASIDE = { field: "smoking", kind: "aside" } as const;
@@ -1363,7 +1353,7 @@ describe("the routes' edges", () => {
   }) => {
     const { a } = await pondWith(ctx, "test-short-card-budget", [{ fields: {}, count: 2 }]);
     await opens(ctx.client, a);
-    await setConfig(ctx.client, "exposure_cards_per_day", 1);
+    await withMatchingConfig(ctx.client, { exposure_cards_per_day: 1 });
     const app = await appAt(ctx.client);
     const { headers } = await signInAs(ctx.client, a);
 

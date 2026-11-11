@@ -12,6 +12,7 @@ import { applySanction } from "../safety/index.ts";
 import { signInAs, withMatchingConfig } from "../test/account.ts";
 import { cardShown } from "../test/cards.ts";
 import { conversationBetween } from "../test/chat.ts";
+import { STOPPED_CLOCK as T } from "../test/global-setup.ts";
 import {
   captureLogger,
   type LogLine,
@@ -41,7 +42,6 @@ import { createPush } from "./push.ts";
 // clock the test moves; a test waits for the push with `settled`.
 
 /** 12:00 in Helsinki, a Friday in summer time (UTC+3). */
-const T = new Date("2026-10-16T09:00:00.000Z");
 const MINUTE = 60_000;
 const DAY = 24 * 60 * MINUTE;
 /** At T a push may wait ten hours for its phone: the quiet hours begin at 22:00. */

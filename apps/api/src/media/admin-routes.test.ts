@@ -1,8 +1,9 @@
 import type { Queryable } from "@kuutti/db";
-import { ErrorResponse, PhotoList, PhotoReviewQueue, PhotoUrlResponse } from "@kuutti/schema";
+import { PhotoList, PhotoReviewQueue, PhotoUrlResponse } from "@kuutti/schema";
 import { describe, expect } from "vitest";
 import { createApp } from "../app.ts";
 import { signedInAccount, staffSession, withMatchingConfig } from "../test/account.ts";
+import { errorCode } from "../test/answers.ts";
 import { captureLogger, type TestContext, test, testConfig } from "../test/harness.ts";
 import { TEST_MEDIA_BASE, testMediaDeps } from "../test/media.ts";
 import { rejectUnreviewedPhotos } from "./moderation.ts";
@@ -49,7 +50,6 @@ async function photoIn(
   return id;
 }
 
-const errorCode = async (res: Response) => ErrorResponse.parse(await res.json()).error.code;
 const decide = (
   app: ReturnType<typeof createApp>,
   headers: Record<string, string>,

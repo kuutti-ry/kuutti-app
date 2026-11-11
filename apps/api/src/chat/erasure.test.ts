@@ -1,14 +1,11 @@
-import { randomUUID } from "node:crypto";
 import { ConversationDetail, ConversationList, ErrorResponse, MessagePage } from "@kuutti/schema";
 import { describe, expect } from "vitest";
 import { createApp } from "../app.ts";
 import { eraseAccount } from "../identity/index.ts";
 import { applySanction } from "../safety/index.ts";
-import { signInAs } from "../test/account.ts";
-import { conversationBetween } from "../test/chat.ts";
+import { conversationBetween, person, send } from "../test/chat.ts";
 import { openExport } from "../test/export.ts";
-import { captureLogger, type TestContext, test, testConfig } from "../test/harness.ts";
-import { people } from "../test/people.ts";
+import { captureLogger, test, testConfig } from "../test/harness.ts";
 
 // features/identity/erasure.feature, the chat's rows (#348, ADR-007 §4,
 // ADR-031 §5): erasure cuts the person's link and keeps the words for the
@@ -19,28 +16,6 @@ import { people } from "../test/people.ts";
 
 // A marker of letters: a number can turn up in a timestamp by chance.
 const MARK = "qzxvkw";
-
-async function person(ctx: TestContext, name: string) {
-  const [accountId] = await people(ctx.client, null, 1, { complete: true });
-  if (!accountId) throw new Error("no person");
-  await ctx.client.query("UPDATE profile SET display_name = $2 WHERE account_id = $1", [
-    accountId,
-    name,
-  ]);
-  return { accountId, headers: (await signInAs(ctx.client, accountId)).headers };
-}
-
-const send = (
-  app: ReturnType<typeof createApp>,
-  who: { headers: Record<string, string> },
-  id: string,
-  body: string,
-) =>
-  app.request(`/conversations/${id}/messages`, {
-    method: "POST",
-    headers: { ...who.headers, "content-type": "application/json" },
-    body: JSON.stringify({ clientId: randomUUID(), body }),
-  });
 
 const markRead = (
   app: ReturnType<typeof createApp>,

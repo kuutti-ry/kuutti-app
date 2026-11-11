@@ -1,8 +1,12 @@
 import { generateKeyPairSync } from "node:crypto";
+import { Photo } from "@kuutti/schema";
 import pLimit from "p-limit";
 import sharp from "sharp";
+import { expect } from "vitest";
+import type { App } from "../app.ts";
 import type { Inspection, Moderator } from "../media/index.ts";
 import { cloudFrontSigner, type MediaDeps, memoryMediaStore } from "../media/index.ts";
+import type { TestContext } from "./harness.ts";
 
 /**
  * Test fixtures for the photo pipeline (#48). Images are made with sharp at
@@ -179,3 +183,23 @@ export function scriptedModerator(...answers: Array<Inspection | Error>): Modera
     },
   };
 }
+
+/** A PNG through the upload route, as the phone sends one, and the photo it answers. */
+export async function upload(
+  app: App,
+  headers: Record<string, string>,
+  bytes: Buffer,
+): Promise<Photo> {
+  const form = new FormData();
+  form.append("photo", new Blob([new Uint8Array(bytes)], { type: "image/png" }), "p.png");
+  const response = await app.request("/photos", { method: "POST", headers, body: form });
+  expect(response.status).toBe(201);
+  return Photo.parse(await response.json());
+}
+
+/** A note of the photo check's on the person, of nudity, at `at` (#253). */
+export const photoCheckNote = (ctx: TestContext, accountId: string, at: Date) =>
+  ctx.client.query(
+    "INSERT INTO photo_check_note (account_id, kind, at) VALUES ($1, 'nudity', $2)",
+    [accountId, at],
+  );

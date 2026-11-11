@@ -1,6 +1,9 @@
 import { createHash, randomBytes } from "node:crypto";
 import type { Queryable } from "@kuutti/db";
 import type { ModeratorRole } from "@kuutti/schema";
+import { expect } from "vitest";
+import type { App } from "../app.ts";
+import { CURRENT_CONSENT_VERSIONS } from "../identity/index.ts";
 import { hashToken } from "../lib/auth-middleware.ts";
 import { SPECIAL_CATEGORY_CONSENT_VERSION } from "../profile/index.ts";
 
@@ -19,6 +22,33 @@ export type SignedIn = {
   /** Ready for `app.request(path, { headers })`. */
   headers: { authorization: string };
 };
+
+/** A phone's session of the account, as the exchange writes one: the tokens, and only their hashes stored. */
+async function deviceSession(
+  db: Queryable,
+  accountId: string,
+): Promise<{ sessionId: string; accessToken: string; refreshToken: string }> {
+  const accessToken = randomBytes(32).toString("base64url");
+  // The refresh token's shape (ADR-059): the session's secret, a dot, the rotating part.
+  const family = randomBytes(32).toString("base64url");
+  const refreshToken = `${family}.${randomBytes(32).toString("base64url")}`;
+  const now = Date.now();
+  const session = await db.query<{ id: string }>(
+    `INSERT INTO session (account_id, platform, access_hash, access_expires_at, refresh_hash, family_hash, expires_at)
+     VALUES ($1, 'ios', $2, $3, $4, $5, $6) RETURNING id`,
+    [
+      accountId,
+      hashToken(accessToken),
+      new Date(now + 15 * 60 * 1000),
+      hashToken(refreshToken),
+      hashToken(family),
+      new Date(now + 90 * 24 * 60 * 60 * 1000),
+    ],
+  );
+  const sessionId = session.rows[0]?.id;
+  if (!sessionId) throw new Error("test session not written");
+  return { sessionId, accessToken, refreshToken };
+}
 
 export async function signedInAccount(
   db: Queryable,
@@ -45,25 +75,7 @@ export async function signedInAccount(
   const accountId = account.rows[0]?.id;
   if (!accountId) throw new Error("test account not written");
 
-  const accessToken = randomBytes(32).toString("base64url");
-  // The refresh token's shape (ADR-059): the session's secret, a dot, the rotating part.
-  const family = randomBytes(32).toString("base64url");
-  const refreshToken = `${family}.${randomBytes(32).toString("base64url")}`;
-  const now = Date.now();
-  const session = await db.query<{ id: string }>(
-    `INSERT INTO session (account_id, platform, access_hash, access_expires_at, refresh_hash, family_hash, expires_at)
-     VALUES ($1, 'ios', $2, $3, $4, $5, $6) RETURNING id`,
-    [
-      accountId,
-      hashToken(accessToken),
-      new Date(now + 15 * 60 * 1000),
-      hashToken(refreshToken),
-      hashToken(family),
-      new Date(now + 90 * 24 * 60 * 60 * 1000),
-    ],
-  );
-  const sessionId = session.rows[0]?.id;
-  if (!sessionId) throw new Error("test session not written");
+  const { sessionId, accessToken, refreshToken } = await deviceSession(db, accountId);
   return {
     accountId,
     sessionId,
@@ -92,22 +104,7 @@ export async function signInAs(
   db: Queryable,
   accountId: string,
 ): Promise<{ accountId: string; headers: { authorization: string } }> {
-  const accessToken = randomBytes(32).toString("base64url");
-  const family = randomBytes(32).toString("base64url");
-  const refreshToken = `${family}.${randomBytes(32).toString("base64url")}`;
-  const now = Date.now();
-  await db.query(
-    `INSERT INTO session (account_id, platform, access_hash, access_expires_at, refresh_hash, family_hash, expires_at)
-     VALUES ($1, 'ios', $2, $3, $4, $5, $6)`,
-    [
-      accountId,
-      hashToken(accessToken),
-      new Date(now + 15 * 60 * 1000),
-      hashToken(refreshToken),
-      hashToken(family),
-      new Date(now + 90 * 24 * 60 * 60 * 1000),
-    ],
-  );
+  const { accessToken } = await deviceSession(db, accountId);
   return { accountId, headers: { authorization: `Bearer ${accessToken}` } };
 }
 
@@ -174,4 +171,18 @@ export async function staffSession(
     role,
     headers: { authorization: `Bearer ${accessToken}` },
   };
+}
+
+/** The research consent of the current wording, through the route as the app gives it (#50). */
+export async function joinStudy(app: App, headers: Record<string, string>): Promise<void> {
+  const answer = await app.request("/consents", {
+    method: "POST",
+    headers: { ...headers, "content-type": "application/json" },
+    body: JSON.stringify({
+      kind: "research",
+      version: CURRENT_CONSENT_VERSIONS.research,
+      locale: "fi",
+    }),
+  });
+  expect(answer.status).toBe(200);
 }

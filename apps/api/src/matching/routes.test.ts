@@ -3,7 +3,13 @@ import { DealBreakersResponse, PreferencesResponse } from "@kuutti/schema";
 import { describe, expect } from "vitest";
 import { createApp } from "../app.ts";
 import { consentedAccount, signedInAccount, withMatchingConfig } from "../test/account.ts";
-import { captureLogger, type TestContext, test, testConfig } from "../test/harness.ts";
+import {
+  captureLogger,
+  jsonHeaders as json,
+  type TestContext,
+  test,
+  testConfig,
+} from "../test/harness.ts";
 import {
   deletePreferencesOfAccount,
   deleteSeeksOfAccount,
@@ -16,8 +22,6 @@ import {
 // a withdrawn seek answer. The hard rows are rule 7's: what is stored here is
 // what the round builder never crosses, in either direction.
 
-type Headers = Record<string, string>;
-const json = (headers: Headers) => ({ ...headers, "content-type": "application/json" });
 const errorCode = async (res: Response) =>
   ((await res.json()) as { error: { code: string } }).error.code;
 

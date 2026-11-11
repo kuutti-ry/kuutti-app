@@ -1,13 +1,12 @@
-import { createPool, type Pool, type PoolClient } from "@kuutti/db";
+import { createPool, type Pool, type PoolClient, TEST_DATABASE_URL } from "@kuutti/db";
 import { createI18n, typedT } from "@kuutti/i18n";
 import { test as base } from "vitest";
 import { type App, createApp } from "../app.ts";
 import { type Config, parseConfig } from "../lib/config.ts";
 import { createLogger, type Logger } from "../lib/logger.ts";
 
-/** Local default matches docker compose (#5) and the CI service container; never a secret. */
-export const TEST_DATABASE_URL =
-  process.env.DATABASE_URL ?? "postgres://kuutti:kuutti@127.0.0.1:5432/kuutti_test";
+/** DATABASE_URL, or the local default of docker compose (#5) and CI, as @kuutti/db gives it. */
+export { TEST_DATABASE_URL };
 
 export function testConfig(overrides: Record<string, string | undefined> = {}): Config {
   return parseConfig({
@@ -82,5 +81,25 @@ export const test = base.extend<{ ctx: TestContext }>({
     }
   },
 });
+
+/** A request's headers with a JSON body. */
+export const jsonHeaders = (headers: Record<string, string>) => ({
+  ...headers,
+  "content-type": "application/json",
+});
+
+/** A count the test asks of its own transaction: the first column of the first row. */
+export const count = async (ctx: TestContext, sql: string, params: unknown[] = []) =>
+  Number((await ctx.client.query<{ n: string }>(sql, params)).rows[0]?.n ?? 0);
+
+/** The configuration for docker compose's S3 stand-in at `endpoint` (CI's compose job, or a developer with the stack up). */
+export const composeS3Config = (endpoint: string | undefined) =>
+  testConfig({
+    S3_ENDPOINT: endpoint,
+    S3_BUCKET: process.env.S3_BUCKET ?? "kuutti-media",
+    S3_ACCESS_KEY: process.env.S3_ACCESS_KEY ?? "kuutti",
+    S3_SECRET_KEY: process.env.S3_SECRET_KEY ?? "kuutti-dev-only",
+    S3_FORCE_PATH_STYLE: "true",
+  });
 
 export { describe, expect } from "vitest";

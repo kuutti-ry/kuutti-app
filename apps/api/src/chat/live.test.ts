@@ -1,6 +1,5 @@
 import { randomUUID } from "node:crypto";
 import type { AddressInfo } from "node:net";
-import { resolve } from "node:path";
 import { serve } from "@hono/node-server";
 import { createPool, migrate, type Pool, withTemporaryDatabase } from "@kuutti/db";
 import { FRAME_BYTES_MAX, MESSAGES_PAGE_MAX, MessagePage, ServerFrame } from "@kuutti/schema";
@@ -13,7 +12,8 @@ import { applySanction } from "../safety/index.ts";
 import { signedInAccount, staffSession } from "../test/account.ts";
 import { cardShown } from "../test/cards.ts";
 import { conversationBetween } from "../test/chat.ts";
-import { testConfig } from "../test/harness.ts";
+import { MIGRATIONS } from "../test/global-setup.ts";
+import { jsonHeaders as json, testConfig } from "../test/harness.ts";
 import { fixturePng, testMediaDeps } from "../test/media.ts";
 import { archiveSilentConversations } from "./archive.ts";
 import { startChatListener } from "./listen.ts";
@@ -26,7 +26,6 @@ import { createLive, type Live, type Schedule } from "./live.ts";
 // scheduler the test runs by hand, and "nothing more arrived" is shown by a
 // later frame that the same ordered delivery brings after it.
 
-const MIGRATIONS = resolve(import.meta.dirname, "../../../../packages/db/drizzle");
 // A marker of letters: a number can turn up in a timestamp by chance.
 const MARK = "qzxvkw";
 const AUTH_MS = 5_000;
@@ -245,10 +244,6 @@ async function signedIn(token: string, resume: Array<{ id: string; seq: number }
   return p;
 }
 
-const json = (headers: Record<string, string>) => ({
-  ...headers,
-  "content-type": "application/json",
-});
 const send = (headers: Record<string, string>, id: string, body: string, clientId = randomUUID()) =>
   ctx.app.request(`/conversations/${id}/messages`, {
     method: "POST",

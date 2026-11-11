@@ -1,7 +1,9 @@
-import { AUDIT_PAGE_SIZE, AuditPage, ErrorResponse } from "@kuutti/schema";
+import { AUDIT_PAGE_SIZE, AuditPage } from "@kuutti/schema";
 import type { App } from "../app.ts";
 import { type Staff, signedInAccount, staffSession } from "../test/account.ts";
+import { errorCode } from "../test/answers.ts";
 import { describe, expect, type TestContext, test } from "../test/harness.ts";
+import { auditRows } from "../test/reports.ts";
 
 // The audit log's reader through the app (#309): each filter alone and
 // together on rows written straight into the test's transaction, newest
@@ -47,14 +49,6 @@ async function pages(app: App, headers: Headers, query: Query = {}): Promise<Aud
 
 /** The rows' labels: every seeded row carries `{ n }` as its detail. */
 const labels = (p: AuditPage) => p.items.map((item) => item.detail?.n);
-
-async function errorCode(response: Response): Promise<string> {
-  return ErrorResponse.parse(await response.json()).error.code;
-}
-
-async function auditRows(ctx: TestContext) {
-  return (await ctx.client.query("SELECT * FROM audit_log ORDER BY at, id")).rows;
-}
 
 const base64url = (text: string) => Buffer.from(text).toString("base64url");
 const cursor = (value: unknown) => base64url(JSON.stringify(value));

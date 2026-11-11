@@ -1,9 +1,9 @@
-import { resolve } from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 import { createPool, migrate, type Queryable, withTemporaryDatabase } from "@kuutti/db";
 import { PondCounterResponse } from "@kuutti/schema";
 import { it } from "vitest";
 import { withMatchingConfig } from "../test/account.ts";
+import { MIGRATIONS } from "../test/global-setup.ts";
 import { captureLogger, describe, expect, type TestContext, test } from "../test/harness.ts";
 import { people, pondNamed } from "../test/people.ts";
 import {
@@ -334,7 +334,7 @@ describe("two counts at once", () => {
     await withTemporaryDatabase(async (url) => {
       const pool = createPool({ connectionString: url, max: 4, applicationName: "kuutti-counts" });
       try {
-        await migrate(pool, resolve(import.meta.dirname, "../../../../packages/db/drizzle"));
+        await migrate(pool, MIGRATIONS);
         const { logger } = await captureLogger();
         const pond = await pondNamed(pool, "test-counter-parallel");
         await people(pool, pond, 45, { complete: true });

@@ -64,13 +64,6 @@ async function fillAll(db: Queryable, ids: readonly (string | undefined)[], now 
 }
 
 /** A value of matching_config above every version a migration wrote, so it is the one read. */
-async function setConfig(db: Queryable, key: string, value: unknown) {
-  await db.query(
-    `INSERT INTO matching_config (version, key, value, created_by)
-     SELECT coalesce(max(version), 0) + 1, $1, $2::jsonb, 'test' FROM matching_config WHERE key = $1`,
-    [key, JSON.stringify(value)],
-  );
-}
 
 /** An open pond, `women` women and `men` men in it. */
 async function pondOf(ctx: TestContext, slug: string, women: number, men: number) {
@@ -1112,7 +1105,7 @@ describe("distance (#514, ADR-061 §5 to §7)", () => {
 
     // To B's own area, and with nearby ending at a kilometre.
     await moves(ctx, a, HOMES.close);
-    await setConfig(ctx.client, "distance_nearby_km", 1);
+    await withMatchingConfig(ctx.client, { distance_nearby_km: 1 });
 
     expect(await bandsOf(ctx.client, a)).toEqual(written);
     // A's cards were never displayed, so their people are new again (ADR-062 §2).

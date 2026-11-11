@@ -1,11 +1,11 @@
-import type { Queryable } from "@kuutti/db";
 import { ConfigChange, ConfigList } from "@kuutti/schema";
-import type { QueryResultRow } from "pg";
 import { type App, createApp } from "../app.ts";
 import { AppError } from "../lib/errors.ts";
 import { matchingConfigNumber } from "../lib/matching-config.ts";
 import { signedInAccount, staffSession, withMatchingConfig } from "../test/account.ts";
+import { interleavedAfter as interleaved } from "../test/chat.ts";
 import {
+  jsonHeaders as asJson,
   test as base,
   captureLogger,
   describe,
@@ -30,7 +30,6 @@ const test = base.extend<{ api: App }>({
   },
 });
 
-const asJson = (headers: Headers) => ({ ...headers, "content-type": "application/json" });
 const sendFeedback = (api: App, headers: Headers) =>
   api.request("/feedback", {
     method: "POST",
@@ -355,31 +354,6 @@ describe("listConfig", () => {
     ]);
   });
 });
-
-/**
- * The test's transaction with another request's work slipped in once, just
- * after the first statement matching the pattern, as if a concurrent request
- * had committed at that moment (identity/races.test.ts). `ran` says whether
- * the moment came, so a test cannot pass by missing it.
- */
-function interleaved(
-  db: Queryable,
-  after: RegExp,
-  other: () => Promise<unknown>,
-): Queryable & { ran: () => boolean } {
-  let ran = false;
-  return {
-    ran: () => ran,
-    async query<R extends QueryResultRow = QueryResultRow>(text: string, values?: unknown[]) {
-      const result = await db.query<R>(text, values);
-      if (!ran && after.test(text)) {
-        ran = true;
-        await other();
-      }
-      return result;
-    },
-  };
-}
 
 /** changeConfig's read of the key's latest version, before its transaction. */
 const LATEST_READ = /FROM matching_config WHERE key = \$1 ORDER BY version DESC LIMIT 1/;

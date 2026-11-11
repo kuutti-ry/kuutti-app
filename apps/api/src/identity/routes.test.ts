@@ -5,6 +5,7 @@ import { generateHetu } from "@kuutti-ry/tunnistus-oidc/hetu";
 import type { QueryResultRow } from "pg";
 import { describe, expect } from "vitest";
 import { createApp } from "../app.ts";
+import { errorCode } from "../test/answers.ts";
 import { CHALLENGE, VERIFIER } from "../test/attempt.ts";
 import { captureLogger, test, testConfig, testPool } from "../test/harness.ts";
 import { BrokerError, type BrokerIdentity, type IdentityBroker } from "./broker.ts";
@@ -128,10 +129,6 @@ function exchangeWith(app: ReturnType<typeof createApp>, body: unknown) {
 /** The exchange of `code`, with the app's verifier unless told another. */
 async function exchange(app: ReturnType<typeof createApp>, code: string, verifier = VERIFIER) {
   return exchangeWith(app, { code, verifier });
-}
-
-async function errorCode(res: Response): Promise<string> {
-  return ErrorResponse.parse(await res.json()).error.code;
 }
 
 /** What a refusal tells the caller, all but its request id; a body that is no error reads as its status alone. */

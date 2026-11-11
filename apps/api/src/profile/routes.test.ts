@@ -3,7 +3,6 @@ import {
   CARD_FIELD_KEYS,
   CardPreviewResponse,
   HOBBIES,
-  Photo,
   PhotoList,
   PROFILE_FIELD_KEYS,
   PROFILE_FIELDS,
@@ -15,7 +14,7 @@ import { createApp } from "../app.ts";
 import { signedInAccount, withMatchingConfig } from "../test/account.ts";
 import { exportOf } from "../test/export.ts";
 import { captureLogger, type TestContext, test, testConfig } from "../test/harness.ts";
-import { fixturePng, testMediaDeps } from "../test/media.ts";
+import { fixturePng, testMediaDeps, upload } from "../test/media.ts";
 import { ageInYears, buildCard } from "./card.ts";
 import { consentMissingFor, SPECIAL_CATEGORY_CONSENT_VERSION } from "./service.ts";
 
@@ -54,14 +53,6 @@ const put = (app: App, headers: Record<string, string>, body: unknown) =>
     headers: { ...headers, "content-type": "application/json" },
     body: JSON.stringify(body),
   });
-
-async function upload(app: App, headers: Record<string, string>, bytes: Buffer): Promise<Photo> {
-  const form = new FormData();
-  form.append("photo", new Blob([new Uint8Array(bytes)], { type: "image/png" }), "p.png");
-  const response = await app.request("/photos", { method: "POST", headers, body: form });
-  expect(response.status).toBe(201);
-  return Photo.parse(await response.json());
-}
 
 async function approvedPhotos(
   ctx: TestContext,

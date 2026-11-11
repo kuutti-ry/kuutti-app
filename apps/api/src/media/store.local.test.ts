@@ -1,7 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import { createS3Client } from "../lib/s3.ts";
-import { testConfig } from "../test/harness.ts";
+import { composeS3Config } from "../test/harness.ts";
 import { fixtureWebp } from "../test/media.ts";
 import { objectKey, s3MediaStore } from "./store.ts";
 import { presignedS3Signer, URL_TTL_MS } from "./urls.ts";
@@ -13,13 +13,7 @@ import { presignedS3Signer, URL_TTL_MS } from "./urls.ts";
 const endpoint = process.env.S3_ENDPOINT;
 
 describe.skipIf(!endpoint)("media store (compose stand-in)", () => {
-  const config = testConfig({
-    S3_ENDPOINT: endpoint,
-    S3_BUCKET: process.env.S3_BUCKET ?? "kuutti-media",
-    S3_ACCESS_KEY: process.env.S3_ACCESS_KEY ?? "kuutti",
-    S3_SECRET_KEY: process.env.S3_SECRET_KEY ?? "kuutti-dev-only",
-    S3_FORCE_PATH_STYLE: "true",
-  });
+  const config = composeS3Config(endpoint);
 
   it("puts the variants, reads them back, presigns a GET that fetch can open, and deletes them", async () => {
     const client = createS3Client(config);

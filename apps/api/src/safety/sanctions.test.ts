@@ -1,7 +1,6 @@
 import type { Queryable } from "@kuutti/db";
 import {
   AuthExchangeResponse,
-  ErrorResponse,
   OnboardingStatus,
   Sanction,
   type SanctionKind,
@@ -20,9 +19,11 @@ import {
   staffSession,
   withMatchingConfig,
 } from "../test/account.ts";
+import { errorCode } from "../test/answers.ts";
 import { CHALLENGE, VERIFIER } from "../test/attempt.ts";
+import { interleavedAfter as interleaved } from "../test/chat.ts";
 import { exportOf } from "../test/export.ts";
-import { captureLogger, type TestContext, test, testConfig } from "../test/harness.ts";
+import { captureLogger, count, type TestContext, test, testConfig } from "../test/harness.ts";
 import { testMediaDeps } from "../test/media.ts";
 import { people, pondNamed } from "../test/people.ts";
 import {
@@ -207,10 +208,6 @@ async function created(response: Response): Promise<Sanction> {
   return Sanction.parse(await response.json());
 }
 
-async function errorCode(response: Response): Promise<string> {
-  return ErrorResponse.parse(await response.json()).error.code;
-}
-
 // What the database says.
 
 async function stateOf(ctx: TestContext, accountId: string) {
@@ -248,11 +245,6 @@ async function sanctionRow(ctx: TestContext, id: string) {
     [id],
   );
   return rows[0];
-}
-
-async function count(ctx: TestContext, sql: string, params: unknown[] = []): Promise<number> {
-  const { rows } = await ctx.client.query<{ n: string }>(sql, params);
-  return Number(rows[0]?.n ?? 0);
 }
 
 const sanctionsOf = (ctx: TestContext, accountId: string) =>
@@ -333,31 +325,6 @@ const input = (
   at: options.at ?? T,
   ...(kind === "suspend" ? { endsOn: options.endsOn ?? "2026-10-22" } : {}),
 });
-
-/**
- * The test's transaction with another request's work slipped in once, just
- * after the first statement matching `after`, as if a concurrent request had
- * committed at that moment (the pattern of identity/races.test.ts). `ran`
- * says whether the moment came, so a test cannot pass by missing it.
- */
-function interleaved(
-  db: Queryable,
-  after: RegExp,
-  other: () => Promise<unknown>,
-): Queryable & { ran: () => boolean } {
-  let ran = false;
-  return {
-    ran: () => ran,
-    async query<R extends QueryResultRow = QueryResultRow>(text: string, values?: unknown[]) {
-      const result = await db.query<R>(text, values);
-      if (!ran && after.test(text)) {
-        ran = true;
-        await other();
-      }
-      return result;
-    },
-  };
-}
 
 /** The test's transaction with a look taken just before every statement matching `before`. */
 function probed(db: Queryable, before: RegExp, look: () => Promise<void>): Queryable {

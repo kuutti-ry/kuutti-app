@@ -1,14 +1,25 @@
 import type { Queryable } from "@kuutti/db";
-import { ErrorResponse, RoundDecisionAnswer, RoundResponse } from "@kuutti/schema";
+import { RoundDecisionAnswer, RoundResponse } from "@kuutti/schema";
 import fc from "fast-check";
 import { type App, createApp } from "../app.ts";
 import { finnishDay } from "../lib/finnish-day.ts";
-import { signInAs } from "../test/account.ts";
+import { errorCode as codeOf } from "../test/answers.ts";
 import { interleaved } from "../test/chat.ts";
+import { STOPPED_CLOCK as T } from "../test/global-setup.ts";
 import { captureLogger, describe, expect, test, testConfig } from "../test/harness.ts";
 import { earnedUnits, unitsOf } from "../test/invitations.ts";
 import { pidOf, waitsFor, watched, withTwoConnections } from "../test/races.ts";
-import { fitsAt, type LoggedCard, logged, MATCHES, peopleWhoFit } from "../test/rounds.ts";
+import {
+  block,
+  cast,
+  fishToSendAfter,
+  fitsAt,
+  type LoggedCard,
+  likesLeftAfter,
+  logged,
+  MATCHES,
+  peopleWhoFit,
+} from "../test/rounds.ts";
 import { decide } from "./rounds.ts";
 
 // Earned fish in today's round (#107, ADR-044 §8, #503,
@@ -20,7 +31,6 @@ import { decide } from "./rounds.ts";
 // jobs/invitation-count.test.ts.
 
 /** 12:00 in Finland, one Friday. */
-const T = new Date("2026-10-16T09:00:00.000Z");
 const DAY_MS = 24 * 60 * 60 * 1000;
 const TODAY = finnishDay(T);
 
@@ -32,11 +42,6 @@ const daysBefore = (days: number) => new Date(T.getTime() - days * DAY_MS);
 async function appAt(db: Queryable): Promise<App> {
   const { logger } = await captureLogger();
   return createApp({ config: testConfig(), logger, db, now: () => T });
-}
-
-async function cast(db: Queryable, count: number): Promise<Person[]> {
-  const ids = await peopleWhoFit(db, count);
-  return Promise.all(ids.map((id) => signInAs(db, id)));
 }
 
 /** A round for `owner` `days` before today with these cards, matching every filter unless said; the entries' ids in order. */
@@ -82,27 +87,9 @@ async function likeBudget(db: Queryable, n: number) {
   );
 }
 
-const codeOf = async (answer: Response) => ErrorResponse.parse(await answer.json()).error.code;
-
 /** What the answer to a decision says of the caller's fish after it (#475). */
-async function fishToSendAfter(answer: Response) {
-  expect(answer.status).toBe(200);
-  return RoundDecisionAnswer.parse(await answer.json()).fishToSend;
-}
 
 /** What the answer to a decision says of the caller's likes after it (#524). */
-async function likesLeftAfter(answer: Response) {
-  expect(answer.status).toBe(200);
-  return RoundDecisionAnswer.parse(await answer.json()).likesLeft;
-}
-
-async function block(db: Queryable, blocker: Person, blocked: Person) {
-  await db.query(
-    `INSERT INTO block (blocker_identity_id, blocked_identity_id)
-     SELECT x.identity_id, y.identity_id FROM account x, account y WHERE x.id = $1 AND y.id = $2`,
-    [blocker.accountId, blocked.accountId],
-  );
-}
 
 async function decisionsOf(db: Queryable, entries: readonly string[]) {
   const { rows } = await db.query<{ id: string; decision: string | null; fish: boolean }>(

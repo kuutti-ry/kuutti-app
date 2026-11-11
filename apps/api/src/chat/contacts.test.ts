@@ -9,12 +9,12 @@ import {
 } from "@kuutti/schema";
 import { describe, expect } from "vitest";
 import { createApp } from "../app.ts";
-import { CURRENT_CONSENT_VERSIONS, eraseAccount } from "../identity/index.ts";
+import { eraseAccount } from "../identity/index.ts";
 import { applySanction } from "../safety/index.ts";
-import { signInAs, staffSession, withMatchingConfig } from "../test/account.ts";
-import { cardShown } from "../test/cards.ts";
-import { conversationBetween, interleaved } from "../test/chat.ts";
-import { captureLogger, type TestContext, test, testConfig } from "../test/harness.ts";
+import { joinStudy, signInAs, staffSession, withMatchingConfig } from "../test/account.ts";
+import { errorCode } from "../test/answers.ts";
+import { block, conversationBetween, interleaved, send } from "../test/chat.ts";
+import { captureLogger, jsonHeaders, type TestContext, test, testConfig } from "../test/harness.ts";
 import { testMediaDeps } from "../test/media.ts";
 import { people } from "../test/people.ts";
 import { archiveSilentConversations } from "./archive.ts";
@@ -42,10 +42,6 @@ async function person(ctx: TestContext): Promise<Person> {
   return { accountId, headers: (await signInAs(ctx.client, accountId)).headers };
 }
 
-const jsonHeaders = (headers: Record<string, string>) => ({
-  ...headers,
-  "content-type": "application/json",
-});
 const keep = (app: App, who: Person, kind: string, value: unknown) =>
   app.request(`/contacts/${kind}`, {
     method: "PUT",
@@ -58,12 +54,6 @@ const share = (app: App, who: Person, id: string, kind: string) =>
   app.request(`/conversations/${id}/contacts/${kind}`, { method: "POST", headers: who.headers });
 const stop = (app: App, who: Person, id: string, kind: string) =>
   app.request(`/conversations/${id}/contacts/${kind}`, { method: "DELETE", headers: who.headers });
-const send = (app: App, who: Person, id: string, body: string) =>
-  app.request(`/conversations/${id}/messages`, {
-    method: "POST",
-    headers: jsonHeaders(who.headers),
-    body: JSON.stringify({ clientId: randomUUID(), body }),
-  });
 
 async function kept(app: App, who: Person, kind: string, value: string): Promise<StoredContact> {
   const answer = await keep(app, who, kind, value);
@@ -99,7 +89,6 @@ async function stopped(app: App, who: Person, id: string, kind: string) {
 }
 const theirsOf = async (app: App, who: Person, id: string) =>
   (await detailOf(app, who, id)).contacts.theirs;
-const errorCode = async (answer: Response) => ErrorResponse.parse(await answer.json()).error.code;
 /** The conversation's shares, the record as stored: whose side, which kind, how it ended. */
 const sharesIn = async (ctx: TestContext, id: string) =>
   (
@@ -122,27 +111,6 @@ const eventsNamed = async (ctx: TestContext, names: string[]) =>
       [names],
     )
   ).rows;
-const block = async (ctx: TestContext, blocker: Person, blocked: Person) => {
-  await cardShown(ctx.client, blocker.accountId, blocked.accountId);
-  const answer = await ctx.app.request("/blocks", {
-    method: "POST",
-    headers: jsonHeaders(blocker.headers),
-    body: JSON.stringify({ accountId: blocked.accountId }),
-  });
-  expect(answer.status).toBe(204);
-};
-const giveResearchConsent = async (ctx: TestContext, who: Person) => {
-  const answer = await ctx.app.request("/consents", {
-    method: "POST",
-    headers: jsonHeaders(who.headers),
-    body: JSON.stringify({
-      kind: "research",
-      version: CURRENT_CONSENT_VERSIONS.research,
-      locale: "fi",
-    }),
-  });
-  expect(answer.status).toBe(200);
-};
 const silent = () => captureLogger().then(({ logger }) => logger);
 const sanction = (
   ctx: TestContext,
@@ -332,7 +300,7 @@ describe("a share in a conversation", () => {
   test("Sharing again writes nothing", async ({ ctx }) => {
     const a = await person(ctx);
     const b = await person(ctx);
-    await giveResearchConsent(ctx, a);
+    await joinStudy(ctx.app, a.headers);
     const id = await conversationBetween(ctx.client, a.accountId, b.accountId);
     await kept(ctx.app, a, "phone", "040 123 4567");
     const first = await shared(ctx.app, a, id, "phone");
@@ -862,7 +830,7 @@ describe("who may share, and how often", () => {
   }) => {
     const a = await person(ctx);
     const b = await person(ctx);
-    await giveResearchConsent(ctx, a);
+    await joinStudy(ctx.app, a.headers);
     const id = await conversationBetween(ctx.client, a.accountId, b.accountId, {
       openedAt: new Date(Date.now() - 2 * DAY),
       messages: [
@@ -915,7 +883,7 @@ describe("the night's archive", () => {
     const a = await person(ctx);
     const b = await person(ctx);
     const c = await person(ctx);
-    await giveResearchConsent(ctx, a);
+    await joinStudy(ctx.app, a.headers);
     const night = async () =>
       archiveSilentConversations({ db: ctx.client, logger: await silent(), now: () => now });
     const archivedOf = async (id: string) =>

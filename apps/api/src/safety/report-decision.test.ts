@@ -12,8 +12,10 @@ import { type App, createApp } from "../app.ts";
 import { eraseAccount } from "../identity/index.ts";
 import { type MediaDeps, objectKey } from "../media/index.ts";
 import { type SignedIn, signedInAccount, staffSession } from "../test/account.ts";
+import { errorCode } from "../test/answers.ts";
 import { cardShown } from "../test/cards.ts";
 import { conversationBetween, interleaved, photoMessage } from "../test/chat.ts";
+import { STOPPED_CLOCK as T } from "../test/global-setup.ts";
 import {
   test as base,
   captureLogger,
@@ -39,7 +41,6 @@ import { applySanction } from "./sanctions.ts";
 // straight into the test's transaction, as filing leaves them.
 
 /** The panel's clock: 12:00 in Finland, one Friday. */
-const T = new Date("2026-10-16T09:00:00.000Z");
 const FILED = "2026-10-15T08:00:00.000Z";
 const UNKNOWN = "00000000-0000-4000-8000-000000000312";
 const NOTE = "Kysyy aina kotiosoitettani";
@@ -75,10 +76,6 @@ async function opened(app: App, headers: Headers, id: string): Promise<ReportDet
   const response = await open(app, headers, id);
   expect(response.status).toBe(200);
   return ReportDetail.parse(await response.json());
-}
-
-async function errorCode(response: Response): Promise<string> {
-  return ErrorResponse.parse(await response.json()).error.code;
 }
 
 async function auditOf(db: Queryable, action: string) {

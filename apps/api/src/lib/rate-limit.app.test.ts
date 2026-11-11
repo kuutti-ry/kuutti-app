@@ -1,7 +1,7 @@
 import { randomBytes } from "node:crypto";
-import { ErrorResponse } from "@kuutti/schema";
 import { createApp, ENDS_SESSION } from "../app.ts";
 import { type SignedIn, signedInAccount, signInAs, staffSession } from "../test/account.ts";
+import { errorCode } from "../test/answers.ts";
 import { CHALLENGE } from "../test/attempt.ts";
 import {
   captureLogger,
@@ -59,10 +59,6 @@ async function appAt(ctx: TestContext, options: { limit?: number; media?: boolea
     requests: () => lines().filter((l) => l.msg === "request"),
     refusedSignIns: () => lines().filter((l) => l.msg === "sign-in refused"),
   };
-}
-
-async function errorCode(res: Response): Promise<string> {
-  return ErrorResponse.parse(await res.json()).error.code;
 }
 
 async function lastUsed(ctx: TestContext, table: "session" | "admin_session", id: string) {

@@ -12,6 +12,7 @@ import { createApp } from "../app.ts";
 import { invitationCountJob } from "../jobs/invitation-count.ts";
 import type { Mailer, MailMessage } from "../lib/mail.ts";
 import { signedInAccount, signInAs } from "../test/account.ts";
+import { errorCode } from "../test/answers.ts";
 import { CHALLENGE, VERIFIER } from "../test/attempt.ts";
 import { captureLogger, type TestContext, test, testConfig } from "../test/harness.ts";
 import { completed, invitationOf } from "../test/invitations.ts";
@@ -127,10 +128,6 @@ async function appOn(
 async function eraseOnOtherDevice(ctx: TestContext, accountId: string) {
   const { logger } = await captureLogger();
   await eraseAccount({ db: ctx.client, logger, now: () => new Date() }, accountId);
-}
-
-async function errorCode(res: Response): Promise<string> {
-  return ErrorResponse.parse(await res.json()).error.code;
 }
 
 type Call = { method: string; path: string; body?: unknown };

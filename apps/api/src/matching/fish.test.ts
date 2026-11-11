@@ -1,11 +1,13 @@
 import type { Queryable } from "@kuutti/db";
 import { ErrorResponse, RoundDecisionAnswer, RoundResponse } from "@kuutti/schema";
-import { type App, createApp } from "../app.ts";
+import type { App } from "../app.ts";
 import { CURRENT_CONSENT_VERSIONS } from "../identity/index.ts";
 import { finnishDay } from "../lib/finnish-day.ts";
-import { signInAs } from "../test/account.ts";
-import { captureLogger, describe, expect, test, testConfig } from "../test/harness.ts";
-import { logged, peopleWhoFit } from "../test/rounds.ts";
+import { withMatchingConfig } from "../test/account.ts";
+import { errorCode as codeOf } from "../test/answers.ts";
+import { STOPPED_CLOCK as T } from "../test/global-setup.ts";
+import { describe, expect, test } from "../test/harness.ts";
+import { appAt, cast, fishToSendAfter, logged } from "../test/rounds.ts";
 import { exportRounds } from "./rounds.ts";
 
 // The fish (#378, ADR-039, features/matching/fish.feature): its budget in a
@@ -15,7 +17,6 @@ import { exportRounds } from "./rounds.ts";
 // person's queue is jobs/round-builder.test.ts.
 
 /** 12:00 in Finland, one Friday; its week began on Monday 12 October. */
-const T = new Date("2026-10-16T09:00:00.000Z");
 /** The midnight in Helsinki that begins the next Monday, 19 October. */
 const NEXT_MONDAY = new Date("2026-10-18T21:00:00.000Z");
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -24,16 +25,6 @@ const TODAY = finnishDay(T);
 type Person = { accountId: string; headers: { authorization: string } };
 
 const daysBefore = (days: number) => new Date(T.getTime() - days * DAY_MS);
-
-async function appAt(db: Queryable, at: Date = T): Promise<App> {
-  const { logger } = await captureLogger();
-  return createApp({ config: testConfig(), logger, db, now: () => at });
-}
-
-async function cast(db: Queryable, count: number): Promise<Person[]> {
-  const ids = await peopleWhoFit(db, count);
-  return Promise.all(ids.map((id) => signInAs(db, id)));
-}
 
 /** A round for `owner` `days` before today with these cards, each of the reason given or matching every filter. */
 const roundOf = (
@@ -69,10 +60,6 @@ const choose = (app: App, who: Person, position: number, decision: string, day =
     body: JSON.stringify({ decision }),
   });
 
-async function codeOf(response: Response) {
-  return ErrorResponse.parse(await response.json()).error.code;
-}
-
 async function entriesOf(db: Queryable, roundId: string) {
   return (
     await db.query<{ decision: string | null; fish: boolean }>(
@@ -90,24 +77,12 @@ async function fishToSendOn(app: App, who: Person) {
 }
 
 /** What a decision's answer says of the caller's fish after it (#475). */
-async function fishToSendAfter(answer: Response) {
-  expect(answer.status).toBe(200);
-  return RoundDecisionAnswer.parse(await answer.json()).fishToSend;
-}
 
 /** What a decision's answer says of the caller's two budgets after it. */
 async function budgetsAfter(answer: Response) {
   expect(answer.status).toBe(200);
   const { fishToSend, likesLeft } = RoundDecisionAnswer.parse(await answer.json());
   return { fishToSend, likesLeft };
-}
-
-async function setConfig(db: Queryable, key: string, value: unknown) {
-  await db.query(
-    `INSERT INTO matching_config (version, key, value, created_by)
-     SELECT coalesce(max(version), 0) + 1, $1, $2::jsonb, 'test' FROM matching_config WHERE key = $1`,
-    [key, JSON.stringify(value)],
-  );
 }
 
 describe("the fish", () => {
@@ -180,7 +155,7 @@ describe("the fish", () => {
   ] as const)(
     "a window of %s set in the panel counts today's fish alone, the next from midnight",
     async ([, days], { ctx }) => {
-      await setConfig(ctx.client, "fish_window_days", days);
+      await withMatchingConfig(ctx.client, { fish_window_days: days });
       const [a, b, c, d] = await cast(ctx.client, 4);
       if (!a || !b || !c || !d) throw new Error("cast not written");
       await sentBefore(ctx.client, a, b, 1, true);
@@ -198,7 +173,7 @@ describe("the fish", () => {
   test("the refusal is said in the request's language, and with no budget at all it waits for Monday", async ({
     ctx,
   }) => {
-    await setConfig(ctx.client, "fish_budget", 0);
+    await withMatchingConfig(ctx.client, { fish_budget: 0 });
     const [a, b] = await cast(ctx.client, 2);
     if (!a || !b) throw new Error("cast not written");
     await roundOf(ctx.client, a, [b]);
@@ -246,7 +221,7 @@ describe("the fish", () => {
   });
 
   test("A fish counts in the likes left", async ({ ctx }) => {
-    await setConfig(ctx.client, "like_budget_balanced", 2);
+    await withMatchingConfig(ctx.client, { like_budget_balanced: 2 });
     const [a, b] = await cast(ctx.client, 2);
     if (!a || !b) throw new Error("cast not written");
     await roundOf(ctx.client, a, [b]);
@@ -259,7 +234,7 @@ describe("the fish", () => {
   });
 
   test("A fish counts against the day's like budget", async ({ ctx }) => {
-    await setConfig(ctx.client, "like_budget_balanced", 1);
+    await withMatchingConfig(ctx.client, { like_budget_balanced: 1 });
     const [a, b, c] = await cast(ctx.client, 3);
     if (!a || !b || !c) throw new Error("cast not written");
     await roundOf(ctx.client, a, [b, c]);
@@ -275,7 +250,7 @@ describe("the fish", () => {
   test("a like made a fish was counted already, and spends a fish but no other like", async ({
     ctx,
   }) => {
-    await setConfig(ctx.client, "like_budget_balanced", 1);
+    await withMatchingConfig(ctx.client, { like_budget_balanced: 1 });
     const [a, b] = await cast(ctx.client, 2);
     if (!a || !b) throw new Error("cast not written");
     const roundId = await roundOf(ctx.client, a, [b]);
@@ -286,7 +261,7 @@ describe("the fish", () => {
   });
 
   test("A fish on a card of somebody whose like waits is a like", async ({ ctx }) => {
-    await setConfig(ctx.client, "like_budget_balanced", 2);
+    await withMatchingConfig(ctx.client, { like_budget_balanced: 2 });
     const [a, b, c] = await cast(ctx.client, 3);
     if (!a || !b || !c) throw new Error("cast not written");
     await sentBefore(ctx.client, b, a, 1, false);
@@ -311,7 +286,7 @@ describe("the fish", () => {
   test("a like back on a fish card spends one of the day's likes, and so does a fish there, which is a like", async ({
     ctx,
   }) => {
-    await setConfig(ctx.client, "like_budget_balanced", 2);
+    await withMatchingConfig(ctx.client, { like_budget_balanced: 2 });
     const [a, b, c, d] = await cast(ctx.client, 4);
     if (!a || !b || !c || !d) throw new Error("cast not written");
     await sentBefore(ctx.client, b, a, 1, true);
@@ -350,7 +325,7 @@ describe("the fish", () => {
   ] as const)(
     "%s on a %s card with no likes left is refused, and the like it would answer keeps waiting",
     async ([, reason, decision], { ctx }) => {
-      await setConfig(ctx.client, "like_budget_balanced", 1);
+      await withMatchingConfig(ctx.client, { like_budget_balanced: 1 });
       const [a, b, c] = await cast(ctx.client, 3);
       if (!a || !b || !c) throw new Error("cast not written");
       await sentBefore(ctx.client, b, a, 1, reason === "fish");
@@ -379,7 +354,7 @@ describe("the fish", () => {
   test("a fish past the day's likes and the week's fish is refused for the likes, until midnight", async ({
     ctx,
   }) => {
-    await setConfig(ctx.client, "like_budget_balanced", 1);
+    await withMatchingConfig(ctx.client, { like_budget_balanced: 1 });
     const [a, b, c, x] = await cast(ctx.client, 4);
     if (!a || !b || !c || !x) throw new Error("cast not written");
     await sentBefore(ctx.client, a, x, 3, true);
@@ -485,7 +460,7 @@ describe("whether a fish can go today (#475)", () => {
   test("the fish's own budget says whether one can go, with no likes left too, and a like made a fish still goes (#503)", async ({
     ctx,
   }) => {
-    await setConfig(ctx.client, "like_budget_balanced", 1);
+    await withMatchingConfig(ctx.client, { like_budget_balanced: 1 });
     const [a, b] = await cast(ctx.client, 2);
     if (!a || !b) throw new Error("cast not written");
     const roundId = await roundOf(ctx.client, a, [b]);
@@ -507,7 +482,7 @@ describe("whether a fish can go today (#475)", () => {
   test("a fish on a card liked back already is the same like, with no likes left too", async ({
     ctx,
   }) => {
-    await setConfig(ctx.client, "like_budget_balanced", 1);
+    await withMatchingConfig(ctx.client, { like_budget_balanced: 1 });
     const [a, b] = await cast(ctx.client, 2);
     if (!a || !b) throw new Error("cast not written");
     await sentBefore(ctx.client, b, a, 1, false);
@@ -524,7 +499,7 @@ describe("whether a fish can go today (#475)", () => {
   });
 
   test("with fish switched off none can go, whether or not the day is open", async ({ ctx }) => {
-    await setConfig(ctx.client, "fish_budget", 0);
+    await withMatchingConfig(ctx.client, { fish_budget: 0 });
     const [a, b] = await cast(ctx.client, 2);
     if (!a || !b) throw new Error("cast not written");
     const app = await appAt(ctx.client);

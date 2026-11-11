@@ -1,8 +1,9 @@
-import { AdminSession, ErrorResponse } from "@kuutti/schema";
+import { AdminSession } from "@kuutti/schema";
 import { generateHetu } from "@kuutti-ry/tunnistus-oidc/hetu";
 import { describe, expect } from "vitest";
 import { createApp } from "../app.ts";
 import { staffSession } from "../test/account.ts";
+import { errorCode } from "../test/answers.ts";
 import { CHALLENGE, VERIFIER } from "../test/attempt.ts";
 import { captureLogger, type TestContext, test, testConfig } from "../test/harness.ts";
 import { ADMIN_SESSION_TTL_MS, sweepAdminSessions } from "./admin-session.ts";
@@ -110,8 +111,6 @@ const exchange = (app: ReturnType<typeof createApp>, path: string, code: string)
     // The staff exchange is strict and unbound (ADR-027): its body is the code alone.
     body: JSON.stringify(path === "/auth/exchange" ? { code, verifier: VERIFIER } : { code }),
   });
-
-const errorCode = async (res: Response) => ErrorResponse.parse(await res.json()).error.code;
 
 /**
  * The order of the moderator tool's `recent` (packages/db/src/cli/moderator.ts),

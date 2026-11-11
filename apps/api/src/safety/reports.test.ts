@@ -1,13 +1,20 @@
-import { resolve } from "node:path";
 import { createPool, migrate, withTemporaryDatabase } from "@kuutti/db";
-import { ErrorResponse, GateResponse, REPORT_NOTE_MAX } from "@kuutti/schema";
+import { GateResponse, REPORT_NOTE_MAX } from "@kuutti/schema";
 import { describe, expect, it } from "vitest";
 import { CURRENT_CONSENT_VERSIONS } from "../identity/index.ts";
 import { dayWindow } from "../media/index.ts";
 import { signedInAccount, signInAs, staffSession, withMatchingConfig } from "../test/account.ts";
+import { errorCode } from "../test/answers.ts";
 import { cardShown } from "../test/cards.ts";
 import { exportOf } from "../test/export.ts";
-import { captureLogger, type TestContext, test } from "../test/harness.ts";
+import { MIGRATIONS } from "../test/global-setup.ts";
+import {
+  captureLogger,
+  count,
+  jsonHeaders as json,
+  type TestContext,
+  test,
+} from "../test/harness.ts";
 import { openPond, type PeopleOptions, people, pondNamed } from "../test/people.ts";
 import { pruneReports, REPORT_RETENTION_DAYS, recordReport } from "./reports.ts";
 
@@ -24,18 +31,12 @@ const DAY_MS = 86_400_000;
 /** Women who seek women, complete: every two of them are in each other's pool. */
 const ALIKE: PeopleOptions = { gender: "woman", seeks: ["woman"], complete: true, consented: true };
 
-const json = (headers: Record<string, string>) => ({
-  ...headers,
-  "content-type": "application/json",
-});
 const report = (ctx: TestContext, headers: Record<string, string>, body: unknown) =>
   ctx.app.request("/reports", {
     method: "POST",
     headers: json(headers),
     body: JSON.stringify(body),
   });
-const errorCode = async (response: Response) =>
-  ErrorResponse.parse(await response.json()).error.code;
 
 type ReportRow = {
   reported_account_id: string;
@@ -53,8 +54,6 @@ const reportsOf = async (ctx: TestContext, reporter: string) =>
       [reporter],
     )
   ).rows;
-const count = async (ctx: TestContext, sql: string, params: unknown[] = []) =>
-  Number((await ctx.client.query<{ n: string }>(sql, params)).rows[0]?.n ?? 0);
 const blockedBetween = async (ctx: TestContext, a: string, b: string) =>
   (
     await ctx.client.query<{ blocked: boolean }>("SELECT blocked_between($1, $2) AS blocked", [
@@ -312,7 +311,7 @@ describe("how many, and how often", () => {
     await withTemporaryDatabase(async (url) => {
       const pool = createPool({ connectionString: url, max: 6, applicationName: "kuutti-burst" });
       try {
-        await migrate(pool, resolve(import.meta.dirname, "../../../../packages/db/drizzle"));
+        await migrate(pool, MIGRATIONS);
         const person = async (label: string) => {
           const { rows } = await pool.query<{ id: string }>(
             `WITH i AS (INSERT INTO identity (hetu_hmac) VALUES ($1) RETURNING id)

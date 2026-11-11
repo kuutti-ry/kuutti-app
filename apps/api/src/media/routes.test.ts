@@ -1,7 +1,8 @@
-import { ErrorResponse, PHOTO_MAX_BYTES, Photo, PhotoList, PhotoUrlResponse } from "@kuutti/schema";
+import { PHOTO_MAX_BYTES, Photo, PhotoList, PhotoUrlResponse } from "@kuutti/schema";
 import { describe, expect } from "vitest";
 import { createApp } from "../app.ts";
 import { signedInAccount, withMatchingConfig } from "../test/account.ts";
+import { errorCode } from "../test/answers.ts";
 import { captureLogger, type TestContext, test, testConfig } from "../test/harness.ts";
 import {
   fixtureGif,
@@ -74,10 +75,6 @@ async function approvedPhotos(
     ids.push(photo.id);
   }
   return ids;
-}
-
-async function errorCode(res: Response): Promise<string> {
-  return ErrorResponse.parse(await res.json()).error.code;
 }
 
 describe("photo routes", () => {

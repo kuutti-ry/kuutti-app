@@ -9,6 +9,7 @@ import { createApp } from "../app.ts";
 import { hashToken } from "../lib/auth-middleware.ts";
 import { applySanction } from "../safety/index.ts";
 import { staffSession } from "../test/account.ts";
+import { errorCode } from "../test/answers.ts";
 import { CHALLENGE, VERIFIER } from "../test/attempt.ts";
 import { captureLogger, test, testConfig } from "../test/harness.ts";
 import type { BrokerIdentity, IdentityBroker } from "./broker.ts";
@@ -72,10 +73,6 @@ async function refresh(app: ReturnType<typeof createApp>, refreshToken: string) 
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ refreshToken }),
   });
-}
-
-async function errorCode(res: Response): Promise<string> {
-  return ErrorResponse.parse(await res.json()).error.code;
 }
 
 describe("sessions", () => {

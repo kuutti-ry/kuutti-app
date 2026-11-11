@@ -1,12 +1,13 @@
 import { randomUUID } from "node:crypto";
-import { ConversationDetail, ConversationList } from "@kuutti/schema";
+import { ConversationDetail } from "@kuutti/schema";
 import { describe, expect } from "vitest";
 import { type App, createApp } from "../app.ts";
 import { applySanction } from "../safety/index.ts";
 import { signInAs, withMatchingConfig } from "../test/account.ts";
 import { cardShown } from "../test/cards.ts";
-import { photoMessage, conversationBetween as writtenBetween } from "../test/chat.ts";
-import { captureLogger, type TestContext, test, testConfig } from "../test/harness.ts";
+import { listOf, photoMessage, conversationBetween as writtenBetween } from "../test/chat.ts";
+import { STOPPED_CLOCK as T } from "../test/global-setup.ts";
+import { captureLogger, jsonHeaders, type TestContext, test, testConfig } from "../test/harness.ts";
 import { people } from "../test/people.ts";
 import { archiveSilentConversations } from "./archive.ts";
 import { conversationBetween, conversationsOnTurn, openConversation } from "./conversations.ts";
@@ -19,7 +20,6 @@ import { conversationBetween, conversationsOnTurn, openConversation } from "./co
 // refusal at the limit is features/matching/matches.feature's.
 
 /** 12:00 in Finland, a Friday. */
-const T = new Date("2026-10-16T09:00:00.000Z");
 const MINUTE = 60_000;
 const DAY = 24 * 60 * MINUTE;
 const at = (ms: number) => new Date(T.getTime() + ms);
@@ -39,11 +39,6 @@ async function appAt(ctx: TestContext) {
   const app = createApp({ config: testConfig(), logger, db: ctx.client, now: () => clock.at });
   return { app, clock };
 }
-
-const jsonHeaders = (headers: Record<string, string>) => ({
-  ...headers,
-  "content-type": "application/json",
-});
 
 async function say(app: App, who: Person, id: string, body = "Hei") {
   const answer = await app.request(`/conversations/${id}/messages`, {
@@ -66,12 +61,6 @@ async function shareContact(app: App, who: Person, id: string) {
     headers: who.headers,
   });
   expect(shared.status).toBe(200);
-}
-
-async function listOf(app: App, who: Person, query = ""): Promise<ConversationList> {
-  const answer = await app.request(`/conversations${query}`, { headers: who.headers });
-  expect(answer.status).toBe(200);
-  return ConversationList.parse(await answer.json());
 }
 
 /** The count, as the list says it and as the like path asks it: one answer. */
