@@ -7,10 +7,8 @@ import {
   ConversationList,
   ConversationListQuery,
   ConversationParams,
-  ErrorResponse,
   MessagePage,
   MessagesQuery,
-  PHOTO_MAX_BYTES,
   PutContactRequest,
   ReadRequest,
   SendMessageRequest,
@@ -19,15 +17,15 @@ import {
   StoredContacts,
 } from "@kuutti/schema";
 import type { MiddlewareHandler } from "hono";
-import { bodyLimit } from "hono/body-limit";
 import { z } from "zod";
 import type { Deps } from "../app.ts";
 import { callerOf } from "../lib/auth-middleware.ts";
 import type { AppEnv } from "../lib/env.ts";
 import { AppError, localisedEnvelope } from "../lib/errors.ts";
 import { matchingConfigNumber } from "../lib/matching-config.ts";
+import { bearer, errorContent, json, unauthenticated } from "../lib/openapi.ts";
 import { personOf, rateLimit } from "../lib/rate-limit.ts";
-import { dayWindow } from "../media/index.ts";
+import { dayWindow, photoBodyLimit, RETRY_AFTER_SECONDS } from "../media/index.ts";
 import {
   keepContact,
   listContacts,
@@ -45,9 +43,6 @@ import {
 import { MESSAGES_PER_MINUTE_KEY, markRead, readMessages, sendMessage } from "./messages.ts";
 import { MESSAGE_PHOTO_ATTEMPTS_PER_DAY_KEY, sendPhoto } from "./photos.ts";
 
-/** The pipeline at capacity (media/photos.ts' RETRY_AFTER_SECONDS): a moment, as the profile upload says. */
-const MEDIA_BUSY_RETRY_AFTER_SECONDS = 5;
-
 // The chat's routes (#348, ADR-031): the list, one conversation, its pages,
 // the send, the read mark and the unmatch (#351); the person's own contacts and their shares in
 // a conversation (#103, ADR-031 §11). All behind the session guard; every
@@ -56,13 +51,6 @@ const MEDIA_BUSY_RETRY_AFTER_SECONDS = 5;
 // 404, never a 403. What a message says, and a contact, reach no log line
 // (rule 5): the request line names the route and the status.
 
-const errorContent = (description: string) => ({
-  description,
-  content: { "application/json": { schema: ErrorResponse } },
-});
-const json = <T>(schema: T) => ({ content: { "application/json": { schema } } });
-const bearer = { security: [{ session: [] }] };
-const unauthenticated = errorContent("unauthenticated, session_expired or session_revoked.");
 const notFound = errorContent(
   "not_found: no such conversation for the caller: not theirs, nobody's, or hidden from the one who blocked the other.",
 );
@@ -410,16 +398,7 @@ export function chatRoutes(
   // read; the day's tries and the person's one minute's bucket, shared with
   // the texts; then the route's own 10 MB cap, which replaces the app-wide
   // one app.ts skips here.
-  app.use(
-    photoRoute.getRoutingPath(),
-    guard,
-    perDayAttempts,
-    perMinute,
-    bodyLimit({
-      maxSize: PHOTO_MAX_BYTES,
-      onError: (c) => c.json(localisedEnvelope(c, "payload_too_large"), 413),
-    }),
-  );
+  app.use(photoRoute.getRoutingPath(), guard, perDayAttempts, perMinute, photoBodyLimit());
 
   app.openapi(listRoute, async (c) => {
     const { accountId } = callerOf(c);
@@ -536,6 +515,6 @@ export function chatRoutes(
 function retryAfterOf(error: AppError): number | null {
   const detail = error.detail as { retryAfterSeconds?: unknown } | undefined;
   if (typeof detail?.retryAfterSeconds === "number") return detail.retryAfterSeconds;
-  if (error.code === "media_busy") return MEDIA_BUSY_RETRY_AFTER_SECONDS;
+  if (error.code === "media_busy") return RETRY_AFTER_SECONDS;
   return null;
 }

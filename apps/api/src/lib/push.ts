@@ -1,6 +1,7 @@
 import type { PushData } from "@kuutti/schema";
 import { z } from "zod";
 import type { Config } from "./config.ts";
+import { errorName } from "./errors.ts";
 import type { Logger } from "./logger.ts";
 
 /**
@@ -131,7 +132,7 @@ export function expoPusher(
         signal: AbortSignal.timeout(options.timeoutMs ?? EXPO_TIMEOUT_MS),
       });
     } catch (error) {
-      throw new PushFailed(error instanceof Error ? error.name : "unknown", undefined);
+      throw new PushFailed(errorName(error), undefined);
     }
     const answer: unknown = await response.json().catch(() => null);
     const refused = RequestRefusal.safeParse(answer);

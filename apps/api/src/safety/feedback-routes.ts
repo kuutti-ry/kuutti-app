@@ -1,7 +1,6 @@
 import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
 import { transaction } from "@kuutti/db";
 import {
-  ErrorResponse,
   FeedbackHandledResponse,
   FeedbackList,
   FeedbackListQuery,
@@ -13,8 +12,9 @@ import type { Deps } from "../app.ts";
 import { staffOf } from "../lib/admin-middleware.ts";
 import { callerOf } from "../lib/auth-middleware.ts";
 import type { AppEnv } from "../lib/env.ts";
-import { AppError } from "../lib/errors.ts";
+import { AppError, noLiveAccount } from "../lib/errors.ts";
 import { matchingConfigNumber } from "../lib/matching-config.ts";
+import { bearer, errorContent, json, staffErrors, unauthenticated } from "../lib/openapi.ts";
 import { dayWindow, secondsUntil } from "../media/index.ts";
 import { track } from "../research/index.ts";
 import { recordAudit } from "./audit.ts";
@@ -30,18 +30,6 @@ import {
 // few lines; the moderators read them in the panel and mark them handled,
 // which is an audit_log row. The text goes into no log line and no research
 // event (rule 5): the event carries the kind alone.
-
-const errorContent = (description: string) => ({
-  description,
-  content: { "application/json": { schema: ErrorResponse } },
-});
-const json = <T>(schema: T) => ({ content: { "application/json": { schema } } });
-const bearer = { security: [{ session: [] }] };
-const unauthenticated = errorContent("unauthenticated, session_expired or session_revoked.");
-const staffErrors = {
-  401: unauthenticated,
-  403: errorContent("admin_forbidden: the role does not allow this."),
-};
 
 const sendRoute = createRoute({
   method: "post",
@@ -85,7 +73,7 @@ export function feedbackRoutes(deps: Deps, guard: MiddlewareHandler<AppEnv>) {
       since: day.start,
       limit,
     });
-    if (!record.live) throw new AppError(404, "not_found", "No live account");
+    if (!record.live) throw noLiveAccount();
     if (!record.id) {
       const retryAfterSeconds = secondsUntil(day.end, at);
       deps.logger.warn(

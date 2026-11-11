@@ -1,6 +1,7 @@
 import { type Queryable, transaction } from "@kuutti/db";
 import { daysBand, messageCountBand } from "@kuutti/schema";
 import type { NightlyJob } from "../jobs/nightly.ts";
+import { DAY_MS } from "../lib/finnish-day.ts";
 import type { Logger } from "../lib/logger.ts";
 import { matchingConfigNumber } from "../lib/matching-config.ts";
 import { track } from "../research/index.ts";
@@ -14,8 +15,6 @@ import * as repo from "./repo.ts";
 // conversations go the same way.
 
 const SILENT_MATCH_ARCHIVE_DAYS_KEY = "silent_match_archive_days";
-
-const DAY_MS = 86_400_000;
 
 export type ArchiveDeps = { db: Queryable; logger: Logger; now: () => Date };
 

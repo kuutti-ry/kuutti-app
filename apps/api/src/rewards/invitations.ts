@@ -13,9 +13,9 @@ import {
   normaliseInvitationCode,
 } from "@kuutti/schema";
 import { currentConsent } from "../identity/index.ts";
-import { AppError } from "../lib/errors.ts";
+import { AppError, noLiveAccount } from "../lib/errors.ts";
 import type { Logger } from "../lib/logger.ts";
-import { matchingConfigNumber, readMatchingConfig } from "../lib/matching-config.ts";
+import { matchingConfigNumber, matchingConfigOf } from "../lib/matching-config.ts";
 import { recordInvitationNotices } from "../notifications/index.ts";
 import * as repo from "./repo.ts";
 
@@ -72,19 +72,13 @@ export const hashInvitationCode = (normalised: string): string =>
  * the photo fetch budget's reader answers one (ADR-044 §4).
  */
 async function readInvitationReward(db: Queryable): Promise<InvitationReward> {
-  const parsed = InvitationReward.safeParse(await readMatchingConfig(db, INVITATION_REWARD_KEY));
-  if (!parsed.success) {
-    throw new AppError(
-      500,
-      "internal_error",
-      `matching_config ${INVITATION_REWARD_KEY} is not a reward of fish for the two`,
-      { key: INVITATION_REWARD_KEY },
-    );
-  }
-  return parsed.data;
+  return matchingConfigOf(
+    db,
+    INVITATION_REWARD_KEY,
+    InvitationReward,
+    "a reward of fish for the two",
+  );
 }
-
-const noAccount = () => new AppError(404, "not_found", "No live account");
 
 /**
  * Whether the person may still type a code (ADR-044 §6), their profile not
@@ -117,7 +111,7 @@ export async function invitationsOf(
 ): Promise<Invitations> {
   const { db } = deps;
   const deletionCount = await repo.deletionCountOf(db, accountId);
-  if (deletionCount === null) throw noAccount();
+  if (deletionCount === null) throw noLiveAccount();
   const [complete, reward, open, counted, earned] = await Promise.all([
     deps.complete(db, accountId),
     readInvitationReward(db),
@@ -149,7 +143,7 @@ export async function makeInvitation(
   const at = deps.now();
   const code = drawCode();
   const id = await transaction(deps.db, async (tx) => {
-    if (!(await repo.lockAccount(tx, accountId))) throw noAccount();
+    if (!(await repo.lockAccount(tx, accountId))) throw noLiveAccount();
     if (!(await deps.complete(tx, accountId))) {
       throw new AppError(
         409,
@@ -199,7 +193,7 @@ export async function redeemInvitation(
   const at = deps.now();
   await transaction(deps.db, async (tx) => {
     const caller = await repo.lockAccount(tx, input.accountId);
-    if (!caller) throw noAccount();
+    if (!caller) throw noLiveAccount();
     const complete = await deps.complete(tx, input.accountId);
     if (complete || !(await mayRedeem(tx, input.accountId, caller.deletionCount))) {
       throw new AppError(409, "invitation_not_for_you", "This account cannot use an invitation");

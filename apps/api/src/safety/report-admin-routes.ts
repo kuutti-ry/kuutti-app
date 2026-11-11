@@ -1,7 +1,6 @@
 import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
 import { transaction } from "@kuutti/db";
 import {
-  ErrorResponse,
   PhotoUrlResponse,
   ReportCopyPhotoParams,
   ReportDecision,
@@ -15,9 +14,9 @@ import type { MiddlewareHandler } from "hono";
 import type { Deps } from "../app.ts";
 import { staffOf } from "../lib/admin-middleware.ts";
 import type { AppEnv } from "../lib/env.ts";
-import { AppError } from "../lib/errors.ts";
 import { matchingConfigNumber } from "../lib/matching-config.ts";
-import { staffPhotoUrl } from "../media/index.ts";
+import { bearer, errorContent, json, staffErrors } from "../lib/openapi.ts";
+import { mediaUnavailable, signedPhotoUrl } from "../media/index.ts";
 import { recordAudit } from "./audit.ts";
 import { MODERATION_RESPONSE_HOURS_KEY } from "./overview-routes.ts";
 import {
@@ -25,6 +24,7 @@ import {
   decideReport,
   findReportSource,
   listReports,
+  notFound,
   openReport,
   pointedPhotoKeyOf,
 } from "./report-queue.ts";
@@ -40,16 +40,6 @@ import {
 // reach the answer and nothing else: no log line, error detail or event
 // (rule 5).
 
-const errorContent = (description: string) => ({
-  description,
-  content: { "application/json": { schema: ErrorResponse } },
-});
-const json = <T>(schema: T) => ({ content: { "application/json": { schema } } });
-const bearer = { security: [{ session: [] }] };
-const staffErrors = {
-  401: errorContent("unauthenticated, session_expired or session_revoked."),
-  403: errorContent("admin_forbidden: the role does not allow this."),
-};
 const noSuchReport = errorContent(
   "not_found: no such report, or one the reader is a party to, answered alike.",
 );
@@ -151,7 +141,6 @@ export function reportAdminRoutes(deps: Deps, requireModerator: MiddlewareHandle
   for (const route of [listRoute, openRoute, photoRoute, pointedPhotoRoute, decisionRoute]) {
     app.use(route.getRoutingPath(), requireModerator);
   }
-  const notFound = () => new AppError(404, "not_found", "No such report");
 
   app.openapi(listRoute, async (c) => {
     const staff = staffOf(c);
@@ -194,7 +183,7 @@ export function reportAdminRoutes(deps: Deps, requireModerator: MiddlewareHandle
     const { id, seq } = c.req.valid("param");
     // Asked before anything is read, so the answer is the same for everybody.
     if (!deps.media) {
-      throw new AppError(503, "media_unavailable", "Object storage is not configured here");
+      throw mediaUnavailable();
     }
     const held = await copyPhotoOf(deps.db, staff.identityId, id, seq);
     if (!held) throw notFound();
@@ -207,7 +196,7 @@ export function reportAdminRoutes(deps: Deps, requireModerator: MiddlewareHandle
       subjectId: id,
       detail: { seq, variant: "full" },
     });
-    const answer = await staffPhotoUrl(deps.media.signer, held.key, "full", at);
+    const answer = await signedPhotoUrl(deps.media.signer, held.key, "full", at);
     // Every issuance logged with its photo, as the card route's (rules/api.md);
     // the answer itself carries no photo id.
     deps.logger.info(
@@ -229,7 +218,7 @@ export function reportAdminRoutes(deps: Deps, requireModerator: MiddlewareHandle
     const { id } = c.req.valid("param");
     // Asked before anything is read, so the answer is the same for everybody.
     if (!deps.media) {
-      throw new AppError(503, "media_unavailable", "Object storage is not configured here");
+      throw mediaUnavailable();
     }
     const held = await pointedPhotoKeyOf(deps.db, staff.identityId, id);
     if (!held) throw notFound();
@@ -242,7 +231,7 @@ export function reportAdminRoutes(deps: Deps, requireModerator: MiddlewareHandle
       subjectId: id,
       detail: { variant: "card" },
     });
-    const answer = await staffPhotoUrl(deps.media.signer, held.key, "card", at);
+    const answer = await signedPhotoUrl(deps.media.signer, held.key, "card", at);
     deps.logger.info(
       {
         staffIdentityId: staff.identityId,

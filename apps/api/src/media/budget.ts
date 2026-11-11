@@ -1,7 +1,6 @@
 import type { Queryable } from "@kuutti/db";
 import { PhotoFetchBudget } from "@kuutti/schema";
-import { AppError } from "../lib/errors.ts";
-import { readMatchingConfig } from "../lib/matching-config.ts";
+import { matchingConfigOf } from "../lib/matching-config.ts";
 
 // The exposure budget's day (#52, TD-6, ADR-008). The count itself happens in
 // the statement that writes the fetch-log row (repo.insertPhotoAccess), so
@@ -39,17 +38,7 @@ export function secondsUntil(end: Date, now: Date): number {
 }
 
 export async function readPhotoFetchBudget(db: Queryable): Promise<PhotoFetchBudget> {
-  const value = await readMatchingConfig(db, PHOTO_FETCHES_KEY);
-  const parsed = PhotoFetchBudget.safeParse(value);
-  if (!parsed.success) {
-    throw new AppError(
-      500,
-      "internal_error",
-      `matching_config ${PHOTO_FETCHES_KEY} is not a budget per variant`,
-      { key: PHOTO_FETCHES_KEY },
-    );
-  }
-  return parsed.data;
+  return matchingConfigOf(db, PHOTO_FETCHES_KEY, PhotoFetchBudget, "a budget per variant");
 }
 
 type Parts = {

@@ -2,7 +2,6 @@ import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
 import {
   DealBreakersResponse,
   DealBreakersUpdate,
-  ErrorResponse,
   PreferencesResponse,
   PreferencesUpdate,
 } from "@kuutti/schema";
@@ -10,7 +9,8 @@ import type { MiddlewareHandler } from "hono";
 import type { Deps } from "../app.ts";
 import { callerOf } from "../lib/auth-middleware.ts";
 import type { AppEnv } from "../lib/env.ts";
-import { AppError } from "../lib/errors.ts";
+import { noLiveAccount } from "../lib/errors.ts";
+import { bearer, errorContent, json, unauthenticated } from "../lib/openapi.ts";
 import {
   dealBreakersMax,
   type OwnFieldsReader,
@@ -18,14 +18,6 @@ import {
   saveDealBreakers,
 } from "./deal-breakers.ts";
 import { readPreferences, type SeeksConsentReader, savePreferences } from "./preferences.ts";
-
-const errorContent = (description: string) => ({
-  description,
-  content: { "application/json": { schema: ErrorResponse } },
-});
-const json = <T>(schema: T) => ({ content: { "application/json": { schema } } });
-const bearer = { security: [{ session: [] }] };
-const unauthenticated = errorContent("unauthenticated, session_expired or session_revoked.");
 
 const readRoute = createRoute({
   method: "get",
@@ -123,7 +115,7 @@ export function preferencesRoutes(
     const own = await readOwnFields(accountId);
     const max = await dealBreakersMax(deps.db);
     if (!(await saveDealBreakers(deps.db, accountId, c.req.valid("json"), own, max, new Date()))) {
-      throw new AppError(404, "not_found", "No live account");
+      throw noLiveAccount();
     }
     // The fields and values stay out of the log (rule 5): how many, and nothing else.
     deps.logger.info(
@@ -141,7 +133,7 @@ export function preferencesRoutes(
     const update = c.req.valid("json");
     const { accountId } = callerOf(c);
     if (!(await savePreferences(deps.db, accountId, update, new Date(), seeksConsent))) {
-      throw new AppError(404, "not_found", "No live account");
+      throw noLiveAccount();
     }
     // The values stay out of the log (rule 5): this line says only that they were set.
     deps.logger.info({ accountId }, "preferences saved");

@@ -826,6 +826,28 @@ describe("relaxing a deal-breaker for the day", () => {
     expect(byPerson.get(b)?.notAnswered).toEqual(["smoking"]);
     expect(byPerson.get(c)?.notAnswered).toEqual(["smoking"]);
   });
+
+  test("A card names no deal-breaker that waits for the person's own answer", async ({ ctx }) => {
+    const { a, of } = await pondWith(
+      ctx,
+      "test-short-paused-label",
+      [{ fields: {}, count: 1 }],
+      true,
+    );
+    const [b] = of[0] ?? [];
+    if (!b) throw new Error("people not written");
+    // A has not answered wantsKids herself, so this one waits: it filters nobody and says nothing.
+    await dealBreaker(ctx.client, a, "wantsKids", ["want"], true);
+    await opens(ctx.client, a);
+    const app = await appAt(ctx.client);
+    const { headers } = await signInAs(ctx.client, a);
+
+    const { entries } = await readToday(app, headers);
+
+    expect(entries?.map((entry) => [entry.card.accountId, entry.notAnswered])).toEqual([
+      [b, ["smoking"]],
+    ]);
+  });
 });
 
 describe("the inbox stop and the short pool (ADR-062 §4)", () => {

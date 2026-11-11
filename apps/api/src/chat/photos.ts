@@ -1,10 +1,12 @@
 import { type Queryable, transaction } from "@kuutti/db";
 import { type ChatMessage, elapsedBand, messageLength, messageLengthBand } from "@kuutti/schema";
+import { advisoryLock } from "../lib/db.ts";
 import { AppError } from "../lib/errors.ts";
 import { matchingConfigNumbers } from "../lib/matching-config.ts";
 import {
   countMessagePhotosSince,
   dayWindow,
+  mediaUnavailable,
   type PreparedMessagePhoto,
   prepareMessagePhoto,
   secondsUntil,
@@ -12,7 +14,14 @@ import {
 } from "../media/index.ts";
 import { contactDetailsIn } from "../profile/index.ts";
 import { track } from "../research/index.ts";
-import { type ChatDeps, MESSAGE_MAX_LENGTH_KEY } from "./conversations.ts";
+import {
+  type ChatDeps,
+  contactDetailsRefused,
+  conversationClosed,
+  foreignClientId,
+  MESSAGE_MAX_LENGTH_KEY,
+  notFound,
+} from "./conversations.ts";
 import { withPhotoUrls } from "./messages.ts";
 import * as repo from "./repo.ts";
 
@@ -69,7 +78,7 @@ export async function sendPhoto(
   },
 ): Promise<{ message: ChatMessage; created: boolean }> {
   const media = deps.media;
-  if (!media) throw new AppError(503, "media_unavailable", "Object storage is not configured here");
+  if (!media) throw mediaUnavailable();
   const at = deps.now();
   const day = dayWindow(at);
   const before = await refuseEarly(deps, input, at);
@@ -92,11 +101,11 @@ export async function sendPhoto(
   if (outcome.kind !== "created") await prepared.dropOrphans();
   switch (outcome.kind) {
     case "not_found":
-      throw new AppError(404, "not_found", "No such conversation");
+      throw notFound();
     case "foreign_client_id":
-      throw new AppError(400, "validation_failed", "The client id is not the caller's");
+      throw foreignClientId();
     case "closed":
-      throw new AppError(409, "conversation_closed", "The conversation is closed");
+      throw conversationClosed();
     case "over_budget":
       throw budgetRefusal(at, day.end);
     case "stored":
@@ -130,15 +139,15 @@ async function refuseEarly(
   at: Date,
 ): Promise<Before> {
   const state = await repo.readSendState(deps.db, input.accountId, input.conversationId);
-  if (!state || state.hidden) throw new AppError(404, "not_found", "No such conversation");
+  if (!state || state.hidden) throw notFound();
   const stored = await repo.findByClientId(deps.db, input);
   if (stored) {
     if (stored.side !== state.side) {
-      throw new AppError(400, "validation_failed", "The client id is not the caller's");
+      throw foreignClientId();
     }
     return { kind: "stored", row: stored, side: state.side };
   }
-  if (state.closed) throw new AppError(409, "conversation_closed", "The conversation is closed");
+  if (state.closed) throw conversationClosed();
   const limits = await matchingConfigNumbers(deps.db, [
     MESSAGE_MAX_LENGTH_KEY,
     MESSAGE_PHOTOS_PER_DAY_KEY,
@@ -151,9 +160,7 @@ async function refuseEarly(
     }
     const contact = contactDetailsIn(input.caption);
     if (contact) {
-      throw new AppError(400, "contact_details", "Contact details are not for a message", {
-        kind: contact,
-      });
+      throw contactDetailsRefused(contact);
     }
   }
   const day = dayWindow(at);
@@ -173,9 +180,7 @@ async function writePhotoMessage(
   input: { accountId: string; conversationId: string; clientId: string; caption: string | null },
   photo: { prepared: PreparedMessagePhoto; at: Date; since: Date; perDay: number },
 ): Promise<Outcome> {
-  await tx.query("SELECT pg_advisory_xact_lock(hashtext($1))", [
-    `message_photo:${input.accountId}`,
-  ]);
+  await advisoryLock(tx, `message_photo:${input.accountId}`);
   if (!(await repo.holdLiveAccount(tx, input.accountId))) return { kind: "not_found" };
   // Locked through the caller's participant row; without one, the state below is none too.
   await repo.lockConversation(tx, input.accountId, input.conversationId);

@@ -14,9 +14,14 @@ import { contactDetailsIn } from "../profile/index.ts";
 import { track } from "../research/index.ts";
 import {
   type ChatDeps,
+  contactDetailsRefused,
+  conversationClosed,
+  foreignClientId,
+  lockForSend,
   MESSAGE_MAX_LENGTH_KEY,
+  notFound,
   requireConversation,
-  stateOf,
+  visibleState,
 } from "./conversations.ts";
 import * as repo from "./repo.ts";
 
@@ -114,12 +119,8 @@ export async function sendMessage(
   const at = deps.now();
   const maxLength = await matchingConfigNumber(deps.db, MESSAGE_MAX_LENGTH_KEY);
   const outcome = await transaction(deps.db, async (tx): Promise<Outcome> => {
-    if (!(await repo.holdLiveAccount(tx, input.accountId))) return { kind: "not_found" };
-    if (!(await repo.lockConversation(tx, input.accountId, input.conversationId))) {
-      return { kind: "not_found" };
-    }
-    const state = await repo.readSendState(tx, input.accountId, input.conversationId);
-    if (!state || state.hidden) return { kind: "not_found" };
+    const state = await lockForSend(tx, input.accountId, input.conversationId);
+    if (!state) return { kind: "not_found" };
     const stored = await repo.findByClientId(tx, input);
     if (stored) {
       // An id the other side used is not the caller's to resend; a phone that makes its ids at random never meets one.
@@ -147,11 +148,11 @@ export async function sendMessage(
   });
   switch (outcome.kind) {
     case "not_found":
-      throw new AppError(404, "not_found", "No such conversation");
+      throw notFound();
     case "foreign_client_id":
-      throw new AppError(400, "validation_failed", "The client id is not the caller's");
+      throw foreignClientId();
     case "closed":
-      throw new AppError(409, "conversation_closed", "The conversation is closed");
+      throw conversationClosed();
     case "too_long":
       // The limit, never the text or its length.
       throw new AppError(400, "message_too_long", "The message is too long", {
@@ -159,9 +160,7 @@ export async function sendMessage(
       });
     case "contact_details":
       // The kind found, as the card's refusal names it; never the text.
-      throw new AppError(400, "contact_details", "Contact details are not for a message", {
-        kind: outcome.contact,
-      });
+      throw contactDetailsRefused(outcome.contact);
     case "stored":
       return { message: outcome.message, created: false };
     case "created": {
@@ -218,7 +217,7 @@ export async function markRead(
   upTo: number,
 ): Promise<void> {
   if (!(await repo.markRead(deps.db, { accountId, conversationId, upTo }))) {
-    throw new AppError(404, "not_found", "No such conversation");
+    throw notFound();
   }
 }
 
@@ -238,14 +237,7 @@ export async function messageReaders(
     if (accountId === input.senderAccountId) continue;
     const row = await repo.findConversation(db, accountId, input.conversationId);
     if (!row) continue;
-    const open =
-      stateOf({
-        archivedAt: row.archivedAt,
-        closedAt: row.closedAt,
-        closedHow: row.closedHow,
-        counterpartLinked: row.counterpartId !== null,
-        blocked: row.blocked,
-      }).state !== "closed";
+    const open = visibleState(row).state !== "closed";
     const message = await repo.messageFor(db, {
       accountId,
       conversationId: input.conversationId,

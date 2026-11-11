@@ -1,7 +1,7 @@
 import { type Queryable, transaction } from "@kuutti/db";
 import type { Locale } from "@kuutti/i18n";
 import type { AccountExport, HomeSummary, HomeUpdate, PlaceName } from "@kuutti/schema";
-import { AppError } from "../lib/errors.ts";
+import { AppError, noLiveAccount } from "../lib/errors.ts";
 import type { Logger } from "../lib/logger.ts";
 import { areaOf, homeRules, homeSummary, keptPlace, nameOf, shownPlace, townOf } from "./places.ts";
 import * as repo from "./repo.ts";
@@ -34,7 +34,7 @@ export async function saveHome(
   }
   const home = await transaction(deps.db, async (tx) => {
     const stored = await repo.lockHomeOfAccount(tx, accountId);
-    if (!stored) throw new AppError(404, "not_found", "No live account");
+    if (!stored) throw noLiveAccount();
     const place =
       moved ?? (stored.place === null ? null : keptPlace(stored.place, rules.minInhabitants));
     if (place === null) throw new AppError(400, "validation_failed", "A postal code first");

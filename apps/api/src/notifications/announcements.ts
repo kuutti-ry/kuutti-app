@@ -6,7 +6,7 @@ import {
   type AnnouncementDraft,
   type AnnouncementText,
 } from "@kuutti/schema";
-import { AppError } from "../lib/errors.ts";
+import { AppError, errorName } from "../lib/errors.ts";
 import { tFor } from "../lib/i18n.ts";
 import type { Logger } from "../lib/logger.ts";
 import { type Mailer, MailFailed } from "../lib/mail.ts";
@@ -204,7 +204,7 @@ export async function mailAnnouncement(
       const reason =
         error instanceof MailFailed
           ? { reason: error.reason, status: error.status }
-          : { reason: error instanceof Error ? error.name : "unknown" };
+          : { reason: errorName(error) };
       deps.logger.warn({ accountId, ...reason }, "announcement mail not sent");
     }
   }

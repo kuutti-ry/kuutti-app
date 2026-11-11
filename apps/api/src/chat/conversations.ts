@@ -14,6 +14,7 @@ import {
   messageCountBand,
 } from "@kuutti/schema";
 import { AppError } from "../lib/errors.ts";
+import { DAY_MS } from "../lib/finnish-day.ts";
 import type { Logger } from "../lib/logger.ts";
 import { matchingConfigNumber, matchingConfigNumbers } from "../lib/matching-config.ts";
 import { issueConversationThumb, type MediaDeps } from "../media/index.ts";
@@ -30,8 +31,6 @@ import * as repo from "./repo.ts";
 export const MESSAGE_MAX_LENGTH_KEY = "message_max_length";
 /** The days after a close during which either person may still report the conversation (#351, ADR-030 §12). */
 export const REPORT_AFTER_CLOSE_DAYS_KEY = "report_after_close_days";
-
-const DAY_MS = 86_400_000;
 
 /**
  * Whether a report from the conversation is taken at `at` (#351): while it is
@@ -56,7 +55,7 @@ export type ChatDeps = {
  * the moment between, the block alone closes it), or when the counterpart is
  * erased. Erasure reads as such; everything else as an ended conversation.
  */
-export function stateOf(row: {
+function stateOf(row: {
   archivedAt: Date | null;
   closedAt: Date | null;
   closedHow: ConversationCloseKind | null;
@@ -67,6 +66,17 @@ export function stateOf(row: {
   if (!closed) return { state: row.archivedAt ? "archived" : "open", closedHow: null };
   const erased = row.closedHow === "erasure" || (row.closedHow === null && !row.counterpartLinked);
   return { state: "closed", closedHow: erased ? "erasure" : "unmatch" };
+}
+
+/** What a conversation row of the list shows of its state, to the caller it was read for. */
+export function visibleState(row: repo.ConversationRow) {
+  return stateOf({
+    archivedAt: row.archivedAt,
+    closedAt: row.closedAt,
+    closedHow: row.closedHow,
+    counterpartLinked: row.counterpartId !== null,
+    blocked: row.blocked,
+  });
 }
 
 const preview = (body: string | null) =>
@@ -89,13 +99,7 @@ async function summaryOf(
   row: repo.ConversationRow,
   withThumb = true,
 ): Promise<ConversationSummary> {
-  const { state, closedHow } = stateOf({
-    archivedAt: row.archivedAt,
-    closedAt: row.closedAt,
-    closedHow: row.closedHow,
-    counterpartLinked: row.counterpartId !== null,
-    blocked: row.blocked,
-  });
+  const { state, closedHow } = visibleState(row);
   // A live account always has its year and month (rule 3); only a tombstone lacks them, and its link is cut.
   const person =
     row.counterpartId !== null &&
@@ -172,7 +176,30 @@ export async function listConversations(
   };
 }
 
-const notFound = () => new AppError(404, "not_found", "No such conversation");
+/** No such conversation for the caller: not theirs, nobody's, or hidden from its blocker. A 404, never a 403. */
+export const notFound = () => new AppError(404, "not_found", "No such conversation");
+/** The conversation is closed: nothing more is sent in it. */
+export const conversationClosed = () =>
+  new AppError(409, "conversation_closed", "The conversation is closed");
+/** A resend under an id the other side used: not the caller's to resend. */
+export const foreignClientId = () =>
+  new AppError(400, "validation_failed", "The client id is not the caller's");
+/** Words that carry a contact's details, which go through a share, never a message (ADR-031 §11). */
+export const contactDetailsRefused = (kind: string) =>
+  new AppError(400, "contact_details", "Contact details are not for a message", { kind });
+
+/**
+ * The send's order (ADR-031 §3), inside the caller's transaction: the account
+ * held, then the conversation locked, then its state read. Null when any of
+ * them refuses, or the conversation is hidden from the caller.
+ */
+export async function lockForSend(tx: Queryable, accountId: string, conversationId: string) {
+  if (!(await repo.holdLiveAccount(tx, accountId))) return null;
+  if (!(await repo.lockConversation(tx, accountId, conversationId))) return null;
+  const state = await repo.readSendState(tx, accountId, conversationId);
+  if (!state || state.hidden) return null;
+  return state;
+}
 
 /**
  * One conversation, with what the composer needs, how far the other side has
@@ -184,8 +211,7 @@ export async function readConversation(
   accountId: string,
   conversationId: string,
 ): Promise<ConversationDetail> {
-  const row = await repo.findConversation(deps.db, accountId, conversationId);
-  if (!row) throw notFound();
+  const row = await requireConversation(deps.db, accountId, conversationId);
   const summary = await summaryOf(deps, accountId, row);
   const maxLength = await matchingConfigNumber(deps.db, MESSAGE_MAX_LENGTH_KEY);
   const contacts = await repo.readConversationContacts(deps.db, accountId, conversationId);
@@ -264,10 +290,8 @@ export async function unmatchConversation(
   await transaction(deps.db, async (tx) => {
     // The send's order (ADR-031 §3): the account held in a live state, the
     // conversation locked through the caller's row, then what it decides on.
-    if (!(await repo.holdLiveAccount(tx, accountId))) throw notFound();
-    if (!(await repo.lockConversation(tx, accountId, conversationId))) throw notFound();
-    const state = await repo.readSendState(tx, accountId, conversationId);
-    if (!state || state.hidden) throw notFound();
+    const state = await lockForSend(tx, accountId, conversationId);
+    if (!state) throw notFound();
     const closed = await repo.closeConversationsOf(tx, {
       accountIds: [accountId],
       how: "unmatch",

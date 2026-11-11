@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  byLabel,
   FISH_SPECIES_LABELS,
   fishSpeciesOf,
   GROUP_REASON,
@@ -72,5 +73,16 @@ describe("the fish the fish tip may name (#253)", () => {
     for (const [species, label] of Object.entries(FISH_SPECIES_LABELS)) {
       expect(fishSpeciesOf(label)).toBe(species);
     }
+  });
+});
+
+describe("byLabel", () => {
+  it("turns our keys' label names around, the name lowercased, so any case finds its key", () => {
+    const labels = byLabel({ beach: "Beach", forest: "Forest Path" });
+    expect([...labels]).toEqual([
+      ["beach", "beach"],
+      ["forest path", "forest"],
+    ]);
+    expect(labels.get("Forest Path")).toBeUndefined();
   });
 });

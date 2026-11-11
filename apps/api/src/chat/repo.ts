@@ -20,12 +20,19 @@ import type {
 
 export type Side = "a" | "b";
 
-/** The caller blocked the counterpart, by identity: what hides a conversation from its blocker while both are linked. */
-const CALLER_BLOCKED = `(them.account_id IS NOT NULL AND EXISTS (
+/** One account blocked the other, by identity (ADR-030 §2). */
+const blockedBy = (blocker: string, blocked: string) => `EXISTS (
   SELECT 1 FROM block bl
   JOIN account x ON x.identity_id = bl.blocker_identity_id
   JOIN account y ON y.identity_id = bl.blocked_identity_id
-  WHERE x.id = me.account_id AND y.id = them.account_id))`;
+  WHERE x.id = ${blocker} AND y.id = ${blocked})`;
+
+/** The caller blocked the counterpart, by identity: what hides a conversation from its blocker while both are linked. */
+const CALLER_BLOCKED = `(them.account_id IS NOT NULL AND ${blockedBy("me.account_id", "them.account_id")})`;
+
+/** Either of the two blocked the other: what a row of the list and a conversation's detail say as `blocked`. */
+const BLOCKED =
+  "(them.account_id IS NOT NULL AND blocked_between(me.account_id, them.account_id)) AS blocked";
 
 /**
  * Who may see the conversation at all: not its blocker, by a block that
@@ -165,7 +172,7 @@ const conversationFrom = (r: Row): ConversationRow => ({
 const CONVERSATION_COLUMNS = `c.id, c.opened_at, c.last_message_at, c.next_seq, c.archived_at,
   c.closed_at, c.closed_how, me.side, me.read_up_to,
   them.account_id AS counterpart_id, ${COUNTERPART_READ_UP_TO} AS counterpart_read_up_to,
-  (them.account_id IS NOT NULL AND blocked_between(me.account_id, them.account_id)) AS blocked,
+  ${BLOCKED},
   p.display_name AS counterpart_name, a.birth_year, a.birth_month,
   lm.seq AS last_seq, lm.side AS last_side, lm.kind AS last_kind, lm.body AS last_body,
   lm.created_at AS last_created_at,
@@ -527,17 +534,12 @@ export async function closeConversationsOf(
   },
 ): Promise<Closed[]> {
   if (input.accountIds.length === 0) return [];
-  const blockedBy = (blocker: string, blocked: string) => `EXISTS (
-    SELECT 1 FROM block bl
-    JOIN account x ON x.identity_id = bl.blocker_identity_id
-    JOIN account y ON y.identity_id = bl.blocked_identity_id
-    WHERE x.id = ${blocker} AND y.id = ${blocked})`;
   const { rows } = await db.query<Row>(
     `WITH closing AS (
        SELECT c.id, c.closed_at IS NULL AS was_open, me.side AS my_side, them.side AS their_side,
               them.account_id AS counterpart_id,
               (them.account_id IS NOT NULL AND ${blockedBy("them.account_id", "me.account_id")}) AS they_blocked,
-              (them.account_id IS NOT NULL AND ${blockedBy("me.account_id", "them.account_id")}) AS i_blocked
+              ${CALLER_BLOCKED} AS i_blocked
        ${FROM_CALLER}
        WHERE me.account_id = ANY($1::uuid[])
          AND ($4::uuid IS NULL OR c.id = $4) AND ($5::uuid IS NULL OR them.account_id = $5)),
@@ -764,7 +766,7 @@ export async function exportConversationsOf(
   const { rows } = await db.query<Row>(
     `SELECT c.id, c.opened_at, c.archived_at, c.closed_at, c.closed_how,
             them.account_id IS NOT NULL AS counterpart_linked,
-            (them.account_id IS NOT NULL AND blocked_between(me.account_id, them.account_id)) AS blocked,
+            ${BLOCKED},
             coalesce((
               SELECT json_agg(json_build_object(
                        'mine', m.side = me.side,

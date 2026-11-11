@@ -1,21 +1,14 @@
 import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
-import { CardPreviewResponse, ErrorResponse, ProfileResponse, ProfileUpdate } from "@kuutti/schema";
+import { CardPreviewResponse, ProfileResponse, ProfileUpdate } from "@kuutti/schema";
 import type { MiddlewareHandler } from "hono";
 import type { Deps } from "../app.ts";
 import { currentConsent } from "../identity/index.ts";
 import { callerOf } from "../lib/auth-middleware.ts";
 import type { AppEnv } from "../lib/env.ts";
+import { bearer, errorContent, json, unauthenticated } from "../lib/openapi.ts";
 import { readPreferences } from "../matching/index.ts";
 import { buildCard, type CardDeps } from "./card.ts";
 import { readProfile, saveProfile } from "./service.ts";
-
-const errorContent = (description: string) => ({
-  description,
-  content: { "application/json": { schema: ErrorResponse } },
-});
-const json = <T>(schema: T) => ({ content: { "application/json": { schema } } });
-const bearer = { security: [{ session: [] }] };
-const unauthenticated = errorContent("unauthenticated, session_expired or session_revoked.");
 
 const readRoute = createRoute({
   method: "get",

@@ -864,6 +864,21 @@ describe("a card opened from the list", () => {
     expect(seen.status).toBe(204);
   });
 
+  test("Opening a star past the day's cards says their wait in Retry-After", async ({ ctx }) => {
+    const { app, who } = await scene(ctx, 3);
+    const [a, b, c] = [person(who, 0), person(who, 1), person(who, 2)];
+    const id = await starredYesterday(ctx.client, a, b);
+    await queued(ctx.client, a, [c.accountId]);
+    await withMatchingConfig(ctx.client, { exposure_cards_per_day: 1 });
+    await readToday(app, a);
+
+    const answer = await open(app, a, id);
+
+    expect(answer.status).toBe(429);
+    expect(await errorCode(answer)).toBe("card_budget_exceeded");
+    expect(Number(answer.headers.get("Retry-After"))).toBeGreaterThan(0);
+  });
+
   test("Opening a star again the same day gives the same place", async ({ ctx }) => {
     const { app, who } = await scene(ctx, 2);
     const [a, b] = [person(who, 0), person(who, 1)];

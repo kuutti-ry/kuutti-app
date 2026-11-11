@@ -2,6 +2,7 @@ import { type Queryable, transaction } from "@kuutti/db";
 import type { AutomaticBan, SanctionReason, SanctionRule } from "@kuutti/schema";
 import { firstMessageCounts } from "../chat/index.ts";
 import { lockAccountForSanction } from "../identity/index.ts";
+import { DAY_MS, HOUR_MS } from "../lib/finnish-day.ts";
 import type { Logger } from "../lib/logger.ts";
 import { matchingConfigNumbers } from "../lib/matching-config.ts";
 import { cardsServedSince, othersPhotoFetchesSince } from "../media/index.ts";
@@ -46,8 +47,6 @@ const AUTO_SHADOW_BAN_ROUND_READS_MINUTES_KEY = "auto_shadow_ban_round_reads_min
 export const AUTO_SHADOW_BAN_REVIEW_HOURS_KEY = "auto_shadow_ban_review_hours";
 
 const MINUTE_MS = 60_000;
-const HOUR_MS = 60 * MINUTE_MS;
-const DAY_MS = 24 * HOUR_MS;
 
 /** Staff's words on the sanction, fixed per rule: what applied it, never what it counted. */
 const RULE_NOTE: Record<SanctionRule, string> = {
@@ -78,6 +77,16 @@ const on = (threshold: number) => threshold >= 1;
 
 /** A rule met at `count` when it is on. */
 const reaches = (count: number, threshold: number) => on(threshold) && count >= threshold;
+
+/** What a rule found, when its count reaches a threshold that is on; null otherwise. */
+const met = (
+  rule: SanctionRule,
+  counted: { count: number; firstAt: Date | null },
+  threshold: number,
+): Met | null =>
+  counted.firstAt && reaches(counted.count, threshold)
+    ? { rule, count: counted.count, firstAt: counted.firstAt }
+    : null;
 
 type Standing = { erased: boolean; staff: boolean; hidden: boolean; floor: Date | null };
 
@@ -191,10 +200,7 @@ export async function checkReports(deps: RuleDeps, reportedAccountId: string): P
       reportedAccountId,
       since(at, config[AUTO_SHADOW_BAN_REPORTS_DAYS_KEY] * DAY_MS, floor),
     );
-    if (!counted.firstAt || !reaches(counted.count, config[AUTO_SHADOW_BAN_REPORTS_KEY])) {
-      return null;
-    }
-    return { rule: "reports", count: counted.count, firstAt: counted.firstAt };
+    return met("reports", counted, config[AUTO_SHADOW_BAN_REPORTS_KEY]);
   });
 }
 
@@ -220,13 +226,10 @@ export async function checkFirstMessage(
       sameSince: since(at, config[AUTO_SHADOW_BAN_SAME_FIRST_MESSAGE_HOURS_KEY] * HOUR_MS, floor),
     });
     // The same opener is the more specific evidence, said first when both are met.
-    if (same.firstAt && reaches(same.count, config[AUTO_SHADOW_BAN_SAME_FIRST_MESSAGE_KEY])) {
-      return { rule: "same_first_message", count: same.count, firstAt: same.firstAt };
-    }
-    if (first.firstAt && reaches(first.count, config[AUTO_SHADOW_BAN_FIRST_MESSAGES_KEY])) {
-      return { rule: "first_messages", count: first.count, firstAt: first.firstAt };
-    }
-    return null;
+    return (
+      met("same_first_message", same, config[AUTO_SHADOW_BAN_SAME_FIRST_MESSAGE_KEY]) ??
+      met("first_messages", first, config[AUTO_SHADOW_BAN_FIRST_MESSAGES_KEY])
+    );
   });
 }
 
@@ -248,8 +251,7 @@ export async function checkPhotoFetches(deps: RuleDeps, accountId: string): Prom
       accountId,
       since(at, config[AUTO_SHADOW_BAN_PHOTO_FETCHES_MINUTES_KEY] * MINUTE_MS, floor),
     );
-    if (!counted.firstAt || !reaches(counted.count, threshold)) return null;
-    return { rule: "photo_fetches", count: counted.count, firstAt: counted.firstAt };
+    return met("photo_fetches", counted, threshold);
   };
   await underRuleLock(deps, "photo_fetch", accountId, measure, {});
 }
@@ -326,9 +328,8 @@ export function roundReadRule(deps: RuleDeps): (accountId: string) => Promise<vo
           accountId,
           since(at, config[AUTO_SHADOW_BAN_CARDS_SERVED_MINUTES_KEY] * MINUTE_MS, floor),
         );
-        if (served.firstAt && reaches(served.count, cards)) {
-          return { rule: "cards_served", count: served.count, firstAt: served.firstAt };
-        }
+        const found = met("cards_served", served, cards);
+        if (found) return found;
       }
       const times = reads.since(
         accountId,

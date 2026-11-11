@@ -1,5 +1,6 @@
 import type { Queryable } from "@kuutti/db";
 import { it } from "vitest";
+import { z } from "zod";
 import { describe, expect, test } from "../test/harness.ts";
 import { AppError } from "./errors.ts";
 import {
@@ -7,6 +8,7 @@ import {
   distanceEdges,
   matchingConfigNumber,
   matchingConfigNumbers,
+  matchingConfigOf,
   readMatchingConfig,
 } from "./matching-config.ts";
 
@@ -66,6 +68,38 @@ describe("matchingConfigNumber", () => {
 
   test("a missing key fails as readMatchingConfig does", async ({ ctx }) => {
     const error = await refusal(matchingConfigNumber(ctx.client, "lib_test.absent"));
+    expect(error.message).toBe("matching_config has no row for lib_test.absent");
+  });
+});
+
+describe("matchingConfigOf", () => {
+  const Window = z.object({ min: z.number(), max: z.number() }).strict();
+
+  test("a value of the schema's shape is read as the schema parses it", async ({ ctx }) => {
+    await row(ctx.client, "lib_test.window", 1, { min: 18, max: 40 });
+    expect(await matchingConfigOf(ctx.client, "lib_test.window", Window, "a window")).toEqual({
+      min: 18,
+      max: 40,
+    });
+  });
+
+  test("a value of another shape is refused, the shape named in words", async ({ ctx }) => {
+    await row(ctx.client, "lib_test.window", 1, { min: "18", max: 40 });
+    const error = await refusal(
+      matchingConfigOf(ctx.client, "lib_test.window", Window, "a window"),
+    );
+    expect(error).toMatchObject({
+      status: 500,
+      code: "internal_error",
+      detail: { key: "lib_test.window" },
+    });
+    expect(error.message).toBe("matching_config lib_test.window is not a window");
+  });
+
+  test("a missing key fails as readMatchingConfig does", async ({ ctx }) => {
+    const error = await refusal(
+      matchingConfigOf(ctx.client, "lib_test.absent", Window, "a window"),
+    );
     expect(error.message).toBe("matching_config has no row for lib_test.absent");
   });
 });

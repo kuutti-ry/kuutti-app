@@ -8,6 +8,7 @@ import {
   type ResearchSnapshot,
   researchFieldsOf,
 } from "@kuutti/schema";
+import { HOUR_MS } from "../lib/finnish-day.ts";
 import type { Logger } from "../lib/logger.ts";
 import { localYearMonth } from "../media/index.ts";
 import * as repo from "./repo.ts";
@@ -35,7 +36,7 @@ export type TrackResult =
  * The hour is coarse enough for every question in the registry (ADR-011 §1).
  */
 function hourOf(at: Date): Date {
-  return new Date(Math.floor(at.getTime() / 3_600_000) * 3_600_000);
+  return new Date(Math.floor(at.getTime() / HOUR_MS) * HOUR_MS);
 }
 
 /** Whole years from the bank-verified year and month by the Finnish calendar, as the card counts them (rule 3: never a day). */

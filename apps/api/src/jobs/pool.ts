@@ -4,6 +4,7 @@ import {
   type DistanceEdges,
   type GateResponse,
   PROFILE_FIELDS,
+  type PreferencesResponse,
 } from "@kuutti/schema";
 import { CURRENT_CONSENT_VERSIONS } from "../identity/index.ts";
 import { distanceEdges } from "../lib/matching-config.ts";
@@ -58,17 +59,49 @@ export type Subject = RoundCandidate & {
   visible: boolean;
 };
 
+/**
+ * What `profileComplete` reads of an account `a` beside its profile's own
+ * columns: its approved profile photos, and its seeks and age window.
+ */
+export const PROFILE_FACTS = `(SELECT count(*) FROM photo ph
+           WHERE ph.account_id = a.id AND ph.purpose = 'profile' AND ph.state = 'approved') AS approved_photos,
+         (SELECT r.value FROM preferences r
+           WHERE r.account_id = a.id AND r.mode = 'hard' AND r.field = 'seeks') AS seeks,
+         (SELECT r.value FROM preferences r
+           WHERE r.account_id = a.id AND r.mode = 'hard' AND r.field = 'age_window') AS age_window`;
+
+/**
+ * Whether a profile is complete, decided by `completeness()` itself from the
+ * facts the profile screen gathers, so the round, the counter and the screen
+ * cannot disagree.
+ */
+export function profileComplete(
+  row: {
+    display_name: string | null;
+    bio: string | null;
+    bio_preset: string | null;
+    prompts: unknown;
+    approved_photos: string;
+  },
+  preferences: PreferencesResponse,
+): boolean {
+  return completeness({
+    displayName: row.display_name,
+    bio: row.bio,
+    bioPreset: row.bio_preset,
+    answeredPrompts: answeredPromptsOf(row.prompts),
+    approvedPhotos: Number(row.approved_photos),
+    seeks: preferences.seeks,
+    ageWindow: preferences.ageWindow,
+  }).complete;
+}
+
 // Who can be complete: live accounts in good standing. `registered` is not
 // (no consents yet), paused, suspended and banned accounts are hidden or gone.
 const FACTS = `
   SELECT a.id, a.identity_id, a.gender, a.home_place, a.state, a.birth_year, a.birth_month,
          p.display_name, p.bio, p.bio_preset, p.prompts, p.fields, p.fields->>'intent' AS intent,
-         (SELECT count(*) FROM photo ph
-           WHERE ph.account_id = a.id AND ph.purpose = 'profile' AND ph.state = 'approved') AS approved_photos,
-         (SELECT r.value FROM preferences r
-           WHERE r.account_id = a.id AND r.mode = 'hard' AND r.field = 'seeks') AS seeks,
-         (SELECT r.value FROM preferences r
-           WHERE r.account_id = a.id AND r.mode = 'hard' AND r.field = 'age_window') AS age_window,
+         ${PROFILE_FACTS},
          EXISTS (SELECT 1 FROM consent c WHERE c.account_id = a.id AND c.kind = 'terms'
                   AND c.withdrawn_at IS NULL AND c.version = $3) AS terms,
          EXISTS (SELECT 1 FROM consent c WHERE c.account_id = a.id AND c.kind = 'privacy'
@@ -123,16 +156,7 @@ function subjectFrom(
   if (!point) return null;
   // The seek answer counts only with the special-category consent (ADR-019 §4), as the status reads it.
   if (!row.terms || !row.privacy || !row.special_category) return null;
-  const complete = completeness({
-    displayName: row.display_name,
-    bio: row.bio,
-    bioPreset: row.bio_preset,
-    answeredPrompts: answeredPromptsOf(row.prompts),
-    approvedPhotos: Number(row.approved_photos),
-    seeks: preferences.seeks,
-    ageWindow: preferences.ageWindow,
-  }).complete;
-  if (!complete) return null;
+  if (!profileComplete(row, preferences)) return null;
   return {
     id: row.id,
     person: {

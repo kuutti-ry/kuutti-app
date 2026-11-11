@@ -1,3 +1,5 @@
+import { ErrorResponse } from "@kuutti/schema";
+
 /**
  * The document served at /openapi.json outside production and written to
  * apps/api/openapi.json by `pnpm openapi`, from which packages/schema's typed
@@ -48,3 +50,23 @@ export function servedDocument(
 ): unknown {
   return nullMembers(app.getOpenAPIDocument(openApiDocument(version)));
 }
+
+// The pieces every route's contract is written with (#610): written once here,
+// so a refusal's envelope and a session's scheme say the same in every slice.
+
+/** A refusal in a route's contract: its codes in words, and the error envelope. */
+export const errorContent = (description: string) => ({
+  description,
+  content: { "application/json": { schema: ErrorResponse } },
+});
+/** A JSON body or answer of the given schema. */
+export const json = <T>(schema: T) => ({ content: { "application/json": { schema } } });
+/** A route that takes the session's bearer token. */
+export const bearer = { security: [{ session: [] }] };
+/** The 401 of a route that takes a session. */
+export const unauthenticated = errorContent("unauthenticated, session_expired or session_revoked.");
+/** The refusals of a staff route: no session, or a role that does not allow it. */
+export const staffErrors = {
+  401: unauthenticated,
+  403: errorContent("admin_forbidden: the role does not allow this."),
+};

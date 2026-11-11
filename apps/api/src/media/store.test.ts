@@ -5,7 +5,7 @@ import {
   type S3Client,
 } from "@aws-sdk/client-s3";
 import { describe, expect, it } from "vitest";
-import { memoryMediaStore, objectKey, s3MediaStore } from "./store.ts";
+import { memoryMediaStore, objectKey, s3MediaStore, variantKeys } from "./store.ts";
 
 // Answers of S3 that the compose stand-in never gives but the API documents
 // (store.local.test.ts runs the real client against the stand-in): a
@@ -211,5 +211,15 @@ describe("listing a prefix", () => {
       "media/c/thumb.webp",
     ]);
     expect(store.writtenAt.has("media/a/thumb.webp")).toBe(false);
+  });
+});
+
+describe("variantKeys", () => {
+  it("names every variant's object of one content key, thumb first and full last", () => {
+    expect(variantKeys("abc123")).toEqual([
+      "media/abc123/thumb.webp",
+      "media/abc123/card.webp",
+      "media/abc123/full.webp",
+    ]);
   });
 });

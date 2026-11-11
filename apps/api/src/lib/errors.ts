@@ -19,6 +19,21 @@ export class AppError extends Error {
   }
 }
 
+/** The wait a budget's refusal names (`detail.retryAfterSeconds`), for its Retry-After; undefined for any other error. */
+export function retryAfterOf(error: unknown): number | undefined {
+  return error instanceof AppError
+    ? (error.detail as { retryAfterSeconds?: number } | undefined)?.retryAfterSeconds
+    : undefined;
+}
+
+/**
+ * An error's name alone, for a log line: never its message, which may carry
+ * what no log line may (SES names the address in its own).
+ */
+export function errorName(error: unknown): string {
+  return error instanceof Error ? error.name : "unknown";
+}
+
 /** Called for every unhandled error after it is logged; Sentry in deployed environments (#11), nothing in tests. */
 export type ErrorReporter = (
   error: unknown,
@@ -99,3 +114,6 @@ export function validationHook<E extends Env>(logger: Logger): Hook<unknown, E, 
     return undefined;
   };
 }
+
+/** The caller's account is gone or not live: erased meanwhile, paused, or never there (#51). */
+export const noLiveAccount = () => new AppError(404, "not_found", "No live account");

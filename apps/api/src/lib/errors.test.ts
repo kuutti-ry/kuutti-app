@@ -6,7 +6,7 @@ import { describe, expect, vi } from "vitest";
 import { createApp } from "../app.ts";
 import { captureLogger, test, testConfig } from "../test/harness.ts";
 import type { AppEnv } from "./env.ts";
-import { AppError, notFound, onError } from "./errors.ts";
+import { AppError, errorName, notFound, onError, retryAfterOf } from "./errors.ts";
 import { serverRequestId } from "./request-id.ts";
 
 const echoRoute = createRoute({
@@ -196,5 +196,29 @@ describe("error envelope for what Hono itself throws", () => {
     });
     const body = ErrorResponse.parse(await (await app.request("/teapot")).json());
     expect(body.error).toEqual({ code: "teapot", message: "I am a teapot", requestId: "unknown" });
+  });
+});
+
+describe("retryAfterOf", () => {
+  test("reads the wait a refusal names, and nothing from any other error", () => {
+    expect(retryAfterOf(new AppError(429, "budget", "spent", { retryAfterSeconds: 30 }))).toBe(30);
+    expect(retryAfterOf(new AppError(429, "budget", "spent"))).toBeUndefined();
+    expect(retryAfterOf(new AppError(409, "taken", "taken", { other: 1 }))).toBeUndefined();
+    expect(retryAfterOf(Object.assign(new Error("x"), { detail: { retryAfterSeconds: 9 } }))).toBe(
+      undefined,
+    );
+    expect(retryAfterOf("thrown text")).toBeUndefined();
+  });
+});
+
+describe("errorName", () => {
+  test("is an error's name, never its message, and unknown for anything else", () => {
+    class MailRefused extends Error {
+      override name = "MailRefused";
+    }
+    expect(errorName(new MailRefused("to someone@example.invalid"))).toBe("MailRefused");
+    expect(errorName(new TypeError("bad"))).toBe("TypeError");
+    expect(errorName("someone@example.invalid")).toBe("unknown");
+    expect(errorName(null)).toBe("unknown");
   });
 });

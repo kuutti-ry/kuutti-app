@@ -6,7 +6,9 @@ import {
   type PreferencesUpdate,
 } from "@kuutti/schema";
 import { z } from "zod";
+import { lockLiveAccount } from "../lib/db.ts";
 import { AppError } from "../lib/errors.ts";
+import { DAY_MS } from "../lib/finnish-day.ts";
 
 // Raw parameterised SQL for the same reason as identity/repo.ts: Deps.db is
 // the Queryable seam the test harness hands a rolled-back transaction through.
@@ -21,7 +23,6 @@ const AGE_WINDOW = "age_window";
 
 /** A change of gender is possible once in this many days (#147, ADR-060 §9). */
 export const CHANGE_CADENCE_KEY = "change_cadence_days";
-const DAY_MS = 86_400_000;
 
 /** From when a change made at `changedAt` may be followed by another; null when now. */
 export function nextChangeFrom(changedAt: Date | null, cadenceDays: number, at: Date): Date | null {
@@ -84,11 +85,7 @@ export async function savePreferences(
   return transaction(db, async (tx) => {
     // The lock erasure takes first (ADR-009 §8): a save racing an erasure
     // lands before the deletes or sees the tombstone and writes nothing.
-    const live = await tx.query(
-      "SELECT 1 FROM account WHERE id = $1 AND state <> 'deleted' FOR UPDATE",
-      [accountId],
-    );
-    if (live.rows.length === 0) return false;
+    if (!(await lockLiveAccount(tx, accountId))) return false;
     const { seeks, ageWindow } = update;
     // Read under the lock a withdrawal takes, as the profile's save does: a
     // save either lands before the withdrawal, whose clear then removes the
@@ -131,11 +128,7 @@ export async function savePreferences(
  */
 export async function deleteSeeksOfAccount(db: Queryable, accountId: string): Promise<boolean> {
   return transaction(db, async (tx) => {
-    const live = await tx.query(
-      "SELECT 1 FROM account WHERE id = $1 AND state <> 'deleted' FOR UPDATE",
-      [accountId],
-    );
-    if (live.rows.length === 0) return false;
+    if (!(await lockLiveAccount(tx, accountId))) return false;
     await tx.query("DELETE FROM preferences WHERE account_id = $1 AND field = $2", [
       accountId,
       SEEKS,

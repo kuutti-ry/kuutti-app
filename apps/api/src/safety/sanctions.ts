@@ -17,7 +17,7 @@ import {
   settleStanding,
 } from "../identity/index.ts";
 import { AppError } from "../lib/errors.ts";
-import { finnishDay } from "../lib/finnish-day.ts";
+import { addDays, finnishDay } from "../lib/finnish-day.ts";
 import { recordWarningNotice } from "../notifications/index.ts";
 import { recordAudit } from "./audit.ts";
 
@@ -113,12 +113,6 @@ async function openOf(
     suspensionEndsAt: row?.ends ?? null,
     shadowBan: row?.shadow === true,
   };
-}
-
-/** A calendar day plus so many days, as `YYYY-MM-DD`: date arithmetic, so no change of the clocks moves it. */
-function addDays(day: string, days: number): string {
-  const [year, month, date] = day.split("-").map(Number) as [number, number, number];
-  return new Date(Date.UTC(year, month - 1, date + days)).toISOString().slice(0, 10);
 }
 
 /** The day a suspension ends must be after today in Finland and at most SUSPENSION_DAYS_MAX calendar days ahead. */

@@ -9,9 +9,16 @@ import {
   type StoredContact,
   type StoredContacts,
 } from "@kuutti/schema";
-import { AppError } from "../lib/errors.ts";
+import { AppError, noLiveAccount } from "../lib/errors.ts";
 import { track } from "../research/index.ts";
-import { type ChatDeps, readConversation, requireConversation } from "./conversations.ts";
+import {
+  type ChatDeps,
+  conversationClosed,
+  lockForSend,
+  notFound,
+  readConversation,
+  requireConversation,
+} from "./conversations.ts";
 import * as repo from "./repo.ts";
 
 // Contacts shared in a conversation (#103, ADR-031 §11; the maintainer's
@@ -69,7 +76,7 @@ export async function keepContact(
       at: deps.now(),
     });
   });
-  if (!row) throw new AppError(404, "not_found", "No live account");
+  if (!row) throw noLiveAccount();
   return toStored(row);
 }
 
@@ -94,7 +101,7 @@ export async function removeContact(
     await repo.deleteContact(tx, input);
     return repo.endShares(tx, { ...input, how: "removed", at });
   });
-  if (ended === null) throw new AppError(404, "not_found", "No live account");
+  if (ended === null) throw noLiveAccount();
   for (let i = 0; i < ended; i++) await unshared(deps, input.accountId, at);
 }
 
@@ -135,12 +142,8 @@ export async function shareContact(
 ): Promise<ConversationDetail> {
   const at = deps.now();
   const outcome = await transaction(deps.db, async (tx): Promise<ShareOutcome> => {
-    if (!(await repo.holdLiveAccount(tx, input.accountId))) return { kind: "not_found" };
-    if (!(await repo.lockConversation(tx, input.accountId, input.conversationId))) {
-      return { kind: "not_found" };
-    }
-    const state = await repo.readSendState(tx, input.accountId, input.conversationId);
-    if (!state || state.hidden) return { kind: "not_found" };
+    const state = await lockForSend(tx, input.accountId, input.conversationId);
+    if (!state) return { kind: "not_found" };
     if (state.closed) return { kind: "closed" };
     if (!(await repo.holdContact(tx, input.accountId, input.kind))) return { kind: "not_stored" };
     if (!(await repo.beginShare(tx, { ...input, at }))) return { kind: "standing" };
@@ -149,9 +152,9 @@ export async function shareContact(
   });
   switch (outcome.kind) {
     case "not_found":
-      throw new AppError(404, "not_found", "No such conversation");
+      throw notFound();
     case "closed":
-      throw new AppError(409, "conversation_closed", "The conversation is closed");
+      throw conversationClosed();
     case "not_stored":
       throw new AppError(409, "contact_not_stored", "No contact of this kind is kept", {
         kind: input.kind,

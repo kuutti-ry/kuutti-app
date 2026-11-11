@@ -6,13 +6,13 @@ import {
   type AuditEntry,
   AuditPage,
   AuditQuery,
-  ErrorResponse,
 } from "@kuutti/schema";
 import type { MiddlewareHandler } from "hono";
 import type { Deps } from "../app.ts";
 import { staffOf } from "../lib/admin-middleware.ts";
 import type { AppEnv } from "../lib/env.ts";
 import { AppError } from "../lib/errors.ts";
+import { bearer, errorContent, json, staffErrors } from "../lib/openapi.ts";
 import { type AuditEntry as AuditRow, recordAudit } from "./audit.ts";
 
 // The audit log's reader (#309), admins only: who did or saw what, narrowed
@@ -23,15 +23,6 @@ import { type AuditEntry as AuditRow, recordAudit } from "./audit.ts";
 // the person's page writes account.view (#306). A read not narrowed to a
 // subject writes nothing: it is the oversight of staff, and a row per page
 // would say nothing TD-5 asks for.
-
-const errorContent = (description: string) => ({
-  description,
-  content: { "application/json": { schema: ErrorResponse } },
-});
-const staffErrors = {
-  401: errorContent("unauthenticated, session_expired or session_revoked."),
-  403: errorContent("admin_forbidden: the role does not allow this."),
-};
 
 /**
  * The keyset cursor: the last row's time and id, opaque to the panel. The
@@ -131,10 +122,10 @@ const auditRoute = createRoute({
   path: "/admin/audit",
   summary: "The audit log, a page at a time",
   description: `Who did or saw what, newest first, ${AUDIT_PAGE_SIZE} rows a page; narrowed by actor, action, subject type and id, and a time window; \`before\` is the \`next\` of the page before. Never more than a page. Admins only; a read narrowed to a subject id writes audit.read about it first, any other read writes nothing.`,
-  security: [{ session: [] }],
+  ...bearer,
   request: { query: AuditQuery },
   responses: {
-    200: { description: "One page.", content: { "application/json": { schema: AuditPage } } },
+    200: { description: "One page.", ...json(AuditPage) },
     400: errorContent("Validation failed, or cursor_invalid: a cursor this route did not give."),
     ...staffErrors,
   },

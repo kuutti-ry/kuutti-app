@@ -24,13 +24,15 @@ export type UrlSigner = {
 };
 
 /**
- * A photo signed for a member of staff, after the caller has written the
- * look's audit row: fifteen minutes from `at`, counted against no budget and
- * logged in no photo_access row (that log is keyed by a viewer's account, and
- * staff have none). The profile photo's card for review (#306), a report's
- * copied photo in full (#312).
+ * A variant signed for fifteen minutes from `at`, which counts and logs
+ * nothing itself. A person's URL leaves only with its photo_access row
+ * (`issuePhotoUrl`, `issueConversationThumb`); a member of staff's after the
+ * look's audit row, counted against no budget and logged in no photo_access
+ * row (that log is keyed by a viewer's account, and staff have none): the
+ * profile photo's card for review (#306), a report's copied photo in full
+ * (#312).
  */
-export async function staffPhotoUrl(
+export async function signedPhotoUrl(
   signer: UrlSigner,
   key: string,
   variant: PhotoVariant,

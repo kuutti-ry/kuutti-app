@@ -7,7 +7,7 @@ import {
 } from "@kuutti/schema";
 import { z } from "zod";
 import type { Logger } from "../lib/logger.ts";
-import { stateOf } from "./conversations.ts";
+import { visibleState } from "./conversations.ts";
 import { toMessage } from "./messages.ts";
 import { createPresence, type LiveSocket, type Presence } from "./presence.ts";
 import * as repo from "./repo.ts";
@@ -244,16 +244,6 @@ function createChatHub(deps: { db: Queryable; logger: Logger; presence: Presence
       }
     },
   };
-}
-
-function visibleState(row: repo.ConversationRow) {
-  return stateOf({
-    archivedAt: row.archivedAt,
-    closedAt: row.closedAt,
-    closedHow: row.closedHow,
-    counterpartLinked: row.counterpartId !== null,
-    blocked: row.blocked,
-  });
 }
 
 export type Live = ReturnType<typeof createLive>;

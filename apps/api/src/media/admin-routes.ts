@@ -1,7 +1,6 @@
 import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
 import { transaction } from "@kuutti/db";
 import {
-  ErrorResponse,
   PhotoDecisionRequest,
   PhotoDecisionResponse,
   PhotoParams,
@@ -14,12 +13,14 @@ import type { Deps } from "../app.ts";
 import { staffOf } from "../lib/admin-middleware.ts";
 import type { AppEnv } from "../lib/env.ts";
 import { AppError } from "../lib/errors.ts";
+import { bearer, errorContent, json, staffErrors } from "../lib/openapi.ts";
 import { recordAudit, withdrawPhotoCheckNote } from "../safety/index.ts";
 import { groupOf } from "./label-groups.ts";
 import { isTipSignal, readThresholds } from "./moderation.ts";
 import type { MediaDeps } from "./photos.ts";
+import { mediaUnavailable } from "./photos.ts";
 import * as repo from "./repo.ts";
-import { staffPhotoUrl } from "./urls.ts";
+import { signedPhotoUrl } from "./urls.ts";
 
 // The photo review queue (#49, rules/admin.md): what a moderator sees and
 // decides. Every route sits behind requireAdmin with the moderator and admin
@@ -27,17 +28,6 @@ import { staffPhotoUrl } from "./urls.ts";
 // audit_log row before anything is served or changed (security checklist line
 // 67). Staff see the card variant only, through the same short-lived signed
 // URL as everyone else.
-
-const errorContent = (description: string) => ({
-  description,
-  content: { "application/json": { schema: ErrorResponse } },
-});
-const json = <T>(schema: T) => ({ content: { "application/json": { schema } } });
-const bearer = { security: [{ session: [] }] };
-const staffErrors = {
-  401: errorContent("unauthenticated, session_expired or session_revoked."),
-  403: errorContent("admin_forbidden: the role does not allow this."),
-};
 
 const queueRoute = createRoute({
   method: "get",
@@ -96,7 +86,7 @@ export function photoAdminRoutes(deps: Deps, requireModerator: MiddlewareHandler
 
   const media = (): MediaDeps => {
     if (!deps.media) {
-      throw new AppError(503, "media_unavailable", "Object storage is not configured here");
+      throw mediaUnavailable();
     }
     return deps.media;
   };
@@ -145,7 +135,7 @@ export function photoAdminRoutes(deps: Deps, requireModerator: MiddlewareHandler
       subjectId: id,
       detail: { variant: "card", state: photo.state },
     });
-    const answer = await staffPhotoUrl(signer, photo.key, "card", at);
+    const answer = await signedPhotoUrl(signer, photo.key, "card", at);
     deps.logger.info(
       { staffIdentityId: staff.identityId, photoId: id, variant: "card", at },
       "staff photo view",

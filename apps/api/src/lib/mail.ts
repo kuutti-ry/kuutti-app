@@ -1,5 +1,6 @@
 import { SESv2Client, SendEmailCommand } from "@aws-sdk/client-sesv2";
 import type { Config } from "./config.ts";
+import { errorName } from "./errors.ts";
 import type { Logger } from "./logger.ts";
 
 /** One plain-text message to one address (#385, ADR-043). */
@@ -41,7 +42,7 @@ export function sesMailer(client: Pick<SESv2Client, "send">, from: string): Mail
           }),
         );
       } catch (error) {
-        const reason = error instanceof Error ? error.name : "unknown";
+        const reason = errorName(error);
         const status = (error as { $metadata?: { httpStatusCode?: number } } | null)?.$metadata
           ?.httpStatusCode;
         throw new MailFailed(reason, status);
