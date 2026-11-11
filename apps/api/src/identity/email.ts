@@ -2,7 +2,7 @@ import { createHash, randomInt, timingSafeEqual } from "node:crypto";
 import { type Queryable, transaction } from "@kuutti/db";
 import type { TFunction } from "@kuutti/i18n";
 import { type AccountEmailResponse, EMAIL_CODE_LENGTH } from "@kuutti/schema";
-import { AppError } from "../lib/errors.ts";
+import { AppError, noLiveAccount } from "../lib/errors.ts";
 import type { Logger } from "../lib/logger.ts";
 import { type Mailer, MailFailed } from "../lib/mail.ts";
 import { matchingConfigNumbers } from "../lib/matching-config.ts";
@@ -48,7 +48,6 @@ export type EmailDeps = {
   mailer?: Mailer;
 };
 
-const noAccount = () => new AppError(404, "not_found", "No live account");
 const noAddress = () => new AppError(409, "email_none", "No address is set");
 
 function viewOf(state: repo.EmailState, at: Date): AccountEmailResponse {
@@ -72,7 +71,7 @@ function viewOf(state: repo.EmailState, at: Date): AccountEmailResponse {
 /** The caller's own address, whether it is confirmed, and until when a code waits. */
 export async function readEmail(deps: EmailDeps, accountId: string): Promise<AccountEmailResponse> {
   const state = await repo.findEmailState(deps.db, accountId);
-  if (!state) throw noAccount();
+  if (!state) throw noLiveAccount();
   return viewOf(state, deps.now());
 }
 
@@ -83,7 +82,7 @@ export async function setAccountEmail(
   email: string | null,
 ): Promise<AccountEmailResponse> {
   const set = await repo.setEmail(deps.db, accountId, email);
-  if (!set) throw noAccount();
+  if (!set) throw noLiveAccount();
   // The address stays out of the log (rules/api.md): this line says only what happened.
   deps.logger.info(
     { accountId, changed: set.changed },
@@ -157,7 +156,7 @@ export async function sendEmailCode(
     );
     throw new AppError(503, "mail_unavailable", "The code could not be sent");
   }
-  if (outcome.kind === "gone") throw noAccount();
+  if (outcome.kind === "gone") throw noLiveAccount();
   if (outcome.kind === "none") throw noAddress();
   if (outcome.kind === "confirmed") {
     throw new AppError(409, "email_confirmed", "The address is confirmed already");
@@ -221,7 +220,7 @@ export async function confirmEmailCode(
   });
   switch (outcome.kind) {
     case "gone":
-      throw noAccount();
+      throw noLiveAccount();
     case "none":
       throw noAddress();
     case "no_code":

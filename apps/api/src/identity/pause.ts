@@ -1,5 +1,6 @@
 import { type Queryable, transaction } from "@kuutti/db";
-import { AppError } from "../lib/errors.ts";
+import { AppError, noLiveAccount } from "../lib/errors.ts";
+import { DAY_MS } from "../lib/finnish-day.ts";
 import type { Logger } from "../lib/logger.ts";
 import { track } from "../research/index.ts";
 import * as repo from "./repo.ts";
@@ -35,7 +36,7 @@ export async function pauseAccount(
   const result = await transaction(deps.db, async (tx) => {
     const locked = await repo.lockAccountRow(tx, accountId);
     if (!locked || locked.state === "deleted") {
-      throw new AppError(404, "not_found", "No live account");
+      throw noLiveAccount();
     }
     if (locked.state === "paused") {
       throw new AppError(409, "already_paused", "The account is on a break already");
@@ -65,7 +66,7 @@ export async function resumeAccount(
   if (!(await repo.resumeAccount(deps.db, account.id, at))) return false;
   const since = account.stateChangedAt ?? at;
   await track(deps, account.id, "account_resumed", {
-    afterDays: Math.max(0, Math.floor((at.getTime() - since.getTime()) / 86_400_000)),
+    afterDays: Math.max(0, Math.floor((at.getTime() - since.getTime()) / DAY_MS)),
   });
   deps.logger.info({ accountId: account.id }, "account resumed");
   return true;

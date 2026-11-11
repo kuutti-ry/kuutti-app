@@ -327,9 +327,7 @@ export async function exportAccount(
   if (!account || !identity) throw new AppError(404, "not_found", "No such account");
   const sessions = await repo.listSessionsForAccount(deps.db, accountId);
   const pushes = await exportPushTokens(deps.db, accountId);
-  const media = deps.media
-    ? { ...deps.media, db: deps.db, logger: deps.logger, now: deps.now }
-    : { db: deps.db, logger: deps.logger, now: deps.now };
+  const media = { ...deps.media, db: deps.db, logger: deps.logger, now: deps.now };
   const photos = await exportPhotos(media, accountId);
   const profile = await exportProfile(
     deps.db,

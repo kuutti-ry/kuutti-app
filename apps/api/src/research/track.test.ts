@@ -142,6 +142,19 @@ describe("track", () => {
     expect(props?.sinceRegistrationD).toBe(0);
   });
 
+  test("the opt-in counts the whole days since the registration", async ({ ctx }) => {
+    const a = await signedInAccount(ctx.client);
+    // Three days and two hours back on the database's clock: whole days, whatever its seconds off the API's.
+    await ctx.client.query(
+      "UPDATE account SET registered_at = now() - interval '3 days 2 hours' WHERE id = $1",
+      [a.accountId],
+    );
+    await researchConsent(ctx, a.headers);
+    const rows = await eventsOf(ctx, a.accountId, "research_opt_in");
+    const props = rows[0]?.props as { sinceRegistrationD?: number } | undefined;
+    expect(props?.sinceRegistrationD).toBe(3);
+  });
+
   test("an event is timestamped to the hour, never to the instant of a consent row", async ({
     ctx,
   }) => {

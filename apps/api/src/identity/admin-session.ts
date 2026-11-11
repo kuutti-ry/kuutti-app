@@ -22,17 +22,15 @@ export const ADMIN_PLATFORM = "admin";
 
 export type AdminLoginDeps = LoginDeps & { adminAppUrl: string };
 
-/** Back to the panel: the code rides in the fragment, so it reaches the SPA and no log. */
-function adminReturnUrl(adminAppUrl: string, code: string): URL {
+/** Back to the panel: the code or the error rides in the fragment, so it reaches the SPA and no log. */
+function panelUrl(adminAppUrl: string, key: "code" | "error", value: string): URL {
   const url = new URL(adminAppUrl);
-  url.hash = `code=${encodeURIComponent(code)}`;
+  url.hash = `${key}=${encodeURIComponent(value)}`;
   return url;
 }
 
 export function adminErrorUrl(adminAppUrl: string, code: string): URL {
-  const url = new URL(adminAppUrl);
-  url.hash = `error=${encodeURIComponent(code)}`;
-  return url;
+  return panelUrl(adminAppUrl, "error", code);
 }
 
 /**
@@ -75,7 +73,7 @@ export async function completeAdminLogin(
     codeExpiresAt: new Date(input.now.getTime() + ONE_TIME_CODE_TTL_MS),
     identityId: identity.id,
   });
-  return adminReturnUrl(deps.adminAppUrl, code);
+  return panelUrl(deps.adminAppUrl, "code", code);
 }
 
 /** /admin/auth/exchange: the code, once, within its minute; the role is read again at this moment. */

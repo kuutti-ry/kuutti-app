@@ -52,6 +52,24 @@ function pair(now: Date, family: string) {
   };
 }
 
+/**
+ * What the device is handed, once its session is written or rotated: the
+ * tokens by name, never the pair whole, which holds their hashes.
+ */
+function answer(
+  sessionId: string,
+  tokens: ReturnType<typeof pair>,
+  refreshExpiresAt: Date,
+): SessionTokens {
+  return {
+    sessionId,
+    accessToken: tokens.accessToken,
+    accessExpiresAt: tokens.accessExpiresAt.toISOString(),
+    refreshToken: tokens.refreshToken,
+    refreshExpiresAt: refreshExpiresAt.toISOString(),
+  };
+}
+
 /** A fresh session for the device that just exchanged a one-time code. */
 export async function issueSession(
   deps: SessionDeps,
@@ -83,13 +101,7 @@ export async function issueSession(
   // code reads as spent, and the person signs in again into a fresh account
   // once the cooldown has passed.
   if (!row) throw new AppError(401, "auth_code_used", "This code is unknown, used or expired");
-  return {
-    sessionId: row.id,
-    accessToken: tokens.accessToken,
-    accessExpiresAt: tokens.accessExpiresAt.toISOString(),
-    refreshToken: tokens.refreshToken,
-    refreshExpiresAt: refreshExpiresAt.toISOString(),
-  };
+  return answer(row.id, tokens, refreshExpiresAt);
 }
 
 /**
@@ -161,15 +173,7 @@ export async function refreshSession(
     unasserted,
     at: now,
   });
-  if (rotated) {
-    return {
-      sessionId: rotated.id,
-      accessToken: tokens.accessToken,
-      accessExpiresAt: tokens.accessExpiresAt.toISOString(),
-      refreshToken: tokens.refreshToken,
-      refreshExpiresAt: rotated.expiresAt.toISOString(),
-    };
-  }
+  if (rotated) return answer(rotated.id, tokens, rotated.expiresAt);
   // Only a holder of a genuine token of the session knows its family part, so
   // a made-up token cannot end somebody else's session. The live token of a
   // session that is over (ninety idle days, the year, a sign-out, a sanction)

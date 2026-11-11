@@ -2,6 +2,7 @@ import type { X509Certificate } from "node:crypto";
 import { swaggerUI } from "@hono/swagger-ui";
 import { OpenAPIHono } from "@hono/zod-openapi";
 import type { Queryable } from "@kuutti/db";
+import type { ModeratorRole } from "@kuutti/schema";
 import { bodyLimit } from "hono/body-limit";
 import { secureHeaders } from "hono/secure-headers";
 import {
@@ -33,7 +34,7 @@ import { fillQueue, fitsNow, relaxationOffers, relaxedCandidates } from "./jobs/
 import { starPlace, starredPeople, starsShown } from "./jobs/stars.ts";
 import { requireAdmin } from "./lib/admin-middleware.ts";
 import { requireSession } from "./lib/auth-middleware.ts";
-import type { Config } from "./lib/config.ts";
+import { type Config, developmentOrTest } from "./lib/config.ts";
 import { corsAllowlist } from "./lib/cors.ts";
 import type { AppEnv } from "./lib/env.ts";
 import {
@@ -225,25 +226,13 @@ export function createApp(deps: Deps) {
     onCount: (c) => c.set("personCounted", true),
   });
   const guard = requireSession({ db: deps.db, store: sessionStore, limit: perPerson });
-  const anyStaff = requireAdmin({
-    db: deps.db,
-    store: adminSessionStore,
-    roles: ["moderator", "admin", "researcher"],
-    limit: perPerson,
-  });
-  const moderators = requireAdmin({
-    db: deps.db,
-    store: adminSessionStore,
-    roles: ["moderator", "admin"],
-    limit: perPerson,
-  });
+  // The staff guards differ in their roles alone (ADR-024 §3), each under the person's budget.
+  const staff = (roles: readonly ModeratorRole[]) =>
+    requireAdmin({ db: deps.db, store: adminSessionStore, roles, limit: perPerson });
+  const anyStaff = staff(["moderator", "admin", "researcher"]);
+  const moderators = staff(["moderator", "admin"]);
   // A ban and its lift and review (#307, ADR-024 §3).
-  const admins = requireAdmin({
-    db: deps.db,
-    store: adminSessionStore,
-    roles: ["admin"],
-    limit: perPerson,
-  });
+  const admins = staff(["admin"]);
 
   // The automatic rules' clock and connection (#105, ADR-033), and the round
   // reads one of them counts in memory, once for this app (#86, ADR-041).
@@ -451,7 +440,7 @@ export function createApp(deps: Deps) {
   // Swagger UI over the same document, on a developer's machine only: the page
   // pulls swagger-ui-dist from jsDelivr, and no deployed environment of this
   // API is a web surface (rule 8). Staging and previews keep /openapi.json alone.
-  if (deps.config.APP_ENV === "development" || deps.config.APP_ENV === "test") {
+  if (developmentOrTest(deps.config.APP_ENV)) {
     app.get("/docs", swaggerUI({ url: "/openapi.json", version: "5.33.1", title: "Kuutti API" }));
   }
 

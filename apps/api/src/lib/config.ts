@@ -211,6 +211,11 @@ const SIGN_IN_RATE_LIMIT_DEFAULT = { production: 10, other: 60 } as const;
 
 export type AppEnv = z.infer<typeof AppEnv>;
 
+/** A developer's machine or a test: the only places the placeholders and the log outlets may run (rule 2, ADR-043 §4, ADR-055 §8). */
+export function developmentOrTest(appEnv: AppEnv): boolean {
+  return appEnv === "development" || appEnv === "test";
+}
+
 export type PreviewConfig = {
   prNumber: string;
   /** kuutti_pr_<n>: the database this process serves from, created on first boot. */
@@ -279,8 +284,7 @@ export function parseConfig(raw: Record<string, string | undefined>): Config {
   if (
     env.HETU_HMAC_KEY !== undefined &&
     /^0+$/.test(env.HETU_HMAC_KEY) &&
-    env.APP_ENV !== "development" &&
-    env.APP_ENV !== "test"
+    !developmentOrTest(env.APP_ENV)
   ) {
     throw new ConfigError([], ["HETU_HMAC_KEY: the development placeholder is not a key"]);
   }
@@ -354,13 +358,12 @@ export function parseConfig(raw: Record<string, string | undefined>): Config {
     }
   }
   // A deployed log is no place for a confirmation code (ADR-043 §4).
-  if (env.MAIL === "log" && env.APP_ENV !== "development" && env.APP_ENV !== "test") {
+  if (env.MAIL === "log" && !developmentOrTest(env.APP_ENV)) {
     throw new ConfigError(["MAIL"], [`MAIL: log is for development and test, not ${env.APP_ENV}`]);
   }
-  const mail =
-    env.MAIL ?? (env.APP_ENV === "development" || env.APP_ENV === "test" ? "log" : "off");
+  const mail = env.MAIL ?? (developmentOrTest(env.APP_ENV) ? "log" : "off");
   // As mail's: a deployed environment sends through Expo or not at all (ADR-055 §8).
-  if (env.PUSH === "log" && env.APP_ENV !== "development" && env.APP_ENV !== "test") {
+  if (env.PUSH === "log" && !developmentOrTest(env.APP_ENV)) {
     throw new ConfigError(["PUSH"], [`PUSH: log is for development and test, not ${env.APP_ENV}`]);
   }
   // Production sends only with Expo's access token, so that nobody holding a
@@ -371,11 +374,9 @@ export function parseConfig(raw: Record<string, string | undefined>): Config {
       ["EXPO_ACCESS_TOKEN: production sends pushes only with Expo's access token"],
     );
   }
-  const push =
-    env.PUSH ?? (env.APP_ENV === "development" || env.APP_ENV === "test" ? "log" : "off");
+  const push = env.PUSH ?? (developmentOrTest(env.APP_ENV) ? "log" : "off");
   const trustedProxy: TrustedProxy =
-    env.TRUSTED_PROXY ??
-    (env.APP_ENV === "development" || env.APP_ENV === "test" ? "none" : "traefik");
+    env.TRUSTED_PROXY ?? (developmentOrTest(env.APP_ENV) ? "none" : "traefik");
   const originSecrets = (env.ORIGIN_SECRET ?? "").split(/\s+/).filter((value) => value !== "");
   if (originSecrets.length > 2 || originSecrets.some((value) => value.length < 32)) {
     throw new ConfigError(
@@ -474,7 +475,7 @@ function allowedOrigins(env: z.infer<typeof Env>): ReadonlySet<string> {
         .filter((o) => o.length > 0),
     );
   }
-  return env.APP_ENV === "development" || env.APP_ENV === "test"
+  return developmentOrTest(env.APP_ENV)
     ? new Set(["http://localhost:8081", "http://localhost:5173"])
     : new Set();
 }

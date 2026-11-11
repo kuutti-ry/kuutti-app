@@ -17,7 +17,8 @@ import {
   type PreferencesResponse,
   type WithdrawableConsentKind,
 } from "@kuutti/schema";
-import { AppError } from "../lib/errors.ts";
+import { AppError, noLiveAccount } from "../lib/errors.ts";
+import { DAY_MS } from "../lib/finnish-day.ts";
 import type { Logger } from "../lib/logger.ts";
 import { matchingConfigNumber } from "../lib/matching-config.ts";
 import {
@@ -139,7 +140,7 @@ export async function onboardingStatus(
     account.birthYear === null ||
     account.birthMonth === null
   ) {
-    throw new AppError(404, "not_found", "No live account");
+    throw noLiveAccount();
   }
   const [preferences, consents, profile, photos, cadence] = await Promise.all([
     readPreferences(deps.db, accountId),
@@ -255,7 +256,7 @@ export async function giveConsent(
         await track({ db: tx, logger: deps.logger, now: () => at }, accountId, "research_opt_in", {
           sinceRegistrationD: Math.max(
             0,
-            Math.floor((at.getTime() - account.registeredAt.getTime()) / 86_400_000),
+            Math.floor((at.getTime() - account.registeredAt.getTime()) / DAY_MS),
           ),
           accountActive: account.state === "active",
         });
@@ -263,7 +264,7 @@ export async function giveConsent(
     }
     return recorded;
   });
-  if (outcome === "no_account") throw new AppError(404, "not_found", "No live account");
+  if (outcome === "no_account") throw noLiveAccount();
   if (outcome === "too_many") {
     throw new AppError(429, "too_many_changes", "The consent changed too often today", {
       kind: request.kind,
@@ -307,7 +308,7 @@ export async function withdrawConsentOf(
     }
     return withdrawn;
   });
-  if (!outcome.live) throw new AppError(404, "not_found", "No live account");
+  if (!outcome.live) throw noLiveAccount();
   if (outcome.withdrawn > 0) deps.logger.info({ accountId, kind }, "consent withdrawn");
   return consentsOf(deps, accountId);
 }
@@ -344,7 +345,7 @@ export async function declareGender(
     if (change && before.gender === "non_binary") await clearIdentityLabel(tx, accountId, at);
     return repo.setGender(tx, accountId, gender, change ? at : null);
   });
-  if (!declared) throw new AppError(404, "not_found", "No live account");
+  if (!declared) throw noLiveAccount();
   // The value stays out of the log: self-declared, and nobody's business there.
   deps.logger.info({ accountId }, "gender declared");
 }

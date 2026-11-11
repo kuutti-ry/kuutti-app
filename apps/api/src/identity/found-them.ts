@@ -1,6 +1,6 @@
 import { type Queryable, transaction } from "@kuutti/db";
 import type { FoundReason } from "@kuutti/schema";
-import { AppError } from "../lib/errors.ts";
+import { AppError, noLiveAccount } from "../lib/errors.ts";
 import { finnishDay } from "../lib/finnish-day.ts";
 import type { Logger } from "../lib/logger.ts";
 import { track } from "../research/index.ts";
@@ -22,7 +22,7 @@ export async function foundThemAnswered(db: Queryable, accountId: string): Promi
     [accountId],
   );
   const row = rows[0];
-  if (!row) throw new AppError(404, "not_found", "No live account");
+  if (!row) throw noLiveAccount();
   return row.answered;
 }
 
@@ -45,7 +45,7 @@ export async function tellFoundThem(
       [accountId],
     );
     const row = rows[0];
-    if (!row) throw new AppError(404, "not_found", "No live account");
+    if (!row) throw noLiveAccount();
     if (row.answered) {
       throw new AppError(409, "found_them_answered", "This account told Kuutti already");
     }

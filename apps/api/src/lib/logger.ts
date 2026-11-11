@@ -10,7 +10,7 @@ export type { Logger };
  * text, email, credentials, a report's note, a message's body, a stored contact, a home (CLAUDE.md security defaults, rule 5). Top level and
  * one level nested; the PII-in-logs test (#11) is the backstop.
  */
-const REDACTED_PATHS = [
+const REDACTED_KEYS = [
   "hetu",
   "personal_identity_code",
   "email",
@@ -41,29 +41,10 @@ const REDACTED_PATHS = [
   "keyId",
   "attestKey",
   "attest_key",
-  "*.hetu",
-  "*.personal_identity_code",
-  "*.email",
-  "*.message",
-  "*.text",
-  "*.caption",
-  "*.password",
-  "*.authorization",
-  "*.cookie",
-  "*.seeks",
-  "*.gender",
-  "*.note",
-  "*.body",
-  "*.value",
-  "*.postalCode",
-  "*.homePlace",
-  "*.home_place",
-  "*.attestation",
-  "*.assertion",
-  "*.keyId",
-  "*.attestKey",
-  "*.attest_key",
 ];
+
+/** Each key at the top and one level down: the nested twin of every key, by construction. */
+const REDACTED_PATHS = [...REDACTED_KEYS, ...REDACTED_KEYS.map((key) => `*.${key}`)];
 
 type LogDestination = { write(line: string): void };
 

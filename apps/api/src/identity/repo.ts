@@ -6,7 +6,8 @@ import {
   transaction,
 } from "@kuutti/db";
 import type { IdentityStanding, ModeratorRole } from "@kuutti/schema";
-import type { SessionStanding } from "../lib/auth-middleware.ts";
+import type { SessionLookup, SessionStanding } from "../lib/auth-middleware.ts";
+import { advisoryLock, lockLiveAccount } from "../lib/db.ts";
 
 // Raw parameterised SQL rather than the Drizzle builder (rules/api.md asks for
 // a reason): `Deps.db` is the `Queryable` seam through which the test harness
@@ -480,14 +481,7 @@ export async function insertSession(
 export async function findSessionByAccessHash(
   db: Queryable,
   accessHash: string,
-): Promise<{
-  accountId: string;
-  sessionId: string;
-  accessExpiresAt: Date;
-  revokedAt: Date | null;
-  accountState: string;
-  identityStanding: string;
-} | null> {
+): Promise<SessionLookup | null> {
   const { rows } = await db.query<Row>(
     `SELECT s.id, s.account_id, s.access_expires_at, s.revoked_at, s.expires_at, a.state, i.standing
      FROM session s JOIN account a ON a.id = s.account_id JOIN identity i ON i.id = a.identity_id
@@ -1049,7 +1043,7 @@ export async function setEmail(
     );
     const row = rows[0];
     if (!row) return null;
-    if (row.changed) await tx.query("DELETE FROM email_code WHERE account_id = $1", [accountId]);
+    if (row.changed) await deleteEmailCode(tx, accountId);
     return { changed: row.changed };
   });
 }
@@ -1176,7 +1170,7 @@ export async function confirmEmail(db: Queryable, accountId: string, at: Date): 
 
 /** Erasure's share (ADR-007): the waiting code and the day's sends go with the account. */
 export async function deleteEmailRows(db: Queryable, accountId: string): Promise<void> {
-  await db.query("DELETE FROM email_code WHERE account_id = $1", [accountId]);
+  await deleteEmailCode(db, accountId);
   await db.query("DELETE FROM email_send WHERE account_id = $1", [accountId]);
 }
 
@@ -1283,9 +1277,7 @@ export async function recordExport(
   },
 ): Promise<ExportRecord> {
   return transaction(db, async (tx) => {
-    await tx.query("SELECT pg_advisory_xact_lock(hashtext($1))", [
-      `account_export:${input.accountId}`,
-    ]);
+    await advisoryLock(tx, `account_export:${input.accountId}`);
     const { rows } = await tx.query<{ live: boolean; used: number; id: string | null }>(
       // Share erasure's account lock before writing its child row (TD-7).
       `WITH live AS (SELECT 1 FROM account WHERE id = $1 AND state <> 'deleted' FOR SHARE),
@@ -1354,11 +1346,7 @@ export async function recordConsent(
 ): Promise<"recorded" | "already" | "no_account" | "too_many"> {
   return transaction(db, async (tx) => {
     // The lock erasure takes first (ADR-009 §8), so no consent row lands behind the deletes.
-    const live = await tx.query(
-      "SELECT 1 FROM account WHERE id = $1 AND state <> 'deleted' FOR UPDATE",
-      [accountId],
-    );
-    if (live.rows.length === 0) return "no_account";
+    if (!(await lockLiveAccount(tx, accountId))) return "no_account";
     const recent = await tx.query<{ n: string }>(
       `SELECT count(*) AS n FROM consent
        WHERE account_id = $1 AND kind = $2 AND given_at > $3::timestamptz - interval '1 day'`,
@@ -1384,11 +1372,7 @@ export async function withdrawConsent(
   at: Date,
 ): Promise<{ live: boolean; withdrawn: number }> {
   return transaction(db, async (tx) => {
-    const live = await tx.query(
-      "SELECT 1 FROM account WHERE id = $1 AND state <> 'deleted' FOR UPDATE",
-      [accountId],
-    );
-    if (live.rows.length === 0) return { live: false, withdrawn: 0 };
+    if (!(await lockLiveAccount(tx, accountId))) return { live: false, withdrawn: 0 };
     const result = await tx.query(
       "UPDATE consent SET withdrawn_at = $3 WHERE account_id = $1 AND kind = $2 AND withdrawn_at IS NULL",
       [accountId, kind, at],

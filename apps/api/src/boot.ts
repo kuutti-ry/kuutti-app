@@ -14,7 +14,7 @@ import {
 import { invitationCountJob } from "./jobs/invitation-count.ts";
 import type { NightlyJob } from "./jobs/nightly.ts";
 import { ensureFirstSnapshot, pondCounterJob } from "./jobs/pond-counter.ts";
-import type { Config } from "./lib/config.ts";
+import { type Config, developmentOrTest } from "./lib/config.ts";
 import type { Logger } from "./lib/logger.ts";
 import { mailerFor } from "./lib/mail.ts";
 import { ensurePreviewDatabase } from "./lib/preview-database.ts";
@@ -130,7 +130,7 @@ export async function boot({
         );
       }
     } catch (error) {
-      if (config.APP_ENV === "development" || config.APP_ENV === "test") {
+      if (developmentOrTest(config.APP_ENV)) {
         logger.warn(
           { err: error, stage },
           "bank identification unavailable; is the mock IdP running?",
@@ -206,7 +206,7 @@ export async function boot({
   // fails here rather than serving photos nobody can open; the private key
   // itself never appears in the log line (keyPairId is the public half's id).
   const media = createMediaDeps(config);
-  if (media.setup.mode === "off" && config.APP_ENV !== "development" && config.APP_ENV !== "test") {
+  if (media.setup.mode === "off" && !developmentOrTest(config.APP_ENV)) {
     logger.warn(media.setup, "photos off: media delivery is not configured (infra/modules/media)");
   } else {
     logger.info(media.setup, "media");
