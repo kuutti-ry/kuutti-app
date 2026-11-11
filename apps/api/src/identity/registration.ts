@@ -1,4 +1,5 @@
 import type { Account, Identity } from "@kuutti/db";
+import { DAY_MS } from "../lib/finnish-day.ts";
 
 /**
  * Days after a self-deletion before the same person may register again
@@ -7,8 +8,6 @@ import type { Account, Identity } from "@kuutti/db";
  * parameter, so a constant here rather than a matching_config row.
  */
 export const REREGISTER_COOLDOWN_DAYS = 30;
-
-const DAY_MS = 24 * 60 * 60 * 1000;
 
 /** What the callback does after the bank has said who this is (rules/api.md). */
 export type RegistrationDecision =

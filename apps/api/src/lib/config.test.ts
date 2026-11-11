@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
 import { describe, expect, it } from "vitest";
-import { type AppEnv, ConfigError, parseConfig, ssmPrefix } from "./config.ts";
+import { type AppEnv, ConfigError, developmentOrTest, parseConfig, ssmPrefix } from "./config.ts";
 import { parameterNameToEnvKey } from "./ssm.ts";
 
 describe("parseConfig", () => {
@@ -741,5 +741,14 @@ describe("parseConfig for App Attest (ADR-069 §5)", () => {
     expect(
       refusalOf({ ...environments.staging, ...team, IOS_ATTESTATION: value }).issues,
     ).toContain("IOS_ATTESTATION");
+  });
+});
+
+describe("developmentOrTest", () => {
+  it("is a developer's machine or a test, and never a deployed environment", () => {
+    const local: AppEnv[] = ["development", "test"];
+    const deployed: AppEnv[] = ["preview", "staging", "production"];
+    expect(local.map(developmentOrTest)).toEqual([true, true]);
+    expect(deployed.map(developmentOrTest)).toEqual([false, false, false]);
   });
 });

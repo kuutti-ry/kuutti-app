@@ -9,7 +9,6 @@ import {
   AuthExchangeResponse,
   AuthRefreshRequest,
   AuthStartQuery,
-  ErrorResponse,
   SessionResponse,
   SessionTokens,
   USER_AGENT_MAX,
@@ -21,6 +20,7 @@ import { callerOf } from "../lib/auth-middleware.ts";
 import type { AppEnv } from "../lib/env.ts";
 import { AppError } from "../lib/errors.ts";
 import { isLocalisedErrorCode } from "../lib/i18n.ts";
+import { bearer, errorContent, json, unauthenticated } from "../lib/openapi.ts";
 import { addressOf, rateLimit } from "../lib/rate-limit.ts";
 import {
   ADMIN_PLATFORM,
@@ -48,13 +48,6 @@ import {
   refreshSession,
   type SessionDeps,
 } from "./sessions.ts";
-
-const errorContent = (description: string) => ({
-  description,
-  content: { "application/json": { schema: ErrorResponse } },
-});
-const json = <T>(schema: T) => ({ content: { "application/json": { schema } } });
-const bearer = { security: [{ session: [] }] };
 
 /** As much of the bundle version Apple read as a log line takes; ours are a few digits. */
 const BUNDLE_VERSION_LOGGED = 32;
@@ -156,7 +149,7 @@ const sessionRoute = createRoute({
   ...bearer,
   responses: {
     200: { description: "The caller's own session.", ...json(SessionResponse) },
-    401: errorContent("unauthenticated, session_expired or session_revoked."),
+    401: unauthenticated,
   },
 });
 
@@ -167,7 +160,7 @@ const logoutRoute = createRoute({
   ...bearer,
   responses: {
     204: { description: "The session is ended; both tokens stop working." },
-    401: errorContent("unauthenticated, session_expired or session_revoked."),
+    401: unauthenticated,
   },
 });
 
@@ -179,7 +172,7 @@ const logoutAllRoute = createRoute({
   ...bearer,
   responses: {
     204: { description: "Every session of the account is ended." },
-    401: errorContent("unauthenticated, session_expired or session_revoked."),
+    401: unauthenticated,
   },
 });
 
@@ -224,7 +217,7 @@ const adminWhoAmIRoute = createRoute({
   ...bearer,
   responses: {
     200: { description: "The role and when the session ends.", ...json(AdminWhoAmI) },
-    401: errorContent("unauthenticated, session_expired or session_revoked."),
+    401: unauthenticated,
   },
 });
 
@@ -235,7 +228,7 @@ const adminLogoutRoute = createRoute({
   ...bearer,
   responses: {
     204: { description: "The session is ended." },
-    401: errorContent("unauthenticated, session_expired or session_revoked."),
+    401: unauthenticated,
   },
 });
 

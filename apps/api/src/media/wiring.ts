@@ -2,7 +2,7 @@ import { createPrivateKey } from "node:crypto";
 import { availableParallelism } from "node:os";
 import { RekognitionClient } from "@aws-sdk/client-rekognition";
 import pLimit from "p-limit";
-import type { Config } from "../lib/config.ts";
+import { type Config, developmentOrTest } from "../lib/config.ts";
 import { createS3Client } from "../lib/s3.ts";
 import { type Moderator, queueAllModerator, rekognitionModerator } from "./moderation.ts";
 import type { MediaDeps } from "./photos.ts";
@@ -90,7 +90,7 @@ export function createMediaDeps(config: Config): { deps?: MediaDeps; setup: Medi
         }),
         limit,
         moderator,
-        deliverUnchecked: config.APP_ENV === "development" || config.APP_ENV === "test",
+        deliverUnchecked: developmentOrTest(config.APP_ENV),
       },
       setup: {
         mode: "cloudfront",
@@ -103,7 +103,7 @@ export function createMediaDeps(config: Config): { deps?: MediaDeps; setup: Medi
     };
   }
   if (config.S3_ENDPOINT) {
-    if (config.APP_ENV !== "development" && config.APP_ENV !== "test") {
+    if (!developmentOrTest(config.APP_ENV)) {
       throw new Error(
         `media: presigned object-store URLs are for development only, not ${config.APP_ENV}; configure CloudFront`,
       );

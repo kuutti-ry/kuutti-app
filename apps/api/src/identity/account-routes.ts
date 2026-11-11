@@ -6,7 +6,6 @@ import {
   AccountEmailResponse,
   AccountExport,
   AccountPauseRequest,
-  ErrorResponse,
   FoundThemRequest,
   FoundThemStatus,
 } from "@kuutti/schema";
@@ -14,8 +13,9 @@ import type { MiddlewareHandler } from "hono";
 import type { Deps } from "../app.ts";
 import { callerOf } from "../lib/auth-middleware.ts";
 import type { AppEnv } from "../lib/env.ts";
-import { AppError } from "../lib/errors.ts";
+import { AppError, retryAfterOf } from "../lib/errors.ts";
 import { tOf } from "../lib/i18n.ts";
+import { bearer, errorContent, json, unauthenticated } from "../lib/openapi.ts";
 import {
   confirmEmailCode,
   type EmailDeps,
@@ -28,13 +28,6 @@ import { exportArchive } from "./export.ts";
 import { foundThemAnswered, tellFoundThem } from "./found-them.ts";
 import { pauseAccount } from "./pause.ts";
 
-const errorContent = (description: string) => ({
-  description,
-  content: { "application/json": { schema: ErrorResponse } },
-});
-const json = <T>(schema: T) => ({ content: { "application/json": { schema } } });
-const bearer = { security: [{ session: [] }] };
-
 const deleteRoute = createRoute({
   method: "post",
   path: "/account/delete",
@@ -46,7 +39,7 @@ const deleteRoute = createRoute({
   responses: {
     204: { description: "Erased. Every token of this account has stopped working." },
     400: errorContent("Validation failed (confirm missing)."),
-    401: errorContent("unauthenticated, session_expired or session_revoked."),
+    401: unauthenticated,
     404: errorContent(
       "No live account: a second deletion that passed the session guard before the first committed (not_found).",
     ),
@@ -72,7 +65,7 @@ const exportRoute = createRoute({
         },
       },
     },
-    401: errorContent("unauthenticated, session_expired or session_revoked."),
+    401: unauthenticated,
     404: errorContent(
       "No live account: erased between the session guard and the record (not_found).",
     ),
@@ -81,8 +74,6 @@ const exportRoute = createRoute({
     ),
   },
 });
-
-const unauthenticated = errorContent("unauthenticated, session_expired or session_revoked.");
 
 const pauseRoute = createRoute({
   method: "post",
@@ -278,9 +269,7 @@ export function accountRoutes(deps: Deps, requireSession: MiddlewareHandler<AppE
     } catch (error) {
       // The wait until the day rolls, as the export and the feedback say it.
       if (error instanceof AppError && error.code === "email_code_budget_exceeded") {
-        const wait = (error.detail as { retryAfterSeconds?: number } | undefined)
-          ?.retryAfterSeconds;
-        c.header("Retry-After", String(wait ?? 1));
+        c.header("Retry-After", String(retryAfterOf(error) ?? 1));
       }
       throw error;
     }
@@ -329,9 +318,7 @@ export function accountRoutes(deps: Deps, requireSession: MiddlewareHandler<AppE
     } catch (error) {
       // The wait until the day rolls, as the photo and card routes say it.
       if (error instanceof AppError && error.code === "export_budget_exceeded") {
-        const wait = (error.detail as { retryAfterSeconds?: number } | undefined)
-          ?.retryAfterSeconds;
-        c.header("Retry-After", String(wait ?? 1));
+        c.header("Retry-After", String(retryAfterOf(error) ?? 1));
       }
       throw error;
     }
