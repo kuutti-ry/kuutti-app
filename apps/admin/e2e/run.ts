@@ -799,8 +799,11 @@ ${extra}
     refusal = (error as Error).message;
   }
   check("a refusal without the address's password", !refusal.includes("kuutti380mark"));
-  // control: the host is what the refusal says
-  check("a refusal with the host", refusal.includes("db.example.org"));
+  // control: the refusal is this one, and says the host and nothing more of the address
+  check(
+    "a refusal with the host",
+    refusal === "the database server db.example.org is not on this computer",
+  );
   const database = new URL(privateDatabase(local.toString(), DATABASE));
   check(
     "the private database on this computer, as the same role",
