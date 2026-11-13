@@ -25,7 +25,7 @@
     "@aws-sdk/client-ssm": "^3.1158.0",
     "@aws-sdk/cloudfront-signer": "^3.1157.0",
     "@aws-sdk/s3-request-presigner": "^3.1158.0",
-    "@hono/node-server": "^2.1.5",
+    "@hono/node-server": "^2.1.6",
     "@hono/swagger-ui": "0.6.1",
     "@hono/zod-openapi": "^1.6.3",
     "@kuutti/db": "workspace:*",
