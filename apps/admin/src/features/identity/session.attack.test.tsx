@@ -1,10 +1,10 @@
 import { I18nProvider } from "@kuutti/i18n/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
-import { afterEach, beforeEach, expect, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { i18n } from "../../i18n.ts";
 import { attack } from "../../test/attack.ts";
-import { held, json, network, on, settled } from "../../test/network.ts";
+import { held, json, network, on, sentTo, settled } from "../../test/network.ts";
 import { restoreReturnPath } from "./return-path.ts";
 import { SignIn } from "./SignIn.tsx";
 import { StaffSessionProvider, useStaffSession } from "./session.tsx";
@@ -58,25 +58,93 @@ async function settle() {
 /**
  * The session's own requests are not caught where they are made, so a fetch
  * that fails outright rejects a promise nobody holds, and Vitest fails the
- * whole run on an unhandled rejection. While an attempt runs such rejections
- * are counted here instead, and Vitest's own listeners are put back after:
- * the attack is judged by what the panel did.
+ * whole run on an unhandled rejection. Only the exact error the attempt
+ * injects may go unhandled, at most once. Zero is allowed: a future fix can
+ * catch it, and the attack then judges what the panel showed. Every other
+ * rejection still fails the test, even if the screen stays as it was.
  */
-async function countingUnhandled<T>(run: () => Promise<T>) {
-  const unhandled: unknown[] = [];
+async function countingUnhandled<T>(expected: Error | undefined, run: () => Promise<T>) {
+  let unhandled = 0;
+  const unexpected: unknown[] = [];
   const theirs = process.listeners("unhandledRejection");
   const count = (reason: unknown) => {
-    unhandled.push(reason);
+    if (expected !== undefined && reason === expected) unhandled += 1;
+    else unexpected.push(reason);
   };
   process.removeAllListeners("unhandledRejection");
   process.on("unhandledRejection", count);
   try {
-    return { ...(await run()), unhandled: unhandled.length };
+    const seen = await run();
+    if (unexpected.length > 0) {
+      throw new AggregateError(unexpected, "unexpected unhandled rejection in the attack");
+    }
+    if (unhandled > 1) throw new Error("the injected rejection went unhandled more than once");
+    return { ...seen, unhandled };
   } finally {
     process.off("unhandledRejection", count);
     for (const listener of theirs) process.on("unhandledRejection", listener);
   }
 }
+
+describe("the session attack's expected rejection", () => {
+  it("counts only the exact injected error, and restores the runner's listeners", async () => {
+    const expected = new TypeError("Failed to fetch");
+    const listeners = process.listeners("unhandledRejection");
+    const seen = await countingUnhandled(expected, async () => {
+      process.emit("unhandledRejection", expected, Promise.resolve());
+      return { said: false };
+    });
+    expect(seen).toEqual({ said: false, unhandled: 1 });
+    expect(process.listeners("unhandledRejection")).toEqual(listeners);
+  });
+
+  it("allows the injected error to be caught by a repaired session", async () => {
+    expect(await countingUnhandled(new TypeError("Failed to fetch"), async () => ({}))).toEqual({
+      unhandled: 0,
+    });
+  });
+
+  it("leaves a control with no rejection at zero", async () => {
+    expect(await countingUnhandled(undefined, async () => ({}))).toEqual({ unhandled: 0 });
+  });
+
+  it.each([undefined, new TypeError("Failed to fetch")])(
+    "fails an unexpected rejection, even one with the injected error's message (%s)",
+    async (expected) => {
+      const unexpected = new TypeError("Failed to fetch");
+      const listeners = process.listeners("unhandledRejection");
+      await expect(
+        countingUnhandled(expected, async () => {
+          process.emit("unhandledRejection", unexpected, Promise.resolve());
+          return { said: false };
+        }),
+      ).rejects.toMatchObject({ errors: [unexpected] });
+      expect(process.listeners("unhandledRejection")).toEqual(listeners);
+    },
+  );
+
+  it("fails when the same injected error escapes twice", async () => {
+    const expected = new TypeError("Failed to fetch");
+    await expect(
+      countingUnhandled(expected, async () => {
+        process.emit("unhandledRejection", expected, Promise.resolve());
+        process.emit("unhandledRejection", expected, Promise.resolve());
+        return {};
+      }),
+    ).rejects.toThrow("more than once");
+  });
+
+  it("restores the runner's listeners when the attempt itself throws", async () => {
+    const failure = new Error("broken setup");
+    const listeners = process.listeners("unhandledRejection");
+    await expect(
+      countingUnhandled(undefined, async () => {
+        throw failure;
+      }),
+    ).rejects.toBe(failure);
+    expect(process.listeners("unhandledRejection")).toEqual(listeners);
+  });
+});
 
 beforeEach(() => {
   window.sessionStorage.clear();
@@ -90,17 +158,21 @@ afterEach(() => {
 
 /** The code back from the bank, its exchange not answered yet or failing outright. */
 async function exchangeUnanswered(failsOutright: boolean) {
+  const lost = new TypeError("Failed to fetch");
   const exchange = held();
-  network([on("POST", EXCHANGE, () => exchange.promise)]);
-  window.history.replaceState(null, "", `/${CODE}`);
-  show();
-  await settle();
-  if (failsOutright) exchange.fail();
-  await settle();
-  return {
-    state: screen.getByTestId("state").textContent,
-    said: screen.queryByText(GENERIC) !== null,
-  };
+  const sent = network([on("POST", EXCHANGE, () => exchange.promise)]);
+  return countingUnhandled(failsOutright ? lost : undefined, async () => {
+    window.history.replaceState(null, "", `/${CODE}`);
+    show();
+    await settle();
+    expect(sentTo(sent, "POST", EXCHANGE)).toHaveLength(1);
+    if (failsOutright) exchange.fail(lost);
+    await settle();
+    return {
+      state: screen.getByTestId("state").textContent,
+      said: screen.queryByText(GENERIC) !== null,
+    };
+  });
 }
 
 // admin.signIn.error.generic: any other sign-in failure, "a used code, the API unreachable".
@@ -109,8 +181,8 @@ attack(
   {
     // Goes through today: the exchange has no catch for a request that fails outright.
     open: HOLE,
-    attempt: () => countingUnhandled(() => exchangeUnanswered(true)),
-    control: () => countingUnhandled(() => exchangeUnanswered(false)),
+    attempt: () => exchangeUnanswered(true),
+    control: () => exchangeUnanswered(false),
     succeeds: (seen) => expect(seen.said).toBe(false),
   },
 );
@@ -118,22 +190,26 @@ attack(
 /** A stored session, its check with the API answered or failing outright. */
 async function checkUnanswered(failsOutright: boolean) {
   window.sessionStorage.setItem("kuutti.admin.session", JSON.stringify(stored));
+  const lost = new TypeError("Failed to fetch");
   const check = held();
-  network([on("GET", WHOAMI, () => check.promise)]);
-  show();
-  await settle();
-  if (failsOutright) check.fail();
-  else check.answer(json({ role: "admin", expiresAt: stored.expiresAt }));
-  await settle();
-  return { state: screen.getByTestId("state").textContent };
+  const sent = network([on("GET", WHOAMI, () => check.promise)]);
+  return countingUnhandled(failsOutright ? lost : undefined, async () => {
+    show();
+    await settle();
+    expect(sentTo(sent, "GET", WHOAMI)).toHaveLength(1);
+    if (failsOutright) check.fail(lost);
+    else check.answer(json({ role: "admin", expiresAt: stored.expiresAt }));
+    await settle();
+    return { state: screen.getByTestId("state").textContent };
+  });
 }
 
 // session.tsx: "A stored token is checked against the API before anything is shown with it."
 attack("session: a stored session whose check fails outright stays signed in, never checked", {
   // Goes through today: the check of a stored session has no catch for a request that fails outright.
   open: HOLE,
-  attempt: () => countingUnhandled(() => checkUnanswered(true)),
-  control: () => countingUnhandled(() => checkUnanswered(false)),
+  attempt: () => checkUnanswered(true),
+  control: () => checkUnanswered(false),
   succeeds: (seen) => expect(seen.state).toBe("signed-in admin"),
 });
 

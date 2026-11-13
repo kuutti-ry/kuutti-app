@@ -107,13 +107,17 @@ async function heldPhoto(held: boolean) {
       await db.query("DELETE FROM photo WHERE id = $1", [photoId]);
     }
     const { logger } = await captureLogger();
+    for (const variant of PHOTO_VARIANTS) {
+      expect(store.objects.has(objectKey(key, variant))).toBe(true);
+    }
     await sweepOrphanedObjects({ db, store, logger }, NIGHT);
-    return { deleted: PHOTO_VARIANTS.every((v) => !store.objects.has(objectKey(key, v))) };
+    // Losing even one variant violates the hold; another variant surviving cannot hide it.
+    return { deleted: PHOTO_VARIANTS.some((v) => !store.objects.has(objectKey(key, v))) };
   });
 }
 
 attack(
-  "sweep-orphaned-objects: the objects of an erased sender's photo that a report's copy still holds are deleted",
+  "sweep-orphaned-objects: a variant of an erased sender's photo that a report's copy still holds is deleted",
   {
     attempt: () => heldPhoto(true),
     control: () => heldPhoto(false),

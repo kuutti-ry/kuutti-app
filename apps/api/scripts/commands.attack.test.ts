@@ -2,11 +2,14 @@ import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { createPool, migrate, withTemporaryDatabase } from "@kuutti/db";
 import { DEMO_SUBJECT_PREFIX, demoHetuHmac, PLACEHOLDER_PHOTO_PREFIX } from "@kuutti/db/demo";
-import { describe, expect } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { attack } from "../src/test/attack.ts";
 import { MIGRATIONS } from "../src/test/global-setup.ts";
 import { TEST_DATABASE_URL } from "../src/test/harness.ts";
-import { command, type Outcome, scratch } from "./run-command.ts";
+import * as commandDriver from "./run-command.ts";
+
+type Outcome = commandDriver.Outcome;
+const scratch = commandDriver.scratch;
 
 // Attacks on the demo command lines (#380; #73, #141, #142, ADR-014, ADR-018),
 // each in a process of its own as the maintainer runs them. Nothing here can
@@ -34,21 +37,84 @@ const MARK = "kuutti380mark";
 const proxied = process.allowedNodeEnvironmentFlags.has("--use-env-proxy");
 
 const reset = (args: readonly string[], env: Record<string, string> = LOCAL) =>
-  command("demo-reset.ts", args, env);
+  commandDriver.command("demo-reset.ts", args, env);
+/** A refusal of the attacked rule or the deliberately closed database, never an unrelated crash. */
+async function resetReaches(
+  args: readonly string[],
+  env: Record<string, string> = LOCAL,
+  refusal?: string,
+): Promise<Outcome> {
+  const seen = await reset(args, env);
+  if (seen.code === 1 && seen.stderr.includes("ECONNREFUSED")) {
+    expect(seen.stderr).toContain("127.0.0.1:1");
+  } else {
+    expect(refusal, "the control must reach the deliberately closed database").toBeDefined();
+    expect(seen.code).toBe(2);
+    expect(seen.stderr).toContain(`✖ ${refusal}`);
+  }
+  expect(seen.stdout).toBe("");
+  return seen;
+}
 /** Past every check of the local reset: the database was asked, at the closed port. */
 const askedTheDatabase = (seen: Outcome) => expect(seen.stderr).toContain("ECONNREFUSED");
 const printed = (seen: Outcome) => expect(`${seen.stdout}${seen.stderr}`).toContain(MARK);
 
+describe("the reset attack's observation", () => {
+  it.each([
+    "Error: the fixture broke before the production guard",
+    "ReferenceError: missingVar is not defined",
+    "✖ refusing: the bank is not configured",
+  ])("does not take an unrelated command failure for its refusal: %s", async (stderr) => {
+    const spy = vi.spyOn(commandDriver, "command").mockResolvedValueOnce({
+      code: 2,
+      stdout: "",
+      stderr,
+    });
+    try {
+      await expect(
+        resetReaches(
+          ["--bare"],
+          { ...LOCAL, APP_ENV: "production" },
+          'refusing: APP_ENV is "production"',
+        ),
+      ).rejects.toMatchObject({ name: "AssertionError" });
+    } finally {
+      spy.mockRestore();
+    }
+  });
+});
+
 describe("demo:reset, made to go ahead", { concurrent: true, timeout: 60_000 }, () => {
   attack("demo:reset: an API that is not on this computer, named in one word with =, is taken", {
-    attempt: () => reset(["--bare", "--api=http://192.0.2.10:3000"]),
-    control: () => reset(["--bare", "--api=http://127.0.0.1:3000"]),
+    attempt: () =>
+      resetReaches(
+        ["--bare", "--api=http://192.0.2.10:3000"],
+        LOCAL,
+        "refusing: the personas get their histories from a local API, not from 192.0.2.10:3000",
+      ),
+    control: () => resetReaches(["--bare", "--api=http://127.0.0.1:3000"]),
     succeeds: askedTheDatabase,
   });
 
   for (const [how, run] of [
-    ["by --env, in one word", (env: string) => reset(["--bare", `--env=${env}`], BANK)],
-    ["by APP_ENV alone", (env: string) => reset(["--bare"], { ...BANK, APP_ENV: env })],
+    [
+      "by --env, in one word",
+      (env: string) =>
+        resetReaches(
+          ["--bare", `--env=${env}`],
+          BANK,
+          env === "production" ? 'refusing: APP_ENV is "production"' : undefined,
+        ),
+    ],
+    [
+      "by APP_ENV alone",
+      (env: string) =>
+        resetReaches(
+          ["--bare"],
+          { ...BANK, APP_ENV: env },
+          env === "production" ? 'refusing: APP_ENV is "production"' : undefined,
+        ),
+    ],
   ] as const) {
     attack(`demo:reset: production, named ${how}, has its personas reset`, {
       attempt: () => run("production"),
@@ -62,7 +128,7 @@ describe("demo:reset, made to go ahead", { concurrent: true, timeout: 60_000 }, 
       "demo:reset: told through NODE_OPTIONS to send everything through a proxy, it goes ahead",
       {
         attempt: async () => {
-          const seen = await reset(["--bare"], {
+          const seen = await resetReaches(["--bare"], {
             ...LOCAL,
             HTTP_PROXY: DEAD_PROXY,
             NODE_OPTIONS: "--use-env-proxy",
@@ -72,7 +138,7 @@ describe("demo:reset, made to go ahead", { concurrent: true, timeout: 60_000 }, 
           return seen;
         },
         // A proxy that is named and that Node was not told to use: nothing goes through it.
-        control: () => reset(["--bare"], { ...LOCAL, HTTP_PROXY: DEAD_PROXY }),
+        control: () => resetReaches(["--bare"], { ...LOCAL, HTTP_PROXY: DEAD_PROXY }),
         succeeds: askedTheDatabase,
         // Goes through today: the reset refuses NODE_USE_ENV_PROXY and does not ask NODE_OPTIONS.
         open: "#380",
@@ -91,8 +157,8 @@ describe("demo:reset, made to go ahead", { concurrent: true, timeout: 60_000 }, 
     ["a dry run, which it has not", ["--bare", "--dry-run"], ["--bare"]],
   ] as const) {
     attack(`demo:reset: ${how} is passed over, and the reset goes ahead`, {
-      attempt: () => reset(attempt),
-      control: () => reset(control),
+      attempt: () => resetReaches(attempt, LOCAL, `unknown argument ${attempt.at(-1)}:`),
+      control: () => resetReaches(control),
       succeeds: askedTheDatabase,
     });
   }
@@ -103,16 +169,30 @@ describe("demo:stories and demo:assets, made to go ahead", {
   timeout: 60_000,
 }, () => {
   attack("demo:stories: an empty word is no argument, and the job goes on", {
-    attempt: () => command("demo-stories.ts", [""]),
-    control: () => command("demo-stories.ts", []),
+    attempt: async () => {
+      const seen = await commandDriver.command("demo-stories.ts", [""]);
+      expect(seen.code).toBe(2);
+      expect(seen.stderr).toMatch(
+        /✖ (?:the stories take no argument|refusing: APP_ENV is "unset")/,
+      );
+      return seen;
+    },
+    control: async () => {
+      const seen = await commandDriver.command("demo-stories.ts", []);
+      expect(seen.code).toBe(2);
+      expect(seen.stderr).toContain('✖ refusing: APP_ENV is "unset"');
+      return seen;
+    },
     // The check after the arguments' own: where the process runs.
     succeeds: (seen) => expect(seen.stderr).toContain('refusing: APP_ENV is "unset"'),
   });
 
   /** One fetch of a release into the run's own home, through the proxy that is not there. */
   const fetched = async (tag: string) => {
-    const seen = await command("demo-assets.ts", ["--tag", tag], NO_NETWORK);
+    const seen = await commandDriver.command("demo-assets.ts", ["--tag", tag], NO_NETWORK);
+    expect(seen.code).toBe(2);
     expect(seen.stderr).toContain(`fetching ${tag} of`);
+    expect(seen.stderr).toContain("failed: fetch failed. Is the tag pushed?");
     return { made: existsSync(join(scratch, ".cache", "kuutti-demo-photos", tag)) };
   };
   if (proxied)
@@ -131,9 +211,24 @@ describe("demo:stories and demo:assets, made to go ahead", {
   ] as const) {
     if (proxied)
       attack(`demo:assets: a check of a directory asked for with ${how} fetches the release`, {
-        attempt: () =>
-          command("demo-assets.ts", [flag, join(scratch, "no-such-release")], NO_NETWORK),
-        control: () => command("demo-assets.ts", [], NO_NETWORK),
+        attempt: async () => {
+          const seen = await commandDriver.command(
+            "demo-assets.ts",
+            [flag, join(scratch, "no-such-release")],
+            NO_NETWORK,
+          );
+          expect(seen.code).toBe(2);
+          if (!seen.stderr.includes("failed: fetch failed. Is the tag pushed?")) {
+            expect(seen.stderr).toContain(`✖ unknown argument ${flag}:`);
+          }
+          return seen;
+        },
+        control: async () => {
+          const seen = await commandDriver.command("demo-assets.ts", [], NO_NETWORK);
+          expect(seen.code).toBe(2);
+          expect(seen.stderr).toContain("failed: fetch failed. Is the tag pushed?");
+          return seen;
+        },
         succeeds: (seen) => expect(seen.stderr).toContain("fetching"),
       });
   }
@@ -163,7 +258,13 @@ describe("demo:population, asked to remove", { timeout: 60_000 }, () => {
            VALUES ($1, $2, 'LEHV6nWB2yk8pyo0adR*.7kCMdnj', 1200, 1600, 0)`,
           [account.rows[0]?.id, picture],
         );
-        await command("demo-population.ts", ["--remove"], { DATABASE_URL: url });
+        const seen = await commandDriver.command("demo-population.ts", ["--remove"], {
+          DATABASE_URL: url,
+        });
+        if (seen.code !== 0) {
+          expect(seen.code).toBe(2);
+          expect(seen.stderr).toContain("✖ no object store is configured");
+        }
         const left = await pool.query("SELECT 1 FROM identity WHERE id = $1", [
           identity.rows[0]?.id,
         ]);
@@ -194,16 +295,40 @@ describe("what the demo commands print", { concurrent: true, timeout: 60_000 }, 
   };
 
   attack("demo:reset: a failed connection prints the password of the database's address", {
-    attempt: () => reset(["--bare"], { ...LOCAL, DATABASE_URL: address("password") }),
+    attempt: async () => {
+      const seen = await reset(["--bare"], { ...LOCAL, DATABASE_URL: address("password") });
+      expect(seen.code).toBe(1);
+      expect(seen.stderr).toMatch(
+        /database "kuutti_no_such_database" does not exist|password authentication failed for user/,
+      );
+      return seen;
+    },
     // A failed connection names the database it asked for, which is no secret.
-    control: () => reset(["--bare"], { ...LOCAL, DATABASE_URL: address("database") }),
+    control: async () => {
+      const seen = await reset(["--bare"], { ...LOCAL, DATABASE_URL: address("database") });
+      expect(seen.code).toBe(1);
+      expect(seen.stderr).toContain(`database "kuutti_no_such_${MARK}" does not exist`);
+      return seen;
+    },
     succeeds: printed,
   });
 
   attack("demo:reset: a key that is no key is printed with the refusal of it", {
-    attempt: () => reset(["--bare"], { ...LOCAL, HETU_HMAC_KEY: MARK }),
+    attempt: async () => {
+      const seen = await reset(["--bare"], { ...LOCAL, HETU_HMAC_KEY: MARK });
+      expect(seen.code).toBe(1);
+      expect(seen.stderr).toContain(
+        "ConfigError: Invalid configuration: HETU_HMAC_KEY: 32 bytes as hex",
+      );
+      return seen;
+    },
     // The environment's name is no secret, and its refusal says it.
-    control: () => reset(["--bare"], { ...LOCAL, APP_ENV: MARK }),
+    control: async () => {
+      const seen = await reset(["--bare"], { ...LOCAL, APP_ENV: MARK });
+      expect(seen.code).toBe(2);
+      expect(seen.stderr).toContain(`✖ refusing: APP_ENV is "${MARK}"`);
+      return seen;
+    },
     succeeds: printed,
   });
 
@@ -220,8 +345,18 @@ describe("what the demo commands print", { concurrent: true, timeout: 60_000 }, 
     ["demo-population.ts", { DB_APP_PASSWORD: MARK }],
   ] as const) {
     attack(`${script}: what was given by hand on staging is printed with the refusal of it`, {
-      attempt: () => command(script, [], { ...STAGING, ...given }),
-      control: () => command(script, [], { ...STAGING, APP_ENV: MARK }),
+      attempt: async () => {
+        const seen = await commandDriver.command(script, [], { ...STAGING, ...given });
+        expect(seen.code).toBe(2);
+        expect(seen.stderr).toContain(`✖ refusing: ${Object.keys(given)[0]} given to the process`);
+        return seen;
+      },
+      control: async () => {
+        const seen = await commandDriver.command(script, [], { ...STAGING, APP_ENV: MARK });
+        expect(seen.code).toBe(2);
+        expect(seen.stderr).toContain(`✖ refusing: APP_ENV is "${MARK}"`);
+        return seen;
+      },
       succeeds: printed,
     });
   }

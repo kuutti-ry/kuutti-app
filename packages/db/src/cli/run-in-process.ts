@@ -18,7 +18,7 @@ const COMMANDS = {
   moderator: () => import("./moderator.ts"),
 };
 
-type Run = { code: number | undefined; out: string[]; err: string[] };
+type Run = { code: number | undefined; out: string[]; err: (string | Error)[] };
 
 /** Runs `node src/cli/<command>.ts ...args` in this process, with exactly the environment given. */
 export async function run(
@@ -42,7 +42,11 @@ export async function run(
       result.out.push(parts.map(String).join(" "));
     }),
     vi.spyOn(console, "error").mockImplementation((...parts: unknown[]) => {
-      result.err.push(parts.map(String).join(" "));
+      // The attacks must distinguish a refused connection from a broken command,
+      // including a query wrapper's cause. Stringifying an Error loses that evidence.
+      result.err.push(
+        parts.length === 1 && parts[0] instanceof Error ? parts[0] : parts.map(String).join(" "),
+      );
     }),
     vi.spyOn(process, "exit").mockImplementation(((code?: number) => {
       throw new Exit(code);
