@@ -1,6 +1,9 @@
+import { execFile } from "node:child_process";
 import { generateKeyPairSync } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
+import { pathToFileURL } from "node:url";
+import { promisify } from "node:util";
 import { DEMO_SIZE_MAX, PHOTOS_MANIFEST } from "@kuutti/db/demo";
 import { describe, expect, it } from "vitest";
 import { API_DIR, command, scratch } from "./run-command.ts";
@@ -61,11 +64,42 @@ describe.concurrent("demo:assets refuses what it does not understand", () => {
       expect(code).toBe(2);
       expect(stdout).toBe("");
       expect(stderr).toContain("✖ faces/pool/stray.jpg: unlisted");
-      const first = PHOTOS_MANIFEST[0];
-      if (first) expect(stderr).toContain(`✖ ${first.path}: missing`);
+      for (const asset of PHOTOS_MANIFEST) expect(stderr).toContain(`✖ ${asset.path}: missing`);
       expect(stderr).toContain(
         `✖ ${PHOTOS_MANIFEST.length + 1} of the pictures in ${dir} are not the release's; nothing of them is used`,
       );
+    },
+    TIMEOUT,
+  );
+
+  it(
+    "--check drains buffered diagnostics before exiting with code 2",
+    async () => {
+      const dir = join(scratch, "missing-release");
+      const wrapper = join(scratch, "buffered-assets.mjs");
+      // CI lost the tail of stderr when process.exit(2) overtook a pipe write.
+      // Corking forces that pending-output state without timing or pipe-size assumptions.
+      writeFileSync(
+        wrapper,
+        `process.stderr.cork();
+try { await import(${JSON.stringify(pathToFileURL(join(API_DIR, "scripts/demo-assets.ts")).href)}); }
+finally { process.stderr.uncork(); }
+`,
+      );
+      await expect(
+        promisify(execFile)(process.execPath, ["--import", "tsx", wrapper, "--check", dir], {
+          cwd: API_DIR,
+          env: { PATH: process.env.PATH ?? "", HOME: scratch },
+          timeout: 30_000,
+        }),
+      ).rejects.toMatchObject({
+        code: 2,
+        killed: false,
+        stdout: "",
+        stderr: expect.stringContaining(
+          `✖ ${PHOTOS_MANIFEST.length} of the pictures in ${dir} are not the release's; nothing of them is used\n`,
+        ),
+      });
     },
     TIMEOUT,
   );

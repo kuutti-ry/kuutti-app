@@ -84,7 +84,7 @@ async function markedTwice(firstFailedBefore: boolean) {
 attack("FeedbackList: Mark as handled pressed again while the first is out sends a second one", {
   attempt: () => markedTwice(false),
   control: () => markedTwice(true),
-  succeeds: (marks) => expect(marks).toBe(2),
+  succeeds: (marks) => expect(marks).toBeGreaterThan(1),
 });
 
 /** Both rows marked; one of them fails while the other is still out. */

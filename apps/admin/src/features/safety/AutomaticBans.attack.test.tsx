@@ -231,7 +231,7 @@ attack("AutomaticBans: Confirm pressed twice sends two decisions", {
   attempt: () => confirmTwice(() => held().promise),
   // Failed before the second press: sending again is right.
   control: () => confirmTwice(() => failure(500, "internal_error")),
-  succeeds: (decisions) => expect(decisions).toBe(2),
+  succeeds: (decisions) => expect(decisions).toBeGreaterThan(1),
 });
 
 /** Confirms the first line (held), cancels, reverses the second (held); answers the one named. */

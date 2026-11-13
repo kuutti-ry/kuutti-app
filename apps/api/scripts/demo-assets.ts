@@ -25,6 +25,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { promisify } from "node:util";
 import {
+  DemoCommandError,
   demoAssetsDir,
   manifestOf,
   PHOTOS_MANIFEST,
@@ -40,88 +41,98 @@ const MANIFEST_FILE = resolve(
   "../../../packages/db/src/seed/photos-manifest.ts",
 );
 
-function fail(message: string, code = 2): never {
-  console.error(`✖ ${message}`);
-  process.exit(code);
+function fail(message: string): never {
+  throw new DemoCommandError(message);
 }
 
-// pnpm hands the separator through.
-const args = process.argv.slice(2).filter((arg, i) => !(arg === "--" && i === 0));
-let tag = PHOTOS_RELEASE;
-let check: string | undefined;
-let manifest: string | undefined;
-const seen = new Set<string>();
-for (let i = 0; i < args.length; i += 1) {
-  const arg = args[i] as string;
-  const equals = arg.indexOf("=");
-  const flag = equals > 0 ? arg.slice(0, equals) : arg;
-  if (seen.has(flag)) fail(`${flag} is given twice`);
-  seen.add(flag);
-  // An empty value is no value, and neither is the next flag: `--check=` would
-  // otherwise fetch the release, `--tag --check=<dir>` a tag named "--check=<dir>" (#235).
-  const value = () => {
-    if (equals > 0) return arg.slice(equals + 1) || undefined;
-    if (args[i + 1]?.startsWith("--")) return undefined;
-    i += 1;
-    return args[i] || undefined;
-  };
-  if (flag === "--tag") tag = value() ?? fail("--tag takes a release tag");
-  else if (flag === "--check") check = value() ?? fail("--check takes a directory");
-  else if (flag === "--manifest") manifest = value() ?? fail("--manifest takes a directory");
-  else fail(`unknown argument ${arg}: --tag, --check and --manifest are all there is`);
-}
-if (check && manifest) fail("--check and --manifest exclude each other");
+async function main(): Promise<void> {
+  // pnpm hands the separator through.
+  const args = process.argv.slice(2).filter((arg, i) => !(arg === "--" && i === 0));
+  let tag = PHOTOS_RELEASE;
+  let check: string | undefined;
+  let manifest: string | undefined;
+  const seen = new Set<string>();
+  for (let i = 0; i < args.length; i += 1) {
+    const arg = args[i] as string;
+    const equals = arg.indexOf("=");
+    const flag = equals > 0 ? arg.slice(0, equals) : arg;
+    if (seen.has(flag)) fail(`${flag} is given twice`);
+    seen.add(flag);
+    // An empty value is no value, and neither is the next flag: `--check=` would
+    // otherwise fetch the release, `--tag --check=<dir>` a tag named "--check=<dir>" (#235).
+    const value = () => {
+      if (equals > 0) return arg.slice(equals + 1) || undefined;
+      if (args[i + 1]?.startsWith("--")) return undefined;
+      i += 1;
+      return args[i] || undefined;
+    };
+    if (flag === "--tag") tag = value() ?? fail("--tag takes a release tag");
+    else if (flag === "--check") check = value() ?? fail("--check takes a directory");
+    else if (flag === "--manifest") manifest = value() ?? fail("--manifest takes a directory");
+    else fail(`unknown argument ${arg}: --tag, --check and --manifest are all there is`);
+  }
+  if (check && manifest) fail("--check and --manifest exclude each other");
 
-if (manifest) {
-  const assets = manifestOf(resolve(manifest));
-  if (assets.length === 0)
-    fail(`no pictures under ${manifest}: faces/<persona>/, faces/pool/, negatives/`);
-  writeFileSync(MANIFEST_FILE, renderManifest(assets));
-  const purposes: Record<string, number> = {};
-  for (const asset of assets) purposes[asset.purpose] = (purposes[asset.purpose] ?? 0) + 1;
-  console.log(
-    JSON.stringify({
-      msg: "demo assets: manifest written",
-      file: MANIFEST_FILE,
-      pictures: assets.length,
-      purposes,
-    }),
-  );
-  process.exit(0);
-}
-
-if (PHOTOS_MANIFEST.length === 0) {
-  fail(
-    "the manifest is empty: there is no release yet. Generate the pictures (docs/demo/photo-prompts.md), write the manifest with --manifest <dir>, release them, then fetch",
-  );
-}
-
-const dir = check ? resolve(check) : demoAssetsDir(tag);
-if (!check) {
-  mkdirSync(dir, { recursive: true });
-  try {
-    const url = `https://github.com/${PHOTOS_REPO}/archive/refs/tags/${tag}.tar.gz`;
-    const response = await fetch(url);
-    if (!response.ok) throw new Error(`HTTP ${response.status} for ${url}`);
-    const tarball = join(tmpdir(), `kuutti-demo-photos-${process.pid}.tar.gz`);
-    writeFileSync(tarball, new Uint8Array(await response.arrayBuffer()));
-    // The tarball's one top directory is named after the commit; its contents are the release.
-    await run("tar", ["-xzf", tarball, "--strip-components=1", "-C", dir]).finally(() =>
-      rmSync(tarball, { force: true }),
+  if (manifest) {
+    const assets = manifestOf(resolve(manifest));
+    if (assets.length === 0)
+      fail(`no pictures under ${manifest}: faces/<persona>/, faces/pool/, negatives/`);
+    writeFileSync(MANIFEST_FILE, renderManifest(assets));
+    const purposes: Record<string, number> = {};
+    for (const asset of assets) purposes[asset.purpose] = (purposes[asset.purpose] ?? 0) + 1;
+    console.log(
+      JSON.stringify({
+        msg: "demo assets: manifest written",
+        file: MANIFEST_FILE,
+        pictures: assets.length,
+        purposes,
+      }),
     );
-  } catch (error) {
+    return;
+  }
+
+  if (PHOTOS_MANIFEST.length === 0) {
     fail(
-      `fetching ${tag} of ${PHOTOS_REPO} failed: ${error instanceof Error ? error.message.split("\n")[0] : "unknown"}. Is the tag pushed?`,
+      "the manifest is empty: there is no release yet. Generate the pictures (docs/demo/photo-prompts.md), write the manifest with --manifest <dir>, release them, then fetch",
     );
   }
-}
-const problems = verifyAssets(dir, PHOTOS_MANIFEST);
-if (problems.length > 0) {
-  for (const problem of problems) console.error(`✖ ${problem.path}: ${problem.problem}`);
-  fail(
-    `${problems.length} of the pictures in ${dir} are not the release's; nothing of them is used`,
+
+  const dir = check ? resolve(check) : demoAssetsDir(tag);
+  if (!check) {
+    mkdirSync(dir, { recursive: true });
+    try {
+      const url = `https://github.com/${PHOTOS_REPO}/archive/refs/tags/${tag}.tar.gz`;
+      const response = await fetch(url);
+      if (!response.ok) throw new Error(`HTTP ${response.status} for ${url}`);
+      const tarball = join(tmpdir(), `kuutti-demo-photos-${process.pid}.tar.gz`);
+      writeFileSync(tarball, new Uint8Array(await response.arrayBuffer()));
+      // The tarball's one top directory is named after the commit; its contents are the release.
+      await run("tar", ["-xzf", tarball, "--strip-components=1", "-C", dir]).finally(() =>
+        rmSync(tarball, { force: true }),
+      );
+    } catch (error) {
+      fail(
+        `fetching ${tag} of ${PHOTOS_REPO} failed: ${error instanceof Error ? error.message.split("\n")[0] : "unknown"}. Is the tag pushed?`,
+      );
+    }
+  }
+  const problems = verifyAssets(dir, PHOTOS_MANIFEST);
+  if (problems.length > 0) {
+    for (const problem of problems) console.error(`✖ ${problem.path}: ${problem.problem}`);
+    fail(
+      `${problems.length} of the pictures in ${dir} are not the release's; nothing of them is used`,
+    );
+  }
+  console.log(
+    JSON.stringify({ msg: "demo assets: verified", dir, pictures: PHOTOS_MANIFEST.length, tag }),
   );
 }
-console.log(
-  JSON.stringify({ msg: "demo assets: verified", dir, pictures: PHOTOS_MANIFEST.length, tag }),
-);
+
+try {
+  await main();
+} catch (error) {
+  if (!(error instanceof DemoCommandError)) throw error;
+  console.error(`✖ ${error.message}`);
+  // A forced exit can truncate the many diagnostics still queued in a CI pipe.
+  process.exitCode = 2;
+}

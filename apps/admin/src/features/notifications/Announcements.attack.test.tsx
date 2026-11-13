@@ -144,7 +144,7 @@ async function savedTwice(firstFailedBefore: boolean) {
 attack("Announcements: Enter and then a click on Save, while the first is out, write two drafts", {
   attempt: () => savedTwice(false),
   control: () => savedTwice(true),
-  succeeds: (drafts) => expect(drafts).toBe(2),
+  succeeds: (drafts) => expect(drafts).toBeGreaterThan(1),
 });
 
 /** A save that fails, with the English title changed while it was out, or left as it was. */

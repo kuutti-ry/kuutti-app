@@ -396,7 +396,7 @@ attack(
     attempt: () => liftedThenAgain(() => json(lifted(OPEN))),
     // Refused, left to the shell: nothing was lifted, so lifting again is right.
     control: () => liftedThenAgain(() => failure(403, "admin_forbidden")),
-    succeeds: (lifts) => expect(lifts).toBe(2),
+    succeeds: (lifts) => expect(lifts).toBeGreaterThan(1),
   },
 );
 
@@ -437,7 +437,7 @@ attack(
     attempt: () => takenDownThenAgain(() => json(decided(1))),
     // Refused, left to the shell: the photo is still approved, so taking it down again is right.
     control: () => takenDownThenAgain(() => failure(403, "admin_forbidden")),
-    succeeds: (takeDowns) => expect(takeDowns).toBe(2),
+    succeeds: (takeDowns) => expect(takeDowns).toBeGreaterThan(1),
   },
 );
 
@@ -466,7 +466,7 @@ attack("Sanctions: a warning sent by Enter and then a click goes out twice", {
   attempt: () => enterThenClick(() => held().promise),
   // Refused before the click: sending again is right.
   control: () => enterThenClick(() => failure(409, "staff_target")),
-  succeeds: (warnings) => expect(warnings).toBe(2),
+  succeeds: (warnings) => expect(warnings).toBeGreaterThan(1),
 });
 
 /** Presses Take down twice, the first answered as given. */
@@ -492,7 +492,7 @@ attack("TakeDown: Take down pressed twice sends two take-downs", {
   attempt: () => takeDownTwice(() => held().promise),
   // Failed before the second press: sending again is right.
   control: () => takeDownTwice(() => failure(500, "internal_error")),
-  succeeds: (takeDowns) => expect(takeDowns).toBe(2),
+  succeeds: (takeDowns) => expect(takeDowns).toBeGreaterThan(1),
 });
 
 // A3, A4: a step cancelled while its write is out, and another opened.
@@ -660,7 +660,7 @@ async function warnedThenAgain(reason: boolean) {
 attack("Sanctions: the last warning's reason stays chosen, so the next goes without one chosen", {
   attempt: () => warnedThenAgain(false),
   control: () => warnedThenAgain(true),
-  succeeds: (warnings) => expect(warnings).toBe(2),
+  succeeds: (warnings) => expect(warnings).toBeGreaterThan(1),
 });
 
 /** Takes the first photo down, then the second, its reason chosen or not. */

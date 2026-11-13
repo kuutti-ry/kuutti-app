@@ -118,7 +118,7 @@ attack(
     open: QUESTION,
     attempt: () => pressedAgainAfterCancel(false),
     control: () => pressedAgainAfterCancel(true),
-    succeeds: (presses) => expect(presses).toBe(2),
+    succeeds: (presses) => expect(presses).toBeGreaterThan(1),
   },
 );
 

@@ -296,7 +296,7 @@ attack(
     attempt: () => warnedAfterDismissal(() => json(decision("dismissed"))),
     // The dismissal failed: the report still waits, and closing it with the warning is right.
     control: () => warnedAfterDismissal(() => failure(500, "internal_error")),
-    succeeds: (decisions) => expect(decisions).toBe(2),
+    succeeds: (decisions) => expect(decisions).toBeGreaterThan(1),
   },
 );
 

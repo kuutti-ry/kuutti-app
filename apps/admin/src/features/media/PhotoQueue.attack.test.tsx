@@ -190,7 +190,7 @@ async function approvedSensitive(looked: boolean) {
   await screen.findByRole("button", { name: "Show photo" });
   if (looked) {
     fireEvent.click(screen.getByRole("button", { name: "Show photo" }));
-    await screen.findByRole("img", { name: "Photo under review" });
+    fireEvent.load(await screen.findByRole("img", { name: "Photo under review" }));
   }
   const approve = screen.queryByRole("button", { name: "Approve" });
   if (approve) fireEvent.click(approve);
@@ -203,15 +203,18 @@ attack("PhotoQueue: Approve goes out for a sensitive photo still hidden behind S
   open: QUESTION,
   attempt: () => approvedSensitive(false),
   control: () => approvedSensitive(true),
-  succeeds: (seen) => expect(seen.decisions).toBe(1),
+  succeeds: (seen) => expect(seen.decisions).toBeGreaterThan(0),
 });
 
 /**
  * Approve pressed while the picture is not on the screen, or once it is.
  * Added after the pile was graded: #657 lists these two beside the hidden
- * photo above (its B5), and the pile had not tried them.
+ * photo above (its B5), and the pile had not tried them. The signed URL and
+ * the image it points at can each fail or wait independently.
  */
-async function approvedUnseen(picture: "loading" | "failed" | "shown") {
+async function approvedUnseen(
+  picture: "loading" | "failed" | "image loading" | "image failed" | "shown",
+) {
   const never = held();
   const sent = network([
     on("GET", QUEUE, () => queueOf([item(1)])),
@@ -222,7 +225,11 @@ async function approvedUnseen(picture: "loading" | "failed" | "shown") {
     on("POST", DECISION, () => decided(1, "approved")),
   ]);
   show();
-  if (picture === "shown") await screen.findByRole("img", { name: "Photo under review" });
+  if (picture === "shown" || picture === "image loading" || picture === "image failed") {
+    const image = await screen.findByRole("img", { name: "Photo under review" });
+    if (picture === "shown") fireEvent.load(image);
+    else if (picture === "image failed") fireEvent.error(image);
+  }
   const approve = await screen.findByRole("button", { name: "Approve" });
   await settle();
   fireEvent.click(approve);
@@ -233,13 +240,15 @@ async function approvedUnseen(picture: "loading" | "failed" | "shown") {
 for (const [how, picture] of [
   ["while its picture is still loading", "loading"],
   ["after its picture failed to load", "failed"],
+  ["whose signed URL arrived but whose image is still loading", "image loading"],
+  ["whose signed URL arrived but whose image failed to load", "image failed"],
 ] as const) {
   attack(`PhotoQueue: Approve goes out for a photo ${how}`, {
     // Goes through today: Approve waits for nothing but its own request.
     open: QUESTION,
     attempt: () => approvedUnseen(picture),
     control: () => approvedUnseen("shown"),
-    succeeds: (seen) => expect(seen.decisions).toBe(1),
+    succeeds: (seen) => expect(seen.decisions).toBeGreaterThan(0),
   });
 }
 
@@ -266,7 +275,7 @@ async function approvedTwice(firstFailedBefore: boolean) {
 attack("PhotoQueue: Approve pressed again while the first decision is out sends a second one", {
   attempt: () => approvedTwice(false),
   control: () => approvedTwice(true),
-  succeeds: (decisions) => expect(decisions).toBe(2),
+  succeeds: (decisions) => expect(decisions).toBeGreaterThan(1),
 });
 
 /** Show photo pressed twice: on one hidden photo, or once on each of two. */
@@ -290,7 +299,7 @@ async function shownTwice(photos: 1 | 2) {
 attack("PhotoQueue: Show photo pressed twice on one photo asks for two signed URLs", {
   attempt: () => shownTwice(1),
   control: () => shownTwice(2),
-  succeeds: (urls) => expect(urls).toBe(2),
+  succeeds: (urls) => expect(urls).toBeGreaterThan(1),
 });
 
 /** One photo's approval fails while the other's rejection form is open with a reason chosen. */

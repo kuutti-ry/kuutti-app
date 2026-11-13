@@ -190,5 +190,5 @@ async function changedTwice(firstFailedBefore: boolean) {
 attack("ConfigList: Change it pressed again while the first change is out sends a second one", {
   attempt: () => changedTwice(false),
   control: () => changedTwice(true),
-  succeeds: (changes) => expect(changes).toBe(2),
+  succeeds: (changes) => expect(changes).toBeGreaterThan(1),
 });

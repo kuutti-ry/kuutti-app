@@ -31,10 +31,36 @@ export async function command(
     timeout: 30_000,
   }).then(
     ({ stdout, stderr }) => ({ code: 0, stdout, stderr }),
-    (error: { code?: number; stdout?: string; stderr?: string }) => ({
-      code: error.code ?? -1,
-      stdout: error.stdout ?? "",
-      stderr: error.stderr ?? "",
-    }),
+    (error: unknown) => {
+      // A command's nonzero exit is an observation for the test. A process
+      // killed by our deadline, a failed spawn or truncated output is not.
+      if (
+        !(error instanceof Error) ||
+        !("code" in error) ||
+        typeof error.code !== "number" ||
+        error.code <= 0 ||
+        ("killed" in error && error.killed) ||
+        ("signal" in error && error.signal != null) ||
+        !("stdout" in error) ||
+        typeof error.stdout !== "string" ||
+        !("stderr" in error) ||
+        typeof error.stderr !== "string"
+      ) {
+        throw error;
+      }
+      // Node exits with 1 both for application refusals and for a broken
+      // import or programmer error. None of the latter proves a rule held.
+      if (
+        /\b(?:ERR_MODULE_NOT_FOUND|MODULE_NOT_FOUND|ERR_UNKNOWN_FILE_EXTENSION|ERR_PACKAGE_PATH_NOT_EXPORTED|ERR_UNSUPPORTED_DIR_IMPORT|ERR_REQUIRE_ESM)\b/.test(
+          error.stderr,
+        ) ||
+        /(?:^|\n)(?:SyntaxError|ReferenceError|TypeError|RangeError|EvalError|URIError)(?: \[[A-Z_]+\])?:/.test(
+          error.stderr,
+        )
+      ) {
+        throw error;
+      }
+      return { code: error.code, stdout: error.stdout, stderr: error.stderr };
+    },
   );
 }

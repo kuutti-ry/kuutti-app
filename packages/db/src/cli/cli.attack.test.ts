@@ -3,12 +3,12 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { promisify } from "node:util";
-import { describe, expect } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { MIGRATE_LOCK_KEY, migrate } from "../migrate.ts";
 import { createPool, type Pool } from "../pool.ts";
 import { attack } from "../test/attack.ts";
 import { TEST_DATABASE_URL, withTemporaryDatabase } from "../test/temporary-database.ts";
-import { run } from "./run-in-process.ts";
+import * as commandRunner from "./run-in-process.ts";
 
 // Attacks on the package's command lines (#380): the seed, the staff roles and
 // migrate made to go ahead where they must refuse. Nothing here can do harm
@@ -18,20 +18,96 @@ import { run } from "./run-in-process.ts";
 /** Nothing listens on port 1 of this computer: a command that gets this far fails to connect. */
 const CLOSED = "postgres://127.0.0.1:1/never";
 
+/** Only a connection to the deliberately closed port proves the command got past its guards. */
+function refusedConnection(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  return (
+    ("code" in error &&
+      error.code === "ECONNREFUSED" &&
+      "address" in error &&
+      error.address === "127.0.0.1" &&
+      "port" in error &&
+      error.port === 1) ||
+    refusedConnection(error.cause)
+  );
+}
+
 /** One run against the closed port: whether it got as far as trying to connect. */
 async function reach(
-  command: Parameters<typeof run>[0],
+  command: Parameters<typeof commandRunner.run>[0],
   args: string[],
   appEnv?: string,
 ): Promise<{ connected: boolean }> {
-  const said = await run(command, args, { DATABASE_URL: CLOSED, APP_ENV: appEnv }).then(
-    (result) => result.err.join("\n"),
-    // The staff roles' command has no catch of its own: its failure is the import's.
-    (error: unknown) => String(error),
-  );
-  return { connected: /ECONNREFUSED|Failed query/.test(said) };
+  let result: Awaited<ReturnType<typeof commandRunner.run>>;
+  try {
+    result = await commandRunner.run(command, args, { DATABASE_URL: CLOSED, APP_ENV: appEnv });
+  } catch (error) {
+    // The staff roles' command leaves its connection failure to the import's caller.
+    if (!refusedConnection(error)) throw error;
+    return { connected: true };
+  }
+  for (const error of result.err) {
+    if (error instanceof Error && !refusedConnection(error)) throw error;
+  }
+  if (result.err.some(refusedConnection)) {
+    expect(result.code).toBe(1);
+    expect(result.out).toEqual([]);
+    return { connected: true };
+  }
+  // A missing import, an unrelated refusal or a command that stopped silently is
+  // a broken attempt, never evidence that the production guard held.
+  if (command === "migrate") throw new Error("migrate stopped before asking its database");
+  const refusal =
+    command === "seed"
+      ? "refusing to seed production: previews and local databases only (TD-19)"
+      : "refusing production without --env production";
+  expect(result).toEqual({ code: 2, out: [], err: [refusal] });
+  return { connected: false };
 }
 const connected = (seen: { connected: boolean }) => expect(seen.connected).toBe(true);
+
+describe("the command attack's driver", () => {
+  it.each([new TypeError("broken command"), new Error("Cannot find module seed.ts")])(
+    "rethrows an unexpected command failure: %s",
+    async (error) => {
+      const spy = vi.spyOn(commandRunner, "run").mockRejectedValueOnce(error);
+      try {
+        await expect(reach("seed", ["--env", "production"])).rejects.toBe(error);
+      } finally {
+        spy.mockRestore();
+      }
+    },
+  );
+
+  it.each([new TypeError("broken seed"), new Error("Failed query: no connection was attempted")])(
+    "rethrows an error caught and logged by the command: %s",
+    async (error) => {
+      const spy = vi
+        .spyOn(commandRunner, "run")
+        .mockResolvedValueOnce({ code: 1, out: [], err: [error] });
+      try {
+        await expect(reach("seed", ["--env", "production"])).rejects.toBe(error);
+      } finally {
+        spy.mockRestore();
+      }
+    },
+  );
+
+  it("does not take another refusal for the production guard", async () => {
+    const spy = vi.spyOn(commandRunner, "run").mockResolvedValueOnce({
+      code: 2,
+      out: [],
+      err: ["DATABASE_URL is not set"],
+    });
+    try {
+      await expect(reach("seed", ["--env", "production"])).rejects.toMatchObject({
+        name: "AssertionError",
+      });
+    } finally {
+      spy.mockRestore();
+    }
+  });
+});
 
 // What goes through today (#380): a hole, which its contract forbids, and a
 // question, where no line says what should happen.
@@ -129,7 +205,9 @@ describe("the staff roles, revoked", () => {
           [rows[0]?.id, `session ${n}`],
         );
       }
-      const result = await run("moderator", ["revoke", hmac(whose)], { DATABASE_URL: url });
+      const result = await commandRunner.run("moderator", ["revoke", hmac(whose)], {
+        DATABASE_URL: url,
+      });
       expect(result).toEqual({ code: 0, out: ["revoked"], err: [] });
       const { rows } = await pool.query<{ role: boolean; session: boolean }>(
         `SELECT EXISTS (SELECT 1 FROM moderator_roles m WHERE m.identity_id = i.id) AS role,
@@ -251,8 +329,29 @@ describe("what a failure prints", () => {
       cwd: resolve(import.meta.dirname, "..", ".."),
       env: { PATH: process.env.PATH ?? "", DATABASE_URL: databaseUrl },
     }).then(
-      ({ stdout, stderr }) => `${stdout}${stderr}`,
-      (error: { stdout?: string; stderr?: string }) => `${error.stdout ?? ""}${error.stderr ?? ""}`,
+      () => {
+        throw new Error("the nonexistent database unexpectedly accepted the command");
+      },
+      (error: unknown) => {
+        if (
+          !(error instanceof Error) ||
+          !("code" in error) ||
+          error.code !== 1 ||
+          ("killed" in error && error.killed) ||
+          ("signal" in error && error.signal != null) ||
+          !("stderr" in error) ||
+          typeof error.stderr !== "string"
+        ) {
+          throw error;
+        }
+        // A loader failure or a runtime exception that prints no password is
+        // not a successful redaction. The fixture must have reached Postgres.
+        expect(error.stderr).toMatch(
+          /database "kuutti_no_such_[^"]+" does not exist|password authentication failed for user/,
+        );
+        const stdout = "stdout" in error && typeof error.stdout === "string" ? error.stdout : "";
+        return `${stdout}${error.stderr}`;
+      },
     );
 
   // A failed connection names the database it asked for, which is no secret: the control.
