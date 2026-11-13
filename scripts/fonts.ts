@@ -35,7 +35,7 @@
  *   node scripts/fonts.ts --self-test
  * Never prints the credential. Needs Node 22.18+ (type stripping).
  */
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
@@ -305,7 +305,53 @@ async function selfTest(): Promise<void> {
       fail("a malformed token", "the logs hold it");
     }
     if (upload("Not A Bucket", home) !== 2) fail("upload", "took a bad bucket name");
+    // Attacks (#380): a bucket that is no name stops the upload before the faces are looked for;
+    // the control is the line after them, a name, which gets as far as the faces that are not here.
+    for (const bucket of [
+      "kuutti-staging-admin/elsewhere",
+      "s3://kuutti-staging-admin",
+      "kuutti-staging-admin\n",
+      "--check",
+      "",
+    ]) {
+      if (upload(bucket, home) !== 2) fail("upload", `took ${JSON.stringify(bucket)} for a name`);
+    }
     if (upload("kuutti-staging-admin", home) !== 1) fail("upload", "went ahead without the files");
+
+    // attack (#380): the first file is Spoke's and the second is not, and the first is written
+    process.env.FONTS_TOKEN = token;
+    const secondChanged: Get = (url, init) =>
+      serve(200, url.includes("/WOFF2/") ? other : bytes)(url, init);
+    if ((await fetchMissing(list, false, secondChanged)) !== 1 || missing(list).length !== 2) {
+      fail("one changed file of two", "something was written");
+    }
+    // control: both are Spoke's, and both are written
+    if ((await fetchMissing(list, false, serve(200))) !== 0 || missing(list).length !== 0) {
+      fail("two files as delivered", "not written");
+    }
+
+    // Attacks (#380): on a GitHub runner nothing of this runs. The script itself, in a home of its
+    // own and with an empty PATH (no gh, no aws): each line on a runner, and its control off one.
+    for (const [args, elsewhere] of [
+      [[], 0],
+      [["--check"], 1],
+      [["--upload", "kuutti-staging-admin"], 1],
+    ] as const) {
+      const run = (runner: Record<string, string>) =>
+        spawnSync(process.execPath, [import.meta.filename, ...args], {
+          env: { HOME: join(home, "runner"), PATH: "", ...runner },
+          encoding: "utf8",
+        });
+      const on = run({ GITHUB_ACTIONS: "true" });
+      if (on.status !== 2) fail(`on a runner, ${args.join(" ") || "no flag"}`, `exit ${on.status}`);
+      const off = run({});
+      if (off.status !== elsewhere) {
+        fail(
+          `off a runner, ${args.join(" ") || "no flag"}`,
+          `exit ${off.status}: ${off.stdout}${off.stderr}`,
+        );
+      }
+    }
   } finally {
     console.log = log;
     console.error = error;

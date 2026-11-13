@@ -1,11 +1,9 @@
-import { execFile } from "node:child_process";
 import { generateKeyPairSync } from "node:crypto";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { promisify } from "node:util";
 import { DEMO_SIZE_MAX, PHOTOS_MANIFEST } from "@kuutti/db/demo";
-import { afterAll, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
+import { API_DIR, command, scratch } from "./run-command.ts";
 
 // The command lines' own refusals (#73, #141, #142, ADR-014, ADR-018), each in
 // a process of its own as the maintainer runs them. Every case here stops
@@ -15,38 +13,9 @@ import { afterAll, describe, expect, it } from "vitest";
 // runs that would fetch, reset or populate. What the commands do after their
 // checks is tested through the helpers under scripts/demo/.
 
-const run = promisify(execFile);
-const API_DIR = resolve(import.meta.dirname, "..");
-const scratch = mkdtempSync(join(tmpdir(), "kuutti-commands-"));
 // Nothing listens on port 1: were a check ever to let a command through, it would fail to connect, not write.
 const NOWHERE = "postgres://nobody:nothing@127.0.0.1:1/never";
 const LOCAL_BANK = "http://127.0.0.1:8080/ftn";
-
-afterAll(() => {
-  rmSync(scratch, { recursive: true, force: true });
-});
-
-type Outcome = { code: number; stdout: string; stderr: string };
-
-async function command(
-  script: string,
-  args: readonly string[],
-  env: Record<string, string> = {},
-): Promise<Outcome> {
-  return run(process.execPath, ["--import", "tsx", `scripts/${script}`, ...args], {
-    cwd: API_DIR,
-    // A home of its own: no cache of the user's is read.
-    env: { PATH: process.env.PATH ?? "", HOME: scratch, ...env },
-    timeout: 30_000,
-  }).then(
-    ({ stdout, stderr }) => ({ code: 0, stdout, stderr }),
-    (error: { code?: number; stdout?: string; stderr?: string }) => ({
-      code: error.code ?? -1,
-      stdout: error.stdout ?? "",
-      stderr: error.stderr ?? "",
-    }),
-  );
-}
 
 const TIMEOUT = 60_000;
 

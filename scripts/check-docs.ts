@@ -113,6 +113,8 @@ function selfTest(): void {
     { file: "docs/architecture/README.md", draws: undefined },
   ];
   const all = () => true;
+  const socket = "apps/api/src/chat/ws.ts";
+  const asks = [`${view} draws what this change touches`];
   const cases: Array<[string, Doc[], (entry: string) => boolean, string[], string, string[]]> = [
     ["nothing drawn changes", docs, all, ["apps/api/src/app.ts"], "", []],
     ["a drawn file changes", docs, all, ["apps/api/src/chat/ws.ts"], "", [`${view} draws`]],
@@ -208,6 +210,41 @@ function selfTest(): void {
       "",
       [],
     ],
+    // attack: a line that names the view by its file's name alone says it still true
+    ["the view named without its folder", docs, all, [socket], "Still-true: chat.md", asks],
+    // control: the view named by its path
+    ["the view named by its path", docs, all, [socket], `Still-true: ${view}`, []],
+    // attack: the line set in from the margin, as a message quotes another, says it still true
+    ["the line set in", docs, all, [socket], `    Still-true: ${view}`, asks],
+    // control: the same line at the margin, after another line
+    ["the line at the margin", docs, all, [socket], `A subject\n\nStill-true: ${view}`, []],
+    // attack: the words without their hyphen say it still true
+    ["the words without the hyphen", docs, all, [socket], `Still true: ${view}`, asks],
+    // control: the words with it, in capitals
+    ["the words in capitals", docs, all, [socket], `STILL-TRUE: ${view}`, []],
+    // attack: a file in a folder whose name only starts like a drawn folder's asks for a redraw
+    ["a folder that starts the same", docs, all, ["infra/modules/media-old/main.tf"], "", []],
+    // control: a file deep in the drawn folder
+    ["a file deep in the folder", docs, all, ["infra/modules/media/edge/main.tf"], "", asks],
+    // attack: a file whose name only starts with a drawn file's asks for a redraw
+    ["a file that starts the same", docs, all, [`${socket}.bak`], "", []],
+    // control: the drawn file among others
+    ["the drawn file among others", docs, all, ["README.md", socket], "", asks],
+    // attack: a spec's file in a drawn folder is passed over as a test's is
+    ["a spec in a drawn folder", docs, all, ["infra/modules/media/x.spec.ts"], "", asks],
+    // control: a test's file beside it
+    ["a test's .tsx in a drawn folder", docs, all, ["infra/modules/media/x.test.tsx"], "", []],
+    // attack: a redrawn view is excused a path of its block that is gone
+    [
+      "a redrawn view with a path that is gone",
+      docs,
+      (entry) => entry !== socket,
+      [view],
+      "",
+      [`${view} draws ${socket}, which is not in the repository`],
+    ],
+    // control: the redrawn view with every path there
+    ["a redrawn view with its paths", docs, all, [view], "", []],
   ];
   for (const [name, given, exists, changed, messages, expected] of cases) {
     expectProblems(name, problemsOf(given, exists, changed, messages), expected);

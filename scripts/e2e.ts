@@ -544,6 +544,28 @@ async function selfTest(): Promise<never> {
     [["--device", ","], noDevice],
     [["--device", `${udid},`], noDevice],
     [["--device", udid, "--device", "emulator-5554"], "--device is given twice"],
+    // Attacks (#380): each row tries what must be refused, and the row after it is its control.
+    // attack: a stretch that is none, 0 of 4, is read as no stretch, and every flow runs
+    [["--shard", "0/4"], "--shard wants i/n with 1 <= i <= n, not 0/4"],
+    // control: the first of four
+    [["--shard", "1/4"], `{"global":[],"shard":"1/4","args":[]}`],
+    // attack: --shard after a separator in the middle of the line is Maestro's, and every flow runs
+    [
+      ["--format", "junit", "--", "--shard", "2/4"],
+      `{"global":[],"shard":"2/4","args":["--format","junit"]}`,
+    ],
+    // control: the same line without the separator
+    [
+      ["--format", "junit", "--shard", "2/4"],
+      `{"global":[],"shard":"2/4","args":["--format","junit"]}`,
+    ],
+    // attack: a device named after a separator is Maestro's word, and the run takes any device
+    [
+      ["--", "--device", "--", "emulator-5554"],
+      `{"global":["--device","emulator-5554"],"args":[]}`,
+    ],
+    // control: the same device with no separator
+    [["--device", "emulator-5554"], `{"global":["--device","emulator-5554"],"args":[]}`],
   ];
   const failed = cases.filter(([argv, expected]) => outcome(argv) !== expected);
   for (const [argv, expected] of failed) {
