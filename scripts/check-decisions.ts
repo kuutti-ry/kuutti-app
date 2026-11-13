@@ -146,6 +146,24 @@ INSERT INTO "ponds" ("slug", "name") VALUES ('suomi', 'Suomi');`;
     ["a key a later migration deletes", deleted, expectedDeleted],
     ["a key a later migration renames", renamed, expectedRenamed],
     ["a key written again after it was deleted", again, expectedAgain],
+    // attack: an update of a key's value is read as a rename and takes the key away
+    [
+      "a key whose value an update changes",
+      keysAfter(
+        expectedDeleted,
+        `UPDATE "matching_config" SET "value" = '"meri"'::jsonb WHERE "key" = 'default_pond';`,
+      ),
+      expectedDeleted,
+    ],
+    // control: the same statement renaming the key
+    [
+      "a key the same statement renames",
+      keysAfter(
+        expectedDeleted,
+        `UPDATE "matching_config" SET "key" = 'meri' WHERE "key" = 'default_pond';`,
+      ),
+      ["photo_fetches_per_day", "meri"],
+    ],
   ] as const) {
     if (JSON.stringify(got) !== JSON.stringify(expected)) {
       console.error(`✖ self-test, ${what}: expected ${JSON.stringify(expected)}`);
@@ -190,11 +208,63 @@ INSERT INTO "ponds" ("slug", "name") VALUES ('suomi', 'Suomi');`;
       `${header}\n| A \\| rule | 10 | \`like_expiry_days\` | | | |\n${row("`default_pond`")}`,
       [],
     ],
+    // attack: a key named in a Where cell without its backticks counts as a row
+    [
+      "a key without backticks",
+      `${header}\n${row("`like_expiry_days`")}\n${row("default_pond")}`,
+      ["matching_config default_pond has no row"],
+    ],
+    // control: the same cell with them
+    [
+      "a key with backticks",
+      `${header}\n${row("`like_expiry_days`")}\n${row("`default_pond`")}`,
+      [],
+    ],
+    // attack: a key named with the table's name in front counts as a row
+    [
+      "a key behind the table's name",
+      `${header}\n${row("`like_expiry_days`")}\n${row("`matching_config.default_pond`")}`,
+      ["matching_config default_pond has no row"],
+    ],
+    // control: the table's name outside the backticks
+    [
+      "the table's name beside the key",
+      `${header}\n${row("`like_expiry_days`")}\n${row("matching_config `default_pond`")}`,
+      [],
+    ],
+    // attack: a row commented out counts as a row
+    [
+      "a row in a comment",
+      `${header}\n${row("`like_expiry_days`")}\n<!-- ${row("`default_pond`")} -->`,
+      ["matching_config default_pond has no row"],
+    ],
+    // control: the comment after the row
+    [
+      "a row before a comment",
+      `${header}\n${row("`like_expiry_days`")}\n${row("`default_pond`")}\n<!-- checked -->`,
+      [],
+    ],
+    // attack: a column whose heading only starts with Where counts as the Where column
+    [
+      "a column headed Where it lives",
+      both.replace("| Where |", "| Where it lives |"),
+      ["docs/decisions.md has no table with a Where column"],
+    ],
+    // control: the heading in lower case
+    ["a column headed where", both.replace("| Where |", "| where |"), []],
+    // attack: a key that is gone hides behind a live one in the same cell
+    [
+      "a gone key second in a cell",
+      `${header}\n${row("`like_expiry_days`, `like_expiry_hours`")}\n${row("`default_pond`")}`,
+      ["docs/decisions.md names `like_expiry_hours` in a Where cell"],
+    ],
+    // control: two live keys in one cell
+    ["two live keys in a cell", `${header}\n${row("`like_expiry_days`, `default_pond`")}`, []],
   ];
   for (const [name, register, expected] of cases) {
     expectProblems(name, problemsOf(keys, register), expected);
   }
-  console.log(`✔ check-decisions self-test: ${cases.length + 4} cases`);
+  console.log(`✔ check-decisions self-test: ${cases.length + 6} cases`);
 }
 
 if (process.argv.includes("--self-test")) selfTest();

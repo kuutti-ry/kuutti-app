@@ -495,6 +495,10 @@ async function selfTest(): Promise<void> {
       ["markup", "<b>Kallio</b>"],
       ["nothing", " "],
       ["a name too long", "K".repeat(NAME_MAX + 1)],
+      // Attacks (#380): a name that would change the file it lands in, or how it is read, is
+      // written; their control is the fixture's own names, written and read back above.
+      ["a dollar sign", "Kallio $HOME"],
+      ["a mark that turns the reading order", "Kallio\u202Eoillak"],
     ] as const) {
       await refused(`an area with ${name}`, serve([area({ nimi: hostile })]), "a name this list");
       await refused(
@@ -518,6 +522,14 @@ async function selfTest(): Promise<void> {
       ["degrees for metres", { euref_y: 60 }, "out of bounds"],
       ["no inhabitants field", { he_vakiy: null }, "a whole number"],
       ["minus two inhabitants", { he_vakiy: -2 }, "out of bounds"],
+      // Attacks (#380): a code that only looks like five digits is taken; their control is the
+      // fixture's own codes, written and read back above.
+      [
+        "a code in digits of another script",
+        { postinumeroalue: "００１００" },
+        "a code of 5 digits",
+      ],
+      ["a code with a line break after it", { postinumeroalue: "00100\n" }, "a code of 5 digits"],
     ] as const) {
       await refused(name, serve([area(change)]), words);
     }
@@ -578,6 +590,13 @@ async function selfTest(): Promise<void> {
       [["--year", "2026", "--year", "2025"], "--year is given twice"],
       [["--force"], "unknown argument --force"],
       [["2026"], "unknown argument 2026"],
+      // Attacks (#380): a year that would reach another layer or another year's is read; their
+      // control is "the year asked", above.
+      [["--year", "2026&typeName=x"], "--year takes a year"],
+      [["--year", "2026\n"], "--year takes a year"],
+      [["--year", "２０２６"], "--year takes a year"],
+      [["--year=2026", "--year=2025"], "--year is given twice"],
+      [["--YEAR", "2025"], "unknown argument --YEAR"],
     ] as const) {
       let message = "not refused";
       try {

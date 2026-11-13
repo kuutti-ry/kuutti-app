@@ -1399,6 +1399,55 @@ async function selfTest(): Promise<never> {
       `staging ${STAGING} 0.5 60 16 1000 - 0`,
       { APP_ENV: "staging" },
     ],
+    // Attacks (#380): each row tries what must be refused, and the row after it is its control.
+    // attack: production on a port of its own is not production by name, and is driven
+    [
+      ["--target", "https://api.kuutti.app:8443"],
+      "api.kuutti.app is production: the load smoke never runs there",
+    ],
+    // control: this computer on that port
+    [["--target", "http://localhost:8443"], "local http://localhost:8443 0.5 60 16 1000 - 0"],
+    // attack: another port of staging's host, which is not the API, is taken for staging
+    [
+      ["--target", "https://api.staging.kuutti.app:8443", "--confirm-staging"],
+      neither("api.staging.kuutti.app:8443"),
+    ],
+    // control, of the row above and of the row below: staging with the port that is its own
+    [
+      ["--target", "https://api.staging.kuutti.app:443", "--confirm-staging"],
+      `staging ${STAGING} 0.5 60 16 1000 - 0`,
+    ],
+    // attack: a host whose name only begins with staging's is taken for staging
+    [
+      ["--target", "https://api.staging.kuutti.app.example.org", "--confirm-staging"],
+      neither("api.staging.kuutti.app.example.org"),
+    ],
+    // attack: staging is driven on a confirmation that is mistyped
+    [["--target", STAGING, "--confirm_staging"], "unknown option --confirm_staging"],
+    // control: the confirmation as it is written
+    [["--target", STAGING, "--confirm-staging"], `staging ${STAGING} 0.5 60 16 1000 - 0`],
+    // attack: production's APP_ENV in capitals is not production, and the run goes ahead
+    [
+      ["--target", local],
+      "APP_ENV says Production, and the target is this computer",
+      { APP_ENV: "Production" },
+    ],
+    // control: a developer's APP_ENV
+    [["--target", local], `local ${local} 0.5 60 16 1000 - 0`, { APP_ENV: "development" }],
+    // attack: a rate past the cap, written in hexadecimal, is taken
+    [["--target", local, "--rates", "0x33"], rates("0x33")],
+    // control: the cap itself, written the same way
+    [["--target", local, "--rates", "0x32"], `local ${local} 50 60 16 1000 - 0`],
+    // attack: eight stages a second longer than the run may last are taken
+    [
+      ["--target", local, "--rates", "1,1,1,1,1,1,1,1", "--stage", "76"],
+      "the run would last 608 s; at most 600 (an access token lives fifteen minutes and is refreshed once, at the start)",
+    ],
+    // control: eight stages of the longest the run may last
+    [
+      ["--target", local, "--rates", "1,1,1,1,1,1,1,1", "--stage", "75"],
+      `local ${local} 1,1,1,1,1,1,1,1 75 16 1000 - 0`,
+    ],
   ];
   for (const [argv, want, env] of lines)
     expect(`parseArgs ${JSON.stringify(argv)}`, outcome(argv, env), want);
@@ -2257,6 +2306,23 @@ async function standInRuns(
       );
       expect(`${what}: the file`, existsSync(file) ? readFileSync(file, "utf8") : null, before);
     }
+    // Attacks on the file (#380): each expectation tries a file that must be refused (it is read as
+    // a refusal, a string), and the one after it is its control (it is read as sessions).
+    const read = (file: string, target: URL = idle.url) => typeof readSessions(file, target);
+    // attack: a file its owner's group can read is taken
+    expect(
+      "a file a group can read",
+      read(sessionsFile("g", ours(idle.url, one), 0o640)),
+      "string",
+    );
+    // control: the same file, its owner's alone
+    expect("that file, its owner's alone", read(sessionsFile("g2", ours(idle.url, one))), "object");
+    // attack: sessions of the API on the port beside the target's are sent to the target
+    const beside = new URL(`http://127.0.0.1:${Number(idle.url.port) - 1}`);
+    expect("the API on the port beside", read(sessionsFile("q", ours(beside, one))), "string");
+    // control: this computer's API by another of its names, on the target's port
+    const named = new URL(`http://localhost:${idle.url.port}`);
+    expect("this API by another name", read(sessionsFile("q2", ours(named, one))), "object");
     await idle.close();
     expect("what the refused files asked", idle.seen, []);
     return runs;
