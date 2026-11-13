@@ -7,9 +7,6 @@ import { people } from "../test/people.ts";
 import { rolledBack } from "../test/rolled-back.ts";
 import { applySanction, endSuspensions } from "./sanctions.ts";
 
-// What goes through today (#380): a hole, which its contract forbids.
-const HOLE = "#380";
-
 // end-suspensions (#307, ADR-024 §5, #380): every night, every open
 // suspension past its end is closed by nobody and its account settled from
 // what is still open, one account per transaction. Each attack tries to make
@@ -137,7 +134,16 @@ async function behindTheStuck(othersEndOn: string) {
     for (const at of [NIGHT, NEXT_NIGHT]) {
       // The night's runner logs a job that throws; only the planted failure may be thrown here.
       await endSuspensions(db2, at).catch((error: unknown) => {
-        if (!(error instanceof Error && error.message === STUCK)) throw error;
+        const planted = (item: unknown) => item instanceof Error && item.message === STUCK;
+        if (
+          !(
+            planted(error) ||
+            (error instanceof AggregateError &&
+              error.errors.length > 0 &&
+              error.errors.every(planted))
+          )
+        )
+          throw error;
       });
     }
     return {
@@ -152,8 +158,6 @@ async function behindTheStuck(othersEndOn: string) {
 attack(
   "end-suspensions: one person the night cannot settle keeps the others suspended past their day, that night and the next",
   {
-    // Goes through today: the loop over the accounts has no catch, so one that fails ends the job, every night.
-    open: HOLE,
     attempt: () => behindTheStuck(ENDS_ON),
     // The others end after both nights: their suspensions are open by right.
     control: () => behindTheStuck("2026-10-20"),

@@ -326,6 +326,8 @@ describe("a person's page", () => {
     // The photos: state, the reason a rejection named, the upload's time; no picture yet.
     const photos = screen.getAllByRole("button", { name: "Show photo" });
     expect(photos).toHaveLength(2);
+    expect(photos[0]).toHaveAccessibleDescription(`approved · ${when(UPLOADED)}`);
+    expect(photos[1]).toHaveAccessibleDescription(`rejected · no_person · ${when(UPLOADED)}`);
     const [approved, rejected] = photos.map((button) => button.closest("li"));
     expect(approved).toHaveTextContent(`approved · ${when(UPLOADED)}`);
     expect(rejected).toHaveTextContent(`rejected · no_person · ${when(UPLOADED)}`);

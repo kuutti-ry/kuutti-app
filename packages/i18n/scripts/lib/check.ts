@@ -49,7 +49,7 @@ const RELEASED_TRANSLATIONS: readonly string[] = TRANSLATED_LOCALES.filter((loca
 );
 
 // A wording the association's counsel has not yet replaced (#46, ADR-010).
-const DRAFT_VERSION = /draft/i;
+const DRAFT_VERSION = /draft|luonnos|utkast/i;
 // Anywhere in the wording, as its own word, however it is capitalised.
 const DRAFT_TEXT = /(?<![\p{L}])(DRAFT|LUONNOS|UTKAST)(?![\p{L}])/iu;
 

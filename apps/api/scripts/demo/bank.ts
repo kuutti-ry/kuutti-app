@@ -65,6 +65,8 @@ export function whyNotTheLocalStore(
     return "S3_FORCE_PATH_STYLE is not true, so the bucket's name would be part of the host's";
   }
   if (/^arn:/i.test(store.bucket)) return "S3_BUCKET is an ARN, which names an endpoint of its own";
+  if (/(?:--op-s3|-s3alias)$/i.test(store.bucket))
+    return "S3_BUCKET is an access point alias, which names an endpoint of its own";
   return null;
 }
 
@@ -96,7 +98,15 @@ function rateLimited(response: Response): boolean {
  * seventy of the address's window, so a second reset within one minute would
  * otherwise stop half way (docs/demo/runbook.md).
  */
+function localApi(context: BankContext): void {
+  const url = URL.canParse(context.api) ? new URL(context.api) : null;
+  if (!url || !onThisComputer(url) || !["http:", "https:"].includes(url.protocol)) {
+    throw new DemoError("the personas need an API on this computer: nothing was sent");
+  }
+}
+
 async function patient(context: BankContext, input: URL, init?: RequestInit): Promise<Response> {
+  localApi(context);
   const first = await context.fetch(input, init);
   if (!rateLimited(first)) return first;
   const asked = Number(first.headers.get("retry-after"));
@@ -186,6 +196,7 @@ async function bankOf(context: BankContext, locale: Locale, challenge: string): 
 export async function lookAtApi(
   context: BankContext & { db: Queryable },
 ): Promise<{ commit: string; bank: string }> {
+  localApi(context);
   // Not followed anywhere: whoever answers here answers for itself.
   const health = await context
     .fetch(new URL("/health", context.api), { redirect: "manual" })

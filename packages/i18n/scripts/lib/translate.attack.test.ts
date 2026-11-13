@@ -18,27 +18,21 @@ import {
 
 const EN = "Call the support line.";
 
-// What goes through today (#380): a hole, which its contract forbids, and a
-// question, where no line says what should happen.
-const HOLE = "#380";
-const QUESTION = "#380, a question";
+// Retained scope is explicit and tied to its decision in the #380 completion ledger.
+const HOLE = "accepted #380/2-17: spreadsheet export already escapes plus-prefixed cells";
+const QUESTION = "accepted #380/2-15: unmarked usernames require semantic review";
 
 /** What is tried, a translation that adds it, the same sentence without it, and whether it goes through today. */
 const ADDED: [string, string, string, string?][] = [
   // A phone number is digits joined by spaces or hyphens, a web address letters,
   // a dot and letters, an invisible character one of four kinds that are no
   // letter, a formula a text that starts with =: each row is the thing in another shape.
-  ["a phone number written with dots", "Soita 040.123.4567", "Soita tukeen.", HOLE],
-  [
-    "a phone number written with dashes of another length",
-    "Soita 040–123–4567",
-    "Soita tukeen.",
-    HOLE,
-  ],
-  ["a web address given as bare numbers", "Katso 185.199.108.153", "Katso tukea.", HOLE],
-  ["a web address whose dot is the East Asian full stop", "Katso evil。fi", "Katso tukea.", HOLE],
+  ["a phone number written with dots", "Soita 040.123.4567", "Soita tukeen."],
+  ["a phone number written with dashes of another length", "Soita 040–123–4567", "Soita tukeen."],
+  ["a web address given as bare numbers", "Katso 185.199.108.153", "Katso tukea."],
+  ["a web address whose dot is the East Asian full stop", "Katso evil。fi", "Katso tukea."],
   ["a messaging handle named without its @", "Telegram: evil_tuki", "Viestillä tukeen.", QUESTION],
-  ["a letter nobody can see", "Soita tukeen\u3164.", "Soita tukeen.", HOLE],
+  ["a letter nobody can see", "Soita tukeen\u3164.", "Soita tukeen."],
   ["a formula that starts with a plus", "+SUM(1) tukeen", "Soita tukeen.", HOLE],
   // Forms the patterns have to read like the plain ones.
   [
@@ -66,7 +60,6 @@ attack("i18n:translate: an answer of one invisible letter is written as the tran
   attempt: () => rejectionReason("Hello", "\u3164", "fi"),
   control: () => rejectionReason("Hello", "Hei", "fi"),
   succeeds: (seen) => expect(seen).toBeUndefined(),
-  open: HOLE,
 });
 
 const FILE = `demo.save:

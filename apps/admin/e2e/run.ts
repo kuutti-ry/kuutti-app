@@ -44,8 +44,10 @@ import {
   mkdtempSync,
   openSync,
   readFileSync,
+  realpathSync,
   rmSync,
   statSync,
+  symlinkSync,
   writeFileSync,
 } from "node:fs";
 import { createServer, request, type Server } from "node:http";
@@ -518,6 +520,10 @@ function hostHeaders(
   apiOrigin: string,
   localImages: readonly string[],
 ): Record<string, string> {
+  // Comments outside strings have no policy meaning. Keep quoted URLs and interpolation intact.
+  tf = tf.replace(/"(?:\\.|[^"\\])*"|\/\*[\s\S]*?\*\/|(?:#|\/\/)[^\n]*/g, (part) =>
+    part.startsWith('"') ? part : part.replace(/[^\n]/g, " "),
+  );
   const list = /content_security_policy\s*=\s*join\("; ",\s*\[([\s\S]*?)\]\)/.exec(tf)?.[1];
   if (!list) throw new Error('no content_security_policy = join("; ", [...]) in the module');
   const directives = list
@@ -594,21 +600,26 @@ const TYPES: Readonly<Record<string, string>> = {
  * key a client could hold included, every answer with the policy's headers.
  */
 function panelServer(dir: string, headers: Record<string, string>): Server {
-  const root = resolve(dir);
+  const root = realpathSync(dir);
+  const fallback = realpathSync(join(root, "index.html"));
+  if (!fallback.startsWith(root + sep) || !statSync(fallback).isFile()) {
+    throw new Error("the panel index must be a file inside the build directory");
+  }
   return createServer((incoming, response) => {
     for (const [name, value] of Object.entries(headers)) response.setHeader(name, value);
     if (incoming.method !== "GET" && incoming.method !== "HEAD") {
       response.writeHead(405).end();
       return;
     }
-    let file = join(root, "index.html");
+    let file = fallback;
     try {
       const path = normalize(
         decodeURIComponent(new URL(incoming.url ?? "/", "http://panel").pathname),
       );
       const asked = join(root, path);
       if (asked.startsWith(root + sep) && existsSync(asked) && statSync(asked).isFile()) {
-        file = asked;
+        const actual = realpathSync(asked);
+        if (actual.startsWith(root + sep)) file = actual;
       }
     } catch {
       // A malformed escape names no file: the app answers it, as CloudFront would.
@@ -720,6 +731,13 @@ ${extra}
 `;
   const own = `"img-src 'self' \${var.api_origin}",`;
   const minimal = hostHeaders(fixture(own), api, []);
+  for (const comment of ['// "script-src *",', '/* "script-src *", */', '# "script-src *",']) {
+    check(
+      "CSP ignores comments",
+      hostHeaders(fixture(`${comment}\n${own}`), api, [])["Content-Security-Policy"] ===
+        `img-src 'self' ${api}`,
+    );
+  }
   check(
     "no stand-in when none is given",
     minimal["Content-Security-Policy"] === `img-src 'self' ${api}`,
@@ -834,6 +852,11 @@ ${extra}
   writeFileSync(join(dir, "assets", "app.js"), "export {};");
   const secret = join(tmpdir(), "kuutti-e2e-admin-secret.txt");
   writeFileSync(secret, "outside");
+  symlinkSync(secret, join(dir, "assets", "outside.txt"));
+  const outsideIndex = join(dir, "outside-index");
+  mkdirSync(outsideIndex);
+  symlinkSync(secret, join(outsideIndex, "index.html"));
+  throws("the fallback index is outside the build", () => panelServer(outsideIndex, {}));
   // attack (#380): a file beside the build, in a name the build's own only goes on to, is served;
   // its control is "a file is itself", a file of the build.
   const beside = `${dir}-beside.txt`;
@@ -856,6 +879,7 @@ ${extra}
     const page = await fetch(`${base}/reports/123`);
     check("a path is the app", page.status === 200 && (await page.text()).includes("<title>panel"));
     for (const path of [
+      "/assets/outside.txt",
       "/../kuutti-e2e-admin-secret.txt",
       "/assets/../../kuutti-e2e-admin-secret.txt",
       "/%2e%2e%2fkuutti-e2e-admin-secret.txt",

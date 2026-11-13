@@ -1,0 +1,53 @@
+# #380: the same links show the owner's data with a session, then no data
+# after logout. Ordinary refusal assertions: a broken route or an API that
+# never answered cannot satisfy the controls before logout.
+appId: fi.kuutti.app
+name: Links to the card, photos and conversations cannot restore data after logout
+---
+- runFlow: ../common/sign-in.yaml
+- openLink: kuutti://profile/card
+- extendedWaitUntil:
+    visible: "Sanna, \\d+"
+    timeout: 15000
+- openLink: kuutti://photos
+- extendedWaitUntil:
+    visible: "Main photo|Pääkuva|Huvudfoto"
+    timeout: 15000
+- openLink: kuutti://chats
+- extendedWaitUntil:
+    visible: "Antti, \\d+(, .*)?"
+    timeout: 15000
+- openLink: kuutti://
+- extendedWaitUntil:
+    visible: "Your profile|Profiilisi|Din profil"
+    timeout: 15000
+- runFlow: ../common/sign-out.yaml
+- assertVisible: "Sign in with your bank|Kirjaudu pankkitunnuksilla|Logga in med din bank|How we do things here|Näin täällä toimitaan|Så här gör vi här"
+
+# attack: signed-out-card. The heading proves the link still reached its screen.
+- openLink: kuutti://profile/card
+- extendedWaitUntil:
+    visible: "Something unexpected went wrong\\.|Jokin meni odottamatta pieleen\\.|Något oväntat gick fel\\."
+    timeout: 15000
+- assertVisible: "Your card|Korttisi|Ditt kort"
+- assertNotVisible: "Sanna, \\d+"
+- assertNotVisible: "Photo \\d+ of \\d+|Kuva \\d+ / \\d+|Foto \\d+ av \\d+"
+
+# attack: signed-out-photos.
+- openLink: kuutti://photos
+- extendedWaitUntil:
+    visible: "That did not go through\\. Try again\\.|Se ei onnistunut\\. Yritä uudelleen\\.|Det gick inte\\. Försök igen\\."
+    timeout: 15000
+- assertNotVisible: "Main photo|Pääkuva|Huvudfoto"
+- assertNotVisible: "Open photo \\d+|Avaa kuva \\d+|Öppna foto \\d+"
+
+# attack: signed-out-conversations.
+- openLink: kuutti://chats
+- extendedWaitUntil:
+    visible: "Something unexpected went wrong\\.|Jokin meni odottamatta pieleen\\.|Något oväntat gick fel\\."
+    timeout: 15000
+- assertNotVisible: "Antti, \\d+(, .*)?"
+- openLink: kuutti://
+- extendedWaitUntil:
+    visible: "Sign in with your bank|Kirjaudu pankkitunnuksilla|Logga in med din bank|How we do things here|Näin täällä toimitaan|Så här gör vi här"
+    timeout: 15000

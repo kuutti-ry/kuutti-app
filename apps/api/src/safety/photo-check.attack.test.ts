@@ -4,9 +4,6 @@ import { people } from "../test/people.ts";
 import { rolledBack } from "../test/rolled-back.ts";
 import { prunePhotoCheckNotes } from "./photo-check.ts";
 
-// What goes through today (#380): a question, where no line says what should happen.
-const QUESTION = "#380, a question";
-
 // prune-photo-check-notes (#253, #380): "a note older than twelve months goes"
 // (photo-check.ts), "kept twelve months" (rules/db.md, docs/decisions.md).
 // Each attack tries to make a night take a note before its twelve months.
@@ -45,8 +42,6 @@ const LEAP_NIGHT = new Date("2028-03-01T02:00:00.000Z");
 attack(
   "prune-photo-check-notes: across a leap day, a note is pruned before it is twelve months old",
   {
-    // Goes through today: the cut is 365 days of 24 hours, which a leap year makes less than twelve months; pruned early, the safe side.
-    open: QUESTION,
     attempt: () => pruned(new Date("2027-03-01T12:00:00.000Z"), LEAP_NIGHT),
     control: () => pruned(new Date("2027-02-28T12:00:00.000Z"), LEAP_NIGHT),
     succeeds: (seen) => expect(seen.pruned).toBe(true),

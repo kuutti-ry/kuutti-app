@@ -20,32 +20,25 @@ async function logged(fields: Record<string, unknown>): Promise<string> {
 const reaches = (line: string) => expect(line).toContain(SECRET);
 const harmless = () => logged({ route: SECRET });
 
-// What goes through today (#380): a hole, which its contract forbids, and a
-// question, where no line says what should happen.
-const HOLE = "#380";
-const QUESTION = "#380, a question";
+// These forms now hold the same rule as their ordinary spellings (#380).
 
 /** What is tried, the fields logged, and whether the value goes through today. */
 const FIELDS: [string, Record<string, unknown>, string?][] = [
   // Another spelling of a field the list names: a field is known by its exact
   // name, letter for letter, at the top and one level down.
-  ["an e-mail address under Email, with a capital", { Email: SECRET }, HOLE],
-  ["an e-mail address under emailAddress", { emailAddress: SECRET }, HOLE],
-  [
-    "an identity code under personalIdentityCode, in camel case",
-    { personalIdentityCode: SECRET },
-    HOLE,
-  ],
-  ["a postal code under postal_code, in snake case", { postal_code: SECRET }, HOLE],
-  ["a request's Authorization header under its usual capital", { Authorization: SECRET }, HOLE],
-  ["several messages under messages", { messages: [SECRET] }, HOLE],
+  ["an e-mail address under Email, with a capital", { Email: SECRET }],
+  ["an e-mail address under emailAddress", { emailAddress: SECRET }],
+  ["an identity code under personalIdentityCode, in camel case", { personalIdentityCode: SECRET }],
+  ["a postal code under postal_code, in snake case", { postal_code: SECRET }],
+  ["a request's Authorization header under its usual capital", { Authorization: SECRET }],
+  ["several messages under messages", { messages: [SECRET] }],
   // Credentials the list does not name.
-  ["a session's token under token", { token: SECRET }, HOLE],
-  ["a refresh token under refreshToken", { refreshToken: SECRET }, HOLE],
-  ["a session cookie under set-cookie", { "set-cookie": SECRET }, HOLE],
+  ["a session's token under token", { token: SECRET }],
+  ["a refresh token under refreshToken", { refreshToken: SECRET }],
+  ["a session cookie under set-cookie", { "set-cookie": SECRET }],
   // A row of several is two levels down, its place in the list being one: past
   // what the list's header promises.
-  ["an e-mail address in a list of rows", { rows: [{ email: SECRET }] }, QUESTION],
+  ["an e-mail address in a list of rows", { rows: [{ email: SECRET }] }],
   // Forms the list has to read like the plain ones.
   ["an e-mail address one level down", { account: { email: SECRET } }],
   ["an identity code one level down", { claims: { hetu: SECRET } }],
@@ -79,14 +72,9 @@ const named = () => Object.assign(new Error("duplicate key value"), { code: SECR
 const ERRORS: [string, Record<string, unknown>, Record<string, unknown>, string?][] = [
   // An error is cut down to its kind only under err and error, and only while
   // it is still an Error: anywhere else its own fields are written as they are.
-  ["logged under e", { e: quoting() }, { e: named() }, HOLE],
-  ["logged in a list under errors", { errors: [quoting()] }, { errors: [named()] }, HOLE],
-  [
-    "spread into a plain object under err",
-    { err: { ...quoting() } },
-    { err: { ...named() } },
-    HOLE,
-  ],
+  ["logged under e", { e: quoting() }, { e: named() }],
+  ["logged in a list under errors", { errors: [quoting()] }, { errors: [named()] }],
+  ["spread into a plain object under err", { err: { ...quoting() } }, { err: { ...named() } }],
   // Forms the serializer has to read like the plain ones.
   ["logged under err", { err: quoting() }, { err: named() }],
   ["logged under error", { error: quoting() }, { error: named() }],

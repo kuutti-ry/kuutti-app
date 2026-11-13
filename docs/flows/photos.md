@@ -326,7 +326,7 @@ flowchart TB
   subgraph admin["The admin panel"]
     s66["Lists the waiting photos, the longest waiting first, and how many wait"]
     s67{"Did the check see a hard label at its review line?"}
-    s70["Shows the picture, its account, what the check saw, and Appealed if the owner asked"]
+    s70["Loads the picture before enabling Approve; shows its account, check and appeal"]
   end
   subgraph night["The night's jobs"]
     s77["Rejects it as not reviewed, naming nobody, with no appeal"]
@@ -359,8 +359,8 @@ flowchart TB
 68. The moderator chooses "Show photo".
 69. The API writes an audit row naming the moderator, then hands out the card-size picture through a link that works for a short while.
 70. The panel shows the picture; "Uploaded" and when; "Account" and its id, which is the link to the person's page, where the sanctions are ([Moderation](moderation.md#part-3-the-sanctions-and-what-each-does)); "Appealed" when the owner asked a person to look at the automatic rejection; and under "What the automatic check saw" the faces found ("No face found" when none) and the moderation labels with their confidence, or "Not checked automatically." The tips' signals, the description and the check's notes are not shown.
-71. "Approve" or "Reject…"? Approve stays unavailable until the picture has loaded, including after "Show photo" for a sensitive picture. Approve: 72. Reject: 74. When another moderator, or the night, decided the photo first, the first decision stands and the panel says "The decision was not saved. Refresh and try again."
-72. The API approves the photo, names the moderator on its review and in an audit row, and takes away the check's note on it, if it left one (step 23). The panel says "Approved" in the photo's place, and the count goes down.
+71. "Approve" stays unavailable until the picture itself has loaded: a link alone, a hidden sensitive photo, a pending image or a failed image never enables it. "Approve" or "Reject…"? Approve: 72. Reject: 74. When another moderator, or the night, decided the photo first, the first decision stands and the panel says "The decision was not saved. Refresh and try again."
+72. The API approves the photo, names the moderator on its review and in an audit row, and takes away the check's note on it, if it left one (step 23). The panel says "Approved" in the photo's place, moves focus to that outcome, and the count goes down.
 73. The owner's tile loses its hourglass and its "In review" the next time they open "Your photos"; nothing tells them sooner, though home's matching card reads the new answer whenever home comes to the front: part 4.
 74. The moderator chooses the "Reason the person is told" from the list: "Nudity", "No person visible", "Several people", "A child appears", "Violence or weapons", "Contact details, handle or link" or "Other". None is preset ("Choose a reason"), and "Reject photo" stays unavailable until one is chosen; "Cancel" goes back.
 75. The API rejects the photo with that reason and names the moderator on its review and in an audit row. A moderator's rejection leaves no note and offers no appeal. The panel says "Rejected" in the photo's place.
@@ -414,11 +414,11 @@ flowchart TB
 80. Beside each photo, "Show photo" fetches its card size, each look an audit row, about the photo on a person's page and about the report on a report's; beside an approved one stands "Take down…". A pointed photo its owner has removed since reads "Photo removed".
 81. The moderator chooses "Take down…".
 82. "Take down this photo": "Nobody else is given this photo from now on. The person keeps it in their own list with the reason you choose, and cannot appeal. Nothing is deleted, and it is not a sanction. Should they upload the same picture again, the automatic check looks at it, not a person." When it would leave fewer approved photos than a finished profile needs, the step adds that "until another is approved, nobody is shown their card and they read no queue." The "Reason the person is told" comes from the queue's list (step 74), none preset, and "Take down" stays unavailable until one is chosen.
-83. "Take down" or "Cancel"? Cancel: 80. Take down: 84.
+83. "Take down" or "Cancel"? Cancel or Escape before submission: 80. Take down: 84; while the request or its follow-up is pending, the step stays open with Cancel and Escape unavailable.
 84. Is the photo still approved, and still there? Yes: 86. No: 85.
 85. The panel says "The photo is no longer approved: it was taken down meanwhile. Reload the page to see it as it is." or "The photo is gone: its owner removed it meanwhile." Nothing is written. The flow ends here.
 86. The API rejects the photo with that reason, keyed on its approved state, so of two decisions at once one is written, and names the moderator on its review and in an audit row. Nothing is deleted, and it is no sanction: the person's standing, their other photos and the check's notes stay as they are.
-87. The panel says "Taken down." in the photos' own line and shows the photo as it now stands: a person's page is read again, which is another look in the audit log, and a report's page takes the new state from the answer and is not read again. The flow ends here for the moderator.
+87. The panel says "Taken down." in the photos' own line and shows the photo as it now stands: a person's page is read again, which is another look in the audit log, and a report's page takes the new state from the answer and is not read again. The completed take-down is not offered again while that page is being read. The flow ends here for the moderator.
 88. The owner's grid says the reason in words, such as "Not accepted. This photo does not fit Kuutti; try another one.", with no "Ask a person to look", the next time they open "Your photos"; nothing tells them sooner. The flow ends here.
 89. From then on nobody else is given the photo, though a link handed out before works out its short while, and the card shows the person's other approved photos. Left with fewer approved photos than a finished profile needs, the person is shown to nobody and reads no queue until another photo is approved (step 37). The flow ends here.
 
@@ -465,3 +465,4 @@ flowchart TB
 - 2026-11-07 (#636, PR #638): each night, the stored sizes no photo names any more are deleted once they are a day old.
 - 2026-11-07 (#616, PR #641): "Your photos" opened from the profile has the arrow back at the top beside "Done" at the end, and the profile's Photos row is starred as needed for the card.
 - 2026-11-13 (#657): approval waits for the picture to load; the nightly retry reaches every eligible pending photo once per run, including those behind failed checks.
+- 2026-11-13 (#380): approval waits for the actual image to load; its outcome receives focus, and a pending or completed take-down cannot be sent again through a stale page. The phone also ignores a late photo answer after a different photo was requested.

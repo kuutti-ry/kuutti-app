@@ -117,8 +117,8 @@ const moved = (key: string): Messages => ({
   },
 });
 
-// What goes through today (#380): a hole, which its contract forbids.
-const HOLE = "#380";
+// The native review report covers Finnish and Swedish; slang metadata remains a manual diff review.
+const HOLE = "accepted #380/2-17: slang approval metadata is reviewed in the diff";
 
 const UNNAMED: [string, Messages, Messages, string?][] = [
   // The comparison goes through Finnish and Swedish, the two languages the tool approves.

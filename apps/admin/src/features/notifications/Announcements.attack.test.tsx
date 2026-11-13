@@ -8,10 +8,6 @@ import { attack } from "../../test/attack.ts";
 import { held, json, network, on, sentTo, settled } from "../../test/network.ts";
 import { Announcements } from "./Announcements.tsx";
 
-// What goes through today (#380): a hole, which its contract forbids, and a question, where no line says what should happen.
-const HOLE = "#380";
-const QUESTION = "#380, a question";
-
 // Attacks on the announcements (#380, #573, ADR-068): the draft, the second
 // admin's approval that sends it to everybody, and the deletion, tried the
 // wrong way beside a control that does the same thing rightly.
@@ -110,8 +106,6 @@ async function writtenThen(press: "Refresh" | "Save") {
 }
 
 attack("Announcements: a refresh that fails throws away the announcement being written", {
-  // Goes through today: the form lives in the list's ready state, so a refresh empties it.
-  open: QUESTION,
   attempt: () => writtenThen("Refresh"),
   control: () => writtenThen("Save"),
   succeeds: (gone) => expect(gone).toBe(true),
@@ -193,8 +187,6 @@ async function savedWhileTyping(typedMeanwhile: boolean) {
 attack(
   "Announcements: a saved draft empties the Swedish typed after Save was pressed, which was never sent",
   {
-    // Goes through today: a saved draft empties the form, words typed meanwhile included.
-    open: QUESTION,
     attempt: () => savedWhileTyping(true),
     control: () => savedWhileTyping(false),
     succeeds: (swedish) => expect(swedish).toBe(""),
@@ -243,8 +235,6 @@ for (const [what, s] of Object.entries(steps)) {
   attack(
     `Announcements: Cancel closes the ${what} step while the request it cannot take back is out`,
     {
-      // Goes through today, for both steps: Cancel stays enabled while the request is out, and the closed step's answer still lands.
-      open: HOLE,
       attempt: () => cancelled(true),
       control: () => cancelled(false),
       succeeds: (seen) => expect(seen.closed).toBe(true),
@@ -299,8 +289,6 @@ async function pressedInStep(target: "what has the focus" | "Send to everybody")
 attack(
   "Announcements: one more Enter after opening the sending step sends the announcement to everybody",
   {
-    // Goes through today: the step puts the focus on its first control, Send to everybody.
-    open: QUESTION,
     attempt: () => pressedInStep("what has the focus"),
     control: () => pressedInStep("Send to everybody"),
     succeeds: (approvals) => expect(approvals).toBe(1),
@@ -328,10 +316,35 @@ async function sentByKeyboard(blurredAfter: boolean) {
 attack(
   "Announcements: the focus falls to the page's body after an announcement is sent from the keyboard",
   {
-    // Goes through today: the button that opened the step leaves with the draft, so the focus has nowhere to go back to.
-    open: QUESTION,
     attempt: () => sentByKeyboard(false),
     control: () => sentByKeyboard(true),
     succeeds: (onBody) => expect(onBody).toBe(true),
   },
 );
+
+async function draftAfterAccessReturns(saved: boolean) {
+  let reads = 0;
+  network([
+    on("GET", LIST, () => (++reads === 2 ? failure("admin_forbidden", 403) : listOf())),
+    on("POST", LIST, () => json(announcement(4, { yours: true }), 201)),
+  ]);
+  show();
+  await screen.findByText("Nothing is waiting.");
+  fill("English", EN);
+  fill("Finnish", FI);
+  if (saved) {
+    fireEvent.click(saveButton());
+    await settle();
+  }
+  fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
+  await settle();
+  expect(screen.queryByRole("group", { name: "English" })).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
+  await screen.findByText("Nothing is waiting.");
+  return field("English", "Title").value;
+}
+attack("Announcements: a temporary forbidden refresh loses unsaved words when access returns", {
+  attempt: () => draftAfterAccessReturns(false),
+  control: () => draftAfterAccessReturns(true),
+  succeeds: (title) => expect(title).toBe(""),
+});

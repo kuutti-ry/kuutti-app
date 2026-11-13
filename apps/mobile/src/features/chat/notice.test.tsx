@@ -1,5 +1,5 @@
 import { act, fireEvent, screen } from "@testing-library/react-native";
-import { router } from "expo-router";
+import { type Href, router } from "expo-router";
 import { renderRouter } from "expo-router/testing-library";
 import type { ReactNode } from "react";
 import { Pressable, Text } from "react-native";
@@ -38,7 +38,8 @@ async function opened(initialUrl: string, ...paths: string[]) {
   // RNTL 14 renders asynchronously; renderRouter's getters sit on its promise.
   const view = renderRouter(ROUTES, { initialUrl, wrapper });
   await view;
-  for (const path of paths) await act(async () => router.push(path));
+  // This stack uses the fixture routes above, not generated production route types.
+  for (const path of paths) await act(async () => router.push(path as Href));
   return {
     pathname: () => view.getPathname(),
     /** The app's stack, under expo-router's own __root: its screens, bottom first, by their route files. */

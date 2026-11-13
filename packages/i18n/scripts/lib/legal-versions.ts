@@ -118,6 +118,9 @@ export function legalVersionProblems(
   finnish: Readonly<Record<string, string>>,
 ): string[] {
   const problems: string[] = [];
+  if (Object.keys(app).length === 0 && Object.keys(published).length === 0) {
+    return ["no consent kinds to compare"];
+  }
   for (const [kind, version] of Object.entries(app)) {
     const site = published[kind];
     if (!site) {

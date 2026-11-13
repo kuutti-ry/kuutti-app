@@ -14,7 +14,7 @@ import { matchingConfigNumbers } from "../lib/matching-config.ts";
  */
 
 /** Twelve months, like the report snapshots of #84 (rules/db.md); the nightly prune keeps it. */
-export const NOTE_RETENTION_DAYS = 365;
+export const NOTE_RETENTION_MONTHS = 12;
 
 const CLOSER_LOOK_KEYS = {
   attempts: "photo_closer_look_attempts",
@@ -116,8 +116,9 @@ export async function deletePhotoCheckNotesOfAccount(
 /** The nightly prune: a note older than twelve months goes. */
 export async function prunePhotoCheckNotes(db: Queryable, now: Date): Promise<number> {
   const result = await db.query(
-    "DELETE FROM photo_check_note WHERE at < $1::timestamptz - make_interval(hours => 24 * $2::int)",
-    [now, NOTE_RETENTION_DAYS],
+    `DELETE FROM photo_check_note
+     WHERE at < (($1::timestamptz AT TIME ZONE 'UTC') - make_interval(months => $2::int)) AT TIME ZONE 'UTC'`,
+    [now, NOTE_RETENTION_MONTHS],
   );
   return result.rowCount ?? 0;
 }

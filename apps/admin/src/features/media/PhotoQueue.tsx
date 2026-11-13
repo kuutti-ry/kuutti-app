@@ -21,6 +21,7 @@ import { RefreshButton } from "../../lib/refresh-button.tsx";
 import { ScreenTitle } from "../../lib/screen-title.tsx";
 import { useList } from "../../lib/use-list.ts";
 import { short } from "../../lib/utils.ts";
+import { useStatusFocus } from "../safety/index.ts";
 import { RejectionReasonOptions } from "./RejectionReasonOptions.tsx";
 
 // The photo review queue (#49, rules/admin.md): what a person decides about
@@ -77,6 +78,7 @@ function QueueItem({ item, onDecided }: { item: PhotoReviewItem; onDecided: () =
   const [state, setState] = useState<ItemState>({ kind: "idle" });
   const [url, setUrl] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
+  const status = useStatusFocus(state.kind === "decided");
   // A sensitive picture is not even fetched until the moderator chooses to look (#253).
   const [shown, setShown] = useState(!item.sensitive);
 
@@ -101,6 +103,7 @@ function QueueItem({ item, onDecided }: { item: PhotoReviewItem; onDecided: () =
   const decide = async (
     body: { decision: "approve" } | { decision: "reject"; reason: ModeratorRejectionReason },
   ) => {
+    if (state.kind === "saving" || (body.decision === "approve" && !loaded)) return;
     setState({ kind: "saving" });
     // A network failure is a decision not saved: never a saving state that
     // nothing will end. A 403 is the shell's to say (#302): the item goes back
@@ -133,7 +136,9 @@ function QueueItem({ item, onDecided }: { item: PhotoReviewItem; onDecided: () =
             ) : (
               <X aria-hidden="true" className="size-4" />
             )}
-            {t("admin.queue.decided", { decision: state.decision })}
+            <p ref={status} tabIndex={-1}>
+              {t("admin.queue.decided", { decision: state.decision })}
+            </p>
           </CardContent>
         </Card>
       </li>

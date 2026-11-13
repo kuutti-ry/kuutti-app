@@ -73,9 +73,9 @@ if (!existsSync(photos)) {
 if (lstatSync(MEDIA, { throwIfNoEntry: false })?.isSymbolicLink()) rmSync(MEDIA);
 cpSync(photos, MEDIA, { recursive: true, force: true });
 
-const single = args.some((arg) => arg.endsWith(".yaml"));
+const single = args.some((arg) => /\.ya?ml$/.test(arg));
 const plan = single
-  ? { config: [], flows: args.filter((arg) => arg.endsWith(".yaml")) }
+  ? { config: [], flows: args.filter((arg) => /\.ya?ml$/.test(arg)) }
   : planRun(shard);
 const { config } = plan;
 const live = plan.flows.some((flow) => flow.endsWith("chat-live.yaml")) ? await liveEnv() : [];
@@ -176,9 +176,9 @@ function planRun(shard: string | undefined): { config: string[]; flows: string[]
   const order: string[] = parse(readFileSync(join(dir, "config.yaml"), "utf8")).executionOrder
     .flowsOrder;
   const flows = new Map<string, { file: string; weight: number }>();
-  for (const file of readdirSync(join(dir, "flows")).filter((name) => name.endsWith(".yaml"))) {
+  for (const file of readdirSync(join(dir, "flows")).filter((name) => /\.ya?ml$/.test(name))) {
     const text = readFileSync(join(dir, "flows", file), "utf8");
-    const name: string = parseAllDocuments(text)[0]?.toJS()?.name ?? file.replace(/\.yaml$/, "");
+    const name: string = parseAllDocuments(text)[0]?.toJS()?.name ?? file.replace(/\.ya?ml$/, "");
     flows.set(name, { file, weight: weightOf(text) });
   }
   const problems = [
@@ -493,11 +493,17 @@ function parseArgs(argv: string[]): { global: string[]; shard?: string; args: st
   const shard = take("--shard");
   if (shard !== undefined) {
     const [i = 0, n = 0] = shard.split("/").map(Number);
-    if (!Number.isInteger(i) || !Number.isInteger(n) || i < 1 || i > n) {
+    if (
+      !/^\d+\/\d+$/.test(shard) ||
+      !Number.isSafeInteger(i) ||
+      !Number.isSafeInteger(n) ||
+      i < 1 ||
+      i > n
+    ) {
       throw new Error(`--shard wants i/n with 1 <= i <= n, not ${shard || "nothing"}`);
     }
     // A flow named runs alone and the shard would be dropped without a word.
-    if (args.some((arg) => arg.endsWith(".yaml"))) {
+    if (args.some((arg) => /\.ya?ml$/.test(arg))) {
       throw new Error("--shard cuts the whole order; it takes no flow of its own");
     }
   }
@@ -535,6 +541,8 @@ async function selfTest(): Promise<never> {
     [["--shard="], noShard],
     [["--shard", ""], noShard],
     [["--shard", "--format", "junit"], "--shard wants i/n with 1 <= i <= n, not --format"],
+    [["--shard", "2/4/8"], "--shard wants i/n with 1 <= i <= n, not 2/4/8"],
+    [["--shard", "2/4", "flow.yml"], "--shard cuts the whole order; it takes no flow of its own"],
     [["--shard", "5/4"], "--shard wants i/n with 1 <= i <= n, not 5/4"],
     [["--shard", "1/4", "--shard=2/4"], "--shard is given twice"],
     [["--device"], noDevice],

@@ -7,8 +7,9 @@ export type { Logger };
 
 /**
  * Fields that must never reach a log line: the personal identity code, message
- * text, email, credentials, a report's note, a message's body, a stored contact, a home (CLAUDE.md security defaults, rule 5). Top level and
- * one level nested; the PII-in-logs test (#11) is the backstop.
+ * text, email, credentials, a report's note, a message's body, a stored contact,
+ * a home (CLAUDE.md security defaults, rule 5). Key spelling and nesting must
+ * not change that promise; the PII-in-logs test (#11) is the backstop.
  */
 const REDACTED_KEYS = [
   "hetu",
@@ -41,7 +42,16 @@ const REDACTED_KEYS = [
   "keyId",
   "attestKey",
   "attest_key",
+  "emailAddress",
+  "messages",
+  "token",
+  "accessToken",
+  "refreshToken",
+  "set-cookie",
 ];
+
+const normalKey = (key: string) => key.replace(/[-_]/g, "").toLowerCase();
+const PRIVATE_KEYS = new Set(REDACTED_KEYS.map(normalKey));
 
 /** Each key at the top and one level down: the nested twin of every key, by construction. */
 const REDACTED_PATHS = [...REDACTED_KEYS, ...REDACTED_KEYS.map((key) => `*.${key}`)];
@@ -92,6 +102,11 @@ const ERROR_FIELDS = new Set([
 
 export function serializeError(error: unknown): ReturnType<typeof pino.stdSerializers.err> {
   const serialized = pino.stdSerializers.err(error as Error);
+  // The recursive formatter has already serialized errors before Pino's
+  // named err/error serializers see them. Keep their original kind.
+  if (!(error instanceof Error) && typeof (error as { type?: unknown } | null)?.type === "string") {
+    serialized.type = (error as { type: string }).type;
+  }
   // A value that is no error comes back as it was, null too (#102: a push
   // refused with no code logs `error: null`), and has no stack to redact.
   if (typeof serialized?.stack !== "string") return serialized;
@@ -115,8 +130,42 @@ export function serializeError(error: unknown): ReturnType<typeof pino.stdSerial
   // leaves it out; one that is no error (a library's object of claims, a
   // database's string) is dropped, as nothing of it names a kind.
   const cause = (error as { cause?: unknown } | null)?.cause;
-  if (cause instanceof Error) kept.cause = serializeError(cause);
+  if (
+    cause instanceof Error ||
+    (typeof cause === "object" &&
+      cause !== null &&
+      typeof (cause as { stack?: unknown }).stack === "string")
+  )
+    kept.cause = serializeError(cause);
   return kept as ReturnType<typeof pino.stdSerializers.err>;
+}
+
+/** Redact before Pino serializes: errors also arrive in arrays or under a caller's own key. */
+function safeFields(value: unknown, seen = new WeakMap<object, unknown>()): unknown {
+  if (value === null || typeof value !== "object") return value;
+  if (value instanceof Date || Buffer.isBuffer(value)) return value;
+  if (seen.has(value)) return seen.get(value);
+  if (value instanceof Error) return safeFields(serializeError(value), seen);
+  if (Array.isArray(value)) {
+    const out: unknown[] = [];
+    seen.set(value, out);
+    for (const item of value) out.push(safeFields(item, seen));
+    return out;
+  }
+  // Spreading a database error removes its prototype and stack, but leaves
+  // its code and value-bearing detail. Keep the same allowlist in that form.
+  const record = value as Record<string, unknown>;
+  const databaseError =
+    typeof record.code === "string" &&
+    (typeof record.detail === "string" ||
+      ["hint", "where", "severity"].some((key) => key in record));
+  const out: Record<string, unknown> = {};
+  seen.set(value, out);
+  for (const [key, item] of Object.entries(record)) {
+    if (databaseError && !ERROR_FIELDS.has(key)) continue;
+    out[key] = PRIVATE_KEYS.has(normalKey(key)) ? "[redacted]" : safeFields(item, seen);
+  }
+  return out;
 }
 
 export async function createLogger(options: LoggerOptions): Promise<Logger> {
@@ -124,6 +173,9 @@ export async function createLogger(options: LoggerOptions): Promise<Logger> {
     level: options.level,
     redact: { paths: REDACTED_PATHS, censor: "[redacted]" },
     serializers: { err: serializeError, error: serializeError },
+    formatters: {
+      log: (fields: Record<string, unknown>) => safeFields(fields) as Record<string, unknown>,
+    },
   };
   if (options.pretty) {
     // Development only. pino-pretty is external to the production bundle and

@@ -43,5 +43,6 @@ export function restoreReturnPath(
   } catch {
     return;
   }
-  if (path && SAME_ORIGIN_PATH.test(path)) history.replaceState(null, "", path + location.hash);
+  if (path && !/[\t\r\n]/.test(path) && SAME_ORIGIN_PATH.test(path))
+    history.replaceState(null, "", path + location.hash);
 }

@@ -27,6 +27,7 @@ test("a moderator approves one photo and rejects another for a reason, and the c
 
   await first.getByRole("button", { name: "Approve" }).click();
   await expect(first).toHaveText("Approved");
+  await expect(first.getByText("Approved", { exact: true })).toBeFocused();
   await expect(total).toHaveText(waiting(before - 1));
 
   // No reason is preset (#250): the rejection waits for one chosen on purpose.

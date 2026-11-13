@@ -28,6 +28,14 @@ type Policy = {
 
 const ROOT = process.cwd();
 
+function exceptionProblems(policy: Policy): string[] {
+  return [...policy.exceptions, ...(policy.actions ?? [])].flatMap((entry) =>
+    typeof entry.reason !== "string" || entry.reason.trim() === ""
+      ? [`exception for ${entry.name} needs a nonempty reason`]
+      : [],
+  );
+}
+
 /** True when the SPDX expression can be satisfied with allowed licences only. */
 export function allowed(expression: string, allow: ReadonlySet<string>): boolean {
   const tokens = expression.match(/\(|\)|[^\s()]+/g) ?? [];
@@ -127,6 +135,14 @@ function installed(): Map<string, { name: string; license: string }> {
 }
 
 function selfTest(): void {
+  for (const reason of ["", "   ", "Reviewed, distribution is allowed."]) {
+    const found = exceptionProblems({
+      allow: [],
+      exceptions: [{ name: "pkg", license: "custom", reason }],
+    });
+    if (found.length !== (reason.trim() ? 0 : 1))
+      throw new Error("exception reason self-test failed");
+  }
   const allow = new Set(["MIT", "Apache-2.0", "BSD-3-Clause"]);
   const cases: Array<[string, boolean]> = [
     ["MIT", true],
@@ -180,9 +196,8 @@ function selfTest(): void {
 function reviewList(key: string): string[] {
   const path = join(ROOT, ".github", "dependency-review-config.yml");
   if (!existsSync(path)) return [];
-  const block =
-    new RegExp(`^${key}:\\n((?:\\s+-\\s+.+\\n?)+)`, "m").exec(readFileSync(path, "utf8"))?.[1] ??
-    "";
+  const text = readFileSync(path, "utf8").replace(/^\s*#.*\n/gm, "");
+  const block = new RegExp(`^${key}:\\n((?:\\s+-\\s+.+\\n?)+)`, "m").exec(text)?.[1] ?? "";
   return [...block.matchAll(/-\s+["']?([^"'\n#]+?)["']?\s*(?:#.*)?$/gm)].map((m) =>
     (m[1] ?? "").trim(),
   );
@@ -208,7 +223,7 @@ const policy = JSON.parse(
   readFileSync(join(ROOT, "scripts", "license-policy.json"), "utf8"),
 ) as Policy;
 const allow = new Set(policy.allow);
-const problems: string[] = [];
+const problems: string[] = exceptionProblems(policy);
 
 // The pull-request check reads its own file; both of its lists mirror the policy.
 const same = (a: string[], b: string[]): boolean => [...a].sort().join() === [...b].sort().join();

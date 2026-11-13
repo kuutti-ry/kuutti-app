@@ -225,7 +225,7 @@ describe.concurrent("demo:reset", () => {
       {},
       "✖ refusing: the personas get their histories from a local API, not from 192.0.2.10:3000",
     ],
-    [[], { NODE_USE_ENV_PROXY: "1" }, "✖ refusing: NODE_USE_ENV_PROXY is set"],
+    [[], { NODE_USE_ENV_PROXY: "1" }, "✖ refusing: Node is configured to use an environment proxy"],
     [
       [],
       { APP_ENV: "preview" },

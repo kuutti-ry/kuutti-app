@@ -8,9 +8,6 @@ import { attack } from "../../test/attack.ts";
 import { held, json, network, on, sentTo, settled } from "../../test/network.ts";
 import { Overview } from "./Overview.tsx";
 
-// What goes through today (#380): a question, where no line says what should happen.
-const QUESTION = "#380, a question";
-
 // Attacks on the front page's one read (#380, #303): GET /admin/overview, on
 // opening and on Refresh. Each tries what the read must not do and stays
 // green while that fails; its control does the same thing rightly.
@@ -115,7 +112,7 @@ attack(
   "Overview: the first refresh's answer, arriving after the second's, is what the page shows",
   {
     // An older refresh's answer still lands after a newer one's: the overview keeps no order of its reads, and is no list that useList holds.
-    open: QUESTION,
+
     attempt: () => refreshedTwice("newer"),
     control: () => refreshedTwice("older"),
     succeeds: (line) => expect(line).toMatch(/9 wait/),

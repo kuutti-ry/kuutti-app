@@ -30,9 +30,10 @@ import { delimiter, join, resolve } from "node:path";
 
 // A command, not the words in a grep or a quoted string.
 const AT_COMMAND = String.raw`(?:^|[;&|(\n])\s*(?:\w+=\S*\s+)*`;
-const CREATE = new RegExp(`${AT_COMMAND}gh\\s+pr\\s+create\\b`);
-const MERGE = new RegExp(`${AT_COMMAND}gh\\s+pr\\s+merge\\b([^;&|\\n]*)`, "g");
-const CD = /(?:^|&&\s*|;\s*)cd\s+("[^"]+"|'[^']+'|\S+)\s*(?:&&|;)/;
+const GH = String.raw`(?:command\s+)?(?:env\s+(?:\w+=\S*\s+)*)?(?:[\w./-]+/)?gh`;
+const CREATE = new RegExp(`${AT_COMMAND}${GH}\\s+pr\\s+create\\b`);
+const MERGE = new RegExp(`${AT_COMMAND}${GH}\\s+pr\\s+merge\\b([^;&|\\n]*)`, "g");
+const CD = /(?:^|[;&|(\n])\s*(?:cd|pushd)\s+("[^"]+"|'[^']+'|[^\s;&|)]+)(?=\s*(?:&&|;|\n|$))/g;
 const PR_URL = /https:\/\/github\.com\/[\w.-]+\/[\w.-]+\/pull\/\d+/;
 const REFS = /^\s*Refs\s+\S*#\d+/im;
 
@@ -42,7 +43,8 @@ const AT_DIR = "(?:^|/)";
 const NOT_A_TEST = String.raw`(?!.*\.test\.tsx?$)`;
 const SCHEMA = new RegExp(`${AT_DIR}packages/db/(?:src/schema|drizzle)/`);
 const RULES = new RegExp(
-  `${AT_DIR}(?:(?:apps/api/src|apps/mobile/src/features|features)/(?:matching|pond|rewards|notifications|research)/${NOT_A_TEST}` +
+  `${AT_DIR}(?:(?:apps/api/src|apps/mobile/src/features|apps/admin/src/features|features)/(?:matching|pond|rewards|notifications|research)/${NOT_A_TEST}` +
+    `|apps/api/src/jobs/${NOT_A_TEST}` +
     `|apps/mobile/src/features/profile/${NOT_A_TEST}|packages/schema/src/research\\.ts$|docs/decisions\\.md$)`,
 );
 const CODE = new RegExp(
@@ -77,7 +79,7 @@ type HookInput = {
   stop_hook_active?: boolean;
   agent_id?: string;
 };
-type Pull = { state: string; body: string };
+type Pull = { state: string; body: string; number?: number; url?: string };
 
 /** What a transcript shows the session did. */
 type Session = {
@@ -101,7 +103,8 @@ function readSession(transcript: string): Session {
   const ran = (skill: string, args: string) => {
     session.skills.set(skill, `${session.skills.get(skill) ?? ""} ${args}`);
   };
-  const creates = new Set<string | undefined>();
+  const creates = new Map<string | undefined, string>();
+  const skills = new Map<string | undefined, { name: string; args: string }>();
   for (const line of transcript.split("\n")) {
     let entry: { type?: string; isSidechain?: boolean; message?: { content?: unknown } };
     try {
@@ -123,19 +126,26 @@ function readSession(transcript: string): Session {
         const args = /<command-args>(.*?)<\/command-args>/s.exec(block.text ?? "")?.[1];
         if (name) ran(name, args ?? "");
       } else if (block.type === "tool_use" && block.name === "Skill") {
-        ran(String(block.input?.skill), String(block.input?.args ?? ""));
+        skills.set(block.id, {
+          name: String(block.input?.skill),
+          args: String(block.input?.args ?? ""),
+        });
       } else if (block.type === "tool_use" && block.name === "mcp__ccd_pr__set_monitor") {
         if (block.input?.auto_fix === true) session.autoFix.add(String(block.input.url));
       } else if (block.type === "tool_use" && block.name === "Bash") {
         const command = String(block.input?.command ?? "");
-        if (CREATE.test(command)) creates.add(block.id);
+        if (CREATE.test(command)) creates.set(block.id, headOf(command) ?? "HEAD");
         for (const [, rest] of command.matchAll(MERGE)) {
           const target = mergeTarget(rest ?? "");
-          if (target) session.merging.add(target);
+          session.merging.add(target ?? "HEAD");
         }
-      } else if (block.type === "tool_result" && creates.has(block.tool_use_id)) {
-        const url = PR_URL.exec(JSON.stringify(block.content ?? ""))?.[0];
-        if (url && !block.is_error) session.opened.add(url);
+      } else if (block.type === "tool_result") {
+        const skill = skills.get(block.tool_use_id);
+        if (skill && !block.is_error) ran(skill.name, skill.args);
+        if (creates.has(block.tool_use_id) && !block.is_error) {
+          const url = PR_URL.exec(JSON.stringify(block.content ?? ""))?.[0];
+          session.opened.add(url ?? creates.get(block.tool_use_id) ?? "HEAD");
+        }
       }
     }
   }
@@ -179,16 +189,24 @@ function duties(session: Session, desktop: boolean, view: (pr: string) => Pull |
   const owed: string[] = [];
   const seen = new Set<string>();
   for (const pr of [...session.opened, ...session.merging]) {
-    const number = /\d+$/.exec(pr)?.[0] ?? pr;
+    const knownNumber = /\d+$/.exec(pr)?.[0];
+    if (knownNumber && seen.has(knownNumber)) continue;
+    if (
+      knownNumber &&
+      checked.has(knownNumber) &&
+      (!desktop || !session.opened.has(pr) || session.autoFix.has(pr))
+    )
+      continue;
+    const pull = view(pr);
+    const number = pull?.number?.toString() ?? knownNumber ?? pr;
+    const url = pull?.url ?? pr;
     if (seen.has(number)) continue;
     seen.add(number);
-    const wantsAutoFix = desktop && session.opened.has(pr) && !session.autoFix.has(pr);
+    const wantsAutoFix = desktop && session.opened.has(pr) && !session.autoFix.has(url);
     const wantsCheck = !checked.has(number);
-    if (!wantsAutoFix && !wantsCheck) continue;
-    const pull = view(pr);
     if (pull?.state === "OPEN" && wantsAutoFix) {
       owed.push(
-        `Pull request ${pr} has no Auto-fix: call mcp__ccd_pr__set_monitor with auto_fix and address_comments true and this url (the open-pr skill).`,
+        `Pull request ${url} has no Auto-fix: call mcp__ccd_pr__set_monitor with auto_fix and address_comments true and this url (the open-pr skill).`,
       );
     }
     if (pull?.state === "MERGED" && wantsCheck && REFS.test(pull.body)) {
@@ -209,29 +227,49 @@ function sessionOf(input: HookInput): Session | null {
 }
 
 /** What the branch changes, in the directory the command runs in. */
+function headOf(command: string): string | undefined {
+  return /(?:--head[ =]|-H\s+)("[^"]+"|'[^']+'|[^\s;&|)]+)/
+    .exec(command)?.[1]
+    ?.replace(/^["']|["']$/g, "");
+}
+
 function changedFiles(command: string, cwd: string): string[] {
-  const dir = CD.exec(command)?.[1]?.replace(/^["']|["']$/g, "");
+  let dir = cwd;
+  const create = CREATE.exec(command);
+  const beforeCreate = command.slice(0, create ? create.index + create[0].length : command.length);
+  for (const match of beforeCreate.matchAll(CD))
+    dir = resolve(dir, (match[1] ?? ".").replace(/^["']|["']$/g, ""));
   try {
-    const output = execFileSync("git", ["diff", "--name-only", "origin/main...HEAD"], {
-      cwd: resolve(cwd, dir ?? "."),
-      encoding: "utf8",
-      timeout: 10_000,
-      stdio: ["ignore", "pipe", "ignore"],
-    });
+    const output = execFileSync(
+      "git",
+      ["diff", "--name-only", `origin/main...${headOf(command) ?? "HEAD"}`],
+      {
+        cwd: dir,
+        encoding: "utf8",
+        timeout: 10_000,
+        stdio: ["ignore", "pipe", "ignore"],
+      },
+    );
     return output.split("\n").filter(Boolean);
   } catch {
-    return [];
+    throw new Error(
+      "Cannot inspect the pull request's branch; run from its repository with a valid --head and origin/main.",
+    );
   }
 }
 
 function viewPull(pr: string, cwd: string): Pull | null {
   try {
-    const output = execFileSync("gh", ["pr", "view", pr, "--json", "state,body"], {
-      cwd,
-      encoding: "utf8",
-      timeout: 10_000,
-      stdio: ["ignore", "pipe", "ignore"],
-    });
+    const output = execFileSync(
+      "gh",
+      ["pr", "view", ...(pr === "HEAD" ? [] : [pr]), "--json", "state,body,number,url"],
+      {
+        cwd,
+        encoding: "utf8",
+        timeout: 10_000,
+        stdio: ["ignore", "pipe", "ignore"],
+      },
+    );
     return JSON.parse(output);
   } catch {
     return null;
@@ -262,8 +300,12 @@ function create(input: HookInput): void {
   const command = String(input.tool_input?.command ?? "");
   if (!CREATE.test(command)) return;
   const session = sessionOf(input);
-  const reason = session && refusal(session, () => changedFiles(command, input.cwd ?? "."));
-  if (reason) deny(reason);
+  try {
+    const reason = session && refusal(session, () => changedFiles(command, input.cwd ?? "."));
+    if (reason) deny(reason);
+  } catch (error) {
+    deny(error instanceof Error ? error.message : "Cannot inspect the pull request's branch.");
+  }
 }
 
 function stop(input: HookInput): void {
@@ -284,7 +326,7 @@ function selfTest(): void {
     }
   };
   const url = "https://github.com/kuutti-ry/kuutti-app/pull/7";
-  const call = (id: string, name: string, input: Record<string, unknown>) =>
+  const rawCall = (id: string, name: string, input: Record<string, unknown>) =>
     JSON.stringify({
       type: "assistant",
       message: { content: [{ type: "tool_use", id, name, input }] },
@@ -294,6 +336,8 @@ function selfTest(): void {
       type: "user",
       message: { content: [{ type: "tool_result", tool_use_id: id, content, is_error }] },
     });
+  const call = (id: string, name: string, input: Record<string, unknown>) =>
+    rawCall(id, name, input) + (name === "Skill" ? `\n${result(id, "completed")}` : "");
   const bash = (id: string, command: string) => call(id, "Bash", { command });
   const opened = [bash("a", 'cd x && gh pr create --title "t"'), result("a", url)];
   const read = (...lines: string[]) => readSession(lines.join("\n"));
@@ -339,6 +383,9 @@ function selfTest(): void {
     ["gh pr created", false],
     // control: the command with a flag glued to nothing
     ["gh pr create --draft", true],
+    ["command gh pr create --fill", true],
+    ["/usr/local/bin/gh pr create", true],
+    ["env MODE=test gh pr create", true],
   ] as const) {
     same(`CREATE on ${command}`, CREATE.test(command), matches);
   }
@@ -350,9 +397,9 @@ function selfTest(): void {
     [],
   );
   same(
-    "a create with no url opens nothing",
+    "a create with captured output is checked by its branch",
     [...read(bash("a", "gh pr create"), result("a", "nothing to do")).opened],
-    [],
+    ["HEAD"],
   );
   same(
     "a result that is a block list",
@@ -363,6 +410,16 @@ function selfTest(): void {
     "a Skill call with its arguments",
     read(call("a", "Skill", { skill: "recheck-issues", args: "7" })).skills.get("recheck-issues"),
     " 7",
+  );
+  same(
+    "an unfinished Skill call counts nothing",
+    read(rawCall("s", "Skill", { skill: "open-pr" })).skills.size,
+    0,
+  );
+  same(
+    "a failed Skill call counts nothing",
+    read(rawCall("s", "Skill", { skill: "open-pr" }), result("s", "failed", true)).skills.size,
+    0,
   );
   same(
     "a skill typed as a command",
@@ -416,9 +473,9 @@ function selfTest(): void {
     ["https://github.com/kuutti-ry/kuutti-app-site/pull/7"],
   );
   same(
-    "a merge of the branch names nothing",
+    "a merge of the branch is checked even when not opened here",
     [...read(bash("a", "gh pr merge --squash")).merging],
-    [],
+    ["HEAD"],
   );
   same(
     "two merges in one command",
@@ -505,6 +562,8 @@ function selfTest(): void {
     ["apps/api/src/rewards/repo.ts", "change-rule"],
     ["apps/api/src/notifications/push.ts", "change-rule"],
     ["apps/api/src/research/track.ts", "change-rule"],
+    ["apps/api/src/jobs/round-builder.ts", "change-rule"],
+    ["apps/api/src/jobs/round-builder.test.ts", null],
     ["apps/mobile/src/features/matching/Round.tsx", "change-rule"],
     ["apps/mobile/src/features/profile/Card.tsx", "change-rule"],
     ["features/matching/rounds.feature", "change-rule"],
@@ -757,7 +816,33 @@ function selfTest(): void {
     hook("create", { ...opening, cwd: dir, tool_input: { command: "cd repo && gh pr create" } }),
     denied(both),
   );
-  same("create: not a repository", hook("create", { ...opening, cwd: dir }), denied(openOnly));
+  same(
+    "create: not a repository",
+    hook("create", { ...opening, cwd: dir }),
+    denied(
+      "Cannot inspect the pull request's branch; run from its repository with a valid --head and origin/main.",
+    ),
+  );
+  for (const command of [
+    `cd "${repo}"; gh pr create`,
+    `(cd "${repo}"; gh pr create)`,
+    `pushd "${repo}"; gh pr create`,
+    `cd "${dir}"; cd repo; gh pr create`,
+  ]) {
+    same(
+      `create: cwd in ${command}`,
+      hook("create", { ...opening, cwd: dir, tool_input: { command } }),
+      denied(both),
+    );
+  }
+  git("branch", "attack-head");
+  git("checkout", "-q", "--detach", "origin/main");
+  same(
+    "create: explicit head from main",
+    hook("create", { ...opening, tool_input: { command: "gh pr create --head attack-head" } }),
+    denied(both),
+  );
+  git("checkout", "-q", "attack-head");
   same(
     "create: another command",
     hook("create", { ...asked, tool_input: { command: "gh pr view" } }),

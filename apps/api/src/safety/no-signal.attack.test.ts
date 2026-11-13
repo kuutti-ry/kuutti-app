@@ -11,10 +11,10 @@ import { readsBlock, readsReport, readsStar } from "../test/table-readers.ts";
 
 type Reader = (source: string) => boolean;
 
-// What goes through today (#380): a hole, which its contract forbids, and a
-// question, where no line says what should happen.
-const HOLE = "#380";
-const QUESTION = "#380, a question";
+// Retained scope is explicit and tied to its decision in the #380 completion ledger.
+
+const QUESTION =
+  "accepted #380/2-06: migrations have audited readers outside the runtime allowlist";
 
 /**
  * What is tried, who reads it, the form with a guarded table, the same form
@@ -29,84 +29,72 @@ const UNSEEN: [string, Reader, string, string, string?][] = [
     readsBlock,
     "db.query(`SELECT 1 FROM account a, block b WHERE b.blocked_identity_id = a.identity_id`)",
     "db.query(`SELECT 1 FROM account a, session s WHERE s.account_id = a.id`)",
-    HOLE,
   ],
   [
     "a block read with its schema and its name both in quotes",
     readsBlock,
     'db.query(`SELECT count(*) FROM "public"."block"`)',
     'db.query(`SELECT count(*) FROM "public"."session"`)',
-    HOLE,
   ],
   [
     "a block read in a DELETE's USING",
     readsBlock,
     "db.query(`DELETE FROM round_entries e USING block b WHERE b.id = e.id`)",
     "db.query(`DELETE FROM round_entries e USING session s WHERE s.id = e.id`)",
-    HOLE,
   ],
   [
     "a block read FROM ONLY",
     readsBlock,
     "db.query(`SELECT count(*) FROM ONLY block`)",
     "db.query(`SELECT count(*) FROM ONLY session`)",
-    HOLE,
   ],
   [
     "a block read from a table named by a constant",
     readsBlock,
     'const table = "block"; db.query("SELECT count(*) FROM " + table);',
     'const table = "session"; db.query("SELECT count(*) FROM " + table);',
-    HOLE,
   ],
   [
     "a block read through drizzle's relational query",
     readsBlock,
     "const rows = await db.query.block.findMany();",
     "const rows = await db.query.session.findMany();",
-    HOLE,
   ],
   [
     "blocks counted through drizzle's count",
     readsBlock,
     "const n = await db.$count(block, eq(block.blockedIdentityId, id));",
     "const n = await db.$count(session, eq(session.accountId, id));",
-    HOLE,
   ],
   [
     "a block read in a cross join through the builder",
     readsBlock,
     "db.select().from(account).crossJoin(block)",
     "db.select().from(account).crossJoin(session)",
-    HOLE,
   ],
   [
     "a block read from the table imported under another name",
     readsBlock,
     'import { block as b } from "@kuutti/db"; db.select().from(b);',
     'import { session as b } from "@kuutti/db"; db.select().from(b);',
-    HOLE,
   ],
   [
     "a block read under an alias of drizzle's",
     readsBlock,
     'db.select().from(alias(block, "b"))',
     'db.select().from(alias(session, "s"))',
-    HOLE,
   ],
   [
     "stars counted through drizzle's count",
     readsStar,
     "const n = await db.$count(star, eq(star.starredAccountId, id));",
     "const n = await db.$count(session, eq(session.accountId, id));",
-    HOLE,
   ],
   [
     "a report read in a comma join",
     readsReport,
     "db.query(`SELECT count(*) FROM account a, report r WHERE r.reported_account_id = a.id`)",
     "db.query(`SELECT count(*) FROM account a, session s WHERE s.account_id = a.id`)",
-    HOLE,
   ],
   // The guard takes comments out first: code between two strings that hold a
   // comment's marks goes with them, and so does what follows two slashes in a string.
@@ -115,14 +103,12 @@ const UNSEEN: [string, Reader, string, string, string?][] = [
     readsBlock,
     'const kinds = "image/*";\nconst rows = await db.select().from(block);\nconst all = "*/*";',
     'const kinds = "image/*";\nconst rows = await db.select().from(session);\nconst all = "*/*";',
-    HOLE,
   ],
   [
     "a block read after a string that holds two slashes",
     readsBlock,
     'const gap = " // "; const rows = await db.select().from(block);',
     'const gap = " // "; const rows = await db.select().from(session);',
-    HOLE,
   ],
   // Forms the guard has to read like the plain ones.
   [
@@ -186,7 +172,6 @@ attack(
     attempt: () => readsReport('logger.info({ photoId }, "photo copied into report");'),
     control: () => readsReport("db.query(`INSERT INTO report (reason) VALUES ($1)`)"),
     succeeds: (seen) => expect(seen).toBe(true),
-    open: HOLE,
   },
 );
 

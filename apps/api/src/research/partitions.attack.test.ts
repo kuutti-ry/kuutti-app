@@ -9,11 +9,9 @@ import {
   ensureEventPartitions,
   eventPartitions,
   type MonthPartition,
+  pruneEventPartitions,
   researchEventsJob,
 } from "./partitions.ts";
-
-// What goes through today (#380): a question, where no line says what should happen.
-const QUESTION = "#380, a question";
 
 // research-events-partitions (#50, ADR-011, ADR-029 §6, #380): the current
 // and the next month exist after every night, a month whose range began
@@ -32,13 +30,18 @@ const UNANSWERED = "the copy's store does not answer";
 type BeforeDrop = (months: MonthPartition[]) => Promise<number>;
 
 /** The months of `planted` and the one after; a night at `at`; whether `planted`'s month is still there. */
-async function keptAfter(planted: string, at: Date, beforeDrop?: (db: Queryable) => BeforeDrop) {
+async function keptAfter(
+  planted: string,
+  at: Date,
+  beforeDrop?: (db: Queryable) => BeforeDrop,
+  exact = false,
+) {
   return rolledBack(async (db) => {
     await ensureEventPartitions(db, new Date(`${planted}-10T00:00:00Z`));
     const check = beforeDrop?.(db);
     const job = researchEventsJob({ db, now: () => at, ...(check ? { beforeDrop: check } : {}) });
     // The night's runner logs a job that throws; only the planted failure may be thrown here.
-    await job.run().catch((error: unknown) => {
+    await (exact ? pruneEventPartitions(db, at) : job.run()).catch((error: unknown) => {
       if (!(error instanceof Error && error.message === UNANSWERED)) throw error;
     });
     return { kept: (await eventPartitions(db)).includes(`events_${planted.replace("-", "_")}`) };
@@ -46,14 +49,14 @@ async function keptAfter(planted: string, at: Date, beforeDrop?: (db: Queryable)
 }
 
 attack("partitions: a month that began ninety days ago to the second is kept", {
-  attempt: () => keptAfter("2019-01", JANUARY_ENDS),
-  control: () => keptAfter("2019-01", new Date(JANUARY_ENDS.getTime() - SECOND)),
+  attempt: () => keptAfter("2019-01", JANUARY_ENDS, undefined, true),
+  control: () => keptAfter("2019-01", new Date(JANUARY_ENDS.getTime() - SECOND), undefined, true),
   succeeds: (seen) => expect(seen.kept).toBe(true),
 });
 
 attack("partitions: a month that began ninety days less a second ago is dropped", {
-  attempt: () => keptAfter("2019-01", new Date(JANUARY_ENDS.getTime() - SECOND)),
-  control: () => keptAfter("2019-01", JANUARY_ENDS),
+  attempt: () => keptAfter("2019-01", new Date(JANUARY_ENDS.getTime() - SECOND), undefined, true),
+  control: () => keptAfter("2019-01", JANUARY_ENDS, undefined, true),
   succeeds: (seen) => expect(seen.kept).toBe(false),
 });
 
@@ -65,8 +68,6 @@ const TONIGHT = new Date("2019-03-31T01:00:00.000Z");
 attack(
   "partitions: a month whose first row turns ninety days old before the next night is kept tonight",
   {
-    // Goes through today: a month goes on the first night after its start is ninety days back, so its first row lives up to the night's hour longer.
-    open: QUESTION,
     attempt: () => keptAfter("2019-01", TONIGHT),
     control: () => keptAfter("2019-02", TONIGHT),
     succeeds: (seen) => expect(seen.kept).toBe(true),

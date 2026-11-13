@@ -90,8 +90,12 @@ async function read(id: string): Promise<State> {
 }
 
 export function ReportPage() {
-  const { t } = useT();
   const { id = "" } = useParams();
+  return <ReportContents key={id} id={id} />;
+}
+
+function ReportContents({ id }: { id: string }) {
+  const { t } = useT();
   const [state, setState] = useState<State>({ kind: "loading" });
 
   // Each open is an audit row: once per id, though StrictMode runs the effect twice.
@@ -254,7 +258,7 @@ function ReportBody({ opened }: { opened: ReportDetail }) {
       <Card>
         <CardContent>
           <CardTitle>{t("admin.report.peopleTitle")}</CardTitle>
-          <ul className="grid gap-2">
+          <ul className="grid grid-cols-1 gap-2">
             <li className="text-muted-foreground">
               <Link className="target" to={`/accounts/${report.reporter.accountId}`}>
                 {t("admin.reports.reporter", { account: short(report.reporter.accountId) })}
@@ -311,14 +315,14 @@ function ReportBody({ opened }: { opened: ReportDetail }) {
             <CardTitle>{t("admin.report.copyTitle")}</CardTitle>
             {/* The line the reporter pointed at first; the conversation keeps its order below. */}
             {pointed && (
-              <ul className="grid gap-2">
+              <ul className="grid grid-cols-1 gap-2">
                 <CopyLine reportId={report.id} line={pointed} pointed />
               </ul>
             )}
             {report.copy.length === 0 ? (
               <p className="text-muted-foreground">{t("admin.report.copyEmpty")}</p>
             ) : (
-              <ol className="grid gap-2">
+              <ol className="grid grid-cols-1 gap-2">
                 {report.copy.map((line) => (
                   <CopyLine
                     key={line.seq}
@@ -348,7 +352,7 @@ function ReportBody({ opened }: { opened: ReportDetail }) {
               {report.actable.length > 0 && (
                 <>
                   <h4 className="font-semibold">{t("admin.report.closeWithTitle")}</h4>
-                  <ul className="grid gap-2">
+                  <ul className="grid grid-cols-1 gap-2">
                     {report.actable.map((s) => {
                       const line = `${ids}-${s.id}`;
                       return (
@@ -445,17 +449,18 @@ function DecideStep({
   onDecidedElsewhere: () => void;
 }) {
   const { t } = useT();
-  const { sending, refused, send } = useSend({
+  const { sending, refused, send, cancel } = useSend({
     answer: ReportDecision,
     refusals: REFUSALS,
     onShell: onCancel,
+    onCancel,
     onDone,
     onRefused: (code) => {
       if (code === "report_decided") onDecidedElsewhere();
     },
   });
   return (
-    <Dialog title={title} onClose={onCancel}>
+    <Dialog title={title} onClose={cancel}>
       <div className="grid gap-4">
         <p>{effect}</p>
         {refused && <Alert>{t(refused)}</Alert>}
@@ -463,7 +468,7 @@ function DecideStep({
           <Button aria-busy={sending || undefined} onClick={() => void send(request)}>
             {confirm}
           </Button>
-          <Button variant="outline" onClick={onCancel}>
+          <Button variant="outline" aria-disabled={sending || undefined} onClick={cancel}>
             {t("admin.report.cancel")}
           </Button>
         </div>
@@ -491,7 +496,7 @@ function CopyLine({
   const time = formatDateTime(locale, new Date(line.createdAt));
   return (
     <li className="space-y-1 rounded-lg border px-3 py-2">
-      <p id={head} className="text-xs text-muted-foreground">
+      <p id={head} className="text-xs text-muted-foreground wrap-anywhere">
         <strong className="text-foreground">{t(SIDE[line.side])}</strong> · {time}
         {pointed && (
           <>

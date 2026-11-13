@@ -8,7 +8,16 @@ import {
   type AnnouncementDraft,
   type AnnouncementReach,
 } from "@kuutti/schema";
-import { type FormEvent, type ReactNode, useId, useState } from "react";
+import {
+  type Dispatch,
+  type FormEvent,
+  type ReactNode,
+  type SetStateAction,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+} from "react";
 import { z } from "zod";
 import { Alert } from "../../components/ui/alert.tsx";
 import { Button } from "../../components/ui/button.tsx";
@@ -22,7 +31,7 @@ import { Dialog } from "../../lib/dialog.tsx";
 import { RefreshButton } from "../../lib/refresh-button.tsx";
 import { ScreenTitle } from "../../lib/screen-title.tsx";
 import { useList } from "../../lib/use-list.ts";
-import { type Refusals, useSend } from "../safety/index.ts";
+import { type Refusals, useSend, useStatusFocus } from "../safety/index.ts";
 
 // Announcements to everybody (#573, ADR-068 §2, admins only): one admin
 // writes one in English and Finnish, and in Swedish or not; another admin
@@ -88,7 +97,9 @@ type Said = "saved" | "sent" | "deleted";
 export function Announcements() {
   const { t } = useT();
   // What the last act did, in a live region that is always there.
+  const [draft, setDraft] = useState<Draft>(EMPTY);
   const [said, setSaid] = useState<Said | null>(null);
+  const status = useStatusFocus(said === "sent" || said === "deleted");
   const [approving, setApproving] = useState<AdminAnnouncement | null>(null);
   const [deleting, setDeleting] = useState<AdminAnnouncement | null>(null);
   const { state, reload, update } = useList({
@@ -99,6 +110,10 @@ export function Announcements() {
     },
     what: "announcements",
   });
+  const [writeReady, setWriteReady] = useState(false);
+  useEffect(() => {
+    if (state.kind === "ready") setWriteReady(true);
+  }, [state.kind]);
   const waiting = state.kind === "ready" ? state.items.filter((item) => !item.approvedAt) : [];
   const sent = state.kind === "ready" ? state.items.filter((item) => item.approvedAt) : [];
 
@@ -115,7 +130,7 @@ export function Announcements() {
           {t("admin.announcements.refresh")}
         </RefreshButton>
       </div>
-      <p aria-live="polite" className="font-medium empty:sr-only">
+      <p ref={status} tabIndex={-1} aria-live="polite" className="font-medium empty:sr-only">
         {said && t(`admin.announcements.${said}Now`)}
       </p>
       {state.kind === "loading" && <Loading>{t("load.loading")}</Loading>}
@@ -159,13 +174,22 @@ export function Announcements() {
               </ul>
             )}
           </section>
-          <WriteForm
-            onWritten={(written) => {
-              setSaid("saved");
-              update((items) => [written, ...items]);
-            }}
-            onTyping={() => setSaid(null)}
-          />
+        </>
+      )}
+      {(writeReady || state.kind === "ready") && state.kind !== "forbidden" && (
+        <WriteForm
+          available={state.kind === "ready"}
+          draft={draft}
+          setDraft={setDraft}
+          onWritten={(written) => {
+            setSaid("saved");
+            update((items) => [written, ...items]);
+          }}
+          onTyping={() => setSaid(null)}
+        />
+      )}
+      {state.kind === "ready" && (
+        <>
           <section aria-labelledby="announcements-sent" className="space-y-3">
             <h3 id="announcements-sent" className="text-lg font-semibold">
               {t("admin.announcements.sent")}
@@ -211,22 +235,28 @@ export function Announcements() {
 
 /** The form: a title and a body in each language, Swedish optional, saved as a draft that waits for a second admin. */
 function WriteForm({
+  available,
+  draft,
+  setDraft,
   onWritten,
   onTyping,
 }: {
+  available: boolean;
+  draft: Draft;
+  setDraft: Dispatch<SetStateAction<Draft>>;
   onWritten: (written: AdminAnnouncement) => void;
   onTyping: () => void;
 }) {
   const { t } = useT();
   const ids = useId();
-  const [draft, setDraft] = useState<Draft>(EMPTY);
   const [problem, setProblem] = useState<Problem | null>(null);
+  const submitted = useRef<Draft | null>(null);
   const { sending, refused, send } = useSend({
     answer: AdminAnnouncement,
     refusals: WRITE_REFUSALS,
     onShell: () => undefined,
     onDone: async (written) => {
-      setDraft(EMPTY);
+      setDraft((current) => (current === submitted.current ? EMPTY : current));
       onWritten(written);
     },
   });
@@ -239,9 +269,13 @@ function WriteForm({
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
+    if (!available) return;
     const body = draftOf(draft);
     if (typeof body === "string") return setProblem(body);
-    void send(() => api.POST("/admin/announcements", { body }));
+    void send(() => {
+      submitted.current = draft;
+      return api.POST("/admin/announcements", { body });
+    });
   };
 
   return (
@@ -294,7 +328,11 @@ function WriteForm({
         {problem && <Alert>{t(`admin.announcements.${problem}`)}</Alert>}
         {refused && <Alert>{t(refused)}</Alert>}
         <div>
-          <Button type="submit" aria-busy={sending || undefined}>
+          <Button
+            type="submit"
+            aria-disabled={!available || undefined}
+            aria-busy={sending || undefined}
+          >
             {t("admin.announcements.save")}
           </Button>
         </div>
@@ -355,14 +393,19 @@ function ApproveStep({
 }) {
   const { t } = useT();
   // A 403 is the shell's to say (#302): the step closes with no words of its own.
-  const { sending, refused, send } = useSend({
+  const { sending, refused, send, cancel } = useSend({
     answer: AdminAnnouncement,
     refusals: APPROVE_REFUSALS,
     onShell: onCancel,
+    onCancel,
     onDone,
   });
   return (
-    <Dialog title={t("admin.announcements.confirmSend.title")} onClose={onCancel}>
+    <Dialog
+      title={t("admin.announcements.confirmSend.title")}
+      onClose={cancel}
+      initialFocus="dialog"
+    >
       <div className="grid gap-4">
         <p className="font-medium wrap-anywhere">{item.en.title}</p>
         <p>{t("admin.announcements.confirmSend.effect", reach)}</p>
@@ -380,7 +423,7 @@ function ApproveStep({
           >
             {t("admin.announcements.confirmSend.apply")}
           </Button>
-          <Button variant="outline" onClick={onCancel}>
+          <Button variant="outline" aria-disabled={sending || undefined} onClick={cancel}>
             {t("admin.announcements.cancel")}
           </Button>
         </div>
@@ -400,14 +443,15 @@ function DeleteStep({
   onDone: () => Promise<void>;
 }) {
   const { t } = useT();
-  const { sending, refused, send } = useSend({
+  const { sending, refused, send, cancel } = useSend({
     answer: Deleted,
     refusals: DELETE_REFUSALS,
     onShell: onCancel,
+    onCancel,
     onDone,
   });
   return (
-    <Dialog title={t("admin.announcements.confirmDelete.title")} onClose={onCancel}>
+    <Dialog title={t("admin.announcements.confirmDelete.title")} onClose={cancel}>
       <div className="grid gap-4">
         <p className="font-medium wrap-anywhere">{item.en.title}</p>
         <p>{t("admin.announcements.confirmDelete.effect")}</p>
@@ -429,7 +473,7 @@ function DeleteStep({
           >
             {t("admin.announcements.confirmDelete.apply")}
           </Button>
-          <Button variant="outline" onClick={onCancel}>
+          <Button variant="outline" aria-disabled={sending || undefined} onClick={cancel}>
             {t("admin.announcements.cancel")}
           </Button>
         </div>

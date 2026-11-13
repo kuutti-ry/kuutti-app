@@ -59,7 +59,7 @@ flowchart TB
 6. The API holds every title and text to the plain-text rule and to their lengths. Refused: 7. Taken: 8.
 7. "An announcement cannot carry an e-mail address, a link, a phone number or a handle."; one the API does not accept for its lengths is refused with the limits in words; and when nothing answers, "That did not go through. Try again." What was typed stays. Back to 3.
 8. The API keeps it as a draft, with who wrote it and when, and an audit row that carries none of its words. Nobody is told of a draft, and a draft is never changed: a typo seen later means deleting it and writing it again.
-9. The panel says "Saved. It waits for another admin's approval.", empties the form and lists the draft under Waiting for a second admin. To the admin who wrote it the draft says "You wrote this, so another admin approves it." and offers Delete alone: part 2.
+9. The panel says "Saved. It waits for another admin's approval.", empties the form if it still holds the submitted words and lists the draft under Waiting for a second admin. Words typed while saving, or while a list refresh fails, stay in the form. To the admin who wrote it the draft says "You wrote this, so another admin approves it." and offers Delete alone: part 2.
 
 ## Part 2: another admin approves it
 
@@ -79,7 +79,7 @@ flowchart TB
     s19["Presses Delete the draft"]
   end
   subgraph admin["The admin panel"]
-    s12["Asks Send this announcement to everybody?, saying to how many it goes"]
+    s12["Focuses the question Send this announcement to everybody?, saying to how many it goes"]
     s15(["Says why in words"])
     s17(["Says Sent to everybody., and lists it under Sent: part 3"])
     s18["Asks Delete this draft?"]
@@ -102,16 +102,16 @@ flowchart TB
 
 10. Another admin, not the one who wrote it, opens Announcements and reads the draft under Waiting for a second admin, in each language.
 11. "Approve and send": 12. "Delete", which either admin may press, the one who wrote it too: 18.
-12. The step "Send this announcement to everybody?" shows the English title and says, with the numbers of the moment, how many accounts it goes to as a notice in the app, how many confirmed addresses by e-mail and how many people as a push, "or once the quiet hours end if they hold. Nothing takes it back." The accounts are those not erased, the addresses those confirmed whose Announcements switch is on, and the people those with a signed-in phone and the switch on. Cancel leaves the draft as it was.
+12. The step "Send this announcement to everybody?" shows the English title and says, with the numbers of the moment, how many accounts it goes to as a notice in the app, how many confirmed addresses by e-mail and how many people as a push, "or once the quiet hours end if they hold. Nothing takes it back." The accounts are those not erased, the addresses those confirmed whose Announcements switch is on, and the people those with a signed-in phone and the switch on. The step itself takes focus, so a second Enter does not send it. Cancel or Escape leaves the draft as it was before submission; while sending, both are unavailable and the step stays open.
 13. The admin presses "Send to everybody".
 14. The API refuses an approval by the admin who wrote it, which a check in the database holds too, and one of an announcement already sent, writing nothing. Refused: 15. Taken: 16.
 15. "You wrote this announcement, so another admin approves it." or "This announcement went to everybody already."; and when nothing answers, "That did not go through. Try again."
 16. In one go, the API marks it approved, by whom and when, writes a notice of it for every account not erased, a shadow-banned one, one on a break and one suspended included, and writes an audit row that counts them; somebody who signs up later is not told. Its e-mails and pushes go after the answer: part 3. Nothing takes a sent announcement back, and it is kept for good.
-17. The panel says "Sent to everybody." and lists it under Sent, with when it was sent, to be read and never changed: part 3.
+17. The panel says "Sent to everybody.", moves focus to that outcome, and lists it under Sent, with when it was sent, to be read and never changed: part 3.
 18. The step "Delete this draft?" shows the English title and says "Nobody has been told of it. It goes for good."; Cancel keeps it.
 19. The admin presses "Delete the draft".
 20. The API deletes the draft, with an audit row, unless another admin sent it meanwhile, which the panel says as "This announcement went to everybody already."
-21. The panel says "Deleted." and the draft is gone from the list.
+21. The panel says "Deleted.", moves focus to that outcome, and the draft is gone from the list.
 
 ## Part 3: everybody is told
 
@@ -175,3 +175,5 @@ flowchart TB
 
 - 2026-11-07 (#573, PR #643): an announcement to everybody once a second admin approves it: a notice on home in Kuutti's own words and the reader's language, a push that says only that there is one and waits for the quiet hours to end, and an e-mail to a confirmed address; the Announcements switch stops the push and the e-mail, never the notice.
 - 2026-11-07 (#573, PR #646): the panel's Announcements screen, admins only: one admin writes a draft in English and Finnish, and Swedish or not; another approves it through a step that says to how many it goes; either deletes a draft.
+
+- 2026-11-13 (#380): Send starts with focus on its question, pending sends and deletions cannot be dismissed, confirmed outcomes receive focus, and newer typed words survive saving or a failed refresh.

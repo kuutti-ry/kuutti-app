@@ -657,28 +657,36 @@ export async function sweepPendingPhotos(
   deps: ModerationDeps & { store: MediaStore },
 ): Promise<{ rechecked: number; failed: number }> {
   const olderThan = new Date(deps.now().getTime() - RECHECK_AFTER_MS);
-  const tried = new Set<string>();
   let rechecked = 0;
   let failed = 0;
+  let after: { createdAt: string; id: string } | undefined;
   for (;;) {
-    const pending = await repo.findPendingUnchecked(deps.db, olderThan, SWEEP_BATCH, [...tried]);
+    const pending = await repo.findPendingUnchecked(deps.db, olderThan, SWEEP_BATCH, after);
     if (pending.length === 0) break;
     for (const photo of pending) {
-      tried.add(photo.id);
-      const card = await deps.store.get(objectKey(photo.key, "card"));
-      if (!card) {
+      // Advance even when this photo cannot be checked: no failed row may
+      // monopolise the next page, or be retried twice in the same night.
+      after = photo;
+      try {
+        const card = await deps.store.get(objectKey(photo.key, "card"));
+        if (!card) {
+          failed += 1;
+          deps.logger.error({ photoId: photo.id }, "pending photo has no card variant to check");
+          continue;
+        }
+        const decided = await moderatePhoto(deps, {
+          photoId: photo.id,
+          accountId: photo.accountId,
+          card,
+        });
+        if (decided) rechecked += 1;
+        else failed += 1;
+      } catch (err) {
         failed += 1;
-        deps.logger.error({ photoId: photo.id }, "pending photo has no card variant to check");
-        continue;
+        deps.logger.error({ photoId: photo.id, err }, "pending photo could not be rechecked");
       }
-      const decided = await moderatePhoto(deps, {
-        photoId: photo.id,
-        accountId: photo.accountId,
-        card,
-      });
-      if (decided) rechecked += 1;
-      else failed += 1;
     }
+    if (pending.length < SWEEP_BATCH) break;
   }
   return { rechecked, failed };
 }

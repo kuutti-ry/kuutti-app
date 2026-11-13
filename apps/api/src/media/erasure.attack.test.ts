@@ -10,9 +10,6 @@ import { rolledBack } from "../test/rolled-back.ts";
 import { sweepOrphanedObjects } from "./erasure.ts";
 import { memoryMediaStore, objectKey } from "./store.ts";
 
-// What goes through today (#380): a hole, which its contract forbids.
-const HOLE = "#380";
-
 // sweep-orphaned-objects (#636, ADR-007, #380): the night deletes the objects
 // under media/ a day old or more that no photo row names, and leaves an
 // object of another shape alone. Each attack tries to make it delete what it
@@ -63,8 +60,6 @@ attack(
 attack(
   "sweep-orphaned-objects: an object under media/ that is not one of a photo's variants is deleted",
   {
-    // Goes through today: the content key is read from any file name under media/<key>/, not only thumb, card and full.
-    open: HOLE,
     attempt: () => rolledBack((db) => loneObject(db, "media/k-attack-odd/original.webp", WEEK_AGO)),
     control: () => rolledBack((db) => loneObject(db, objectKey("k-attack-odd", "card"), WEEK_AGO)),
     succeeds: (seen) => expect(seen.deleted).toBe(true),

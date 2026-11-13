@@ -8,10 +8,6 @@ import { attack } from "../../test/attack.ts";
 import { held, json, network, on, sentTo, settled } from "../../test/network.ts";
 import { MatchingSwitch } from "./MatchingSwitch.tsx";
 
-// What goes through today (#380): a hole, which its contract forbids, and a question, where no line says what should happen.
-const HOLE = "#380";
-const QUESTION = "#380, a question";
-
 // Attacks on the switch that opens matching (#380, #500, ADR-060): its read
 // and its press through a confirm step, tried the wrong way beside a control
 // that does the same thing rightly.
@@ -114,8 +110,6 @@ async function pressedAgainAfterCancel(firstFailedBefore: boolean) {
 attack(
   "MatchingSwitch: a second press goes out while the first is still out, through Cancel and a new step",
   {
-    // Goes through today: the one-at-a-time guard is each step's own, and Cancel starts a new step while the first press is out.
-    open: QUESTION,
     attempt: () => pressedAgainAfterCancel(false),
     control: () => pressedAgainAfterCancel(true),
     succeeds: (presses) => expect(presses).toBeGreaterThan(1),
@@ -144,8 +138,6 @@ async function cancelled(whileOut: boolean) {
 
 // admin.matching.cancel: "leaves the confirm step with nothing changed".
 attack("MatchingSwitch: Cancel closes the step while the press it cannot take back is still out", {
-  // Goes through today: Cancel stays enabled while the press is out, and the closed step's answer still lands.
-  open: HOLE,
   attempt: () => cancelled(true),
   control: () => cancelled(false),
   succeeds: (seen) => expect(seen.closed).toBe(true),

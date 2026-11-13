@@ -50,6 +50,8 @@ export function TakeDown({
 }) {
   const { t } = useT();
   const [open, setOpen] = useState(false);
+  const [done, setDone] = useState(false);
+  if (done) return null;
   return (
     <>
       <Button
@@ -70,6 +72,7 @@ export function TakeDown({
           onCancel={() => setOpen(false)}
           onDone={async (answer) => {
             setOpen(false);
+            setDone(true);
             await onDone(answer);
           }}
         />
@@ -93,10 +96,11 @@ function TakeDownStep({
   const ids = useId();
   const [reason, setReason] = useState<ModeratorRejectionReason | "">("");
   // A 403 is the shell's to say (#302): the step closes with no words of its own.
-  const { sending, refused, send } = useSend({
+  const { sending, refused, send, cancel } = useSend({
     answer: PhotoDecisionResponse,
     refusals: REFUSALS,
     onShell: onCancel,
+    onCancel,
     onDone,
   });
 
@@ -112,7 +116,7 @@ function TakeDownStep({
   };
 
   return (
-    <Dialog title={t("admin.takeDown.title")} onClose={onCancel}>
+    <Dialog title={t("admin.takeDown.title")} onClose={cancel}>
       <form className="grid gap-4" onSubmit={submit}>
         <p>{t("admin.takeDown.effect")}</p>
         {leavesTooFew && (
@@ -141,7 +145,7 @@ function TakeDownStep({
           >
             {t("admin.takeDown.confirm")}
           </Button>
-          <Button variant="outline" onClick={onCancel}>
+          <Button variant="outline" aria-disabled={sending || undefined} onClick={cancel}>
             {t("admin.queue.cancel")}
           </Button>
         </div>

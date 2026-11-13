@@ -8,9 +8,6 @@ import { attack } from "../../test/attack.ts";
 import { type Held, held, json, network, on, sentTo, settled } from "../../test/network.ts";
 import { ConfigList } from "./ConfigList.tsx";
 
-// What goes through today (#380): a question, where no line says what should happen.
-const QUESTION = "#380, a question";
-
 // Attacks on the tunables (#380, #304, #305): a change with a reason, shown
 // old and new before it is sent, tried the wrong way beside a control that
 // does the same thing rightly.
@@ -103,8 +100,6 @@ async function submittedWithReason(reason: string) {
 attack(
   "ConfigList: a change goes out with a reason of only spaces when the form is submitted without its button",
   {
-    // Goes through today: the review asks only the value; a browser does not submit this form, and the API refuses the empty reason.
-    open: QUESTION,
     attempt: () => submittedWithReason("   "),
     control: () => submittedWithReason("Pilot week two"),
     succeeds: (seen) => expect(seen.changes).toBe(1),

@@ -191,20 +191,20 @@ const customId = (locale: TranslatedLocale, index: number): string =>
  */
 export async function submitBatch(
   chunks: readonly BatchChunk[],
-  options: TranslatorOptions = {},
+  options: TranslatorOptions & { beforeSubmit?: (requests: BatchRequests) => void } = {},
 ): Promise<{ id: string; requests: BatchRequests }> {
   const client = options.client ?? new Anthropic();
   const requests: BatchRequests = {};
-  const batch = await client.messages.batches.create({
-    requests: chunks.map((chunk, index) => {
-      const id = customId(chunk.locale, index);
-      requests[id] = { locale: chunk.locale, keys: chunk.items.map((item) => item.key) };
-      return {
-        custom_id: id,
-        params: requestOf(chunk.locale, chunk.items, chunk.context),
-      };
-    }),
+  const batchRequests = chunks.map((chunk, index) => {
+    const id = customId(chunk.locale, index);
+    requests[id] = { locale: chunk.locale, keys: chunk.items.map((item) => item.key) };
+    return {
+      custom_id: id,
+      params: requestOf(chunk.locale, chunk.items, chunk.context),
+    };
   });
+  options.beforeSubmit?.(requests);
+  const batch = await client.messages.batches.create({ requests: batchRequests });
   return { id: batch.id, requests };
 }
 

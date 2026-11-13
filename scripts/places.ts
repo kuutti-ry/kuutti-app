@@ -8,7 +8,7 @@
  * - postialue:pno_tilasto_<year> (Paavo), one row per postal area: its names,
  *   its municipality, its centre in ETRS-TM35FIN metres, its inhabitants;
  * - tilastointialueet:kunta4500k_<year>, the municipalities' names.
- * and writes three files, or none:
+ * validates both layers before writing these three files:
  * - packages/schema/src/postal-areas.generated.ts, codes and names, which the
  *   phone's autocomplete reads, and the credit as one meta object;
  * - packages/schema/src/postal-areas.NOTICE.md, the same credit beside the data;
@@ -303,7 +303,7 @@ The layers are \`postialue:pno_tilasto_${credit.year}\` and \`tilastointialueet:
 
 type Written = { areas: number; municipalities: number; files: Record<string, number> };
 
-/** Reads both layers and writes the three files, in that order: a refusal leaves the old files as they were. */
+/** Validates both layers before writing. Input refusals leave files unchanged; filesystem errors may leave a partial write. */
 async function build(get: Get, year: number, date: string, root: string): Promise<Written> {
   const areas = areasFrom(await readLayer(get, areaLayer(year)));
   const municipalities = municipalitiesFrom(await readLayer(get, municipalityLayer(year)), areas);

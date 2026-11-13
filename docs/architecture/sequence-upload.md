@@ -132,7 +132,7 @@ sequenceDiagram
 24. Under an advisory lock per account and variant, one statement counts the caller's fetches of this variant since midnight in Finland against `photo_fetches_per_day` and writes the `photo_access` row, the fetch log (ADR-008 §1). Over the budget there is no row and no URL. A block that landed meanwhile is the same 404 as step 22.
 25. For a `card` or a `full`, the safety slice's velocity check reads the fetch log after the row has committed and before the answer (ADR-041); a `thumb` never counts. Since step 22 refuses another's full size, a `full` that reaches here is the caller's own, which the rule never counts.
 26. The app gets 200 with the URL, the variant and when it stops working; or 429 `photo_budget_exceeded` with `Retry-After` until the day rolls, which the app says in words; or 404.
-27. The app fetches the URL from CloudFront.
+27. The app fetches the URL from CloudFront. A component changing photo clears its old image and discards the previous request’s late URL or refusal; a request completing after unmount cannot call the next component’s callback (#380).
 28. CloudFront serves `/media/*` only with a signature from a key in the key group the behaviour trusts, before its expiry.
 29. CloudFront reads the object from the private bucket through origin access control, or from its cache; the bucket policy lets only this distribution read `media/`.
 30. The WebP reaches the app.

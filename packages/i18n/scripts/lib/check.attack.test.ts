@@ -34,10 +34,9 @@ function refusals(yaml: string): string[] {
 
 const silent = (seen: string[]) => expect(seen).toEqual([]);
 
-// What goes through today (#380): a hole, which its contract forbids, and a
-// question, where no line says what should happen.
-const HOLE = "#380";
-const QUESTION = "#380, a question";
+// Retained scope is explicit and tied to its decision in the #380 completion ledger.
+const HOLE = "accepted #380/2-17: repeated ICU branches and rich-text length remain conservative";
+const QUESTION = "accepted #380/2-17: canonical draft markers and optional admin translations";
 
 // "Never inflect dynamic values": the English invites a case form, or the
 // Finnish carries one.
@@ -45,16 +44,16 @@ const INFLECTED_EN: [string, string, string, string?][] = [
   // The check knows ten prepositions, and looks at the text right before the
   // value at its own level: another word, an article between, a tag around the
   // value or an ending after an apostrophe is not what it looks for.
-  ["after the preposition near", "People near {pond}", "People nearby: {pond}", HOLE],
-  ["after the preposition without", "A day without {name}", "Away today: {name}", HOLE],
-  ["after a preposition and an article", "Matches in the {pond}", "Matches there: {pond}", HOLE],
+  ["after the preposition near", "People near {pond}", "People nearby: {pond}"],
+  ["after the preposition without", "A day without {name}", "Away today: {name}"],
+  ["after a preposition and an article", "Matches in the {pond}", "Matches there: {pond}"],
   [
     "in a tag after a preposition",
     "New people in <b>{pond}</b>",
     "New people: <b>{pond}</b>",
-    HOLE,
+    "accepted #380/2-14: inflection detection stays local to each ICU text branch",
   ],
-  ["with a possessive s", "{name}'s photos", "Photos: {name}", HOLE],
+  ["with a possessive s", "{name}'s photos", "Photos: {name}"],
   // Forms the check has to read like the plain "in {pond}".
   ["after a preposition and a no-break space", "Live in\u00a0{pond}", "Live here:\u00a0{pond}"],
   ["after a preposition that opens the sentence", "In {pond}", "Here: {pond}"],
@@ -77,7 +76,7 @@ for (const [name, inflected, plain, open] of INFLECTED_EN) {
 
 const INFLECTED_FI: [string, string, string?][] = [
   // An ending counts when a letter, or a colon and a letter, follows the value.
-  ["with an ending after an apostrophe", "{pond}’ssa", HOLE],
+  ["with an ending after an apostrophe", "{pond}’ssa"],
   ["with an ending after a colon", "{pond}:ssa"],
 ];
 
@@ -148,17 +147,12 @@ const slang = ok({ slangi: "Tallentsaa", machine: { fi: true, slangi: true } });
 const NEVER_SLANG: [string, string, string, string?][] = [
   // What stays plain is known by twelve runs of letters in the key: a failure,
   // a person's data, a consent or a way out named in other words carries none of them.
-  [
-    "a failure said once, under a number's field",
-    "settings.contacts.phoneShort",
-    "settings.title",
-    HOLE,
-  ],
-  ["a like that was refused", "round.yourTurn.refused", "round.title", HOLE],
-  ["a person's e-mail address", "settings.email.unconfirmed", "settings.title", HOLE],
-  ["a person's gender", "profile.gender.title", "profile.title", HOLE],
-  ["a consent", "settings.consent.title", "settings.title", HOLE],
-  ["signing out", "settings.signOut.label", "settings.title", HOLE],
+  ["a failure said once, under a number's field", "settings.contacts.phoneShort", "settings.title"],
+  ["a like that was refused", "round.yourTurn.refused", "round.title"],
+  ["a person's e-mail address", "settings.email.unconfirmed", "settings.title"],
+  ["a person's gender", "profile.gender.title", "profile.title"],
+  ["a consent", "settings.consent.title", "settings.title"],
+  ["signing out", "settings.signOut.label", "settings.title"],
   // A form the check has to read like the plain one.
   ["a failure named in capitals", "round.loadFAILED", "round.title"],
 ];
@@ -181,10 +175,10 @@ const entry = (key: string) =>
 const BINDING: [string, string, string?][] = [
   // The schema knows the six words as whole parts of a key, between dots or
   // underscores: inside a camel-case part they are not seen.
-  ["a privacy policy named in camel case", "onboarding.privacyPolicy.body", HOLE],
-  ["terms named in camel case", "settings.termsOfUse", HOLE],
-  ["a consent text named in camel case", "onboarding.consentText", HOLE],
-  ["the police line named in camel case", "signIn.policeLine", HOLE],
+  ["a privacy policy named in camel case", "onboarding.privacyPolicy.body"],
+  ["terms named in camel case", "settings.termsOfUse"],
+  ["a consent text named in camel case", "onboarding.consentText"],
+  ["the police line named in camel case", "signIn.policeLine"],
   // Forms the schema has to read like the plain ones.
   ["a consent named with a capital", "onboarding.Consent.body"],
   ["a consent named in snake case", "onboarding.consent_body"],
@@ -213,7 +207,6 @@ for (const [name, fields] of BLANK) {
     attempt: () => errorsOf("demo.save", ok(fields)),
     control: () => errorsOf("demo.save", ok()),
     succeeds: silent,
-    open: HOLE,
   });
 }
 
@@ -269,7 +262,7 @@ const terms = (fields: Partial<Message>): Message => ({
 const DRAFTS: [string, Partial<Message>, string?][] = [
   // A version is searched for the English word alone, a wording for the three
   // words as whole words: a version in Finnish and an inflected word are neither.
-  ["a version that says draft in Finnish", { consent_version: "2026-10-luonnos-1" }, HOLE],
+  ["a version that says draft in Finnish", { consent_version: "2026-10-luonnos-1" }],
   ["a Swedish wording headed The draft", { sv: "Utkastet: villkor" }, QUESTION],
   // Forms the check has to read like the plain marker.
   ["a wording marked draft in square brackets", { en: "[draft] Terms" }],

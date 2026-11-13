@@ -1,5 +1,5 @@
 import { act, cleanup, fireEvent, screen, waitFor } from "@testing-library/react-native";
-import { router, Stack, useLocalSearchParams, useNavigation } from "expo-router";
+import { type Href, router, Stack, useLocalSearchParams, useNavigation } from "expo-router";
 import { renderRouter } from "expo-router/testing-library";
 import { useEffect, useState } from "react";
 import { Text, TextInput, View } from "react-native";
@@ -122,7 +122,8 @@ async function opened(initialUrl = "/", ...paths: string[]) {
   await waitFor(() =>
     expect(screen.getByTestId("session-status").props.children).not.toBe("loading"),
   );
-  for (const path of paths) await act(async () => router.push(path));
+  // This stack uses the fixture routes above, not generated production route types.
+  for (const path of paths) await act(async () => router.push(path as Href));
   return { getPathname: () => view.getPathname() };
 }
 
@@ -167,7 +168,7 @@ describe("the navigator belongs to its session", () => {
     expect(router.canGoBack()).toBe(false);
     // Exercise Back on a valid public stack, without an unhandled Back at
     // its root masking which screen it could return to.
-    await act(async () => router.push("/support"));
+    await act(async () => router.push("/support" as Href));
     await act(async () => router.back());
     expect(app.getPathname()).toBe("/");
     expect(screen.getByText("Start")).toBeTruthy();
@@ -187,7 +188,7 @@ describe("the navigator belongs to its session", () => {
     expect(app.getPathname()).toBe("/");
     expectDisposed(previous);
     expect(router.canGoBack()).toBe(false);
-    await act(async () => router.push("/private-one"));
+    await act(async () => router.push("/private-one" as Href));
     expect(screen.getByText(`Private one for ${SECOND}`)).toBeTruthy();
     expect(
       screen.queryByText(`Private one for ${FIRST}`, { includeHiddenElements: true }),
@@ -232,7 +233,7 @@ describe("the navigator belongs to its session", () => {
     expectDisposed(previous);
     expect(router.canGoBack()).toBe(false);
     const heldBeforePublicBack = heldRemovals;
-    await act(async () => router.push("/support"));
+    await act(async () => router.push("/support" as Href));
     await act(async () => router.back());
     expect(app.getPathname()).toBe("/");
     expect(heldRemovals).toBe(heldBeforePublicBack);

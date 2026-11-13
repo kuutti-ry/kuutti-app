@@ -111,8 +111,6 @@ describe("an address that is not this computer's", () => {
       },
       control: () => store("http://127.0.0.1:9000"),
       succeeds: taken,
-      // Goes through today: the guard asks the endpoint, the style and the address, and not the bucket's name.
-      open: "#380",
     },
   );
 });
@@ -145,7 +143,11 @@ describe("the walk to the bank and back", () => {
     return loginAs(persona, { api, fetch, now }).then(
       (login) => ({ signedIn: login.kind === "session" }),
       (error: unknown) => {
-        if (!(error instanceof DemoError)) throw error;
+        if (
+          !(error instanceof DemoError) ||
+          error.message !== "the personas need an API on this computer: nothing was sent"
+        )
+          throw error;
         return { signedIn: false };
       },
     );
@@ -156,8 +158,6 @@ describe("the walk to the bank and back", () => {
     attempt: () => walked("http://192.0.2.10:3000"),
     control: () => walked("http://127.0.0.1:3000"),
     succeeds: (seen) => expect(seen.signedIn).toBe(true),
-    // Goes through today: the walk asks where the bank is and not where the API is, which scripts/e2e.ts says it does.
-    open: "#380",
   });
 });
 

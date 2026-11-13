@@ -1,6 +1,21 @@
 import { describe, expect, it } from "vitest";
 import { findUiStrings } from "./ui-strings.ts";
 
+it("leaves data mapped into translated controls to the JSX inside the callback", () => {
+  expect(
+    findUiStrings(
+      "screen.tsx",
+      `const screen = <View>{["open", "closed"].map(state => <Button title={t(state)} />)}</View>`,
+    ),
+  ).toEqual([]);
+  expect(
+    findUiStrings(
+      "screen.tsx",
+      `const screen = <View>{["open", "closed"].map(state => <Button title="Open" />)}</View>`,
+    ).map((hit) => hit.text),
+  ).toEqual(["Open"]);
+});
+
 const hits = (source: string) =>
   findUiStrings("probe.tsx", source).map((h) => `${h.where}: ${h.text}`);
 
@@ -39,9 +54,13 @@ describe("check:ui-strings", () => {
 
   it("checks the displayed branches of conditional and logical expressions", () => {
     expect(hits('<Text>{ok ? "Done" : (ready && "Failed")}</Text>')).toEqual([
-      "literal as a child: DoneFailed",
+      "literal as a child: Done",
+      "literal as a child: Failed",
     ]);
-    expect(hits('<Button title={busy ? "Saving" : "Save"} />')).toEqual(["title prop: SavingSave"]);
+    expect(hits('<Button title={busy ? "Saving" : "Save"} />')).toEqual([
+      "title prop: Saving",
+      "title prop: Save",
+    ]);
     expect(hits('<Text>{state === "ready" && t("status.ready")}</Text>')).toEqual([]);
     expect(hits('<Text>{ok ? t("status.done") : t("status.failed")}</Text>')).toEqual([]);
   });

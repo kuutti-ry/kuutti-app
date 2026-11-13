@@ -15,38 +15,22 @@
  * Refuses production unless --env production is given on purpose.
  */
 import { createPool, transaction } from "../pool.ts";
+import { argumentsOf } from "./arguments.ts";
 
 const ROLES = new Set(["moderator", "admin", "researcher"]);
 /** As long as the staff list may show the name of who granted a role (StaffMember.grantedBy). */
 const GRANTOR_MAX = 200;
 
-function arg(name: string): string | undefined {
-  const index = process.argv.findIndex((word) => word === name || word.startsWith(`${name}=`));
-  const word = process.argv[index];
-  return word === name ? process.argv[index + 1] : word?.slice(name.length + 1);
-}
-
-/** The flags that take the word after them as their value. */
-const VALUED = new Set(["--by", "--env"]);
-
-/**
- * The words that are not a flag or a flag's value, by position: a role that
- * happens to equal the --by name ("grant <hmac> admin --by admin") stays the
- * role (#250, #310). The bare "--" pnpm passes through ("moderator -- list")
- * is no flag and takes nothing with it.
- */
-function positionals(argv: readonly string[]): string[] {
-  const out: string[] = [];
-  for (let i = 0; i < argv.length; i++) {
-    const word = argv[i] as string;
-    if (VALUED.has(word)) i++;
-    else if (!word.startsWith("--")) out.push(word);
-  }
-  return out;
-}
-
 async function main(): Promise<number> {
-  const [command, hetuHmac, role] = positionals(process.argv.slice(2));
+  let parsed: ReturnType<typeof argumentsOf>;
+  try {
+    parsed = argumentsOf(process.argv.slice(2), ["--env", "--by"]);
+  } catch (error) {
+    console.error((error as Error).message);
+    return 2;
+  }
+  const [command, hetuHmac, role] = parsed.positionals;
+  const arg = (name: string) => parsed.options[name];
   const url = process.env.DATABASE_URL;
   if (!url) {
     console.error("DATABASE_URL is not set");
@@ -58,6 +42,17 @@ async function main(): Promise<number> {
     arg("--env") !== "production"
   ) {
     console.error("refusing production without --env production");
+    return 2;
+  }
+  if (!["recent", "list", "grant", "revoke"].includes(command ?? "")) {
+    console.error(
+      "usage: moderator grant <hetu_hmac> <role> --by <name> | revoke <hetu_hmac> | list",
+    );
+    return 2;
+  }
+  const length = command === "grant" ? 3 : command === "revoke" ? 2 : 1;
+  if (parsed.positionals.length > length) {
+    console.error(`unexpected argument ${parsed.positionals[length]}`);
     return 2;
   }
   const pool = createPool({
@@ -136,25 +131,19 @@ async function main(): Promise<number> {
       console.log(`granted ${role}`);
       return 0;
     }
-    if (command === "revoke") {
-      const result = await transaction(pool, async (tx) => {
-        const removed = await tx.query("DELETE FROM moderator_roles WHERE identity_id = $1", [
-          found.id,
-        ]);
-        // A later grant must not revive sessions that belonged to the revoked role.
-        await tx.query(
-          "UPDATE admin_session SET revoked_at = now() WHERE identity_id = $1 AND revoked_at IS NULL",
-          [found.id],
-        );
-        return removed;
-      });
-      console.log(result.rowCount === 1 ? "revoked" : "no role to revoke");
-      return 0;
-    }
-    console.error(
-      "usage: moderator grant <hetu_hmac> <role> --by <name> | revoke <hetu_hmac> | list",
-    );
-    return 2;
+    const result = await transaction(pool, async (tx) => {
+      const removed = await tx.query("DELETE FROM moderator_roles WHERE identity_id = $1", [
+        found.id,
+      ]);
+      // A later grant must not revive sessions that belonged to the revoked role.
+      await tx.query(
+        "UPDATE admin_session SET revoked_at = now() WHERE identity_id = $1 AND revoked_at IS NULL",
+        [found.id],
+      );
+      return removed;
+    });
+    console.log(result.rowCount === 1 ? "revoked" : "no role to revoke");
+    return 0;
   } finally {
     await pool.end();
   }

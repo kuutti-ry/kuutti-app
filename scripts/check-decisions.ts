@@ -30,20 +30,88 @@ const ROOT = join(import.meta.dirname, "..");
 const MIGRATIONS = join(ROOT, "packages", "db", "drizzle");
 const REGISTER = "docs/decisions.md";
 const KEY = /^[a-z][a-z0-9_]*$/;
-const PAIR = /'([a-z][a-z0-9_]*)',\s*'[^']*'::jsonb/g;
 const QUOTED = /'([a-z][a-z0-9_]*)'/g;
-const RENAME = /SET "key" = '([a-z][a-z0-9_]*)' WHERE "key" = '([a-z][a-z0-9_]*)'/;
+const RENAME =
+  /SET\s+"?key"?\s*=\s*'([a-z][a-z0-9_]*)'\s+WHERE\s+"?key"?\s*=\s*'([a-z][a-z0-9_]*)'/i;
 const SEPARATOR = /^\|(\s*:?-+:?\s*\|)+\s*$/;
+
+/** SQL literals are tokens, so comments, commas and semicolons inside them cannot move a column. */
+function sqlTokens(sql: string): string[] {
+  return (
+    sql.match(/'(?:''|[^'])*'|"(?:""|[^"])*"|--[^\n]*|\/\*[\s\S]*?\*\/|[a-z_][\w$]*|\d+|\S/gi) ?? []
+  ).filter((token) => !token.startsWith("--") && !token.startsWith("/*"));
+}
+
+function columns(tokens: string[]): string[][] {
+  const parts: string[][] = [[]];
+  let depth = 0;
+  for (const token of tokens) {
+    if (token === "(") depth++;
+    if (token === ")") depth--;
+    if (depth === 0 && token.toLowerCase() === "from") break;
+    if (depth === 0 && token === ",") parts.push([]);
+    else parts.at(-1)?.push(token);
+  }
+  return parts;
+}
+
+function insertedKeys(tokens: string[], tableEnd: number): string[] {
+  if (tokens[tableEnd] !== "(") throw new Error("matching_config INSERT needs explicit columns");
+  const close = tokens.indexOf(")", tableEnd);
+  const fields = columns(tokens.slice(tableEnd + 1, close)).map((part) =>
+    part.join("").replaceAll('"', "").toLowerCase(),
+  );
+  const key = fields.indexOf("key");
+  if (key === -1) throw new Error("matching_config INSERT has no key column");
+  const rest = tokens.slice(close + 1);
+  const values: string[][][] = [];
+  if (rest[0]?.toLowerCase() === "select") values.push(columns(rest.slice(1)));
+  else if (rest[0]?.toLowerCase() === "values") {
+    let start = 1;
+    while (rest[start] === "(") {
+      let depth = 1;
+      let end = start + 1;
+      for (; end < rest.length && depth > 0; end++) {
+        if (rest[end] === "(") depth++;
+        if (rest[end] === ")") depth--;
+      }
+      if (depth !== 0) throw new Error("unclosed matching_config VALUES row");
+      values.push(columns(rest.slice(start + 1, end - 1)));
+      start = rest[end] === "," ? end + 1 : end;
+    }
+  }
+  if (values.length === 0) throw new Error("unrecognised matching_config INSERT");
+  return values.flatMap((row) => {
+    const value = row[key]?.[0];
+    const literal = value && /^'([a-z][a-z0-9_]*)'$/.exec(value)?.[1];
+    if (literal) return [literal];
+    // An INSERT ... SELECT that versions existing rows introduces no key.
+    if (value?.replaceAll('"', "").toLowerCase() === "key") return [];
+    throw new Error("matching_config key must be a literal or the existing key column");
+  });
+}
 
 /** The keys that stand after a migration, given those that stood before it, statement by statement. */
 function keysAfter(before: readonly string[], sql: string): string[] {
   const keys = new Set(before);
-  for (const statement of sql.split(";")) {
-    if (/INSERT INTO "matching_config"/.test(statement)) {
-      for (const pair of statement.matchAll(PAIR)) keys.add(pair[1] ?? "");
-    } else if (/DELETE FROM "matching_config"/.test(statement)) {
+  const statements: string[][] = [[]];
+  for (const token of sqlTokens(sql)) {
+    if (token === ";") statements.push([]);
+    else statements.at(-1)?.push(token);
+  }
+  for (const tokens of statements) {
+    const statement = tokens.join(" ");
+    const table =
+      /^(?:INSERT INTO|DELETE FROM|UPDATE)\s+(?:"?public"?\s*\.\s*)?"?matching_config"?(?=\s|\(|$)/i;
+    if (!table.test(statement)) continue;
+    if (/^INSERT INTO/i.test(statement)) {
+      const tableAt = tokens.findIndex(
+        (token) => token.replaceAll('"', "").toLowerCase() === "matching_config",
+      );
+      for (const key of insertedKeys(tokens, tableAt + 1)) keys.add(key);
+    } else if (/^DELETE FROM/i.test(statement)) {
       for (const quoted of statement.matchAll(QUOTED)) keys.delete(quoted[1] ?? "");
-    } else if (/UPDATE "matching_config"/.test(statement)) {
+    } else if (/^UPDATE/i.test(statement)) {
       const [, renamed, was] = statement.match(RENAME) ?? [];
       if (renamed && was && keys.delete(was)) keys.add(renamed);
     }
@@ -106,6 +174,15 @@ function problemsOf(keys: string[], register: string): string[] {
 }
 
 function selfTest(): void {
+  const forms = [
+    `insert into matching_config (version, key, value) values (1, 'new_key', CAST('5' AS jsonb));`,
+    `INSERT\nINTO "matching_config" ("key", "value", "version") VALUES ('new_key', '5' :: JSONB, 1);`,
+    `INSERT /* note */ INTO public.matching_config (version, key, value) SELECT coalesce(max(version), 0) + 1, 'new_key', jsonb_build_object('text', 'a;b') FROM matching_config;`,
+  ];
+  for (const form of forms) {
+    if (JSON.stringify(keysAfter([], form)) !== '["new_key"]')
+      throw new Error(`matching_config INSERT was not read: ${form}`);
+  }
   const sql = `-- comment; with a semicolon
 INSERT INTO "matching_config" ("version", "key", "value", "created_by") VALUES
   (1, 'like_expiry_days', '12'::jsonb, 'migration:0007'),

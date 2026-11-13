@@ -195,6 +195,20 @@ describe("the Anthropic translator", () => {
 });
 
 describe("batch mode", () => {
+  it("does not submit a paid batch when its recovery record cannot be written", async () => {
+    const { client, batches } = fakeClient();
+    await expect(
+      submitBatch([{ locale: "fi", items, context }], {
+        client,
+        beforeSubmit: (requests) => {
+          expect(requests["fi-0000"]?.keys).toEqual(["demo.hello", "demo.save"]);
+          throw new Error("disk full");
+        },
+      }),
+    ).rejects.toThrow("disk full");
+    expect(batches).toEqual([]);
+  });
+
   it("submits one request per chunk and returns what each asked for, without the fallback the Batches API refuses", async () => {
     const { client, batches } = fakeClient();
     const { id, requests } = await submitBatch(

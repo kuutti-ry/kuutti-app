@@ -8,6 +8,7 @@
  */
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
+import ts from "typescript";
 import { findUiStrings } from "./lib/ui-strings.ts";
 
 const repo = resolve(import.meta.dirname, "..", "..", "..");
@@ -22,21 +23,59 @@ function tsxFiles(dir: string): string[] {
   });
 }
 
-const DATE_OUTSIDE_I18N =
-  /\b(toLocaleDateString|toLocaleTimeString|toLocaleString|toDateString|toUTCString)\s*\(|Intl\.DateTimeFormat|\bdateStyle\s*:|\btimeStyle\s*:/g;
+const DATE_METHODS = new Set([
+  "toLocaleDateString",
+  "toLocaleTimeString",
+  "toLocaleString",
+  "toDateString",
+  "toTimeString",
+  "toUTCString",
+  "DateTimeFormat",
+]);
 
-/** Where a client formats a date itself, by line and column; a comment may name the API, code may not. */
+/** Read syntax, so comment markers inside strings cannot hide the next call. */
 function dateHits(source: string): { line: number; column: number; text: string }[] {
+  const file = ts.createSourceFile(
+    "client.tsx",
+    source,
+    ts.ScriptTarget.Latest,
+    true,
+    ts.ScriptKind.TSX,
+  );
   const hits: { line: number; column: number; text: string }[] = [];
-  const lines = source
-    .replace(/\/\*[\s\S]*?\*\//g, (block) => block.replace(/[^\n]/g, " "))
-    .split("\n");
-  lines.forEach((line, index) => {
-    const text = line.replace(/^\s*\/\/.*$/, "");
-    for (const match of text.matchAll(DATE_OUTSIDE_I18N)) {
-      hits.push({ line: index + 1, column: (match.index ?? 0) + 1, text: match[0] });
+  const nameOf = (node: ts.Node): string | undefined => {
+    if (ts.isIdentifier(node) || ts.isStringLiteral(node)) return node.text;
+    if (ts.isPropertyAccessExpression(node)) return node.name.text;
+    if (ts.isElementAccessExpression(node) && ts.isStringLiteral(node.argumentExpression))
+      return node.argumentExpression.text;
+    return undefined;
+  };
+  const visit = (node: ts.Node): void => {
+    const call = ts.isCallExpression(node) || ts.isNewExpression(node);
+    const name = call
+      ? nameOf(node.expression)
+      : ts.isPropertyAssignment(node)
+        ? nameOf(node.name)
+        : undefined;
+    if (
+      name &&
+      ((call && DATE_METHODS.has(name)) || (!call && ["dateStyle", "timeStyle"].includes(name)))
+    ) {
+      const target = call ? node.expression : (node as ts.PropertyAssignment).name;
+      const marked =
+        call && ts.isPropertyAccessExpression(target) && name !== "DateTimeFormat"
+          ? target.name
+          : target;
+      const position = file.getLineAndCharacterOfPosition(marked.getStart(file));
+      hits.push({
+        line: position.line + 1,
+        column: position.character + 1,
+        text: call ? (name === "DateTimeFormat" ? target.getText(file) : `${name}(`) : `${name}:`,
+      });
     }
-  });
+    ts.forEachChild(node, visit);
+  };
+  visit(file);
   return hits;
 }
 

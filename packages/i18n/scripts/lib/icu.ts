@@ -153,9 +153,10 @@ export function branchProblems(en: string, text: string, locale: string): string
 
 // A preposition directly before a plain {value} is where English invites an
 // inflected noun in Finnish ("in {pond}" has no nominative translation).
-const PREPOSITION_BEFORE = /\b(in|at|to|from|of|on|into|with|for|by)\s+$/i;
+const PREPOSITION_BEFORE =
+  /\b(in|at|to|from|of|on|into|with|for|by|near|without)\s+(?:(?:a|an|the)\s+)?$/i;
 // A letter, or a colon and letters ("{pond}:ssa"), glued after a plain {value}.
-const SUFFIX_AFTER = /^:?\p{L}/u;
+const SUFFIX_AFTER = /^[:'’]?\p{L}/u;
 
 /**
  * TD-17: a dynamic value never stands where the sentence inflects it. Reports

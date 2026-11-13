@@ -48,17 +48,57 @@ test("one admin writes an announcement, and another approves and sends it", asyn
     /It goes now to every account as a notice in the app \(\d+ accounts?\)/,
   );
   await expect(step).toContainText("Nothing takes it back.");
+  await expect(step).toBeFocused();
+  await page.setViewportSize({ width: 320, height: 550 });
+  await page.evaluate(() => {
+    document.documentElement.style.fontSize = "200%";
+  });
+  const bounds = await step.boundingBox();
+  expect(bounds).not.toBeNull();
+  expect((bounds?.x ?? 0) + (bounds?.width ?? 0)).toBeLessThanOrEqual(320);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(320);
+  await step.getByRole("button", { name: "Send to everybody" }).scrollIntoViewIfNeeded();
+  await expect(step.getByRole("button", { name: "Send to everybody" })).toBeInViewport();
+  await expect(step.getByRole("button", { name: "Cancel" })).toBeInViewport();
+  await page.setViewportSize({ width: 1000, height: 550 });
+  await page.evaluate(() => {
+    document.documentElement.style.fontSize = "100%";
+  });
+  let approvals = 0;
+  page.on("request", (request) => {
+    if (request.method() === "POST" && request.url().endsWith("/approve")) approvals += 1;
+  });
+  await page.keyboard.press("Enter");
+  await expect(step).toBeVisible();
+  expect(approvals).toBe(0);
   // The step keeps the focus inside, and Escape gives it back to the button that opened it.
   await page.keyboard.press("Escape");
   await expect(step).toHaveCount(0);
   await expect(approve).toBeFocused();
 
+  let release!: () => void;
+  const held = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await page.route("**/admin/announcements/*/approve", async (route) => {
+    await held;
+    await route.continue();
+  });
   await approve.click();
   await page
     .getByRole("dialog", { name: "Send this announcement to everybody?" })
     .getByRole("button", { name: "Send to everybody" })
     .click();
+  const cancel = step.getByRole("button", { name: "Cancel" });
+  await expect(cancel).toHaveAttribute("aria-disabled", "true");
+  await page.keyboard.press("Escape");
+  await expect(step).toBeVisible();
+  await cancel.click({ force: true });
+  await expect(step).toBeVisible();
+  expect(approvals).toBe(1);
+  release();
   await expect(page.getByText("Sent to everybody.")).toBeVisible();
+  await expect(page.getByText("Sent to everybody.")).toBeFocused();
   const sent = page
     .getByRole("heading", { name: "Sent", exact: true })
     .locator("xpath=ancestor::section[1]");

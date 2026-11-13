@@ -1,7 +1,7 @@
 import type { PlainMessageKey } from "@kuutti/i18n";
 import { useT } from "@kuutti/i18n/react";
 import { AdminOverview, type FoundReason, type OverviewQueue } from "@kuutti/schema";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router";
 import { Alert } from "../../components/ui/alert.tsx";
 import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card.tsx";
@@ -51,16 +51,20 @@ export function Overview() {
   const { t } = useT();
   const [state, setState] = useState<State>({ kind: "loading" });
   const ageOf = useAge();
+  const latest = useRef(0);
 
   const load = useCallback(async () => {
+    const request = ++latest.current;
     setState({ kind: "loading" });
     try {
       const { data, response } = await api.GET("/admin/overview");
+      if (request !== latest.current) return;
       // A 403 is the shell's to say (#302).
       if (response.status === 403) return setState({ kind: "forbidden" });
       if (!data) return setState({ kind: "error" });
       setState({ kind: "ready", overview: AdminOverview.parse(data) });
     } catch (error) {
+      if (request !== latest.current) return;
       console.error("overview load failed", error);
       setState({ kind: "error" });
     }

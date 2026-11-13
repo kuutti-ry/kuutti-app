@@ -31,9 +31,21 @@ function* sources(path: string): Generator<string> {
   }
 }
 
-/** The source without its comments: a block comment, and a line comment after a line's start or a space. */
+/** Keep quoted text intact while removing comments: "image/*" is not a comment opener. */
 export const withoutComments = (source: string) =>
-  source.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|\s)\/\/.*$/gm, "$1");
+  source.replace(
+    /"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|`(?:\\.|[^`\\])*`|\/\*[\s\S]*?\*\/|\/\/[^\r\n]*/g,
+    (part) =>
+      part.startsWith("/*") || part.startsWith("//") ? part.replace(/[^\r\n]/g, " ") : part,
+  );
+
+/** Separate identifier words for guards that also read camelCase and CONSTANT_NAMES. */
+export const identifierWords = (source: string) =>
+  source.replace(/"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|[A-Za-z_$][\w$]*/g, (token) =>
+    token.startsWith('"') || token.startsWith("'")
+      ? token
+      : token.replace(/([a-z])([A-Z][a-z])/g, "$1 $2").replace(/_/g, " "),
+  );
 
 /** The files, from the repository's root and sorted, whose source the test finds. */
 export function readersOf(test: (source: string) => boolean): string[] {

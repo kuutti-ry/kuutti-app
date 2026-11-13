@@ -102,7 +102,7 @@ export const ORPHAN_GRACE_MS = 24 * 60 * 60 * 1000;
 
 /** `media/<content key>/<variant>.webp`, as `objectKey` writes it: the content key, or null for a key of another shape. */
 const contentKeyOf = (key: string): string | null =>
-  /^media\/([^/]+)\/[^/]+\.webp$/.exec(key)?.[1] ?? null;
+  /^media\/([^/]+)\/(?:thumb|card|full)\.webp$/.exec(key)?.[1] ?? null;
 
 /** What the night's sweep counts; never a key. */
 type OrphanSweep = {

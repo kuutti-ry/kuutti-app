@@ -37,6 +37,7 @@ async function reach(
   command: Parameters<typeof commandRunner.run>[0],
   args: string[],
   appEnv?: string,
+  expectedRefusal?: string | readonly string[],
 ): Promise<{ connected: boolean }> {
   let result: Awaited<ReturnType<typeof commandRunner.run>>;
   try {
@@ -56,12 +57,17 @@ async function reach(
   }
   // A missing import, an unrelated refusal or a command that stopped silently is
   // a broken attempt, never evidence that the production guard held.
-  if (command === "migrate") throw new Error("migrate stopped before asking its database");
+  if (command === "migrate" && expectedRefusal === undefined)
+    throw new Error("migrate stopped before asking its database");
   const refusal =
-    command === "seed"
+    expectedRefusal ??
+    (command === "seed"
       ? "refusing to seed production: previews and local databases only (TD-19)"
-      : "refusing production without --env production";
-  expect(result).toEqual({ code: 2, out: [], err: [refusal] });
+      : "refusing production without --env production");
+  const allowed = typeof refusal === "string" ? [refusal] : refusal;
+  expect(result).toMatchObject({ code: 2, out: [] });
+  expect(result.err).toHaveLength(1);
+  expect(allowed).toContain(result.err[0]);
   return { connected: false };
 }
 const connected = (seen: { connected: boolean }) => expect(seen.connected).toBe(true);
@@ -109,43 +115,40 @@ describe("the command attack's driver", () => {
   });
 });
 
-// What goes through today (#380) where no line says what should happen.
-const QUESTION = "#380, a question";
-
 describe("the seed, where production is named (#250)", () => {
-  // Each row names production in one spelling; its control names a preview the same way.
-  // Both spellings and every repeated environment must preserve the production refusal.
-  for (const [how, spelt, open] of [
-    ["in one word, --env=production", (env: string) => [`--env=${env}`], undefined],
+  // A production target is refused even among duplicate flags; the control uses one preview.
+  for (const [how, args, refusal] of [
+    ["in one word, --env=production", ["--env=production"], undefined],
     [
       "second, after another environment",
-      (env: string) => ["--env", "development", "--env", env],
+      ["--env", "development", "--env", "production"],
       undefined,
     ],
-    ["after the separator pnpm hands through", (env: string) => ["--", "--env", env], undefined],
+    ["after the separator pnpm hands through", ["--", "--env", "production"], undefined],
   ] as const) {
     attack(`seed: production named ${how}, is seeded`, {
-      attempt: () => reach("seed", spelt("production")),
-      control: () => reach("seed", spelt("preview")),
+      attempt: () => reach("seed", [...args], undefined, refusal),
+      control: () => reach("seed", ["--env=preview"]),
       succeeds: connected,
-      open,
     });
   }
 });
 
 describe("the staff roles, where the process runs in production", () => {
-  // The control is the same command line where APP_ENV is development.
-  // A flag cannot hide the process's own production environment.
-  for (const [how, args, open] of [
+  // Only an explicit production flag is a control for a process in production.
+  for (const [how, args, refusal] of [
     ["--env names another environment", ["list", "--env", "development"], undefined],
-    ["--env is given empty", ["list", "--env", ""], undefined],
-    ["--env is given last, with nothing after it", ["list", "--env"], undefined],
+    ["--env is given empty", ["list", "--env", ""], "--env takes a value"],
+    [
+      "--env is given last, with nothing after it",
+      ["list", "--env"],
+      ["--env takes a value", "refusing production without --env production"],
+    ],
   ] as const) {
     attack(`moderator: production is entered without --env production when ${how}`, {
-      attempt: () => reach("moderator", [...args], "production"),
-      control: () => reach("moderator", [...args], "development"),
+      attempt: () => reach("moderator", [...args], "production", refusal),
+      control: () => reach("moderator", ["list", "--env", "production"], "production"),
       succeeds: connected,
-      open,
     });
   }
 });
@@ -157,12 +160,12 @@ describe("a dry run asked of a command that has none", () => {
     ["migrate", []],
     ["moderator", ["revoke", hmac]],
   ] as const) {
-    // None of the three has a dry run or promises to refuse a word it does not know.
+    // None has a dry run: asking for one must never become a real write.
     attack(`${command}: with --dry-run it goes ahead all the same`, {
-      attempt: () => reach(command, [...args, "--dry-run"]),
+      attempt: () =>
+        reach(command, [...args, "--dry-run"], undefined, "unknown argument --dry-run"),
       control: () => reach(command, [...args]),
       succeeds: connected,
-      open: QUESTION,
     });
   }
 });
