@@ -2,7 +2,7 @@
  * dev-env: the whole local environment with one command.
  *
  *   pnpm env:up [--skip api,mobile,admin] [--no-seed]   start everything, Ctrl+C stops the apps
- *   pnpm env:down                                       stop the apps and the database
+ *   pnpm env:down                                       stop the apps and the compose database
  *   pnpm env:status                                     who holds which port, database state
  *   node scripts/dev-env.ts --self-test                 the command line's cases; starts nothing
  *
@@ -26,7 +26,7 @@
 import { type ChildProcess, spawn, spawnSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { connect } from "node:net";
-import { resolve } from "node:path";
+import { resolve, sep } from "node:path";
 import { parseArgs as parseOptions } from "node:util";
 
 const ROOT = resolve(import.meta.dirname, "..");
@@ -158,18 +158,23 @@ function pipe(child: ChildProcess, tag: string, color: string): void {
 
 type Owner = { pid: number; command: string; cwd: string; ours: boolean };
 
+async function processCwd(pid: number): Promise<string> {
+  const { out } = await run("lsof", ["-a", "-p", String(pid), "-d", "cwd", "-Fn"]);
+  return (
+    out
+      .split("\n")
+      .find((line) => line.startsWith("n"))
+      ?.slice(1) ?? ""
+  );
+}
+
 async function listeners(port: number): Promise<Owner[]> {
   const { out } = await run("lsof", ["-nP", `-iTCP:${port}`, "-sTCP:LISTEN", "-t"]);
   const pids = [...new Set(out.split(/\s+/).filter(Boolean).map(Number))];
   const owners: Owner[] = [];
   for (const pid of pids) {
     const command = (await run("ps", ["-o", "command=", "-p", String(pid)])).out.trim();
-    const cwdOut = (await run("lsof", ["-a", "-p", String(pid), "-d", "cwd", "-Fn"])).out;
-    const cwd =
-      cwdOut
-        .split("\n")
-        .find((l) => l.startsWith("n"))
-        ?.slice(1) ?? "";
+    const cwd = await processCwd(pid);
     owners.push({ pid, command, cwd, ours: isOurs(cwd, command) });
   }
   return owners;
@@ -177,7 +182,10 @@ async function listeners(port: number): Promise<Owner[]> {
 
 /** Whether a port's listener is a copy of one of our own processes, by its working directory and its command. */
 function isOurs(cwd: string, command: string): boolean {
-  return cwd.startsWith(ROOT) && (OURS.test(command) || WRAPPER_SHELL.test(command));
+  return (
+    (cwd === ROOT || cwd.startsWith(`${ROOT}${sep}`)) &&
+    (OURS.test(command) || WRAPPER_SHELL.test(command))
+  );
 }
 
 /** The listener plus its supervisors (pnpm, node --watch) up to, never including, a shell. */
@@ -188,7 +196,7 @@ async function processTree(pid: number): Promise<number[]> {
     const ppid = Number((await run("ps", ["-o", "ppid=", "-p", String(current)])).out.trim());
     if (!ppid || ppid <= 1) break;
     const command = (await run("ps", ["-o", "command=", "-p", String(ppid)])).out.trim();
-    if (stopsAt(command)) break;
+    if (stopsAt(command, await processCwd(ppid))) break;
     chain.push(ppid);
     current = ppid;
   }
@@ -196,9 +204,9 @@ async function processTree(pid: number): Promise<number[]> {
 }
 
 /** Whether the walk up from a listener ends at this parent, which is then left alone: a shell, or nothing of ours. */
-function stopsAt(command: string): boolean {
+function stopsAt(command: string, cwd = ROOT): boolean {
   const wrapper = WRAPPER_SHELL.test(command);
-  return !wrapper && (!OURS.test(command) || SHELLS.test(command));
+  return !isOurs(cwd, command) || (!wrapper && SHELLS.test(command));
 }
 
 async function alive(pid: number): Promise<boolean> {
@@ -316,12 +324,11 @@ async function ensureDatabase(): Promise<void> {
   const docker = composeFile ? await hasDocker() : false;
   const brewListening = (await portOpen(host, port)) && !(await composeHasPostgres());
 
-  if (docker && brewListening && brewPostgres()) {
-    // Docker arrived after Homebrew PostgreSQL was the fallback: hand the port over.
-    const brew = brewPostgres() as NonNullable<ReturnType<typeof brewPostgres>>;
-    env("Homebrew PostgreSQL holds the port; stopping it so the compose stack can take over");
-    await run(brew.pgCtl, ["-D", brew.dataDir, "stop", "-m", "fast"]);
-    await waitFor("port release", async () => !(await portOpen(host, port)), 15_000);
+  if (docker && brewListening) {
+    const owners = await listeners(port);
+    fail(
+      `database port ${host}:${port} is already held outside this compose stack: ${owners.map((owner) => `pid ${owner.pid} ${owner.command}`).join(", ") || "owner unknown"}. Stop it yourself before starting compose; no database was stopped.`,
+    );
   }
 
   if (await portOpen(host, port)) {
@@ -609,6 +616,8 @@ function selfTest(): never {
   // Whose a port's listener is (#380): an attack, a process that must not be taken for ours and
   // stopped, and after it its control, [working directory, command, ours].
   const owners: Array<[string, string, boolean]> = [
+    [`${ROOT}-site/apps/api`, "node --watch src/index.ts", false],
+    [ROOT, "pnpm dev", true],
     // attack: a process started somewhere else entirely
     ["/tmp/kuutti-elsewhere/apps/api", "node --watch src/index.ts", false],
     // control: the same process, started inside this repository
@@ -624,7 +633,10 @@ function selfTest(): never {
   }
   // What is stopped with a listener (#380): an attack, a parent that must be left alone, and after
   // it its control, [the parent's command, the walk ends there].
-  const parents: Array<[string, boolean]> = [
+  const parents: Array<[string, boolean, string?]> = [
+    ["pnpm dev", true, `${ROOT}-site`],
+    ["pnpm dev", false, resolve(ROOT, "apps/api")],
+    ["node runner.js", true, "/tmp/another-project"],
     // attack: the terminal's shell, above the supervisors, is stopped with them
     ["-zsh", true],
     // control: a supervisor of ours, which is
@@ -638,7 +650,7 @@ function selfTest(): never {
     // control: a supervisor of ours that is no shell either, which is
     ["tsx watch src/index.ts", false],
   ];
-  const walked = parents.filter(([command, ends]) => stopsAt(command) !== ends);
+  const walked = parents.filter(([command, ends, cwd]) => stopsAt(command, cwd) !== ends);
   for (const [command, ends] of walked) {
     console.error(`✖ self-test: the walk ${ends ? "goes on past" : "ends at"} ${command}`);
   }
@@ -679,7 +691,7 @@ async function up(skip: Set<string>, seed: boolean): Promise<void> {
     log(service.name, service.color, `ready at ${service.readyUrl}`);
   }
 
-  env("everything is up. Ctrl+C stops the apps; `pnpm env:down` also stops the database.");
+  env("everything is up. Ctrl+C stops the apps; `pnpm env:down` also stops the compose database.");
   if (!skip.has("api"))
     env("check: curl -s http://localhost:3000/health   (db ok, migrations current)");
   if (!skip.has("mobile"))
@@ -693,12 +705,12 @@ async function down(): Promise<void> {
   if (composeFile && (await hasDocker())) {
     await streamed("db", "32", "docker", ["compose", "down"]);
   }
-  // Whatever still listens after compose is down is the Homebrew fallback.
-  const brew = brewPostgres();
-  if (brew && (await portOpen(url.hostname, Number(url.port || 5432)))) {
-    env("stopping Homebrew PostgreSQL");
-    const stopped = await run(brew.pgCtl, ["-D", brew.dataDir, "stop", "-m", "fast"]);
-    if (stopped.code !== 0) env(`pg_ctl stop: ${stopped.err.trim() || stopped.out.trim()}`);
+  // A port says nothing about who started a Homebrew server or who else uses it.
+  if (await portOpen(url.hostname, Number(url.port || 5432))) {
+    env(
+      `apps are down; database at ${url.hostname}:${url.port || 5432} was left running. Stop it yourself if it is no longer needed.`,
+    );
+    return;
   }
   env("everything is down");
 }

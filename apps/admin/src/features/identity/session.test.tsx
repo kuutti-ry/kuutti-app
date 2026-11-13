@@ -190,6 +190,27 @@ describe("staff session", () => {
     expect(screen.getByTestId("state")).toHaveTextContent("signed-out");
   });
 
+  it.each([false, true])(
+    "offers sign-in again after a network failure (StrictMode: %s)",
+    async (strict) => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => {
+          throw new TypeError("Failed to fetch");
+        }),
+      );
+      window.history.replaceState(null, "", `/#code=${"n".repeat(43)}`);
+      show(strict);
+      expect(await screen.findByRole("alert")).toHaveTextContent(
+        "Sign-in did not complete. Try again.",
+      );
+      expect(screen.getByTestId("state")).toHaveTextContent("signed-out");
+      expect(screen.getByRole("button", { name: "Sign in with your bank" })).toBeEnabled();
+      expect(window.location.hash).toBe("");
+      expect(window.sessionStorage.getItem("kuutti.admin.session")).toBeNull();
+    },
+  );
+
   it("is loading while the code is being exchanged", async () => {
     vi.stubGlobal(
       "fetch",

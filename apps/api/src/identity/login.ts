@@ -326,7 +326,7 @@ async function deriveFromBroker(
     });
   } catch (error) {
     if (error instanceof BrokerError) throw error;
-    throw new BrokerError(error instanceof Error ? error.message : "broker failed");
+    throw new BrokerError(error instanceof Error ? error.name : "broker failed");
   }
   let derived: ReturnType<typeof deriveIdentity>;
   try {

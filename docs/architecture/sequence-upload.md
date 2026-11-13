@@ -42,7 +42,7 @@ sequenceDiagram
   api->>api: sharp decodes it, applies the EXIF orientation and drops EXIF, XMP, IPTC and the ICC profile
   api->>api: Makes full, card and thumb as WebP, keyed by the SHA-256 of full, with a blurhash
   api->>s3: Puts media/{key}/thumb.webp, card.webp and full.webp
-  api->>db: Inserts the photo row as pending, under max_photos again
+  api->>db: Serializes this account's insert, then inserts pending under max_photos again
 ```
 
 ### Steps
@@ -50,14 +50,14 @@ sequenceDiagram
 1. The person picks a photo from the phone's library.
 2. The app runs the phone's own nudity check on the picked file, before any byte leaves the phone. Its classifier is native and not built yet (#184): until then every picture passes, and on the web preview always. A classifier that fails refuses the picture, and a refusal sends nothing.
 3. The app pre-resizes the picture to 1600 px on the long edge with `expo-image-manipulator` and saves a new JPEG, which carries none of the original's EXIF, so location and camera data never leave the phone.
-4. The app posts it to `POST /photos` as multipart with one part, `photo`, using the session that began the upload. It refreshes that session first when its token is stale and may retry once after a 401. Before either send, including after building the multipart body or waiting for refresh, it checks that the same session still owns the upload; a sign-out or replacement stops that submission. This cannot recall a request that has already left the phone. There is no path from the phone to the bucket (rule 4).
+4. The app posts it to `POST /photos` as multipart with one part, `photo`, using the session that began the upload. It refreshes that session first when its token is stale and may retry once after a 401. Before either send, including after building the multipart body or waiting for refresh, it checks that the same session still owns the upload; a sign-out or replacement stops that submission. This cannot recall a request that has already left the phone. Each send times out after two minutes, so a stalled upload can be retried. There is no path from the phone to the bucket (rule 4).
 5. The API checks the session before it reads the body, caps the body at 10 MB (413 `payload_too_large`), and validates the part: JPEG, PNG or WebP, anything else 400.
 6. It counts the account's photos against `max_photos` in `matching_config` (409 `photo_limit`).
 7. Above the image concurrency limit, `p-limit` at the box's vCPU count unless `IMAGE_CONCURRENCY` says otherwise, it answers 503 `media_busy` with `Retry-After` rather than queue the work. Then it reads the format, width and height from the file header alone: anything but JPEG, PNG or WebP is 415 `photo_unsupported`, and more than 30 million pixels is 422 `photo_too_many_pixels`, before any decoder runs.
 8. sharp decodes the bytes, with `limitInputPixels` as the decoder's own backstop, takes the first frame of anything animated, and turns the EXIF orientation into the pixels. Re-encoding drops EXIF, XMP, IPTC and the ICC profile. A file the decoder cannot read is 422 `photo_invalid`.
-9. Three WebP variants from one decode: `full`, at most 1600 px on the long edge and never enlarged; `card`, 800 × 1067; `thumb`, 200 × 200, the last two cropped by attention from `full`. The content key is the SHA-256 of `full`, and a blurhash is made from `thumb` for the app to paint before the bytes arrive.
+9. Three WebP variants from one decode: `full`, at most 1600 px on the long edge and never enlarged; `card`, 800 × 1067; `thumb`, 200 × 200. The card is cropped by attention from `full`, and the thumb from the card, so the thumbnail cannot show an area outside the automatic check's image. The content key is the SHA-256 of `full`, and a blurhash is made from `thumb` for the app to paint before the bytes arrive.
 10. The API puts the three objects at `media/{key}/thumb.webp`, `card.webp` and `full.webp` in the environment's media bucket, through the instance role, with an immutable cache header. The same picture uploaded twice, by one person or two, is one set of objects.
-11. It inserts the photo row as `pending`, owner-only, applying `max_photos` again in the same statement. If anything fails between the objects and the row, the objects are removed unless another row shares them. From here the uploaded bytes are referenced by nothing: no original is kept (rule 4).
+11. It serializes inserts for the account under an advisory lock, then inserts the photo row as `pending`, owner-only, applying `max_photos` again in the same statement. Concurrent uploads therefore cannot both take the final place. If anything fails between the objects and the row, the objects are removed unless another row shares them. From here the uploaded bytes are referenced by nothing: no original is kept (rule 4).
 
 ## Part 2: the automatic check
 
@@ -98,7 +98,7 @@ sequenceDiagram
 17. The decision, a pure function (ADR-006 §2): rejected by the check where it is sure (a hard group at its reject line, no face at all, several sure faces), with a reason the owner reads at once and whether a person may be asked to look again; queued for a person where it is unsure; approved for one sure face with nothing flagged. An account with recent notes is checked against a closer look's lines (#253). The automatic description (#296) is made from what the check saw and decides nothing.
 18. One transaction writes the `photo_review` row (at most fifty labels, the face count, what was flagged, the model version, the description) and moves the photo from `pending`, never over a person's decision. A rejection for a hard group leaves a note on the account. The log line carries counts, never a label name.
 19. The app gets 201 with the photo: its state, the reason in words the app has, whether it may be appealed, and its description. Only an approved photo is ever shown to anyone else. The advisory tips (#56) come with the photo list, `GET /photos`, not with the upload.
-20. If Rekognition failed, the photo stays `pending` and the app gets 201 with it. The night's `moderate-pending-photos` job looks again from the stored card variant; nothing becomes visible by waiting. A photo queued and not decided within `photo_queue_reject_days` is rejected by the night as `not_reviewed` (#376). Where there is no Rekognition (`moderation` other than `rekognition`, a developer's machine), every photo goes to the queue.
+20. If Rekognition failed, the photo stays `pending` and the app gets 201 with it. The night's `moderate-pending-photos` job looks again from the stored card variant, paging through every eligible photo once per run even when an earlier batch fails; nothing becomes visible by waiting. A photo queued and not decided within `photo_queue_reject_days` is rejected by the night as `not_reviewed` (#376). Where there is no Rekognition (`moderation` other than `rekognition`, a developer's machine), every photo goes to the queue.
 
 ## Part 3: fetching a photo
 

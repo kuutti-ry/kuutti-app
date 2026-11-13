@@ -289,7 +289,7 @@ export function ConversationScreen({ id }: { id: string }) {
       }
     } catch (error) {
       if (statusOf(error) === 404) setView({ status: "gone" });
-      else if (loaded.current.length === 0) setView({ status: "failed", error });
+      else setView((was) => (was.status === "ready" ? was : { status: "failed", error }));
     }
   }, [id, show, takeDetail]);
 
@@ -473,7 +473,7 @@ export function ConversationScreen({ id }: { id: string }) {
         unsent.current = null;
         return;
       }
-      setText(body);
+      setText((now) => now || body);
       const code = codeOf(error) ?? "";
       const refused = REFUSALS.get(code);
       setRefusal(refused ?? "chat.composer.error.failed");

@@ -373,43 +373,86 @@ describe("the settings screen", () => {
     expect(screen.getByLabelText("Your feedback").props.value).toBe("The round loads slowly.");
   });
 
-  it("marks a row whose panel holds something not saved, and asks before the list is left (#511)", async () => {
+  it.each([
+    { words: "aino", leftField: true },
+    { words: "aino_k", leftField: false },
+  ])(
+    "asks before leaving a contact not saved ($words, left field: $leftField)",
+    async ({ words, leftField }) => {
+      const navigation = (
+        jest.requireMock("expo-router") as {
+          __navigation: { emit: (name: string, event: unknown) => void; dispatch: jest.Mock };
+        }
+      ).__navigation;
+      await saveSession(tokens);
+      await renderWithTheme(<SettingsScreen />);
+      await screen.findByRole("button", { name: "Your account" });
+      await press(row("Ways to reach you"));
+      await act(async () => {
+        fireEvent.changeText(await screen.findByLabelText("Your Telegram username"), words);
+      });
+      if (leftField) {
+        await act(async () => {
+          fireEvent(screen.getByLabelText("Your Telegram username"), "blur");
+        });
+      }
+      await press(row("Theme"));
+      // Closed, the row says it, marked, and what was typed waits under it.
+      expect(row("Ways to reach you").props.accessibilityValue).toEqual({
+        text: "Not saved, closed",
+      });
+      expect(
+        within(row("Ways to reach you")).queryAllByTestId("row-alert", {
+          includeHiddenElements: true,
+        }),
+      ).not.toHaveLength(0);
+      // The arrow, the back key or a swipe: held, and asked.
+      const event = { preventDefault: jest.fn(), data: { action: { type: "GO_BACK" } } };
+      await act(async () => {
+        navigation.emit("beforeRemove", event);
+      });
+      expect(event.preventDefault).toHaveBeenCalled();
+      expect(await screen.findByText("Leave without saving?")).toBeTruthy();
+      // Keep editing goes back to where it was not saved.
+      await press(screen.getByRole("button", { name: "Keep editing" }));
+      expect(expanded("Ways to reach you")).toBe(true);
+      expect(screen.getByLabelText("Your Telegram username").props.value).toBe(words);
+    },
+  );
+
+  it("leaves an unblurred contact without saving after the person discards it", async () => {
     const navigation = (
       jest.requireMock("expo-router") as {
         __navigation: { emit: (name: string, event: unknown) => void; dispatch: jest.Mock };
       }
     ).__navigation;
+    navigation.dispatch.mockClear();
     await saveSession(tokens);
-    await renderWithTheme(<SettingsScreen />);
+    const view = await renderWithTheme(<SettingsScreen />);
     await screen.findByRole("button", { name: "Your account" });
     await press(row("Ways to reach you"));
     await act(async () => {
-      fireEvent.changeText(await screen.findByLabelText("Your Telegram username"), "aino");
+      fireEvent.changeText(await screen.findByLabelText("Your Telegram username"), "aino_k");
     });
-    await act(async () => {
-      fireEvent(screen.getByLabelText("Your Telegram username"), "blur");
-    });
-    await press(row("Theme"));
-    // Closed, the row says it, marked, and what was typed waits under it.
-    expect(row("Ways to reach you").props.accessibilityValue).toEqual({
-      text: "Not saved, closed",
-    });
-    expect(
-      within(row("Ways to reach you")).queryAllByTestId("row-alert", {
-        includeHiddenElements: true,
-      }),
-    ).not.toHaveLength(0);
-    // The arrow, the back key or a swipe: held, and asked.
-    const event = { preventDefault: jest.fn(), data: { action: { type: "GO_BACK" } } };
-    await act(async () => {
-      navigation.emit("beforeRemove", event);
-    });
+    const saves = () =>
+      (globalThis.fetch as jest.Mock).mock.calls
+        .filter(
+          ([input]) =>
+            input instanceof Request &&
+            input.method === "PUT" &&
+            new URL(input.url).pathname === "/contacts/telegram",
+        )
+        .map(([input]) => (input as Request).url);
+    expect(saves()).toHaveLength(0);
+    const action = { type: "GO_BACK" };
+    const event = { preventDefault: jest.fn(), data: { action } };
+    await act(async () => navigation.emit("beforeRemove", event));
     expect(event.preventDefault).toHaveBeenCalled();
-    expect(await screen.findByText("Leave without saving?")).toBeTruthy();
-    // Keep editing goes back to where it was not saved.
-    await press(screen.getByRole("button", { name: "Keep editing" }));
-    expect(expanded("Ways to reach you")).toBe(true);
-    expect(screen.getByLabelText("Your Telegram username").props.value).toBe("aino");
+    await press(await screen.findByRole("button", { name: "Leave without saving" }));
+    expect(navigation.dispatch).toHaveBeenCalledWith(action);
+    // The navigator removes the screen after accepting the dispatched action.
+    await view.unmount();
+    expect(saves()).toHaveLength(0);
   });
 
   it("opens with the row left open while the app runs, and keeps nothing on the phone (#511)", async () => {

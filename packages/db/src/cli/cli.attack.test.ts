@@ -109,20 +109,18 @@ describe("the command attack's driver", () => {
   });
 });
 
-// What goes through today (#380): a hole, which its contract forbids, and a
-// question, where no line says what should happen.
-const HOLE = "#380";
+// What goes through today (#380) where no line says what should happen.
 const QUESTION = "#380, a question";
 
 describe("the seed, where production is named (#250)", () => {
   // Each row names production in one spelling; its control names a preview the same way.
-  // The seed reads --env only as a word of its own, and only the first one.
+  // Both spellings and every repeated environment must preserve the production refusal.
   for (const [how, spelt, open] of [
-    ["in one word, --env=production", (env: string) => [`--env=${env}`], HOLE],
+    ["in one word, --env=production", (env: string) => [`--env=${env}`], undefined],
     [
       "second, after another environment",
       (env: string) => ["--env", "development", "--env", env],
-      HOLE,
+      undefined,
     ],
     ["after the separator pnpm hands through", (env: string) => ["--", "--env", env], undefined],
   ] as const) {
@@ -137,10 +135,10 @@ describe("the seed, where production is named (#250)", () => {
 
 describe("the staff roles, where the process runs in production", () => {
   // The control is the same command line where APP_ENV is development.
-  // The flag's value stands in for APP_ENV before the refusal asks, so any --env but production's passes.
+  // A flag cannot hide the process's own production environment.
   for (const [how, args, open] of [
-    ["--env names another environment", ["list", "--env", "development"], HOLE],
-    ["--env is given empty", ["list", "--env", ""], HOLE],
+    ["--env names another environment", ["list", "--env", "development"], undefined],
+    ["--env is given empty", ["list", "--env", ""], undefined],
     ["--env is given last, with nothing after it", ["list", "--env"], undefined],
   ] as const) {
     attack(`moderator: production is entered without --env production when ${how}`, {

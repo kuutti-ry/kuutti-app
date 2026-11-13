@@ -113,6 +113,7 @@ describe("PhotoQueue", () => {
           : null,
     ]);
     show();
+    fireEvent.load(await screen.findByRole("img", { name: "Photo under review" }));
     fireEvent.click(await screen.findByRole("button", { name: "Approve" }));
     expect(await screen.findByText("Approved")).toBeInTheDocument();
     expect(screen.getByText("Nothing waiting")).toBeInTheDocument();
@@ -179,6 +180,7 @@ describe("PhotoQueue", () => {
           : null,
     ]);
     show();
+    fireEvent.load(await screen.findByRole("img", { name: "Photo under review" }));
     fireEvent.click(await screen.findByRole("button", { name: "Approve" }));
     await waitFor(() => expect(screen.getByRole("button", { name: "Approve" })).toBeEnabled());
     expect(screen.queryByRole("alert")).toBeNull();
@@ -198,6 +200,7 @@ describe("PhotoQueue", () => {
           : null,
     ]);
     show();
+    fireEvent.load(await screen.findByRole("img", { name: "Photo under review" }));
     fireEvent.click(await screen.findByRole("button", { name: "Approve" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("The decision was not saved");
     cleanup();
@@ -236,6 +239,7 @@ describe("PhotoQueue", () => {
       },
     ]);
     show();
+    fireEvent.load(await screen.findByRole("img", { name: "Photo under review" }));
     fireEvent.click(await screen.findByRole("button", { name: "Approve" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("The decision was not saved");
     // Not stuck saving: both buttons are back.
@@ -381,6 +385,7 @@ describe("PhotoQueue", () => {
       "other",
     ]);
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    fireEvent.load(await screen.findByRole("img", { name: "Photo under review" }));
     fireEvent.click(screen.getByRole("button", { name: "Approve" }));
     await waitFor(() => expect(screen.getByRole("button", { name: "Approve" })).toBeDisabled());
     expect(screen.getByRole("button", { name: "Reject…" })).toBeDisabled();
@@ -410,6 +415,7 @@ describe("PhotoQueue", () => {
           : null,
     ]);
     show();
+    fireEvent.load(await screen.findByRole("img", { name: "Photo under review" }));
     fireEvent.click(await screen.findByRole("button", { name: "Approve" }));
     await waitFor(() => expect(answerDecision).toBeDefined());
     fireEvent.click(screen.getByRole("button", { name: "Refresh" }));

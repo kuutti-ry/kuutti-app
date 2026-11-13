@@ -131,8 +131,8 @@ export function YourContacts({ onStored }: { onStored?: (kept: readonly ContactK
  * minute (#103), and one past them, or a failure, keeps the words with a way
  * to try again: Try again while the field holds words it can send, Remove for
  * a removal. One request at a time; an answer leaves alone what was typed
- * after it was asked. Leaving Settings with a change not yet sent sends it
- * on the way out.
+ * after it was asked. Settings asks before leaving any change not yet saved;
+ * choosing to leave discards words that were not sent.
  */
 function ContactCard({
   kind,
@@ -185,10 +185,8 @@ function ContactCard({
   // What leaving the field would send, and so all that Try again can do: after a
   // removal that failed the field holds what is kept, and Remove is the way again.
   const sendable = form !== null && form !== stored;
-  // Typed and not kept: words that are no contact of the kind, or a right one
-  // the API did not take (a failure, the minute's messages). A right one not
-  // sent yet goes on the way out, and needs no word.
-  useReportUnsaved(kind, words !== "" && (form === null || (form !== stored && refused)));
+  // An unsent or pending save may still fail after leaving; ask until the API confirms it.
+  useReportUnsaved(kind, words !== "" && (form === null || form !== stored));
 
   const run = async (call: () => Promise<string | null>) => {
     setBusy(true);
@@ -252,33 +250,6 @@ function ContactCard({
     });
     return () => gone.remove();
   }, []);
-  // Leaving Settings sends a right change not sent yet; a refused one was asked about first.
-  useEffect(
-    () => () => {
-      const {
-        typed: now,
-        stored: before,
-        busy: sending,
-        onStored: keep,
-        region: under,
-      } = latest.current;
-      const text = now.trim();
-      if (text === "" || sending) return;
-      const next = number
-        ? (() => {
-            const read = readPhone(text, under);
-            return "e164" in read ? read.e164 : null;
-          })()
-        : normaliseContact(kind, text);
-      if (next === null || next === before) return;
-      saveContact(kind, next).then(
-        (contact) => keep(contact.value),
-        () => undefined,
-      );
-    },
-    [kind, number],
-  );
-
   const answerWords = said === null ? null : wordsOf(t, kind, said.notice, codeOf(region));
   const countryName =
     new Intl.DisplayNames([realLocale(locale)], { type: "region" }).of(region) ?? region;

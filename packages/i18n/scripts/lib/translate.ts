@@ -175,6 +175,9 @@ function adds(
 
 const lower = (match: string): string => match.toLowerCase().replace(/[.,;:!?)]+$/, "");
 const digits = (match: string): string => match.replace(/\P{Nd}/gu, "");
+// English's thousands commas and Finnish's spaces name the same number.
+const groupedNumbers = (text: string): string =>
+  text.replace(/\b\d{1,3}(?:,\d{3})+\b/g, (number) => number.replaceAll(",", " "));
 
 /**
  * What a text must not carry that its English lacks: invisible characters,
@@ -198,7 +201,7 @@ export function untrustedTextProblem(en: string, text: string): string | undefin
   if (adds(ADDRESS, source, plain, lower) || adds(DOMAIN, source, plain, lower)) {
     return "contains a web or e-mail address the English source does not have";
   }
-  if (adds(PHONE, source, plain, digits)) {
+  if (adds(PHONE, groupedNumbers(source), groupedNumbers(plain), digits)) {
     return "contains a phone number the English source does not have";
   }
   if (FORMULA.test(plain) && !FORMULA.test(source)) {

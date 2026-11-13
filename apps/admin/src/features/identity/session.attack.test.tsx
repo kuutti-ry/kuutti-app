@@ -179,8 +179,6 @@ async function exchangeUnanswered(failsOutright: boolean) {
 attack(
   "session: an exchange that fails outright leaves the sign-in loading without saying it did not complete",
   {
-    // Goes through today: the exchange has no catch for a request that fails outright.
-    open: HOLE,
     attempt: () => exchangeUnanswered(true),
     control: () => exchangeUnanswered(false),
     succeeds: (seen) => expect(seen.said).toBe(false),

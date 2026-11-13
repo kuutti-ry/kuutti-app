@@ -818,11 +818,19 @@ describe("App", () => {
       staffApi("moderator", [], {
         answers: {
           "GET /admin/photos/queue": () => json({ items: [photo], total: 1 }),
+          [`GET /admin/photos/${photo.photoId}/card`]: () =>
+            json({
+              url: "https://media.test/card.webp",
+              variant: "card",
+              expiresAt: "2030-01-01T00:00:00.000Z",
+            }),
           [`POST /admin/photos/${photo.photoId}/decision`]: refused,
         },
       }),
     );
-    fireEvent.click(await screen.findByRole("button", { name: "Approve" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Show photo" }));
+    fireEvent.load(await screen.findByRole("img", { name: "Photo under review" }));
+    fireEvent.click(screen.getByRole("button", { name: "Approve" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("Your role does not allow this.");
     await waitFor(() => expect(screen.getByRole("button", { name: "Approve" })).toBeEnabled());
     expect(screen.getAllByRole("alert")).toHaveLength(1);

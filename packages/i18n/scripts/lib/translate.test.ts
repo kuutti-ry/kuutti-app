@@ -143,6 +143,21 @@ describe("i18n:translate", () => {
 });
 
 describe("untrusted text (#55)", () => {
+  it.each([" ", "\u00a0", "\u202f"])(
+    "accepts a grouped count with %j in place of the English commas",
+    (space) => {
+      expect(
+        untrustedTextProblem("1,000,000 members", `1${space}000${space}000 jäsentä`),
+      ).toBeUndefined();
+      expect(
+        untrustedTextProblem("1,000,000 members", `1${space}000${space}001 jäsentä`),
+      ).toContain("phone number");
+      expect(untrustedTextProblem("1,000,000 members", "Soita 040 1234567")).toContain(
+        "phone number",
+      );
+    },
+  );
+
   it("refuses contact details, line separators and tags the English does not have", () => {
     const cases: [string, string, string][] = [
       ["Contact us", "Ota yhteyttä: kuutti-tuki.fi", "a web or e-mail address"],

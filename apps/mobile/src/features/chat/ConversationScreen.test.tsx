@@ -403,6 +403,37 @@ describe("one conversation", () => {
     expect(router.back).toHaveBeenCalled();
   });
 
+  it.each(["detail", "messages"])(
+    "keeps an empty conversation and its draft when a background %s refresh fails",
+    async (failedRead) => {
+      let failing = false;
+      api(({ path }) => {
+        if (failing && path.endsWith(failedRead === "detail" ? ID : "/messages")) {
+          throw new TypeError("Network request failed");
+        }
+        return path.endsWith("/messages") ? json({ messages: [] }) : json(detail());
+      });
+      await renderWithTheme(<ConversationScreen id={ID} />);
+      await screen.findByLabelText("Message");
+      await type("Hei");
+      failing = true;
+      await act(async () => focus());
+      await settle();
+      expect(composer().props.value).toBe("Hei");
+      expect(screen.queryByText(FAILED_TO_LOAD)).toBeNull();
+    },
+  );
+
+  it("shows a failure when the first message page cannot be read", async () => {
+    api(({ path }) => {
+      if (path.endsWith("/messages")) throw new TypeError("Network request failed");
+      return json(detail());
+    });
+    await renderWithTheme(<ConversationScreen id={ID} />);
+    expect(await screen.findByText(FAILED_TO_LOAD)).toBeTruthy();
+    expect(screen.queryByLabelText("Message")).toBeNull();
+  });
+
   it("keeps the newest in sight as the list grows, and once more a frame later, when the new size has reached the screen", async () => {
     conversation(detail(), [[message(1, "theirs", "Moi", DAY_1)]]);
     await renderWithTheme(<ConversationScreen id={ID} />);
@@ -450,6 +481,29 @@ describe("one conversation", () => {
     await settle();
     expect(screen.queryByText("Sending…")).toBeNull();
     expect(said("You", DAY_2, "Nähdään!")).toBeTruthy();
+  });
+
+  it("keeps the next draft when an earlier send fails", async () => {
+    let fail: (reason: Error) => void = () => undefined;
+    conversation(
+      detail(),
+      [[]],
+      () =>
+        new Promise<Response>((_resolve, reject) => {
+          fail = reject;
+        }),
+    );
+    await renderWithTheme(<ConversationScreen id={ID} />);
+    await screen.findByLabelText("Message");
+    await type("First message");
+    await userEvent.setup().press(sendButton());
+    await type("Next message");
+    await act(async () => fail(new TypeError("Network request failed")));
+    await settle();
+    expect(composer().props.value).toBe("Next message");
+    expect(
+      screen.getByText("The message was not sent. Check your connection and send it again."),
+    ).toBeTruthy();
   });
 
   it("says each refusal in words under the composer and keeps the words", async () => {

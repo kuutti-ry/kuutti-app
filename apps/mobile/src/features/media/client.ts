@@ -146,6 +146,7 @@ function send(
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.open("POST", `${apiBaseUrl()}${path}`);
+    xhr.timeout = 120_000;
     xhr.setRequestHeader("authorization", `Bearer ${token}`);
     xhr.setRequestHeader("accept", "application/json");
     xhr.upload.onprogress = (event) => {

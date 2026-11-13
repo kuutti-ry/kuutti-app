@@ -1,5 +1,5 @@
 import type { Queryable } from "@kuutti/db";
-import { expect } from "vitest";
+import { expect, it } from "vitest";
 import { attack } from "../test/attack.ts";
 import { captureLogger } from "../test/harness.ts";
 import { checked, scriptedModerator } from "../test/media.ts";
@@ -7,9 +7,6 @@ import { people } from "../test/people.ts";
 import { rolledBack } from "../test/rolled-back.ts";
 import { type Moderator, queueAllModerator, sweepPendingPhotos } from "./moderation.ts";
 import { type MediaStore, memoryMediaStore, objectKey } from "./store.ts";
-
-// What goes through today (#380): a hole, which its contract forbids.
-const HOLE = "#380";
 
 // moderate-pending-photos (#49, #380): the night's one more look at every
 // pending photo the check never recorded. Each attack tries to make a night
@@ -57,9 +54,19 @@ const stillPending = async (db: Queryable, ids: readonly string[]) =>
   (await db.query("SELECT 1 FROM photo WHERE id = ANY($1::uuid[]) AND state = 'pending'", [ids]))
     .rows.length;
 
+it("retries all 120 missed photos in one night", async () => {
+  await rolledBack(async (db) => {
+    const store = memoryMediaStore();
+    const ids = await pending(db, store, 120, before(NIGHT, 60));
+    expect(await night(db, store, queueAllModerator(), NIGHT)).toEqual({
+      rechecked: 120,
+      failed: 0,
+    });
+    expect(await stillPending(db, ids)).toBe(0);
+  });
+});
+
 attack("moderate-pending-photos: of fifty-one photos the check missed, one is left unlooked at", {
-  // Goes through today: the night takes fifty, the oldest first, once.
-  open: HOLE,
   attempt: () =>
     rolledBack(async (db) => {
       const store = memoryMediaStore();
@@ -93,8 +100,6 @@ async function behindFifty(last: Date) {
 attack(
   "moderate-pending-photos: behind fifty photos whose card is gone, a photo is never looked at, that night or the next",
   {
-    // Goes through today: the same fifty it cannot finish come first every night.
-    open: HOLE,
     attempt: () => behindFifty(before(NIGHT, 60)),
     // Uploaded five minutes before the second night: neither night may look at it yet.
     control: () => behindFifty(before(NEXT_NIGHT, 5)),

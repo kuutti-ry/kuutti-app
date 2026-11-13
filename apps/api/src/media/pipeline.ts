@@ -162,8 +162,8 @@ export async function processPhoto(bytes: Uint8Array): Promise<ProcessedPhoto> {
       .resize({ ...PHOTO_VARIANT_SIZES.card, fit: "cover", position: sharp.strategy.attention })
       .webp({ quality: WEBP_QUALITY.card })
       .toBuffer();
-    const thumb = await fromFull
-      .clone()
+    // A thumb must show only the crop the profile's check saw (ADR-006 §1).
+    const thumb = await sharp(card)
       .resize({ ...PHOTO_VARIANT_SIZES.thumb, fit: "cover", position: sharp.strategy.attention })
       .webp({ quality: WEBP_QUALITY.thumb })
       .toBuffer();

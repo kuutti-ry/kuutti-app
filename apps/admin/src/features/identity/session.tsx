@@ -98,9 +98,15 @@ export function StaffSessionProvider({ children }: { children: React.ReactNode }
         // development, and the second run finds the fragment already consumed.
         // The code is single-use, so the first run's exchange is the one that
         // counts, and its late setState lands on the live provider.
-        const { data, error, response } = await api.POST("/admin/auth/exchange", {
-          body: { code: fragment.code },
-        });
+        const answer = await api
+          .POST("/admin/auth/exchange", { body: { code: fragment.code } })
+          .catch(() => null);
+        if (!answer) {
+          writeStored(null);
+          setState({ status: "signed-out", error: "generic" });
+          return;
+        }
+        const { data, error, response } = answer;
         if (!data) {
           setState({
             status: "signed-out",
