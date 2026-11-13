@@ -47,6 +47,8 @@ describe("pnpm --filter @kuutti/db migrate", () => {
 describe("pnpm --filter @kuutti/db seed", () => {
   it.each([
     ["--env production", ["--env", "production"], undefined],
+    ["--env=production", ["--env=production"], undefined],
+    ["production after another flag", ["--env", "development", "--env=production"], undefined],
     ["APP_ENV=production", [], "production"],
     ["--env production over APP_ENV=development", ["--env", "production"], "development"],
     // A flag never talks the seed past the environment it runs in (#250).
@@ -65,6 +67,27 @@ describe("pnpm --filter @kuutti/db seed", () => {
     expect(await run("seed", ["--env", "preview"], {})).toMatchObject({
       code: 1,
       err: ["DATABASE_URL is not set"],
+    });
+  });
+
+  it("refuses a managed server reached through a local address before seeding", async () => {
+    await withTemporaryDatabase(async (url) => {
+      const pool = createPool({ connectionString: url, max: 1 });
+      try {
+        // A database-local catalogue fixture, without creating a cluster-wide RDS role.
+        await pool.query("CREATE VIEW public.pg_roles AS SELECT 'rdsadmin'::name AS rolname");
+        const managed = new URL(url);
+        managed.searchParams.set("options", "-c search_path=public,pg_catalog");
+        for (const args of [[], ["--env", "preview"], ["--env", "staging"]]) {
+          const result = await run("seed", args, { DATABASE_URL: managed.toString() });
+          expect(result.code).toBe(1);
+          expect(result.out).toEqual([]);
+          expect(result.err[0]).toMatchObject({ name: "DemoCommandError" });
+          expect(String(result.err[0])).toContain("managed server (RDS)");
+        }
+      } finally {
+        await pool.end();
+      }
     });
   });
 
@@ -166,6 +189,42 @@ describe("pnpm --filter @kuutti/db moderator", () => {
       out: ["no staff roles"],
       err: [],
     });
+    expect(await moderator(["list", "--env", "development"], "production")).toMatchObject({
+      code: 2,
+      err: ["refusing production without --env production"],
+    });
+    expect(await moderator(["list", "--env=production"], "production")).toEqual({
+      code: 0,
+      out: ["no staff roles"],
+      err: [],
+    });
+  });
+
+  it("rolls back a role revocation if ending its sessions fails", async () => {
+    const id = await identity(1);
+    await moderator(["grant", hmac(1), "moderator", "--by", "Maintainer"]);
+    await pool.query(
+      `INSERT INTO admin_session (identity_id, role, access_hash, expires_at)
+       VALUES ($1, 'moderator', 'failed-revoke', '2099-01-01T00:00:00Z')`,
+      [id],
+    );
+    await pool.query(`CREATE FUNCTION reject_session_revoke() RETURNS trigger LANGUAGE plpgsql AS
+      $$ BEGIN RAISE EXCEPTION 'session revoke failed'; END $$`);
+    await pool.query(`CREATE TRIGGER reject_session_revoke BEFORE UPDATE ON admin_session
+      FOR EACH ROW EXECUTE FUNCTION reject_session_revoke()`);
+    try {
+      await expect(moderator(["revoke", hmac(1)])).rejects.toThrow("session revoke failed");
+      expect(
+        (await pool.query("SELECT role FROM moderator_roles WHERE identity_id = $1", [id])).rows,
+      ).toEqual([{ role: "moderator" }]);
+      expect(
+        (await pool.query("SELECT revoked_at FROM admin_session WHERE identity_id = $1", [id]))
+          .rows,
+      ).toEqual([{ revoked_at: null }]);
+    } finally {
+      await pool.query("DROP TRIGGER reject_session_revoke ON admin_session");
+      await pool.query("DROP FUNCTION reject_session_revoke()");
+    }
   });
 
   it("lists the identities that logged in last, newest first, at most five", async () => {

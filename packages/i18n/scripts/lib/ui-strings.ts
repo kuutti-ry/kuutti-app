@@ -18,6 +18,16 @@ const TEXT_PROPS = new Set([
 const HAS_LETTER = /\p{L}/u;
 
 function literalText(node: ts.Expression): string | undefined {
+  if (ts.isParenthesizedExpression(node)) return literalText(node.expression);
+  if (ts.isConditionalExpression(node)) {
+    return `${literalText(node.whenTrue) ?? ""}${literalText(node.whenFalse) ?? ""}`;
+  }
+  if (
+    ts.isBinaryExpression(node) &&
+    node.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken
+  ) {
+    return literalText(node.right);
+  }
   if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) return node.text;
   if (ts.isTemplateExpression(node)) {
     return [node.head.text, ...node.templateSpans.map((span) => span.literal.text)].join("");

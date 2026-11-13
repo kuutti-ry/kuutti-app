@@ -72,7 +72,8 @@ flowchart TB
   s11 -->|"no"| s12
   s11 -->|"yes"| s13
   s13 --> s14
-  s14 --> s15
+  s14 -->|"exchange answered"| s15
+  s14 -->|"network failure"| s8
   s15 --> s16
   s16 -->|"no"| s18
   s16 -->|"yes"| s17
@@ -96,7 +97,7 @@ flowchart TB
 11. Does the identity have a role: moderator, admin or researcher? Roles are granted and taken away only by the maintainer's tool, never in the panel. Yes: 13. No: 12.
 12. Nothing is created: no identity, account or session. The browser goes back to the panel, which says "That bank login has no moderator role. Ask the maintainer to add it." The end.
 13. The API sends the browser back to the panel with a one-time code in the part of the address that no server sees.
-14. The panel puts back the page the sign-in started from and exchanges the code, once, within its short life. A code already used or out of time, or one whose role was taken away or whose standing changed meanwhile, is refused, and the panel says why as in 8 or 12.
+14. The panel puts back the page the sign-in started from and exchanges the code, once, within its short life. A code already used or out of time, or one whose role was taken away or whose standing changed meanwhile, is refused, and the panel says why as in 8 or 12. A network failure also returns to 8, so another bank sign-in can be started.
 15. The API reads the role again and opens a staff session of the fixed hours the code sets: one token, no refresh. This session is the "Last sign-in" the staff list shows (step 94). The header says "Signed in as" and the role, with "Sign out"; it does not say when the session ends. The panel keeps the session in its browser tab, so a closed tab signs out of the panel.
 16. Does the role open a screen of the panel? Yes: 17. No: 18.
 17. The panel shows the front page and the menu. A moderator's menu: "Overview", "Reports", "Automatic shadow bans", "Photos", "Feedback", "A person". An admin's adds "Matching", "Announcements", "Tunables", "Audit log" and "Staff". A screen the role does not open answers at its address with its heading and "Your role does not allow this.", asking the API for nothing, and the API refuses it anyway, whatever the panel shows.
@@ -453,3 +454,4 @@ flowchart TB
 - 2026-11-03 (#575, PR #582): opening a starred person's card counts as a read of the queue for the read rule.
 - 2026-11-05 (#581, PR #600): the panel's words: the menu says Automatic shadow bans and Photos, as their screens do; a count reads as so many waiting or "Nothing waiting"; the actions are Warn, Shadow ban, Suspend and Ban; a report's reason stands at the top of its page, not beside the actions; the header no longer says when the session ends, and Sign in and Staff lose their explanations.
 - 2026-11-07 (#573, PR #646): an admin's menu gains Announcements, where one admin writes an announcement to everybody and another approves it.
+- 2026-11-13 (#657): a failed exchange request returns to Sign in with the existing failure message.

@@ -314,6 +314,30 @@ describe("uploading a photo, the rest of the way", () => {
     });
   });
 
+  it("sets a deadline so a stalled upload rejects instead of waiting forever", async () => {
+    await saveSession(session);
+    jest.useFakeTimers();
+    class StalledXhr extends FakeXhr {
+      timeout = 0;
+      override send(): void {
+        if (this.timeout > 0) setTimeout(() => this.ontimeout?.(), this.timeout);
+      }
+    }
+    (globalThis as { XMLHttpRequest: unknown }).XMLHttpRequest = StalledXhr;
+    try {
+      const upload = uploadPhoto(picked);
+      const answer = jest.fn();
+      const finished = upload.then(answer, (error: unknown) => answer(error));
+      await jest.advanceTimersByTimeAsync(120_000);
+      expect(answer).toHaveBeenCalledWith(
+        expect.objectContaining({ message: "photo upload timed out" }),
+      );
+      await finished;
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
   it("reports no progress it cannot count", async () => {
     await saveSession(session);
     (globalThis as { XMLHttpRequest: unknown }).XMLHttpRequest = UncountedXhr;

@@ -672,7 +672,35 @@ describe("Ways to reach you", () => {
     expect(disabled("Remove your phone number")).toBe(false);
   });
 
-  it("sends a right change not sent yet as Settings is left, and tells the row what is not kept", async () => {
+  it("warns before leaving a valid contact until its save succeeds", async () => {
+    let answer: (response: Response) => void = () => undefined;
+    contactsApi({}, [
+      json({ contacts: [] }),
+      new Promise<Response>((resolve) => {
+        answer = resolve;
+      }) as unknown as Response,
+    ]);
+    const report = jest.fn();
+    await renderWithTheme(
+      <UnsavedRow row="contacts" report={report}>
+        <YourContacts />
+      </UnsavedRow>,
+    );
+    await screen.findByText(/Nobody sees them/);
+    const holds = () => report.mock.calls.filter(([, kind]) => kind === "telegram").at(-1)?.[2];
+    await type("Your Telegram username", "aino_k");
+    expect(holds()).toBe(true);
+    await leave("Your Telegram username");
+    expect(holds()).toBe(true);
+    await act(async () => answer(refusal("internal_error", 500)));
+    await settle();
+    expect(holds()).toBe(true);
+    expect(screen.getByText(FAILED)).toBeTruthy();
+    await press("Try again");
+    expect(holds()).toBe(false);
+  });
+
+  it("clears the row without saving discarded contacts when Settings unmounts", async () => {
     const { writes } = contactsApi();
     const report = jest.fn();
     const view = await renderWithTheme(
@@ -693,9 +721,7 @@ describe("Ways to reach you", () => {
       ),
     );
     await settle();
-    expect(writes()).toEqual([
-      { method: "PUT", path: "/contacts/instagram", body: { value: "aino.k" } },
-    ]);
+    expect(writes()).toEqual([]);
     // Gone, the fields hold nothing for the row any more.
     expect(report).toHaveBeenCalledWith("contacts", "telegram", false);
   });

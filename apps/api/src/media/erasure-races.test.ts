@@ -28,12 +28,14 @@ describe("profile-photo insertion racing account erasure", () => {
         const uploadingPid = await pidOf(uploading);
         await uploading.query("SET statement_timeout = '5s'");
         await erasing.query("BEGIN");
+        await uploading.query("BEGIN");
         try {
           await eraseAccount({ db: erasing, logger, now: () => NOW }, account.accountId);
           const insert = watched(insertPhoto(uploading, photoInput(account.accountId)));
           expect(await waitsFor(pool, uploadingPid, erasingPid, insert.settled)).toBe(true);
           await erasing.query(finish);
           const result = await insert.outcome;
+          await uploading.query("COMMIT");
           const { rows } = await pool.query("SELECT id FROM photo WHERE account_id = $1", [
             account.accountId,
           ]);
@@ -53,6 +55,7 @@ describe("profile-photo insertion racing account erasure", () => {
           expect(state.rows[0]?.state).toBe(finish === "COMMIT" ? "deleted" : "active");
         } finally {
           await erasing.query("ROLLBACK");
+          await uploading.query("ROLLBACK");
         }
       });
     },
@@ -88,4 +91,43 @@ describe("profile-photo insertion racing account erasure", () => {
       }
     });
   });
+});
+
+describe("profile-photo insertion racing the cap", () => {
+  test.each(["COMMIT", "ROLLBACK"] as const)(
+    "the last place waits for an earlier upload's %s and counts its committed result",
+    async (finish) => {
+      await withTwoConnections("photo-cap", async (pool, first, second) => {
+        const account = await signedInAccount(pool, "photo-cap");
+        const input = { ...photoInput(account.accountId), maxPhotos: 2 };
+        expect(await insertPhoto(pool, input)).toMatchObject({ position: 0 });
+        const firstPid = await pidOf(first);
+        const secondPid = await pidOf(second);
+        await first.query("BEGIN");
+        await second.query("BEGIN");
+        await second.query("SET LOCAL statement_timeout = '5s'");
+        try {
+          expect(await insertPhoto(first, input)).toMatchObject({ position: 1 });
+          const later = watched(insertPhoto(second, input));
+          expect(await waitsFor(pool, secondPid, firstPid, later.settled)).toBe(true);
+          await first.query(finish);
+          expect(await later.outcome).toEqual(
+            finish === "COMMIT" ? null : expect.objectContaining({ position: 1 }),
+          );
+          await second.query("COMMIT");
+          expect(
+            (
+              await pool.query(
+                "SELECT position FROM photo WHERE account_id = $1 ORDER BY position",
+                [account.accountId],
+              )
+            ).rows,
+          ).toEqual([{ position: 0 }, { position: 1 }]);
+        } finally {
+          await first.query("ROLLBACK");
+          await second.query("ROLLBACK");
+        }
+      });
+    },
+  );
 });

@@ -19,7 +19,7 @@ pnpm env:doctor                    # names anything missing, with the fix
 pnpm env:up                        # database, storage, mock bank login, API, app, admin
 ```
 
-Then open http://localhost:3000/health (the API), http://localhost:8081 (the app, in a browser) and http://localhost:5173 (the moderation panel). Ctrl+C stops the apps; `pnpm env:down` also stops the database. On a phone, install the development build from the project's [builds page on Expo](https://expo.dev/accounts/kuutti/projects/kuutti/builds) and point it at Metro on this machine (`apps/mobile/README.md`).
+Then open http://localhost:3000/health (the API), http://localhost:8081 (the app, in a browser) and http://localhost:5173 (the moderation panel). Ctrl+C stops the apps; `pnpm env:down` also stops the compose database, leaving shared Homebrew PostgreSQL running. On a phone, install the development build from the project's [builds page on Expo](https://expo.dev/accounts/kuutti/projects/kuutti/builds) and point it at Metro on this machine (`apps/mobile/README.md`).
 
 By hand, one piece at a time (this is what `env:up` does for you), each in its own terminal:
 

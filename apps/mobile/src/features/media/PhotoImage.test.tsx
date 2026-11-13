@@ -129,6 +129,81 @@ describe("PhotoImage", () => {
     expect(seen).toHaveLength(1);
   });
 
+  it.each([
+    { changed: "id", lateFailure: false },
+    { changed: "variant", lateFailure: false },
+    { changed: "id", lateFailure: true },
+  ])(
+    "never draws the old URL under a new $changed, including a late retry (failure: $lateFailure)",
+    async ({ changed, lateFailure }) => {
+      let release: (answer: Response) => void = () => undefined;
+      let latest: (answer: Response) => void = () => undefined;
+      let calls = 0;
+      const refused = jest.fn();
+      globalThis.fetch = jest.fn(async () => {
+        calls += 1;
+        if (calls === 1) return signed(1);
+        return new Promise<Response>((resolve) => {
+          if (calls === 2) release = resolve;
+          else latest = resolve;
+        });
+      }) as unknown as typeof fetch;
+      const view = await renderWithTheme(
+        <PhotoImage
+          id={ID}
+          variant="thumb"
+          blurhash={BLURHASH}
+          accessibilityLabel="Photo 1 of 2"
+          onRefused={refused}
+        />,
+      );
+      await settle();
+      await fireEvent(image(), "error", { nativeEvent: { error: "expired" } });
+      await settle();
+      const id = changed === "id" ? "0b1c1c4e-9a8e-4a0b-9c3a-0c8d1e2f3a02" : ID;
+      const variant = changed === "variant" ? "card" : "thumb";
+      await view.rerender(
+        underProviders(
+          <PhotoImage
+            id={id}
+            variant={variant}
+            blurhash={BLURHASH}
+            accessibilityLabel="Photo 1 of 2"
+            onRefused={refused}
+          />,
+        ),
+      );
+      expect(image().props.source).toEqual([]);
+      await act(async () =>
+        latest(
+          json({
+            url: "https://media.test/new.webp",
+            variant,
+            expiresAt: "2030-01-01T00:15:00.000Z",
+          }),
+        ),
+      );
+      await settle();
+      expect(sourceOf()).toEqual({
+        uri: "https://media.test/new.webp",
+        cacheKey: `${id}/${variant}`,
+      });
+      await act(async () =>
+        release(
+          lateFailure
+            ? json({ error: { code: "photo_budget_exceeded", message: "x", requestId: "r" } }, 429)
+            : signed(2),
+        ),
+      );
+      await settle();
+      expect(sourceOf()).toEqual({
+        uri: "https://media.test/new.webp",
+        cacheKey: `${id}/${variant}`,
+      });
+      expect(refused).not.toHaveBeenCalled();
+    },
+  );
+
   it("appears at once under reduce motion", async () => {
     jest.spyOn(AccessibilityInfo, "isReduceMotionEnabled").mockResolvedValue(true);
     answering(() => signed(1));

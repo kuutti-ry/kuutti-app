@@ -12,17 +12,18 @@
  *   pnpm --filter @kuutti/db moderator -- revoke <hetu_hmac>
  *   pnpm --filter @kuutti/db moderator -- list
  *
- * Refuses production unless --env production is given on purpose, like the seed.
+ * Refuses production unless --env production is given on purpose.
  */
-import { createPool } from "../pool.ts";
+import { createPool, transaction } from "../pool.ts";
 
 const ROLES = new Set(["moderator", "admin", "researcher"]);
 /** As long as the staff list may show the name of who granted a role (StaffMember.grantedBy). */
 const GRANTOR_MAX = 200;
 
 function arg(name: string): string | undefined {
-  const index = process.argv.indexOf(name);
-  return index >= 0 ? process.argv[index + 1] : undefined;
+  const index = process.argv.findIndex((word) => word === name || word.startsWith(`${name}=`));
+  const word = process.argv[index];
+  return word === name ? process.argv[index + 1] : word?.slice(name.length + 1);
 }
 
 /** The flags that take the word after them as their value. */
@@ -52,7 +53,10 @@ async function main(): Promise<number> {
     return 2;
   }
   const env = arg("--env") ?? process.env.APP_ENV ?? "development";
-  if (env === "production" && arg("--env") !== "production") {
+  if (
+    (env === "production" || process.env.APP_ENV === "production") &&
+    arg("--env") !== "production"
+  ) {
     console.error("refusing production without --env production");
     return 2;
   }
@@ -133,14 +137,17 @@ async function main(): Promise<number> {
       return 0;
     }
     if (command === "revoke") {
-      const result = await pool.query("DELETE FROM moderator_roles WHERE identity_id = $1", [
-        found.id,
-      ]);
-      // Every live admin session of that identity ends with the role (the guard re-reads it), but the rows go too.
-      await pool.query(
-        "UPDATE admin_session SET revoked_at = now() WHERE identity_id = $1 AND revoked_at IS NULL",
-        [found.id],
-      );
+      const result = await transaction(pool, async (tx) => {
+        const removed = await tx.query("DELETE FROM moderator_roles WHERE identity_id = $1", [
+          found.id,
+        ]);
+        // A later grant must not revive sessions that belonged to the revoked role.
+        await tx.query(
+          "UPDATE admin_session SET revoked_at = now() WHERE identity_id = $1 AND revoked_at IS NULL",
+          [found.id],
+        );
+        return removed;
+      });
       console.log(result.rowCount === 1 ? "revoked" : "no role to revoke");
       return 0;
     }

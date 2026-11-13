@@ -77,6 +77,40 @@ describe("photo pipeline", () => {
     expect(await sharp(small.variants.card).metadata()).toMatchObject({ width: 800, height: 1067 });
   });
 
+  it("a wide photo's thumbnail contains only the area seen in its moderation card", async () => {
+    const width = 1600;
+    const height = 400;
+    const pixels = Buffer.alloc(width * height * 3);
+    for (let y = 0; y < height; y += 1) {
+      for (let x = 0; x < width; x += 1) {
+        const offset = (y * width + x) * 3;
+        // The red channel identifies the horizontal source position.
+        pixels[offset] = Math.round((x / (width - 1)) * 255);
+        pixels[offset + 1] = 100;
+        pixels[offset + 2] = 120;
+      }
+    }
+    const input = await sharp(pixels, { raw: { width, height, channels: 3 } })
+      .png()
+      .toBuffer();
+    const { variants } = await processPhoto(input);
+    const redRange = async (bytes: Buffer) => {
+      const { data, info } = await sharp(bytes).raw().toBuffer({ resolveWithObject: true });
+      let min = 255;
+      let max = 0;
+      for (let i = 0; i < data.length; i += info.channels) {
+        min = Math.min(min, data[i] ?? 0);
+        max = Math.max(max, data[i] ?? 0);
+      }
+      return { min, max };
+    };
+    const card = await redRange(variants.card);
+    const thumb = await redRange(variants.thumb);
+    // WebP's rounding can move a channel slightly, but cannot account for an extra strip.
+    expect(thumb.min).toBeGreaterThanOrEqual(card.min - 3);
+    expect(thumb.max).toBeLessThanOrEqual(card.max + 3);
+  });
+
   it("bakes the EXIF orientation into the pixels", async () => {
     // Orientation 6 means rotate 90° clockwise to display: a 1200×1600 file shows as 1600×1200.
     const out = await processPhoto(

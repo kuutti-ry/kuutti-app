@@ -166,7 +166,10 @@ async function refused(where: "the decision" | "the photo's signed URL", status:
   ]);
   show();
   const approve = await screen.findByRole("button", { name: "Approve" });
-  if (where === "the decision") fireEvent.click(approve);
+  if (where === "the decision") {
+    fireEvent.load(await screen.findByRole("img", { name: "Photo under review" }));
+    fireEvent.click(approve);
+  }
   await settle();
   return ended;
 }
@@ -199,8 +202,6 @@ async function approvedSensitive(looked: boolean) {
 }
 
 attack("PhotoQueue: Approve goes out for a sensitive photo still hidden behind Show photo", {
-  // Goes through today: Approve is offered while the picture is hidden; no line says it must wait.
-  open: QUESTION,
   attempt: () => approvedSensitive(false),
   control: () => approvedSensitive(true),
   succeeds: (seen) => expect(seen.decisions).toBeGreaterThan(0),
@@ -244,8 +245,6 @@ for (const [how, picture] of [
   ["whose signed URL arrived but whose image failed to load", "image failed"],
 ] as const) {
   attack(`PhotoQueue: Approve goes out for a photo ${how}`, {
-    // Goes through today: Approve waits for nothing but its own request.
-    open: QUESTION,
     attempt: () => approvedUnseen(picture),
     control: () => approvedUnseen("shown"),
     succeeds: (seen) => expect(seen.decisions).toBeGreaterThan(0),
@@ -262,6 +261,7 @@ async function approvedTwice(firstFailedBefore: boolean) {
     on("POST", DECISION, () => (posts++ === 0 ? first.promise : decided(1, "approved"))),
   ]);
   show();
+  fireEvent.load(await screen.findByRole("img", { name: "Photo under review" }));
   fireEvent.click(await screen.findByRole("button", { name: "Approve" }));
   if (firstFailedBefore) {
     first.answer(failure("internal_error", 500));
@@ -313,6 +313,7 @@ async function failedBeside(failing: 1 | 2) {
   ]);
   show();
   await screen.findAllByRole("button", { name: "Approve" });
+  fireEvent.load(await within(itemOf(failing)).findByRole("img"));
   fireEvent.click(within(itemOf(failing)).getByRole("button", { name: "Approve" }));
   fireEvent.click(within(itemOf(other)).getByRole("button", { name: "Reject…" }));
   choose(itemOf(other), "nudity");
@@ -346,6 +347,7 @@ async function decidedInReverse(firstPhoto: "reject" | "approve") {
   for (const n of [1, 2] as const) {
     const row = itemOf(n);
     if (outcome[n] === "approve") {
+      fireEvent.load(await within(row).findByRole("img"));
       fireEvent.click(within(row).getByRole("button", { name: "Approve" }));
     } else {
       fireEvent.click(within(row).getByRole("button", { name: "Reject…" }));
@@ -413,6 +415,7 @@ async function approvedByKeyboard(blurredAfter: boolean) {
   ]);
   show();
   const approve = await screen.findByRole("button", { name: "Approve" });
+  fireEvent.load(await screen.findByRole("img", { name: "Photo under review" }));
   approve.focus();
   fireEvent.click(approve);
   await screen.findByText("Approved");

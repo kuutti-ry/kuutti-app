@@ -23,13 +23,11 @@ const INLINE: [string, string, string, string?][] = [
     "a string in either arm of a conditional between tags",
     '<Text>{ok ? "Yes" : "No"}</Text>',
     '<Text>{ok ? t("a.yes") : t("a.no")}</Text>',
-    HOLE,
   ],
   [
     "a string after && between tags",
     '<Text>{ok && "Done"}</Text>',
     '<Text>{ok && t("a.b")}</Text>',
-    HOLE,
   ],
   [
     "a string joined to a value with + between tags",
@@ -37,12 +35,7 @@ const INLINE: [string, string, string, string?][] = [
     '<Text>{t("a.b") + name}</Text>',
     HOLE,
   ],
-  [
-    "a string in brackets between tags",
-    '<Text>{("Hello")}</Text>',
-    '<Text>{(t("a.b"))}</Text>',
-    HOLE,
-  ],
+  ["a string in brackets between tags", '<Text>{("Hello")}</Text>', '<Text>{(t("a.b"))}</Text>'],
   [
     "strings joined by a call between tags",
     '<Text>{["One", "Two"].join(", ")}</Text>',
@@ -55,7 +48,6 @@ const INLINE: [string, string, string, string?][] = [
     "a string in a conditional in a prop that is read",
     '<Button title={busy ? "Saving" : "Save"} />',
     '<Button title={busy ? t("a.saving") : t("a.save")} />',
-    HOLE,
   ],
   [
     "a prop that is read, spread from an object",

@@ -12,30 +12,37 @@ import { fetchPhotoUrl } from "./client";
  * The blurhash paints meanwhile.
  */
 function useSignedUrl(id: string, variant: PhotoVariant, onRefused?: OnRefused) {
-  const [url, setUrl] = useState<string | null>(null);
+  const key = `${id}/${variant}`;
+  const [signed, setSigned] = useState<{ key: string; url: string } | null>(null);
+  const attempt = useRef(0);
   const retried = useRef(false);
   // A ref, so a parent's inline handler does not restart the fetch on every render.
   const refused = useRef(onRefused);
   refused.current = onRefused;
   const load = useCallback(async () => {
+    const read = ++attempt.current;
     try {
-      const { url: signed } = await fetchPhotoUrl(id, variant);
-      setUrl(signed);
+      const { url } = await fetchPhotoUrl(id, variant);
+      if (read === attempt.current) setSigned({ key, url });
     } catch (error) {
-      setUrl(null); // the placeholder stays; the screen tells the person through onRefused
+      if (read !== attempt.current) return;
+      setSigned(null); // the placeholder stays; the screen tells the person through onRefused
       if (error instanceof ApiError) refused.current?.(error.code);
     }
-  }, [id, variant]);
+  }, [id, variant, key]);
   useEffect(() => {
     retried.current = false;
     void load();
+    return () => {
+      attempt.current += 1;
+    };
   }, [load]);
   const retry = useCallback(() => {
     if (retried.current) return;
     retried.current = true;
     void load();
   }, [load]);
-  return { url, retry };
+  return { url: signed?.key === key ? signed.url : null, retry };
 }
 
 /** The API's code when it refused the URL (#52: photo_budget_exceeded above the day's budget), or undefined for a failure without one. */

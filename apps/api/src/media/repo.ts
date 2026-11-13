@@ -108,13 +108,9 @@ export async function countPhotos(db: Queryable, accountId: string): Promise<num
  * clause. The live-account check holds a share lock until the insert commits:
  * erasure (TD-7, #51) either deletes this photo afterwards or commits first
  * and makes the check refuse the tombstone. A foreign key alone only checks
- * that the retained account row exists. Null means the statement refused. Two
- * inserts that run at the same instant can still both see the old count
- * under READ COMMITTED and both succeed, one photo over the cap and on the
- * same position; the order stays stable through created_at and is renumbered
- * by the next reorder or delete, and the extra photo is the account's own to
- * remove. Serialising those inserts would need an exclusive per-account lock;
- * this shared lock preserves the existing product-cap behaviour.
+ * that the retained account row exists. Null means the statement refused.
+ * The per-account advisory lock comes before the statement's snapshot, so
+ * concurrent uploads count the previous insert after it commits.
  */
 export async function insertPhoto(
   db: Queryable,
@@ -127,16 +123,19 @@ export async function insertPhoto(
     maxPhotos: number;
   },
 ): Promise<PhotoRow | null> {
-  const { rows } = await db.query<Row>(
-    `INSERT INTO photo (account_id, key, blurhash, width, height, position)
+  return transaction(db, async (tx) => {
+    await advisoryLock(tx, `profile_photos:${input.accountId}`);
+    const { rows } = await tx.query<Row>(
+      `INSERT INTO photo (account_id, key, blurhash, width, height, position)
      SELECT $1, $2, $3, $4, $5, coalesce(max(position) + 1, 0) FROM photo
      WHERE account_id = $1 AND purpose = 'profile'
      HAVING count(*) < $6
         AND EXISTS (SELECT 1 FROM account WHERE id = $1 AND state <> 'deleted' FOR SHARE)
      RETURNING ${COLUMNS}`,
-    [input.accountId, input.key, input.blurhash, input.width, input.height, input.maxPhotos],
-  );
-  return rows[0] ? photoFrom(rows[0]) : null;
+      [input.accountId, input.key, input.blurhash, input.width, input.height, input.maxPhotos],
+    );
+    return rows[0] ? photoFrom(rows[0]) : null;
+  });
 }
 
 /** Whether the account still has a live row: an upload's insert refuses a tombstone as it refuses the cap. */
@@ -675,14 +674,15 @@ export async function findPendingUnchecked(
   db: Queryable,
   olderThan: Date,
   limit: number,
+  tried: readonly string[] = [],
 ): Promise<Array<{ id: string; accountId: string; key: string }>> {
   const { rows } = await db.query<Row>(
     `SELECT p.id, p.account_id, p.key FROM photo p
      LEFT JOIN photo_review r ON r.photo_id = p.id
      WHERE p.purpose = 'profile' AND p.state = 'pending' AND (r.photo_id IS NULL OR r.decided_by IS NULL)
-       AND p.created_at < $1
-     ORDER BY p.created_at LIMIT $2`,
-    [olderThan, limit],
+       AND p.created_at < $1 AND NOT (p.id = ANY($3::uuid[]))
+     ORDER BY p.created_at, p.id LIMIT $2`,
+    [olderThan, limit, tried],
   );
   return rows.map((r) => ({
     id: r.id as string,

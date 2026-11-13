@@ -57,6 +57,7 @@ function fakeBroker(
       completed.push(input.state);
       const code = input.callbackUrl.searchParams.get("code");
       if (code === "broken") throw new Error("bad code");
+      if (code === "private") throw new Error(`broker rejected ${hetu} and person@example.test`);
       // The adapter's own refusal, and something that is not an Error at all.
       if (code === "refused") throw new BrokerError("unexpected acr");
       if (code === "garbage") throw { not: "an error" };
@@ -541,6 +542,19 @@ describe("the callback's refusals and failures", () => {
     ).toContainEqual({ detail: "broker failed" });
     // Never a bare 500: no unhandled-error line for either.
     expect(logs().filter((l) => l.msg === "unhandled error")).toEqual([]);
+  });
+
+  test("An unexpected broker error logs its kind without its private message", async ({ ctx }) => {
+    const { app, logs } = await appWith(ctx, ADULT_HETU);
+    expect(refusal(await callback(app, await start(app), "private")).error).toBe(
+      "auth_provider_error",
+    );
+    expect(refusalLine(logs, "auth_provider_error")).toMatchObject({
+      detail: { detail: "Error" },
+    });
+    const written = JSON.stringify(logs());
+    expect(written).not.toContain(ADULT_HETU);
+    expect(written).not.toContain("person@example.test");
   });
 
   test("An invalid identity code from the broker is a provider error naming the check, never the code", async ({

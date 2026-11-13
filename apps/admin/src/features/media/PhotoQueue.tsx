@@ -76,6 +76,7 @@ function QueueItem({ item, onDecided }: { item: PhotoReviewItem; onDecided: () =
   const { t, locale } = useT();
   const [state, setState] = useState<ItemState>({ kind: "idle" });
   const [url, setUrl] = useState<string | null>(null);
+  const [loaded, setLoaded] = useState(false);
   // A sensitive picture is not even fetched until the moderator chooses to look (#253).
   const [shown, setShown] = useState(!item.sensitive);
 
@@ -156,6 +157,8 @@ function QueueItem({ item, onDecided }: { item: PhotoReviewItem; onDecided: () =
             ) : url ? (
               <img
                 src={url}
+                onLoad={() => setLoaded(true)}
+                onError={() => setLoaded(false)}
                 alt={t("admin.queue.image")}
                 width={400}
                 height={533}
@@ -233,7 +236,7 @@ function QueueItem({ item, onDecided }: { item: PhotoReviewItem; onDecided: () =
               ) : (
                 <>
                   <Button
-                    disabled={state.kind === "saving"}
+                    disabled={state.kind === "saving" || !shown || !loaded}
                     onClick={() => void decide({ decision: "approve" })}
                   >
                     <Check aria-hidden="true" />

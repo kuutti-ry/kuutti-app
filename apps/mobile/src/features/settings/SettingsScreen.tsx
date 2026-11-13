@@ -131,7 +131,7 @@ export function SettingsScreen() {
     });
   }, []);
   const unsavedRows = [...unsaved].filter(([, fields]) => fields.size > 0).map(([row]) => row);
-  // Leaving with nothing refused needs no word: a change not sent goes on the way out.
+  // A field keeps its row marked until its change is saved or discarded.
   const leaving = useConfirmLeave(unsavedRows.length > 0, () => undefined);
 
   /** A row that holds its setting, open or closed, with its picture. */

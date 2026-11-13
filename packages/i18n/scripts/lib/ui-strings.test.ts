@@ -37,6 +37,15 @@ describe("check:ui-strings", () => {
     ).toEqual([]);
   });
 
+  it("checks the displayed branches of conditional and logical expressions", () => {
+    expect(hits('<Text>{ok ? "Done" : (ready && "Failed")}</Text>')).toEqual([
+      "literal as a child: DoneFailed",
+    ]);
+    expect(hits('<Button title={busy ? "Saving" : "Save"} />')).toEqual(["title prop: SavingSave"]);
+    expect(hits('<Text>{state === "ready" && t("status.ready")}</Text>')).toEqual([]);
+    expect(hits('<Text>{ok ? t("status.done") : t("status.failed")}</Text>')).toEqual([]);
+  });
+
   it.each(["accessibilityHint", "aria-label", "title", "alt", "label", "closeLabel"])(
     "fails a literal in the %s prop",
     (prop) => {
