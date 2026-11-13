@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { readersOf, withoutComments } from "../test/sources.ts";
+import { readersOf } from "../test/sources.ts";
+import {
+  readsBlock,
+  readsMessage,
+  readsReport,
+  readsReportCopy,
+  readsStar,
+} from "../test/table-readers.ts";
 
 // A block is a filter, never a signal (#84, ADR-030 §7, CLAUDE.md Product
 // constraints): no ordering, score, exposure floor, card or count reads one,
@@ -13,29 +20,6 @@ import { readersOf, withoutComments } from "../test/sources.ts";
 // a decision, made here in review. Tests and
 // comments are not read; SQL across lines, the schema-qualified name and
 // drizzle's builder are.
-
-/**
- * Whether the source reads or writes the table: in SQL, the keyword and the
- * name across any whitespace, a line break included, with or without the
- * schema and quotes; through drizzle's builder, the table handed to a
- * from, join, insert, update or delete.
- */
-function names(source: string, table: string): boolean {
-  const code = withoutComments(source);
-  const sql = new RegExp(`\\b(FROM|JOIN|INTO|UPDATE)\\s+(public\\.)?"?${table}"?(?![\\w])`, "i");
-  const builder = new RegExp(
-    `\\.(from|innerJoin|leftJoin|rightJoin|fullJoin|insert|update|delete)\\(\\s*(\\w+\\.)?${table}\\s*[,)]`,
-  );
-  return sql.test(code) || builder.test(code);
-}
-
-const readsBlock = (source: string) =>
-  names(source, "block") || /blocked_between/.test(withoutComments(source));
-const readsReport = (source: string) => names(source, "report");
-const readsMessage = (source: string) => names(source, "message");
-const readsReportCopy = (source: string) =>
-  names(source, "report_message") || names(source, "reportMessage");
-const readsStar = (source: string) => names(source, "star");
 
 describe("the guard's own reading", () => {
   it.each([

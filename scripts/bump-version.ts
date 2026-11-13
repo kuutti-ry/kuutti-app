@@ -426,6 +426,48 @@ function selfTest(): void {
   expect("a conflict's end", CONFLICT_MARKER.test("a\n>>>>>>> 9ed12c5 (x)\n"), true);
   expect("no conflict", CONFLICT_MARKER.test('{\n  "a": "<<<<<<< b"\n}'), false);
 
+  // Attacks (#380): each expectation tries what must be refused, and after it comes its control.
+  // attack: a level in capitals is taken for the level
+  expect("a level in capitals", refusedWith(next("0.33.6", "Patch"), "usage:"), true);
+  // control: the level as it is written
+  expect("the level as written", next("0.33.6", "patch"), { version: "0.33.7" });
+  // attack: a branch whose number carries a suffix passes the hook as past main's
+  expect(
+    "a number with a suffix",
+    behind("0.33.6", "0.33.7-rc.1")?.startsWith("pnpm version:bump"),
+    true,
+  );
+  // attack: or a letter before it
+  expect("a number after a v", behind("0.33.6", "v0.33.7")?.startsWith("pnpm version:bump"), true);
+  // control: main's next number, bare
+  expect("main's next number, bare", behind("0.33.6", "0.33.7"), undefined);
+  // attack: an owner whose name only ends with ours is taken for the main repository
+  expect(
+    "an owner that ends with ours",
+    MAIN_REPO.test("https://github.com/not-kuutti-ry/kuutti-app.git"),
+    false,
+  );
+  // attack: so is a repository whose name only begins with ours
+  expect(
+    "a repository that begins with ours",
+    MAIN_REPO.test("git@github.com:kuutti-ry/kuutti-app-fonts.git"),
+    false,
+  );
+  // control: the main repository with a slash after it
+  expect("main with a slash", MAIN_REPO.test("https://github.com/kuutti-ry/kuutti-app/"), true);
+  // attack: of two top-level versions the first is changed, and the file still says the second
+  expect(
+    "two top-level versions",
+    withVersion(`{\n  "version": "0.1.0",\n  "name": "x",\n  "version": "0.2.0"\n}\n`, "0.3.0"),
+    undefined,
+  );
+  // control: one top-level version
+  expect(
+    "one top-level version",
+    withVersion(`{\n  "name": "x",\n  "version": "0.2.0"\n}\n`, "0.3.0"),
+    `{\n  "name": "x",\n  "version": "0.3.0"\n}\n`,
+  );
+
   selfTestClone(expect);
 
   if (failures.length > 0) {

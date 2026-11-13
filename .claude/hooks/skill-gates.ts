@@ -307,6 +307,38 @@ function selfTest(): void {
     ["grep 'gh pr create' CLAUDE.md", false],
     ["gh pr view 1", false],
     ["echo gh pr create", false],
+    // attack: the command at the end of a pipe is not seen
+    ["true | gh pr create", true],
+    // control: another command of gh's in its place
+    ["true | gh pr view", false],
+    // attack: the command in a subshell is not seen
+    ["(gh pr create)", true],
+    // control: another command of gh's in its place
+    ["(gh pr view)", false],
+    // attack: the command after two variables is not seen
+    ["A=1 B=2 gh pr create", true],
+    // control: another command of gh's in its place
+    ["A=1 B=2 gh pr list", false],
+    // attack: the command with tabs between its words is not seen
+    ["gh\tpr\tcreate", true],
+    // control: another command of gh's in its place
+    ["gh\tpr\tview", false],
+    // attack: the command glued to what follows it is not seen
+    ["gh pr create&&true", true],
+    // control: another command of gh's in its place
+    ["gh pr view&&true", false],
+    // attack: a commit whose message's second part names the command is refused
+    ["git commit -m docs -m 'gh pr create'", false],
+    // control: the command itself after the commit
+    ["git commit -m docs && gh pr create", true],
+    // attack: a comment's line that names the command is refused
+    ["# gh pr create", false],
+    // control: the command on the line under a comment
+    ["# open it\ngh pr create", true],
+    // attack: a word that only starts like the command's last is refused
+    ["gh pr created", false],
+    // control: the command with a flag glued to nothing
+    ["gh pr create --draft", true],
   ] as const) {
     same(`CREATE on ${command}`, CREATE.test(command), matches);
   }
@@ -398,6 +430,35 @@ function selfTest(): void {
     [...read(call("a", "mcp__ccd_pr__set_monitor", { auto_fix: false, url })).autoFix],
     [],
   );
+  // attack: a skill named in other capitals counts as run
+  same(
+    "a skill in other capitals",
+    read(call("a", "Skill", { skill: "Open-PR" })).skills.has("open-pr"),
+    false,
+  );
+  // control: the skill by its name
+  same(
+    "a skill by its name",
+    read(call("a", "Skill", { skill: "open-pr" })).skills.has("open-pr"),
+    true,
+  );
+  // attack: a tool's result that quotes a typed command runs the skill
+  same(
+    "a tool's result quoting a command",
+    read(result("a", "<command-name>/open-pr</command-name>")).skills.has("open-pr"),
+    false,
+  );
+  // control: the person typing it
+  same(
+    "a person typing the command",
+    read(
+      JSON.stringify({
+        type: "user",
+        message: { content: "<command-name>/open-pr</command-name>" },
+      }),
+    ).skills.has("open-pr"),
+    true,
+  );
 
   const none = read();
   const skills = (...names: string[]) =>
@@ -457,6 +518,18 @@ function selfTest(): void {
     ["packages/db/src/seed.ts", null],
     ["docs/adr/README.md", null],
     ["", null],
+    // attack: the panel's part of a rule's slice is edited without the walk
+    ["apps/admin/src/features/matching/Config.tsx", "change-rule"],
+    // control: the panel's part of a slice that holds no rule
+    ["apps/admin/src/features/safety/Queue.tsx", null],
+    // attack: a spec's file in a rule's folder is passed over as a test's is
+    ["apps/mobile/src/features/matching/Round.spec.tsx", "change-rule"],
+    // control: the test's file beside it
+    ["apps/mobile/src/features/matching/Round.test.tsx", null],
+    // attack: a test's file in the schema's folder is passed over as a rule's test is
+    ["packages/db/src/schema/profile.test.ts", "personal-data"],
+    // control: a test's file beside the folder
+    ["packages/db/src/schema.test.ts", null],
   ] as const) {
     same(
       `the edit of ${file}`,
@@ -477,6 +550,10 @@ function selfTest(): void {
     ["apps/mobile/src/features/chat/Thread.test.tsx", false],
     ["apps/mobile/src/features/chat/client.ts", false],
     ["apps/api/src/app.tsx", false],
+    // attack: a layout among the routes is no screen
+    ["apps/mobile/app/_layout.tsx", true],
+    // control: the layout's test
+    ["apps/mobile/app/_layout.test.tsx", false],
   ] as const) {
     same(`${file} as a screen`, SCREENS.test(file), expected);
   }
@@ -543,6 +620,76 @@ function selfTest(): void {
     "opened and merged here is one duty",
     duties(session(fixed, bash("m", "gh pr merge 7")), true, pull("MERGED")),
     [recheck],
+  );
+  // attack: Auto-fix asked for another pull request counts for this one
+  same(
+    "Auto-fix on another pull request",
+    duties(
+      session(call("f", "mcp__ccd_pr__set_monitor", { auto_fix: true, url: `${url}0` })),
+      true,
+      pull("OPEN"),
+    ),
+    [autoFix],
+  );
+  // control: asked for this one and for the other
+  same(
+    "Auto-fix on both",
+    duties(
+      session(fixed, call("g", "mcp__ccd_pr__set_monitor", { auto_fix: true, url: `${url}0` })),
+      true,
+      pull("OPEN"),
+    ),
+    [],
+  );
+  // attack: Auto-fix given as the word "true" counts
+  same(
+    "Auto-fix as a word",
+    duties(
+      session(call("f", "mcp__ccd_pr__set_monitor", { auto_fix: "true", url })),
+      true,
+      pull("OPEN"),
+    ),
+    [autoFix],
+  );
+  // control: given as true, with what else the skill sets
+  same(
+    "Auto-fix with its other switch",
+    duties(
+      session(
+        call("f", "mcp__ccd_pr__set_monitor", { auto_fix: true, address_comments: true, url }),
+      ),
+      true,
+      pull("OPEN"),
+    ),
+    [],
+  );
+  // attack: a check run with no number counts for the pull request
+  same(
+    "a check with no number",
+    duties(session(fixed, call("c", "Skill", { skill: "recheck-issues" })), true, pull("MERGED")),
+    [recheck],
+  );
+  // control: the check with the number among others
+  same(
+    "a check with two numbers",
+    duties(
+      session(fixed, call("c", "Skill", { skill: "recheck-issues", args: "6 7" })),
+      true,
+      pull("MERGED"),
+    ),
+    [],
+  );
+  // attack: an issue referenced in lower case, under other lines, is no issue
+  same(
+    "a reference in lower case",
+    duties(session(fixed), true, pull("MERGED", "Why.\n\n  refs #3")),
+    [recheck],
+  );
+  // control: a body whose only number is in a sentence
+  same(
+    "a number in a sentence",
+    duties(session(fixed), true, pull("MERGED", "Bumps a dependency to 3.0, as #3 did not.")),
+    [],
   );
   let views = 0;
   duties(session(fixed, check), true, () => {

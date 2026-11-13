@@ -51,7 +51,7 @@ import {
 import { createServer, request, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
-import { extname, join, normalize, resolve, sep } from "node:path";
+import { basename, extname, join, normalize, resolve, sep } from "node:path";
 import { parseEnv } from "node:util";
 import {
   CreateBucketCommand,
@@ -774,6 +774,36 @@ ${extra}
   throws("a server elsewhere", () =>
     privateDatabase("postgres://db.example.org:5432/kuutti", DATABASE),
   );
+  // Attacks (#380): each line tries what must be refused; their control is the check after them,
+  // the run's own database on this computer.
+  // attack: the shared test database, which the run's own name only goes on from, is taken
+  throws("the shared test database", () => privateDatabase(local.toString(), "kuutti_test"));
+  // attack: a name that ends the statement it is written into is taken
+  throws("a name that is more than a name", () =>
+    privateDatabase(local.toString(), `${DATABASE}; DROP DATABASE kuutti`),
+  );
+  // attack: a server elsewhere with this computer's address before an @ is taken for this computer
+  const tricked = new URL("postgres://db.example.org:5432/kuutti");
+  tricked.username = "127.0.0.1";
+  throws("a server elsewhere, a loopback address before an @", () =>
+    privateDatabase(tricked.toString(), DATABASE),
+  );
+  // attack: the refusal of a server elsewhere says the password of its address
+  const elsewhere = new URL("postgres://db.example.org:5432/kuutti");
+  elsewhere.username = "kuutti";
+  elsewhere.password = "kuutti380mark";
+  let refusal = "";
+  try {
+    privateDatabase(elsewhere.toString(), DATABASE);
+  } catch (error) {
+    refusal = (error as Error).message;
+  }
+  check("a refusal without the address's password", !refusal.includes("kuutti380mark"));
+  // control: the refusal is this one, and says the host and nothing more of the address
+  check(
+    "a refusal with the host",
+    refusal === "the database server db.example.org is not on this computer",
+  );
   const database = new URL(privateDatabase(local.toString(), DATABASE));
   check(
     "the private database on this computer, as the same role",
@@ -784,6 +814,14 @@ ${extra}
   );
   throws("a store elsewhere", () =>
     localStore({ S3_ENDPOINT: "https://s3.eu-central-1.amazonaws.com" }),
+  );
+  // Attacks (#380): a store elsewhere whose address names this computer somewhere is taken; the
+  // control is the check after them, the stand-in on this computer.
+  throws("a store elsewhere, localhost before an @", () =>
+    localStore({ S3_ENDPOINT: "http://localhost@s3.example.org:9000" }),
+  );
+  throws("a store whose name begins with localhost", () =>
+    localStore({ S3_ENDPOINT: "http://localhost.example.org:9000" }),
   );
   check(
     "the stand-in on this computer",
@@ -796,6 +834,10 @@ ${extra}
   writeFileSync(join(dir, "assets", "app.js"), "export {};");
   const secret = join(tmpdir(), "kuutti-e2e-admin-secret.txt");
   writeFileSync(secret, "outside");
+  // attack (#380): a file beside the build, in a name the build's own only goes on to, is served;
+  // its control is "a file is itself", a file of the build.
+  const beside = `${dir}-beside.txt`;
+  writeFileSync(beside, "outside");
   const server = panelServer(dir, { "Content-Security-Policy": "default-src 'none'" });
   await new Promise<void>((ready) => server.listen(0, "localhost", ready));
   const port = (server.address() as AddressInfo).port;
@@ -818,6 +860,7 @@ ${extra}
       "/assets/../../kuutti-e2e-admin-secret.txt",
       "/%2e%2e%2fkuutti-e2e-admin-secret.txt",
       "/assets/%2e%2e/%2e%2e/kuutti-e2e-admin-secret.txt",
+      `/../${basename(beside)}`,
     ]) {
       const out = await rawGet(port, path);
       check(
@@ -836,6 +879,7 @@ ${extra}
     await new Promise((closed) => server.close(closed));
     rmSync(dir, { recursive: true, force: true });
     rmSync(secret, { force: true });
+    rmSync(beside, { force: true });
   }
 
   if (failures.length > 0) {
