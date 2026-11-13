@@ -299,6 +299,7 @@ function selfTest(): void {
     { path: "apps/api/src/x/README.md", tds: set(3) },
     { path: "docs/runbooks/quiet.md", tds: set() },
   ];
+  const [one, two, three] = adrs as [Adr, Adr, Adr];
   const row1 = "| [ADR-001](001-one.md) | One | accepted | 2026-01-01 | TD-1 | |";
   const row2 = "| [ADR-002](002-two.md) | Two | proposed (a \\| b) | 2026-01-02 | TD-1 to TD-3 | |";
   const row3 = "| [ADR-003](003-three.md) | Three | accepted | 2026-01-03 | none | rule 10 |";
@@ -515,6 +516,221 @@ function selfTest(): void {
         ),
       }),
       ["TD-3: the row names README.md with no folder"],
+    ],
+    // attack: a status that differs from the record's by one capital
+    [
+      "a status in another case",
+      repo({ index: index(row1.replace("accepted", "Accepted"), row2, row3, td1, td2, td3, td4) }),
+      ['ADR-001: the index says "Accepted"'],
+    ],
+    // control: the record has the capital too
+    [
+      "a status with its record's capital",
+      repo({
+        adrs: [{ ...one, status: "Accepted" }, two, three],
+        index: index(row1.replace("accepted", "Accepted"), row2, row3, td1, td2, td3, td4),
+      }),
+      [],
+    ],
+    // attack: a status with one more space inside it than the record's
+    [
+      "a status with a space more",
+      repo({
+        index: index(row1, row2.replace("proposed (a", "proposed  (a"), row3, td1, td2, td3, td4),
+      }),
+      ['ADR-002: the index says "proposed  (a | b)"'],
+    ],
+    // control: the record has the space too
+    [
+      "a status with its record's spaces",
+      repo({
+        adrs: [one, { ...two, status: "proposed  (a | b)" }, three],
+        index: index(row1, row2.replace("proposed (a", "proposed  (a"), row3, td1, td2, td3, td4),
+      }),
+      [],
+    ],
+    // attack: a record amended since, its row left as it was
+    [
+      "a record amended, its row not",
+      repo({
+        adrs: [{ ...one, status: "accepted, amended 2026-02-01 (§2; see History)" }, two, three],
+      }),
+      ['ADR-001: the index says "accepted"'],
+    ],
+    // control: the row copies the amended line
+    [
+      "a record amended, its row too",
+      repo({
+        adrs: [{ ...one, status: "accepted, amended 2026-02-01 (§2; see History)" }, two, three],
+        index: index(
+          row1.replace("accepted", "accepted, amended 2026-02-01 (§2; see History)"),
+          row2,
+          row3,
+          td1,
+          td2,
+          td3,
+          td4,
+        ),
+      }),
+      [],
+    ],
+    // attack: a record struck out of the index, its row still there
+    [
+      "a row struck through",
+      repo({
+        index: index(
+          row1,
+          row2.replace("[ADR-002](002-two.md)", "~~[ADR-002](002-two.md)~~"),
+          row3,
+          td1,
+          td2,
+          td3,
+          td4,
+        ),
+      }),
+      ["002-two.md is not in the index"],
+    ],
+    // control: the row as it is written
+    ["a row not struck through", repo({ index: index(row1, row2, row3, td1, td2, td3, td4) }), []],
+    // attack: a TD cell that gives the record's range backwards
+    [
+      "a range backwards",
+      repo({
+        index: index(row1, row2.replace("TD-1 to TD-3", "TD-3 to TD-1"), row3, td1, td2, td3, td4),
+      }),
+      ["ADR-002: its TD cell names nothing, the record cites TD-1, TD-2, TD-3"],
+    ],
+    // control: the same numbers one by one
+    [
+      "a range number by number",
+      repo({
+        index: index(
+          row1,
+          row2.replace("TD-1 to TD-3", "TD-3, TD-2, TD-1"),
+          row3,
+          td1,
+          td2,
+          td3,
+          td4,
+        ),
+      }),
+      [],
+    ],
+    // attack: a TD cell that gives the record's range with a dash
+    [
+      "a range with a dash",
+      repo({
+        index: index(row1, row2.replace("TD-1 to TD-3", "TD-1–TD-3"), row3, td1, td2, td3, td4),
+      }),
+      ["ADR-002: its TD cell names TD-1, TD-3, the record cites TD-1, TD-2, TD-3"],
+    ],
+    // control: the range with the word to, and a space more on each side of it
+    [
+      "a range with to",
+      repo({
+        index: index(
+          row1,
+          row2.replace("TD-1 to TD-3", "TD-1  to  TD-3"),
+          row3,
+          td1,
+          td2,
+          td3,
+          td4,
+        ),
+      }),
+      [],
+    ],
+    // attack: a doc in a folder whose name only starts like the records' cites a TD unnamed
+    [
+      "a doc beside the records, not named",
+      repo({ pool: [...pool, { path: "docs/adr-notes/x.md", tds: set(1) }] }),
+      ["TD-1: docs/adr-notes/x.md cites it and the row's last cell does not name it"],
+    ],
+    // control: the cell names it
+    [
+      "a doc beside the records, named",
+      repo({
+        pool: [...pool, { path: "docs/adr-notes/x.md", tds: set(1) }],
+        index: index(
+          row1,
+          row2,
+          row3,
+          td1.replace("CLAUDE.md", "CLAUDE.md, `docs/adr-notes/x.md`"),
+          td2,
+          td3,
+          td4,
+        ),
+      }),
+      [],
+    ],
+    // attack: the README of infra cites a TD unnamed
+    [
+      "infra's README, not named",
+      repo({ pool: [...pool, { path: "infra/README.md", tds: set(1) }] }),
+      ["TD-1: infra/README.md cites it and the row's last cell does not name it"],
+    ],
+    // control: the cell names it with its folder
+    [
+      "infra's README, named",
+      repo({
+        pool: [...pool, { path: "infra/README.md", tds: set(1) }],
+        index: index(
+          row1,
+          row2,
+          row3,
+          td1.replace("CLAUDE.md", "CLAUDE.md, `infra/README.md`"),
+          td2,
+          td3,
+          td4,
+        ),
+      }),
+      [],
+    ],
+    // attack: a Records cell that says no ADR and then more
+    [
+      "no ADR and more",
+      repo({ index: index(row1, row2, row3, td1, td2, td3, td4.replace("no ADR", "no ADR yet")) }),
+      ['TD-4: no record cites it, so its Records cell reads "no ADR"'],
+    ],
+    // control: the two words alone, with a note in the last cell
+    [
+      "no ADR and a note elsewhere",
+      repo({
+        index: index(row1, row2, row3, td1, td2, td3, "| TD-4 | four, none yet | no ADR | |"),
+      }),
+      [],
+    ],
+    // attack: a TD cell with words beside its numbers is refused
+    [
+      "a TD cell with words",
+      repo({
+        index: index(
+          row1.replace("| TD-1 |", "| TD-1 (identity) |"),
+          row2,
+          row3,
+          td1,
+          td2,
+          td3,
+          td4,
+        ),
+      }),
+      [],
+    ],
+    // control: words and a number the record does not cite
+    [
+      "a TD cell with words and a stranger",
+      repo({
+        index: index(
+          row1.replace("| TD-1 |", "| TD-1 (not TD-2) |"),
+          row2,
+          row3,
+          td1,
+          td2,
+          td3,
+          td4,
+        ),
+      }),
+      ["ADR-001: its TD cell names TD-1, TD-2, the record cites TD-1"],
     ],
   ];
   for (const [name, given, expected] of cases) expectProblems(name, problemsOf(given), expected);

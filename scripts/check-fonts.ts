@@ -162,6 +162,7 @@ function selfTest(): void {
   };
   const tar = Buffer.alloc(600);
   tar.write("ustar", 257, "latin1");
+  const png = Buffer.from("89504e470d0a1a0a0000", "hex");
   const cases: Array<[string, string, Buffer, string | null]> = [
     ["a source file", "src/a.ts", Buffer.from("export const a = 1;\n"), null],
     ["a picture", "assets/icon.png", Buffer.from("89504e470d0a1a0a0000", "hex"), null],
@@ -191,6 +192,68 @@ function selfTest(): void {
       "a font written into the file",
     ],
     ["a font named in CSS by its URL", "a.css", Buffer.from("src:url(/fonts/x.woff2)"), null],
+    // attack: a collection by its name, in a folder
+    ["a collection's name", "x/Any.ttc", Buffer.from("x"), "a font's name"],
+    // control: the same file under a name that is no font's
+    ["a text's name", "x/Any.txt", Buffer.from("x"), null],
+    // attack: Apple's TrueType under a picture's name
+    ["Apple's TrueType renamed", "a.png", sfnt("74727565", 12, 400), "a font file"],
+    // control: a picture under that name
+    ["a picture under that name", "a.png", png, null],
+    // attack: PostScript in an sfnt under another name
+    ["PostScript in an sfnt renamed", "a.bin", sfnt("74797031", 12, 400), "a font file"],
+    // control: the same first bytes with no room for the tables they count
+    ["the same start, too short", "a.bin", sfnt("74797031", 12, 40), null],
+    // attack: each archive the list names and no case above tries, under another name
+    // control: a picture under the same name
+    ...(
+      [
+        ["a 7z archive", "377abcaf271c0004"],
+        ["a rar archive", "526172211a0700"],
+        ["an xz archive", "fd377a585a0000"],
+        ["a bzip2 archive", "425a6839314159"],
+        ["an lzip archive", "4c5a495001"],
+        ["a compress archive", "1f9d90"],
+        ["a zip archive", `504b0506${"00".repeat(18)}`],
+      ] as const
+    ).flatMap(
+      ([what, magic]): Array<[string, string, Buffer, string | null]> => [
+        [`${what}, renamed`, "f.png", Buffer.from(magic, "hex"), what],
+        [`a picture where ${what} was`, "f.png", png, null],
+      ],
+    ),
+    // attack: a font written into a file under a type in capitals
+    [
+      "an inlined font, in capitals",
+      "a.css",
+      Buffer.from(`src:url(${["DATA", ":FONT/WOFF2;base64,AAAA"].join("")})`),
+      "a font written into the file",
+    ],
+    // control: a picture written into the file the same way
+    [
+      "an inlined picture, in capitals",
+      "a.css",
+      Buffer.from(`src:url(${["DATA", ":IMAGE/PNG;base64,AAAA"].join("")})`),
+      null,
+    ],
+    // attack: a font written into a file under the embedded-font type
+    [
+      "an inlined font, Microsoft's type",
+      "a.css",
+      Buffer.from(`src:url(${["data", ":application/vnd.ms-fontobject;base64,AA"].join("")})`),
+      "a font written into the file",
+    ],
+    // control: a document written into the file the same way
+    [
+      "an inlined document, Microsoft's type",
+      "a.css",
+      Buffer.from(`src:url(${["data", ":application/vnd.ms-excel;base64,AA"].join("")})`),
+      null,
+    ],
+    // attack: an icon refused as a font, for a start that looks like TrueType's
+    ["an icon", "a.ico", Buffer.from("00000100010010100000".padEnd(800, "0"), "hex"), null],
+    // control: TrueType under an icon's name
+    ["TrueType under an icon's name", "a.ico", sfnt("00010000", 12, 400), "a font file"],
   ];
   for (const [name, path, bytes, expected] of cases) {
     const problem = fontProblem(path, bytes);

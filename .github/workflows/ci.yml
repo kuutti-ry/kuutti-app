@@ -205,7 +205,7 @@ jobs:
         with:
           install: "false"
       - name: Every non-pending scenario has a same-named test (ADR-002)
-        run: pnpm check:scenarios --list
+        run: pnpm check:scenarios --list --self-test
       - name: Every ADR is in docs/adr/README.md with its status (#203)
         run: pnpm check:adr-index --self-test
       - name: Every matching_config key has a row in docs/decisions.md (#396)
@@ -241,10 +241,10 @@ jobs:
           test -z "$(git status --porcelain -- packages/db/drizzle)" || { git status --porcelain -- packages/db/drizzle; echo "schema changed without a committed migration"; exit 1; }
 
       - name: No forbidden identifiers in the schema
-        run: pnpm check:schema-words
+        run: pnpm check:schema-words --self-test
 
       - name: One counted version in the root, the apps and openapi.json (ADR-028)
-        run: pnpm check:version
+        run: pnpm check:version --self-test
 
       # The bump itself is not checked here: Dependabot's pull requests never bump (ADR-028 §6).
       - name: The bump command's own logic (ADR-028)

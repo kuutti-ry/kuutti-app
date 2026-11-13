@@ -170,14 +170,14 @@ async function listeners(port: number): Promise<Owner[]> {
         .split("\n")
         .find((l) => l.startsWith("n"))
         ?.slice(1) ?? "";
-    owners.push({
-      pid,
-      command,
-      cwd,
-      ours: cwd.startsWith(ROOT) && (OURS.test(command) || WRAPPER_SHELL.test(command)),
-    });
+    owners.push({ pid, command, cwd, ours: isOurs(cwd, command) });
   }
   return owners;
+}
+
+/** Whether a port's listener is a copy of one of our own processes, by its working directory and its command. */
+function isOurs(cwd: string, command: string): boolean {
+  return cwd.startsWith(ROOT) && (OURS.test(command) || WRAPPER_SHELL.test(command));
 }
 
 /** The listener plus its supervisors (pnpm, node --watch) up to, never including, a shell. */
@@ -188,12 +188,17 @@ async function processTree(pid: number): Promise<number[]> {
     const ppid = Number((await run("ps", ["-o", "ppid=", "-p", String(current)])).out.trim());
     if (!ppid || ppid <= 1) break;
     const command = (await run("ps", ["-o", "command=", "-p", String(ppid)])).out.trim();
-    const wrapper = WRAPPER_SHELL.test(command);
-    if (!wrapper && (!OURS.test(command) || SHELLS.test(command))) break;
+    if (stopsAt(command)) break;
     chain.push(ppid);
     current = ppid;
   }
   return chain;
+}
+
+/** Whether the walk up from a listener ends at this parent, which is then left alone: a shell, or nothing of ours. */
+function stopsAt(command: string): boolean {
+  const wrapper = WRAPPER_SHELL.test(command);
+  return !wrapper && (!OURS.test(command) || SHELLS.test(command));
 }
 
 async function alive(pid: number): Promise<boolean> {
@@ -577,10 +582,65 @@ function selfTest(): never {
     ],
     [["up", "--no-seeds"], no("Unknown option '--no-seeds'")],
     [["down", "--skip", "mobile"], no("--skip and --no-seed are for up, not down")],
+    // Attacks (#380): each row tries what must be refused, and the row after it is its control.
+    // attack: a service named in capitals is not skipped, so its port is freed and it starts
+    [["up", "--skip", "Mobile"], list("Mobile")],
+    // control: the same service as it is called
+    [["up", "--skip", "mobile"], "up skip=mobile seed=true"],
+    // attack: a space after the comma skips the first service alone
+    [["up", "--skip", "mobile, admin"], list("mobile, admin")],
+    // control: the same list without the space
+    [["up", "--skip", "mobile,admin"], "up skip=mobile,admin seed=true"],
+    // attack: --no-seed after a separator in the middle of the line is not read, and the seed runs
+    [["up", "--skip", "api", "--", "--no-seed"], "up skip=api seed=false"],
+    // control: the same line without the separator
+    [["up", "--skip", "api", "--no-seed"], "up skip=api seed=false"],
+    // attack: of two commands on one line the second, down, runs as well
+    [["up", "down"], no("unexpected down: --skip takes one list, as in --skip mobile,admin")],
+    // control, of the row above and of the row below: down alone
+    [["down"], "down skip= seed=true"],
+    // attack: down with a flag it does not know stops everything all the same
+    [["down", "--force"], no("Unknown option '--force'")],
   ];
   const failed = cases.filter(([argv, expected]) => outcome(argv) !== expected);
   for (const [argv, expected] of failed) {
     console.error(`✖ self-test: ${JSON.stringify(argv)} gave ${outcome(argv)}, not ${expected}`);
+  }
+  // Whose a port's listener is (#380): an attack, a process that must not be taken for ours and
+  // stopped, and after it its control, [working directory, command, ours].
+  const owners: Array<[string, string, boolean]> = [
+    // attack: a process started somewhere else entirely
+    ["/tmp/kuutti-elsewhere/apps/api", "node --watch src/index.ts", false],
+    // control: the same process, started inside this repository
+    [resolve(ROOT, "apps/api"), "node --watch src/index.ts", true],
+    // attack: a program that is none of ours, started inside this repository
+    [resolve(ROOT, "apps/api"), "postgres -D data", false],
+    // control: one of ours, started in the same place
+    [resolve(ROOT, "apps/api"), "pnpm dev", true],
+  ];
+  const mistaken = owners.filter(([cwd, command, ours]) => isOurs(cwd, command) !== ours);
+  for (const [cwd, command, ours] of mistaken) {
+    console.error(`✖ self-test: ${command} in ${cwd} is ${ours ? "not ours" : "ours"}`);
+  }
+  // What is stopped with a listener (#380): an attack, a parent that must be left alone, and after
+  // it its control, [the parent's command, the walk ends there].
+  const parents: Array<[string, boolean]> = [
+    // attack: the terminal's shell, above the supervisors, is stopped with them
+    ["-zsh", true],
+    // control: a supervisor of ours, which is
+    ["pnpm dev", false],
+    // attack: a shell that only carries one of our words in its arguments
+    ["/bin/zsh -l -i --node-debug", true],
+    // control: the shell pnpm runs a script in
+    ["/bin/sh -c node --watch src/index.ts", false],
+    // attack: a parent that is no shell by its name and none of ours is stopped with the listener
+    ["tmux new-session -s dev", true],
+    // control: a supervisor of ours that is no shell either, which is
+    ["tsx watch src/index.ts", false],
+  ];
+  const walked = parents.filter(([command, ends]) => stopsAt(command) !== ends);
+  for (const [command, ends] of walked) {
+    console.error(`✖ self-test: the walk ${ends ? "goes on past" : "ends at"} ${command}`);
   }
   // The refusal comes before the database and the ports: the script itself, with an empty PATH (no
   // docker, lsof or pnpm) and a DATABASE_URL that throws at its first use, prints it first and alone.
@@ -592,7 +652,7 @@ function selfTest(): never {
   const early = child.status === 1 && child.stdout === refused;
   if (!early)
     console.error(`✖ self-test: up --skip exited ${child.status}, printed ${child.stdout}`);
-  if (failed.length > 0 || !early) process.exit(1);
+  if (failed.length > 0 || mistaken.length > 0 || walked.length > 0 || !early) process.exit(1);
   console.log(`✔ dev-env self-test: ${cases.length} command lines, refused before the database`);
   process.exit(0);
 }

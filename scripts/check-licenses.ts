@@ -142,6 +142,30 @@ function selfTest(): void {
     ["NONE", false],
     ["MIT OR", false],
     ["", false],
+    // attack: a copyleft licence joined to an allowed one by a lower-case "and"
+    ["MIT and GPL-3.0-only", false],
+    // control: two allowed licences joined the same way
+    ["MIT and Apache-2.0", true],
+    // attack: a copyleft licence in front of a bracket of allowed ones
+    ["GPL-3.0-only AND (MIT OR Apache-2.0)", false],
+    // control: an allowed licence in its place
+    ["BSD-3-Clause AND (MIT OR Apache-2.0)", true],
+    // attack: a copyleft licence "or later"
+    ["GPL-3.0+", false],
+    // control: an allowed licence "or later"
+    ["Apache-2.0+", true],
+    // attack: a copyleft licence after an allowed one, with nothing between them
+    ["MIT GPL-3.0-only", false],
+    // control: the same two as a choice
+    ["MIT OR GPL-3.0-only", true],
+    // attack: a copyleft licence with an exception clause, beside an allowed one
+    ["MIT AND GPL-3.0-only WITH Classpath-exception-2.0", false],
+    // control: an allowed licence with an exception clause, in its place
+    ["MIT AND Apache-2.0 WITH LLVM-exception", true],
+    // attack: a copyleft licence joined across line breaks
+    ["MIT\nAND\nGPL-3.0-only", false],
+    // control: two allowed licences joined the same way
+    ["MIT\nAND\nApache-2.0", true],
   ];
   for (const [expression, expected] of cases) {
     if (allowed(expression, allow) !== expected) {

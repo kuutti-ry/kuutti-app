@@ -9,10 +9,11 @@
  * a snake_case name (ip_hash, last_ip, client_ip_hash), never as letters
  * inside a word (zip, tip, relationship). Exit 1 with every hit.
  *
- * Usage: node scripts/check-schema-words.ts
+ * Usage: node scripts/check-schema-words.ts [--self-test]
  */
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
+import { expectProblems } from "./lib/self-test.ts";
 
 const ROOT = process.cwd();
 const SCAN = ["packages/db/drizzle", "packages/db/src/schema"];
@@ -71,15 +72,92 @@ function walk(dir: string, out: string[] = []): string[] {
 const whole = new RegExp(`(?<![A-Za-z0-9_])(${FORBIDDEN.join("|")})(?![A-Za-z0-9_])`, "gi");
 // A snake_case segment: an underscore may stand on either side.
 const segment = new RegExp(`(?<![A-Za-z0-9])(${ADDRESS_WORDS.join("|")})(?![A-Za-z0-9])`, "gi");
-const hits: string[] = [];
-for (const file of SCAN.flatMap((d) => walk(join(ROOT, d)))) {
-  const lines = readFileSync(file, "utf8").split(/\r?\n/);
+
+/** The forbidden identifiers of one file's text, named by its path, a hit per word and line. */
+function hitsIn(name: string, text: string): string[] {
+  const hits: string[] = [];
+  const lines = text.split(/\r?\n/);
   lines.forEach((line, i) => {
     if (line.trimStart().startsWith("//") || line.trimStart().startsWith("*")) return;
     for (const m of [...line.matchAll(whole), ...line.matchAll(segment)]) {
-      hits.push(`${relative(ROOT, file)}:${i + 1}: "${m[1]}" in: ${line.trim()}`);
+      hits.push(`${name}:${i + 1}: "${m[1]}" in: ${line.trim()}`);
     }
   });
+  return hits;
+}
+
+function selfTest(): void {
+  // What it is, a line of a migration or of the schema, and the words it is refused for.
+  const cases: Array<[string, string, string[]]> = [
+    ["the personal identity code", '"hetu" text', ["hetu"]],
+    ["the code's HMAC, which is what is kept", '"hetu_hmac" text NOT NULL', []],
+    ["legal sex", '"sex" text', ["sex"]],
+    ["a full date of birth", '"birth_date" date', ["birth_date"]],
+    ["the year and the month, which are kept", '"birth_year" integer, "birth_month" integer', []],
+    ["a name from the bank", '"legal_name" text', ["legal_name"]],
+    ["an address as a segment of a name", '"client_ip_hash" text', ["ip"]],
+    ["letters inside a word", '"zip" text, "tip" text, "relationship" text', []],
+    ["a comment's line", "  // the hetu is never stored", []],
+    // attack: the identity code's column in capitals
+    ["the identity code in capitals", '"HETU" text', ["HETU"]],
+    // control: its HMAC in capitals
+    ["the HMAC in capitals", '"HETU_HMAC" text', []],
+    // attack: a date of birth as a camel-case property of the schema
+    ["a date of birth in camel case", 'dateOfBirth: date("born"),', ["dateOfBirth"]],
+    // control: the month, in the same form
+    ["a month of birth in camel case", 'monthOfBirth: integer("born"),', []],
+    // attack: the identity code spelled out as a camel-case property
+    [
+      "the code spelled out in camel case",
+      'personalIdentityCode: text("pic"),',
+      ["personalIdentityCode"],
+    ],
+    // control: a property that only starts the same
+    ["a note in camel case", 'personalNote: text("pic"),', []],
+    // attack: a date of birth as drizzle's snapshot names a column
+    ["a date of birth in a snapshot", '"name": "birthdate",', ["birthdate"]],
+    // control: the month, in the same form
+    ["a month of birth in a snapshot", '"name": "birth_month",', []],
+    // attack: an address as a camel-case property
+    ["an address in camel case", 'ipAddress: text("a"),', ["ipAddress"]],
+    // control: a postal code, in the same form
+    ["a postal code in camel case", 'zipAddress: text("a"),', []],
+    // attack: a column whose type is an address
+    ["a column of the type inet", '"seen_from" inet,', ["inet"]],
+    // control: the same column as text
+    ["the same column as text", '"seen_from" text,', []],
+    // attack: a proxy's header kept as a column
+    ["the forwarded-for header", '"x_forwarded_for" text', ["forwarded_for"]],
+    // control: another header of the proxy's
+    ["the forwarded-proto header", '"x_forwarded_proto" text', []],
+    // attack: a forbidden column after a block comment on its line
+    ["the identity code after a comment", '/* note */ "hetu" text;', ["hetu"]],
+    // control: the HMAC, in the same form
+    ["the HMAC after a comment", '/* note */ "hetu_hmac" text;', []],
+    // attack: a column refused for the letters of dob inside its name
+    ["a word that only starts with dob", '"dobby" text', []],
+    // control: the abbreviation itself
+    ["the abbreviation of a date of birth", '"dob" date', ["dob"]],
+    // attack: a column refused for the letters of inet inside its name
+    ["a word that only ends with inet", '"cabinet" text', []],
+    // control: the type's name as a segment
+    ["inet as a segment of a name", '"inet_seen" text', ["inet"]],
+  ];
+  for (const [name, line, words] of cases) {
+    expectProblems(
+      name,
+      hitsIn("x", line),
+      words.map((word) => `x:1: "${word}" in: `),
+    );
+  }
+  console.log(`✔ check-schema-words self-test: ${cases.length} cases`);
+}
+
+if (process.argv.includes("--self-test")) selfTest();
+
+const hits: string[] = [];
+for (const file of SCAN.flatMap((d) => walk(join(ROOT, d)))) {
+  hits.push(...hitsIn(relative(ROOT, file), readFileSync(file, "utf8")));
 }
 
 if (hits.length > 0) {
