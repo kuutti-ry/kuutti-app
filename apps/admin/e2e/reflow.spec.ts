@@ -15,6 +15,21 @@ test("staff screens keep their controls within a narrow page with enlarged text"
       await page.evaluate((large) => {
         document.documentElement.style.fontSize = large ? "200%" : "100%";
       }, width === 320);
+      // CI uses a different system font than macOS. A wider fallback must reflow too.
+      if (page.url().endsWith("/announcements")) {
+        await page.evaluate(() => {
+          document.body.style.fontFamily = "Verdana, sans-serif";
+        });
+        const heading = page.getByRole("heading", { name: "Write an announcement", exact: true });
+        const headingSize = await heading.evaluate((node) => ({
+          width: node.clientWidth,
+          content: node.scrollWidth,
+        }));
+        expect(
+          headingSize.content,
+          "the announcement heading fits its content area",
+        ).toBeLessThanOrEqual(headingSize.width);
+      }
       const dimensions = await page.evaluate(() => ({
         viewport: innerWidth,
         page: document.documentElement.scrollWidth,

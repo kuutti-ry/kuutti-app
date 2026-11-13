@@ -280,7 +280,7 @@ function WriteForm({
 
   return (
     <section aria-labelledby="announcements-write" className="space-y-3">
-      <h3 id="announcements-write" className="text-lg font-semibold">
+      <h3 id="announcements-write" className="text-[min(1.125rem,8vw)] font-semibold">
         {t("admin.announcements.write")}
       </h3>
       <form className="grid max-w-2xl gap-6" onSubmit={submit} noValidate>
