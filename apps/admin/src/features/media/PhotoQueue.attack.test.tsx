@@ -416,8 +416,9 @@ async function approvedByKeyboard(blurredAfter: boolean) {
   approve.focus();
   fireEvent.click(approve);
   await screen.findByText("Approved");
-  if (blurredAfter) (document.activeElement as HTMLElement | null)?.blur();
+  // Finish the outcome's focus effect before the control deliberately loses it.
   await settle();
+  if (blurredAfter) (document.activeElement as HTMLElement | null)?.blur();
   return document.activeElement === document.body;
 }
 

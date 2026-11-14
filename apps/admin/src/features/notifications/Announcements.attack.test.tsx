@@ -307,8 +307,9 @@ async function sentByKeyboard(blurredAfter: boolean) {
   fireEvent.click(approve);
   fireEvent.click(within(step()).getByRole("button", { name: "Send to everybody" }));
   await screen.findByText("Sent to everybody.");
-  if (blurredAfter) (document.activeElement as HTMLElement | null)?.blur();
+  // Finish the outcome's focus effect before the control deliberately loses it.
   await settle();
+  if (blurredAfter) (document.activeElement as HTMLElement | null)?.blur();
   return document.activeElement === document.body;
 }
 

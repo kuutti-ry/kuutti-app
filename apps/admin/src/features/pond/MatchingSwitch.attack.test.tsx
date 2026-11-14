@@ -170,8 +170,9 @@ async function turnedByKeyboard(blurredAfter: boolean) {
   fireEvent.click(press);
   confirm();
   await screen.findByText("Open");
-  if (blurredAfter) (document.activeElement as HTMLElement | null)?.blur();
+  // Finish the outcome's focus effect before the control deliberately loses it.
   await settle();
+  if (blurredAfter) (document.activeElement as HTMLElement | null)?.blur();
   return document.activeElement === document.body;
 }
 

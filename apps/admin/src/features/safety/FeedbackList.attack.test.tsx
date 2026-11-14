@@ -160,8 +160,9 @@ async function markedByKeyboard(blurredAfter: boolean) {
   button.focus();
   fireEvent.click(button);
   await screen.findByText("Handled.");
-  if (blurredAfter) (document.activeElement as HTMLElement | null)?.blur();
+  // Finish the outcome's focus effect before the control deliberately loses it.
   await settle();
+  if (blurredAfter) (document.activeElement as HTMLElement | null)?.blur();
   return document.activeElement === document.body;
 }
 
