@@ -15,37 +15,40 @@ test("staff screens keep their controls within a narrow page with enlarged text"
       await page.evaluate((large) => {
         document.documentElement.style.fontSize = large ? "200%" : "100%";
       }, width === 320);
-      // CI uses a different system font than macOS. A wider fallback must reflow too.
-      if (page.url().endsWith("/announcements")) {
-        await page.evaluate(() => {
-          document.body.style.fontFamily = "Verdana, sans-serif";
-        });
-        const heading = page.getByRole("heading", { name: "Write an announcement", exact: true });
-        const headingSize = await heading.evaluate((node) => ({
-          width: node.clientWidth,
-          content: node.scrollWidth,
+      // Check the real system font and a wider fallback on every screen.
+      // A macOS-only pass previously hid Linux overflows beyond Announcements.
+      for (const fontFamily of ["", "Verdana, sans-serif"]) {
+        await page.evaluate((family) => {
+          document.body.style.fontFamily = family;
+        }, fontFamily);
+        if (page.url().endsWith("/announcements")) {
+          const heading = page.getByRole("heading", { name: "Write an announcement", exact: true });
+          const headingSize = await heading.evaluate((node) => ({
+            width: node.clientWidth,
+            content: node.scrollWidth,
+          }));
+          expect(
+            headingSize.content,
+            "the announcement heading fits its content area",
+          ).toBeLessThanOrEqual(headingSize.width);
+        }
+        const dimensions = await page.evaluate(() => ({
+          viewport: innerWidth,
+          page: document.documentElement.scrollWidth,
         }));
-        expect(
-          headingSize.content,
-          "the announcement heading fits its content area",
-        ).toBeLessThanOrEqual(headingSize.width);
-      }
-      const dimensions = await page.evaluate(() => ({
-        viewport: innerWidth,
-        page: document.documentElement.scrollWidth,
-      }));
-      expect(dimensions.page, `${page.url()} at ${width}px`).toBeLessThanOrEqual(
-        dimensions.viewport,
-      );
-      for (const card of await page.getByRole("main").locator('[data-slot="card"]').all()) {
-        const size = await card.evaluate((node) => ({
-          width: node.clientWidth,
-          content: node.scrollWidth,
-        }));
-        expect(
-          size.content,
-          `a card (${(await card.textContent())?.slice(0, 60)}) on ${page.url()} at ${width}px`,
-        ).toBeLessThanOrEqual(size.width);
+        expect(dimensions.page, `${page.url()} at ${width}px`).toBeLessThanOrEqual(
+          dimensions.viewport,
+        );
+        for (const card of await page.getByRole("main").locator('[data-slot="card"]').all()) {
+          const size = await card.evaluate((node) => ({
+            width: node.clientWidth,
+            content: node.scrollWidth,
+          }));
+          expect(
+            size.content,
+            `a card (${(await card.textContent())?.slice(0, 60)}) on ${page.url()} at ${width}px`,
+          ).toBeLessThanOrEqual(size.width);
+        }
       }
     }
   };

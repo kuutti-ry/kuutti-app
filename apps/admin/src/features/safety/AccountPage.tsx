@@ -295,7 +295,7 @@ function AccountContents({ id }: { id: string }) {
           {page.photos.length === 0 ? (
             <p className="text-muted-foreground">{t("admin.account.none")}</p>
           ) : (
-            <ul className="grid gap-4 items-start sm:grid-cols-[repeat(auto-fill,minmax(15rem,1fr))]">
+            <ul className="grid grid-cols-1 gap-4 items-start sm:grid-cols-[repeat(auto-fill,minmax(15rem,1fr))]">
               {page.photos.map((photo) => (
                 <PersonPhoto
                   key={photo.id}
