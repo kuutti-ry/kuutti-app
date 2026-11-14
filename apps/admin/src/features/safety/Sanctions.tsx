@@ -14,6 +14,7 @@ import { Button } from "../../components/ui/button.tsx";
 import { Input } from "../../components/ui/input.tsx";
 import { Label } from "../../components/ui/label.tsx";
 import { NativeSelect } from "../../components/ui/native-select.tsx";
+import { Loading } from "../../components/ui/spinner.tsx";
 import { Textarea } from "../../components/ui/textarea.tsx";
 import { api } from "../../lib/api.ts";
 import { Dialog } from "../../lib/dialog.tsx";
@@ -179,13 +180,14 @@ export function Sanctions({
 }: {
   accountId: string;
   /** Null when the list could not be loaded: the actions stay. */
-  items: SanctionEntry[] | null;
+  items: SanctionEntry[] | null | undefined;
   onChanged: () => Promise<void>;
 }) {
   const { t, locale } = useT();
   const admin = useStaffRole() === "admin";
   const [step, setStep] = useState<Step | null>(null);
   const [done, setDone] = useState<string>("");
+  const [completed, setCompleted] = useState<ReadonlySet<string>>(new Set());
   const ids = useId();
   const when = (at: string) => formatDateTime(locale, new Date(at));
   const who = (id: string | null, role: SanctionEntry["createdByRole"]) =>
@@ -201,6 +203,10 @@ export function Sanctions({
   const status = useStatusFocus(done);
 
   const finish = async (message: string) => {
+    if (step) {
+      const key = `${step.kind}:${step.item.id}`;
+      setCompleted((before) => new Set([...before, key]));
+    }
     setStep(null);
     setDone(message);
     await onChanged();
@@ -208,6 +214,7 @@ export function Sanctions({
 
   return (
     <>
+      {items === undefined && <Loading>{t("load.loading")}</Loading>}
       {items === null && <Alert>{t("admin.loadFailed")}</Alert>}
       <SanctionActions
         accountId={accountId}
@@ -221,7 +228,7 @@ export function Sanctions({
       <p ref={status} role="status" tabIndex={-1} className="font-medium empty:sr-only">
         {done}
       </p>
-      {items === null ? null : items.length === 0 ? (
+      {items == null ? null : items.length === 0 ? (
         <p className="text-muted-foreground">{t("admin.account.none")}</p>
       ) : (
         <ul className="grid gap-2">
@@ -258,7 +265,7 @@ export function Sanctions({
                 )}
                 {mayAct && (!s.liftedAt || !s.reviewedAt) && (
                   <div className="flex flex-wrap gap-3 pt-1">
-                    {!s.liftedAt && (
+                    {!s.liftedAt && !completed.has(`lift:${s.id}`) && (
                       <Button
                         variant="outline"
                         aria-describedby={line}
@@ -270,7 +277,7 @@ export function Sanctions({
                         {t("admin.sanction.lift")}
                       </Button>
                     )}
-                    {!s.reviewedAt && (
+                    {!s.reviewedAt && !completed.has(`review:${s.id}`) && (
                       <Button
                         variant="outline"
                         aria-describedby={line}
@@ -320,8 +327,8 @@ type StepProps = {
 };
 
 /** A step's send: the answer is the sanction, and the refusals are the steps' own. */
-const useSanctionSend = ({ onShell, onDone }: Pick<StepProps, "onShell" | "onDone">) =>
-  useSend({ answer: Sanction, refusals: REFUSALS, onShell, onDone });
+const useSanctionSend = ({ onShell, onDone, onCancel }: StepProps) =>
+  useSend({ answer: Sanction, refusals: REFUSALS, onShell, onDone, onCancel });
 
 function ApplyStep({
   accountId,
@@ -336,7 +343,7 @@ function ApplyStep({
   const [reason, setReason] = useState<SanctionReason | "">("");
   const [note, setNote] = useState("");
   const [endsOn, setEndsOn] = useState("");
-  const { sending, refused, send } = useSanctionSend({ onShell, onDone });
+  const { sending, refused, send, cancel } = useSanctionSend({ onShell, onDone, onCancel });
   const meta = STEPS[sanction];
   const ready = reason !== "" && note.trim() !== "" && (sanction !== "suspend" || endsOn !== "");
 
@@ -358,7 +365,7 @@ function ApplyStep({
   };
 
   return (
-    <Dialog title={t(meta.title)} onClose={onCancel}>
+    <Dialog title={t(meta.title)} onClose={cancel}>
       <form className="grid gap-4" onSubmit={submit}>
         <p>{t(meta.effect)}</p>
         {also && <p className="text-muted-foreground">{also}</p>}
@@ -406,7 +413,7 @@ function ApplyStep({
           >
             {t("admin.sanction.apply")}
           </Button>
-          <Button variant="outline" onClick={onCancel}>
+          <Button variant="outline" aria-disabled={sending || undefined} onClick={cancel}>
             {t("admin.sanction.cancel")}
           </Button>
         </div>
@@ -423,11 +430,11 @@ const CHOICE =
 
 function LiftStep({ item, onCancel, onShell, onDone }: StepProps & { item: SanctionEntry }) {
   const { t } = useT();
-  const { sending, refused, send } = useSanctionSend({ onShell, onDone });
+  const { sending, refused, send, cancel } = useSanctionSend({ onShell, onDone, onCancel });
   return (
     <Dialog
       title={t("admin.sanction.liftTitle", { kind: t(KIND_WORDS[item.kind]) })}
-      onClose={onCancel}
+      onClose={cancel}
     >
       <div className="grid gap-4">
         <p>{t(LIFT_EFFECT[item.kind])}</p>
@@ -445,7 +452,7 @@ function LiftStep({ item, onCancel, onShell, onDone }: StepProps & { item: Sanct
           >
             {t("admin.sanction.lift")}
           </Button>
-          <Button variant="outline" onClick={onCancel}>
+          <Button variant="outline" aria-disabled={sending || undefined} onClick={cancel}>
             {t("admin.sanction.cancel")}
           </Button>
         </div>
@@ -484,7 +491,7 @@ export function ReviewStep({
   const [note, setNote] = useState("");
   const [chosen, setOutcome] = useState<"keep" | "lift" | "">("");
   const outcome = fixed?.outcome ?? chosen;
-  const { sending, refused, send } = useSanctionSend({ onShell, onDone });
+  const { sending, refused, send, cancel } = useSanctionSend({ onShell, onDone, onCancel });
   const ready = note.trim() !== "" && outcome !== "";
   const submit = (event: FormEvent) => {
     event.preventDefault();
@@ -499,7 +506,7 @@ export function ReviewStep({
   return (
     <Dialog
       title={fixed?.title ?? t("admin.sanction.reviewTitle", { kind: t(KIND_WORDS[item.kind]) })}
-      onClose={onCancel}
+      onClose={cancel}
     >
       <form className="grid gap-4" onSubmit={submit}>
         {fixed && <p>{fixed.effect}</p>}
@@ -549,7 +556,7 @@ export function ReviewStep({
           <Button type="submit" disabled={!ready} aria-busy={sending || undefined}>
             {fixed?.submit ?? t("admin.sanction.apply")}
           </Button>
-          <Button variant="outline" onClick={onCancel}>
+          <Button variant="outline" aria-disabled={sending || undefined} onClick={cancel}>
             {t("admin.sanction.cancel")}
           </Button>
         </div>

@@ -108,17 +108,18 @@ function TurnStep({
   const { t } = useT();
   const open = !pond.matchingOpen;
   // A 403 is the shell's to say (#302): the step closes with no words of its own.
-  const { sending, refused, send } = useSend({
+  const { sending, refused, send, cancel } = useSend({
     answer: AdminPond,
     refusals: REFUSALS,
     onShell: onCancel,
+    onCancel,
     onDone,
   });
 
   return (
     <Dialog
       title={t(open ? "admin.matching.confirm.open.title" : "admin.matching.confirm.close.title")}
-      onClose={onCancel}
+      onClose={cancel}
     >
       <div className="grid gap-4">
         <p>
@@ -140,7 +141,7 @@ function TurnStep({
           >
             {t(open ? "admin.matching.apply.open" : "admin.matching.apply.close")}
           </Button>
-          <Button variant="outline" onClick={onCancel}>
+          <Button variant="outline" aria-disabled={sending || undefined} onClick={cancel}>
             {t("admin.matching.cancel")}
           </Button>
         </div>

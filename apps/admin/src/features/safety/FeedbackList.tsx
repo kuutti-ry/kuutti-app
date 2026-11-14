@@ -13,6 +13,8 @@ import { RefreshButton } from "../../lib/refresh-button.tsx";
 import { ScreenTitle } from "../../lib/screen-title.tsx";
 import { useList } from "../../lib/use-list.ts";
 import { short } from "../../lib/utils.ts";
+import { useStatusFocus } from "./status-focus.ts";
+import { codeOf } from "./use-send.ts";
 
 // Feedback from inside the app (#171, ADR-023, rules/admin.md): what people
 // sent, a bug first and praise last, each with the build the app read and the
@@ -64,6 +66,7 @@ function FeedbackRow({ item, onHandled }: { item: FeedbackItem; onHandled: () =>
   const { t, locale } = useT();
   const [state, setState] = useState<"idle" | "saving" | "handled" | "failed">("idle");
 
+  const status = useStatusFocus(state === "handled");
   const mark = async () => {
     setState("saving");
     // A 403 is the shell's to say (#302): the row keeps its button, no failure of its own.
@@ -74,7 +77,7 @@ function FeedbackRow({ item, onHandled }: { item: FeedbackItem; onHandled: () =>
       setState("idle");
       return;
     }
-    if (!answer?.data) {
+    if (!answer?.data && codeOf(answer?.error) !== "feedback_handled") {
       setState("failed");
       return;
     }
@@ -88,7 +91,9 @@ function FeedbackRow({ item, onHandled }: { item: FeedbackItem; onHandled: () =>
         <Card className="bg-muted">
           <CardContent className="flex-row items-center gap-2 font-medium">
             <Check aria-hidden="true" className="size-4" />
-            {t("admin.feedback.handled")}
+            <p ref={status} tabIndex={-1}>
+              {t("admin.feedback.handled")}
+            </p>
           </CardContent>
         </Card>
       </li>

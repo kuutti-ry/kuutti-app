@@ -40,6 +40,7 @@ import { createHash } from "node:crypto";
 import { mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { dirname, join } from "node:path";
+import { parseArgs } from "node:util";
 
 type Face = { name: string; weight: number; style: string; ttf: string; woff2: string };
 type Saiga = { version: string; repository: string; commit: string; faces: Face[] };
@@ -330,12 +331,26 @@ async function selfTest(): Promise<void> {
       fail("two files as delivered", "not written");
     }
 
+    for (const args of [["--chek"], ["--upload"], ["--upload", "bucket", "--check"]]) {
+      const result = spawnSync(process.execPath, [import.meta.filename, ...args], {
+        env: { HOME: join(home, "runner"), PATH: "" },
+        encoding: "utf8",
+      });
+      if (
+        result.status === 0 ||
+        !/Unknown option|argument missing|separate commands/.test(result.stderr)
+      ) {
+        fail("invalid arguments", `${args.join(" ")}: ${result.stderr}`);
+      }
+    }
+
     // Attacks (#380): on a GitHub runner nothing of this runs. The script itself, in a home of its
     // own and with an empty PATH (no gh, no aws): each line on a runner, and its control off one.
     for (const [args, elsewhere] of [
       [[], 0],
       [["--check"], 1],
       [["--upload", "kuutti-staging-admin"], 1],
+      [["--upload=kuutti-staging-admin"], 1],
     ] as const) {
       const run = (runner: Record<string, string>) =>
         spawnSync(process.execPath, [import.meta.filename, ...args], {
@@ -363,7 +378,19 @@ async function selfTest(): Promise<void> {
   process.exit(0);
 }
 
-if (process.argv.includes("--self-test")) await selfTest();
+const { values } = parseArgs({
+  args: process.argv.slice(2).filter((arg, index) => !(index === 0 && arg === "--")),
+  options: {
+    "self-test": { type: "boolean" },
+    check: { type: "boolean" },
+    soft: { type: "boolean" },
+    upload: { type: "string" },
+  },
+});
+if ([values["self-test"], values.check, values.upload !== undefined].filter(Boolean).length > 1) {
+  throw new Error("--self-test, --check and --upload are separate commands");
+}
+if (values["self-test"]) await selfTest();
 
 if (process.env.GITHUB_ACTIONS === "true") {
   console.error("✖ Saiga never goes to a GitHub runner (ADR-052): this runs on a laptop or on EAS");
@@ -371,14 +398,13 @@ if (process.env.GITHUB_ACTIONS === "true") {
 }
 
 const list = wanted(saigaDir());
-const at = process.argv.indexOf("--upload");
-if (at !== -1) {
-  process.exit(upload(process.argv[at + 1] ?? "", saigaDir()));
-} else if (process.argv.includes("--check")) {
+if (values.upload !== undefined) {
+  process.exit(upload(values.upload, saigaDir()));
+} else if (values.check) {
   const absent = missing(list);
   for (const { source } of absent) console.error(`✖ Saiga: ${source} is missing or not Spoke's`);
   if (absent.length === 0) console.log(`Saiga ${SAIGA.version}: all ${list.length} files verified`);
   process.exit(absent.length === 0 ? 0 : 1);
 } else {
-  process.exit(await fetchMissing(list, process.argv.includes("--soft")));
+  process.exit(await fetchMissing(list, values.soft ?? false));
 }

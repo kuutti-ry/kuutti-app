@@ -15,10 +15,9 @@ const [TABLES, COLUMNS] = [...register.matchAll(/`(SELECT c\.relname AS name[^`]
   (match) => match[1] ?? "",
 );
 
-// What goes through today (#380): a hole, which its contract forbids, and a
-// question, where no line says what should happen.
-const HOLE = "#380";
-const QUESTION = "#380, a question";
+// Explicitly retained scope, recorded in the #380 completion ledger.
+const HOLE = "accepted #380/2-08: the register covers the app's public tables";
+const QUESTION = "accepted #380/2-08: materialized views are outside the current storage model";
 
 // A migrated database of this file's own, from its first case to its last. An
 // ALTER TABLE takes its table whole, and a view keeps a reader's hold on the

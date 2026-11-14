@@ -1,17 +1,13 @@
 import { I18nProvider } from "@kuutti/i18n/react";
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { Link, MemoryRouter, Route, Routes } from "react-router";
-import { afterEach, beforeEach, expect, vi } from "vitest";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { i18n } from "../../i18n.ts";
 import { setRoleAnswerHandler, setTokenSource } from "../../lib/api.ts";
 import { StaffRole } from "../../lib/role.ts";
 import { attack } from "../../test/attack.ts";
 import { held, json, network, on, pathOf, sentTo, settled } from "../../test/network.ts";
 import { AccountPage } from "./AccountPage.tsx";
-
-// What goes through today (#380): a hole, which its contract forbids, and a question, where no line says what should happen.
-const HOLE = "#380";
-const QUESTION = "#380, a question";
 
 // Attacks on a person's page (#380, #306), its sanctions (#308) and its
 // take-downs (#477): the reads (the page, its sanctions, both read again after
@@ -227,8 +223,6 @@ async function movedOn(last: "A" | "B") {
 attack(
   "AccountPage: the first person's page, answered after the second's, is shown under the second's title",
   {
-    // Goes through today: the page sets what a read answers without asking whether it is still for the id in the address (no panel link reaches it yet).
-    open: HOLE,
     attempt: () => movedOn("A"),
     control: () => movedOn("B"),
     succeeds: ({ name }) => expect(name).toBe("Aino"),
@@ -278,8 +272,6 @@ async function appliedTwice(last: "first" | "second") {
 attack(
   "AccountPage: the first read after an action, answered after the second's, takes the newer sanction off the history",
   {
-    // Goes through today: the reads after an action keep no order.
-    open: QUESTION,
     attempt: () => appliedTwice("first"),
     control: () => appliedTwice("second"),
     succeeds: (hiddenListed) => expect(hiddenListed).toBe(false),
@@ -305,16 +297,11 @@ async function warnedThenRead(again: Reply) {
   return alerts();
 }
 
-attack(
-  "AccountPage: reading the page again after a warning fails, and nothing on the page says so",
-  {
-    // Goes through today: a failed read of the page after an action is kept quiet, by design, unlike the list's.
-    open: QUESTION,
-    attempt: () => warnedThenRead(() => failure(500, "internal_error")),
-    control: () => warnedThenRead(() => json(page(A))),
-    succeeds: (said) => expect(said).toEqual([]),
-  },
-);
+it("keeps the successful warning and current page when its background reload fails", async () => {
+  expect(await warnedThenRead(() => failure(500, "internal_error"))).toEqual([]);
+  expect(nameShown()).toBe("Aino");
+  expect(statusOfSanctions()).toBe("Applied: Warning.");
+});
 
 /** Opens the page, its two reads answered as given. */
 async function opened(pageReply: Reply, listReply: Reply) {
@@ -325,8 +312,6 @@ async function opened(pageReply: Reply, listReply: Reply) {
 }
 
 attack("AccountPage: a sanctions list that never answers keeps the whole page from showing", {
-  // Goes through today: the page waits for the list before it shows anything.
-  open: QUESTION,
   attempt: () =>
     opened(
       () => json(page(A)),
@@ -342,8 +327,6 @@ attack("AccountPage: a sanctions list that never answers keeps the whole page fr
 });
 
 attack("AccountPage: a sanctions list refused with 403 is said as the page's own failure", {
-  // Goes through today: a refused list is read as a failed one.
-  open: HOLE,
   attempt: () =>
     opened(
       () => json(page(A)),
@@ -391,8 +374,6 @@ async function liftedThenAgain(firstLift: Reply) {
 attack(
   "Sanctions: a lift is sent again while the page is read again after the first went through",
   {
-    // Goes through today: what went through is offered again until the page is read again.
-    open: QUESTION,
     attempt: () => liftedThenAgain(() => json(lifted(OPEN))),
     // Refused, left to the shell: nothing was lifted, so lifting again is right.
     control: () => liftedThenAgain(() => failure(403, "admin_forbidden")),
@@ -432,8 +413,6 @@ async function takenDownThenAgain(first: Reply) {
 attack(
   "TakeDown: a take-down is sent again while the page is read again after the first went through",
   {
-    // Goes through today: what went through is offered again until the page is read again.
-    open: QUESTION,
     attempt: () => takenDownThenAgain(() => json(decided(1))),
     // Refused, left to the shell: the photo is still approved, so taking it down again is right.
     control: () => takenDownThenAgain(() => failure(403, "admin_forbidden")),
@@ -510,7 +489,12 @@ async function twoLifts(answered: "first" | "second", reply: (item: typeof OPEN)
   const one = press(button(await rowOf(OPEN.note), "Lift"));
   fireEvent.click(button(one, "Lift"));
   await settled();
+  if (answered === "second") {
+    first.answer(failure(500, "internal_error"));
+    await drain();
+  }
   fireEvent.click(button(one, "Cancel"));
+  if (screen.queryByRole("dialog")) return { said: null, status: "" };
   fireEvent.click(button(press(button(await rowOf(WARNED.note), "Lift")), "Lift"));
   await settled();
   if (answered === "first") first.answer(reply(OPEN));
@@ -556,7 +540,12 @@ async function twoApplies(answered: "first" | "second") {
   const warn = await openApply("Warn");
   fireEvent.click(button(warn, "Apply"));
   await settled();
+  if (answered === "second") {
+    first.answer(failure(500, "internal_error"));
+    await drain();
+  }
   fireEvent.click(button(warn, "Cancel"));
+  if (screen.queryByRole("dialog")) return true;
   fireEvent.click(button(await openApply("Shadow ban", HIDE_NOTE), "Apply"));
   await settled();
   if (answered === "first") first.answer(json(entry(3, "warn", WARN_NOTE), 201));
@@ -568,8 +557,6 @@ async function twoApplies(answered: "first" | "second") {
 attack(
   "Sanctions: a warning cancelled while out, answered later, closes the shadow ban's step opened since",
   {
-    // Goes through today: a cancelled step's late answer closes whatever step is open.
-    open: QUESTION,
     attempt: () => twoApplies("first"),
     control: () => twoApplies("second"),
     succeeds: (stillOpen) => expect(stillOpen).toBe(false),
@@ -589,7 +576,12 @@ async function twoTakeDowns(answered: "first" | "second", reply: (n: number) => 
   const one = await openTakeDown(0);
   fireEvent.click(button(one, "Take down"));
   await settled();
+  if (answered === "second") {
+    first.answer(failure(500, "internal_error"));
+    await drain();
+  }
   fireEvent.click(button(one, "Cancel"));
+  if (screen.queryByRole("dialog")) return { stepOpen: true, said: null };
   fireEvent.click(button(await openTakeDown(1), "Take down"));
   await settled();
   if (answered === "first") first.answer(reply(1));
@@ -622,23 +614,37 @@ attack(
 // A5: no answer.
 
 /** Sends Warn, which never answers; cancels; opens Warn again, its reason chosen or not, and presses Apply. */
-async function lostThenAgain(reason: boolean) {
-  const sent = network([...person(), on("POST", LIST, () => held().promise)]);
+async function lostThenAgain(failedBefore: boolean) {
+  const first = held();
+  const sent = network([
+    ...person(),
+    on(
+      "POST",
+      LIST,
+      inTurn(
+        () => first.promise,
+        () => held().promise,
+      ),
+    ),
+  ]);
   show();
-  const first = await openApply("Warn");
-  fireEvent.click(button(first, "Apply"));
+  const step = await openApply("Warn");
+  fireEvent.click(button(step, "Apply"));
   await settled();
-  fireEvent.click(button(first, "Cancel"));
-  fireEvent.click(button(await openApply("Warn", WARN_NOTE, reason), "Apply"));
+  if (failedBefore) {
+    first.answer(failure(500, "internal_error"));
+    await drain();
+  }
+  fireEvent.click(button(step, "Cancel"));
+  if (!screen.queryByRole("dialog")) fireEvent.click(button(await openApply("Warn"), "Apply"));
   await drain();
   return sentTo(sent, "POST", LIST).length;
 }
 
-attack("Sanctions: a warning that never answers leaves no way to send one again", {
-  attempt: () => lostThenAgain(true),
-  // The second step lacks its reason: nothing goes, rightly.
-  control: () => lostThenAgain(false),
-  succeeds: (warnings) => expect(warnings).toBe(1),
+attack("Sanctions: cancelling a warning with an unknown outcome lets it be sent again", {
+  attempt: () => lostThenAgain(false),
+  control: () => lostThenAgain(true),
+  succeeds: (warnings) => expect(warnings).toBeGreaterThan(1),
 });
 
 // A6: a decision by default, a choice left from the step before.

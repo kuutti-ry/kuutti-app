@@ -36,12 +36,19 @@ const ReviewHashes = z.strictObject({
   slangi: ReviewHash.optional(),
 });
 
+const Nonblank = z
+  .string()
+  .refine(
+    (text) => text.replace(/[\s\p{Cf}\u3164]/gu, "").length > 0,
+    "text must contain a visible character",
+  );
+
 const Message = z.strictObject({
-  en: z.string().min(1),
-  description: z.string().min(1),
-  fi: z.string().min(1).optional(),
-  sv: z.string().min(1).optional(),
-  slangi: z.string().min(1).optional(),
+  en: Nonblank,
+  description: Nonblank,
+  fi: Nonblank.optional(),
+  sv: Nonblank.optional(),
+  slangi: Nonblank.optional(),
   /** Written by a machine or an agent; not yet read by a native speaker. */
   machine: MachineFlags.optional(),
   /** Approved by a native reviewer: the hash of en and this text at the time (#55). */
@@ -65,6 +72,7 @@ export const isLegalKey = (key: string): boolean => key.startsWith("legal.");
 // A backstop for the prefix rule: binding text filed under another name would
 // be sent to the translator and could carry a machine flag.
 const LEGAL_WORD = /(^|[._])(legal|consent|privacy|terms|police|traceability)([._]|$)/i;
+const wordsOf = (key: string) => key.replace(/([a-z])([A-Z])/g, "$1.$2");
 
 /** True for keys of the English-only moderation panel (TD-17). */
 export const isAdminKey = (key: string): boolean => key.startsWith("admin.");
@@ -75,7 +83,7 @@ const SLANG_NAMESPACE = /^(round|home|profile|settings)\./;
 // failure), consent and a person's data, their way out of danger or of a
 // session, and the answers that say who somebody is.
 const NEVER_SLANG =
-  /failed|invalid|error|research|sensitive|export|support|session|logout|lock|report|option/i;
+  /failed|invalid|error|refused|contact|email|gender|consent|signout|research|sensitive|export|support|session|logout|lock|report|option/i;
 
 /** True for keys a `slangi:` text may stand on: i18n:check refuses one anywhere else. */
 export const isSlangKey = (key: string): boolean =>
@@ -95,7 +103,7 @@ export function parseMessages(yamlText: string): Messages {
     if (!KEY_PATTERN.test(key)) {
       problems.push(`${key}: keys are dotted and semantic (profile.bio.required), never the text`);
     }
-    if (!isLegalKey(key) && LEGAL_WORD.test(key)) {
+    if (!isLegalKey(key) && LEGAL_WORD.test(wordsOf(key))) {
       problems.push(
         `${key}: consent, privacy, terms and police-traceability texts live under legal.*`,
       );

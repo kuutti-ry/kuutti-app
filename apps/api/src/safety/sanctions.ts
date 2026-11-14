@@ -400,19 +400,27 @@ export async function endSuspensions(db: Queryable, at: Date): Promise<number> {
     [at],
   );
   let ended = 0;
+  const failures: unknown[] = [];
   for (const { account_id: accountId } of rows) {
-    ended += await transaction(db, async (tx) => {
-      const account = await lockAccountForSanction(tx, accountId);
-      if (!account) return 0;
-      const result = await tx.query(
-        `UPDATE sanction SET lifted_at = $2
+    try {
+      ended += await transaction(db, async (tx) => {
+        const account = await lockAccountForSanction(tx, accountId);
+        if (!account) return 0;
+        const result = await tx.query(
+          `UPDATE sanction SET lifted_at = $2
          WHERE account_id = $1 AND kind = 'suspend' AND lifted_at IS NULL AND ends_at <= $2`,
-        [accountId, at],
-      );
-      await settleAll(tx, account, at);
-      return result.rowCount ?? 0;
-    });
+          [accountId, at],
+        );
+        await settleAll(tx, account, at);
+        return result.rowCount ?? 0;
+      });
+    } catch (error) {
+      failures.push(error);
+    }
   }
+  // The runner still records a failed job, after each independent account
+  // has had its turn. The failed account's transaction rolled back alone.
+  if (failures.length > 0) throw new AggregateError(failures, "Some suspensions could not end");
   return ended;
 }
 

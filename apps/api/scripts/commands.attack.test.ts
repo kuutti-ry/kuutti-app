@@ -124,26 +124,34 @@ describe("demo:reset, made to go ahead", { concurrent: true, timeout: 60_000 }, 
   }
 
   if (proxied)
-    attack(
-      "demo:reset: told through NODE_OPTIONS to send everything through a proxy, it goes ahead",
-      {
-        attempt: async () => {
-          const seen = await resetReaches(["--bare"], {
-            ...LOCAL,
-            HTTP_PROXY: DEAD_PROXY,
-            NODE_OPTIONS: "--use-env-proxy",
-          });
-          // A Node that does not know the flag stops before the script: that is no refusal of the reset's.
-          expect(seen.stderr).not.toMatch(/bad option|not allowed in NODE_OPTIONS/);
-          return seen;
+    for (const proxyFlag of [
+      "--use-env-proxy",
+      "--use_env_proxy",
+      "--use-env_proxy",
+      "--use_env-proxy",
+    ])
+      attack(
+        `demo:reset: NODE_OPTIONS=${proxyFlag} sends everything through a proxy, and reset goes ahead`,
+        {
+          attempt: async () => {
+            const seen = await resetReaches(
+              ["--bare"],
+              {
+                ...LOCAL,
+                HTTP_PROXY: DEAD_PROXY,
+                NODE_OPTIONS: proxyFlag,
+              },
+              "refusing: Node is configured to use an environment proxy; unset NODE_USE_ENV_PROXY and --use-env-proxy",
+            );
+            // A Node that does not know the flag stops before the script: that is no refusal of the reset's.
+            expect(seen.stderr).not.toMatch(/bad option|not allowed in NODE_OPTIONS/);
+            return seen;
+          },
+          // A proxy that is named and that Node was not told to use: nothing goes through it.
+          control: () => resetReaches(["--bare"], { ...LOCAL, HTTP_PROXY: DEAD_PROXY }),
+          succeeds: askedTheDatabase,
         },
-        // A proxy that is named and that Node was not told to use: nothing goes through it.
-        control: () => resetReaches(["--bare"], { ...LOCAL, HTTP_PROXY: DEAD_PROXY }),
-        succeeds: askedTheDatabase,
-        // Goes through today: the reset refuses NODE_USE_ENV_PROXY and does not ask NODE_OPTIONS.
-        open: "#380",
-      },
-    );
+      );
 
   // Each row is a word the reset does not know; its control is the word it stands for.
   for (const [how, attempt, control] of [
@@ -188,20 +196,27 @@ describe("demo:stories and demo:assets, made to go ahead", {
   });
 
   /** One fetch of a release into the run's own home, through the proxy that is not there. */
-  const fetched = async (tag: string) => {
+  const fetched = async (tag: string, refusal?: string) => {
     const seen = await commandDriver.command("demo-assets.ts", ["--tag", tag], NO_NETWORK);
     expect(seen.code).toBe(2);
-    expect(seen.stderr).toContain(`fetching ${tag} of`);
-    expect(seen.stderr).toContain("failed: fetch failed. Is the tag pushed?");
+    if (!seen.stderr.includes(`fetching ${tag} of`)) {
+      expect(refusal, "only the attacked tag refusal may stop the fetch").toBeDefined();
+      expect(seen.stderr).toContain(refusal);
+    } else {
+      expect(seen.stderr).toContain(`fetching ${tag} of`);
+      expect(seen.stderr).toContain("failed: fetch failed. Is the tag pushed?");
+    }
     return { made: existsSync(join(scratch, ".cache", "kuutti-demo-photos", tag)) };
   };
   if (proxied)
     attack("demo:assets: a tag that leads out of the cache has its directory made where it leads", {
-      attempt: () => fetched("../../outside-the-cache"),
+      attempt: () =>
+        fetched(
+          "../../outside-the-cache",
+          "--tag takes a single release name without path separators",
+        ),
       control: () => fetched("v0-attack"),
       succeeds: (seen) => expect(seen.made).toBe(true),
-      // Goes through today: the tag is the maintainer's own word, and no line says it is checked.
-      open: "#380, a question",
     });
 
   // The control is the command with no word at all, which is the fetch.

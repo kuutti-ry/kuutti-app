@@ -42,9 +42,6 @@ beforeEach(() => {
   api.answer = (keys) => ({ translations: keys.map((key) => ({ key, text: "Tallenna" })) });
 });
 
-/** What goes through today where no line says what should happen (#380). */
-const QUESTION = "#380, a question";
-
 /** One command line. A refusal by the parser of the arguments is an outcome; any other failure is the test's. */
 const ran = (script: "review.ts" | "translate.ts", args: readonly string[]) =>
   run(script, [...args]).then(
@@ -67,11 +64,6 @@ describe("pnpm i18n:review, asked for a dry run", () => {
     await ran("review.ts", args);
     return { wrote: disk.written.has(MESSAGES) };
   };
-  // The import passes a stray word over, where the approval refuses it as a key nothing matches.
-  const PASSED_OVER: readonly string[] = [
-    "after a bare --",
-    "with a long dash a pasted line carries",
-  ];
   for (const [what, line] of [
     ["an approval", ["--approve", "--locale", "fi", "demo.greeting"]],
     ["an import of a reviewer's sheet", ["--import", SHEET, "--locale", "fi"]],
@@ -81,7 +73,6 @@ describe("pnpm i18n:review, asked for a dry run", () => {
         attempt: () => wrote([...line, ...words]),
         control: () => wrote(line),
         succeeds: (seen) => expect(seen.wrote).toBe(true),
-        open: line[0] === "--import" && PASSED_OVER.includes(how) ? QUESTION : undefined,
       });
     }
   }
@@ -96,8 +87,6 @@ describe("pnpm i18n:review, asked for a dry run", () => {
       approvedSwedish(["--approve", "--locale", "fi", "--locale", "sv", "demo.greeting"]),
     control: () => approvedSwedish(["--approve", "--locale", "sv", "demo.greeting"]),
     succeeds: (seen) => expect(seen.swedish).toBe(true),
-    // Goes through today: the last --locale wins without a word.
-    open: QUESTION,
   });
 });
 
@@ -124,7 +113,10 @@ describe("pnpm i18n:translate, a batch", () => {
     }
   }
   const submitted = () => ({
-    withoutItsRecord: api.submitted.length > 0 && !disk.files.has(RECORD),
+    withoutItsRecord:
+      api.submitted.length > 0 &&
+      !disk.files.has(RECORD) &&
+      ![...disk.files.keys()].some((path) => path.includes("/.pending-")),
   });
 
   attack(
@@ -145,8 +137,6 @@ describe("pnpm i18n:translate, a batch", () => {
         return submitted();
       },
       succeeds: (seen) => expect(seen.withoutItsRecord).toBe(true),
-      // Goes through today: the batch is submitted before its record is written, and its id is said after.
-      open: QUESTION,
     },
   );
 });

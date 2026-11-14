@@ -75,6 +75,7 @@ import {
   openSync,
   readdirSync,
   readFileSync,
+  realpathSync,
   renameSync,
   rmSync,
   statSync,
@@ -920,6 +921,9 @@ function readSessions(file: string, target: URL): Sessions | string {
   }
   let mode: number;
   try {
+    const resolvedTree = workTreeOf(dirname(realpathSync(path)));
+    if (resolvedTree !== null)
+      return `the sessions file is inside the git work tree ${resolvedTree}; keep it outside every one, where git cannot take it`;
     const stat = statSync(path);
     if (!stat.isFile()) return `${file} is not a file`;
     mode = stat.mode;
@@ -2309,6 +2313,11 @@ async function standInRuns(
     // Attacks on the file (#380): each expectation tries a file that must be refused (it is read as
     // a refusal, a string), and the one after it is its control (it is read as sessions).
     const read = (file: string, target: URL = idle.url) => typeof readSessions(file, target);
+    const linked = join(dir, "linked-sessions");
+    const linkedTarget = join(tree, "sessions");
+    writeFileSync(linkedTarget, ours(idle.url, one), { mode: 0o600 });
+    symlinkSync(linkedTarget, linked);
+    expect("a link into another work tree", read(linked), "string");
     // attack: a file its owner's group can read is taken
     expect(
       "a file a group can read",

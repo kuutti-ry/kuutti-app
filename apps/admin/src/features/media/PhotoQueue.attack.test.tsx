@@ -8,9 +8,6 @@ import { attack } from "../../test/attack.ts";
 import { type Held, held, json, network, on, sentTo, settled } from "../../test/network.ts";
 import { PhotoQueue } from "./PhotoQueue.tsx";
 
-// What goes through today (#380): a question, where no line says what should happen.
-const QUESTION = "#380, a question";
-
 // Attacks on the photo queue (#380, #49): its reads (the queue, a photo's
 // signed URL) and its writes (approve, reject with a reason), each tried the
 // wrong way beside a control that does the same thing rightly.
@@ -419,16 +416,15 @@ async function approvedByKeyboard(blurredAfter: boolean) {
   approve.focus();
   fireEvent.click(approve);
   await screen.findByText("Approved");
-  if (blurredAfter) (document.activeElement as HTMLElement | null)?.blur();
+  // Finish the outcome's focus effect before the control deliberately loses it.
   await settle();
+  if (blurredAfter) (document.activeElement as HTMLElement | null)?.blur();
   return document.activeElement === document.body;
 }
 
 attack(
   "PhotoQueue: the focus falls to the page's body after a photo is approved from the keyboard",
   {
-    // Goes through today: the button is replaced by the outcome, and the focus is not moved.
-    open: QUESTION,
     attempt: () => approvedByKeyboard(false),
     control: () => approvedByKeyboard(true),
     succeeds: (onBody) => expect(onBody).toBe(true),

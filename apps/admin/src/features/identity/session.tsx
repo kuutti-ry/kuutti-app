@@ -55,109 +55,99 @@ const SessionContext = React.createContext<SessionApi | null>(null);
 
 export function StaffSessionProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = React.useState<SessionState>({ status: "loading" });
-  const stateRef = React.useRef(state);
-  stateRef.current = state;
+  const token = React.useRef<string | null>(null);
+  const mounted = React.useRef(false);
+  const started = React.useRef(false);
+  const generation = React.useRef(0);
 
-  // The client's middleware reads the token from here; never from storage
-  // directly. A 401 to a request that carried it ends the session here, from
-  // whichever screen asked: back to the sign-in, saying so (#250).
+  // The token may authorize its own check while the screen stays loading.
+  // A stored role is never enough to display a staff screen.
   React.useEffect(() => {
-    setTokenSource(() =>
-      stateRef.current.status === "signed-in" ? stateRef.current.session.accessToken : null,
-    );
+    setTokenSource(() => token.current);
     setUnauthorizedHandler(() => {
+      if (token.current === null) return;
+      token.current = null;
+      generation.current += 1;
       writeStored(null);
       setState({ status: "signed-out", error: "session_ended" });
     });
-    // A panel that has closed signs nobody out on a late answer.
-    return () => setUnauthorizedHandler(() => undefined);
+    return () => {
+      setTokenSource(() => null);
+      setUnauthorizedHandler(() => undefined);
+    };
   }, []);
 
   React.useEffect(() => {
-    let mounted = true;
-    // No API address (a production build without VITE_API_URL): nothing is
-    // sent anywhere, and the panel says it cannot sign in.
+    mounted.current = true;
+    const stop = () => {
+      mounted.current = false;
+    };
+    // StrictMode replays effects: the single-use exchange belongs to the
+    // provider, and its first run may finish during the replayed mount.
+    if (started.current) return stop;
+    started.current = true;
     if (!API_URL) {
       setState({ status: "signed-out", error: "no_api" });
-      return;
+      return stop;
     }
+    const owner = generation.current;
+    const current = () => mounted.current && generation.current === owner;
     const fragment = readFragment(window.location.hash);
     if (fragment.code || fragment.error) {
-      // The fragment is consumed once: a reload must not exchange or show it again.
       window.history.replaceState(null, "", window.location.pathname + window.location.search);
     }
-    // Up to its first await this runs inside the effect itself, where `mounted` is still true.
     void (async () => {
-      if (fragment.error) {
-        writeStored(null);
-        setState({ status: "signed-out", error: fragment.error });
-        return;
-      }
-      if (fragment.code) {
-        // Not gated on `mounted`: React's StrictMode runs this effect twice in
-        // development, and the second run finds the fragment already consumed.
-        // The code is single-use, so the first run's exchange is the one that
-        // counts, and its late setState lands on the live provider.
-        const answer = await api
-          .POST("/admin/auth/exchange", { body: { code: fragment.code } })
-          .catch(() => null);
-        if (!answer) {
+      try {
+        if (fragment.error) {
           writeStored(null);
-          setState({ status: "signed-out", error: "generic" });
+          setState({ status: "signed-out", error: fragment.error });
           return;
         }
-        const { data, error, response } = answer;
-        if (!data) {
-          setState({
-            status: "signed-out",
-            error: failed(response, error, "exchange").code ?? "generic",
+        if (fragment.code) {
+          const { data, error, response } = await api.POST("/admin/auth/exchange", {
+            body: { code: fragment.code },
           });
+          if (!current()) return;
+          if (!data) {
+            writeStored(null);
+            setState({
+              status: "signed-out",
+              error: failed(response, error, "exchange").code ?? "generic",
+            });
+            return;
+          }
+          const session = AdminSession.parse(data);
+          token.current = session.accessToken;
+          writeStored(session);
+          setState({ status: "signed-in", session });
           return;
         }
-        const session = AdminSession.parse(data);
+        const stored = readStored();
+        if (!stored) {
+          setState({ status: "signed-out" });
+          return;
+        }
+        token.current = stored.accessToken;
+        const { data } = await api.GET("/admin/whoami");
+        if (!current()) return;
+        if (!data) {
+          token.current = null;
+          writeStored(null);
+          setState({ status: "signed-out" });
+          return;
+        }
+        const me = AdminWhoAmI.parse(data);
+        const session = { ...stored, role: me.role, expiresAt: me.expiresAt };
         writeStored(session);
         setState({ status: "signed-in", session });
-        return;
-      }
-      const stored = readStored();
-      if (!stored) {
-        // The second StrictMode run must not undo the first run's exchange in flight.
-        setState((previous) =>
-          previous.status === "loading" ? { status: "signed-out" } : previous,
-        );
-        return;
-      }
-      // A stored token is checked against the API before anything is shown
-      // with it. The client's middleware reads the ref, and setState fills it
-      // only on the next render, so the ref is set here first or the first
-      // request would go out without the token and sign the person out.
-      stateRef.current = { status: "signed-in", session: stored };
-      setState(stateRef.current);
-      const { data } = await api.GET("/admin/whoami");
-      if (!mounted) return;
-      if (!data) {
+      } catch {
+        if (!current()) return;
+        token.current = null;
         writeStored(null);
-        // A 401 has already ended the session and said so; keep that.
-        setState((previous) =>
-          previous.status === "signed-out" ? previous : { status: "signed-out" },
-        );
-      } else {
-        const me = AdminWhoAmI.parse(data);
-        // Only a session still signed in is confirmed: a request that came
-        // back 401 while this one was out has ended it, and it stays ended.
-        setState((previous) =>
-          previous.status === "signed-in"
-            ? {
-                status: "signed-in",
-                session: { ...stored, role: me.role, expiresAt: me.expiresAt },
-              }
-            : previous,
-        );
+        setState({ status: "signed-out", ...(fragment.code ? { error: "generic" } : {}) });
       }
     })();
-    return () => {
-      mounted = false;
-    };
+    return stop;
   }, []);
 
   const signIn = React.useCallback(() => {
@@ -166,9 +156,12 @@ export function StaffSessionProvider({ children }: { children: React.ReactNode }
   }, []);
 
   const signOut = React.useCallback(async () => {
-    await api.POST("/admin/auth/logout").catch(() => undefined);
+    const logout = api.POST("/admin/auth/logout");
+    generation.current += 1;
+    token.current = null;
     writeStored(null);
     setState({ status: "signed-out" });
+    await logout.catch(() => undefined);
   }, []);
 
   const value = React.useMemo<SessionApi>(

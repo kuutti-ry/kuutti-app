@@ -1,5 +1,5 @@
 import type { PlainMessageKey } from "@kuutti/i18n";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { z } from "zod";
 
 // A confirm step's request (#308, #312): one at a time, its refusal in
@@ -49,10 +49,12 @@ export function useSend<T>({
   onShell,
   onDone,
   onRefused,
+  onCancel,
 }: {
   answer: z.ZodType<T>;
   refusals: Refusals;
   onShell: () => void;
+  onCancel?: () => void;
   onDone: (value: T) => Promise<void>;
   /** A refusal's code, for a step whose page changes with it (a report decided meanwhile, #312). */
   onRefused?: (code: string | undefined) => void;
@@ -60,20 +62,36 @@ export function useSend<T>({
   const [sending, setSending] = useState(false);
   const [refused, setRefused] = useState<PlainMessageKey | null>(null);
   const out = useRef(false);
+  const active = useRef(true);
+  useEffect(() => {
+    active.current = true;
+    return () => {
+      active.current = false;
+    };
+  }, []);
+  // A submitted operation cannot be recalled. Keep its step visible until
+  // the answer arrives, instead of pretending Cancel undoes the request.
+  const cancel = () => {
+    if (!out.current) onCancel?.();
+  };
   const send = async (request: () => Promise<Answer>) => {
     if (out.current) return;
     out.current = true;
     setSending(true);
     setRefused(null);
-    const outcome = await outcomeOf(request(), answer, refusals);
-    out.current = false;
-    setSending(false);
-    if (outcome.kind === "shell") return onShell();
-    if (outcome.kind === "refused") {
-      setRefused(outcome.message);
-      return onRefused?.(outcome.code);
+    try {
+      const outcome = await outcomeOf(Promise.resolve().then(request), answer, refusals);
+      if (!active.current) return;
+      if (outcome.kind === "shell") return onShell();
+      if (outcome.kind === "refused") {
+        setRefused(outcome.message);
+        return onRefused?.(outcome.code);
+      }
+      await onDone(outcome.value);
+    } finally {
+      out.current = false;
+      if (active.current) setSending(false);
     }
-    await onDone(outcome.value);
   };
-  return { sending, refused, send };
+  return { sending, refused, send, cancel };
 }

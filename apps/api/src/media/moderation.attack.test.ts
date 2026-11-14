@@ -116,6 +116,32 @@ async function uploadedBefore(minutes: number) {
   });
 }
 
+async function tiedFailures(lastIsDue: boolean) {
+  return rolledBack(async (db) => {
+    const store = memoryMediaStore();
+    const failures = await pending(db, store, 51, before(NIGHT, 120), false);
+    // Real PostgreSQL defaults carry microseconds; neither ties nor their
+    // precision may send the cursor backwards through the same failed rows.
+    await db.query(
+      "UPDATE photo SET created_at = '2026-10-15 01:00:00.123456+00' WHERE id = ANY($1::uuid[])",
+      [failures],
+    );
+    const behind = await pending(db, store, 1, before(NIGHT, lastIsDue ? 60 : 5));
+    const result = await night(db, store, queueAllModerator(), NIGHT);
+    expect(result.failed).toBe(51);
+    return { unlooked: (await stillPending(db, behind)) === 1 };
+  });
+}
+
+attack(
+  "moderate-pending-photos: tied microsecond timestamps keep a later photo behind failed pages",
+  {
+    attempt: () => tiedFailures(true),
+    control: () => tiedFailures(false),
+    succeeds: (seen) => expect(seen.unlooked).toBe(true),
+  },
+);
+
 attack(
   "moderate-pending-photos: a photo uploaded nine minutes before the night is looked at while its own check may still run",
   {

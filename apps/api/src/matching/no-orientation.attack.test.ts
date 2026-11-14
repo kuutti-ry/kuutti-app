@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { expect } from "vitest";
 import { attack } from "../test/attack.ts";
+import { identifierWords } from "../test/sources.ts";
 
 // Attacks on the guard of no-orientation.test.ts (#380): "no source of the
 // apps, and no text of the catalogue, names one", in a form or a place its
@@ -12,7 +13,7 @@ import { attack } from "../test/attack.ts";
 const guard = readFileSync(new URL("./no-orientation.test.ts", import.meta.url), "utf8");
 
 function regexOf(name: string): RegExp {
-  const [, source, flags] = new RegExp(`const ${name} = /(.+)/([a-z]*);`).exec(guard) ?? [];
+  const [, source, flags] = new RegExp(`const ${name}\\s*=\\s*/(.+)/([a-z]*);`).exec(guard) ?? [];
   if (source === undefined) throw new Error(`no ${name} in no-orientation.test.ts`);
   return new RegExp(source, flags);
 }
@@ -29,10 +30,7 @@ const [first = "", second = "", third = "", , fifth = ""] = (
 const capital = (word: string) => `${word.slice(0, 1).toUpperCase()}${word.slice(1)}`;
 const parts = (...of: string[]) => of.join("");
 
-// What goes through today (#380): a hole, which its contract forbids, and a
-// question, where no line says what should happen.
-const HOLE = "#380";
-const QUESTION = "#380, a question";
+// These forms now hold the same rule as their ordinary spellings (#380).
 
 /**
  * What is tried, a line that names an orientation, the same line naming
@@ -45,35 +43,22 @@ const NAMED: [string, string, string, string?][] = [
     "in the plural",
     `const labels = ["${first}s", "${second}s"];`,
     'const labels = ["days", "weeks"];',
-    HOLE,
   ],
-  ["as the noun", `const label = "${fifth}ity";`, 'const label = "hospitality";', HOLE],
+  ["as the noun", `const label = "${fifth}ity";`, 'const label = "hospitality";'],
   [
     "in a camel-case name",
     `const is${capital(first)} = seeks.includes(own);`,
     "const isDay = seeks.includes(own);",
-    HOLE,
   ],
-  [
-    "in a snake-case name",
-    `const inferred_${second} = true;`,
-    "const inferred_weekday = true;",
-    HOLE,
-  ],
-  [
-    "in a constant's name",
-    `const ${third.toUpperCase()}_LABEL = 3;`,
-    "const WEEKDAY_LABEL = 3;",
-    HOLE,
-  ],
-  ["in Finnish", `  fi: "${parts("bi", "seksuaali")}"`, '  fi: "viikonpäivä"', HOLE],
-  ["in Finnish, by the short word", `  fi: "${parts("ho", "mo")}"`, '  fi: "talo"', HOLE],
-  ["in Swedish", `  sv: "${parts("homo", "sexuell")}"`, '  sv: "veckodag"', HOLE],
+  ["in a snake-case name", `const inferred_${second} = true;`, "const inferred_weekday = true;"],
+  ["in a constant's name", `const ${third.toUpperCase()}_LABEL = 3;`, "const WEEKDAY_LABEL = 3;"],
+  ["in Finnish", `  fi: "${parts("b", "i", "seksuaali")}"`, '  fi: "viikonpäivä"'],
+  ["in Finnish, by the short word", `  fi: "${parts("ho", "mo")}"`, '  fi: "talo"'],
+  ["in Swedish", `  sv: "${parts("ho", "mo", "sexuell")}"`, '  sv: "veckodag"'],
   [
     "by the short word the guard's own header uses",
     `const label = seeksBoth ? "${parts("b", "i")}" : null;`,
     'const label = seeksBoth ? "both" : null;',
-    QUESTION,
   ],
   // Forms the search has to read like the plain ones.
   ["with a capital", `const label = "${capital(first)}";`, 'const label = "Day";'],
@@ -87,9 +72,9 @@ for (const [name, named, harmless, open] of NAMED) {
     attempt: () => {
       // The guard's list still starts with the five words the cases are built from.
       expect([first, second, third, fifth].every((word) => ORIENTATION.test(word))).toBe(true);
-      return ORIENTATION.test(named);
+      return ORIENTATION.test(identifierWords(named));
     },
-    control: () => ORIENTATION.test(harmless),
+    control: () => ORIENTATION.test(identifierWords(harmless)),
     succeeds: (seen) => expect(seen).toBe(false),
     open,
   });
@@ -105,9 +90,9 @@ const read = (path: string) =>
 /** What is tried, a file of the apps, and whether it goes through today. */
 const PLACES: [string, string, string?][] = [
   // The guard opens .ts, .tsx and .yaml under three folders, and the catalogue.
-  ["a screen's route", "apps/mobile/app/(tabs)/you.tsx", HOLE],
-  ["a command line of the API's", "apps/api/scripts/demo-stories.ts", HOLE],
-  ["a list of labels kept as JSON", "apps/mobile/src/features/profile/labels.json", QUESTION],
+  ["a screen's route", "apps/mobile/app/(tabs)/you.tsx"],
+  ["a command line of the API's", "apps/api/scripts/demo-stories.ts"],
+  ["a list of labels kept as JSON", "apps/mobile/src/features/profile/labels.json"],
   // Places the guard has to read like the plain ones.
   ["a screen of the panel", "apps/admin/src/features/safety/Person.tsx"],
   ["a test's helper of the API's", "apps/api/src/test/people.ts"],

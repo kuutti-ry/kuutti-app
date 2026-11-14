@@ -78,10 +78,10 @@ const passes = (seen: { code: number; refused: string[] }) =>
 const SCREEN = "export const S = () => <Text>Hello</Text>;\n";
 const TRANSLATED = "export const S = () => <Text>{t('a.b')}</Text>;\n";
 
-// What goes through today (#380): a hole, which its contract forbids, and a
-// question, where no line says what should happen.
-const HOLE = "#380";
-const QUESTION = "#380, a question";
+// Retained scope is explicit and tied to its decision in the #380 completion ledger.
+
+const SCOPE = "accepted #380/2-09: TypeScript screens in the documented app/src layout";
+const FORMATTING = "accepted #380/2-10: arithmetic and ISO transport are not inferred as display";
 
 /** What is tried, where a screen with an inline string is put, and whether it goes through today. */
 const PLACES: [string, string, string?][] = [
@@ -94,12 +94,8 @@ const PLACES: [string, string, string?][] = [
     "apps/mobile/src/features/chat/Thread.tests.tsx",
   ],
   // The three folders and the two endings are fixed lists: what is beside them is not opened.
-  [
-    "a client's screen in a folder beside app and src",
-    "apps/mobile/components/Banner.tsx",
-    QUESTION,
-  ],
-  ["a screen written as .jsx", "apps/admin/src/features/safety/Old.jsx", QUESTION],
+  ["a client's screen in a folder beside app and src", "apps/mobile/components/Banner.tsx", SCOPE],
+  ["a screen written as .jsx", "apps/admin/src/features/safety/Old.jsx", SCOPE],
 ];
 
 for (const [name, path, open] of PLACES) {
@@ -118,22 +114,21 @@ const when = (body: string) =>
 const DATES: [string, string, string?][] = [
   // The same methods in another spelling: the pass looks for a listed name with
   // a bracket straight after it, for "Intl.DateTimeFormat" and for a bare "dateStyle:".
-  ["a time formatted with toTimeString", "d.toTimeString()", HOLE],
-  ["a date formatted through an optional call", "d.toLocaleDateString?.()", HOLE],
-  ["a date formatted through a method named in brackets", 'd["toLocaleDateString"]()', HOLE],
+  ["a time formatted with toTimeString", "d.toTimeString()"],
+  ["a date formatted through an optional call", "d.toLocaleDateString?.()"],
+  ["a date formatted through a method named in brackets", 'd["toLocaleDateString"]()'],
   [
     "a date formatted by Intl's formatter once it is taken out of Intl",
     '(({ DateTimeFormat }) => new DateTimeFormat("fi").format(d))(Intl)',
-    HOLE,
   ],
-  ["a date style given under a quoted key", 'show(d, { "dateStyle": "short" })', HOLE],
+  ["a date style given under a quoted key", 'show(d, { "dateStyle": "short" })'],
   // Other means than the ones the check's header names.
-  ["an ISO date cut out of toISOString", "d.toISOString().slice(0, 10)", QUESTION],
+  ["an ISO date cut out of toISOString", "d.toISOString().slice(0, 10)", FORMATTING],
   [
     "a date put together by hand, month first",
     // biome-ignore lint/suspicious/noTemplateCurlyInString: source under test, not a template of this file
     "`${d.getMonth() + 1}/${d.getDate()}/${d.getFullYear()}`",
-    QUESTION,
+    FORMATTING,
   ],
   // Forms the check has to read like the plain ones.
   ["a date formatted on a line of its own after the value", "d\n    .toLocaleDateString()"],
@@ -164,7 +159,6 @@ attack(
         "apps/admin/src/features/media/Pick.tsx": `const kinds = "image/*";\nexport const when = (d: Date) => formatDate(d);\nconst all = "*/*";\n`,
       }),
     succeeds: passes,
-    open: HOLE,
   },
 );
 
@@ -177,7 +171,6 @@ const NOT_A_DATE: [string, string, string, string?][] = [
     "a comment after code that names the method",
     "export const n = 1; // never toLocaleDateString() here\n",
     "export const n = (d: Date) => d.toLocaleDateString();\n",
-    HOLE,
   ],
   [
     "a key that only starts like dateStyle",

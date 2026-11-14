@@ -7,6 +7,15 @@
 import { resolve } from "node:path";
 import { migrate } from "../migrate.ts";
 import { createPool } from "../pool.ts";
+import { argumentsOf } from "./arguments.ts";
+
+try {
+  const { positionals } = argumentsOf(process.argv.slice(2), []);
+  if (positionals.length) throw new Error(`unknown argument ${positionals[0]}`);
+} catch (error) {
+  console.error((error as Error).message);
+  process.exit(2);
+}
 
 const url = process.env.DATABASE_URL;
 if (!url) {

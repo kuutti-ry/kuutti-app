@@ -30,10 +30,43 @@ export const FIXTURES = {
   originSecret: "pii-origin-proof-4711-4711-4711-4711",
 } as const;
 
-/** Which fixture values appear anywhere in the captured lines. */
+/** Fixtures in common wire encodings, plus identity-code and email patterns. */
 export function leakedFixtures(lines: LogLine[]): string[] {
-  const out = JSON.stringify(lines);
-  return Object.entries(FIXTURES)
-    .filter(([, value]) => out.includes(value))
-    .map(([name]) => name);
+  const texts = new Set([JSON.stringify(lines)]);
+  // A request may have been logged as a URL, form or encoded body. Decode a
+  // bounded number of layers, never treating a malformed encoding as clean.
+  for (let layer = 0; layer < 2; layer++) {
+    for (const text of [...texts]) {
+      try {
+        texts.add(decodeURIComponent(text.replace(/\+/g, " ")));
+      } catch {
+        /* The original text is still checked. */
+      }
+      for (const token of text.match(/[A-Za-z0-9+/_-]{12,}={0,2}/g) ?? []) {
+        const decoded = Buffer.from(token, "base64").toString("utf8");
+        if (!/[\p{Cc}\ufffd]/u.test(decoded.replace(/[\r\n\t]/g, ""))) texts.add(decoded);
+      }
+    }
+  }
+  const out = [...texts].join("\n").toLowerCase();
+  const structured = out.replace(/\\+"/g, '"');
+  const found = new Set(
+    Object.entries(FIXTURES)
+      .filter(([, value]) => out.includes(value.toLowerCase()))
+      .map(([name]) => name),
+  );
+  if (/\b\d{6}[+\-abcdefyxwvu]\d{3}[0-9a-y]\b/i.test(out)) found.add("hetu");
+  if (/[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-z0-9-]+(?:\.[a-z0-9-]+)+/i.test(out)) found.add("email");
+  if (/"seeks"\s*:\s*\[/.test(structured)) found.add("seeks");
+  for (const address of out.match(/[0-9a-f]*:[0-9a-f:]+/g) ?? []) {
+    try {
+      const canonical = new URL(`http://[${address}]/`).hostname;
+      if (canonical === `[${FIXTURES.ipv6}]`) found.add("ipv6");
+      if (canonical.startsWith(`[${FIXTURES.ipv6Prefix}:`)) found.add("ipv6Prefix");
+      if (canonical === "[::ffff:cb00:712f]") found.add("ipv4");
+    } catch {
+      /* A timestamp or another colon-separated value is not an address. */
+    }
+  }
+  return [...found];
 }

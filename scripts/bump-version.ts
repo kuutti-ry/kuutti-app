@@ -53,8 +53,9 @@ const SEMVER = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/;
 const VERSION_LINE = /^( {2}"version": ")[^"\n]*(")/m;
 const CONFLICT_MARKER = /^(<{7}|={7}|>{7})( |$)/m;
 const USAGE = "usage: pnpm version:bump patch|minor (a feature bumps MINOR, only fixes PATCH)";
-// The repository whose main a pull request merges into, over HTTPS or SSH (a host alias too).
-const MAIN_REPO = /[/:]kuutti-ry\/kuutti-app(\.git)?\/?$/i;
+// The repository whose main a pull request merges into, at its known HTTPS or SSH host.
+const MAIN_REPO =
+  /^(?:https:\/\/github\.com\/|git@github\.com:|ssh:\/\/git@github\.com\/)kuutti-ry\/kuutti-app(?:\.git)?\/?$/i;
 const NO_REMOTE = "no remote of this clone is github.com/kuutti-ry/kuutti-app";
 
 type Next = { version: string } | { refused: string };
@@ -415,6 +416,7 @@ function selfTest(): void {
     true,
   );
 
+  expect("another host", MAIN_REPO.test("https://example.org/kuutti-ry/kuutti-app.git"), false);
   expect("main over HTTPS", MAIN_REPO.test("https://github.com/kuutti-ry/kuutti-app.git"), true);
   expect("main over SSH", MAIN_REPO.test("git@github.com:kuutti-ry/kuutti-app.git"), true);
   expect("main without .git", MAIN_REPO.test("https://github.com/kuutti-ry/kuutti-app"), true);
@@ -524,6 +526,19 @@ function selfTestClone(expect: (name: string, got: unknown, wanted: unknown) => 
     for (const file of PACKAGES) write(file, pkg("0.33.5"));
     for (const file of GENERATED) write(file, "\n");
     write("scripts/bump-version.ts", readFileSync(import.meta.filename, "utf8"));
+    for (const args of [
+      ["patch", "--dry-run"],
+      ["--check-ahead", "--output=escaped"],
+      ["--check-ahead", "HEAD", "extra"],
+    ]) {
+      expect(`invalid arguments ${args.join(" ")}`, script(...args).status, 2);
+      expect(
+        "invalid arguments never write",
+        readFileSync(join(work, "package.json"), "utf8"),
+        pkg("0.33.5"),
+      );
+    }
+
     sh("add", "-A");
     sh("commit", "-qm", "A");
     sh("push", "-q", join(dir, "fork.git"), "HEAD:main");
@@ -571,10 +586,13 @@ function selfTestClone(expect: (name: string, got: unknown, wanted: unknown) => 
 }
 
 const argv = process.argv.slice(2);
-if (argv.includes("--self-test")) {
+if (argv.length === 1 && argv[0] === "--self-test") {
   selfTest();
-} else if (argv[0] === "--check-ahead") {
+} else if (argv[0] === "--check-ahead" && argv.length <= 2 && !argv[1]?.startsWith("-")) {
   checkAhead(argv[1] ?? "HEAD");
-} else {
+} else if (argv.length === 1 && ["patch", "minor", "major"].includes(argv[0] ?? "")) {
   bump(argv[0]);
+} else {
+  console.error(USAGE);
+  process.exitCode = 2;
 }

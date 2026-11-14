@@ -5,8 +5,8 @@ import { createPortal } from "react-dom";
 // end of <body>, and the page behind made inert while it is open, so neither
 // a pointer, a Tab nor a screen reader reaches what the step hides. The focus
 // stays inside (Tab and Shift+Tab wrap around; a press on the backdrop keeps
-// it; focus moved out any other way comes back), Escape closes it wherever
-// the focus is, and on closing the focus goes back to what had it before.
+// it; focus moved out any other way comes back), Escape asks its owner to close
+// it (a pending action refuses), and closing gives focus back to the opener.
 // Drawn as shadcn/ui's Dialog (ADR-050), but kept our own: Radix's dialog
 // writes a <style> element the CSP refuses, and this one needs no library.
 
@@ -17,10 +17,12 @@ export function Dialog({
   title,
   onClose,
   children,
+  initialFocus = "first",
 }: {
   title: string;
   onClose: () => void;
   children: ReactNode;
+  initialFocus?: "first" | "dialog";
 }) {
   const id = useId();
   const layer = useRef<HTMLDivElement>(null);
@@ -38,7 +40,8 @@ export function Dialog({
     const inside = (node: EventTarget | null) =>
       node instanceof Node && box.current?.contains(node) === true;
     const controls = () => [...(box.current?.querySelectorAll<HTMLElement>(FOCUSABLE) ?? [])];
-    const enter = () => (controls()[0] ?? box.current)?.focus();
+    const enter = () =>
+      (initialFocus === "dialog" ? box.current : (controls()[0] ?? box.current))?.focus();
 
     // The rest of <body> goes inert while the step is open; what was inert already stays so.
     const others = [...document.body.children].filter(
@@ -82,7 +85,7 @@ export function Dialog({
       for (const node of others) node.removeAttribute("inert");
       if (opener?.isConnected) opener.focus();
     };
-  }, []);
+  }, [initialFocus]);
 
   return createPortal(
     // A press beside the box keeps the focus where it is.
@@ -90,7 +93,7 @@ export function Dialog({
     <div
       ref={layer}
       data-slot="dialog-overlay"
-      className="fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-black/50 p-4"
+      className="fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-black/50 p-[16px]"
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) event.preventDefault();
       }}
@@ -98,7 +101,7 @@ export function Dialog({
       <div
         ref={box}
         data-slot="dialog-content"
-        className="grid w-full max-w-lg gap-4 rounded-xl bg-popover p-5 text-sm text-popover-foreground shadow-lg ring-1 ring-foreground/10 sm:p-6"
+        className="grid min-w-0 w-full max-w-lg gap-4 rounded-xl bg-popover p-[20px] text-sm text-popover-foreground shadow-lg ring-1 ring-foreground/10 sm:p-6"
         role="dialog"
         aria-modal="true"
         aria-labelledby={id}

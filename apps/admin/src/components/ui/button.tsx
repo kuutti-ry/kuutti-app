@@ -7,7 +7,7 @@ import { cn } from "../../lib/utils.ts";
 // (CLAUDE.md), the label may wrap on a narrow screen, and the focus ring is
 // the stylesheet's own outline. The transparent border shows in forced colours.
 const buttonVariants = cva(
-  "inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-md border border-transparent px-4 py-2 text-center text-sm font-medium no-underline transition-colors select-none disabled:pointer-events-none disabled:opacity-50 aria-busy:cursor-progress [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+  "inline-flex min-h-11 max-w-full shrink-0 items-center justify-center gap-2 rounded-md border border-transparent px-4 py-2 text-center text-sm font-medium no-underline transition-colors select-none disabled:pointer-events-none disabled:border-border disabled:bg-muted disabled:text-muted-foreground aria-busy:cursor-progress [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
   {
     variants: {
       variant: {

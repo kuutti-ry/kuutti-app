@@ -227,7 +227,7 @@ describe("boot", () => {
   });
 
   // Without an object store there is no research copy either (#194).
-  it("arms the thirteen nightly jobs, each of which runs against the database it was given", async () => {
+  it("arms the nightly jobs, each of which runs against the database it was given", async () => {
     const { jobs } = await booted();
     expect(jobs.map((j) => j.name)).toEqual([
       "sweep-sessions",

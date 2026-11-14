@@ -103,7 +103,6 @@ describe("pnpm --filter @kuutti/db seed", () => {
         [["--env", "preview"], undefined, "preview"],
         [[], "test", "test"],
         [[], undefined, "development"],
-        [["--env"], "test", "test"],
       ] as const) {
         const result = await run("seed", [...args], { DATABASE_URL: url, APP_ENV: appEnv });
         expect(result.code, env).toBe(0);
@@ -312,13 +311,20 @@ describe("pnpm --filter @kuutti/db moderator", () => {
     ["no role", ["grant", "HMAC", "--by", "Maintainer"]],
     ["a role that does not exist", ["grant", "HMAC", "owner", "--by", "Maintainer"]],
     ["no name of who grants it", ["grant", "HMAC", "moderator"]],
-    ["--by without a name", ["grant", "HMAC", "moderator", "--by"]],
   ])("refuses a grant with %s", async (_, args) => {
     await identity(1);
     const result = await moderator(args.map((arg) => (arg === "HMAC" ? hmac(1) : arg)));
     expect(result).toMatchObject({
       code: 2,
       err: ["usage: moderator grant <hetu_hmac> <moderator|admin|researcher> --by <name>"],
+    });
+    expect((await pool.query("SELECT 1 FROM moderator_roles")).rowCount).toBe(0);
+  });
+
+  it("refuses a flag without its grantor before any role is written", async () => {
+    expect(await moderator(["grant", hmac(1), "moderator", "--by"])).toMatchObject({
+      code: 2,
+      err: ["--by takes a value"],
     });
     expect((await pool.query("SELECT 1 FROM moderator_roles")).rowCount).toBe(0);
   });

@@ -5,9 +5,13 @@ import type { Logger } from "../lib/logger.ts";
  * The nightly jobs run inside the API process (rules/api.md): one timer to
  * the next 04:00 in Helsinki, set again for the next 04:00 after each run, so
  * the night summer time begins or ends waits 23 or 25 hours. Each job runs
- * alone and its failure is logged, never thrown, so one broken job does not
+ * alone and its rejection is logged, never thrown, so one rejected job does not
  * stop the others or the server. Tests call `runNightly` directly; the timer
  * is unref'd so a process with nothing else to do can exit.
+ * A job that never settles still holds the sequence: its database and object
+ * writes have no cancellation contract. Racing a timer would leave them
+ * running beside dependent jobs, or beside tomorrow's retry. Bound the
+ * underlying operation before adding a runner deadline.
  */
 export type NightlyJob = { name: string; run: () => Promise<Record<string, number>> };
 

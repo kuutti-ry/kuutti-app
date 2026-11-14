@@ -75,16 +75,12 @@ for (const [name, parted] of PARTED) {
   });
 }
 
-// What goes through today (#380): a question, where no line says what should happen.
-const QUESTION = "#380, a question";
-
 // "Nothing found, read as nothing wrong": neither side names a kind. The
 // comparison goes kind by kind, and with no kind on either side asks nothing.
 attack("check:legal-versions: an app and a site that both name no kind at all agree", {
   attempt: () => legalVersionProblems({}, {}, FI),
   control: agreed,
   succeeds: silent,
-  open: QUESTION,
 });
 
 /** How reading the site's document ended: the kinds it gave, or the refusal. */

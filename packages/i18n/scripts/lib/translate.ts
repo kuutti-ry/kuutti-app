@@ -138,7 +138,7 @@ export const graphemeLength = (text: string): number => [...graphemes.segment(te
 
 const MARKUP = /<\/?[a-z][^>]*>/i;
 // Invisible or direction-changing characters, and line or paragraph separators.
-const INVISIBLE = /[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/u;
+const INVISIBLE = /[\p{Cc}\p{Cf}\p{Zl}\p{Zp}\u3164]/u;
 // What a decoder leaves where the bytes were not the encoding it was told (a
 // sheet saved as Windows-1252 and read as UTF-8): never part of a real text.
 const REPLACEMENT = "\uFFFD";
@@ -153,7 +153,8 @@ const REPLACEMENT = "\uFFFD";
 // without its space) costs a rephrase; a false pass costs a person.
 const DOMAIN =
   /(?<=^|[^\p{L}\p{N}.@-])\p{L}[\p{L}\p{N}-]*(?:\.[\p{L}\p{N}-]+)*\.\p{L}{2,}(?![\p{L}\p{N}])/gu;
-const PHONE = /\+?\p{Nd}[\p{Nd} \u00a0-]{6,}\p{Nd}/gu;
+const PHONE = /\+?\p{Nd}[\p{Nd} .()\u00a0\u2010-\u2015-]{6,}\p{Nd}/gu;
+const IP_ADDRESS = /\b(?:\d{1,3}\.){3}\d{1,3}\b/g;
 const LINK = /[\p{L}][\p{L}\p{N}+.-]*:\/\/[^\s<>"']+/gu;
 const ADDRESS = /[\p{L}\p{N}._%+-]*@[\p{L}\p{N}._-]*/gu;
 // A spreadsheet reads a cell that starts with = as a formula (review.ts, the sheet).
@@ -188,17 +189,22 @@ const groupedNumbers = (text: string): string =>
  * file itself (#13, #55).
  */
 export function untrustedTextProblem(en: string, text: string): string | undefined {
+  if (text.trim().length === 0) return "empty";
   if (INVISIBLE.test(text)) return "contains control, bidirectional or line-separator characters";
   if (text.includes(REPLACEMENT)) {
     return "contains a replacement character: the text was not read as UTF-8";
   }
-  const plain = text.normalize("NFKC");
-  const source = en.normalize("NFKC");
+  const plain = text.normalize("NFKC").replace(/\u3002/g, ".");
+  const source = en.normalize("NFKC").replace(/\u3002/g, ".");
   if (adds(LINK, source, plain, lower)) return "contains a link the English source does not have";
   if (MARKUP.test(plain) && !MARKUP.test(source)) {
     return "contains markup the English source does not have";
   }
-  if (adds(ADDRESS, source, plain, lower) || adds(DOMAIN, source, plain, lower)) {
+  if (
+    adds(ADDRESS, source, plain, lower) ||
+    adds(DOMAIN, source, plain, lower) ||
+    adds(IP_ADDRESS, source, plain, lower)
+  ) {
     return "contains a web or e-mail address the English source does not have";
   }
   if (adds(PHONE, groupedNumbers(source), groupedNumbers(plain), digits)) {

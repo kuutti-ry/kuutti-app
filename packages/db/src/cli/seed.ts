@@ -9,17 +9,27 @@
 import { createPool } from "../pool.ts";
 import { assertDemoTarget, describeTarget } from "../seed/command.ts";
 import { seed } from "../seed.ts";
+import { argumentsOf } from "./arguments.ts";
 
 const args = process.argv.slice(2);
 const flags = args.flatMap((arg, index) =>
   arg === "--env" ? [args[index + 1]] : arg.startsWith("--env=") ? [arg.slice(6)] : [],
 );
-const env = flags[0] ?? process.env.APP_ENV ?? "development";
-
 if (flags.includes("production") || process.env.APP_ENV === "production") {
   console.error("refusing to seed production: previews and local databases only (TD-19)");
   process.exit(2);
 }
+let flag: string | undefined;
+try {
+  const parsed = argumentsOf(args, ["--env"]);
+  if (parsed.positionals.length) throw new Error(`unknown argument ${parsed.positionals[0]}`);
+  flag = parsed.options["--env"];
+} catch (error) {
+  console.error((error as Error).message);
+  process.exit(2);
+}
+const env = flag ?? process.env.APP_ENV ?? "development";
+
 const url = process.env.DATABASE_URL;
 if (!url) {
   console.error("DATABASE_URL is not set");

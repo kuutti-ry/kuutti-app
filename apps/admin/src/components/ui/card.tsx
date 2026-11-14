@@ -9,7 +9,7 @@ export function Card({ className, ...props }: ComponentProps<"div">) {
     <div
       data-slot="card"
       className={cn(
-        "flex flex-col gap-4 rounded-xl bg-card py-4 text-sm text-card-foreground shadow-xs ring-1 ring-foreground/10 sm:gap-5 sm:py-5",
+        "flex min-w-0 flex-col gap-4 rounded-xl bg-card py-4 text-sm text-card-foreground shadow-xs ring-1 ring-foreground/10 sm:gap-5 sm:py-5",
         className,
       )}
       {...props}
@@ -22,7 +22,7 @@ export function CardHeader({ className, ...props }: ComponentProps<"div">) {
     <div
       data-slot="card-header"
       className={cn(
-        "flex flex-wrap items-start justify-between gap-x-4 gap-y-2 px-4 sm:px-5",
+        "flex flex-wrap items-start justify-between gap-x-4 gap-y-2 px-[16px] sm:px-5",
         className,
       )}
       {...props}
@@ -54,7 +54,7 @@ export function CardContent({ className, ...props }: ComponentProps<"div">) {
   return (
     <div
       data-slot="card-content"
-      className={cn("flex flex-col gap-3 px-4 sm:px-5", className)}
+      className={cn("flex flex-col gap-3 px-[16px] sm:px-5", className)}
       {...props}
     />
   );

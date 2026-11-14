@@ -9,10 +9,6 @@ import { attack } from "../../test/attack.ts";
 import { held, json, network, on, pathOf, sentTo, settled } from "../../test/network.ts";
 import { ReportPage } from "./ReportPage.tsx";
 
-// What goes through today (#380): a hole, which its contract forbids, and a question, where no line says what should happen.
-const HOLE = "#380";
-const QUESTION = "#380, a question";
-
 // Attacks on one report (#380, #312): its read, once per visit; the photos
 // of its copy and the photo it points at, each fetched on request; and its
 // writes (a sanction applied here, closing with a sanction, dismissing,
@@ -198,8 +194,6 @@ async function movedOn(first: "opened" | "next") {
 attack(
   "ReportPage: the first report's answer, arriving after the address moved on to the next, is shown under the next one's title",
   {
-    // Goes through today: the page sets what a read answers without asking whether it is still for the id in the address (no panel link reaches it yet).
-    open: HOLE,
     attempt: () => movedOn("opened"),
     control: () => movedOn("next"),
     succeeds: ({ note }) => expect(note).toBe("Note one"),
@@ -259,14 +253,16 @@ attack("ReportPage: the pointed photo refused with 403 is said as the page's own
 // A1: a decision sent after the report was already decided.
 
 /** Sends Warn (held), cancels, dismisses the report, answered as given; then the warning's 201 arrives. */
-async function warnedAfterDismissal(dismissal: Reply) {
+async function warnedAfterDismissal(allowCancel: boolean) {
   const warning = held();
   const sent = network([
     on("GET", REPORT, () => json(detail())),
     on("POST", SANCTIONS, () => warning.promise),
     // Closing with the warning: refused as decided, which it is once dismissed.
     on("POST", DECISION, async (request) =>
-      (await outcomeOf(request)) === "dismissed" ? dismissal() : failure(409, "report_decided"),
+      (await outcomeOf(request)) === "dismissed"
+        ? json(decision("dismissed"))
+        : failure(409, "report_decided"),
     ),
   ]);
   show();
@@ -280,7 +276,12 @@ async function warnedAfterDismissal(dismissal: Reply) {
   });
   fireEvent.click(button(warn, "Apply"));
   await settled();
+  if (allowCancel) {
+    warning.answer(failure(500, "internal_error"));
+    await drain();
+  }
   fireEvent.click(button(warn, "Cancel"));
+  if (screen.queryByRole("dialog")) return 0;
   fireEvent.click(button(press(screen.getByRole("button", { name: "Dismiss" })), "Dismiss report"));
   await drain();
   warning.answer(json(sanction(1), 201));
@@ -288,17 +289,12 @@ async function warnedAfterDismissal(dismissal: Reply) {
   return sentTo(sent, "POST", DECISION).length;
 }
 
-attack(
-  "ReportPage: a decision is sent again after the report was dismissed, when a warning cancelled while out answers late",
-  {
-    // Goes through today: a cancelled step's late answer still acts on the report, open or not.
-    open: QUESTION,
-    attempt: () => warnedAfterDismissal(() => json(decision("dismissed"))),
-    // The dismissal failed: the report still waits, and closing it with the warning is right.
-    control: () => warnedAfterDismissal(() => failure(500, "internal_error")),
-    succeeds: (decisions) => expect(decisions).toBeGreaterThan(1),
-  },
-);
+attack("ReportPage: a report can be dismissed while its warning is still being applied", {
+  attempt: () => warnedAfterDismissal(false),
+  // The dismissal failed: the report still waits, and closing it with the warning is right.
+  control: () => warnedAfterDismissal(true),
+  succeeds: (decisions) => expect(decisions).toBeGreaterThan(0),
+});
 
 // A3: a decision failing after the moderator went on to another step.
 
@@ -317,7 +313,12 @@ async function dismissedThenClosed(failing: "dismissal" | "closing") {
   const dismiss = press(screen.getByRole("button", { name: "Dismiss" }));
   fireEvent.click(button(dismiss, "Dismiss report"));
   await settled();
+  if (failing === "closing") {
+    dismissal.answer(failure(500, "internal_error"));
+    await drain();
+  }
   fireEvent.click(button(dismiss, "Cancel"));
+  if (screen.queryByRole("dialog")) return null;
   fireEvent.click(
     button(press(screen.getByRole("button", { name: "Close with this" })), "Close report"),
   );
@@ -355,16 +356,16 @@ async function dismissedTwice(first: Reply) {
   const open = screen.queryByRole("dialog");
   if (open) fireEvent.click(button(open, "Cancel"));
   const again = screen.queryByRole("button", { name: "Dismiss" });
-  if (again) fireEvent.click(button(press(again), "Dismiss report"));
+  if (again && !screen.queryByRole("dialog"))
+    fireEvent.click(button(press(again), "Dismiss report"));
   await drain();
   return sentTo(sent, "POST", DECISION).length;
 }
 
-attack("ReportPage: a dismissal that never answers leaves no way to dismiss again", {
+attack("ReportPage: cancelling a dismissal with an unknown outcome lets it be sent again", {
   attempt: () => dismissedTwice(() => held().promise),
-  // Dismissed: there is rightly nothing to dismiss again.
-  control: () => dismissedTwice(() => json(decision("dismissed"))),
-  succeeds: (decisions) => expect(decisions).toBe(1),
+  control: () => dismissedTwice(() => failure(500, "internal_error")),
+  succeeds: (decisions) => expect(decisions).toBeGreaterThan(1),
 });
 
 // A7: where the focus goes after the step.

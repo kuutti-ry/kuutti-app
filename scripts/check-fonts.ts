@@ -74,8 +74,7 @@ function fontProblem(path: string, bytes: Buffer): string | null {
   // happens to start with "true" does not have a directory that fits.
   if (SFNT.has(head.slice(0, 8)) && bytes.length >= 12) {
     const tables = bytes.readUInt16BE(4);
-    if (tables > 0 && tables < 64 && bytes.length >= 12 + 16 * tables)
-      return `${path}: a font file`;
+    if (tables > 0 && bytes.length >= 12 + 16 * tables) return `${path}: a font file`;
   }
   for (const [magic, what] of ARCHIVES) if (head.startsWith(magic)) return `${path}: ${what}`;
   if (bytes.length > 262 && bytes.subarray(257, 262).toString("latin1") === "ustar") {
@@ -85,6 +84,17 @@ function fontProblem(path: string, bytes: Buffer): string | null {
     return `${path}: a file of Saiga`;
   }
   if (INLINED.test(bytes.toString("latin1"))) return `${path}: a font written into the file`;
+  // A generic MIME type does not change the bytes. Inspect decoded data
+  // URLs by the same signatures, without treating every octet stream as a font.
+  const data = new RegExp(
+    ["data", ":application/octet-stream(?:;[^,]*)?;base64,([a-z0-9+/=\\s]+)"].join(""),
+    "gi",
+  );
+  for (const match of bytes.toString("latin1").matchAll(data)) {
+    const decoded = Buffer.from(match[1] ?? "", "base64");
+    if (decoded.length > 0 && decoded.length < bytes.length && fontProblem("embedded.bin", decoded))
+      return `${path}: a font written into the file`;
+  }
   return null;
 }
 
@@ -172,6 +182,24 @@ function selfTest(): void {
     ["WOFF renamed", "a.bin", Buffer.from("774f4646000100000000", "hex"), "a font file"],
     ["TrueType renamed", "a.png", sfnt("00010000", 12, 400), "a font file"],
     ["OpenType renamed", "a.png", sfnt("4f54544f", 10, 400), "a font file"],
+    ["sfnt with sixty-four tables", "a.bin", sfnt("00010000", 64, 12 + 16 * 64), "a font file"],
+    ["truncated sfnt with sixty-four tables", "a.bin", sfnt("00010000", 64, 200), null],
+    [
+      "font in a generic data URL",
+      "a.css",
+      Buffer.from(
+        `src:url(${["data", ":application/octet-stream;base64,"].join("")}${sfnt("00010000", 64, 12 + 16 * 64).toString("base64")})`,
+      ),
+      "a font written into the file",
+    ],
+    [
+      "nonfont in a generic data URL",
+      "a.css",
+      Buffer.from(
+        `src:url(${["data", ":application/octet-stream;base64,"].join("")}${Buffer.from("plain text").toString("base64")})`,
+      ),
+      null,
+    ],
     ["a collection", "a.bin", Buffer.from("74746366000100000000", "hex"), "a font collection"],
     ["a short file that starts like an sfnt", "a.bin", sfnt("00010000", 12, 40), null],
     ["a zip", "fonts.bin", Buffer.from("504b030414000000", "hex"), "a zip archive"],
@@ -274,20 +302,27 @@ function selfTest(): void {
 
 if (process.argv.includes("--self-test")) selfTest();
 
-const range = process.argv.indexOf("--range");
-const fresh = process.argv.indexOf("--new");
+const args = process.argv
+  .slice(2)
+  .flatMap((arg) =>
+    /^(?:--range|--new|--remote)=/.test(arg)
+      ? [arg.slice(0, arg.indexOf("=")), arg.slice(arg.indexOf("=") + 1)]
+      : [arg],
+  );
+const range = args.indexOf("--range");
+const fresh = args.indexOf("--new");
 let blobs: Blob[];
 let what: string;
 if (range !== -1 || fresh !== -1) {
-  const value = process.argv[(range !== -1 ? range : fresh) + 1];
-  if (value === undefined || value.startsWith("--")) {
+  const value = args[(range !== -1 ? range : fresh) + 1];
+  if (!value || value.startsWith("-")) {
     console.error(`✖ ${range !== -1 ? "--range" : "--new"} needs a value`);
     process.exit(2);
   }
   // Only what the remote pushed to has: another remote's history, a private
   // repository fetched into this clone, is not public by being there.
-  const at = process.argv.indexOf("--remote");
-  const remote = at === -1 ? undefined : process.argv[at + 1];
+  const at = args.indexOf("--remote");
+  const remote = at === -1 ? undefined : args[at + 1];
   const revisions =
     range !== -1 ? [value] : [value, "--not", remote ? `--remotes=${remote}` : "--remotes"];
   blobs = revisionBlobs(revisions);

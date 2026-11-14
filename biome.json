@@ -179,10 +179,14 @@
                       "**/notifications/**",
                       "!**/notifications/index",
                       "!**/notifications/index.ts",
-                      "**/smoke/*",
-                      "**/smoke/**",
-                      "!**/smoke/index",
-                      "!**/smoke/index.ts"
+                      "**/home/*",
+                      "**/home/**",
+                      "!**/home/index",
+                      "!**/home/index.ts",
+                      "**/settings/*",
+                      "**/settings/**",
+                      "!**/settings/index",
+                      "!**/settings/index.ts"
                     ],
                     "message": "Slices import from a neighbour only through its index.ts, never its internals. Move shared code down into lib/ or export it from the neighbour's index. See .claude/rules/layout.md."
                   }
@@ -244,10 +248,14 @@
                       "**/notifications/**",
                       "!**/notifications/index",
                       "!**/notifications/index.ts",
-                      "**/smoke/*",
-                      "**/smoke/**",
-                      "!**/smoke/index",
-                      "!**/smoke/index.ts"
+                      "**/home/*",
+                      "**/home/**",
+                      "!**/home/index",
+                      "!**/home/index.ts",
+                      "**/settings/*",
+                      "**/settings/**",
+                      "!**/settings/index",
+                      "!**/settings/index.ts"
                     ],
                     "message": "Slices import from a neighbour only through its index.ts, never its internals. Move shared code down into lib/ or export it from the neighbour's index. See .claude/rules/layout.md."
                   }

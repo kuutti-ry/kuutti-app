@@ -8,9 +8,6 @@ import { attack } from "../../test/attack.ts";
 import { held, json, network, on, sentTo, settled } from "../../test/network.ts";
 import { FeedbackList } from "./FeedbackList.tsx";
 
-// What goes through today (#380): a question, where no line says what should happen.
-const QUESTION = "#380, a question";
-
 // Attacks on the feedback list (#380, #171): its rows, each marked handled on
 // its own, tried the wrong way beside a control that does it rightly.
 
@@ -150,8 +147,6 @@ async function refusedMarking(code: string, status: number) {
 
 // 409 feedback_handled: another moderator marked it meanwhile, so a second press is refused again.
 attack("FeedbackList: a row another moderator marked meanwhile still offers Mark as handled", {
-  // Goes through today: a 409 is read as any failure, and the button stays.
-  open: QUESTION,
   attempt: () => refusedMarking("feedback_handled", 409),
   control: () => refusedMarking("internal_error", 500),
   succeeds: (offered) => expect(offered).toBe(true),
@@ -165,14 +160,13 @@ async function markedByKeyboard(blurredAfter: boolean) {
   button.focus();
   fireEvent.click(button);
   await screen.findByText("Handled.");
-  if (blurredAfter) (document.activeElement as HTMLElement | null)?.blur();
+  // Finish the outcome's focus effect before the control deliberately loses it.
   await settle();
+  if (blurredAfter) (document.activeElement as HTMLElement | null)?.blur();
   return document.activeElement === document.body;
 }
 
 attack("FeedbackList: the focus falls to the page's body after a row is marked from the keyboard", {
-  // Goes through today: the button is replaced by the outcome, and the focus is not moved.
-  open: QUESTION,
   attempt: () => markedByKeyboard(false),
   control: () => markedByKeyboard(true),
   succeeds: (onBody) => expect(onBody).toBe(true),

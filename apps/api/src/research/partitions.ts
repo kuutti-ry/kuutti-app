@@ -1,14 +1,15 @@
 import { type Queryable, transaction } from "@kuutti/db";
-import type { NightlyJob } from "../jobs/nightly.ts";
+import { msUntilNightly, type NightlyJob } from "../jobs/nightly.ts";
 import { DAY_MS } from "../lib/finnish-day.ts";
 
 /**
  * The monthly partitions of `events` (#50, ADR-011; rules/db.md: monthly
  * partitions, 90-day retention). Created ahead, never on demand: the current
  * and the next month exist after boot and after every nightly run, and a
- * partition whose range *began* the retention ago or earlier is dropped whole:
+ * partition whose range *began* the retention ago or earlier is dropped whole.
+ * The night also drops a month that would reach that age before the next run:
  * the binding research text promises "at most 90 days" (legal.research.summary),
- * so a row lives between about 60 and 90 days, never longer. No row is ever
+ * so a row lives between about 59 and 90 days, never longer while the night runs. No row is ever
  * deleted (the table's triggers refuse it); retention is the drop. Month
  * bounds are UTC: research reads months, not Finnish days.
  */
@@ -131,10 +132,13 @@ export function researchEventsJob(deps: {
       // One clock read: a month rolling over between the steps would leave a month uncreated.
       const now = deps.now();
       const ensured = await ensureEventPartitions(deps.db, now);
+      // The next chance to delete is tomorrow's 04:00, not midnight UTC
+      // when a month reaches its ninetieth day (ADR-011's binding upper bound).
+      const nextRun = new Date(now.getTime() + msUntilNightly(now));
       const uncopied: Record<string, number> = deps.beforeDrop
-        ? { uncopied: await deps.beforeDrop(await expiredPartitions(deps.db, now)) }
+        ? { uncopied: await deps.beforeDrop(await expiredPartitions(deps.db, nextRun)) }
         : {};
-      const pruned = await pruneEventPartitions(deps.db, now);
+      const pruned = await pruneEventPartitions(deps.db, nextRun);
       return {
         created: ensured.created,
         dropped: pruned.dropped,

@@ -902,7 +902,8 @@ admin.title:
         code: 1,
         err: ['✖ the batch id is not a file name: "../escape"'],
       });
-      expect(disk.written.size).toBe(0);
+      expect([...disk.written.keys()]).toEqual([resolve(BATCHES, `.pending-${process.pid}.json`)]);
+      expect(disk.files.has(resolve(ROOT, "escape.json"))).toBe(false);
     });
   });
 

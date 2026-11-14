@@ -6,7 +6,6 @@ import {
   closerLookOf,
   deletePhotoCheckNotesOfAccount,
   listPhotoCheckNotes,
-  NOTE_RETENTION_DAYS,
   prunePhotoCheckNotes,
   recordPhotoCheckNote,
   withdrawPhotoCheckNote,
@@ -168,12 +167,13 @@ describe("the notes themselves", () => {
   test("are pruned at twelve months to the day, and deleted per account", async ({ ctx }) => {
     const me = await signedInAccount(ctx.client);
     const other = await signedInAccount(ctx.client);
-    await note(ctx, me.accountId, daysFrom(T, -NOTE_RETENTION_DAYS));
-    await note(ctx, me.accountId, daysFrom(T, -NOTE_RETENTION_DAYS - 1 / 86_400));
+    const cutoff = new Date("2025-10-01T12:00:00Z");
+    await note(ctx, me.accountId, cutoff);
+    await note(ctx, me.accountId, new Date(cutoff.getTime() - 1000));
     await note(ctx, other.accountId, T);
     expect(await prunePhotoCheckNotes(ctx.client, T)).toBe(1);
     expect(await listPhotoCheckNotes(ctx.client, me.accountId)).toEqual([
-      { kind: "nudity", at: daysFrom(T, -NOTE_RETENTION_DAYS) },
+      { kind: "nudity", at: cutoff },
     ]);
     expect(await deletePhotoCheckNotesOfAccount(ctx.client, me.accountId)).toBe(1);
     expect(await listPhotoCheckNotes(ctx.client, other.accountId)).toHaveLength(1);

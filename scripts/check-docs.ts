@@ -48,15 +48,17 @@ const TEST = /\.test\.tsx?$/;
 function drawsOf(text: string): string[] | undefined {
   const block = BLOCK.exec(text)?.[1];
   if (block === undefined) return undefined;
-  return block
+  const entries = block
     .split(/\r?\n/)
-    .map((line) => line.trim())
+    .map((line) => line.trim().replace(/^(?:\.\/)+/, ""))
     .filter((line) => line !== "");
+  return entries.length === 0 ? undefined : entries;
 }
 
 function stillTrue(messages: string): Set<string> {
   const named = new Set<string>();
   for (const line of messages.matchAll(STILL_TRUE)) {
+    if (!/^\s*docs\/[^\s,]+\.md(?:\s|,|$)/.test(line[1] ?? "")) continue;
     for (const file of (line[1] ?? "").split(/[\s,]+/)) {
       if (file.endsWith(".md")) named.add(file);
     }
@@ -138,6 +140,7 @@ function selfTest(): void {
       [],
     ],
     ["the line in another case", docs, all, ["apps/api/src/chat/ws.ts"], `still-TRUE: ${view}`, []],
+    ["merely mentioning a view", docs, all, [socket], `Still-true: this mentions ${view}`, asks],
     [
       "two views on one line",
       [...docs, { file: "docs/architecture/b.md", draws: ["biome.json"] }],
@@ -252,6 +255,21 @@ function selfTest(): void {
   const block = "# T\n\n<!-- draws\napps/a.ts\n\n  infra/b/\n-->\n";
   const quoted = "# T\n\nText.\n\n```\n<!-- draws\napps/a.ts\n-->\n```\n";
   const parsed = [drawsOf(block), drawsOf("# T\n"), drawsOf(quoted)];
+  expectProblems(
+    "an empty draws block",
+    problemsOf([{ file: view, draws: drawsOf("# T\n<!-- draws\n -->") }], all, [], ""),
+    [`${view} has no`],
+  );
+  expectProblems(
+    "a relative draws path",
+    problemsOf(
+      [{ file: view, draws: drawsOf("# T\n<!-- draws\n./apps/api/src/chat/ws.ts\n-->") }],
+      all,
+      ["apps/api/src/chat/ws.ts"],
+      "",
+    ),
+    [`${view} draws what this change touches`],
+  );
   if (JSON.stringify(parsed) !== '[["apps/a.ts","infra/b/"],null,null]') {
     console.error(`✖ self-test, the block's parse: got ${JSON.stringify(parsed)}`);
     process.exit(1);

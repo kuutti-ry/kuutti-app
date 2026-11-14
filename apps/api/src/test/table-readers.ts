@@ -11,12 +11,32 @@ import { withoutComments } from "./sources.ts";
  * from, join, insert, update or delete.
  */
 function names(source: string, table: string): boolean {
-  const code = withoutComments(source);
-  const sql = new RegExp(`\\b(FROM|JOIN|INTO|UPDATE)\\s+(public\\.)?"?${table}"?(?![\\w])`, "i");
-  const builder = new RegExp(
-    `\\.(from|innerJoin|leftJoin|rightJoin|fullJoin|insert|update|delete)\\(\\s*(\\w+\\.)?${table}\\s*[,)]`,
+  let code = withoutComments(source);
+  const names = [table];
+  for (const alias of code.matchAll(new RegExp(`\\b${table}\\s+as\\s+(\\w+)`, "g"))) {
+    if (alias[1]) names.push(alias[1]);
+  }
+  // A literal table name concatenated into SQL is still a static reader.
+  for (const match of code.matchAll(
+    new RegExp(`\\bconst\\s+(\\w+)\\s*=\\s*["']${table}["']`, "g"),
+  )) {
+    if (match[1])
+      code = code.replace(new RegExp(`["']\\s*\\+\\s*${match[1]}\\b`, "g"), ` ${table}`);
+  }
+  const identifier = `(?:(?:"?\\w+"?)\\s*\\.\\s*)?"?${table}"?(?![\\w])`;
+  const sql = new RegExp(
+    `\\b(FROM|JOIN|UPDATE|USING|INSERT\\s+INTO)\\s+(?:ONLY\\s+)?${identifier}`,
+    "i",
   );
-  return sql.test(code) || builder.test(code);
+  const commaJoin = new RegExp(
+    `\\b(?:SELECT|DELETE)\\b[^;\x60]*?\\bFROM\\b(?:(?!\\b(?:WHERE|GROUP|ORDER|LIMIT|RETURNING)\\b)[^;\x60])*?,\\s*${identifier}`,
+    "i",
+  );
+  const builder = new RegExp(
+    `\\.(from|innerJoin|leftJoin|rightJoin|fullJoin|crossJoin|insert|update|delete|\\$count)\\(\\s*(?:alias\\(\\s*)?(\\w+\\.)?(?:${names.join("|")})\\s*[,)]`,
+  );
+  const relational = new RegExp(`\\.query\\.${table}\\.(?:findMany|findFirst)\\s*\\(`);
+  return sql.test(code) || commaJoin.test(code) || builder.test(code) || relational.test(code);
 }
 
 export const readsBlock = (source: string) =>

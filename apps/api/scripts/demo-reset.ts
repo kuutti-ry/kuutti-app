@@ -149,8 +149,13 @@ async function localReset(): Promise<void> {
   // Node sends fetch through a proxy when it is told to, loopback addresses
   // included unless NO_PROXY names them: a persona's claims and a session's
   // token would then pass through somebody else.
-  if (process.env.NODE_USE_ENV_PROXY) {
-    fail("refusing: NODE_USE_ENV_PROXY is set, and nothing of this goes through a proxy; unset it");
+  if (
+    process.env.NODE_USE_ENV_PROXY ||
+    /(?:^|[\s"'])--use[-_]env[-_]proxy(?:$|[\s"'=])/.test(process.env.NODE_OPTIONS ?? "")
+  ) {
+    fail(
+      "refusing: Node is configured to use an environment proxy; unset NODE_USE_ENV_PROXY and --use-env-proxy",
+    );
   }
 
   if (env !== "development" && env !== "test") {

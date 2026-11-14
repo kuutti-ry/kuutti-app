@@ -36,10 +36,14 @@ import SeekRoute from "../app/profile/seek/index";
 // biome-ignore lint/style/noRestrictedImports: a route file, not a slice internal
 import SeekWhomRoute from "../app/profile/seek/whom";
 import RoundRoute from "../app/round";
+// biome-ignore lint/style/noRestrictedImports: a route file, not a slice internal
 import FoundThemRoute from "../app/settings/found-them";
 import SettingsRoute from "../app/settings/index";
+// biome-ignore lint/style/noRestrictedImports: a route file, not a slice internal
 import LicensesRoute from "../app/settings/licenses";
+// biome-ignore lint/style/noRestrictedImports: a route file, not a slice internal
 import LicenseTextsRoute from "../app/settings/licenses/texts";
+// biome-ignore lint/style/noRestrictedImports: a route file, not a slice internal
 import SupportRoute from "../app/settings/support";
 import TechRoute from "../app/tech";
 

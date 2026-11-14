@@ -268,18 +268,29 @@ if (batchId !== undefined) {
       })),
     );
     if (chunks.length > 0) {
-      const { id, requests } = await submitBatch(chunks);
-      // The id names a file: the same check --batch-id gets.
-      if (!/^[A-Za-z0-9_-]+$/.test(id))
-        fail(`the batch id is not a file name: ${JSON.stringify(id)}`);
       const sources = Object.fromEntries(
         chunks.flatMap((chunk) => chunk.items.map((item) => [item.key, sourceOf(item.en)])),
       );
       mkdirSync(batches, { recursive: true });
+      const pending = resolve(batches, `.pending-${process.pid}.json`);
+      const { id, requests } = await submitBatch(chunks, {
+        beforeSubmit: (requests) =>
+          writeFileSync(
+            pending,
+            `${JSON.stringify({ selection, requests, sources } satisfies Manifest, null, 2)}\n`,
+            { flag: "wx" },
+          ),
+      });
+      // Say the id while the recoverable preflight record still exists, including on a later disk error.
+      console.log(`Submitted batch ${id}; recovery record: ${pending}`);
+      // The id names a file: the same check --batch-id gets.
+      if (!/^[A-Za-z0-9_-]+$/.test(id))
+        fail(`the batch id is not a file name: ${JSON.stringify(id)}`);
       writeFileSync(
         resolve(batches, `${id}.json`),
         `${JSON.stringify({ selection, requests, sources } satisfies Manifest, null, 2)}\n`,
       );
+      unlinkSync(pending);
       console.log(
         `Submitted batch ${id} (${chunks.length} requests). Most finish within an hour, all within 24.\n` +
           `Collect it with: pnpm i18n:translate --batch-id ${id}`,

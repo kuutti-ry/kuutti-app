@@ -674,20 +674,24 @@ export async function findPendingUnchecked(
   db: Queryable,
   olderThan: Date,
   limit: number,
-  tried: readonly string[] = [],
-): Promise<Array<{ id: string; accountId: string; key: string }>> {
+  after?: { createdAt: string; id: string },
+): Promise<Array<{ id: string; accountId: string; key: string; createdAt: string }>> {
   const { rows } = await db.query<Row>(
-    `SELECT p.id, p.account_id, p.key FROM photo p
+    `SELECT p.id, p.account_id, p.key, p.created_at::text AS cursor_at FROM photo p
      LEFT JOIN photo_review r ON r.photo_id = p.id
      WHERE p.purpose = 'profile' AND p.state = 'pending' AND (r.photo_id IS NULL OR r.decided_by IS NULL)
-       AND p.created_at < $1 AND NOT (p.id = ANY($3::uuid[]))
+       AND p.created_at < $1
+       AND ($3::timestamptz IS NULL OR (p.created_at, p.id) > ($3, $4::uuid))
      ORDER BY p.created_at, p.id LIMIT $2`,
-    [olderThan, limit, tried],
+    [olderThan, limit, after?.createdAt ?? null, after?.id ?? null],
   );
   return rows.map((r) => ({
     id: r.id as string,
     accountId: r.account_id as string,
     key: r.key as string,
+    // Keep PostgreSQL's microseconds: a JS Date rounds the cursor down and
+    // can select the same failed last row again forever.
+    createdAt: r.cursor_at as string,
   }));
 }
 

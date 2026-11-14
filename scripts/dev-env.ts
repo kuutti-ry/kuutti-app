@@ -2,7 +2,7 @@
  * dev-env: the whole local environment with one command.
  *
  *   pnpm env:up [--skip api,mobile,admin] [--no-seed]   start everything, Ctrl+C stops the apps
- *   pnpm env:down                                       stop the apps and the compose database
+ *   pnpm env:down                                       stop the apps and this checkout’s Docker database
  *   pnpm env:status                                     who holds which port, database state
  *   node scripts/dev-env.ts --self-test                 the command line's cases; starts nothing
  *
@@ -24,9 +24,10 @@
  * default, which is not a secret. No dependencies. Node 22.18+.
  */
 import { type ChildProcess, spawn, spawnSync } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { connect } from "node:net";
-import { resolve, sep } from "node:path";
+import { tmpdir } from "node:os";
+import { dirname, join, resolve, sep } from "node:path";
 import { parseArgs as parseOptions } from "node:util";
 
 const ROOT = resolve(import.meta.dirname, "..");
@@ -74,7 +75,7 @@ const SERVICES: Service[] = [
   },
 ];
 
-const OURS = /(node|pnpm|npm|npx|tsx|expo|vite|metro)/i;
+const OURS = /^(?:\S*\/)?(?:node|pnpm|npm|npx|tsx|expo|vite|metro)(?:\s|$)/i;
 const WRAPPER_SHELL = /^(\/bin\/)?(sh|bash|zsh) -c /;
 const SHELLS = /(^|\/)(-?zsh|-?bash|-?sh|fish|login|Terminal|iTerm|WebStorm|code)(\s|$)/i;
 
@@ -181,11 +182,12 @@ async function listeners(port: number): Promise<Owner[]> {
 }
 
 /** Whether a port's listener is a copy of one of our own processes, by its working directory and its command. */
-function isOurs(cwd: string, command: string): boolean {
-  return (
-    (cwd === ROOT || cwd.startsWith(`${ROOT}${sep}`)) &&
-    (OURS.test(command) || WRAPPER_SHELL.test(command))
-  );
+function isOurs(cwd: string, command: string, root = ROOT): boolean {
+  if (cwd !== root && !cwd.startsWith(`${root}${sep}`)) return false;
+  for (let at = cwd; at !== root; at = dirname(at)) {
+    if (existsSync(join(at, ".git"))) return false;
+  }
+  return OURS.test(command) || WRAPPER_SHELL.test(command);
 }
 
 /** The listener plus its supervisors (pnpm, node --watch) up to, never including, a shell. */
@@ -618,6 +620,7 @@ function selfTest(): never {
   const owners: Array<[string, string, boolean]> = [
     [`${ROOT}-site/apps/api`, "node --watch src/index.ts", false],
     [ROOT, "pnpm dev", true],
+    [ROOT, "not-node --watch", false],
     // attack: a process started somewhere else entirely
     ["/tmp/kuutti-elsewhere/apps/api", "node --watch src/index.ts", false],
     // control: the same process, started inside this repository
@@ -627,6 +630,20 @@ function selfTest(): never {
     // control: one of ours, started in the same place
     [resolve(ROOT, "apps/api"), "pnpm dev", true],
   ];
+  const nestedRoot = mkdtempSync(join(tmpdir(), "kuutti-owner-"));
+  try {
+    const child = join(nestedRoot, "worktree");
+    mkdirSync(child);
+    writeFileSync(join(child, ".git"), "gitdir: elsewhere");
+    if (
+      isOurs(child, "node app.js", nestedRoot) ||
+      !isOurs(nestedRoot, "node app.js", nestedRoot)
+    ) {
+      throw new Error("a nested worktree was claimed, or this checkout was not");
+    }
+  } finally {
+    rmSync(nestedRoot, { recursive: true, force: true });
+  }
   const mistaken = owners.filter(([cwd, command, ours]) => isOurs(cwd, command) !== ours);
   for (const [cwd, command, ours] of mistaken) {
     console.error(`✖ self-test: ${command} in ${cwd} is ${ours ? "not ours" : "ours"}`);
@@ -691,7 +708,9 @@ async function up(skip: Set<string>, seed: boolean): Promise<void> {
     log(service.name, service.color, `ready at ${service.readyUrl}`);
   }
 
-  env("everything is up. Ctrl+C stops the apps; `pnpm env:down` also stops the compose database.");
+  env(
+    "everything is up. Ctrl+C stops the apps; `pnpm env:down` also stops this checkout’s Docker database.",
+  );
   if (!skip.has("api"))
     env("check: curl -s http://localhost:3000/health   (db ok, migrations current)");
   if (!skip.has("mobile"))
@@ -712,7 +731,7 @@ async function down(): Promise<void> {
     );
     return;
   }
-  env("everything is down");
+  env("this checkout's services are down");
 }
 
 async function status(): Promise<void> {

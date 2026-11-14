@@ -11,12 +11,26 @@
  *
  * Usage: node scripts/check-schema-words.ts [--self-test]
  */
-import { readdirSync, readFileSync, statSync } from "node:fs";
+import {
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
 import { join, relative } from "node:path";
 import { expectProblems } from "./lib/self-test.ts";
 
 const ROOT = process.cwd();
-const SCAN = ["packages/db/drizzle", "packages/db/src/schema"];
+const SCHEMA = [
+  "packages/db/src/schema",
+  "packages/db/src/schema.ts",
+  "packages/db/src/schema.mts",
+  "packages/db/src/schema.cts",
+];
 const FORBIDDEN = [
   "hetu",
   "personal_identity_code",
@@ -36,12 +50,32 @@ const FORBIDDEN = [
   "first_name",
   "last_name",
   "legal_name",
+  "given_name",
+  "givenname",
+  "family_name",
+  "familyname",
+  "firstname",
+  "lastname",
+  "henkilotunnus",
+  "personbeteckning",
+  "hetu_plain",
+  "raw_hetu",
+  "sex_at_birth",
+  "sexatbirth",
+  "legal_gender",
+  "legalgender",
+  "day_of_birth",
+  "dayofbirth",
 ];
 // The limiter keys on the address in memory only (ADR-026 §7). A segment is
 // enough: ip covers ip_address, last_ip and client_ip_hash alike.
 const ADDRESS_WORDS = [
   "ip",
   "ipaddress",
+  "clientip",
+  "ips",
+  "client_addr",
+  "clientaddr",
   "ipv4",
   "ipv6",
   "inet",
@@ -56,14 +90,16 @@ const ADDRESS_WORDS = [
 function walk(dir: string, out: string[] = []): string[] {
   let entries: string[];
   try {
+    if (statSync(dir).isFile()) return /\.(sql|[cm]?ts|json)$/i.test(dir) ? [...out, dir] : out;
     entries = readdirSync(dir);
-  } catch {
-    return out;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return out;
+    throw error;
   }
   for (const entry of entries) {
     const path = join(dir, entry);
     if (statSync(path).isDirectory()) walk(path, out);
-    else if (/\.(sql|ts|json)$/.test(entry)) out.push(path);
+    else if (/\.(sql|[cm]?ts|json)$/i.test(entry)) out.push(path);
   }
   return out;
 }
@@ -83,6 +119,19 @@ function hitsIn(name: string, text: string): string[] {
       hits.push(`${name}:${i + 1}: "${m[1]}" in: ${line.trim()}`);
     }
   });
+  return hits;
+}
+
+function scan(root: string): string[] {
+  const migrations = walk(join(root, "packages/db/drizzle"));
+  const schema = SCHEMA.flatMap((path) => walk(join(root, path)));
+  const hits =
+    migrations.length === 0 || schema.length === 0
+      ? ["no migrations or Drizzle schema to read: run from the repository root"]
+      : [];
+  for (const file of [...migrations, ...schema]) {
+    hits.push(...hitsIn(relative(root, file), readFileSync(file, "utf8")));
+  }
   return hits;
 }
 
@@ -150,15 +199,54 @@ function selfTest(): void {
       words.map((word) => `x:1: "${word}" in: `),
     );
   }
-  console.log(`✔ check-schema-words self-test: ${cases.length} cases`);
+  const aliases = [
+    "given_name",
+    "family_name",
+    "firstName",
+    "henkilotunnus",
+    "personbeteckning",
+    "hetu_plain",
+    "raw_hetu",
+    "sex_at_birth",
+    "legal_gender",
+    "day_of_birth",
+    "clientIp",
+    "ips",
+    "client_addr",
+  ];
+  for (const name of aliases) {
+    expectProblems(`forbidden alias ${name}`, hitsIn("x", `"${name}" text`), [`x:1: "${name}"`]);
+  }
+  const fixture = mkdtempSync(join(tmpdir(), "kuutti-schema-words-"));
+  try {
+    expectProblems("an empty checkout", scan(fixture), ["no migrations or Drizzle schema to read"]);
+    mkdirSync(join(fixture, "packages/db/drizzle"), { recursive: true });
+    mkdirSync(join(fixture, "packages/db/src"), { recursive: true });
+    writeFileSync(join(fixture, "packages/db/drizzle/0001.SQL"), 'CREATE TABLE x ("hetu" text);');
+    writeFileSync(
+      join(fixture, "packages/db/src/schema.mts"),
+      'export const email = text("safe");',
+    );
+    expectProblems("an uppercase migration beside a flat mts schema", scan(fixture), [
+      'packages/db/drizzle/0001.SQL:1: "hetu"',
+    ]);
+    writeFileSync(join(fixture, "packages/db/drizzle/0001.SQL"), 'CREATE TABLE x ("id" text);');
+    writeFileSync(
+      join(fixture, "packages/db/src/schema.ts"),
+      'export const firstName = text("name");',
+    );
+    expectProblems("a flat schema file", scan(fixture), [
+      'packages/db/src/schema.ts:1: "firstName"',
+    ]);
+  } finally {
+    rmSync(fixture, { recursive: true, force: true });
+  }
+  console.log(`✔ check-schema-words self-test: ${cases.length + aliases.length + 3} cases`);
 }
 
 if (process.argv.includes("--self-test")) selfTest();
 
-const hits: string[] = [];
-for (const file of SCAN.flatMap((d) => walk(join(ROOT, d)))) {
-  hits.push(...hitsIn(relative(ROOT, file), readFileSync(file, "utf8")));
-}
+const hits = scan(ROOT);
 
 if (hits.length > 0) {
   console.error("✖ forbidden identifiers in the database schema (rules 1 and 3, ADR-026 §7):");

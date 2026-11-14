@@ -179,6 +179,7 @@ function Tunable({
 
   const review = (event: FormEvent) => {
     event.preventDefault();
+    if (reason.trim() === "") return;
     const value = parseAs(declared, input);
     if (value === null) return setStep({ kind: "editing", error: "invalid" });
     onOpen();
@@ -186,6 +187,7 @@ function Tunable({
   };
 
   const send = async (value: ConfigValue) => {
+    if (reason.trim() === "") return;
     setStep({ kind: "saving", value });
     const answer = await api
       .POST("/admin/config/{key}", {

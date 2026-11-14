@@ -72,6 +72,8 @@ async function main(): Promise<void> {
     else fail(`unknown argument ${arg}: --tag, --check and --manifest are all there is`);
   }
   if (check && manifest) fail("--check and --manifest exclude each other");
+  if (!/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(tag))
+    fail("--tag takes a single release name without path separators");
 
   if (manifest) {
     const assets = manifestOf(resolve(manifest));

@@ -118,9 +118,13 @@ attack("the night: a job's database error puts the address it quotes into the ni
       await night([failingOnAnAddress(`Key (email)=(${ADDRESS}) already exists.`)]),
     ),
   }),
-  // A detail of the API's own, an object, is kept for the log by design (lib/logger.ts).
+  // Plant the leak after the real logger: a stricter serializer must not
+  // make this detector's positive control disappear with the attack.
   control: async () => ({
-    text: JSON.stringify(await night([failingOnAnAddress({ quoted: ADDRESS })])),
+    text: JSON.stringify([
+      ...(await night([failingOnAnAddress({ quoted: ADDRESS })])),
+      { detail: ADDRESS },
+    ]),
   }),
   succeeds: (seen) => expect(seen.text).toContain(ADDRESS),
 });

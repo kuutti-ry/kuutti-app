@@ -1,6 +1,7 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
+import { identifierWords } from "../test/sources.ts";
 
 // Nothing is ever derived from whom a person seeks (#147, TD-14, ADR-019 §6):
 // a woman seeking women and men may be bi, pan, queer or nothing, and a label
@@ -12,12 +13,15 @@ import { describe, expect, it } from "vitest";
 const ROOT = resolve(import.meta.dirname, "../../../..");
 const SCANNED = [
   "apps/api/src",
+  "apps/api/scripts",
   "apps/mobile/src",
+  "apps/mobile/app",
   "apps/admin/src",
   "packages/i18n/messages.yaml",
 ];
-const ORIENTATION = /\b(gay|lesbian|bisexual|heterosexual|homosexual|pansexual|asexual)\b/i;
-const SOURCE = /\.(ts|tsx|yaml)$/;
+const ORIENTATION =
+  /\b(gay|lesbian|bisexual|heterosexual|homosexual|pansexual|asexual)(?:s|ity)?\b|\b(homo|bi)\b|\b(?:bi|hetero|homo|pan|a)seksuaali\b|\b(?:bi|hetero|homo|pan|a)sexuell\b/i;
+const SOURCE = /\.(ts|tsx|yaml|json)$/;
 const SELF = resolve(import.meta.filename);
 
 function* files(path: string): Generator<string> {
@@ -39,7 +43,7 @@ describe("orientation", () => {
       for (const file of files(resolve(ROOT, dir))) {
         const lines = readFileSync(file, "utf8").split("\n");
         lines.forEach((line, index) => {
-          if (ORIENTATION.test(line))
+          if (ORIENTATION.test(identifierWords(line)))
             found.push(`${relative(ROOT, file)}:${index + 1}: ${line.trim()}`);
         });
       }

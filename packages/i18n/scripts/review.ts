@@ -42,7 +42,8 @@ import {
 const file = resolve(import.meta.dirname, "..", "messages.yaml");
 const annotate = process.env.GITHUB_ACTIONS === "true";
 
-const { values, positionals } = parseArgs({
+const { values, positionals, tokens } = parseArgs({
+  tokens: true,
   allowPositionals: true,
   options: {
     locale: { type: "string" },
@@ -64,6 +65,15 @@ const { values, positionals } = parseArgs({
 // An empty value is no value: `--approved-since=` would otherwise pass the
 // one-command check below and fall through to printing the table (#235).
 refuseEmptyValues(values);
+const supplied = new Set<string>();
+for (const token of tokens) {
+  if (token.kind !== "option") continue;
+  if (supplied.has(token.name)) fail(`--${token.name} is given twice`);
+  supplied.add(token.name);
+}
+if (positionals.length > 0 && !values.approve && !values.reflag) {
+  fail(`unexpected argument ${positionals[0]}`);
+}
 
 function requireLocale(): TranslatedLocale {
   if (!isTranslatedLocale(values.locale)) fail(`--locale is ${TRANSLATED_LOCALES.join(" or ")}`);

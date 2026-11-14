@@ -16,5 +16,6 @@ export { Overview } from "./Overview.tsx";
 export { ReportPage } from "./ReportPage.tsx";
 // The report queue (#311).
 export { ReportQueue } from "./ReportQueue.tsx";
+export { useStatusFocus } from "./status-focus.ts";
 // A confirm step's request, which the matching switch uses too (#500).
 export { type Refusals, useSend } from "./use-send.ts";

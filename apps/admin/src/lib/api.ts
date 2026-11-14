@@ -47,8 +47,13 @@ export function setRoleAnswerHandler(handler: (allowed: boolean) => void): void 
   onRoleAnswer = handler;
 }
 
+const routeOf = new WeakMap<Request, string>();
+// BrowserRouter stores its visit key in history; a return to the same path
+// must not inherit an outstanding request from an earlier visit.
+const visit = () => `${window.location.pathname}:${window.history.state?.key ?? ""}`;
 const bearer: Middleware = {
   async onRequest({ request }) {
+    routeOf.set(request, visit());
     const token = tokenSource();
     if (token) request.headers.set("authorization", `Bearer ${token}`);
     return request;
@@ -59,10 +64,12 @@ const bearer: Middleware = {
   // A role the route does not admit is said once, in the shell, rather than
   // as each screen's own failure (#302); the screen still gets the answer.
   async onResponse({ request, response }) {
-    if (request.headers.has("authorization")) {
+    if (request.headers.get("authorization") === `Bearer ${tokenSource()}`) {
       if (response.status === 401) onUnauthorized();
-      else if (response.status === 403) onRoleAnswer(false);
-      else if (response.ok) onRoleAnswer(true);
+      else if (routeOf.get(request) === visit()) {
+        if (response.status === 403) onRoleAnswer(false);
+        else if (response.ok) onRoleAnswer(true);
+      }
     }
     return response;
   },

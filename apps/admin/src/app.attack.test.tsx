@@ -8,10 +8,6 @@ import { i18n } from "./i18n.ts";
 import { attack } from "./test/attack.ts";
 import { type Handler, held, json, network, on, settled } from "./test/network.ts";
 
-// What goes through today (#380): a hole, which its contract forbids, and a question, where no line says what should happen.
-const HOLE = "#380";
-const QUESTION = "#380, a question";
-
 // Attacks on the shell (#380, #302, #304): what each role is shown, the one
 // notice of a refusal, and the session around the screens, tried the wrong
 // way beside a control that does the same thing rightly.
@@ -99,8 +95,6 @@ async function storedAdmin(check: "out" | "answered") {
 attack(
   "shell: an admin's screens are offered on a stored session's word while the API's check of it is out",
   {
-    // Goes through today: the stored role is shown before the API has answered for it.
-    open: HOLE,
     attempt: () => storedAdmin("out"),
     control: () => storedAdmin("answered"),
     succeeds: (shown) => expect(shown).toBe(true),
@@ -153,8 +147,6 @@ async function refusedAfterLeaving(photos: "honoured" | "refused") {
 
 // rules/admin.md: a 403 is said once by the shell; the notice belongs to the visit (app.tsx).
 attack("shell: a refusal answered after the person left its screen is said over the next screen", {
-  // Goes through today: a left screen's request is not given up, and its refusal is said wherever the person is.
-  open: QUESTION,
   attempt: () => refusedAfterLeaving("honoured"),
   control: () => refusedAfterLeaving("refused"),
   succeeds: (said) => expect(said).toBe("Your role does not allow this."),
@@ -187,8 +179,6 @@ async function unauthorizedLate(signedOutFirst: boolean) {
 attack(
   "shell: a 401 to a request sent before signing out tells the person who signed out that their session ended",
   {
-    // Goes through today: a 401 after signing out is read as a session the API stopped honouring.
-    open: QUESTION,
     attempt: () => unauthorizedLate(true),
     control: () => unauthorizedLate(false),
     succeeds: (said) => expect(said).toBe(true),

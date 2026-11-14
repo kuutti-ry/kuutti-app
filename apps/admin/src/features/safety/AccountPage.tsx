@@ -99,42 +99,57 @@ type State =
   | { kind: "error" }
   | { kind: "missing" }
   | { kind: "forbidden" }
-  | { kind: "ready"; page: AdminAccount; sanctions: SanctionEntry[] | null };
+  | { kind: "ready"; page: AdminAccount; sanctions: SanctionEntry[] | null | undefined };
 
 export function AccountPage() {
-  const { t, locale } = useT();
   const { id = "" } = useParams();
+  return <AccountContents key={id} id={id} />;
+}
+
+function AccountContents({ id }: { id: string }) {
+  const { t, locale } = useT();
   const [state, setState] = useState<State>({ kind: "loading" });
   const when = (at: string | null) => (at ? formatDateTime(locale, new Date(at)) : "–");
 
-  const read = useCallback(async (): Promise<State> => {
-    try {
-      const { data, response } = await api.GET("/admin/accounts/{id}", {
-        params: { path: { id } },
-      });
-      // A 403 is the shell's to say (#302).
-      if (response.status === 403) return { kind: "forbidden" };
-      if (response.status === 404 || response.status === 400) return { kind: "missing" };
-      if (!data) return { kind: "error" };
-      const page = AdminAccount.parse(data);
-      // An erased account shows nothing more, so nothing more is asked for.
-      if (page.state === "deleted") return { kind: "ready", page, sanctions: [] };
-      // The sanctions come from their own route (#307); a failure there leaves the rest of the page.
-      const listed = await api
-        .GET("/admin/accounts/{id}/sanctions", { params: { path: { id } } })
-        .catch(() => null);
-      const parsed = SanctionList.safeParse(listed?.data);
-      const sanctions = parsed.success ? parsed.data.items : null;
-      return { kind: "ready", page, sanctions };
-    } catch (error) {
-      console.error("account page load failed", error);
-      return { kind: "error" };
-    }
-  }, [id]);
+  const latest = useRef(0);
+  const read = useCallback(
+    async (showPage?: (state: State) => void): Promise<State> => {
+      try {
+        const { data, response } = await api.GET("/admin/accounts/{id}", {
+          params: { path: { id } },
+        });
+        // A 403 is the shell's to say (#302).
+        if (response.status === 403) return { kind: "forbidden" };
+        if (response.status === 404 || response.status === 400) return { kind: "missing" };
+        if (!data) return { kind: "error" };
+        const page = AdminAccount.parse(data);
+        // An erased account shows nothing more, so nothing more is asked for.
+        if (page.state === "deleted") return { kind: "ready", page, sanctions: [] };
+        // Show the person while their separate history loads.
+        showPage?.({ kind: "ready", page, sanctions: undefined });
+        // The sanctions come from their own route (#307); a failure there leaves the rest of the page.
+        const listed = await api
+          .GET("/admin/accounts/{id}/sanctions", { params: { path: { id } } })
+          .catch(() => null);
+        if (listed?.response.status === 403) return { kind: "forbidden" };
+        const parsed = SanctionList.safeParse(listed?.data);
+        const sanctions = parsed.success ? parsed.data.items : null;
+        return { kind: "ready", page, sanctions };
+      } catch (error) {
+        console.error("account page load failed", error);
+        return { kind: "error" };
+      }
+    },
+    [id],
+  );
 
   const load = useCallback(async () => {
+    const request = ++latest.current;
+    const land = (next: State) => {
+      if (request === latest.current) setState(next);
+    };
     setState({ kind: "loading" });
-    setState(await read());
+    land(await read(land));
   }, [read]);
 
   // After a sanction (#308): read again without the loading step, so the
@@ -142,8 +157,9 @@ export function AccountPage() {
   // replaces it: a failure keeps what is shown and the line that says what
   // was done, so nobody applies it twice; a refusal there is the shell's.
   const refresh = useCallback(async () => {
+    const request = ++latest.current;
     const next = await read();
-    if (next.kind === "ready") setState(next);
+    if (request === latest.current && next.kind === "ready") setState(next);
   }, [read]);
 
   // Each open is an account.view row: once per id, though StrictMode runs the effect twice.
@@ -279,7 +295,7 @@ export function AccountPage() {
           {page.photos.length === 0 ? (
             <p className="text-muted-foreground">{t("admin.account.none")}</p>
           ) : (
-            <ul className="grid gap-4 items-start sm:grid-cols-[repeat(auto-fill,minmax(15rem,1fr))]">
+            <ul className="grid grid-cols-1 gap-4 items-start sm:grid-cols-[repeat(auto-fill,minmax(15rem,1fr))]">
               {page.photos.map((photo) => (
                 <PersonPhoto
                   key={photo.id}
@@ -405,6 +421,7 @@ function PersonPhoto({
           <Button
             variant="outline"
             className="self-start"
+            aria-describedby={line}
             aria-busy={pending || undefined}
             onClick={() => void show()}
           >

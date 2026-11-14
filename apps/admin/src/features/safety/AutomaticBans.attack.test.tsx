@@ -8,9 +8,6 @@ import { attack } from "../../test/attack.ts";
 import { held, json, network, on, sentTo, settled } from "../../test/network.ts";
 import { AutomaticBans } from "./AutomaticBans.tsx";
 
-// What goes through today (#380): a question, where no line says what should happen.
-const QUESTION = "#380, a question";
-
 // Attacks on the automatic shadow bans (#380, #105): the list's read, on
 // opening and on Refresh, and Confirm and Reverse, #307's second look with the
 // decision fixed by the button pressed. Each tries what must not happen and
@@ -249,7 +246,12 @@ async function twoDecisions(answered: "first" | "second", reply: (item: Ban) => 
   const step = await openDecision("Confirm", one);
   fireEvent.click(button(step, "Confirm"));
   await settled();
+  if (answered === "second") {
+    first.answer(failure(500, "internal_error"));
+    await drain();
+  }
   fireEvent.click(button(step, "Cancel"));
+  if (screen.queryByRole("dialog")) return { stepOpen: true, said: null, secondListed: true };
   fireEvent.click(button(await openDecision("Reverse", two), "Reverse"));
   await settled();
   if (answered === "first") first.answer(reply(one));
@@ -274,8 +276,6 @@ attack(
 attack(
   "AutomaticBans: one line's decision, answered after the moderator went on to another line's, closes that step",
   {
-    // Goes through today: a cancelled step's late answer closes whatever step is open.
-    open: QUESTION,
     attempt: () => twoDecisions("first", (item) => json(reviewed(item, "keep"))),
     control: () => twoDecisions("second", (item) => json(reviewed(item, "lift"))),
     succeeds: ({ stepOpen }) => expect(stepOpen).toBe(false),
@@ -292,27 +292,39 @@ attack(
 );
 
 /** Confirms, never answered; cancels; confirms again, its note written or not. */
-async function lostThenAgain(note: boolean) {
+async function lostThenAgain(failedBefore: boolean) {
   const item = ban(1);
+  const first = held();
   const sent = network([
     on("GET", LIST, () => json(queue([item]))),
-    on("POST", reviewOf(item), () => held().promise),
+    on(
+      "POST",
+      reviewOf(item),
+      inTurn(
+        () => first.promise,
+        () => held().promise,
+      ),
+    ),
   ]);
   show();
-  const first = await openDecision("Confirm", item);
-  fireEvent.click(button(first, "Confirm"));
+  const step = await openDecision("Confirm", item);
+  fireEvent.click(button(step, "Confirm"));
   await settled();
-  fireEvent.click(button(first, "Cancel"));
-  fireEvent.click(button(await openDecision("Confirm", item, note), "Confirm"));
+  if (failedBefore) {
+    first.answer(failure(500, "internal_error"));
+    await drain();
+  }
+  fireEvent.click(button(step, "Cancel"));
+  if (!screen.queryByRole("dialog"))
+    fireEvent.click(button(await openDecision("Confirm", item), "Confirm"));
   await drain();
   return sentTo(sent, "POST", reviewOf(item)).length;
 }
 
-attack("AutomaticBans: a decision that never answers leaves no way to send it again", {
-  attempt: () => lostThenAgain(true),
-  // The second step has no note: nothing goes, rightly.
-  control: () => lostThenAgain(false),
-  succeeds: (decisions) => expect(decisions).toBe(1),
+attack("AutomaticBans: cancelling a decision with an unknown outcome lets it be sent again", {
+  attempt: () => lostThenAgain(false),
+  control: () => lostThenAgain(true),
+  succeeds: (decisions) => expect(decisions).toBeGreaterThan(1),
 });
 
 /** Writes a note in Reverse and cancels; opens Confirm on the same line, its note written or not, and presses it. */

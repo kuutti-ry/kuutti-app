@@ -6,8 +6,8 @@
  * - Reads features/**\/*.feature and collects Scenario, Scenario Outline and
  *   Example names, with their tags (scenario tags plus Feature and Rule tags).
  * - Reads every *.test.ts and *.test.tsx under apps/ and packages/ and collects
- *   the contents of all string literals.
- * - A scenario is implemented when its exact name is one of those literals:
+ *   literal names of active it(), test() and describe() declarations.
+ * - A scenario is implemented when its exact name is one of those declarations:
  *   it("<name>", ...) for a Scenario, describe("<name>", ...) for an Outline.
  * - Scenarios tagged @pending are exempt.
  * - Fails on any non-pending scenario without a test, and on duplicate names.
@@ -71,15 +71,16 @@ function parseFeatureText(file: string, text: string): Scenario[] {
   let featureTags: string[] = [];
   let ruleTags: string[] = [];
   let pendingTags: string[] = [];
-  let inDocString = false;
+  let docString: string | undefined;
 
   lines.forEach((raw, index) => {
     const line = raw.trim();
-    if (line.startsWith('"""') || line.startsWith("```")) {
-      inDocString = !inDocString;
+    const delimiter = line.startsWith('"""') ? '"""' : line.startsWith("```") ? "```" : undefined;
+    if (delimiter && (!docString || delimiter === docString)) {
+      docString = docString ? undefined : delimiter;
       return;
     }
-    if (inDocString || line === "" || line.startsWith("#")) return;
+    if (docString || line === "" || line.startsWith("#")) return;
 
     if (line.startsWith("@")) {
       pendingTags.push(...line.split(/\s+/).filter((t) => t.startsWith("@")));
@@ -92,6 +93,10 @@ function parseFeatureText(file: string, text: string): Scenario[] {
     }
     if (line.startsWith("Rule:")) {
       ruleTags = pendingTags;
+      pendingTags = [];
+      return;
+    }
+    if (line.startsWith("Examples:") || line.startsWith("Scenarios:")) {
       pendingTags = [];
       return;
     }
@@ -109,20 +114,28 @@ function parseFeatureText(file: string, text: string): Scenario[] {
       pendingTags = [];
     }
   });
+  if (docString) throw new Error(`${file}: unclosed ${docString} doc string`);
   return scenarios;
 }
 
-const STRING_LITERAL = /(["'`])((?:\\.|(?!\1)[^\\])*)\1/gs;
+/** A small lexical reader, not a TypeScript evaluator: computed names and aliases are not declarations here. */
+function testTokens(source: string): string[] {
+  return (
+    source.match(
+      /"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|`(?:\\.|[^`\\])*`|\/\/[^\n]*|\/\*[\s\S]*?\*\/|[a-z_$][\w$]*|\S/gi,
+    ) ?? []
+  ).filter((token) => !token.startsWith("//") && !token.startsWith("/*"));
+}
 
-/**
- * Comments go before the literals are read: an apostrophe in a prose comment
- * ("onboarding's") would otherwise open a string that swallows every test
- * name up to the next quote. Whole-line comments and block comments only; a
- * comment after code on the same line stays, since "//" also lives inside a
- * URL in a string.
- */
-function withoutComments(source: string): string {
-  return source.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+/** End of a call or table argument, including nested calls. */
+function afterCall(tokens: string[], at: number): number {
+  let depth = 0;
+  do {
+    if (tokens[at] === "(") depth++;
+    if (tokens[at] === ")") depth--;
+    at++;
+  } while (at < tokens.length && depth > 0);
+  return at;
 }
 
 function collectTestNames(files: string[]): Map<string, string[]> {
@@ -131,11 +144,30 @@ function collectTestNames(files: string[]): Map<string, string[]> {
   return names;
 }
 
-/** Adds the string literals of one test file's text, named by its path. */
+/** Reads a test's literal name, including each(table)(name), never an assertion, comment or skipped call. */
 function addTestNames(names: Map<string, string[]>, file: string, text: string): void {
-  const source = withoutComments(text);
-  for (const match of source.matchAll(STRING_LITERAL)) {
-    const literal = match[2] ?? "";
+  const tokens = testTokens(text);
+  for (let index = 0; index < tokens.length; index++) {
+    if (!["it", "test", "describe"].includes(tokens[index] ?? "") || tokens[index - 1] === ".")
+      continue;
+    let at = index + 1;
+    let skipped = false;
+    while (tokens[at] === ".") {
+      const modifier = tokens[at + 1];
+      at += 2;
+      if (modifier === "each" || modifier === "for") {
+        if (tokens[at] === "(") at = afterCall(tokens, at);
+      } else if (!["only", "concurrent", "sequential"].includes(modifier ?? "")) skipped = true;
+    }
+    if (tokens[at] !== "(") continue;
+    if (skipped) {
+      // A skipped describe's children are skipped too.
+      index = afterCall(tokens, at) - 1;
+      continue;
+    }
+    const quoted = tokens[at + 1] ?? "";
+    if (!/^["'`]/.test(quoted) || quoted.includes("${")) continue;
+    const literal = quoted.slice(1, -1);
     if (literal === "") continue;
     const holders = names.get(literal) ?? [];
     holders.push(file);
@@ -175,6 +207,8 @@ function judge(
   list: boolean,
 ): { errors: string[]; pending: number; implemented: number } {
   const errors: string[] = [];
+  if (scenarios.length === 0)
+    errors.push("no scenarios found: run from the repository root with its feature files present");
   const seen = new Map<string, Scenario>();
   for (const s of scenarios) {
     const first = seen.get(s.name);
@@ -214,6 +248,17 @@ function judge(
 }
 
 function selfTest(): void {
+  expectProblems("no feature input", judge([], new Map(), false).errors, ["no scenarios found"]);
+  let malformedRefused = false;
+  try {
+    parseFeatureText(
+      "broken.feature",
+      'Feature: Broken\nScenario: First\nGiven a text\n"""\nScenario: Hidden',
+    );
+  } catch (error) {
+    malformedRefused = error instanceof Error && error.message.includes("unclosed");
+  }
+  if (!malformedRefused) throw new Error("an unclosed doc string hid scenarios");
   const NAME = "A like is refused";
   const feature = (...lines: string[]) => ["Feature: Likes", ...lines].join("\n");
   const test = (name: string) => `it(${JSON.stringify(name)}, () => {});\n`;
@@ -230,6 +275,21 @@ function selfTest(): void {
       [],
     ],
     ["a pending scenario", [feature("  @pending", `  Scenario: ${NAME}`)], "", []],
+    [
+      "a pending Examples tag does not leak",
+      [
+        feature(
+          "Scenario Outline: First",
+          "@pending",
+          "Examples:",
+          "| value |",
+          "| one |",
+          `Scenario: ${NAME}`,
+        ),
+      ],
+      test("First"),
+      missing(),
+    ],
     ["a pending feature", [`@pending\n${feature(`  Scenario: ${NAME}`)}`], "", []],
     [
       "two scenarios of one name",
@@ -314,6 +374,48 @@ function selfTest(): void {
       "a longer name and the name",
       [feature(`  Scenario: ${NAME}`)],
       test(`${NAME} twice`) + test(NAME),
+      [],
+    ],
+    [
+      "a string in an assertion",
+      [feature(`  Scenario: ${NAME}`)],
+      `expect(${JSON.stringify(NAME)}).toBeTruthy();`,
+      missing(),
+    ],
+    [
+      "a string in a trailing comment",
+      [feature(`  Scenario: ${NAME}`)],
+      `const x = 1; // ${test(NAME)}`,
+      missing(),
+    ],
+    [
+      "a skipped test",
+      [feature(`  Scenario: ${NAME}`)],
+      `it.skip(${JSON.stringify(NAME)}, () => {});`,
+      missing(),
+    ],
+    [
+      "a todo test",
+      [feature(`  Scenario: ${NAME}`)],
+      `it.todo(${JSON.stringify(NAME)});`,
+      missing(),
+    ],
+    [
+      "inside a skipped suite",
+      [feature(`  Scenario: ${NAME}`)],
+      `describe.skip("Later", () => { ${test(NAME)} });`,
+      missing(),
+    ],
+    [
+      "an each table",
+      [feature(`  Scenario: ${NAME}`)],
+      `it.each([[1], [2]])(${JSON.stringify(NAME)}, () => {});`,
+      [],
+    ],
+    [
+      "a URL before a test",
+      [feature(`  Scenario: ${NAME}`)],
+      `const url = "https://example.test/path"; ${test(NAME)}`,
       [],
     ],
     // attack: a test that is commented out, a line each, counts
