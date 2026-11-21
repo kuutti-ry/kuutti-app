@@ -1,7 +1,7 @@
 # Deleting the account (#51, TD-7, ADR-007): Settings asks first, keeping the
 # account closes the question with nothing deleted, and "Delete everything"
 # erases the account at once and signs the person out. The same person's next
-# bank login is refused for the cooldown, with the date. Aino is a newcomer:
+# bank login is refused for the cooldown, with the date. Sofia is a newcomer:
 # her first login registers her, so the flow needs nobody else's state, and
 # `pnpm demo:reset` forgets her identity, the cooldown with it.
 appId: fi.kumpa
@@ -10,7 +10,7 @@ name: Deleting the account asks first, signs the person out, and the next login 
 - runFlow:
     file: ../common/sign-in.yaml
     env:
-      PERSONA: Aino Virtanen
+      PERSONA: Sofia Heino
 # Settings is reachable before onboarding is done.
 - openLink: fi.kumpa://settings
 # The deletion opens under Your account, the last row of the list (#287,
@@ -46,7 +46,7 @@ name: Deleting the account asks first, signs the person out, and the next login 
 - runFlow:
     file: ../common/bank-login.yaml
     env:
-      PERSONA: Aino Virtanen
+      PERSONA: Sofia Heino
 - extendedWaitUntil:
     visible: "You deleted your account recently.*|Poistit tilisi äskettäin.*|Du raderade ditt konto nyligen.*"
     timeout: 30000

@@ -102,19 +102,25 @@ Forty-eight more people, for the accounts a staging phone can sign in as to go t
 | who | people | ages | seek | age window | here for |
 |---|---|---|---|---|---|
 | men for the members | 22 | 40 to 53 | women, non-binary people | 30 to 62 | long-term |
-| women for the members | 4 | 45 to 52 | women, non-binary people | 40 to 60 | long-term |
+| women for the members | 4 | 45 to 52 | anyone | 40 to 60 | long-term |
 | non-binary people | 2 | 34, 38 | anyone | 25 to 55 | open to either |
 | younger men | 10 | 28 to 31 | anyone | 21 to 45 | open to either |
 | younger women | 10 | 24 to 31 | anyone | 21 to 45 | open to either |
 
-A card never shows whom its person seeks or their age window, so these are wide and one man fits three members. What sets the number is Sanna, who seeks only men. Wider windows on the members' side would not lower it: filters run both ways. A test holds all of it against the product's filters on every month to the end of 2028 (`apps/api/scripts/demo/demo-cast.test.ts`), and that nobody here fits Iida's window, so her queue stays what her flow expects.
+A card never shows whom its person seeks or their age window, so these are wide and one man fits three members. What sets the number is Sanna, who seeks only men; the four women seek anyone, so that Tapio, who seeks women, has cards among them. Wider windows on the members' side would not lower it: filters run both ways. A test holds all of it against the product's filters on every month to the end of 2028 (`apps/api/scripts/demo/demo-cast.test.ts`), and that nobody here fits Iida's window, so her queue stays what her flow expects.
 
 | account | test bank | cards | waiting first | open chats |
 |---|---|---|---|---|
 | Sanna | Nordea `DEMOUSER4` | 20, men | Jere's fish, likes of Risto and Karim | Juha, on her turn; Mika, on his |
 | Noa | Nordea `DEMOUSER3` | 26, every gender | Jere's fish, likes of Robin and Timo | Harri, on their turn; Leena, on hers |
 | Kerttu | Säästöpankki `22222222` | 25, women and men | Jere's fish, a like of Tiina | Seppo, on her turn, once she has accepted the terms again |
-| Aino, Onni | Nordea `DEMOUSER2`, `DEMOUSER1` | 8 to 10 after onboarding, at the window the app offers | nothing | nothing |
+| Aino | Nordea `DEMOUSER2` | 9 or more, men and non-binary people | Niko's fish, likes of Aleksi and Sasha | Elias, on her turn; Oskari, on his |
+| Onni | Nordea `DEMOUSER1` | 8 or more, women | Nea's fish, likes of Fanni and Emilia | Aada, on his turn; Ronja, on hers |
+| Tapio | OP, prefilled | 3, women: the cast has four of his years | Päivi's fish, a like of Tiina | Sari, on his turn |
+| Ilona | Aktia, prefilled | 14 or more, men | Antero's fish, likes of Esa and Olavi | Anders, on her turn; Lasse, on his |
+| Helmi | Mobiilivarmenne emulator | none: nobody here is of her years, and the release has no face of her yet | nothing | nothing |
+
+The last five are the members to explore (#560, the maintainer, 21/11/2026): every test user of the bed that works is a member, so whichever a reviewer or a tester types, the app is there to go through, and no flow reads what they change. Personas are each other's cards too: Aino and Onni; Tapio and each of Sanna, Ilona and, until the summer of 2027, Kerttu. A newcomer at the mock bank (Sofia, or Otto of the onboarding's flow) finds 8 to 10 people after onboarding, at the window the app offers.
 
 The reset and the stories give the likes, the fish and the chats (`giveCastStories`), as rows, the likes on the day before. So the population comes first: a write replaces the people, and takes what they gave the members with it, so after a later write the reset runs again. Where no cast has been written, the reset gives nothing and says so. An erased member's chats would stay for the other side, who will never read them, so each giving takes those away first.
 

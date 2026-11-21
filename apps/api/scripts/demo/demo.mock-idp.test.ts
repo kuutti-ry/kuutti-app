@@ -107,9 +107,10 @@ async function world(ctx: TestContext, overrides: Record<string, string> = {}) {
 
 describe("the histories are what a person's own answers would be", () => {
   test("every one passes the contracts, and there is one for each persona with a history", () => {
-    // The people of Iida's queue (#379) have stories too: their profiles are her cards.
+    // The people of Iida's queue (#379) have stories too: their profiles are her cards. So do
+    // the members to explore (#560), and nobody of the walkthrough or of the ages.
     expect(PERSONA_HISTORIES.map((h) => h.key).sort()).toEqual(
-      DEMO_PERSONAS.filter((p) => p.group === "history" || p.group === "cards")
+      DEMO_PERSONAS.filter((p) => ["history", "members", "cards"].includes(p.group))
         .map((p) => p.key)
         .sort(),
     );
@@ -684,7 +685,12 @@ describe.skipIf(!reachable)("the personas, through the mock bank", () => {
   });
 
   test("the histories leave each persona where the mock bank's page says", async ({ ctx }) => {
-    const { bank, context, lines } = await world(ctx);
+    // The stories are given under the limits a reset meets: twenty-four sign-ins fit one
+    // minute of its address (ADR-026), and a wait for the next would run this test out of
+    // its time. The looks below sign in seventeen times more, as people's own phones would,
+    // so they go to a second process of the same API, with the same key and windows of its own.
+    const hmacKey = randomBytes(32).toString("hex");
+    const { context, lines } = await world(ctx, { HETU_HMAC_KEY: hmacKey });
     const began = Date.now();
     const results: HistoryResult[] = [];
     for (const history of PERSONA_HISTORIES) {
@@ -692,6 +698,7 @@ describe.skipIf(!reachable)("the personas, through the mock bank", () => {
       expect(given).toMatchObject({ key: history.key });
       results.push(given);
     }
+    const { bank, lines: later } = await world(ctx, { HETU_HMAC_KEY: hmacKey });
     expect(await giveConversations(ctx.client, results, new Date())).toEqual({
       written: 4,
       already: 0,
@@ -728,15 +735,21 @@ describe.skipIf(!reachable)("the personas, through the mock bank", () => {
     expect(await stateOf("jussi")).toEqual(["active"]);
     expect(await stateOf("laura")).toEqual(["active"]);
     expect(await stateOf("emmi")).toEqual(["active"]);
-    expect(await stateOf("onni")).toEqual(["registered"]);
-    expect(await stateOf("tapio")).toEqual(["banned"]);
+    expect(await stateOf("aune")).toEqual(["active"]);
+    // The members to explore (#560): whoever a person reaches through Telia's bed is a member.
+    for (const key of ["aino", "onni", "tapio", "ilona"]) {
+      expect(await stateOf(key), key).toEqual(["active"]);
+    }
+    // The states a flow needs are on people of this bank alone.
+    expect(await stateOf("otto")).toEqual(["registered"]);
+    expect(await stateOf("reijo")).toEqual(["banned"]);
     // His ban is a sanction row by nobody (ADR-024 §10): the panel lists it, an admin can lift it.
     const { rows: bans } = await ctx.client.query<{ kind: string; created_by: string | null }>(
       `SELECT s.kind, s.created_by FROM sanction s JOIN identity i ON i.id = s.identity_id
-       WHERE i.broker_subject = 'tapio'`,
+       WHERE i.broker_subject = 'reijo'`,
     );
     expect(bans).toEqual([{ kind: "ban", created_by: null }]);
-    expect(await stateOf("ilona")).toEqual(["deleted"]);
+    expect(await stateOf("marjatta")).toEqual(["deleted"]);
 
     const sanna = await as("sanna");
     expect(sanna.login.outcome).toBe("resumed");
@@ -746,7 +759,7 @@ describe.skipIf(!reachable)("the personas, through the mock bank", () => {
     expect(sanna.profile.completeness.missing).toEqual(["photos"]);
 
     // Registered and gone: nothing answered, the home among it (ADR-061 §1).
-    expect((await as("onni")).onboarding.missing).toEqual([
+    expect((await as("otto")).onboarding.missing).toEqual([
       "name",
       "gender",
       "seeks",
@@ -758,6 +771,20 @@ describe.skipIf(!reachable)("the personas, through the mock bank", () => {
       "photos",
     ]);
     expect((await as("noa")).onboarding.gender).toBe("non_binary");
+
+    // A member to explore signs in to a whole profile, in the language of their story.
+    for (const [key, name] of [
+      ["aino", "Aino"],
+      ["onni", "Onni"],
+      ["tapio", "Tapio"],
+      ["ilona", "Ilona"],
+    ] as const) {
+      const member = await as(key);
+      expect(member.login.outcome, key).toBe("resumed");
+      expect(member.onboarding.missing, key).toEqual(["photos"]);
+      expect(member.profile.profile?.displayName, key).toBe(name);
+      expect(member.profile.completeness.missing, key).toEqual(["photos"]);
+    }
 
     // The chat's pair, as each one's list says it (#348): Antti has Ville's
     // last message to read and a silent match with Sanna in the archive.
@@ -824,22 +851,23 @@ describe.skipIf(!reachable)("the personas, through the mock bank", () => {
     );
     expect(older).toEqual([{ version: OLDER_TERMS_VERSION }]);
 
-    expect(await loginAs(persona("tapio"), bank)).toEqual({
+    expect(await loginAs(persona("reijo"), bank)).toEqual({
       kind: "refused",
       error: "auth_banned",
       until: null,
     });
-    const ilona = await loginAs(persona("ilona"), bank);
-    expect(ilona).toMatchObject({ kind: "refused", error: "auth_cooldown" });
+    const marjatta = await loginAs(persona("marjatta"), bank);
+    expect(marjatta).toMatchObject({ kind: "refused", error: "auth_cooldown" });
     // The waiting time, counted from when she deleted her account.
-    const until = Date.parse((ilona.kind === "refused" && ilona.until) || "");
+    const until = Date.parse((marjatta.kind === "refused" && marjatta.until) || "");
     expect(until).toBeGreaterThanOrEqual(began + REREGISTER_COOLDOWN_DAYS * DAY_MS - 1000);
     expect(until).toBeLessThanOrEqual(ended + REREGISTER_COOLDOWN_DAYS * DAY_MS + 1000);
 
     // Nothing of a persona's bank claims is in a log line: no code, no name.
     // The codes themselves, not a pattern: a request id can look like one.
-    const logged = JSON.stringify(lines());
+    const logged = JSON.stringify([...lines(), ...later()]);
     expect(lines().length).toBeGreaterThan(20);
+    expect(later().length).toBeGreaterThan(20);
     for (const p of DEMO_PERSONAS) {
       expect(logged).not.toContain(p.family);
       for (const at of [began, ended]) expect(logged).not.toContain(personaHetu(p, new Date(at)));
@@ -865,28 +893,31 @@ describe.skipIf(!reachable)("the personas, through the mock bank", () => {
     const { bank, context, logger } = await world(ctx);
     const now = () => new Date();
     for (const history of PERSONA_HISTORIES) await giveHistory(history, viaRoutes(context));
-    await loginAs(persona("aino"), bank);
+    await loginAs(persona("sofia"), bank);
     // Somebody who is no persona, at the same bank.
     const other = await loginAs({ ...persona("mikael"), key: "somebody", individual: 950 }, bank);
     expect(other).toMatchObject({ kind: "session", outcome: "created" });
     // And a persona's name at another bank: not ours to forget.
     await ctx.client.query(
       `INSERT INTO identity (hetu_hmac, broker_subject, acr, amr)
-       VALUES ('not-the-mock-bank', 'aino', 'x', ARRAY['https://another.bank/method'])`,
+       VALUES ('not-the-mock-bank', 'sofia', 'x', ARRAY['https://another.bank/method'])`,
     );
 
     const count = async (sql: string) =>
       Number((await ctx.client.query<{ n: string }>(sql)).rows[0]?.n);
     const personas = `broker_subject = ANY(ARRAY[${DEMO_PERSONAS.map((p) => `'${p.key}'`).join(",")}])`;
-    // The nineteen with a history, Aino, and Aino's name at the other bank.
-    expect(await count(`SELECT count(*) AS n FROM identity WHERE ${personas}`)).toBe(21);
-    // Tapio's ban, which his erasure keeps on the identity (ADR-024 §8).
+    // The twenty-four with a history, Sofia, and Sofia's name at the other bank.
+    expect(await count(`SELECT count(*) AS n FROM identity WHERE ${personas}`)).toBe(
+      PERSONA_HISTORIES.length + 2,
+    );
+    expect(PERSONA_HISTORIES).toHaveLength(24);
+    // Reijo's ban, which his erasure keeps on the identity (ADR-024 §8).
     expect(await count("SELECT count(*) AS n FROM sanction")).toBe(1);
 
     const result = await resetPersonas({ db: ctx.client, logger, now });
-    // Twenty identities of the mock bank; nineteen accounts were live (Ilona's was a tombstone
-    // already, Tapio's was banned and is taken as it is).
-    expect(result).toEqual({ identities: 20, erased: 19, objects: 0, spared: [] });
+    // Twenty-five identities of the mock bank; twenty-four accounts were live (Marjatta's was a
+    // tombstone already, Reijo's was banned and is taken as it is).
+    expect(result).toEqual({ identities: 25, erased: 24, objects: 0, spared: [] });
     expect(await count(`SELECT count(*) AS n FROM identity WHERE ${personas}`)).toBe(1);
     expect(
       await count(
@@ -899,7 +930,7 @@ describe.skipIf(!reachable)("the personas, through the mock bank", () => {
     expect(await count("SELECT count(*) AS n FROM sanction")).toBe(0);
 
     // Everybody is a newcomer again, the banned and the deleted included.
-    for (const key of ["sanna", "tapio", "ilona", "aino"]) {
+    for (const key of ["sanna", "reijo", "marjatta", "sofia"]) {
       expect(await loginAs(persona(key), bank), key).toMatchObject({
         kind: "session",
         outcome: "created",

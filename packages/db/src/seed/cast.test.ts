@@ -139,7 +139,31 @@ describe("what the cast gives the members", () => {
     }
     const pairs = CAST_CONVERSATIONS.map((told) => told.between.join("+"));
     expect(new Set(pairs).size).toBe(pairs.length);
-    expect(CAST_LIKES.map((likes) => likes.of).sort()).toEqual(["kerttu", "noa", "sanna"]);
+    // Every member who can see people has a fish, likes and a chat waiting: the three
+    // of the flows, and the four to explore (#560). Helmi waits for her pictures.
+    expect(CAST_LIKES.map((likes) => likes.of).sort()).toEqual([
+      "aino",
+      "ilona",
+      "kerttu",
+      "noa",
+      "onni",
+      "sanna",
+      "tapio",
+    ]);
+    expect([...members].sort()).toEqual([
+      "aino",
+      "henna",
+      "iida",
+      "ilona",
+      "katja",
+      "kerttu",
+      "minna",
+      "noa",
+      "onni",
+      "riikka",
+      "sanna",
+      "tapio",
+    ]);
   });
 
   it("keeps every chat open, oldest message first, and one on each member's turn with something unread", () => {
@@ -192,14 +216,14 @@ describe("what the cast gives the members", () => {
         expect(await writeConversations(pool, accounts, NOW, CAST_CONVERSATIONS)).toEqual({
           written: 2,
           already: 0,
-          missing: 3,
+          missing: CAST_CONVERSATIONS.length - 2,
         });
         const messages = await pool.query("SELECT count(*)::int AS n FROM message");
         expect(messages.rows).toEqual([{ n: 6 }]);
         expect(await writeConversations(pool, accounts, NOW, CAST_CONVERSATIONS)).toEqual({
           written: 0,
           already: 2,
-          missing: 3,
+          missing: CAST_CONVERSATIONS.length - 2,
         });
       } finally {
         await pool.end();

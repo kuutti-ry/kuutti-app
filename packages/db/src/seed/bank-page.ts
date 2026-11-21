@@ -31,7 +31,12 @@ const GROUPS: ReadonlyArray<{ group: DemoPersona["group"]; title: string; lead: 
   {
     group: "history",
     title: "People with a history",
-    lead: "The same identity on every day, and, but for the three pairs of the conversations, Iida and Ritva, the same person as a test user of Telia's bed on staging. What Kuutti holds about them is given by pnpm demo:reset; before it has run they are newcomers too.",
+    lead: "The same identity on every day; Sanna, Noa and Kerttu are also test users of Telia's bed on staging, the rest exist at this bank only. What Kuutti holds about them is given by pnpm demo:reset; before it has run they are newcomers too. The flows sign in as these, so what you change here a flow may read.",
+  },
+  {
+    group: "members",
+    title: "Members to explore",
+    lead: "The other working test users of Telia's bed on staging, each a member with a profile, given by pnpm demo:reset. No flow signs in as them: like, pass, write and change what you want.",
   },
   {
     group: "ages",
@@ -68,10 +73,14 @@ export function renderBankPage(personas: readonly DemoPersona[]): string {
   // last button ends 699 CSS px down the page at 375 to 411 px wide; an iPhone 17's Safari shows
   // about 728 above its floating bar, a Pixel 7's Chrome about 780. The eleventh row took a shorter
   // warning, less room above the list and a narrower gap between its rows. The people of Iida's
-  // queue are cards a demo does not sign in as, so they are not listed. A twenty-second name needs a third
-  // column, and every name must stay on one line, as Mikael Lindqvist's does.
-  const names = personas
-    .filter((p) => p.group !== "cards")
+  // queue are cards a demo does not sign in as, so they are not listed, and the members, as whom
+  // no flow signs in, come after everybody a flow taps (#560): a person scrolls to them. A
+  // twenty-second name a flow taps needs a third column, and every name must stay on one line,
+  // as Mikael Lindqvist's does.
+  const names = [
+    ...personas.filter((p) => p.group !== "cards" && p.group !== "members"),
+    ...personas.filter((p) => p.group === "members"),
+  ]
     .map(
       (p) =>
         `        <li><button type="button" data-persona="${escapeHtml(p.key)}">${escapeHtml(`${p.given} ${p.family}`)}</button></li>`,

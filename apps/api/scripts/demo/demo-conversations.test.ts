@@ -1,5 +1,6 @@
 import { MATCHING_CONFIG_V1 } from "@kuutti/db";
 import {
+  DEMO_PERSONAS,
   PERSONA_CONVERSATIONS,
   PERSONA_HISTORIES,
   PERSONA_QUEUE_DAYS,
@@ -163,5 +164,35 @@ describe("the queue of the stories (#379)", () => {
         }
       }
     }
+  });
+});
+
+describe("the test persons of the bed (#560)", () => {
+  it("are each other's people where their answers allow, so two people at two phones can meet", () => {
+    // Mikael's bank returns a code the parser refuses (docs/vendors/telia.md 1.4): nobody reaches him.
+    const reachable = DEMO_PERSONAS.filter((p) => p.bank && p.key !== "mikael").map((p) => p.key);
+    expect(reachable).toHaveLength(8);
+    const pairsOn = (at: Date) =>
+      reachable
+        .flatMap((first, i) =>
+          reachable
+            .slice(i + 1)
+            .filter((second) => inEachOthersPool(poolPerson(first, at), poolPerson(second, at)))
+            .map((second) => [first, second].sort().join("+")),
+        )
+        .sort();
+    // Kerttu seeks people up to 56, which Tapio is until July 2027.
+    const tapioIs57 = new Date(Date.UTC(2027, 6, 1));
+    for (const at of MONTH_ENDS) {
+      const always = ["aino+onni", "ilona+tapio", "sanna+tapio"];
+      expect(pairsOn(at), at.toISOString().slice(0, 10)).toEqual(
+        at < tapioIs57 ? [...always, "kerttu+tapio"].sort() : always,
+      );
+    }
+    // Two have only the cast. Noa, 43, could be Aino's alone, who seeks non-binary people too,
+    // and a window of hers that held Noa would hold Jussi, 39, whom the contact share's flow
+    // keeps to Elina (above). Helmi, 94: nobody of her years exists, and she has no photos.
+    const linked = new Set(pairsOn(MONTH_ENDS[0] as Date).flatMap((pair) => pair.split("+")));
+    expect(reachable.filter((key) => !linked.has(key))).toEqual(["noa", "helmi"]);
   });
 });

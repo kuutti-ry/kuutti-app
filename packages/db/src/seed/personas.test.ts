@@ -34,14 +34,14 @@ const persona = (key: string) => {
 };
 
 describe("the personas of the mock bank", () => {
-  it("are twenty-five, each with a name of its own and an artificial code", () => {
-    expect(DEMO_PERSONAS).toHaveLength(25);
-    expect(new Set(DEMO_PERSONAS.map((p) => p.key)).size).toBe(25);
-    expect(new Set(DEMO_PERSONAS.map((p) => p.individual)).size).toBe(25);
+  it("are thirty, each with a name of its own and an artificial code", () => {
+    expect(DEMO_PERSONAS).toHaveLength(30);
+    expect(new Set(DEMO_PERSONAS.map((p) => p.key)).size).toBe(30);
+    expect(new Set(DEMO_PERSONAS.map((p) => p.individual)).size).toBe(30);
     // A name of its own: a flow finds the persona's button by the name, and
     // the chat's and the queue's flows find the other person by the given name.
-    expect(new Set(DEMO_PERSONAS.map((p) => p.given)).size).toBe(25);
-    expect(new Set(DEMO_PERSONAS.map((p) => `${p.given} ${p.family}`)).size).toBe(25);
+    expect(new Set(DEMO_PERSONAS.map((p) => p.given)).size).toBe(30);
+    expect(new Set(DEMO_PERSONAS.map((p) => `${p.given} ${p.family}`)).size).toBe(30);
     for (const p of DEMO_PERSONAS) {
       expect(p.key).toMatch(/^[a-z]+$/);
       // 900 to 999: never given to a person.
@@ -86,12 +86,18 @@ describe("the personas of the mock bank", () => {
       expect(p.bank, key).toBeDefined();
       for (const at of DAYS) expect(personaHetu(p, at), key).toBe(code);
     }
-    // The rest are the mock bank's alone: the ages, the three pairs of the
-    // conversations, the chat's (#348), the contact share's (#103) and the
-    // report's (#351), the queue's cast (#379), and What you seek's (#542), for
-    // whom the bed has no test user left.
+    // The rest are the mock bank's alone: the ages, the flows' newcomer and
+    // the four states a flow needs and a person exploring does not (#560), the
+    // three pairs of the conversations, the chat's (#348), the contact
+    // share's (#103) and the report's (#351), the queue's cast (#379), and
+    // What you seek's (#542), for whom the bed has no test user left.
     const mockOnly = DEMO_PERSONAS.filter((p) => p.bank === undefined).map((p) => p.key);
     expect(mockOnly).toEqual([
+      "sofia",
+      "otto",
+      "reijo",
+      "marjatta",
+      "aune",
       "antti",
       "ville",
       "elina",
@@ -110,6 +116,11 @@ describe("the personas of the mock bank", () => {
       "siiri",
     ]);
     for (const key of [
+      "sofia",
+      "otto",
+      "reijo",
+      "marjatta",
+      "aune",
       "antti",
       "ville",
       "elina",
@@ -134,7 +145,7 @@ describe("the personas of the mock bank", () => {
       const same = personaHetu(p, first) === personaHetu(p, later);
       expect(same, p.key).toBe(hasFixedIdentity(p));
       // A history needs an identity that stays.
-      if (p.group === "history" || p.group === "cards") {
+      if (p.group === "history" || p.group === "members" || p.group === "cards") {
         expect(hasFixedIdentity(p), p.key).toBe(true);
       }
     }
@@ -206,13 +217,38 @@ describe("the login page of the mock bank", () => {
     expect(names).toBeGreaterThan(-1);
     expect(names).toBeLessThan(cards);
     const listed = DEMO_PERSONAS.filter((p) => p.group !== "cards");
-    // Two columns on a phone hold twenty-one names (bank-page.ts).
-    expect(listed.length).toBeLessThanOrEqual(21);
+    const short = (p: (typeof DEMO_PERSONAS)[number]) =>
+      `<button type="button" data-persona="${p.key}">${p.given} ${p.family}</button>`;
     for (const p of listed) {
-      const short = `<button type="button" data-persona="${p.key}">${p.given} ${p.family}</button>`;
       // The first button a selector by the name finds is the short one.
-      expect(page.indexOf(short)).toBeGreaterThan(names);
-      expect(page.indexOf(short)).toBeLessThan(cards);
+      expect(page.indexOf(short(p))).toBeGreaterThan(names);
+      expect(page.indexOf(short(p))).toBeLessThan(cards);
+    }
+    // Two columns on a phone hold twenty-one names (bank-page.ts): those are the
+    // names a flow taps, and the members, as whom no flow signs in, come after
+    // every one of them (#560).
+    const members = listed.filter((p) => p.group === "members");
+    const tapped = listed.filter((p) => p.group !== "members");
+    expect(tapped.length).toBeLessThanOrEqual(21);
+    expect(members.map((p) => p.key)).toEqual(["aino", "onni", "tapio", "ilona", "helmi"]);
+    const lastTapped = Math.max(...tapped.map((p) => page.indexOf(short(p))));
+    for (const p of members) expect(page.indexOf(short(p)), p.key).toBeGreaterThan(lastTapped);
+  });
+
+  it("gives the members to explore a section of their own, each with where the person is on the bed (#560)", () => {
+    const theirs = page.indexOf('<section aria-labelledby="group-members">');
+    const next = page.indexOf('<section aria-labelledby="group-ages">');
+    expect(theirs).toBeGreaterThan(page.indexOf('<section aria-labelledby="group-history">'));
+    expect(next).toBeGreaterThan(theirs);
+    const section = page.slice(theirs, next);
+    for (const p of DEMO_PERSONAS.filter((p) => p.group === "members")) {
+      // Whoever is free to explore is somebody a person can reach through Telia's bed.
+      expect(p.bank, p.key).toBeDefined();
+      expect(section, p.key).toContain(`<span class="name">${p.given} ${p.family}</span>`);
+    }
+    // Nobody whose state a flow reads is offered for exploring.
+    for (const key of ["sanna", "noa", "kerttu", "otto", "reijo", "marjatta", "aune", "sofia"]) {
+      expect(section, key).not.toContain(`data-persona="${key}"`);
     }
   });
 

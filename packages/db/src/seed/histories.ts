@@ -2,7 +2,7 @@ import type { Gender, ProfileUpdate } from "@kuutti/schema";
 import { DEMO_PERSONAS, type DemoPersona } from "./personas.ts";
 
 /**
- * What the nineteen personas "with a history" have done before the demo begins
+ * What the twenty-four personas with a story have done before the demo begins
  * (#73, ADR-014 §12). The ages follow the codes of Telia's test persons
  * (#140), and each age window holds its persona's own age (a test says so).
  * Data only: `pnpm demo:reset` gives a persona its history by logging it in
@@ -10,6 +10,11 @@ import { DEMO_PERSONAS, type DemoPersona } from "./personas.ts";
  * as the app would, so every rule that holds for a person holds for a
  * persona. What no route can do (an older wording of the terms, a
  * ban) is named in `afterwards` and done in the database.
+ *
+ * Every working test user of the bed is a member with a whole profile (#560,
+ * the maintainer, 21/11/2026): whoever types one on staging finds a person to
+ * be, not a state to look at. The states live on people of the mock bank
+ * alone (Otto, Reijo, Marjatta, Aune).
  *
  * The two newcomers and the four ages have no history: they begin as people
  * Kuutti has never seen.
@@ -81,7 +86,88 @@ export const PERSONA_HISTORIES: readonly PersonaHistory[] = [
     photos: 5,
     afterwards: "nothing",
   },
-  { key: "onni", locale: "fi", onboarding: null, profile: null, photos: 0, afterwards: "nothing" },
+  // The members to explore (#560): Aino and Onni in each other's pool, both
+  // ways, and in no pair's and not in Iida's cast's (a test says so: she seeks
+  // no women and nobody as old as Jussi, he nobody as old as Elina). The
+  // younger half of the cast (cast.ts) is theirs. Their pictures are the camera
+  // rolls the release always had of them.
+  {
+    key: "aino",
+    locale: "fi",
+    onboarding: {
+      gender: "woman",
+      seeks: ["man", "non_binary"],
+      ageWindow: { min: 25, max: 38 },
+      home: "00180",
+    },
+    profile: {
+      displayName: "Aino",
+      bio: "Luokanopettaja, joka viettää kesäillat mökin portailla ja syksyt meren rannalla tuulessa. Leivon korvapuusteja useammin kuin myönnän. Etsin jotakuta, jonka kanssa nauraa ääneen.",
+      bioPreset: null,
+      fields: {
+        languages: ["fi", "en", "sv"],
+        intent: "long_term",
+        monogamy: "monogamous",
+        hasKids: "no",
+        wantsKids: "want",
+        smoking: "never",
+        drinking: "socially",
+        education: "maisteri",
+        field: ["education"],
+        occupation: ["education"],
+        occupationTitle: "Luokanopettaja",
+        hobbies: ["baking", "cottage", "reading", "forest_walks"],
+        exercise: "weekly",
+        height: 166,
+      },
+      prompts: [
+        { key: "sunday", answer: "Pitkä kävely meren rannassa ja sen päälle pullakahvit." },
+        { key: "hidden_talent", answer: "Muistan jokaisen oppilaani lempieläimen." },
+      ],
+    },
+    photos: 5,
+    afterwards: "nothing",
+  },
+  {
+    key: "onni",
+    locale: "en",
+    onboarding: {
+      gender: "man",
+      seeks: ["woman"],
+      ageWindow: { min: 22, max: 36 },
+      home: "00510",
+    },
+    profile: {
+      displayName: "Onni",
+      bio: "Sound engineer who plays disc golf badly and the guitar slightly better. Summers by a lake, winters in a rehearsal room. Looking for somebody who says yes to a swim after the sauna.",
+      bioPreset: null,
+      fields: {
+        languages: ["fi", "en"],
+        intent: "open_to_either",
+        hasKids: "no",
+        wantsKids: "not_sure",
+        smoking: "never",
+        drinking: "socially",
+        education: "amk",
+        field: ["tech", "arts"],
+        occupation: ["media"],
+        occupationTitle: "Sound engineer",
+        hobbies: ["making_music", "swimming", "sauna", "concerts"],
+        exercise: "weekly",
+        height: 181,
+      },
+      prompts: [
+        {
+          key: "first_date",
+          answer: "Disc golf, and the loser buys the ice cream. I usually buy.",
+        },
+        { key: "teach_me", answer: "Teach me to cook something that is not pasta." },
+      ],
+    },
+    // Four of the eight: the onboarding's flow uploads others of the roll as Otto.
+    photos: 4,
+    afterwards: "nothing",
+  },
   {
     key: "noa",
     locale: "en",
@@ -149,43 +235,92 @@ export const PERSONA_HISTORIES: readonly PersonaHistory[] = [
     photos: 4,
     afterwards: "older_terms",
   },
+  // Tapio and Ilona (#560): in each other's pool and in Sanna's, Tapio in
+  // Kerttu's until he is older than her window, and neither in a pair's: he
+  // is older than Elina seeks and she older than Antti and Jussi seek.
   {
     key: "tapio",
     locale: "fi",
     onboarding: {
       gender: "man",
       seeks: ["woman"],
-      ageWindow: { min: 45, max: 60 },
+      ageWindow: { min: 42, max: 62 },
       home: "33100",
     },
-    profile: null,
-    photos: 0,
-    afterwards: "banned",
+    profile: {
+      displayName: "Tapio",
+      bio: "Koneistaja Tampereelta. Kesät kuluvat mökillä ja talvet pilkillä, ja halkopino on aina suorassa. Sauna lämpiää, kun sanot milloin.",
+      bioPreset: null,
+      fields: {
+        languages: ["fi"],
+        intent: "long_term",
+        monogamy: "monogamous",
+        hasKids: "yes_not_with_me",
+        wantsKids: "dont_want",
+        smoking: "never",
+        drinking: "socially",
+        education: "toinen_aste",
+        field: ["trades"],
+        occupation: ["trades_construction"],
+        occupationTitle: "Koneistaja",
+        hobbies: ["fishing", "cottage", "sauna", "diy"],
+        height: 178,
+      },
+      prompts: [
+        { key: "sunday", answer: "Aamulla pilkille, illalla saunaan. Välissä päiväunet." },
+        {
+          key: "proud_of",
+          answer: "Rakensin mökin saunan itse. Ovi narisee vähän, mutta lämpö pysyy.",
+        },
+      ],
+    },
+    photos: 3,
+    afterwards: "nothing",
   },
   {
     key: "ilona",
-    locale: "fi",
+    locale: "sv",
     onboarding: {
       gender: "woman",
       seeks: ["man"],
-      ageWindow: { min: 48, max: 64 },
+      ageWindow: { min: 44, max: 66 },
       home: "00550",
     },
     profile: {
       displayName: "Ilona",
-      bio: "Kokeilin, katsoin ja lähdin. Ehkä palaan.",
+      bio: "Översättare som odlar för många tomater på kolonilotten och cyklar längs havet så fort isen har gått. Jag söker någon som tål torr humor och hjälper till med skörden.",
       bioPreset: null,
-      fields: {},
-      prompts: [],
+      fields: {
+        languages: ["sv", "fi", "en", "de"],
+        intent: "long_term",
+        hasKids: "yes_not_with_me",
+        wantsKids: "dont_want",
+        smoking: "never",
+        drinking: "socially",
+        education: "maisteri",
+        field: ["arts"],
+        occupation: ["arts_culture"],
+        occupationTitle: "Översättare",
+        hobbies: ["gardening", "cycling", "reading", "cinema"],
+        pets: ["cat"],
+        height: 164,
+      },
+      prompts: [
+        {
+          key: "unpopular_opinion",
+          answer: "Tomater ska ätas varma från plantan, aldrig ur kylskåpet.",
+        },
+        { key: "ask_me", answer: "Fråga mig om boken jag översätter just nu." },
+      ],
     },
-    photos: 0,
-    afterwards: "deleted",
+    photos: 3,
+    afterwards: "nothing",
   },
-  // The break's flow (#170, ADR-022): onboarded and active, no photos, so the
-  // flow finds her signed in and leaves her so; nothing another flow reads.
-  // Her municipality, Pukkila, is too small to keep, so the nearest large
-  // enough is kept; Kerttu's area is too small and her municipality is not.
-  // With these two a persona shows every way a home is kept (ADR-061 §2).
+  // Helmi (#560): onboarded, and still without photos, since the release has
+  // no face of her yet; her profile says what it lacks. Her municipality,
+  // Pukkila, is too small to keep, so the nearest large enough is kept;
+  // Kerttu's area is too small and her municipality is not. With these two a
+  // persona shows every way a home is kept (ADR-061 §2).
   {
     key: "helmi",
     locale: "fi",
@@ -197,6 +332,63 @@ export const PERSONA_HISTORIES: readonly PersonaHistory[] = [
     },
     profile: {
       displayName: "Helmi",
+      bio: null,
+      bioPreset: "ask_me_instead",
+      fields: { intent: "long_term" },
+      prompts: [],
+    },
+    photos: 0,
+    afterwards: "nothing",
+  },
+  // The states the flows need (#560), on people of the mock bank alone, each
+  // where a test user of the bed was until 21/11/2026: Otto never onboarded
+  // (Onni), Reijo banned (Tapio), Marjatta deleted (Ilona), and Aune, the
+  // break's flow's (#170, ADR-022; Helmi): onboarded and active, no photos, so
+  // the flow finds her signed in and leaves her so; nothing another flow reads.
+  { key: "otto", locale: "fi", onboarding: null, profile: null, photos: 0, afterwards: "nothing" },
+  {
+    key: "reijo",
+    locale: "fi",
+    onboarding: {
+      gender: "man",
+      seeks: ["woman"],
+      ageWindow: { min: 48, max: 62 },
+      home: "70100",
+    },
+    profile: null,
+    photos: 0,
+    afterwards: "banned",
+  },
+  {
+    key: "marjatta",
+    locale: "fi",
+    onboarding: {
+      gender: "woman",
+      seeks: ["man"],
+      ageWindow: { min: 48, max: 64 },
+      home: "20100",
+    },
+    profile: {
+      displayName: "Marjatta",
+      bio: "Kokeilin, katsoin ja lähdin. Ehkä palaan.",
+      bioPreset: null,
+      fields: {},
+      prompts: [],
+    },
+    photos: 0,
+    afterwards: "deleted",
+  },
+  {
+    key: "aune",
+    locale: "fi",
+    onboarding: {
+      gender: "woman",
+      seeks: ["man"],
+      ageWindow: { min: 75, max: 99 },
+      home: "15100",
+    },
+    profile: {
+      displayName: "Aune",
       bio: null,
       bioPreset: "ask_me_instead",
       fields: { intent: "long_term" },

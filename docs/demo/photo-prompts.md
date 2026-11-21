@@ -17,14 +17,14 @@ Chosen 09/10/2026.
 
 | path | for | pictures | who |
 |---|---|---|---|
-| `faces/aino/1.jpg` … `5.jpg` | Aino's camera roll: the live upload of scene 2 of the storyboard, where she picks three or more | 5 | a woman of 33 |
+| `faces/aino/1.jpg` … `5.jpg` | Aino's profile (complete; a member to explore, #560), and the camera roll of scene 2 of the storyboard, where the newcomer picks three or more, until a release carries Sofia's own | 5 | a woman of 33 |
 | `faces/mikael/1.jpg` … `4.jpg` | Mikael's camera roll: the walkthrough in Swedish | 4 | a man of 56, Swedish-speaking |
 | `faces/sanna/1.jpg` … `5.jpg` | Sanna's profile (complete) | 5 | a woman of 49, an architect who birdwatches |
-| `faces/onni/1.jpg` … `8.jpg` | Onni's camera roll, for a demo that onboards him | 8 | a man of 26 |
+| `faces/onni/1.jpg` … `8.jpg` | Onni's profile (complete; a member to explore, #560): the first four; the last three are the camera roll of the onboarding flow, whose newcomer is Otto (`apps/mobile/e2e/flows/onboarding.yaml`) | 8 | a man of 26 |
 | `faces/noa/1.jpg` … `2.jpg` | Noa's profile (incomplete: the second face waits in review) | 2 | a non-binary person of 43, a doctoral researcher who climbs |
 | `faces/kerttu/1.jpg` … `4.jpg` | Kerttu's profile | 4 | a woman of 46, Swedish-speaking, by the sea with a book and coffee |
-| `faces/tapio/1.jpg` … `3.jpg` | nothing today: Tapio is banned and refused at login, and his story uploads nothing; the set lets a later story give him a profile without a new release | 3 | a man of 56 |
-| `faces/ilona/1.jpg` … `3.jpg` | nothing today: Ilona deleted her account and is refused at login; the same reason | 3 | a woman of 56 |
+| `faces/tapio/1.jpg` … `3.jpg` | Tapio's profile (complete; a member to explore, #560). Until 21/11/2026 nothing used the set: he was the banned persona, which Reijo of the mock bank is now | 3 | a man of 56 |
+| `faces/ilona/1.jpg` … `3.jpg` | Ilona's profile (complete; a member to explore, #560). Until 21/11/2026 nothing used the set: hers was the deleted account, which Marjatta's of the mock bank is now | 3 | a woman of 56 |
 | `faces/iida/1.jpg` … `3.jpg` | Iida's profile (complete): the persona of the queue's flow (#379) | 3 | a woman of 36 |
 | `faces/henna/1.jpg` … `2.jpg` | Henna's profile (complete): the card in Iida's queue that liked her and becomes a match (#379) | 2 | a woman of 37 |
 | `faces/katja/1.jpg` … `2.jpg` | Katja's profile (complete): a card in Iida's queue (#379) | 2 | a woman of 36 |

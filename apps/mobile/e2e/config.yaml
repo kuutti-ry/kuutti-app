@@ -14,7 +14,7 @@ executionOrder:
     - The bank login refuses the banned, the recently deleted and those under 18, and lets in 18 and 99
     - At 99 the age window starts at 94 to 99 and neither end can leave the bounds
     - A label chosen after non-binary shows on the card after the gender
-    # Onni, new.
+    # Otto, new.
     - A newcomer answers four questions before the bank, keeps them over a restart, and is taken through the rest one question per screen
     # Kerttu, and kids-labels on from her to Sanna.
     - A person who accepted an older wording of the terms is asked for the current one, and nothing else is asked again
@@ -49,7 +49,7 @@ executionOrder:
     - A sign-in link not asked for is refused without touching the session, and a refusal has words only for a fact of its own
     - Links to the card, photos and conversations cannot restore data after logout
     - Log out everywhere ends this device's session, and reopening the app does not bring it back
-    # Helmi, who takes a break and comes back.
+    # Aune, who takes a break and comes back.
     - Taking a break signs the person out everywhere, and the next bank login brings them back
     # Noa.
     - A deal-breaker is offered only on what the person answered, and a row that says to share first opens the question
@@ -74,6 +74,6 @@ executionOrder:
     # Riikka, a card of that queue, whose filters the short pool's flow changes and puts
     # back (#99, #581): after it, so that one stopping half-way takes no card from it.
     - With few people left, the queue's end offers the deal-breakers to relax for today in two groups, and reading them relaxes nothing
-    # Aino, who tells Kuutti she found someone, then whose account goes: last.
+    # Sofia, who tells Kuutti she found someone, then whose account goes: last.
     - I found someone tells Kuutti the reason once, thanks the person, and asks no more
     - Deleting the account asks first, signs the person out, and the next login is refused until the cooldown ends

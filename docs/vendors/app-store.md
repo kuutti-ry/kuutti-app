@@ -93,7 +93,7 @@ What the record holds, in English (U.K.) alone (ADR-063, Open 5):
 | Digital Services Act | the association's declaration, active since 2026-11-05 (App Store Connect, Business) |
 | App Review Information | a contact of the association with `hello@kumpa.fi`, the website's address (`hello@kuutti.app` when it was sent; changed on 2026-11-21); no demo account, since there are no passwords; the notes |
 
-The notes are plain text of at most 4,000 characters; these take 2,617. Their parts: Signing in (a link to an unlisted video of it, why bank identification is the only login, guideline 4.8, that this is the staging build, the five steps and a second person, `docs/runbooks/store-review.md`); What is different (4.3(b)); User-generated content (1.2); Account deletion (5.1.1(v)); Age.
+The notes are plain text of at most 4,000 characters; these take 2,617. Their parts: Signing in (a link to an unlisted video of it, why bank identification is the only login, guideline 4.8, that this is the staging build, the five steps and a second person, `DEMOUSER1`, whom the notes call a new member in the sign-up steps and who since #560 lands in the app as a member; the line is reworded on the maintainer's yes, `docs/runbooks/store-review.md`); What is different (4.3(b)); User-generated content (1.2); Account deletion (5.1.1(v)); Age.
 
 How it was written:
 

@@ -513,11 +513,11 @@ describe("a history given", () => {
     await expect(giveHistory(historyOf("sanna"), writer)).rejects.toThrow(
       "sanna is refused at the login (auth_banned): reset the personas first",
     );
-    // Tapio's ends in a ban, and Ilona's in a deletion: the other refusal is still not theirs.
+    // Reijo's ends in a ban, and Marjatta's in a deletion: the other refusal is still not theirs.
     const cooled = fakeWriter({ login: async () => ({ refused: "auth_cooldown" }) });
-    await expect(giveHistory(historyOf("tapio"), cooled)).rejects.toThrow(/tapio is refused/);
+    await expect(giveHistory(historyOf("reijo"), cooled)).rejects.toThrow(/reijo is refused/);
     const banned = fakeWriter({ login: async () => ({ refused: "auth_banned" }) });
-    await expect(giveHistory(historyOf("ilona"), banned)).rejects.toThrow(/ilona is refused/);
+    await expect(giveHistory(historyOf("marjatta"), banned)).rejects.toThrow(/marjatta is refused/);
   });
 
   it("an onboarding the API does not finish is said with what is missing", async () => {
@@ -530,7 +530,7 @@ describe("a history given", () => {
     );
   });
 
-  it("types the story's home once the answers before it are in, and only Onni has none to type", async () => {
+  it("types the story's home once the answers before it are in, and only Otto has none to type", async () => {
     const said: string[] = [];
     const writer = fakeWriter({
       preferences: async () => {
@@ -547,7 +547,7 @@ describe("a history given", () => {
     await giveHistory(historyOf("sanna"), writer);
     expect(said).toEqual(["preferences", "home 02100", "status"]);
     said.length = 0;
-    await giveHistory(historyOf("onni"), writer);
+    await giveHistory(historyOf("otto"), writer);
     expect(said).toEqual([]);
   });
 
@@ -559,8 +559,8 @@ describe("a history given", () => {
         return [];
       },
     });
-    expect(await giveHistory(historyOf("onni"), writer)).toMatchObject({
-      key: "onni",
+    expect(await giveHistory(historyOf("otto"), writer)).toMatchObject({
+      key: "otto",
       photos: 0,
       onboarded: false,
       profile: false,
@@ -573,13 +573,13 @@ describe("a history given", () => {
         return [];
       },
     });
-    // Onni's story has neither faces nor negatives: the release is not opened for him.
-    expect((await giveHistory(historyOf("onni"), withRelease)).photos).toBe(0);
+    // Otto's story has neither faces nor negatives: the release is not opened for him.
+    expect((await giveHistory(historyOf("otto"), withRelease)).photos).toBe(0);
     expect(asked).toEqual([]);
   });
 });
 
-describe("the ban Tapio's story ends in", () => {
+describe("the ban Reijo's story ends in", () => {
   /** An account of the test database for the story, and its identity, which `whoIs` names. */
   async function someone(ctx: TestContext) {
     const { accountId } = await signedInAccount(ctx.client);
@@ -613,21 +613,21 @@ describe("the ban Tapio's story ends in", () => {
   test("is one sanction row by nobody at the story's time, with the standing and the state it settles to", async ({
     ctx,
   }) => {
-    const tapio = await someone(ctx);
+    const reijo = await someone(ctx);
     const writer = fakeWriter({
       db: ctx.client,
-      login: async () => ({ accountId: tapio.accountId, outcome: "created" }),
-      whoIs: () => ({ clause: "i.id = $2", params: [tapio.identityId] }),
+      login: async () => ({ accountId: reijo.accountId, outcome: "created" }),
+      whoIs: () => ({ clause: "i.id = $2", params: [reijo.identityId] }),
     });
-    expect(await giveHistory(historyOf("tapio"), writer)).toMatchObject({
-      key: "tapio",
+    expect(await giveHistory(historyOf("reijo"), writer)).toMatchObject({
+      key: "reijo",
       afterwards: "banned",
       login: "created",
     });
     // ADR-024 §10: the panel lists it and an admin can lift it; nobody applied it.
-    expect(await sanctionsOf(ctx, tapio.identityId)).toEqual([
+    expect(await sanctionsOf(ctx, reijo.identityId)).toEqual([
       {
-        account_id: tapio.accountId,
+        account_id: reijo.accountId,
         kind: "ban",
         reason: "harassment",
         note: "Demo: the story ends in a ban.",
@@ -639,7 +639,7 @@ describe("the ban Tapio's story ends in", () => {
         reviewed_at: null,
       },
     ]);
-    expect(await standingOf(ctx, tapio.accountId)).toEqual({
+    expect(await standingOf(ctx, reijo.accountId)).toEqual({
       standing: "banned",
       standing_changed_at: NOW,
       state: "banned",
@@ -651,18 +651,18 @@ describe("the ban Tapio's story ends in", () => {
   test("meets the persona or nobody: a story that names another identity writes nothing", async ({
     ctx,
   }) => {
-    const tapio = await someone(ctx);
+    const reijo = await someone(ctx);
     const other = await someone(ctx);
     const writer = fakeWriter({
       db: ctx.client,
-      login: async () => ({ accountId: tapio.accountId, outcome: "created" }),
+      login: async () => ({ accountId: reijo.accountId, outcome: "created" }),
       // The account the login said, with somebody else's identity beside it.
       whoIs: () => ({ clause: "i.id = $2", params: [other.identityId] }),
     });
-    await expect(giveHistory(historyOf("tapio"), writer)).rejects.toThrow(
-      "tapio: the sanction met 0 rows, not one: does the API serve the database of DATABASE_URL?",
+    await expect(giveHistory(historyOf("reijo"), writer)).rejects.toThrow(
+      "reijo: the sanction met 0 rows, not one: does the API serve the database of DATABASE_URL?",
     );
-    for (const who of [tapio, other]) {
+    for (const who of [reijo, other]) {
       expect(await sanctionsOf(ctx, who.identityId)).toEqual([]);
       expect(await standingOf(ctx, who.accountId)).toMatchObject({
         standing: "ok",

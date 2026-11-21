@@ -93,9 +93,9 @@ function rateLimited(response: Response): boolean {
  * for the rate, whether as a 429 or as a start sent back with
  * error=auth_rate_limited. The personas' own calls are counted per person and
  * leave the address's count (ADR-026 §2); what a reset spends of its address
- * is its starts, nineteen of the sign-in doors' sixty a minute in
+ * is its starts, twenty-five of the sign-in doors' sixty a minute in
  * development (§4, §5), and the requests before a persona is signed in, about
- * seventy of the address's window, so a second reset within one minute would
+ * ninety of the address's window, so a second reset within one minute would
  * otherwise stop half way (docs/demo/runbook.md).
  */
 function localApi(context: BankContext): void {

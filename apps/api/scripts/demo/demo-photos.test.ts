@@ -187,12 +187,18 @@ describe("the stories with their pictures", () => {
       const results = await giveStories(writer);
       expect(Object.fromEntries(results.map((r) => [r.key, r.photos]))).toEqual({
         sanna: 5,
-        onni: 0,
+        aino: 5,
+        onni: 4,
         noa: 6,
         kerttu: 4,
-        tapio: 0,
-        ilona: 0,
+        tapio: 3,
+        ilona: 3,
+        // The release has no face of Helmi yet (#560), and the four of the states have none.
         helmi: 0,
+        otto: 0,
+        reijo: 0,
+        marjatta: 0,
+        aune: 0,
         antti: 0,
         ville: 0,
         elina: 0,

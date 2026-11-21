@@ -2,7 +2,7 @@ import { postalMatches } from "@kuutti/schema/postal-areas";
 import { ageFromYearMonth } from "@kuutti-ry/tunnistus-oidc/hetu";
 import { describe, expect, it } from "vitest";
 import { PERSONA_HISTORIES, personaOf } from "./histories.ts";
-import { personaBirth } from "./personas.ts";
+import { DEMO_PERSONAS, personaBirth } from "./personas.ts";
 
 // The stories of the personas (#73, ADR-014 §12).
 
@@ -24,9 +24,9 @@ describe("the stories of the personas", () => {
     }
   });
 
-  it("type a home the list knows, and only Onni, who left at the bank, has none", () => {
+  it("type a home the list knows, and only Otto, who left at the bank, has none", () => {
     for (const history of PERSONA_HISTORIES) {
-      if (history.key === "onni") {
+      if (history.key === "otto") {
         expect(history.onboarding).toBeNull();
         continue;
       }
@@ -35,6 +35,38 @@ describe("the stories of the personas", () => {
         postalMatches(home, 2).map((area) => area.code),
         history.key,
       ).toEqual([home]);
+    }
+  });
+
+  it("make a member with a whole profile of every test user of the bed a person can sign in as (#560)", () => {
+    // Mikael's bank returns a code the parser refuses (docs/vendors/telia.md 1.4): nobody reaches him.
+    const reachable = DEMO_PERSONAS.filter((p) => p.bank && p.key !== "mikael");
+    expect(reachable.map((p) => p.key)).toEqual([
+      "aino",
+      "sanna",
+      "onni",
+      "noa",
+      "kerttu",
+      "tapio",
+      "ilona",
+      "helmi",
+    ]);
+    for (const persona of reachable) {
+      const history = PERSONA_HISTORIES.find((h) => h.key === persona.key);
+      // Signed in, never refused: no ban, no deletion, and an onboarding that is done.
+      expect(history?.onboarding, persona.key).not.toBeNull();
+      expect(["nothing", "older_terms"], persona.key).toContain(history?.afterwards);
+      expect(history?.profile?.fields.intent, persona.key).toBeDefined();
+      expect(
+        history?.profile?.bio ?? history?.profile?.bioPreset ?? null,
+        persona.key,
+      ).not.toBeNull();
+    }
+    // The states a flow needs are on people of the mock bank alone.
+    for (const history of PERSONA_HISTORIES) {
+      if (history.onboarding === null || ["banned", "deleted"].includes(history.afterwards)) {
+        expect(personaOf(history).bank, history.key).toBeUndefined();
+      }
     }
   });
 });

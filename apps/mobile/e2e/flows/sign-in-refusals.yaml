@@ -16,7 +16,7 @@ name: The bank login refuses the banned, the recently deleted and those under 18
 - runFlow:
     file: ../common/bank-login.yaml
     env:
-      PERSONA: Tapio Heikkinen
+      PERSONA: Reijo Salonen
 - extendedWaitUntil:
     visible: "Sign-in did not complete|Kirjautuminen ei onnistunut|Inloggningen slutfördes inte"
     timeout: 30000
@@ -25,7 +25,7 @@ name: The bank login refuses the banned, the recently deleted and those under 18
 - runFlow:
     file: ../common/bank-login.yaml
     env:
-      PERSONA: Ilona Öhman
+      PERSONA: Marjatta Lund
 - extendedWaitUntil:
     visible: "You deleted your account recently.*|Poistit tilisi äskettäin.*|Du raderade ditt konto nyligen.*"
     timeout: 30000

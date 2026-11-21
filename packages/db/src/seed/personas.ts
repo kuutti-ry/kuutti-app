@@ -1,14 +1,14 @@
 import { checkCharacter } from "@kuutti-ry/tunnistus-oidc/hetu";
 
 /**
- * The people of the mock bank (#73, #140, ADR-014): twenty-five named persons the
+ * The people of the mock bank (#73, #140, #560, ADR-014): thirty named persons the
  * local identity provider can log in as with one tap, so that a demo or a
  * test of the first ten minutes does not start with typing claims into a
  * form. The whole product path runs for them as for anybody: the OIDC
  * exchange, the parsing of the code, the HMAC, the age rule, the
  * re-registration rule. Nothing in the API or the app knows their names.
  *
- * The nine born on a fixed day carry the codes of the test persons of
+ * Nine born on a fixed day carry the codes of the test persons of
  * Telia's pre-production bed (#140, docs/vendors/telia.md 1.4): the mock bank
  * issues locally the very code a test bank returns on staging, so a persona
  * is one identity in each environment and a story given on staging is the
@@ -16,7 +16,19 @@ import { checkCharacter } from "@kuutti-ry/tunnistus-oidc/hetu";
  * broker sends it, and is stored nowhere; what the app calls the persona is
  * the display name the story gives.
  *
- * Twelve more are born on a fixed day and exist at the mock bank only: Antti
+ * Whoever a person can reach through the bed is a member with a whole profile
+ * (#560, the maintainer, 21/11/2026): a store's reviewer, a tester or a guest
+ * of a demo types any working test user and finds photos, people to go
+ * through, likes and a conversation. Sanna, Noa and Kerttu are that and the
+ * flows' people too (`history`); Aino, Onni, Tapio, Ilona and Helmi are that
+ * and nothing else (`members`), so no flow signs in as them and what somebody
+ * leaves in their accounts breaks no run. The states a flow needs and a
+ * person exploring does not (never onboarded, banned, deleted, without
+ * photos, a newcomer whose account goes) belong to people of the mock bank
+ * alone: Otto, Reijo, Marjatta, Aune and Sofia.
+ *
+ * Seventeen more are born on a fixed day and exist at the mock bank only: those
+ * five; Antti
  * and Ville, the pair of the chat's flows (#348, #101), Elina and Jussi, the
  * pair of the contact share's flow (#103), and Laura and Emmi, the pair of
  * the report's flow (#351), each pair with a conversation of its own so that
@@ -26,8 +38,8 @@ import { checkCharacter } from "@kuutti-ry/tunnistus-oidc/hetu";
  * and of the flows only `short-pool`, as Riikka; and Ritva, What you seek's (#542), whose answers that
  * flow changes and puts back, which no other flow reads. Every test user of the bed whose code the
  * product's parser accepts is a persona already (docs/vendors/telia.md 1.4),
- * so nobody signs in as them on staging (the maintainer's choices of
- * 17/10/2026 and 18/10/2026, ADR-014 §4); their stories are given there as
+ * so nobody signs in as these on staging (the maintainer's choices of
+ * 17/10/2026 and 18/10/2026, ADR-014 §4); the stories of those who have one are given there as
  * anywhere.
  *
  * Their codes are artificial: the individual number is in 900 to 999, which
@@ -74,11 +86,15 @@ export type DemoPersona = {
   born: FixedBirth | RelativeBirth;
   /** 900 to 999: artificial, not given to a person by the population register. */
   individual: number;
-  /** `cards`: people a queue shows, whom a demo does not sign in as (#379); off the page's list of names. */
-  group: "walkthrough" | "history" | "ages" | "cards";
+  /**
+   * `members`: the bed's test users no flow signs in as, whole profiles for a person to explore (#560);
+   * last on the page's list of names. `cards`: people a queue shows, whom a demo does not sign in
+   * as (#379); off that list.
+   */
+  group: "walkthrough" | "history" | "members" | "ages" | "cards";
   /** What the persona is for, shown under the name. */
   note: string;
-  /** Where the same person is on Telia's bed; absent for the ages, the three pairs of the conversations and the queue's cast, who exist at the mock bank only. */
+  /** Where the same person is on Telia's bed; absent for everybody who exists at the mock bank only. */
   bank?: TestBank;
 };
 
@@ -89,8 +105,8 @@ export const DEMO_PERSONAS: readonly DemoPersona[] = [
     family: "Virtanen",
     born: { year: 1992, month: 12, day: 29 },
     individual: 918,
-    group: "walkthrough",
-    note: "The walkthrough: registers, onboards, fills in a profile, uploads photos.",
+    group: "members",
+    note: "A member to explore: a whole profile with five photos, people to go through, likes waiting and a conversation where the cast is written.",
     bank: { name: "Nordea", user: "DEMOUSER2" },
   },
   {
@@ -106,6 +122,16 @@ export const DEMO_PERSONAS: readonly DemoPersona[] = [
       user: "12345678",
       note: "password 123456, code card 1234; S-Pankki returns the same person",
     },
+  },
+  // The newcomer of the flows (#560): Aino's place, since Aino is a member now.
+  {
+    key: "sofia",
+    given: "Sofia",
+    family: "Heino",
+    born: { year: 1993, month: 4, day: 18 },
+    individual: 975,
+    group: "walkthrough",
+    note: "The walkthrough: registers, onboards, fills in a profile, uploads photos. The flows of Found someone and of deleting the account sign in as her.",
   },
   {
     key: "sanna",
@@ -123,8 +149,8 @@ export const DEMO_PERSONAS: readonly DemoPersona[] = [
     family: "Korhonen",
     born: { year: 2000, month: 2, day: 1 },
     individual: 961,
-    group: "history",
-    note: "Registered and never onboarded: the app starts at the first step.",
+    group: "members",
+    note: "A member to explore: a whole profile with four photos, people to go through, likes waiting and a conversation where the cast is written.",
     bank: { name: "Nordea", user: "DEMOUSER1" },
   },
   {
@@ -157,8 +183,8 @@ export const DEMO_PERSONAS: readonly DemoPersona[] = [
     family: "Heikkinen",
     born: { year: 1970, month: 7, day: 7 },
     individual: 905,
-    group: "history",
-    note: "A banned identity: the login is refused.",
+    group: "members",
+    note: "A member to explore: a whole profile with three photos, and people to go through, likes waiting and a conversation where the cast is written.",
     bank: { name: "OP", user: "prefilled" },
   },
   {
@@ -167,8 +193,8 @@ export const DEMO_PERSONAS: readonly DemoPersona[] = [
     family: "Öhman",
     born: { year: 1970, month: 1, day: 1 },
     individual: 999,
-    group: "history",
-    note: "Deleted her account: refused until the waiting time is over.",
+    group: "members",
+    note: "A member to explore: a whole profile with three photos, people to go through, likes waiting and a conversation where the cast is written.",
     bank: { name: "Aktia", user: "prefilled", note: "or 12345678, password 123456, code 1234" },
   },
   {
@@ -177,9 +203,48 @@ export const DEMO_PERSONAS: readonly DemoPersona[] = [
     family: "Mäkelä",
     born: { year: 1932, month: 1, day: 1 },
     individual: 998,
+    group: "members",
+    note: "A member to explore, onboarded and still without photos: the release of pictures has none of her yet, so her profile says what it lacks.",
+    bank: { name: "Mobiilivarmenne emulator", user: "0401234567", note: "prefilled" },
+  },
+  // The states a flow needs and a person exploring does not (#560): people of the mock bank
+  // alone, in the places Onni, Tapio, Ilona and Helmi held while they were the bed's.
+  {
+    key: "otto",
+    given: "Otto",
+    family: "Ahonen",
+    // Onni's day, so the ages the onboarding offers are the ones its flow has always read.
+    born: { year: 2000, month: 2, day: 1 },
+    individual: 973,
+    group: "history",
+    note: "Registered and never onboarded: the app starts at the first step. The onboarding's flow signs in as him.",
+  },
+  {
+    key: "reijo",
+    given: "Reijo",
+    family: "Salonen",
+    born: { year: 1968, month: 9, day: 9 },
+    individual: 976,
+    group: "history",
+    note: "A banned identity: the login is refused.",
+  },
+  {
+    key: "marjatta",
+    given: "Marjatta",
+    family: "Lund",
+    born: { year: 1969, month: 3, day: 23 },
+    individual: 977,
+    group: "history",
+    note: "Deleted her account: refused until the waiting time is over.",
+  },
+  {
+    key: "aune",
+    given: "Aune",
+    family: "Rinne",
+    born: { year: 1940, month: 6, day: 6 },
+    individual: 978,
     group: "history",
     note: "Onboarded without photos: the persona of the break's flow, who takes a break and comes back (#170).",
-    bank: { name: "Mobiilivarmenne emulator", user: "0401234567", note: "prefilled" },
   },
   // The chat's pair (#348): no test user of the bed is left for them.
   {

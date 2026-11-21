@@ -160,6 +160,12 @@ describe("the cast", () => {
     ["sanna", 20],
     ["kerttu", 24],
     ["noa", 20],
+    // The members to explore (#560). Tapio's are the cast's four women of his years, less the
+    // one he is talking to: Sanna, Ilona and Kerttu, who are personas, are his cards besides.
+    ["aino", 9],
+    ["onni", 8],
+    ["tapio", 3],
+    ["ilona", 14],
   ] as const)(
     "give %s at least %i people to go through, on every day of the demo",
     (key, least) => {
@@ -190,6 +196,22 @@ describe("the cast", () => {
     expect(genders("noa")).toEqual(new Set(["man", "woman", "non_binary"]));
   });
 
+  it("give each member to explore the people they seek, and nobody else (#560)", () => {
+    for (const at of MONTHS) {
+      for (const key of ["aino", "onni", "tapio", "ilona"]) {
+        const member = memberOf(key, at);
+        const genders = new Set(
+          CAST.filter((person) => inEachOthersPool(member, cardOf(person, at))).map(
+            (person) => person.gender,
+          ),
+        );
+        expect(genders, `${key} on ${at.toISOString().slice(0, 10)}`).toEqual(
+          new Set(historyOf(key).onboarding?.seeks),
+        );
+      }
+    }
+  });
+
   it("hold every fish, like and chat to the filters, both ways, on every day of the demo", () => {
     const byKey = new Map(CAST.map((person) => [person.key, person]));
     const pairs = [
@@ -211,11 +233,12 @@ describe("the cast", () => {
   });
 
   it.each([
-    // Eight for the part of each year in which the two of twenty-eight fall out of her window.
-    ["aino", "woman", "man", 8],
-    ["aino", "woman", "woman", 4],
-    ["onni", "man", "woman", 10],
-    ["onni", "man", "man", 10],
+    // The newcomers of the flows, who answer in the app. Eight for the part of each year in
+    // which the two of twenty-eight fall out of her window.
+    ["sofia", "woman", "man", 8],
+    ["sofia", "woman", "woman", 4],
+    ["otto", "man", "woman", 10],
+    ["otto", "man", "man", 10],
   ] as const)(
     "give %s, a %s who seeks %s, at least %i people at the window the app offers",
     (key, gender, seeks, least) => {
@@ -258,6 +281,11 @@ describe("the cast", () => {
 });
 
 describe("what the cast gives the members", () => {
+  // Seven members' fish and likes, and their chats: the three of the flows, and the four to
+  // explore (#560). Sanna's part is three likes and two chats.
+  const LIKES = 19;
+  const CHATS = 12;
+
   test("nothing, where no cast has been written", async ({ ctx }) => {
     expect(await giveCastStories(ctx.client, [], new Date())).toEqual({ cast: 0 });
   });
@@ -288,8 +316,8 @@ describe("what the cast gives the members", () => {
     expect(await giveCastStories(ctx.client, results, now())).toEqual({
       cast: CAST.length,
       leftovers: 0,
-      likes: { liked: 8, already: 0, missing: 0 },
-      conversations: { written: 5, already: 0, missing: 0 },
+      likes: { liked: LIKES, already: 0, missing: 0 },
+      conversations: { written: CHATS, already: 0, missing: 0 },
     });
 
     // As many reads as it takes to walk the pool, and one more that finds its end.
@@ -322,8 +350,8 @@ describe("what the cast gives the members", () => {
     expect(await giveCastStories(ctx.client, results, now())).toEqual({
       cast: CAST.length,
       leftovers: 0,
-      likes: { liked: 0, already: 8, missing: 0 },
-      conversations: { written: 0, already: 5, missing: 0 },
+      likes: { liked: 0, already: LIKES, missing: 0 },
+      conversations: { written: 0, already: CHATS, missing: 0 },
     });
   });
 
@@ -348,23 +376,23 @@ describe("what the cast gives the members", () => {
       );
       return rows[0];
     };
-    expect(await conversations()).toEqual({ n: 5, erased: 0, messages: 15 });
+    expect(await conversations()).toEqual({ n: CHATS, erased: 0, messages: 36 });
 
     // Sanna leaves, as a reset forgets her: her two chats stay for the other side.
     const sanna = results.find((r) => r.key === "sanna")?.accountId;
     if (!sanna) throw new Error("Sanna has no account");
     await writer.deleteAccount(sanna);
-    expect(await conversations()).toEqual({ n: 5, erased: 2, messages: 15 });
+    expect(await conversations()).toEqual({ n: CHATS, erased: 2, messages: 36 });
 
     // Her account is gone, so her likes and chats are missing this time; the others' stand.
     const others = results.filter((r) => r.key !== "sanna");
     expect(await giveCastStories(ctx.client, others, now())).toEqual({
       cast: CAST.length,
       leftovers: 2,
-      likes: { liked: 0, already: 5, missing: 3 },
-      conversations: { written: 0, already: 3, missing: 2 },
+      likes: { liked: 0, already: LIKES - 3, missing: 3 },
+      conversations: { written: 0, already: CHATS - 2, missing: 2 },
     });
-    expect(await conversations()).toEqual({ n: 3, erased: 0, messages: 9 });
+    expect(await conversations()).toEqual({ n: CHATS - 2, erased: 0, messages: 30 });
   });
 });
 

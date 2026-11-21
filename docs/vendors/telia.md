@@ -102,17 +102,19 @@ What the bed returned when each test user logged in to staging (#139, the simula
 
 | bank, user | code returned | birth | Kuutti's answer |
 |---|---|---|---|
-| Nordea `DEMOUSER1` | Onni's | 1.2.2000 | completed (onboarding from the first step) |
-| Nordea `DEMOUSER2` | Aino's | 29.12.1992 | completed |
+| Nordea `DEMOUSER1` | Onni's | 1.2.2000 | completed (resumed: a member) |
+| Nordea `DEMOUSER2` | Aino's | 29.12.1992 | completed (resumed: a member) |
 | Nordea `DEMOUSER3` | Noa's | 3.8.1983 | completed (resumed) |
 | Nordea `DEMOUSER4` | Sanna's | 17.6.1977 | completed (resumed) |
 | Säästöpankki `22222222` / `123456` | `010280-952L` (Kerttu's) | 1.2.1980 | completed (asked to accept the terms again) |
-| OP, prefilled, key code 1234 | Tapio's | 7.7.1970 | refused: banned, by design |
-| Aktia, prefilled | `010170-999R` (Ilona's) | 1.1.1970 | refused: deleted, with the earliest day, by design |
+| OP, prefilled, key code 1234 | Tapio's | 7.7.1970 | completed (resumed: a member) |
+| Aktia, prefilled | `010170-999R` (Ilona's) | 1.1.1970 | completed (resumed: a member) |
 | Ålandsbanken `12345678` / `123456` / `1234` | `410165-012D` | 1.2.1980 | refused: not a valid code (day 41) |
 | S-Pankki `12345678` / `123456` / `1234` | `750240-1228` | 1.2.1980 | refused: not a valid code (day 75) |
 | Danske `88888888` / `4545` | `010108-000Z` | 1.1.1908 | refused: not a valid code (individual number 000) |
-| Mobiilivarmenne emulator, `0401234567` | `010132-998W` | 1.1.1932 | completed (a new account, 94 years old) |
+| Mobiilivarmenne emulator, `0401234567` | `010132-998W` | 1.1.1932 | completed (resumed: Helmi, a member still without photos) |
+
+The codes and the births are what the bed returned in October. The last column is what the personas' stories make of each since 21/11/2026 (#560, the maintainer): every test user whose code the parser accepts is a member with a profile, so a reviewer of a store or a tester lands in the app whichever of them they type, and nobody who signs in through the bed lands in the sign-up steps. Until then `DEMOUSER1` started onboarding from its first step, OP's user was refused as banned and Aktia's as deleted, by the stories of that time; those states are now on people of the mock bank alone (`services/mock-idp/README.md`). The new answers are the stories' tests', not yet a walk on the bed.
 
 Two things changed on the bed since the published list: Danske now returns `010108-000Z` (not `280453-111A`), and Ålandsbanken and S-Pankki return codes with impossible days, so neither is Mikael (`010170-960x`) any more; the mock bank's Mikael has no working test user on staging. Every refusal of an invalid code reaches the person as the sign-in card's title, "Sign-in did not complete", over Try again (#581), which promises a retry that cannot help.
 

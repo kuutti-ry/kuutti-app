@@ -180,24 +180,27 @@ describe("the stories through the services", () => {
     expect(await markedIdentities(ctx)).toBe(PERSONA_HISTORIES.length);
 
     // What the callback decides on the bed, by the same hash: the story's ending.
-    for (const key of ["sanna", "onni", "noa", "kerttu"]) {
-      expect((await loginWouldBe(ctx, hmacKey, key)).decision.kind, key).toBe("resume");
+    // Whoever a person reaches through the bed is let in (#560): no test user of Telia's
+    // that works ends at a refusal.
+    for (const persona of DEMO_PERSONAS.filter((p) => p.bank && p.key !== "mikael")) {
+      const { decision } = await loginWouldBe(ctx, hmacKey, persona.key);
+      expect(decision.kind, persona.key).toBe("resume");
     }
-    const tapio = await loginWouldBe(ctx, hmacKey, "tapio");
-    expect(tapio.decision).toEqual({ kind: "refuse", reason: "banned" });
+    const reijo = await loginWouldBe(ctx, hmacKey, "reijo");
+    expect(reijo.decision).toEqual({ kind: "refuse", reason: "banned" });
     // His ban is a sanction row by nobody (ADR-024 §10): the panel lists it.
-    expect(await bansOf(ctx, tapio.identity?.id)).toEqual([
+    expect(await bansOf(ctx, reijo.identity?.id)).toEqual([
       { kind: "ban", created_by: null, lifted_at: null },
     ]);
-    const ilona = await loginWouldBe(ctx, hmacKey, "ilona");
-    expect(ilona.decision).toMatchObject({ kind: "refuse", reason: "cooldown" });
-    if (ilona.decision.kind === "refuse" && ilona.decision.reason === "cooldown") {
-      expect(Math.round((ilona.decision.until.getTime() - ilona.now.getTime()) / DAY_MS)).toBe(
-        REREGISTER_COOLDOWN_DAYS,
-      );
+    const marjatta = await loginWouldBe(ctx, hmacKey, "marjatta");
+    expect(marjatta.decision).toMatchObject({ kind: "refuse", reason: "cooldown" });
+    if (marjatta.decision.kind === "refuse" && marjatta.decision.reason === "cooldown") {
+      expect(
+        Math.round((marjatta.decision.until.getTime() - marjatta.now.getTime()) / DAY_MS),
+      ).toBe(REREGISTER_COOLDOWN_DAYS);
     }
-    // Aino has no history: nothing of her is written until she logs in herself.
-    expect((await loginWouldBe(ctx, hmacKey, "aino")).identity).toBeNull();
+    // Sofia has no history: nothing of her is written until she logs in herself.
+    expect((await loginWouldBe(ctx, hmacKey, "sofia")).identity).toBeNull();
 
     const sanna = await loginWouldBe(ctx, hmacKey, "sanna");
     const { rows: accounts } = await ctx.client.query<{
@@ -217,11 +220,11 @@ describe("the stories through the services", () => {
     ]);
     // What the route keeps of what each typed (ADR-061 §2): an area too small
     // for it goes to its municipality, one too small to the nearest that is
-    // not, and Onni left before the step.
+    // not, and Otto left before the step.
     const kept: [string, string | null][] = [
       ["kerttu", "149"],
       ["helmi", "505"],
-      ["onni", null],
+      ["otto", null],
     ];
     for (const [key, home] of kept) {
       const { identity } = await loginWouldBe(ctx, hmacKey, key);
@@ -251,12 +254,17 @@ describe("the stories through the services", () => {
     const second = await giveStories(writer);
     expect(second.map((r) => [r.key, r.login])).toEqual([
       ["sanna", "resumed"],
+      ["aino", "resumed"],
       ["onni", "resumed"],
       ["noa", "resumed"],
       ["kerttu", "resumed"],
-      ["tapio", "already"],
-      ["ilona", "already"],
+      ["tapio", "resumed"],
+      ["ilona", "resumed"],
       ["helmi", "resumed"],
+      ["otto", "resumed"],
+      ["reijo", "already"],
+      ["marjatta", "already"],
+      ["aune", "resumed"],
       ["antti", "resumed"],
       ["ville", "resumed"],
       ["elina", "resumed"],
@@ -278,22 +286,22 @@ describe("the stories through the services", () => {
       already: 4,
       missing: 0,
     });
-    // Nor a second ban: Tapio was told already.
-    expect(await bansOf(ctx, tapio.identity?.id)).toHaveLength(1);
+    // Nor a second ban: Reijo was told already.
+    expect(await bansOf(ctx, reijo.identity?.id)).toHaveLength(1);
   });
 
-  test("Tapio's ban is one an admin can lift, and the bank then lets him back in", async ({
+  test("Reijo's ban is one an admin can lift, and the bank then lets him back in", async ({
     ctx,
   }) => {
     const { writer, hmacKey } = await world(ctx);
     await giveStories(writer);
-    const tapio = await loginWouldBe(ctx, hmacKey, "tapio");
+    const reijo = await loginWouldBe(ctx, hmacKey, "reijo");
     const { rows } = await ctx.client.query<{ id: string }>(
       "SELECT id FROM account WHERE identity_id = $1",
-      [tapio.identity?.id],
+      [reijo.identity?.id],
     );
     const accountId = rows[0]?.id;
-    if (!accountId) throw new Error("no account of tapio");
+    if (!accountId) throw new Error("no account of reijo");
     const admin = await staffSession(ctx.client, "admin");
     const listed = await ctx.app.request(`/admin/accounts/${accountId}/sanctions`, {
       headers: admin.headers,
@@ -310,7 +318,7 @@ describe("the stories through the services", () => {
       headers: admin.headers,
     });
     expect(lifted.status).toBe(200);
-    expect((await loginWouldBe(ctx, hmacKey, "tapio")).decision.kind).toBe("resume");
+    expect((await loginWouldBe(ctx, hmacKey, "reijo")).decision.kind).toBe("resume");
     // Active again, as he was before the story banned him.
     const state = await ctx.client.query<{ state: string; sanctioned_from: string | null }>(
       "SELECT state, sanctioned_from FROM account WHERE id = $1",
@@ -374,13 +382,13 @@ describe("the stories through the services", () => {
     expect(await sanctions()).toBe(1);
     expect(await resetPersonas({ db: ctx.client, logger, now, personas })).toEqual({
       identities: PERSONA_HISTORIES.length,
-      // Ilona's account was erased by her own story; the others are live.
+      // Marjatta's account was erased by her own story; the others are live.
       erased: PERSONA_HISTORIES.length - 1,
       objects: 0,
       spared: [],
     });
     expect(await markedIdentities(ctx)).toBe(0);
-    // Tapio's ban outlived his erasure on the identity (ADR-024 §8) and went with it.
+    // Reijo's ban outlived his erasure on the identity (ADR-024 §8) and went with it.
     expect(await sanctions()).toBe(0);
     // Both people of each conversation were erased, so the conversations went too (ADR-031 §5).
     const conversations = await ctx.client.query("SELECT 1 FROM conversation");

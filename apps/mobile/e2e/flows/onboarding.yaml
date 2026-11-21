@@ -16,17 +16,18 @@
 # around the person's own age; the intent on its whole-width rows, where the
 # app is closed again and opens at the intent (#219), the invitation code not
 # offered again; three photos on the step's own grid; and the offer of a
-# fuller profile, once, declined with Not now. Onni (26) is registered and
+# fuller profile, once, declined with Not now. Otto (26) is registered and
 # never onboarded after `pnpm demo:reset`, so one run per reset; the photos
-# are his from the release of pictures, which the local check queues, so home
-# says the profile still lacks something.
+# are of Onni's roll in the release of pictures, the three his own story does
+# not use (#560), which the local check queues, so home says the profile
+# still lacks something.
 appId: fi.kumpa
 name: A newcomer answers four questions before the bank, keeps them over a restart, and is taken through the rest one question per screen
 ---
 - addMedia:
-    - ../media/faces/onni/1.jpg
-    - ../media/faces/onni/2.jpg
-    - ../media/faces/onni/3.jpg
+    - ../media/faces/onni/6.jpg
+    - ../media/faces/onni/7.jpg
+    - ../media/faces/onni/8.jpg
 - runFlow: ../common/open-app.yaml
 - runFlow: ../common/sign-out.yaml
 
@@ -65,7 +66,7 @@ name: A newcomer answers four questions before the bank, keeps them over a resta
 # The field, below its name drawn over it (#581); an empty field has no text to match.
 - tapOn:
     below: "Name on your card|Nimi kortillasi|Namn på ditt kort"
-- inputText: "Onni"
+- inputText: "Otto"
 # A tap on the question, which is no button, closes the keyboard (README, the keyboard).
 - tapOn: "What should we call you\\?|Miksi sinua kutsutaan\\?|Vad ska vi kalla dig\\?"
 - tapOn: "Continue|Jatka|Fortsätt"
@@ -206,7 +207,7 @@ name: A newcomer answers four questions before the bank, keeps them over a resta
 - runFlow:
     file: ../common/bank-login.yaml
     env:
-      PERSONA: Onni Korhonen
+      PERSONA: Otto Ahonen
 
 # After the bank the terms are recorded, so no welcome step comes; a friend's
 # invitation code, offered once and counting no step, is skipped (#107; using

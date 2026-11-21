@@ -2,7 +2,7 @@
 # they found someone and why, from three reasons in words; Tell Kumpa waits
 # for a choice, the answer is thanked, and the screen opened again thanks at
 # once and asks nothing. It is an indication only: nothing else in the app
-# changes, which the API's tests hold. Aino: each account answers once, so
+# changes, which the API's tests hold. Sofia: each account answers once, so
 # the flow runs once per `pnpm demo:reset`, and her account-deletion flow,
 # which runs after it, erases the answer with her (the day's count stays).
 appId: fi.kumpa
@@ -11,7 +11,7 @@ name: I found someone tells Kuutti the reason once, thanks the person, and asks 
 - runFlow:
     file: ../common/sign-in.yaml
     env:
-      PERSONA: Aino Virtanen
+      PERSONA: Sofia Heino
 # Settings is reachable before onboarding is done.
 - openLink: fi.kumpa://settings
 # Your account is the last row of the list (#511), below the fold on a phone.

@@ -1,7 +1,7 @@
 # Taking a break (#170, ADR-022): from Settings, behind the tick, the account is
 # paused and this device signed out with the reason on the sign-in screen;
 # reopening the app does not bring the session back; the next bank login brings
-# the person back where they left off. Helmi has no photos, so where she left
+# the person back where they left off. Aune has no photos, so where she left
 # off is onboarding's photos step, and the home screen's "Welcome back" line
 # waits for a profile with photos (its test is HomeScreen.test.tsx). She ends
 # as she began: signed in and active, nothing of hers changed.
@@ -11,7 +11,7 @@ name: Taking a break signs the person out everywhere, and the next bank login br
 - runFlow:
     file: ../common/sign-in.yaml
     env:
-      PERSONA: Helmi Mäkelä
+      PERSONA: Aune Rinne
 - openLink: fi.kumpa://settings
 - extendedWaitUntil:
     visible: "Settings|Asetukset|Inställningar"
@@ -58,7 +58,7 @@ name: Taking a break signs the person out everywhere, and the next bank login br
 - runFlow:
     file: ../common/sign-in.yaml
     env:
-      PERSONA: Helmi Mäkelä
+      PERSONA: Aune Rinne
 - extendedWaitUntil:
     visible: "Two photos of you|Kaksi kuvaa sinusta|Två bilder på dig"
     timeout: 15000

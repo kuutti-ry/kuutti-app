@@ -20,10 +20,10 @@ import { DEMO_SUBJECT_PREFIX } from "./write-population.ts";
  * of their own in the release (`cast:<key>`, docs/demo/photo-prompts.md).
  *
  * A card never shows whom its person seeks or their age window, so these are wide:
- * one man fits Sanna, Kerttu and Noa alike. What sets the number is Sanna, who
- * seeks only men. Nobody here fits Iida's window, so the queue's flow keeps its
- * exact queue. A test holds all of it against the product's own filters
- * (apps/api/scripts/demo/demo-cast.test.ts).
+ * one man fits Sanna, Kerttu, Noa and Ilona alike, and the younger half is Aino's
+ * and Onni's. What sets the number is Sanna, who seeks only men. Nobody here fits
+ * Iida's window, so the queue's flow keeps its exact queue. A test holds all of it
+ * against the product's own filters (apps/api/scripts/demo/demo-cast.test.ts).
  */
 type CastAnswers = {
   seeks: readonly Gender[];
@@ -32,15 +32,15 @@ type CastAnswers = {
 };
 
 const EVERYBODY: readonly Gender[] = ["woman", "man", "non_binary"];
-/** Sanna, Kerttu and Noa, whatever each of them has answered. */
+/** Sanna, Kerttu and Noa, whatever each of them has answered, and Ilona, for those of her age window. */
 const MEN_FOR_MEMBERS: CastAnswers = {
   seeks: ["woman", "non_binary"],
   ageWindow: { min: 30, max: 62 },
   intent: "long_term",
 };
-/** Kerttu and Noa, and too old for Iida's window and too narrow for her age. */
+/** Kerttu, Noa and, since they seek men too, Tapio; too old for Iida's window and too narrow for her age. */
 const WOMEN_FOR_MEMBERS: CastAnswers = {
-  seeks: ["woman", "non_binary"],
+  seeks: EVERYBODY,
   ageWindow: { min: 40, max: 60 },
   intent: "long_term",
 };
@@ -49,7 +49,7 @@ const NON_BINARY_PEOPLE: CastAnswers = {
   ageWindow: { min: 25, max: 55 },
   intent: "open_to_either",
 };
-/** Aino and Onni after their onboarding, whichever of the answers they give. */
+/** Aino and Onni, whose own windows hold them (histories.ts), and a newcomer, whichever of the answers they give. */
 const YOUNGER_PEOPLE: CastAnswers = {
   seeks: EVERYBODY,
   ageWindow: { min: 21, max: 45 },
@@ -819,19 +819,24 @@ export async function removeCastLeftovers(
 
 /**
  * What waits when a member opens People, the day after it was given: a fish comes
- * first in the queue, so Jere, the DJ, is the first card on all three accounts,
- * and a like back makes a match (ADR-062 §2).
+ * first in the queue, so Jere, the DJ, is the first card on Sanna's, Noa's and
+ * Kerttu's accounts, and a like back makes a match (ADR-062 §2). The four members
+ * to explore (#560) have a fish and likes of their own, from people of their ages.
  */
 export const CAST_LIKES: readonly WaitingLikes[] = [
   { of: "sanna", fishFrom: ["jere"], likedBy: ["risto", "karim"] },
   { of: "noa", fishFrom: ["jere"], likedBy: ["robin", "timo"] },
   { of: "kerttu", fishFrom: ["jere"], likedBy: ["tiina"] },
+  { of: "aino", fishFrom: ["niko"], likedBy: ["aleksi", "sasha"] },
+  { of: "onni", fishFrom: ["nea"], likedBy: ["fanni", "emilia"] },
+  { of: "tapio", fishFrom: ["paivi"], likedBy: ["tiina"] },
+  { of: "ilona", fishFrom: ["antero"], likedBy: ["esa", "olavi"] },
 ];
 
 /**
- * The members' chats, in the language each of them writes (histories.ts): one on
- * the member's turn, with something unread, and, where there are two, one on the
- * other's. Written as the stories' conversations are; a chat partner is no card
+ * The members' chats, in the language each of them writes (histories.ts), or the
+ * other's where the member speaks it: one on the member's turn, with something
+ * unread, and, where there are two, one on the other's. Written as the stories' conversations are; a chat partner is no card
  * while the conversation stands (ADR-062 §6).
  */
 export const CAST_CONVERSATIONS: readonly PersonaConversation[] = [
@@ -936,5 +941,159 @@ export const CAST_CONVERSATIONS: readonly PersonaConversation[] = [
       },
     ],
     readUpTo: { a: 2, b: 2 },
+  },
+  {
+    between: ["aino", "elias"],
+    openedHoursAgo: 52,
+    messages: [
+      {
+        from: "b",
+        hoursAgo: 50,
+        body: "Moi Aino! Luokanopettaja siis. Osaatko pitää järjestystä myös kukolle? Meidän kukko ei tottele ketään.",
+      },
+      {
+        from: "a",
+        hoursAgo: 46,
+        body: "Kukot ovat helpompia kuin kolmasluokkalaiset maanantaiaamuna. Mitä vasikoille kuuluu?",
+      },
+      {
+        from: "b",
+        hoursAgo: 26,
+        body: "Hyvää. Yksi niistä söi lippikseni. Toisitko korvapuusteja, jos tulisit käymään?",
+      },
+    ],
+    readUpTo: { a: 2, b: 2 },
+  },
+  {
+    between: ["aino", "oskari"],
+    openedHoursAgo: 38,
+    messages: [
+      {
+        from: "a",
+        hoursAgo: 36,
+        body: "Hei Oskari! Pakko kysyä siitä etuhampaasta. Torjuitko sentään sen kiekon?",
+      },
+      {
+        from: "b",
+        hoursAgo: 33,
+        body: "Torjuin, naamalla. Maalia ei tullut, joten se kannatti. Melkein.",
+      },
+      {
+        from: "a",
+        hoursAgo: 19,
+        body: "Kuulostaa sankarilliselta. Mitä kissat sanoivat, kun tulit kotiin?",
+      },
+    ],
+    readUpTo: { a: 3, b: 2 },
+  },
+  {
+    between: ["onni", "aada"],
+    openedHoursAgo: 50,
+    messages: [
+      {
+        from: "b",
+        hoursAgo: 48,
+        body: "Hi Onni. A sound engineer, so you can tell me what a rock sounds like when I lick it. I am joking. Mostly.",
+      },
+      {
+        from: "a",
+        hoursAgo: 45,
+        body: "Crunchy, I would guess. I once recorded a frozen lake cracking. Does that count as geology?",
+      },
+      {
+        from: "b",
+        hoursAgo: 27,
+        body: "It counts, and now I want to hear it. Do you still have the recording?",
+      },
+    ],
+    readUpTo: { a: 2, b: 2 },
+  },
+  {
+    between: ["onni", "ronja"],
+    openedHoursAgo: 32,
+    messages: [
+      {
+        from: "a",
+        hoursAgo: 30,
+        body: "Hello Ronja. Is it true that a chimney sweep brings luck, or is that only good marketing?",
+      },
+      {
+        from: "b",
+        hoursAgo: 28,
+        body: "Both. Shake my hand and see what happens. What can you see from your rehearsal room?",
+      },
+      {
+        from: "a",
+        hoursAgo: 16,
+        body: "A car park and one brave birch. Rooftops at sunrise sound better. Does the schnauzer come up with you?",
+      },
+    ],
+    readUpTo: { a: 3, b: 2 },
+  },
+  {
+    between: ["tapio", "sari"],
+    openedHoursAgo: 48,
+    messages: [
+      {
+        from: "b",
+        hoursAgo: 46,
+        body: "Moi Tapio! Rekkakuski täällä, ajan usein Tampereen ohi. Onko pilkillä tilaa chihuahualle?",
+      },
+      {
+        from: "a",
+        hoursAgo: 43,
+        body: "On, jos sillä on lämmin takki. Mitä se tekee kojelaudalla koko päivän?",
+      },
+      {
+        from: "b",
+        hoursAgo: 25,
+        body: "Vahtii liikennettä ja haukkuu asuntoautoja. Lämpiääkö se sauna myös pakkasella?",
+      },
+    ],
+    readUpTo: { a: 2, b: 2 },
+  },
+  {
+    between: ["ilona", "anders"],
+    openedHoursAgo: 56,
+    messages: [
+      {
+        from: "b",
+        hoursAgo: 54,
+        body: "Hej Ilona! En översättare. Vad heter det på finska när hunden tar hela båten och man själv sitter på relingen?",
+      },
+      {
+        from: "a",
+        hoursAgo: 50,
+        body: "Det heter att hunden är kapten. Hur stor är han egentligen?",
+      },
+      {
+        from: "b",
+        hoursAgo: 29,
+        body: "Större än jag, och han vet om det. Tar du med tomater om jag kokar kaffe på en kobbe?",
+      },
+    ],
+    readUpTo: { a: 2, b: 2 },
+  },
+  {
+    between: ["ilona", "lasse"],
+    openedHoursAgo: 35,
+    messages: [
+      {
+        from: "a",
+        hoursAgo: 33,
+        body: "Hei Lasse! Kumpi keittää paremmat nuotiokahvit, sinä vai koira?",
+      },
+      {
+        from: "b",
+        hoursAgo: 31,
+        body: "Koira vahtii pannua ja minä poltan sormeni, joten kai se on yhteistyötä.",
+      },
+      {
+        from: "a",
+        hoursAgo: 17,
+        body: "Hyvä tiimi. Huomasiko hirvi teidät tälläkin viikolla ensin?",
+      },
+    ],
+    readUpTo: { a: 3, b: 2 },
   },
 ];

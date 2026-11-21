@@ -1,17 +1,17 @@
 # The demo storyboard
 
-The first ten minutes of Kuutti, shown with the demo personas (#144, ADR-014, ADR-018). The story runs in the simulator against the mock bank and on the staging phone against Telia's test banks; only the sign-in differs, and scene 5, the queue, has somebody else on each (#379, #560; the scene says why). `runbook.md` says how to prepare either. What a screen says is quoted from the catalogue as of 09/10/2026 (English); the app follows the phone's language.
+The first ten minutes of Kuutti, shown with the demo personas (#144, ADR-014, ADR-018). The story runs in the simulator against the mock bank and, from scene 4 on, on the staging phone against Telia's test banks; only the sign-in differs, and scene 5, the queue, has somebody else on each (#379, #560; the scene says why). The sign-up, the refusals and the deletion (scenes 1 to 3, 7 and the end of 8) run locally only: every test user of the bed that works is a member with a profile (#560, the maintainer, 21/11/2026), so nobody who signs in on staging is a newcomer, banned or gone. `runbook.md` says how to prepare either. What a screen says is quoted from the catalogue as of 09/10/2026 (English); the app follows the phone's language.
 
-The personas and their banks: `services/mock-idp/README.md`. Locally every persona is a button on the mock bank's page; on staging each persona of the other scenes is a test user of a bank (`docs/vendors/telia.md` 1.4), and the stories were written by the job of ADR-018.
+The personas and their banks: `services/mock-idp/README.md`. Locally every persona is a button on the mock bank's page; on staging each persona of scenes 4 to 6 and 8 is a test user of a bank (`docs/vendors/telia.md` 1.4), and the stories were written by the job of ADR-018.
 
-## Scene 1: Aino answers and signs in (3 min)
+## Scene 1: Sofia answers and signs in (3 min)
 
-Aino Virtanen is a newcomer: Kumpa has never seen her.
+Locally. Sofia Heino is a newcomer: Kumpa has never seen her.
 
 1. Open the app. The first screen says what Kumpa is and why it asks for a bank ID, with "Get started" and "I already have an account", and no legal text (ADR-010 §22). Tap "Get started".
-2. Four questions, one a screen, "Step 1 of 4" to "Step 4 of 4" above each, and nothing sent anywhere: they wait in the phone's keychain for an hour. Name: what the card will call her, never the bank's; type "Aino". Gender: self-declared, the identity label offered after a non-binary answer only; choose a woman. Whom she seeks: one to three, under it the switch "I consent to Kuutti ry storing whom I seek" (the article 9 consent, ADR-019 §4); choose men. "Where do you live?": "Your postal code tells Kumpa how far people are. Others see a town or your area by name, never the digits." Type five digits; the names under the field come from a list on the phone, so a half-typed home never reaches the server.
+2. Four questions, one a screen, "Step 1 of 4" to "Step 4 of 4" above each, and nothing sent anywhere: they wait in the phone's keychain for an hour. Name: what the card will call her, never the bank's; type "Sofia". Gender: self-declared, the identity label offered after a non-binary answer only; choose a woman. Whom she seeks: one to three, under it the switch "I consent to Kuutti ry storing whom I seek" (the article 9 consent, ADR-019 §4); choose men. "Where do you live?": "Your postal code tells Kumpa how far people are. Others see a town or your area by name, never the digits." Type five digits; the names under the field come from a list on the phone, so a half-typed home never reaches the server.
 3. "Accept terms of use": the terms in one line and the two texts as links, then "Agree and continue". "Identification": why the bank, that it is not a payment, and that Kumpa keeps neither her name nor her identity code from the bank. Tap "Sign in with your bank".
-4. The system browser opens the bank chooser. Locally: the mock bank's page, tap **Aino Virtanen**. On staging: Telia's chooser, choose **Nordea**, user `DEMOUSER2`, confirm on the bank's test page.
+4. The system browser opens the bank chooser: the mock bank's page, tap **Sofia Heino**. (On staging the browser shows Telia's chooser, and every test user there is a member: scene 4.)
 5. The bank sends the browser back; the app receives its one-time code, says Signing you in…, records the terms, saves the four answers through the account's own routes, and goes on to the first open step. Say what happened: the code was parsed, the age checked, the HMAC derived, the code discarded; nothing of the bank's name for her is kept (rule 1 and 3), and the answers left the phone only now.
 
 ## Scene 2: Onboarding (2 min)
@@ -23,7 +23,7 @@ What is left after the bank, one screen each, "Continue" at the bottom and no st
 3. "What should your card show?": the town or, where her area is large enough to keep, the area, which she may choose. Where none is, "On your card:" and the town stand in the question's place. Say what happened: what is kept is a place of at least three thousand people, and the home changes whenever she likes (ADR-061).
 4. Age window: buttons, not a number field, around her own age.
 5. Intent: long-term, casual, open to either, or a dance partner.
-6. "Two photos of you": the grid on the step itself, "Add a photo" at least twice, then "Continue". From the camera roll: two or more of Aino's five pictures (the runbook put them there). Each goes through the pipeline: resized, EXIF stripped, three variants, a blurhash, the check. Locally the check queues everything, so the grid shows them "In review"; on staging Rekognition approves a face within seconds.
+6. "Two photos of you": the grid on the step itself, "Add a photo" at least twice, then "Continue". From the camera roll: two or more of the five pictures the runbook put there (Aino's, since the release has none of Sofia yet: her card shows Aino's face). Each goes through the pipeline: resized, EXIF stripped, three variants, a blurhash, the check. Locally the check queues everything, so the grid shows them "In review".
 7. "Finish your profile": "A fuller profile brings much better suggestions." once, with "Finish my profile" and "Not now". Tap "Not now": a profile is complete without words.
 8. The home screen comes at once. Having a home is what puts her in the pond, of which there is one, the whole country; there is no pond step.
 
@@ -33,7 +33,7 @@ The account is active once the four matching answers and the two consents are th
 
 The home screen: "Kumpa", what there is to do, and the counter's card last (#581).
 
-- Where Aino stands, on a card with no word above its sentence. With her photos pending: "Matching opens for finished profiles. Yours still lacks something." Once her photos are approved: "Matching is open for you.", since the demo commands open the pond; once an admin has closed it, "Your profile is finished. Matching has not opened yet." (ADR-060).
+- Where Sofia stands, on a card with no word above its sentence. With her photos pending: "Matching opens for finished profiles. Yours still lacks something." Once her photos are approved: "Matching is open for you.", since the demo commands open the pond; once an admin has closed it, "Your profile is finished. Matching has not opened yet." (ADR-060).
 - Below: "Your profile". The profile list holds the rest (#239): "Photos" and the sections, each with a check mark once done or how far it is filled, then "What you seek", which holds whom she seeks, the ages, what she is here for and "Deal-breakers" (up to seven: distance, which everybody can set, and the others only on what she answered herself, #149, ADR-061 §7) and, while a question is unanswered, "Fill in the rest when you have a moment" (the optional fields, one per screen, "Ask me later" on each, #148). The eye at the top opens her card.
 - Last, "People on Kumpa": "n people have completed their profiles and are looking for:", a number that moves in tens, and right under it the bar in three colours with its percentages in words, which the population's fifty fill (population.md; ADR-013).
 
@@ -48,7 +48,7 @@ Sign out (Settings, "Log out") and sign in as Sanna Korhonen (locally her button
 
 ## Scene 5: People (3 min)
 
-Locally, sign out and sign in as Iida Mattila (her button). She and the four women of her queue exist at the mock bank only, so nobody signs in as any of them on staging (ADR-018 §1). On staging, sign in as Noa (Nordea `DEMOUSER3`) or Sanna (`DEMOUSER4`), or Kerttu (Säästöpankki) once she has accepted the terms again: with the cast written (`population.md`), Jere's fish comes first, then the likes waiting, then the rest, nearest first, and they have chats to open. The steps below are Iida's, and go the same with other names. Her story is complete: a profile, three approved photos (release v3 of the pictures), and a day opened for her, which the stories give her. The four women of her queue, Henna, Katja, Minna and Riikka, have stories too, and Henna liked Iida the day before the reset (#379).
+Locally, sign out and sign in as Iida Mattila (her button). She and the four women of her queue exist at the mock bank only, so nobody signs in as any of them on staging (ADR-018 §1). On staging, sign in as any member: Sanna (Nordea `DEMOUSER4`), Noa (`DEMOUSER3`), Aino (`DEMOUSER2`), Onni (`DEMOUSER1`), Tapio (OP), Ilona (Aktia), or Kerttu (Säästöpankki) once she has accepted the terms again. With the cast written (`population.md`), a fish comes first (Jere's for Sanna), then the likes waiting, then the rest, nearest first, and each has chats to open. Two people on two phones can also meet: Aino and Onni are each other's cards, and Tapio is Sanna's, Ilona's and Kerttu's, as they are his. The steps below are Iida's, and go the same with other names. Her story is complete: a profile, three approved photos (release v3 of the pictures), and a day opened for her, which the stories give her. The four women of her queue, Henna, Katja, Minna and Riikka, have stories too, and Henna liked Iida the day before the reset (#379).
 
 Her queue holds from the reset for as long as nobody looks. An entry never displayed is nothing, so on a later day the same four come again, Henna first while her like waits, for two weeks from the day it was given (ADR-062 §2). A card looked at and left on an earlier day reads as a skip and comes back labelled "Seen before", and a decision holds for its clock, a pass thirty days and a like ninety (ADR-062 §3, §6). So the reset for this scene follows any rehearsal, and the morning's checks sign in as Iida and decide nothing (`runbook.md`).
 
@@ -71,17 +71,17 @@ Noa Salmi's story uploaded two faces and four more pictures for the check (#142)
 
 ## Scene 7: Refusals (1 min)
 
-Two logins the product refuses, by the code that refuses anybody (TD-7).
+Locally. Two logins the product refuses, by the code that refuses anybody (TD-7).
 
-- Ilona Öhman (locally her button; on staging Aktia, prefilled): she deleted her account in her story. The sign-in says "You deleted your account recently. The earliest day for a new one: …" with the day thirty days after her story was written, as d.M.yyyy (#150).
-- Tapio Heikkinen (locally his button; on staging OP, prefilled): banned. "This person may not use Kumpa."
+- Marjatta Lund (her button): she deleted her account in her story. The sign-in says "You deleted your account recently. The earliest day for a new one: …" with the day thirty days after her story was written, as d.M.yyyy (#150).
+- Reijo Salonen (his button): banned. "This person may not use Kumpa."
 
 ## Scene 8: The person's data (1 min)
 
-As Aino again: Settings → the account card.
+As Sofia again (on staging, any member, for the export alone): Settings → the account card.
 
 - "Your Kumpa data": the export, everything held about her, as JSON (ADR-007): the account, her home in words, never a code, the profile, the preferences and deal-breakers, every consent ever given, the photos with short-lived links.
-- "Delete your account?" → "Delete everything": the erasure path. She is signed out; a sign-in within thirty days is refused with the date, as Ilona's was.
+- "Delete your account?" → "Delete everything": the erasure path. She is signed out; a sign-in within thirty days is refused with the date, as Marjatta's was. Locally only: on staging a deleted member is refused until the night's reset, and whoever signs in as them meanwhile, a store's reviewer included, is refused too.
 
 Then `pnpm demo:reset` (locally) or the reset in the container (staging): everybody back to where they begin, the stories told anew.
 

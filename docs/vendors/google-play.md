@@ -162,7 +162,7 @@ The listing's last step, Review, asks for the AI asset declaration: "Don't label
 | Financial features | None |
 | Health | No health features |
 | Advertising ID | No |
-| Sign in details | all or some functionality is restricted; two sets, each a user ID of the broker's test bank with an empty password: a member with a history (`DEMOUSER4`, Sanna) and a new member (`DEMOUSER1`, Onni), with the steps in English (`docs/runbooks/store-review.md`) |
+| Sign in details | all or some functionality is restricted; two sets, each a user ID of the broker's test bank with an empty password: a member with a history (`DEMOUSER4`, Sanna) and, as saved, a new member (`DEMOUSER1`, Onni), who since #560 is a member with a history too, the form's wording waiting for the page's next change; with the steps in English (`docs/runbooks/store-review.md`) |
 | Child safety standards | the published standards at `https://kumpa.fi/child-safety/`, the in-app reporting, a named point of contact, and the self-certification (#188) |
 
 While a page is unsaved the app's setup is incomplete, and nothing is reviewed by itself (ADR-057 §6); the last pages were saved only when the review was wanted.
